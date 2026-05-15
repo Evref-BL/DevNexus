@@ -8,6 +8,7 @@ export * from "./workTrackingJiraProvider.js";
 export * from "./workItemService.js";
 export * from "./worktreeExecutionMetadata.js";
 export * from "./nexusExtension.js";
+export * from "./nexusProjectConfig.js";
 export * from "./workTrackingLocalProvider.js";
 export * from "./workTrackingProviderService.js";
 export * from "./workTrackingTypes.js";

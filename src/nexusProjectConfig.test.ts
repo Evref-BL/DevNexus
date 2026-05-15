@@ -1,0 +1,271 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  devNexusProjectConfigFileName,
+  loadProjectConfig,
+  NexusConfigError,
+  projectConfigPath,
+  projectWorktreesRootPath,
+  resolveNexusAgentConfig,
+  saveProjectConfig,
+  validateProjectConfig,
+} from "./nexusProjectConfig.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+describe("project config", () => {
+  it("validates and persists project config files", () => {
+    const projectRoot = path.join(makeTempDir("dev-nexus-project-"), "project");
+    const config = {
+      version: 1 as const,
+      id: "my-project",
+      name: "My Project",
+      home: "C:\\dev\\code\\.dev-nexus",
+      repo: {
+        kind: "git" as const,
+        remoteUrl: "https://github.com/example/my-project.git",
+        defaultBranch: "main",
+        sourceRoot: "source",
+      },
+      worktreesRoot: "worktrees",
+      kanban: {
+        provider: "vibe-kanban" as const,
+        projectId: "vk-project-1",
+      },
+      workTracking: {
+        provider: "github" as const,
+        repository: {
+          owner: "example",
+          name: "my-project",
+        },
+      },
+      extensions: {
+        "example-module": {
+          enabled: true,
+        },
+      },
+      agent: {
+        executor: "CODEX",
+        model: "gpt-5.4",
+        reasoning: "high",
+      },
+    };
+
+    expect(validateProjectConfig(config)).toEqual(config);
+    expect(saveProjectConfig(projectRoot, config)).toBe(
+      path.join(projectRoot, devNexusProjectConfigFileName),
+    );
+    expect(loadProjectConfig(projectRoot)).toEqual(config);
+    expect(projectConfigPath(projectRoot)).toBe(
+      path.join(projectRoot, devNexusProjectConfigFileName),
+    );
+  });
+
+  it("defaults legacy project configs to the current explicit JSON shape", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "legacy-project",
+        name: "Legacy Project",
+        kanban: {
+          provider: "vibe-kanban",
+        },
+      }),
+    ).toEqual({
+      version: 1,
+      id: "legacy-project",
+      name: "Legacy Project",
+      home: null,
+      repo: {
+        kind: "local",
+        remoteUrl: null,
+        defaultBranch: null,
+      },
+      worktreesRoot: "worktrees",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+    });
+  });
+
+  it("resolves agent configuration using issue, project, home, then fallback precedence", () => {
+    expect(
+      resolveNexusAgentConfig({
+        fallback: {
+          executor: "CODEX",
+          model: "profile-default",
+          reasoning: "medium",
+        },
+        home: {
+          agent: {
+            model: "gpt-5.4",
+          },
+        },
+        project: {
+          agent: {
+            reasoning: "high",
+          },
+        },
+        issue: {
+          model: "gpt-5.5",
+        },
+      }),
+    ).toEqual({
+      executor: "CODEX",
+      model: "gpt-5.5",
+      reasoning: "high",
+    });
+  });
+
+  it("accepts supported work tracking providers", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "local-tracked-project",
+        name: "Local Tracked Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        workTracking: {
+          provider: "local",
+          storePath: ".dev-nexus/work-items.json",
+        },
+      }).workTracking,
+    ).toEqual({
+      provider: "local",
+      storePath: ".dev-nexus/work-items.json",
+    });
+
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "jira-tracked-project",
+        name: "Jira Tracked Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        workTracking: {
+          provider: "jira",
+          host: "example.atlassian.net",
+          projectKey: "NEX",
+          issueType: "Bug",
+          board: {
+            kind: "jira-workflow",
+            statusOptions: {
+              blocked: "31",
+              done: "41",
+            },
+          },
+        },
+      }).workTracking,
+    ).toEqual({
+      provider: "jira",
+      host: "example.atlassian.net",
+      projectKey: "NEX",
+      issueType: "Bug",
+      board: {
+        kind: "jira-workflow",
+        statusOptions: {
+          blocked: "31",
+          done: "41",
+        },
+      },
+    });
+  });
+
+  it("rejects invalid project and work tracking config", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-repo",
+        name: "Invalid Repo",
+        repo: {
+          kind: "svn",
+        },
+        kanban: {
+          provider: "vibe-kanban",
+        },
+      }),
+    ).toThrow(/repo\.kind/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-provider",
+        name: "Invalid Provider",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        workTracking: {
+          provider: "trello",
+        },
+      }),
+    ).toThrow(/workTracking\.provider/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-github",
+        name: "Invalid GitHub",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        workTracking: {
+          provider: "github",
+          repository: {
+            owner: "example",
+          },
+        },
+      }),
+    ).toThrow(/workTracking\.repository\.name/);
+  });
+
+  it("resolves configured worktree roots from the project directory", () => {
+    const projectRoot = path.join(makeTempDir("dev-nexus-project-"), "project");
+    const config = validateProjectConfig({
+      version: 1,
+      id: "custom-worktrees",
+      name: "Custom Worktrees",
+      worktreesRoot: path.join(".nexus", "worktrees"),
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+    });
+
+    expect(projectWorktreesRootPath(projectRoot, config)).toBe(
+      path.join(projectRoot, ".nexus", "worktrees"),
+    );
+  });
+
+  it("reports missing project config with the generic project name", () => {
+    const projectRoot = makeTempDir("dev-nexus-missing-project-");
+
+    expect(() => loadProjectConfig(projectRoot)).toThrow(NexusConfigError);
+    expect(() => loadProjectConfig(projectRoot)).toThrow(
+      `DevNexus project is not initialized: ${path.join(
+        projectRoot,
+        devNexusProjectConfigFileName,
+      )}`,
+    );
+  });
+});
