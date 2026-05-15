@@ -45,7 +45,7 @@ describe("nexus project scaffold", () => {
     });
 
     expect(fs.existsSync(worktreesRoot)).toBe(true);
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       projectRoot,
       worktreesRoot,
       extensionResults: {
@@ -55,5 +55,64 @@ describe("nexus project scaffold", () => {
         },
       },
     });
+    expect(result.skills.installed.map((skill) => skill.id)).toContain(
+      "diagnose",
+    );
+  });
+
+  it("materializes extension-contributed skills", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+
+    const result = scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig: {
+        id: "project-1",
+      },
+      skills: {
+        defaultCorePack: false,
+      },
+      extensions: [
+        {
+          id: "example",
+          name: "Example",
+          projectSkills() {
+            return [
+              {
+                manifest: {
+                  id: "example-skill",
+                  name: "example-skill",
+                  description: "Example extension skill.",
+                  version: "0.1.0",
+                  license: "Apache-2.0",
+                  source: {
+                    type: "curated",
+                    uri: "example:skills",
+                  },
+                  supportedAgents: ["codex"],
+                  materialization: "copy",
+                  sourceControl: "support",
+                },
+                files: {
+                  "SKILL.md":
+                    "---\nname: example-skill\ndescription: Example extension skill.\n---\n",
+                },
+              },
+            ];
+          },
+        },
+      ],
+    });
+
+    expect(result.skills.installed.map((skill) => skill.id)).toEqual([
+      "example-skill",
+    ]);
+    expect(
+      fs.existsSync(
+        path.join(projectRoot, ".dev-nexus", "skills", "example-skill", "SKILL.md"),
+      ),
+    ).toBe(true);
   });
 });

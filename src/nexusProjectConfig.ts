@@ -11,6 +11,12 @@ import type {
   WorkTrackingProviderName,
   WorkTrackingRepositoryConfig,
 } from "./workTrackingTypes.js";
+import type {
+  NexusProjectSkillsConfig,
+  NexusProjectSkillSelection,
+  NexusSkillMaterializationMode,
+  NexusSkillSourceControl,
+} from "./nexusSkills.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -48,6 +54,7 @@ export interface NexusProjectConfig {
   workTracking?: WorkTrackingConfig;
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
+  skills?: NexusProjectSkillsConfig;
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -253,6 +260,108 @@ function validateProjectExtensionsConfig(
   }
 
   return extensions;
+}
+
+function validateSkillMaterialization(
+  value: unknown,
+  pathName: string,
+): NexusSkillMaterializationMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "copy" || value === "symlink" || value === "reference") {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be copy, symlink, or reference`,
+  );
+}
+
+function validateSkillSourceControl(
+  value: unknown,
+  pathName: string,
+): NexusSkillSourceControl | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "support" || value === "source") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be support or source`);
+}
+
+function validateProjectSkillSelection(
+  value: unknown,
+  index: number,
+): NexusProjectSkillSelection {
+  const pathName = `project config.skills.items[${index}]`;
+  const record = assertRecord(value, pathName);
+  const enabled = record.enabled;
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    throw new NexusConfigError(`${pathName}.enabled must be a boolean`);
+  }
+  const version = optionalString(record, "version", pathName);
+  const materialization = validateSkillMaterialization(
+    record.materialization,
+    `${pathName}.materialization`,
+  );
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+
+  return {
+    id: requiredString(record, "id", pathName),
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(version !== undefined ? { version } : {}),
+    ...(materialization !== undefined ? { materialization } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+  };
+}
+
+function validateProjectSkillsConfig(
+  value: unknown,
+): NexusProjectSkillsConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, "project config.skills");
+  const defaultCorePack = record.defaultCorePack;
+  if (defaultCorePack !== undefined && typeof defaultCorePack !== "boolean") {
+    throw new NexusConfigError(
+      "project config.skills.defaultCorePack must be a boolean",
+    );
+  }
+  const items = record.items;
+  if (items !== undefined && !Array.isArray(items)) {
+    throw new NexusConfigError("project config.skills.items must be an array");
+  }
+  const materialization = validateSkillMaterialization(
+    record.materialization,
+    "project config.skills.materialization",
+  );
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    "project config.skills.sourceControl",
+  );
+
+  return {
+    ...(defaultCorePack !== undefined ? { defaultCorePack } : {}),
+    ...(materialization !== undefined ? { materialization } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(items
+      ? {
+          items: items.map((item, index) =>
+            validateProjectSkillSelection(item, index),
+          ),
+        }
+      : {}),
+  };
 }
 
 function validateWorkTrackingProviderName(
@@ -543,6 +652,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const agent = validateNexusAgentConfig(record.agent, "project config.agent");
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const extensions = validateProjectExtensionsConfig(record.extensions);
+  const skills = validateProjectSkillsConfig(record.skills);
 
   return {
     version: 1,
@@ -557,6 +667,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(workTracking ? { workTracking } : {}),
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
+    ...(skills ? { skills } : {}),
   };
 }
 

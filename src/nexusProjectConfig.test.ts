@@ -63,6 +63,22 @@ describe("project config", () => {
         model: "gpt-5.4",
         reasoning: "high",
       },
+      skills: {
+        materialization: "copy" as const,
+        sourceControl: "support" as const,
+        items: [
+          {
+            id: "diagnose",
+            enabled: true,
+          },
+          {
+            id: "experimental-review",
+            enabled: false,
+            version: "0.2.0",
+            materialization: "reference" as const,
+          },
+        ],
+      },
     };
 
     expect(validateProjectConfig(config)).toEqual(config);
@@ -237,6 +253,21 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/workTracking\.repository\.name/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-skills",
+        name: "Invalid Skills",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        skills: {
+          materialization: "install",
+        },
+      }),
+    ).toThrow(/project config\.skills\.materialization/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

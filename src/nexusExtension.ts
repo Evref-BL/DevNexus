@@ -1,3 +1,5 @@
+import type { NexusSkillDefinition } from "./nexusSkills.js";
+
 export interface NexusProjectScaffoldContext<ProjectConfig = unknown> {
   homePath: string;
   projectRoot: string;
@@ -16,6 +18,15 @@ export interface NexusProjectTrackerLinkContext<ProjectConfig = unknown> {
   trackerProjectId: string;
 }
 
+export interface NexusProjectSkillsContext<ProjectConfig = unknown> {
+  homePath: string;
+  projectRoot: string;
+  worktreesRoot: string;
+  projectConfig: ProjectConfig;
+}
+
+export type NexusSkillContribution = NexusSkillDefinition;
+
 export interface NexusExtension<
   ProjectConfig = unknown,
   ProjectScaffoldResult = unknown,
@@ -27,6 +38,9 @@ export interface NexusExtension<
   installProjectFiles?(
     context: NexusProjectScaffoldContext<ProjectConfig>,
   ): ProjectScaffoldResult;
+  projectSkills?(
+    context: NexusProjectSkillsContext<ProjectConfig>,
+  ): NexusSkillContribution[] | undefined;
   projectStatus?(
     context: NexusProjectStatusContext<ProjectConfig>,
   ): ProjectStatusResult;
