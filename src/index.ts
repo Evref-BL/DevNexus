@@ -16,4 +16,5 @@ export * from "./vibeKanbanAuth.js";
 export * from "./vibeKanbanBoardAdapter.js";
 export * from "./vibeKanbanMcpConfig.js";
 export * from "./vibeKanbanProjectAdapter.js";
+export * from "./vibeKanbanWorkspaceSetup.js";
 export * from "./workTrackingVibeProvider.js";
