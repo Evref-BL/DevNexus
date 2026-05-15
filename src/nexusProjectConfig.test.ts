@@ -206,6 +206,77 @@ describe("project config", () => {
     });
   });
 
+  it("accepts generic automation policy with safe defaults", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "automated-project",
+        name: "Automated Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          selector: {
+            statuses: ["ready"],
+            labels: ["automation"],
+            limit: 3,
+          },
+          verification: {
+            focusedCommands: ["npm test"],
+            fullCommands: ["npm run check"],
+          },
+          publication: {
+            strategy: "direct_integration",
+            targetBranch: "main",
+            push: true,
+          },
+        },
+      }).automation,
+    ).toEqual({
+      enabled: true,
+      mode: "run_once",
+      selector: {
+        statuses: ["ready"],
+        labels: ["automation"],
+        excludeLabels: [],
+        assignees: [],
+        search: null,
+        limit: 3,
+      },
+      verification: {
+        focusedCommands: ["npm test"],
+        fullCommands: ["npm run check"],
+        requirePassing: true,
+      },
+      ledger: {
+        path: ".dev-nexus/automation/runs.json",
+        retention: 200,
+      },
+      lock: {
+        path: ".dev-nexus/automation/run.lock",
+        staleAfterMs: 3600000,
+      },
+      backoff: {
+        failureLimit: 3,
+        baseDelayMs: 300000,
+        maxDelayMs: 3600000,
+      },
+      safety: {
+        profile: "local",
+        allowHostMutation: false,
+        allowDependencyInstall: false,
+        allowLiveServices: false,
+      },
+      publication: {
+        strategy: "direct_integration",
+        remote: "origin",
+        targetBranch: "main",
+        push: true,
+      },
+    });
+  });
+
   it("rejects invalid project and work tracking config", () => {
     expect(() =>
       validateProjectConfig({
@@ -268,6 +339,23 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.skills\.materialization/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-automation",
+        name: "Invalid Automation",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          selector: {
+            statuses: ["open"],
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.selector\.statuses/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

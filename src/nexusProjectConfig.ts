@@ -17,6 +17,10 @@ import type {
   NexusSkillMaterializationMode,
   NexusSkillSourceControl,
 } from "./nexusSkills.js";
+import {
+  validateNexusAutomationConfig,
+  type NexusAutomationConfig,
+} from "./nexusAutomationConfig.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -55,6 +59,7 @@ export interface NexusProjectConfig {
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
   skills?: NexusProjectSkillsConfig;
+  automation?: NexusAutomationConfig;
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -653,6 +658,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
+  const automation = validateNexusAutomationConfig(record.automation);
 
   return {
     version: 1,
@@ -668,6 +674,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
     ...(skills ? { skills } : {}),
+    ...(automation ? { automation } : {}),
   };
 }
 
