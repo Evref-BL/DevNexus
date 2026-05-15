@@ -4,9 +4,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultCoreSkillPack,
+  inspectNexusProjectSkills,
   materializeNexusProjectSkills,
   NexusSkillError,
   nexusSkillManifestFileName,
+  refreshNexusProjectSkills,
 } from "./nexusSkills.js";
 
 const tempDirs: string[] = [];
@@ -126,5 +128,104 @@ describe("nexus skills", () => {
         },
       }),
     ).toThrow(NexusSkillError);
+  });
+
+  it("inspects missing, stale, and unexpected project skills", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    materializeNexusProjectSkills({ projectRoot });
+    const diagnosePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "skills",
+      "diagnose",
+      "SKILL.md",
+    );
+    fs.writeFileSync(diagnosePath, "# locally edited\n", "utf8");
+    fs.rmSync(path.join(projectRoot, ".dev-nexus", "skills", "tdd"), {
+      recursive: true,
+      force: true,
+    });
+    const unexpectedRoot = path.join(projectRoot, ".dev-nexus", "skills", "local-only");
+    fs.mkdirSync(unexpectedRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(unexpectedRoot, nexusSkillManifestFileName),
+      JSON.stringify(
+        {
+          id: "local-only",
+          name: "local-only",
+          description: "Local-only skill.",
+          version: "0.1.0",
+          license: "Apache-2.0",
+          source: {
+            type: "local",
+          },
+          supportedAgents: ["codex"],
+          materialization: "reference",
+          sourceControl: "support",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const status = inspectNexusProjectSkills({ projectRoot });
+
+    expect(status.summary).toMatchObject({
+      expected: defaultCoreSkillPack.length,
+      installed: defaultCoreSkillPack.length,
+      missing: 1,
+      stale: 1,
+      unexpected: 1,
+    });
+    expect(status.skills.find((skill) => skill.id === "diagnose")).toMatchObject({
+      state: "stale",
+      reasons: ["skill file differs from the expected definition: SKILL.md"],
+    });
+    expect(status.skills.find((skill) => skill.id === "tdd")).toMatchObject({
+      state: "missing",
+      installed: false,
+    });
+    expect(status.skills.find((skill) => skill.id === "local-only")).toMatchObject({
+      state: "unexpected",
+      expected: false,
+      skillPath: null,
+    });
+  });
+
+  it("refreshes selected project skills and preserves explicit local additions", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    materializeNexusProjectSkills({ projectRoot });
+    fs.rmSync(path.join(projectRoot, ".dev-nexus", "skills", "handoff"), {
+      recursive: true,
+      force: true,
+    });
+    const unexpectedRoot = path.join(projectRoot, ".dev-nexus", "skills", "local-only");
+    fs.mkdirSync(unexpectedRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(unexpectedRoot, nexusSkillManifestFileName),
+      "{ not json",
+      "utf8",
+    );
+
+    const result = refreshNexusProjectSkills({ projectRoot });
+
+    expect(result.before.summary).toMatchObject({
+      missing: 1,
+      invalid: 1,
+    });
+    expect(result.after.summary).toMatchObject({
+      missing: 0,
+      stale: 0,
+      invalid: 1,
+    });
+    expect(result.after.skills.find((skill) => skill.id === "handoff")).toMatchObject({
+      state: "installed",
+      installed: true,
+    });
+    expect(result.after.skills.find((skill) => skill.id === "local-only")).toMatchObject({
+      state: "invalid",
+      expected: false,
+    });
   });
 });

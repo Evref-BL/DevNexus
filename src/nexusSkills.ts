@@ -74,6 +74,59 @@ export interface MaterializeNexusProjectSkillsResult {
   gitExcludeEntries: string[];
 }
 
+export type NexusProjectSkillState =
+  | "installed"
+  | "missing"
+  | "stale"
+  | "unexpected"
+  | "invalid";
+
+export interface NexusProjectSkillStatus {
+  id: string;
+  state: NexusProjectSkillState;
+  expected: boolean;
+  installed: boolean;
+  name: string | null;
+  expectedVersion: string | null;
+  installedVersion: string | null;
+  materialization: NexusSkillMaterializationMode | null;
+  sourceControl: NexusSkillSourceControl | null;
+  skillRoot: string;
+  manifestPath: string;
+  skillPath: string | null;
+  reasons: string[];
+}
+
+export interface NexusProjectSkillStatusSummary {
+  expected: number;
+  installed: number;
+  missing: number;
+  stale: number;
+  unexpected: number;
+  invalid: number;
+}
+
+export interface InspectNexusProjectSkillsOptions {
+  projectRoot: string;
+  skillsConfig?: NexusProjectSkillsConfig;
+  skillDefinitions?: NexusSkillDefinition[];
+}
+
+export interface InspectNexusProjectSkillsResult {
+  skillsDirectory: string;
+  summary: NexusProjectSkillStatusSummary;
+  skills: NexusProjectSkillStatus[];
+}
+
+export interface RefreshNexusProjectSkillsOptions
+  extends MaterializeNexusProjectSkillsOptions {}
+
+export interface RefreshNexusProjectSkillsResult {
+  before: InspectNexusProjectSkillsResult;
+  materialized: MaterializeNexusProjectSkillsResult;
+  after: InspectNexusProjectSkillsResult;
+}
+
 export class NexusSkillError extends Error {
   constructor(message: string) {
     super(message);
@@ -421,14 +474,304 @@ function addGitExcludeEntries(
   };
 }
 
-export function materializeNexusProjectSkills(
-  options: MaterializeNexusProjectSkillsOptions,
-): MaterializeNexusProjectSkillsResult {
-  const skillsDirectory = path.join(
-    options.projectRoot,
+function projectSkillsDirectory(projectRoot: string): string {
+  return path.join(
+    projectRoot,
     nexusSkillSupportDirectoryName,
     nexusSkillsDirectoryName,
   );
+}
+
+function expectedSkillEntries(
+  skillsConfig: NexusProjectSkillsConfig | undefined,
+  skillDefinitions: readonly NexusSkillDefinition[],
+): Array<{
+  definition: NexusSkillDefinition;
+  manifest: NexusSkillManifest;
+}> {
+  return selectedSkillDefinitions(skillsConfig, skillDefinitions).map(
+    (definition) => ({
+      definition,
+      manifest: manifestWithOverrides(
+        definition.manifest,
+        selectionForSkill(skillsConfig, definition.manifest.id),
+        skillsConfig,
+      ),
+    }),
+  );
+}
+
+function isManifest(value: unknown): value is NexusSkillManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.name === "string" &&
+    typeof record.description === "string" &&
+    typeof record.version === "string" &&
+    typeof record.license === "string" &&
+    record.source !== null &&
+    typeof record.source === "object" &&
+    !Array.isArray(record.source) &&
+    Array.isArray(record.supportedAgents) &&
+    record.supportedAgents.every((agent) => typeof agent === "string") &&
+    (record.materialization === "copy" ||
+      record.materialization === "symlink" ||
+      record.materialization === "reference") &&
+    (record.sourceControl === "support" || record.sourceControl === "source")
+  );
+}
+
+interface InstalledSkillEntry {
+  id: string;
+  manifest?: NexusSkillManifest;
+  error?: string;
+  skillRoot: string;
+  manifestPath: string;
+}
+
+function readInstalledSkillEntry(skillRoot: string): InstalledSkillEntry {
+  const manifestPath = path.join(skillRoot, nexusSkillManifestFileName);
+  const fallbackId = path.basename(skillRoot);
+  if (!fs.existsSync(manifestPath)) {
+    return {
+      id: fallbackId,
+      error: "skill manifest is missing",
+      skillRoot,
+      manifestPath,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    if (!isManifest(parsed)) {
+      return {
+        id: fallbackId,
+        error: "skill manifest has an invalid shape",
+        skillRoot,
+        manifestPath,
+      };
+    }
+
+    return {
+      id: parsed.id,
+      manifest: parsed,
+      skillRoot,
+      manifestPath,
+    };
+  } catch (error) {
+    return {
+      id: fallbackId,
+      error: error instanceof Error ? error.message : String(error),
+      skillRoot,
+      manifestPath,
+    };
+  }
+}
+
+function installedSkillEntries(
+  skillsDirectory: string,
+): Map<string, InstalledSkillEntry> {
+  const entries = new Map<string, InstalledSkillEntry>();
+  if (!fs.existsSync(skillsDirectory)) {
+    return entries;
+  }
+
+  for (const directoryEntry of fs.readdirSync(skillsDirectory, {
+    withFileTypes: true,
+  })) {
+    if (!directoryEntry.isDirectory()) {
+      continue;
+    }
+
+    const entry = readInstalledSkillEntry(
+      path.join(skillsDirectory, directoryEntry.name),
+    );
+    entries.set(entry.id, entry);
+  }
+
+  return entries;
+}
+
+function skillPathForManifest(
+  skillRoot: string,
+  manifest: Pick<NexusSkillManifest, "materialization"> | undefined,
+): string | null {
+  return manifest?.materialization === "reference"
+    ? null
+    : path.join(skillRoot, nexusSkillMarkdownFileName);
+}
+
+function skillStatusSummary(
+  skills: readonly NexusProjectSkillStatus[],
+): NexusProjectSkillStatusSummary {
+  return {
+    expected: skills.filter((skill) => skill.expected).length,
+    installed: skills.filter((skill) => skill.installed).length,
+    missing: skills.filter((skill) => skill.state === "missing").length,
+    stale: skills.filter((skill) => skill.state === "stale").length,
+    unexpected: skills.filter((skill) => skill.state === "unexpected").length,
+    invalid: skills.filter((skill) => skill.state === "invalid").length,
+  };
+}
+
+function manifestsMatch(
+  expected: NexusSkillManifest,
+  installed: NexusSkillManifest,
+): boolean {
+  return JSON.stringify(expected) === JSON.stringify(installed);
+}
+
+function expectedSkillStatus(
+  skillsDirectory: string,
+  expected: {
+    definition: NexusSkillDefinition;
+    manifest: NexusSkillManifest;
+  },
+  installed: InstalledSkillEntry | undefined,
+): NexusProjectSkillStatus {
+  const skillRoot = path.join(skillsDirectory, expected.manifest.id);
+  const manifestPath = path.join(skillRoot, nexusSkillManifestFileName);
+  if (!installed) {
+    return {
+      id: expected.manifest.id,
+      state: "missing",
+      expected: true,
+      installed: false,
+      name: expected.manifest.name,
+      expectedVersion: expected.manifest.version,
+      installedVersion: null,
+      materialization: expected.manifest.materialization,
+      sourceControl: expected.manifest.sourceControl,
+      skillRoot,
+      manifestPath,
+      skillPath: skillPathForManifest(skillRoot, expected.manifest),
+      reasons: ["skill is not installed"],
+    };
+  }
+
+  if (!installed.manifest) {
+    return {
+      id: expected.manifest.id,
+      state: "invalid",
+      expected: true,
+      installed: true,
+      name: expected.manifest.name,
+      expectedVersion: expected.manifest.version,
+      installedVersion: null,
+      materialization: expected.manifest.materialization,
+      sourceControl: expected.manifest.sourceControl,
+      skillRoot: installed.skillRoot,
+      manifestPath: installed.manifestPath,
+      skillPath: skillPathForManifest(installed.skillRoot, expected.manifest),
+      reasons: [installed.error ?? "skill manifest is invalid"],
+    };
+  }
+
+  const reasons: string[] = [];
+  if (!manifestsMatch(expected.manifest, installed.manifest)) {
+    reasons.push("skill manifest differs from the expected definition");
+  }
+
+  if (expected.manifest.materialization === "copy") {
+    for (const [filePath, content] of Object.entries(expected.definition.files)) {
+      const targetPath = path.join(installed.skillRoot, filePath);
+      if (!fs.existsSync(targetPath)) {
+        reasons.push(`skill file is missing: ${filePath}`);
+        continue;
+      }
+      if (fs.readFileSync(targetPath, "utf8") !== content) {
+        reasons.push(`skill file differs from the expected definition: ${filePath}`);
+      }
+    }
+  } else if (expected.manifest.materialization === "symlink") {
+    const skillPath = path.join(installed.skillRoot, nexusSkillMarkdownFileName);
+    if (!fs.existsSync(skillPath)) {
+      reasons.push(`${nexusSkillMarkdownFileName} symlink is missing`);
+    } else if (!fs.lstatSync(skillPath).isSymbolicLink()) {
+      reasons.push(`${nexusSkillMarkdownFileName} is not a symlink`);
+    }
+  }
+
+  return {
+    id: expected.manifest.id,
+    state: reasons.length > 0 ? "stale" : "installed",
+    expected: true,
+    installed: true,
+    name: expected.manifest.name,
+    expectedVersion: expected.manifest.version,
+    installedVersion: installed.manifest.version,
+    materialization: expected.manifest.materialization,
+    sourceControl: expected.manifest.sourceControl,
+    skillRoot: installed.skillRoot,
+    manifestPath: installed.manifestPath,
+    skillPath: skillPathForManifest(installed.skillRoot, expected.manifest),
+    reasons,
+  };
+}
+
+function installedOnlySkillStatus(
+  installed: InstalledSkillEntry,
+): NexusProjectSkillStatus {
+  const manifest = installed.manifest;
+  const state: NexusProjectSkillState = manifest ? "unexpected" : "invalid";
+
+  return {
+    id: installed.id,
+    state,
+    expected: false,
+    installed: true,
+    name: manifest?.name ?? null,
+    expectedVersion: null,
+    installedVersion: manifest?.version ?? null,
+    materialization: manifest?.materialization ?? null,
+    sourceControl: manifest?.sourceControl ?? null,
+    skillRoot: installed.skillRoot,
+    manifestPath: installed.manifestPath,
+    skillPath: skillPathForManifest(installed.skillRoot, manifest),
+    reasons: [
+      manifest
+        ? "skill is installed but is not selected by project configuration"
+        : installed.error ?? "skill manifest is invalid",
+    ],
+  };
+}
+
+export function inspectNexusProjectSkills(
+  options: InspectNexusProjectSkillsOptions,
+): InspectNexusProjectSkillsResult {
+  const skillsDirectory = projectSkillsDirectory(options.projectRoot);
+  const expected = expectedSkillEntries(
+    options.skillsConfig,
+    options.skillDefinitions ?? [],
+  );
+  const installed = installedSkillEntries(skillsDirectory);
+  const statuses = expected.map((entry) =>
+    expectedSkillStatus(skillsDirectory, entry, installed.get(entry.manifest.id)),
+  );
+  const expectedIds = new Set(expected.map((entry) => entry.manifest.id));
+  for (const entry of [...installed.values()].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  )) {
+    if (!expectedIds.has(entry.id)) {
+      statuses.push(installedOnlySkillStatus(entry));
+    }
+  }
+
+  return {
+    skillsDirectory,
+    summary: skillStatusSummary(statuses),
+    skills: statuses,
+  };
+}
+
+export function materializeNexusProjectSkills(
+  options: MaterializeNexusProjectSkillsOptions,
+): MaterializeNexusProjectSkillsResult {
+  const skillsDirectory = projectSkillsDirectory(options.projectRoot);
   const selected = selectedSkillDefinitions(
     options.skillsConfig,
     options.skillDefinitions ?? [],
@@ -456,5 +799,24 @@ export function materializeNexusProjectSkills(
     installed,
     gitExcludePath: gitExclude.gitExcludePath,
     gitExcludeEntries: gitExclude.gitExcludeEntries,
+  };
+}
+
+export function refreshNexusProjectSkills(
+  options: RefreshNexusProjectSkillsOptions,
+): RefreshNexusProjectSkillsResult {
+  const inspectOptions = {
+    projectRoot: options.projectRoot,
+    skillsConfig: options.skillsConfig,
+    skillDefinitions: options.skillDefinitions,
+  };
+  const before = inspectNexusProjectSkills(inspectOptions);
+  const materialized = materializeNexusProjectSkills(options);
+  const after = inspectNexusProjectSkills(inspectOptions);
+
+  return {
+    before,
+    materialized,
+    after,
   };
 }
