@@ -1,3 +1,4 @@
+export * from "./browserOpener.js";
 export * from "./gitWorktreeService.js";
 export * from "./nexusProjectScaffold.js";
 export * from "./processSupervisor.js";
