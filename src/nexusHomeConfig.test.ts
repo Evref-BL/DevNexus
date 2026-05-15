@@ -1,0 +1,153 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  createDefaultNexusHomeConfigBase,
+  defaultNexusHomePath,
+  devNexusHomeConfigFileName,
+  loadNexusHomeConfigFile,
+  NexusConfigError,
+  nexusGeneratedDirectoryName,
+  nexusHomeConfigPath,
+  nexusLogsDirectoryName,
+  resolveNexusHome,
+  saveNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+} from "./index.js";
+
+const tempDirs: string[] = [];
+const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
+const originalNexusTestHome = process.env.NEXUS_TEST_HOME;
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+  restoreEnv("DEV_NEXUS_HOME", originalDevNexusHome);
+  restoreEnv("NEXUS_TEST_HOME", originalNexusTestHome);
+});
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
+
+describe("home config primitives", () => {
+  it("resolves default, explicit, and file paths without provider settings", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-parent-"), "home");
+    const relativeHomePath = path.relative(process.cwd(), homePath);
+
+    process.env.NEXUS_TEST_HOME = homePath;
+
+    expect(
+      defaultNexusHomePath({
+        envVarName: "NEXUS_TEST_HOME",
+        directoryName: ".nexus-test",
+      }),
+    ).toBe(homePath);
+    expect(defaultNexusHomePath()).toBe(path.join(os.homedir(), ".dev-nexus"));
+    expect(resolveNexusHome(relativeHomePath)).toBe(path.resolve(homePath));
+    expect(nexusHomeConfigPath(relativeHomePath)).toBe(
+      path.join(path.resolve(homePath), devNexusHomeConfigFileName),
+    );
+    expect(nexusLogsDirectoryName).toBe("logs");
+    expect(nexusGeneratedDirectoryName).toBe("generated");
+    expect(() => resolveNexusHome("   ")).toThrow(NexusConfigError);
+  });
+
+  it("creates provider-neutral home defaults", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-parent-"), "home");
+
+    expect(
+      createDefaultNexusHomeConfigBase(homePath, {
+        projectsRoot: "custom-projects",
+        workspacesRoot: "custom-workspaces",
+        agent: {
+          executor: "CODEX",
+        },
+      }),
+    ).toEqual({
+      version: 1,
+      paths: {
+        projectsRoot: path.resolve(homePath, "custom-projects"),
+        workspacesRoot: path.resolve(homePath, "custom-workspaces"),
+      },
+      agent: {
+        executor: "CODEX",
+      },
+      projects: [],
+    });
+  });
+
+  it("validates project registry entries and rejects duplicate ids", () => {
+    const config = createDefaultNexusHomeConfigBase(makeTempDir("dev-nexus-home-"));
+    config.projects = [
+      {
+        id: "tool-a",
+        name: "Tool A",
+        projectRoot: "C:\\dev\\tools\\a",
+        vibeKanbanProjectId: "tracker-a",
+      },
+      {
+        id: "tool-b",
+        name: "Tool B",
+        projectRoot: "C:\\dev\\tools\\b",
+      },
+    ];
+
+    expect(validateNexusHomeConfigBase(config).projects).toEqual(config.projects);
+
+    config.projects[1] = {
+      id: "tool-a",
+      name: "Tool A Duplicate",
+      projectRoot: "C:\\dev\\tools\\a-duplicate",
+    };
+
+    expect(() => validateNexusHomeConfigBase(config)).toThrow(NexusConfigError);
+  });
+
+  it("loads and saves normalized JSON through an injected validator", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-parent-"), "nested", "home");
+    const config = createDefaultNexusHomeConfigBase(homePath, {
+      projectsRoot: "projects-custom",
+      workspacesRoot: "workspaces-custom",
+    });
+
+    const configPath = saveNexusHomeConfigFile(
+      homePath,
+      config,
+      validateNexusHomeConfigBase,
+    );
+    const rawConfig = fs.readFileSync(configPath, "utf8");
+
+    expect(configPath).toBe(path.join(homePath, devNexusHomeConfigFileName));
+    expect(rawConfig.startsWith("\uFEFF")).toBe(false);
+    expect(rawConfig.endsWith("\n")).toBe(true);
+    expect(JSON.parse(rawConfig)).toEqual(config);
+    expect(
+      loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
+    ).toEqual(config);
+  });
+
+  it("reports a configurable missing home error", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-parent-"), "missing");
+
+    expect(() =>
+      loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase, {
+        missingMessage: (configPath) => `Missing test home: ${configPath}`,
+      }),
+    ).toThrow(/Missing test home/);
+  });
+});
