@@ -36,7 +36,10 @@ import {
   type NexusProjectReference,
   type NexusProjectRegistry,
 } from "./nexusProjectRegistry.js";
-import { scaffoldNexusProject } from "./nexusProjectScaffold.js";
+import {
+  scaffoldNexusProject,
+  type ScaffoldNexusProjectResult,
+} from "./nexusProjectScaffold.js";
 import type { WorkTrackingConfig } from "./workTrackingTypes.js";
 
 export interface NexusProjectRegistryWithRoot extends NexusProjectRegistry {
@@ -76,6 +79,7 @@ export interface CreateNexusProjectInRegistryResult {
   worktreesRoot: string;
   projectConfig: NexusProjectConfig;
   reference: NexusProjectReference;
+  scaffold: ScaffoldNexusProjectResult;
   git: {
     operation: "clone" | "init";
     remoteUrl: string | null;
@@ -90,6 +94,7 @@ export interface ImportNexusProjectInRegistryResult {
   worktreesRoot: string;
   projectConfig: NexusProjectConfig;
   reference: NexusProjectReference;
+  scaffold: ScaffoldNexusProjectResult;
   git: {
     operation: "import";
     remoteUrl: string | null;
@@ -304,7 +309,7 @@ export function createNexusProjectInRegistry(
 
   assertFileDoesNotExist(devNexusProjectConfigPath);
   saveProjectConfig(projectRoot, projectConfig);
-  scaffoldNexusProject({
+  const scaffold = scaffoldNexusProject({
     homePath: options.homePath,
     projectRoot,
     worktreesRoot,
@@ -325,6 +330,7 @@ export function createNexusProjectInRegistry(
     worktreesRoot,
     projectConfig,
     reference,
+    scaffold,
     git: {
       operation: creatingFromRemote ? "clone" : "init",
       remoteUrl: options.from ?? null,
@@ -373,18 +379,26 @@ export function importNexusProjectInRegistry(
     runProjectGitCommand(gitRunner, gitCommands, ["init", projectRoot]);
   }
 
-  const projectConfig =
-    existingProjectConfig ??
-    buildProjectConfig(
-      projectName,
-      projectId,
-      remoteUrl ?? undefined,
-      defaultBranch,
-      vibeKanbanProjectId,
-      pathForProjectConfig(projectRoot, sourceRoot),
-      true,
-      options.extensions,
-    );
+  const projectConfig = existingProjectConfig
+    ? options.extensions
+      ? {
+          ...existingProjectConfig,
+          extensions: {
+            ...existingProjectConfig.extensions,
+            ...options.extensions,
+          },
+        }
+      : existingProjectConfig
+    : buildProjectConfig(
+        projectName,
+        projectId,
+        remoteUrl ?? undefined,
+        defaultBranch,
+        vibeKanbanProjectId,
+        pathForProjectConfig(projectRoot, sourceRoot),
+        true,
+        options.extensions,
+      );
   if (existingProjectConfig && vibeKanbanProjectId) {
     projectConfig.kanban = {
       ...projectConfig.kanban,
@@ -393,12 +407,12 @@ export function importNexusProjectInRegistry(
   }
 
   const devNexusProjectConfigPath = projectConfigPath(projectRoot);
-  if (!existingProjectConfig || vibeKanbanProjectId) {
+  if (!existingProjectConfig || vibeKanbanProjectId || options.extensions) {
     saveProjectConfig(projectRoot, projectConfig);
   }
 
   const worktreesRoot = projectWorktreesRootPath(projectRoot, projectConfig);
-  scaffoldNexusProject({
+  const scaffold = scaffoldNexusProject({
     homePath: options.homePath,
     projectRoot,
     worktreesRoot,
@@ -419,6 +433,7 @@ export function importNexusProjectInRegistry(
     worktreesRoot,
     projectConfig,
     reference,
+    scaffold,
     git: {
       operation: "import",
       remoteUrl,

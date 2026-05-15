@@ -8,6 +8,8 @@ import {
   devNexusProjectConfigFileName,
   importNexusProjectInRegistry,
   loadProjectConfig,
+  type NexusExtension,
+  type NexusProjectConfig,
   type NexusProjectRegistryWithRoot,
   type ProjectGitCommandResult,
   type ProjectGitRunner,
@@ -84,6 +86,14 @@ function fakeGitRunner(
   };
 }
 
+const sampleExtension: NexusExtension<NexusProjectConfig> = {
+  id: "sample-extension",
+  name: "Sample Extension",
+  installProjectFiles: ({ projectRoot }) => ({
+    markerPath: path.join(projectRoot, "sample-extension.marker"),
+  }),
+};
+
 describe("project operations", () => {
   it("creates a generic project and registers it", () => {
     const projectRegistry = registry();
@@ -128,6 +138,31 @@ describe("project operations", () => {
       ["init", result.projectRoot],
       ["-C", result.projectRoot, "symbolic-ref", "--short", "HEAD"],
     ]);
+  });
+
+  it("creates projects with configured extensions and exposes scaffold results", () => {
+    const projectRegistry = registry();
+    const result = createNexusProjectInRegistry({
+      homePath: makeTempDir("dev-nexus-home-"),
+      registry: projectRegistry,
+      name: "ExtendedTool",
+      gitRunner: fakeGitRunner([], { branch: "main" }),
+      extensions: {
+        "sample-extension": {
+          enabled: true,
+        },
+      },
+      scaffoldExtensions: [sampleExtension],
+    });
+
+    expect(result.projectConfig.extensions).toEqual({
+      "sample-extension": {
+        enabled: true,
+      },
+    });
+    expect(result.scaffold.extensionResults["sample-extension"]).toEqual({
+      markerPath: path.join(result.projectRoot, "sample-extension.marker"),
+    });
   });
 
   it("creates a managed project root and clones a remote source under it", () => {
@@ -193,6 +228,70 @@ describe("project operations", () => {
         projectRoot: result.projectRoot,
       },
     ]);
+  });
+
+  it("merges extension metadata when importing an initialized project", () => {
+    const projectRegistry = registry();
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Initialized");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(sourceRoot, devNexusProjectConfigFileName),
+      `${JSON.stringify(
+        {
+          version: 1,
+          id: "initialized",
+          name: "Initialized",
+          home: null,
+          repo: {
+            kind: "git",
+            remoteUrl: null,
+            defaultBranch: "main",
+          },
+          worktreesRoot: "worktrees",
+          kanban: {
+            provider: "vibe-kanban",
+            projectId: null,
+          },
+          extensions: {
+            existing: {
+              retained: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = importNexusProjectInRegistry({
+      homePath: makeTempDir("dev-nexus-home-"),
+      registry: projectRegistry,
+      root: sourceRoot,
+      gitRunner: fakeGitRunner([], {
+        branch: "main",
+        remoteUrl: "https://github.com/example/initialized.git",
+      }),
+      extensions: {
+        "sample-extension": {
+          enabled: true,
+        },
+      },
+      scaffoldExtensions: [sampleExtension],
+    });
+
+    expect(result.projectRoot).toBe(sourceRoot);
+    expect(loadProjectConfig(sourceRoot).extensions).toEqual({
+      existing: {
+        retained: true,
+      },
+      "sample-extension": {
+        enabled: true,
+      },
+    });
+    expect(result.scaffold.extensionResults["sample-extension"]).toEqual({
+      markerPath: path.join(sourceRoot, "sample-extension.marker"),
+    });
   });
 
   it("configures provider-neutral tracking and registers an unregistered project", () => {
