@@ -2,6 +2,7 @@ export * from "./workTrackingGitHubProvider.js";
 export * from "./workTrackingGitLabProvider.js";
 export * from "./workTrackingJiraProvider.js";
 export * from "./workItemService.js";
+export * from "./worktreeExecutionMetadata.js";
 export * from "./nexusExtension.js";
 export * from "./workTrackingLocalProvider.js";
 export * from "./workTrackingProviderService.js";
