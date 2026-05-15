@@ -1,7 +1,11 @@
-﻿# DevNexus
+# DevNexus
 
-DevNexus is the generic development orchestration core split out from PharoNexus.
+DevNexus is a generic development orchestration core.
 
-It owns project/work tracking, local work items, Codex worktree orchestration, execution metadata, verification records, and publication handoff across language ecosystems.
+It owns project and work tracking, local work items, Codex worktree
+orchestration, execution metadata, verification records, credential-aware
+forge integration, and publication handoff across language ecosystems.
 
-PharoNexus remains the Pharo and PLexus specialization layer on top of DevNexus.
+Language, runtime, framework, and toolchain-specific behavior belongs in
+extensions. DevNexus provides the core contracts and extension hooks without
+depending on any specific specialization.
