@@ -10,6 +10,7 @@ export * from "./worktreeExecutionMetadata.js";
 export * from "./nexusExtension.js";
 export * from "./nexusProjectConfig.js";
 export * from "./nexusProjectLifecycle.js";
+export * from "./nexusProjectOperations.js";
 export * from "./nexusProjectRegistry.js";
 export * from "./workTrackingLocalProvider.js";
 export * from "./workTrackingProviderService.js";
