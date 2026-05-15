@@ -5,10 +5,16 @@
   "description": "Language-neutral project/work tracking and local execution core.",
   "license": "Apache-2.0",
   "type": "module",
+  "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
   "engines": {
     "node": ">=24"
   },
