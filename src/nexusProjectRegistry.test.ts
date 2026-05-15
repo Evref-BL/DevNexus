@@ -1,0 +1,184 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  buildNexusProjectStatus,
+  buildNexusProjectStatusForPath,
+  devNexusProjectConfigFileName,
+  findNexusProjectReference,
+  findNexusProjectReferenceById,
+  findNexusProjectReferenceByPath,
+  NexusProjectError,
+  projectRootFromInput,
+  saveProjectConfig,
+  upsertNexusProjectReference,
+  type NexusProjectRegistry,
+} from "./index.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+function projectConfig(id: string, name: string) {
+  return {
+    version: 1 as const,
+    id,
+    name,
+    home: null,
+    repo: {
+      kind: "local" as const,
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    worktreesRoot: "worktrees",
+    kanban: {
+      provider: "vibe-kanban" as const,
+      projectId: null,
+    },
+  };
+}
+
+describe("project registry helpers", () => {
+  it("normalizes project config file input to the project root", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+
+    expect(projectRootFromInput(path.join(root, devNexusProjectConfigFileName))).toBe(root);
+    expect(projectRootFromInput(root)).toBe(root);
+  });
+
+  it("finds project references by registry id, config id, or path", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(root, { recursive: true });
+    saveProjectConfig(root, projectConfig("config-id", "Config Project"));
+    const registry: NexusProjectRegistry = {
+      projects: [
+        {
+          id: "registry-id",
+          name: "Registry Project",
+          projectRoot: root,
+        },
+      ],
+    };
+
+    expect(findNexusProjectReferenceById(registry, "registry-id")).toMatchObject({
+      id: "registry-id",
+    });
+    expect(findNexusProjectReferenceById(registry, "config-id")).toMatchObject({
+      id: "registry-id",
+    });
+    expect(findNexusProjectReferenceByPath(registry, root)).toMatchObject({
+      id: "registry-id",
+    });
+    expect(
+      findNexusProjectReference(
+        registry,
+        path.join(root, devNexusProjectConfigFileName),
+      ),
+    ).toMatchObject({
+      id: "registry-id",
+    });
+  });
+
+  it("builds status from project config when present", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(path.join(root, "worktrees"), { recursive: true });
+    saveProjectConfig(root, {
+      ...projectConfig("config-id", "Config Project"),
+      workTracking: {
+        provider: "local",
+      },
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: "vk-project",
+      },
+    });
+
+    expect(
+      buildNexusProjectStatus({
+        id: "registry-id",
+        name: "Registry Project",
+        projectRoot: root,
+        vibeKanbanRepoId: "vk-repo",
+      }),
+    ).toEqual({
+      id: "config-id",
+      name: "Config Project",
+      projectRoot: root,
+      repo: {
+        kind: "local",
+        remoteUrl: null,
+        defaultBranch: "main",
+      },
+      workTracking: {
+        provider: "local",
+      },
+      vibeKanbanProjectId: "vk-project",
+      vibeKanbanRepoId: "vk-repo",
+      projectConfigPath: path.join(root, devNexusProjectConfigFileName),
+      projectConfigExists: true,
+      worktreesRoot: path.join(root, "worktrees"),
+      worktreesRootExists: true,
+    });
+  });
+
+  it("reports missing path status with a generic initialization error", () => {
+    const root = makeTempDir("dev-nexus-missing-project-");
+
+    expect(() => buildNexusProjectStatusForPath(root)).toThrow(NexusProjectError);
+    expect(() => buildNexusProjectStatusForPath(root)).toThrow(
+      `DevNexus project is not initialized: ${path.join(
+        root,
+        devNexusProjectConfigFileName,
+      )}`,
+    );
+  });
+
+  it("upserts references while preserving provider ids", () => {
+    const firstRoot = path.join(makeTempDir("dev-nexus-project-"), "First");
+    const secondRoot = path.join(makeTempDir("dev-nexus-project-"), "Second");
+    const registry: NexusProjectRegistry = {
+      projects: [
+        {
+          id: "first",
+          name: "First",
+          projectRoot: firstRoot,
+          vibeKanbanRepoId: "vk-repo",
+        },
+      ],
+    };
+
+    expect(
+      upsertNexusProjectReference(
+        registry,
+        firstRoot,
+        projectConfig("first", "First Renamed"),
+        { vibeKanbanProjectId: "vk-project" },
+      ),
+    ).toEqual({
+      id: "first",
+      name: "First Renamed",
+      projectRoot: firstRoot,
+      vibeKanbanProjectId: "vk-project",
+      vibeKanbanRepoId: "vk-repo",
+    });
+
+    expect(() =>
+      upsertNexusProjectReference(
+        registry,
+        secondRoot,
+        projectConfig("first", "Duplicate"),
+      ),
+    ).toThrow(/Project id is already registered/);
+  });
+});

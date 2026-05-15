@@ -250,7 +250,7 @@ export function samePath(left: string, right: string): boolean {
 }
 
 export function ensureUniqueProject(
-  config: NexusProjectRegistryConfig,
+  config: Pick<NexusProjectRegistryConfig, "projects">,
   projectId: string,
   projectRoot: string,
 ): void {
