@@ -11,3 +11,7 @@ export * from "./nexusExtension.js";
 export * from "./workTrackingLocalProvider.js";
 export * from "./workTrackingProviderService.js";
 export * from "./workTrackingTypes.js";
+export * from "./vibeKanbanApi.js";
+export * from "./vibeKanbanBoardAdapter.js";
+export * from "./vibeKanbanProjectAdapter.js";
+export * from "./workTrackingVibeProvider.js";

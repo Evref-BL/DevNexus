@@ -11,10 +11,15 @@ import {
   type JiraWorkTrackerProviderOptions,
 } from "./workTrackingJiraProvider.js";
 import { createLocalWorkTrackerProvider } from "./workTrackingLocalProvider.js";
+import {
+  createVibeWorkTrackerProvider,
+  type VibeWorkTrackerProviderOptions,
+} from "./workTrackingVibeProvider.js";
 import type {
   GitHubWorkTrackingConfig,
   GitLabWorkTrackingConfig,
   JiraWorkTrackingConfig,
+  VibeKanbanWorkTrackingConfig,
   WorkTrackingConfig,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
@@ -25,6 +30,7 @@ export interface CreateWorkTrackerProviderOptions {
   github?: Omit<GitHubWorkTrackerProviderOptions, "config">;
   gitlab?: Omit<GitLabWorkTrackerProviderOptions, "config">;
   jira?: Omit<JiraWorkTrackerProviderOptions, "config">;
+  vibeKanban?: Omit<VibeWorkTrackerProviderOptions, "config">;
 }
 
 export class WorkTrackingProviderServiceError extends Error {
@@ -38,11 +44,26 @@ export function createWorkTrackerProvider(
   config: WorkTrackingConfig,
   options: CreateWorkTrackerProviderOptions = {},
 ): WorkTrackerProvider {
+  const providerName = config.provider;
+
   if (config.provider === "local") {
     return createLocalWorkTrackerProvider({
       projectRoot: options.projectRoot,
       config,
       now: options.now,
+    });
+  }
+
+  if (config.provider === "vibe-kanban") {
+    if (!options.vibeKanban) {
+      throw new WorkTrackingProviderServiceError(
+        "Vibe Kanban provider requires Vibe Kanban API options",
+      );
+    }
+
+    return createVibeWorkTrackerProvider({
+      ...options.vibeKanban,
+      config: config as VibeKanbanWorkTrackingConfig,
     });
   }
 
@@ -68,6 +89,6 @@ export function createWorkTrackerProvider(
   }
 
   throw new WorkTrackingProviderServiceError(
-    `Work tracking provider is not available in DevNexus core: ${config.provider}`,
+    `Work tracking provider is not available in DevNexus core: ${providerName}`,
   );
 }

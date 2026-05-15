@@ -65,7 +65,23 @@ describe("work tracking provider service", () => {
     ).toBe(true);
   });
 
-  it("keeps Vibe compatibility outside the DevNexus core provider set", () => {
+  it("creates the Vibe provider when API options are available", () => {
+    expect(
+      createWorkTrackerProvider(
+        {
+          provider: "vibe-kanban",
+          projectId: "project-1",
+        },
+        {
+          vibeKanban: {
+            port: 3000,
+          },
+        },
+      ).capabilities.board,
+    ).toBe(true);
+  });
+
+  it("requires Vibe API options for Vibe providers", () => {
     expect(() =>
       createWorkTrackerProvider({
         provider: "vibe-kanban",
