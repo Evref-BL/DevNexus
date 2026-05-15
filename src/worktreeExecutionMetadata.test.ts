@@ -1,10 +1,31 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   applyWorktreeExecutionUpdate,
   emptyWorktreeExecutionMetadata,
   normalizeWorktreeExecutionMetadata,
+  readWorktreeExecutionMetadata,
+  updateWorktreeExecutionMetadata,
+  worktreeExecutionMetadataPath,
   WorktreeExecutionMetadataError,
+  writeWorktreeExecutionMetadata,
 } from "./worktreeExecutionMetadata.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 describe("worktree execution metadata", () => {
   it("creates and normalizes empty execution metadata", () => {
@@ -113,6 +134,57 @@ describe("worktree execution metadata", () => {
       },
       updatedAt: null,
     });
+  });
+
+  it("reads, writes, and updates metadata under the worktree support directory", () => {
+    const worktreePath = makeTempDir("dev-nexus-worktree-");
+
+    expect(readWorktreeExecutionMetadata(worktreePath)).toEqual(
+      emptyWorktreeExecutionMetadata(),
+    );
+    expect(worktreeExecutionMetadataPath(worktreePath)).toBe(
+      path.join(worktreePath, ".dev-nexus", "execution.json"),
+    );
+
+    writeWorktreeExecutionMetadata(worktreePath, {
+      commitIds: ["abc123"],
+      verification: [],
+      publicationDecision: null,
+      updatedAt: "2026-05-16T09:00:00.000Z",
+    });
+    const updated = updateWorktreeExecutionMetadata(
+      worktreePath,
+      {
+        verification: {
+          command: "npm test",
+          status: "passed",
+          summary: "ok",
+        },
+        publicationDecision: {
+          type: "local_only",
+          reason: "recorded locally",
+        },
+      },
+      "2026-05-16T10:00:00.000Z",
+    );
+
+    expect(updated).toMatchObject({
+      commitIds: ["abc123"],
+      verification: [
+        {
+          command: "npm test",
+          status: "passed",
+          summary: "ok",
+          recordedAt: "2026-05-16T10:00:00.000Z",
+        },
+      ],
+      publicationDecision: {
+        type: "local_only",
+        reason: "recorded locally",
+      },
+      updatedAt: "2026-05-16T10:00:00.000Z",
+    });
+    expect(readWorktreeExecutionMetadata(worktreePath)).toEqual(updated);
   });
 
   it("rejects invalid or empty updates", () => {

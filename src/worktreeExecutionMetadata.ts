@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 export type WorktreeVerificationStatus = "passed" | "failed" | "not_run";
 export type WorktreePublicationDecisionType =
   | "not_decided"
@@ -49,6 +52,9 @@ export interface WorktreeExecutionUpdate {
   publicationDecision?: WorktreePublicationDecisionInput;
 }
 
+export const worktreeExecutionMetadataDirectoryName = ".dev-nexus";
+export const worktreeExecutionMetadataFileName = "execution.json";
+
 export class WorktreeExecutionMetadataError extends Error {
   constructor(message: string) {
     super(message);
@@ -63,6 +69,58 @@ export function emptyWorktreeExecutionMetadata(): WorktreeExecutionMetadata {
     publicationDecision: null,
     updatedAt: null,
   };
+}
+
+export function worktreeExecutionMetadataPath(worktreePath: string): string {
+  return path.join(
+    path.resolve(requiredNonEmptyString(worktreePath, "worktreePath")),
+    worktreeExecutionMetadataDirectoryName,
+    worktreeExecutionMetadataFileName,
+  );
+}
+
+export function readWorktreeExecutionMetadata(
+  worktreePath: string,
+): WorktreeExecutionMetadata {
+  const metadataPath = worktreeExecutionMetadataPath(worktreePath);
+  if (!fs.existsSync(metadataPath)) {
+    return emptyWorktreeExecutionMetadata();
+  }
+
+  return normalizeWorktreeExecutionMetadata(
+    JSON.parse(fs.readFileSync(metadataPath, "utf8").replace(/^\uFEFF/, "")),
+  );
+}
+
+export function writeWorktreeExecutionMetadata(
+  worktreePath: string,
+  metadata: WorktreeExecutionMetadata,
+): string {
+  const metadataPath = worktreeExecutionMetadataPath(worktreePath);
+  const normalized = normalizeWorktreeExecutionMetadata(metadata);
+  fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
+  fs.writeFileSync(
+    metadataPath,
+    `${JSON.stringify(normalized, null, 2)}\n`,
+    "utf8",
+  );
+
+  return metadataPath;
+}
+
+export function updateWorktreeExecutionMetadata(
+  worktreePath: string,
+  update: WorktreeExecutionUpdate,
+  now: Date | string = new Date(),
+): WorktreeExecutionMetadata {
+  const updated = applyWorktreeExecutionUpdate(
+    readWorktreeExecutionMetadata(worktreePath),
+    update,
+    isoString(now),
+  );
+  writeWorktreeExecutionMetadata(worktreePath, updated);
+
+  return updated;
 }
 
 export function hasWorktreeExecutionUpdate(
@@ -275,6 +333,15 @@ function optionalNullableString(value: unknown): string | null | undefined {
   }
 
   return requiredNonEmptyString(value, "value");
+}
+
+function isoString(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new WorktreeExecutionMetadataError("now must be a valid date");
+  }
+
+  return date.toISOString();
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {

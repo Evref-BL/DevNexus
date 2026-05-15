@@ -29,6 +29,11 @@ export interface NexusAutomationRunRecord {
   finishedAt: string | null;
   workItemId: string | null;
   workItemTitle: string | null;
+  sourceRoot: string | null;
+  worktreePath: string | null;
+  branchName: string | null;
+  baseRef: string | null;
+  commitIds: string[];
   summary: string | null;
   verification: WorktreeVerificationRecord[];
   publicationDecision: WorktreePublicationDecision | null;
@@ -44,6 +49,11 @@ export interface NexusAutomationRunRecordInput {
   finishedAt?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
+  sourceRoot?: string | null;
+  worktreePath?: string | null;
+  branchName?: string | null;
+  baseRef?: string | null;
+  commitIds?: string[];
   summary?: string | null;
   verification?: WorktreeVerificationRecord[];
   publicationDecision?: WorktreePublicationDecision | null;
@@ -326,6 +336,76 @@ export function evaluateNexusAutomationBackoff(
   };
 }
 
+export function countConsecutiveNexusAutomationFailures(
+  ledger: NexusAutomationRunLedger,
+): number {
+  let failures = 0;
+  for (let index = ledger.runs.length - 1; index >= 0; index -= 1) {
+    const run = ledger.runs[index]!;
+    if (run.status === "skipped") {
+      continue;
+    }
+    if (run.status === "failed" || run.status === "blocked") {
+      failures += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return failures;
+}
+
+export function evaluateNexusAutomationLedgerBackoff(
+  config: NexusAutomationConfig,
+  ledger: NexusAutomationRunLedger,
+  now: Date | string = new Date(),
+): NexusAutomationBackoffDecision {
+  const consecutiveFailures = countConsecutiveNexusAutomationFailures(ledger);
+  if (consecutiveFailures === 0) {
+    return {
+      consecutiveFailures,
+      shouldRun: true,
+      retryAfter: null,
+      delayMs: null,
+      reason: null,
+    };
+  }
+
+  const lastFailure = [...ledger.runs]
+    .reverse()
+    .find((run) => run.status === "failed" || run.status === "blocked");
+  if (!lastFailure) {
+    return {
+      consecutiveFailures: 0,
+      shouldRun: true,
+      retryAfter: null,
+      delayMs: null,
+      reason: null,
+    };
+  }
+
+  const decision = evaluateNexusAutomationBackoff(
+    config,
+    consecutiveFailures,
+    lastFailure.finishedAt ?? lastFailure.startedAt,
+  );
+  if (!decision.retryAfter) {
+    return decision;
+  }
+
+  const retryAt = dateFrom(decision.retryAfter, "retryAfter");
+  if (dateFrom(now, "now").getTime() >= retryAt.getTime()) {
+    return {
+      ...decision,
+      shouldRun: true,
+      reason: null,
+    };
+  }
+
+  return decision;
+}
+
 function resolveAutomationStatePath(
   projectRoot: string,
   configuredPath: string,
@@ -431,6 +511,11 @@ function normalizeRunRecordInput(
     finishedAt: input.finishedAt ?? null,
     workItemId: input.workItemId ?? null,
     workItemTitle: input.workItemTitle ?? null,
+    sourceRoot: input.sourceRoot ?? null,
+    worktreePath: input.worktreePath ?? null,
+    branchName: input.branchName ?? null,
+    baseRef: input.baseRef ?? null,
+    commitIds: input.commitIds ?? [],
     summary: input.summary ?? null,
     verification: input.verification ?? [],
     publicationDecision: input.publicationDecision ?? null,
@@ -453,6 +538,11 @@ function normalizeRunRecord(value: unknown): NexusAutomationRunRecord {
     finishedAt: optionalIsoString(record.finishedAt, "automation run.finishedAt"),
     workItemId: optionalNullableString(record.workItemId) ?? null,
     workItemTitle: optionalNullableString(record.workItemTitle) ?? null,
+    sourceRoot: optionalNullableString(record.sourceRoot) ?? null,
+    worktreePath: optionalNullableString(record.worktreePath) ?? null,
+    branchName: optionalNullableString(record.branchName) ?? null,
+    baseRef: optionalNullableString(record.baseRef) ?? null,
+    commitIds: normalizeStringArray(record.commitIds, "automation run.commitIds"),
     summary: optionalNullableString(record.summary) ?? null,
     verification: normalizeVerificationRecords(record.verification),
     publicationDecision: normalizePublicationDecision(record.publicationDecision),
@@ -470,6 +560,19 @@ function normalizeVerificationRecords(
   return normalizeWorktreeExecutionMetadata({
     verification: value,
   }).verification;
+}
+
+function normalizeStringArray(value: unknown, name: string): string[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusAutomationError(`${name} must be an array`);
+  }
+
+  return value.map((item, index) =>
+    requiredNonEmptyString(item, `${name}[${index}]`),
+  );
 }
 
 function normalizePublicationDecision(

@@ -17,3 +17,10 @@ Projects can opt into generic run-once automation through
 verification commands, run ledgers, stale-aware locks, retry backoff, safety
 policy, and publication policy. These APIs only model and record automation
 state; execution adapters decide how to run agents and tools for a project.
+
+`runNexusAutomationOnce` provides the generic orchestration boundary for those
+adapters. It loads the project config, selects eligible work from the configured
+tracker, preflights tracker and Git worktree requirements, prepares a
+branch-backed worktree, invokes an injected executor, records execution
+metadata under the worktree support directory, appends the run ledger, and
+updates the tracker with conservative status and comments.
