@@ -43,7 +43,7 @@ describe("work tracking provider service", () => {
     });
   });
 
-  it("creates forge providers without PharoNexus project config", () => {
+  it("creates forge providers without specialization project config", () => {
     expect(
       createWorkTrackerProvider({
         provider: "github",
