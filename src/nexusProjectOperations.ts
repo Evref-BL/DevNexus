@@ -3,6 +3,7 @@ import path from "node:path";
 import type { NexusExtension } from "./nexusExtension.js";
 import {
   nexusProjectWorktreesDirectoryName,
+  loadProjectConfig,
   projectConfigPath,
   projectWorktreesRootPath,
   saveProjectConfig,
@@ -128,6 +129,21 @@ export interface ConfigureNexusProjectTrackerInRegistryResult {
   projectConfig: NexusProjectConfig;
   reference: NexusProjectReference;
   workTracking: WorkTrackingConfig;
+}
+
+export interface LinkNexusProjectTrackerInRegistryOptions {
+  registry: NexusProjectRegistry;
+  project: string;
+  trackerProjectId: string;
+}
+
+export interface LinkNexusProjectTrackerInRegistryResult {
+  projectRoot: string;
+  projectConfigPath: string;
+  projectConfig: NexusProjectConfig;
+  reference: NexusProjectReference;
+  vibeKanbanProjectId: string;
+  vibeKanbanRepoId: string | null;
 }
 
 export function buildProjectConfig(
@@ -478,5 +494,52 @@ export function configureNexusProjectTrackerInRegistry(
     projectConfig: updatedProjectConfig,
     reference,
     workTracking,
+  };
+}
+
+export function linkNexusProjectTrackerInRegistry(
+  options: LinkNexusProjectTrackerInRegistryOptions,
+): LinkNexusProjectTrackerInRegistryResult {
+  const vibeKanbanProjectId = optionalNonEmptyString(
+    options.trackerProjectId,
+    "trackerProjectId",
+  );
+  if (!vibeKanbanProjectId) {
+    throw new NexusProjectError("trackerProjectId must be a non-empty string");
+  }
+
+  const existingReference = findNexusProjectReference(
+    options.registry,
+    options.project,
+  );
+  const projectRoot = existingReference
+    ? path.resolve(existingReference.projectRoot)
+    : projectRootFromInput(options.project);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const updatedProjectConfig: NexusProjectConfig = {
+    ...projectConfig,
+    kanban: {
+      ...projectConfig.kanban,
+      projectId: vibeKanbanProjectId,
+    },
+  };
+  const projectConfigFilePath = saveProjectConfig(
+    projectRoot,
+    updatedProjectConfig,
+  );
+  const reference = upsertNexusProjectReference(
+    options.registry,
+    projectRoot,
+    updatedProjectConfig,
+    { vibeKanbanProjectId },
+  );
+
+  return {
+    projectRoot,
+    projectConfigPath: projectConfigFilePath,
+    projectConfig: updatedProjectConfig,
+    reference,
+    vibeKanbanProjectId,
+    vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
   };
 }
