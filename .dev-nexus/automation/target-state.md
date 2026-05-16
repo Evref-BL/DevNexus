@@ -9,18 +9,20 @@ Immediate direction:
 - `dev-nexus:local-5` split `PLAN.md` into component-owned local work items
   using the curated `to-issues` skill. New work items include readiness,
   blocker, acceptance, verification, and publication notes.
-- The next eligible ready dogfood batch is DevNexus core:
+- The ready DevNexus core dogfood batch is complete:
   - `dev-nexus:local-8` component-aware target completion reporting.
   - `dev-nexus:local-11` Codex and Claude agent profile policy schema.
 - Low-token coordinator discovery is now available through DevNexus CLI
   `automation eligible-work` and `automation agent-profiles`, plus native MCP
   tools `eligible_work` and `agent_profiles`.
-- The coordinator should choose the largest safe bounded subset of the ready
-  DevNexus batch, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS` when running
-  under agent launch.
+- No ready `dogfood` work item currently matches the automation selector; the
+  latest target report is `completed` with relaunch decision `stop`.
+- Possible next target choices:
+  - Promote `dev-nexus:local-12` to ready and shape a production-quality
+    project template from this dogfood evidence.
+  - Promote dependent component backlog after choosing the next component
+    focus and preserving the live-runtime safety boundary.
 - Later or dependent non-eligible work:
-  - `dev-nexus:local-12` production-quality project template after the dogfood
-    loop is reliable.
   - `pharo-nexus:local-2` adapter alignment after new DevNexus coordination
     surfaces stabilize.
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
@@ -62,6 +64,9 @@ Durable completed foundation:
   published through `ac07964`, covering coordinator-reported dispatch progress
   surfaces, component-scoped worktree ownership records, and neutral
   work-tracker provider capability conformance.
+- DevNexus parallel wave `parallel-dev-nexus-wave-2-20260516` completed and
+  was published through `e11df67`, covering component-aware target completion
+  reporting and hardened Codex/Claude agent profile policy schema.
 - PharoNexus specialization alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
