@@ -313,7 +313,7 @@ function localWorkItemStorePaths(
 ): string[] {
   const paths = new Set<string>();
   collectLocalWorkTrackingPath(projectRoot, paths, config.workTracking ?? null);
-  for (const component of config.components) {
+  for (const component of resolveProjectComponents(projectRoot, config)) {
     collectLocalWorkTrackingPath(
       projectRoot,
       paths,
