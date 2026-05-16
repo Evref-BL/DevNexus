@@ -12,6 +12,10 @@ import {
   type RunNexusAutomationOnceResult,
 } from "./nexusAutomationRunOnce.js";
 import {
+  getNexusAutomationStatus,
+  type NexusAutomationStatus,
+} from "./nexusAutomationStatus.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -69,12 +73,18 @@ interface ParsedAutomationRunOnceCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationStatusCommand {
+  projectRoot: string;
+  json?: boolean;
+}
+
 export function usage(): string {
   return [
     "Usage:",
     "  dev-nexus --help",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
+    "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation run-once <project-root> --command <command> [options]",
     "",
     "Options for work-item create:",
@@ -92,6 +102,9 @@ export function usage(): string {
     "  --assignee <assignee>      repeatable",
     "  --search <text>",
     "  --limit <count>",
+    "  --json",
+    "",
+    "Options for automation status:",
     "  --json",
     "",
     "Options for automation run-once:",
@@ -170,8 +183,22 @@ async function handleAutomationCommand(
   argv: string[],
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
+  if (argv[1] === "status") {
+    const parsed = parseAutomationStatusCommand(argv);
+    const result = await getNexusAutomationStatus({
+      projectRoot: parsed.projectRoot,
+      now: dependencies.now,
+    });
+    printAutomationStatusResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] !== "run-once") {
-    throw new Error("automation requires run-once");
+    throw new Error("automation requires status or run-once");
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
@@ -393,6 +420,28 @@ function parseAutomationRunOnceCommand(
   return parsed as ParsedAutomationRunOnceCommand;
 }
 
+function parseAutomationStatusCommand(
+  argv: string[],
+): ParsedAutomationStatusCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation status requires a project root");
+  }
+
+  const parsed: ParsedAutomationStatusCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function printWorkItemCreateResult(
   item: WorkItem,
   parsed: ParsedWorkItemCreateCommand,
@@ -455,6 +504,44 @@ function printAutomationRunOnceResult(
       `  Verification: ${result.execution.verification.length} record(s)`,
     );
     writeLine(stdout, `  Commits: ${result.execution.commitIds.length}`);
+  }
+}
+
+function printAutomationStatusResult(
+  result: NexusAutomationStatus,
+  parsed: ParsedAutomationStatusCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus automation status: ${result.status}.`);
+  writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  if (result.selectedWorkItem) {
+    writeLine(
+      stdout,
+      `  Selected work item: ${result.selectedWorkItem.id} ${result.selectedWorkItem.title}`,
+    );
+  }
+  if (result.candidateCount !== null) {
+    writeLine(stdout, `  Candidates: ${result.candidateCount}`);
+  }
+  if (result.lock) {
+    writeLine(stdout, `  Lock: ${result.lock.status}`);
+  }
+  if (result.ledger) {
+    writeLine(stdout, `  Runs recorded: ${result.ledger.runs.length}`);
+    const lastRun = result.ledger.runs.at(-1);
+    if (lastRun) {
+      writeLine(
+        stdout,
+        `  Last run: ${lastRun.id} ${lastRun.status} ${lastRun.summary ?? ""}`.trimEnd(),
+      );
+    }
   }
 }
 

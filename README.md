@@ -30,8 +30,13 @@ The package also ships a generic `dev-nexus` CLI for the same boundary:
 ```bash
 dev-nexus work-item create <project-root> --title "Implement task" --status ready --label automation
 dev-nexus work-item list <project-root> --status ready
+dev-nexus automation status <project-root>
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 ```
+
+`automation status` is read-only. It reports whether automation is disabled,
+locked, in retry backoff, blocked by preflight, idle, or ready with a selected
+work item before any worktree or tracker mutation happens.
 
 `automation run-once` runs the command in the prepared worktree, exposes
 `DEV_NEXUS_*` environment variables for the selected work item and worktree,

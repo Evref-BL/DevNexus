@@ -175,6 +175,42 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("prints read-only automation status", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Runnable task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+
+    await main(["automation", "status", projectRoot, "--json"], {
+      stdout: output.writer,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "ready",
+      candidateCount: 1,
+      selectedWorkItem: {
+        id: "local-1",
+        title: "Runnable task",
+      },
+      lock: {
+        status: "none",
+      },
+    });
+    expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
   it("runs automation once through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
