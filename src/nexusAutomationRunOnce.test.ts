@@ -190,7 +190,12 @@ describe("nexus automation run once", () => {
           "add",
           "-b",
           "codex/demo-project/local-1/run-1",
-          path.join(projectRoot, "worktrees", "codex-demo-project-local-1-run-1"),
+          path.join(
+            projectRoot,
+            "worktrees",
+            "primary",
+            "codex-demo-project-local-1-run-1",
+          ),
           "main",
         ],
       },
@@ -340,7 +345,7 @@ describe("nexus automation run once", () => {
 
     expect(result).toMatchObject({
       status: "blocked",
-      summary: "Project work tracking is not configured",
+      summary: "Primary component work tracking is not configured",
       worktree: null,
       workItem: null,
     });
@@ -348,7 +353,7 @@ describe("nexus automation run once", () => {
       {
         name: "workTracking",
         status: "failed",
-        message: "Project work tracking is not configured",
+        message: "Primary component work tracking is not configured",
       },
     ]);
     expect(gitCalls).toEqual([]);

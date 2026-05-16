@@ -6,6 +6,13 @@ It owns project and work tracking, local work items, agent launch
 configuration, execution metadata, verification records, credential-aware forge
 integration, and publication handoff across language ecosystems.
 
+A DevNexus project is a managed orchestration context containing one or more
+components. A component is the unit that points at a source root, optional Git
+remote, worktree root, work-item service, verification hints, publication
+hints, and relationships to other components. Component arity can be one or
+many; a project with one component follows the same model as a project with
+several components.
+
 DevNexus is not the work-planning agent. It should not decide which work item
 to implement, supervise the implementation, or plan parallel worktrees itself.
 A user drives DevNexus by configuring projects, schedules, launch policies, and
@@ -21,7 +28,7 @@ behavior.
 For example, a human can tell Codex to use DevNexus to work on a project until
 no eligible issue remains. In that flow, Codex is the user of DevNexus under
 human instruction; DevNexus supplies the configured launch gates, schedule,
-project context, relaunch loop, and run records.
+component context, relaunch loop, and run records.
 
 Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions. DevNexus provides the core contracts and extension hooks without
@@ -48,6 +55,86 @@ to `DEV_NEXUS_HOME` and then the default user home path. `project status` can
 also inspect an initialized project root directly without a home registry,
 which is useful for local smoke checks and generated worktrees.
 
+## Project Components
+
+`dev-nexus.project.json` stores `components` as a first-class list. Each
+component has a stable `id`, display `name`, `role`, `kind`, source root,
+worktree root, optional work tracking configuration, optional verification and
+publication hints, and explicit relationships to other components.
+
+The primary component is the compatibility anchor for legacy commands that can
+operate on only one component. New automation and project status surfaces expose
+all configured components, including each component's source root and whether
+that root exists. Component worktrees default under
+`<project worktreesRoot>/<component-id>` so arity one is not a special
+directory case.
+
+Work tracking is component-scoped. Older project-level `workTracking` remains
+accepted for legacy configs and is normalized onto the generated primary
+component, but explicit multi-component configs should put the work-item
+service on the component that owns those items. A component can use a local
+store, GitHub Issues, GitHub Projects, GitLab issues, Jira, or another
+configured provider as those adapters become available.
+
+Example:
+
+```json
+{
+  "version": 1,
+  "id": "example-suite",
+  "name": "Example Suite",
+  "repo": {
+    "kind": "local",
+    "remoteUrl": null,
+    "defaultBranch": null
+  },
+  "components": [
+    {
+      "id": "core",
+      "name": "Core",
+      "kind": "git",
+      "role": "primary",
+      "remoteUrl": "git@example.invalid:example/core.git",
+      "defaultBranch": "main",
+      "sourceRoot": "components/core",
+      "workTracking": {
+        "provider": "github",
+        "repository": {
+          "owner": "example",
+          "name": "core"
+        }
+      },
+      "relationships": []
+    },
+    {
+      "id": "addon",
+      "name": "Addon",
+      "kind": "git",
+      "role": "addon",
+      "remoteUrl": "git@example.invalid:example/addon.git",
+      "defaultBranch": "main",
+      "sourceRoot": "components/addon",
+      "workTracking": {
+        "provider": "jira",
+        "host": "example.atlassian.net",
+        "projectKey": "ADDON"
+      },
+      "relationships": [
+        {
+          "kind": "extends",
+          "componentId": "core"
+        }
+      ]
+    }
+  ],
+  "worktreesRoot": "worktrees",
+  "kanban": {
+    "provider": "vibe-kanban",
+    "projectId": null
+  }
+}
+```
+
 ## Automation Foundation
 
 Projects can opt into generic agent-launch automation through
@@ -73,6 +160,13 @@ agent receives `DEV_NEXUS_AGENT_CONTEXT_FILE` and
 verification records, publication decisions, blockers, and notes to the result
 file for DevNexus to retain in the run ledger.
 
+The agent context includes `components` and `componentEligibleWorkItems`.
+DevNexus groups eligible work items by component and does not collapse that
+grouping into a decision. The launched agent can then decide which component
+work items to take, how many subagents to launch, what model and reasoning
+profile each subagent should use, and how to report progress back to each
+component's work-item service.
+
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That
 selected-work path is interim. New automation work should prefer
@@ -83,10 +177,10 @@ behavior, and records the agent's reported result.
 
 Generated worktrees can declare setup-only dependency links through
 `automation.setup.dependencyLinks`. Each link copies no package data and runs
-no installer; it only links an existing reviewed path from the source checkout
-into the generated worktree and records the target in the worktree Git exclude
-file. Required links are checked during read-only status so unsafe or missing
-dependencies block before worktree creation.
+no installer; it only links an existing reviewed path from the active component
+source root into the generated worktree and records the target in the worktree
+Git exclude file. Required links are checked during read-only status so unsafe
+or missing dependencies block before worktree creation.
 
 The package also ships a generic `dev-nexus` CLI for the same boundary:
 
@@ -107,6 +201,10 @@ agent-launch mode or `automation.executor.command` for the older generated
 worktree executor mode. `automation run-once` and `automation schedule` may
 omit `--command` when the relevant command is configured. Command-line options
 still override the configured command and timeout.
+
+Manual `work-item` commands currently target the primary component's work-item
+service. Agent-launch automation is the component-aware path for reading
+eligible work across all configured component services.
 
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an

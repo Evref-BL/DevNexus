@@ -260,7 +260,7 @@ Use this skill when work needs to survive a context switch, automation run, or h
 
 Use this skill when a request, issue, or finding needs to become actionable work.
 
-1. Identify the owning project, source checkout, and tracker provider.
+1. Identify the owning project component, source root, and work-item service.
 2. Separate symptoms, suspected causes, acceptance criteria, and constraints.
 3. Check for duplicate or related existing work before creating new items.
 4. Slice work so each item has one owner, one verification path, and a clear done state.
@@ -288,15 +288,15 @@ Use this skill when a change touches module boundaries, ownership, or long-lived
   curatedCoreSkill(
     "setup-agent-skills",
     "setup-agent-skills",
-    "Repository setup workflow for documenting issue tracker, triage label, and domain-document context used by agent skills.",
+    "Component setup workflow for documenting work-item services, triage labels, and domain-document context used by agent skills.",
     `
 # Setup Agent Skills
 
-Use this skill when a project first enables curated agent skills, or when skills are missing repository-specific context about tracking, triage, or domain documentation.
+Use this skill when a project first enables curated agent skills, or when skills are missing component-specific context about tracking, triage, or domain documentation.
 
-1. Inspect the repository before writing: Git remotes, existing \`AGENTS.md\` or \`CLAUDE.md\`, \`docs/agents\`, \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, \`docs/adr\`, and any local issue or work-item directories.
+1. Inspect the relevant component source roots before writing: Git remotes, existing \`AGENTS.md\` or \`CLAUDE.md\`, \`docs/agents\`, \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, \`docs/adr\`, and any local issue or work-item directories.
 2. Present what exists and what is missing, then confirm setup decisions one at a time instead of asking for every choice at once.
-3. Record where work items live: configured DevNexus tracker, GitHub Issues, GitLab Issues, Jira, Linear, local work items, or another project-specific tracker.
+3. Record where work items live for each relevant component: configured DevNexus tracker, GitHub Issues, GitLab Issues, Jira, Linear, local work items, or another project-specific tracker.
 4. Record triage labels or status values for the canonical flow: needs triage, needs information, autonomous agent-ready (AFK), ready for human, and will not fix.
 5. Record domain-document layout: single-context \`CONTEXT.md\`, multi-context \`CONTEXT-MAP.md\`, and where Architecture Decision Records (ADRs) live.
 6. Draft the exact changes before writing: an \`Agent skills\` section in the existing agent instruction file, plus \`docs/agents/issue-tracker.md\`, \`docs/agents/triage-labels.md\`, and \`docs/agents/domain.md\`.

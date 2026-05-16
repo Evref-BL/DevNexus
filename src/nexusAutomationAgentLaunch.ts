@@ -23,7 +23,11 @@ import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import {
+  resolvePrimaryProjectComponent,
+  resolveProjectComponents,
+  type ResolvedNexusProjectComponent,
+} from "./nexusProjectLifecycle.js";
 import type {
   NexusAutomationPreflightCheck,
   NexusAutomationProviderContext,
@@ -51,6 +55,29 @@ export type NexusAutomationAgentLaunchStatus =
   | "failed"
   | "blocked";
 
+export interface NexusAutomationAgentLaunchComponentContext {
+  id: string;
+  name: string;
+  role: ResolvedNexusProjectComponent["role"];
+  kind: ResolvedNexusProjectComponent["kind"];
+  sourceRoot: string;
+  sourceRootExists: boolean;
+  worktreesRoot: string;
+  worktreesRootExists: boolean;
+  remoteUrl: string | null;
+  defaultBranch: string | null;
+  workTracker: {
+    provider: string | null;
+    configured: boolean;
+  };
+  relationships: ResolvedNexusProjectComponent["relationships"];
+}
+
+export interface NexusAutomationComponentEligibleWorkItems {
+  componentId: string;
+  workItems: WorkItem[];
+}
+
 export interface NexusAutomationAgentLaunchContext {
   version: 1;
   runId: string;
@@ -60,13 +87,16 @@ export interface NexusAutomationAgentLaunchContext {
   project: {
     id: string;
     name: string;
+    componentCount: number;
   };
+  components: NexusAutomationAgentLaunchComponentContext[];
   automation: {
     mode: "agent_launch";
     selectorQuery: WorkItemQuery;
     eligibleWorkItemCount: number;
   };
   eligibleWorkItems: WorkItem[];
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
 }
@@ -76,10 +106,12 @@ export interface NexusAutomationAgentLaunchInput {
   startedAt: string;
   projectRoot: string;
   sourceRoot: string;
+  components: ResolvedNexusProjectComponent[];
   projectConfig: NexusProjectConfig;
   automationConfig: NexusAutomationConfig;
   selectorQuery: WorkItemQuery;
   eligibleWorkItems: WorkItem[];
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   contextFile: string;
   resultFile: string;
 }
@@ -131,9 +163,16 @@ export interface RunNexusAutomationAgentLaunchOnceResult {
   preflight: NexusAutomationPreflightCheck[];
   selectorQuery: WorkItemQuery | null;
   eligibleWorkItems: WorkItem[];
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  components: ResolvedNexusProjectComponent[];
   contextFile: string | null;
   resultFile: string | null;
   launch: NexusAutomationAgentLaunchResult | null;
+}
+
+export interface NexusAutomationAgentLaunchComponentProvider {
+  component: ResolvedNexusProjectComponent;
+  provider: WorkTrackerProvider;
 }
 
 export class NexusAutomationAgentLaunchError extends Error {
@@ -151,12 +190,14 @@ export async function runNexusAutomationAgentLaunchOnce(
   const automationConfig = projectConfig.automation ?? null;
   const runId = options.runId ?? generateNexusAutomationAgentRunId(options.now);
   let sourceRoot: string | null = null;
+  let components: ResolvedNexusProjectComponent[] = [];
   let lock: AcquireNexusAutomationRunLockResult | null = null;
   let ledger: NexusAutomationRunLedger | null = null;
-  let provider: WorkTrackerProvider | null = null;
+  let componentProviders: NexusAutomationAgentLaunchComponentProvider[] = [];
   let preflight: NexusAutomationPreflightCheck[] = [];
   let selectorQuery: WorkItemQuery | null = null;
   let eligibleWorkItems: WorkItem[] = [];
+  let componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] = [];
   let contextFile: string | null = null;
   let resultFile: string | null = null;
 
@@ -174,6 +215,8 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight: [],
       selectorQuery,
       eligibleWorkItems,
+      componentEligibleWorkItems,
+      components,
       contextFile,
       resultFile,
       launch: null,
@@ -194,6 +237,8 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight: [],
       selectorQuery,
       eligibleWorkItems,
+      componentEligibleWorkItems,
+      components,
       contextFile,
       resultFile,
       launch: null,
@@ -245,20 +290,29 @@ export async function runNexusAutomationAgentLaunchOnce(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        componentEligibleWorkItems,
+        components,
         contextFile,
         resultFile,
         launch: null,
       });
     }
 
-    sourceRoot = resolveProjectSourceRoot(projectRoot, projectConfig);
-    if (!projectConfig.workTracking) {
-      const summary = "Project work tracking is not configured";
+    components = resolveProjectComponents(projectRoot, projectConfig);
+    sourceRoot = resolvePrimaryProjectComponent(projectRoot, projectConfig).sourceRoot;
+    componentProviders = createAgentLaunchComponentProviders({
+      options,
+      projectRoot,
+      projectConfig,
+      components,
+    });
+    if (componentProviders.length === 0) {
+      const summary = "No project component has work tracking configured";
       preflight = [
         check(
           "workTracking",
           false,
-          "Project has work tracking configured",
+          "At least one component has work tracking configured",
           summary,
         ),
       ];
@@ -290,22 +344,17 @@ export async function runNexusAutomationAgentLaunchOnce(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        componentEligibleWorkItems,
+        components,
         contextFile,
         resultFile,
         launch: null,
       });
     }
 
-    provider = createAgentLaunchProvider({
-      options,
-      projectRoot,
-      sourceRoot,
-      projectConfig,
-    });
     preflight = preflightNexusAutomationAgentLaunch({
-      sourceRoot,
-      projectConfig,
-      provider,
+      components,
+      componentProviders,
     });
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
@@ -338,6 +387,8 @@ export async function runNexusAutomationAgentLaunchOnce(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        componentEligibleWorkItems,
+        components,
         contextFile,
         resultFile,
         launch: null,
@@ -345,12 +396,14 @@ export async function runNexusAutomationAgentLaunchOnce(
     }
 
     selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
-    eligibleWorkItems = eligibleNexusAutomationWorkItems(
-      await provider.listWorkItems({
-        ...selectorQuery,
-        projectRoot,
-      }),
+    componentEligibleWorkItems = await listEligibleWorkItemsByComponent(
+      componentProviders,
+      selectorQuery,
       automationConfig,
+      projectRoot,
+    );
+    eligibleWorkItems = componentEligibleWorkItems.flatMap(
+      (component) => component.workItems,
     );
     if (eligibleWorkItems.length === 0) {
       const summary = "No eligible work item matched the automation selector";
@@ -382,6 +435,8 @@ export async function runNexusAutomationAgentLaunchOnce(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        componentEligibleWorkItems,
+        components,
         contextFile,
         resultFile,
         launch: null,
@@ -396,10 +451,12 @@ export async function runNexusAutomationAgentLaunchOnce(
         startedAt,
         projectRoot,
         sourceRoot,
+        components,
         projectConfig,
         automationConfig,
         selectorQuery,
         eligibleWorkItems,
+        componentEligibleWorkItems,
       }),
     });
     contextFile = launchFiles.contextFile;
@@ -410,10 +467,12 @@ export async function runNexusAutomationAgentLaunchOnce(
       startedAt,
       projectRoot,
       sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       selectorQuery,
       eligibleWorkItems,
+      componentEligibleWorkItems,
       contextFile,
       resultFile,
     });
@@ -455,6 +514,8 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      componentEligibleWorkItems,
+      components,
       contextFile,
       resultFile,
       launch: agentResult,
@@ -494,6 +555,8 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      componentEligibleWorkItems,
+      components,
       contextFile,
       resultFile,
       launch: null,
@@ -561,28 +624,31 @@ export function createNexusAutomationAgentCommandLauncher(
 }
 
 export function preflightNexusAutomationAgentLaunch(options: {
-  sourceRoot: string;
-  projectConfig: NexusProjectConfig;
-  provider: WorkTrackerProvider;
+  components: ResolvedNexusProjectComponent[];
+  componentProviders: NexusAutomationAgentLaunchComponentProvider[];
 }): NexusAutomationPreflightCheck[] {
   return [
     check(
       "workTracking",
-      Boolean(options.projectConfig.workTracking),
-      "Project has work tracking configured",
-      "Project work tracking is not configured",
+      options.componentProviders.length > 0,
+      "At least one component has work tracking configured",
+      "No project component has work tracking configured",
     ),
-    check(
-      "trackerListItems",
-      options.provider.capabilities.listItems,
-      "Tracker can list work items",
-      `Tracker provider ${options.provider.provider} cannot list work items`,
+    ...options.componentProviders.map(({ component, provider }) =>
+      check(
+        `component:${component.id}:trackerListItems`,
+        provider.capabilities.listItems,
+        `Component ${component.id} tracker can list work items`,
+        `Component ${component.id} tracker provider ${provider.provider} cannot list work items`,
+      ),
     ),
-    check(
-      "sourceRoot",
-      fs.existsSync(options.sourceRoot) && fs.statSync(options.sourceRoot).isDirectory(),
-      "Project source root exists",
-      `Project source root does not exist: ${options.sourceRoot}`,
+    ...options.components.map((component) =>
+      check(
+        `component:${component.id}:sourceRoot`,
+        component.sourceRootExists,
+        `Component ${component.id} source root exists`,
+        `Component ${component.id} source root does not exist: ${component.sourceRoot}`,
+      ),
     ),
   ];
 }
@@ -599,16 +665,35 @@ export function generateNexusAutomationAgentRunId(
   return `agent-${timestamp}-${suffix}`;
 }
 
+function createAgentLaunchComponentProviders(options: {
+  options: RunNexusAutomationAgentLaunchOnceOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  components: ResolvedNexusProjectComponent[];
+}): NexusAutomationAgentLaunchComponentProvider[] {
+  return options.components
+    .filter((component) => component.workTracking)
+    .map((component) => ({
+      component,
+      provider: createAgentLaunchProvider({
+        options: options.options,
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+        component,
+      }),
+    }));
+}
+
 function createAgentLaunchProvider(options: {
   options: RunNexusAutomationAgentLaunchOnceOptions;
   projectRoot: string;
-  sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
 }): WorkTrackerProvider {
-  const workTracking = options.projectConfig.workTracking;
+  const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationAgentLaunchError(
-      "Project work tracking is not configured",
+      `Component ${options.component.id} work tracking is not configured`,
     );
   }
   if (options.options.provider) {
@@ -617,8 +702,9 @@ function createAgentLaunchProvider(options: {
   if (options.options.providerFactory) {
     return options.options.providerFactory({
       projectRoot: options.projectRoot,
-      sourceRoot: options.sourceRoot,
+      sourceRoot: options.component.sourceRoot,
       projectConfig: options.projectConfig,
+      component: options.component,
       workTracking,
     } satisfies NexusAutomationProviderContext);
   }
@@ -628,6 +714,29 @@ function createAgentLaunchProvider(options: {
     projectRoot: options.projectRoot,
     now: options.options.now,
   });
+}
+
+async function listEligibleWorkItemsByComponent(
+  componentProviders: NexusAutomationAgentLaunchComponentProvider[],
+  selectorQuery: WorkItemQuery,
+  automationConfig: NexusAutomationConfig,
+  projectRoot: string,
+): Promise<NexusAutomationComponentEligibleWorkItems[]> {
+  const grouped: NexusAutomationComponentEligibleWorkItems[] = [];
+  for (const { component, provider } of componentProviders) {
+    grouped.push({
+      componentId: component.id,
+      workItems: eligibleNexusAutomationWorkItems(
+        await provider.listWorkItems({
+          ...selectorQuery,
+          projectRoot,
+        }),
+        automationConfig,
+      ),
+    });
+  }
+
+  return grouped;
 }
 
 function buildAgentLaunchContext(
@@ -645,15 +754,40 @@ function buildAgentLaunchContext(
     project: {
       id: input.projectConfig.id,
       name: input.projectConfig.name,
+      componentCount: input.components.length,
     },
+    components: input.components.map(componentContext),
     automation: {
       mode: "agent_launch",
       selectorQuery: input.selectorQuery,
       eligibleWorkItemCount: input.eligibleWorkItems.length,
     },
     eligibleWorkItems: input.eligibleWorkItems,
+    componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
     publication: input.automationConfig.publication,
+  };
+}
+
+function componentContext(
+  component: ResolvedNexusProjectComponent,
+): NexusAutomationAgentLaunchComponentContext {
+  return {
+    id: component.id,
+    name: component.name,
+    role: component.role,
+    kind: component.kind,
+    sourceRoot: component.sourceRoot,
+    sourceRootExists: component.sourceRootExists,
+    worktreesRoot: component.worktreesRoot,
+    worktreesRootExists: component.worktreesRootExists,
+    remoteUrl: component.remoteUrl,
+    defaultBranch: component.defaultBranch,
+    workTracker: {
+      provider: component.workTracking?.provider ?? null,
+      configured: Boolean(component.workTracking),
+    },
+    relationships: component.relationships,
   };
 }
 
@@ -692,6 +826,14 @@ function agentLaunchEnvironment(
     DEV_NEXUS_STARTED_AT: input.startedAt,
     DEV_NEXUS_PROJECT_ROOT: input.projectRoot,
     DEV_NEXUS_SOURCE_ROOT: input.sourceRoot,
+    DEV_NEXUS_COMPONENT_COUNT: input.components.length.toString(),
+    DEV_NEXUS_COMPONENT_IDS: input.components
+      .map((component) => component.id)
+      .join(","),
+    DEV_NEXUS_PRIMARY_COMPONENT_ID:
+      input.components.find((component) => component.role === "primary")?.id ??
+      input.components[0]?.id ??
+      "",
     DEV_NEXUS_AGENT_CONTEXT_FILE: input.contextFile,
     DEV_NEXUS_AGENT_RESULT_FILE: input.resultFile,
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_COUNT: input.eligibleWorkItems.length.toString(),
@@ -943,10 +1085,25 @@ function check(
   };
 }
 
+type AgentLaunchResultInput = Omit<
+  RunNexusAutomationAgentLaunchOnceResult,
+  "componentEligibleWorkItems" | "components"
+> &
+  Partial<
+    Pick<
+      RunNexusAutomationAgentLaunchOnceResult,
+      "componentEligibleWorkItems" | "components"
+    >
+  >;
+
 function launchResult(
-  result: RunNexusAutomationAgentLaunchOnceResult,
+  result: AgentLaunchResultInput,
 ): RunNexusAutomationAgentLaunchOnceResult {
-  return result;
+  return {
+    ...result,
+    componentEligibleWorkItems: result.componentEligibleWorkItems ?? [],
+    components: result.components ?? [],
+  };
 }
 
 function safePathSegment(value: string): string {

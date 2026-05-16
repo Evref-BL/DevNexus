@@ -151,6 +151,127 @@ describe("nexus automation status", () => {
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
 
+  it("reports agent launch readiness grouped by configured components", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), { recursive: true });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+              storePath: primaryStorePath,
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:demo/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            workTracking: {
+              provider: "local",
+              storePath: addonStorePath,
+            },
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary work",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: fixedClock("2026-05-16T09:05:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon work",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      candidateCount: 2,
+      selectedWorkItem: null,
+      components: [
+        {
+          id: "primary",
+          role: "primary",
+          workTracking: {
+            provider: "local",
+          },
+        },
+        {
+          id: "addon",
+          role: "addon",
+          relationships: [
+            {
+              kind: "extends",
+              componentId: "primary",
+            },
+          ],
+        },
+      ],
+      componentEligibleWorkItems: [
+        {
+          componentId: "primary",
+          workItems: [
+            {
+              title: "Primary work",
+            },
+          ],
+        },
+        {
+          componentId: "addon",
+          workItems: [
+            {
+              title: "Addon work",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("reports an active run lock before listing candidate work", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     const config = projectConfig();

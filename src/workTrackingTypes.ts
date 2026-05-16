@@ -204,6 +204,8 @@ export interface NexusProjectContext {
   projectRoot: string;
   projectId: string;
   projectName: string;
+  componentId?: string;
+  componentName?: string;
   sourceRoot?: string;
   workTracking?: WorkTrackingConfig;
 }

@@ -57,7 +57,7 @@ import {
   type ListNexusProjectsResult,
   type NexusProjectHomeStore,
 } from "./nexusProjectHomeService.js";
-import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import { resolvePrimaryProjectComponent } from "./nexusProjectLifecycle.js";
 import {
   buildNexusProjectStatusForPath,
   type NexusProjectStatusBase,
@@ -801,8 +801,9 @@ function workItemService(
 function resolveDirectProject(projectRoot: string): ResolvedWorkItemProjectContext {
   const resolvedProjectRoot = path.resolve(projectRoot);
   const config = loadProjectConfig(resolvedProjectRoot);
-  if (!config.workTracking) {
-    throw new Error("Project work tracking is not configured");
+  const primaryComponent = resolvePrimaryProjectComponent(resolvedProjectRoot, config);
+  if (!primaryComponent.workTracking) {
+    throw new Error("Primary component work tracking is not configured");
   }
 
   return {
@@ -810,8 +811,10 @@ function resolveDirectProject(projectRoot: string): ResolvedWorkItemProjectConte
     projectRoot: resolvedProjectRoot,
     projectId: config.id,
     projectName: config.name,
-    sourceRoot: resolveProjectSourceRoot(resolvedProjectRoot, config),
-    workTracking: config.workTracking,
+    componentId: primaryComponent.id,
+    componentName: primaryComponent.name,
+    sourceRoot: primaryComponent.sourceRoot,
+    workTracking: primaryComponent.workTracking,
   };
 }
 
@@ -1669,6 +1672,13 @@ function printProjectStatusResult(
     stdout,
     `  Work tracking: ${project.workTracking?.provider ?? "not configured"}`,
   );
+  writeLine(stdout, `  Components: ${project.components.length}`);
+  for (const component of project.components) {
+    writeLine(
+      stdout,
+      `    ${component.id} [${component.role}] ${component.sourceRoot}`,
+    );
+  }
   writeLine(stdout, `  Config exists: ${project.projectConfigExists}`);
   writeLine(stdout, `  Worktrees root: ${project.worktreesRoot}`);
 }

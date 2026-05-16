@@ -233,4 +233,183 @@ describe("nexus automation agent launch", () => {
       ],
     });
   });
+
+  it("launches with component-scoped work items across multiple components", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), { recursive: true });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+              storePath: primaryStorePath,
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:demo/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            workTracking: {
+              provider: "local",
+              storePath: addonStorePath,
+            },
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary work",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: fixedClock("2026-05-16T09:05:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon work",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const commandRunner: NexusAutomationCommandRunner = (_command, options) => {
+      expect(options.env.DEV_NEXUS_COMPONENT_COUNT).toBe("2");
+      expect(options.env.DEV_NEXUS_COMPONENT_IDS).toBe("primary,addon");
+      expect(options.env.DEV_NEXUS_PRIMARY_COMPONENT_ID).toBe("primary");
+      const context = JSON.parse(
+        fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
+      );
+      expect(context.project).toMatchObject({
+        id: "demo-project",
+        componentCount: 2,
+      });
+      expect(context.components).toMatchObject([
+        {
+          id: "primary",
+          role: "primary",
+          workTracker: {
+            provider: "local",
+            configured: true,
+          },
+        },
+        {
+          id: "addon",
+          role: "addon",
+          relationships: [
+            {
+              kind: "extends",
+              componentId: "primary",
+            },
+          ],
+        },
+      ]);
+      expect(context.componentEligibleWorkItems).toMatchObject([
+        {
+          componentId: "primary",
+          workItems: [
+            {
+              id: "local-1",
+              title: "Primary work",
+            },
+          ],
+        },
+        {
+          componentId: "addon",
+          workItems: [
+            {
+              id: "local-1",
+              title: "Addon work",
+            },
+          ],
+        },
+      ]);
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Component-aware launch complete",
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command: "codex run",
+        cwd: options.cwd,
+        stdout: "launched",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-components-1",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      components: [
+        {
+          id: "primary",
+          workTracking: {
+            provider: "local",
+          },
+        },
+        {
+          id: "addon",
+          workTracking: {
+            provider: "local",
+          },
+        },
+      ],
+      componentEligibleWorkItems: [
+        {
+          componentId: "primary",
+          workItems: [{ title: "Primary work" }],
+        },
+        {
+          componentId: "addon",
+          workItems: [{ title: "Addon work" }],
+        },
+      ],
+    });
+  });
 });

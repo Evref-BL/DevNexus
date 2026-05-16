@@ -26,10 +26,12 @@ import {
 } from "./nexusAutomationWorktreeSetup.js";
 import {
   loadProjectConfig,
-  projectWorktreesRootPath,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import {
+  resolvePrimaryProjectComponent,
+  type ResolvedNexusProjectComponent,
+} from "./nexusProjectLifecycle.js";
 import {
   applyWorktreeExecutionUpdate,
   emptyWorktreeExecutionMetadata,
@@ -85,6 +87,7 @@ export interface NexusAutomationProviderContext {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component?: ResolvedNexusProjectComponent;
   workTracking: WorkTrackingConfig;
 }
 
@@ -158,6 +161,7 @@ export async function runNexusAutomationOnce(
   let setup: NexusAutomationWorktreeSetupResult | null = null;
   let ledger: NexusAutomationRunLedger | null = null;
   let provider: WorkTrackerProvider | null = null;
+  let primaryComponent: ResolvedNexusProjectComponent | null = null;
   let preflight: NexusAutomationPreflightCheck[] = [];
 
   if (!automationConfig?.enabled) {
@@ -233,14 +237,15 @@ export async function runNexusAutomationOnce(
       });
     }
 
-    sourceRoot = resolveProjectSourceRoot(projectRoot, projectConfig);
-    if (!projectConfig.workTracking) {
-      const summary = "Project work tracking is not configured";
+    primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);
+    sourceRoot = primaryComponent.sourceRoot;
+    if (!primaryComponent.workTracking) {
+      const summary = "Primary component work tracking is not configured";
       preflight = [
         check(
           "workTracking",
           false,
-          "Project has work tracking configured",
+          "Primary component has work tracking configured",
           summary,
         ),
       ];
@@ -284,11 +289,13 @@ export async function runNexusAutomationOnce(
       projectRoot,
       sourceRoot,
       projectConfig,
+      component: primaryComponent,
     });
     preflight = preflightNexusAutomationRunOnce({
       projectRoot,
       sourceRoot,
       projectConfig,
+      component: primaryComponent,
       automationConfig,
       provider,
     });
@@ -372,12 +379,16 @@ export async function runNexusAutomationOnce(
       });
     }
 
-    const baseRef = options.baseRef ?? projectConfig.repo.defaultBranch ?? null;
+    const baseRef =
+      options.baseRef ??
+      primaryComponent.defaultBranch ??
+      projectConfig.repo.defaultBranch ??
+      null;
     const branchName =
       options.branchName ?? defaultAutomationBranchName(projectConfig.id, workItem.id, runId);
     worktree = prepareGitWorktree({
       sourceRoot,
-      worktreesRoot: projectWorktreesRootPath(projectRoot, projectConfig),
+      worktreesRoot: primaryComponent.worktreesRoot,
       branchName,
       ...(options.worktreeName ? { worktreeName: options.worktreeName } : {}),
       ...(baseRef ? { baseRef } : {}),
@@ -534,20 +545,18 @@ export function preflightNexusAutomationRunOnce(options: {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
   automationConfig: NexusAutomationConfig;
   provider: WorkTrackerProvider;
 }): NexusAutomationPreflightCheck[] {
-  const worktreesRoot = projectWorktreesRootPath(
-    options.projectRoot,
-    options.projectConfig,
-  );
+  const worktreesRoot = options.component.worktreesRoot;
 
   return [
     check(
       "workTracking",
-      Boolean(options.projectConfig.workTracking),
-      "Project has work tracking configured",
-      "Project work tracking is not configured",
+      Boolean(options.component.workTracking),
+      "Primary component has work tracking configured",
+      "Primary component work tracking is not configured",
     ),
     check(
       "trackerListItems",
@@ -569,15 +578,15 @@ export function preflightNexusAutomationRunOnce(options: {
     ),
     check(
       "gitRepository",
-      options.projectConfig.repo.kind === "git",
-      "Project source is Git-backed",
-      "Automation worktree preparation requires repo.kind to be git",
+      options.component.kind === "git",
+      "Primary component source is Git-backed",
+      "Automation worktree preparation requires the primary component to be Git-backed",
     ),
     check(
       "sourceRoot",
       fs.existsSync(options.sourceRoot) && fs.statSync(options.sourceRoot).isDirectory(),
-      "Project source root exists",
-      `Project source root does not exist: ${options.sourceRoot}`,
+      "Primary component source root exists",
+      `Primary component source root does not exist: ${options.sourceRoot}`,
     ),
     check(
       "worktreesRoot",
@@ -609,11 +618,12 @@ function createAutomationProvider(options: {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
 }): WorkTrackerProvider {
-  const workTracking = options.projectConfig.workTracking;
+  const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationRunOnceError(
-      "Project work tracking is not configured",
+      "Primary component work tracking is not configured",
     );
   }
   if (options.options.provider) {
@@ -624,6 +634,7 @@ function createAutomationProvider(options: {
       projectRoot: options.projectRoot,
       sourceRoot: options.sourceRoot,
       projectConfig: options.projectConfig,
+      component: options.component,
       workTracking,
     });
   }

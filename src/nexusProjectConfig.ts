@@ -21,6 +21,8 @@ import type {
 import {
   validateNexusAutomationConfig,
   type NexusAutomationConfig,
+  type NexusAutomationPublicationConfig,
+  type NexusAutomationVerificationConfig,
 } from "./nexusAutomationConfig.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
@@ -33,6 +35,39 @@ export interface NexusProjectRepoConfig {
   remoteUrl: string | null;
   defaultBranch: string | null;
   sourceRoot?: string;
+}
+
+export type NexusProjectComponentRole =
+  | "primary"
+  | "extension"
+  | "addon"
+  | "dependency"
+  | "optional";
+
+export type NexusProjectComponentRelationshipKind =
+  | "extends"
+  | "depends_on"
+  | "optional"
+  | "related";
+
+export interface NexusProjectComponentRelationshipConfig {
+  kind: NexusProjectComponentRelationshipKind;
+  componentId: string;
+}
+
+export interface NexusProjectComponentConfig {
+  id: string;
+  name: string;
+  kind: NexusProjectRepoKind;
+  role: NexusProjectComponentRole;
+  remoteUrl: string | null;
+  defaultBranch: string | null;
+  sourceRoot?: string;
+  worktreesRoot?: string;
+  workTracking?: WorkTrackingConfig;
+  verification?: Partial<NexusAutomationVerificationConfig>;
+  publication?: Partial<NexusAutomationPublicationConfig>;
+  relationships: NexusProjectComponentRelationshipConfig[];
 }
 
 export interface NexusAgentConfig {
@@ -54,6 +89,7 @@ export interface NexusProjectConfig {
   name: string;
   home: string | null;
   repo: NexusProjectRepoConfig;
+  components: NexusProjectComponentConfig[];
   worktreesRoot: string;
   kanban: NexusProjectKanbanConfig;
   workTracking?: WorkTrackingConfig;
@@ -663,6 +699,173 @@ function validateWorkTrackingConfig(
   } satisfies JiraWorkTrackingConfig;
 }
 
+function optionalBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): boolean | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "boolean") {
+    throw new NexusConfigError(`${pathName}.${key} must be a boolean`);
+  }
+
+  return value;
+}
+
+function optionalStringArray(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName}.${key} must be an array`);
+  }
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new NexusConfigError(
+        `${pathName}.${key}[${index}] must be a non-empty string`,
+      );
+    }
+  }
+
+  return [...value];
+}
+
+function validateComponentRole(
+  value: unknown,
+  fallback: NexusProjectComponentRole,
+  pathName: string,
+): NexusProjectComponentRole {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (
+    value === "primary" ||
+    value === "extension" ||
+    value === "addon" ||
+    value === "dependency" ||
+    value === "optional"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be primary, extension, addon, dependency, or optional`,
+  );
+}
+
+function validateComponentRelationshipKind(
+  value: unknown,
+  pathName: string,
+): NexusProjectComponentRelationshipKind {
+  if (
+    value === "extends" ||
+    value === "depends_on" ||
+    value === "optional" ||
+    value === "related"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be extends, depends_on, optional, or related`,
+  );
+}
+
+function validateComponentRelationships(
+  value: unknown,
+  pathName: string,
+): NexusProjectComponentRelationshipConfig[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const entryPath = `${pathName}[${index}]`;
+    const record = assertRecord(entry, entryPath);
+    return {
+      kind: validateComponentRelationshipKind(record.kind, `${entryPath}.kind`),
+      componentId: requiredString(record, "componentId", entryPath),
+    };
+  });
+}
+
+function validateComponentVerificationConfig(
+  value: unknown,
+  pathName: string,
+): Partial<NexusAutomationVerificationConfig> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const focusedCommands = optionalStringArray(record, "focusedCommands", pathName);
+  const fullCommands = optionalStringArray(record, "fullCommands", pathName);
+  const requirePassing = optionalBoolean(record, "requirePassing", pathName);
+
+  return {
+    ...(focusedCommands !== undefined ? { focusedCommands } : {}),
+    ...(fullCommands !== undefined ? { fullCommands } : {}),
+    ...(requirePassing !== undefined ? { requirePassing } : {}),
+  };
+}
+
+function validatePublicationStrategy(
+  value: unknown,
+  pathName: string,
+): NexusAutomationPublicationConfig["strategy"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    value === "local_only" ||
+    value === "direct_integration" ||
+    value === "review_handoff"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be local_only, direct_integration, or review_handoff`,
+  );
+}
+
+function validateComponentPublicationConfig(
+  value: unknown,
+  pathName: string,
+): Partial<NexusAutomationPublicationConfig> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const strategy = validatePublicationStrategy(record.strategy, `${pathName}.strategy`);
+  const remote = optionalNullableString(record, "remote", pathName);
+  const targetBranch = optionalNullableString(record, "targetBranch", pathName);
+  const push = optionalBoolean(record, "push", pathName);
+
+  return {
+    ...(strategy !== undefined ? { strategy } : {}),
+    ...(remote !== undefined ? { remote } : {}),
+    ...(targetBranch !== undefined ? { targetBranch } : {}),
+    ...(push !== undefined ? { push } : {}),
+  };
+}
+
 function validateRepoConfig(value: unknown): NexusProjectRepoConfig {
   if (value === undefined) {
     return {
@@ -687,6 +890,116 @@ function validateRepoConfig(value: unknown): NexusProjectRepoConfig {
   };
 }
 
+function validateProjectComponent(
+  value: unknown,
+  index: number,
+): NexusProjectComponentConfig {
+  const pathName = `project config.components[${index}]`;
+  const record = assertRecord(value, pathName);
+  const id = requiredString(record, "id", pathName);
+  const kind = record.kind;
+  if (kind !== "local" && kind !== "git") {
+    throw new NexusConfigError(`${pathName}.kind must be local or git`);
+  }
+  const sourceRoot = optionalString(record, "sourceRoot", pathName) ?? `components/${id}`;
+  const worktreesRoot = optionalString(record, "worktreesRoot", pathName);
+  const workTracking = validateWorkTrackingConfig(record.workTracking);
+  const verification = validateComponentVerificationConfig(
+    record.verification,
+    `${pathName}.verification`,
+  );
+  const publication = validateComponentPublicationConfig(
+    record.publication,
+    `${pathName}.publication`,
+  );
+
+  return {
+    id,
+    name: optionalString(record, "name", pathName) ?? id,
+    kind,
+    role: validateComponentRole(
+      record.role,
+      index === 0 ? "primary" : "dependency",
+      `${pathName}.role`,
+    ),
+    remoteUrl: nullableString(record, "remoteUrl", pathName),
+    defaultBranch: nullableString(record, "defaultBranch", pathName),
+    ...(sourceRoot ? { sourceRoot } : {}),
+    ...(worktreesRoot ? { worktreesRoot } : {}),
+    ...(workTracking ? { workTracking } : {}),
+    ...(verification ? { verification } : {}),
+    ...(publication ? { publication } : {}),
+    relationships: validateComponentRelationships(
+      record.relationships,
+      `${pathName}.relationships`,
+    ),
+  };
+}
+
+function defaultPrimaryComponentFromRepo(
+  config: Pick<NexusProjectConfig, "name" | "repo" | "workTracking">,
+): NexusProjectComponentConfig {
+  return {
+    id: "primary",
+    name: config.name,
+    kind: config.repo.kind,
+    role: "primary",
+    remoteUrl: config.repo.remoteUrl,
+    defaultBranch: config.repo.defaultBranch,
+    sourceRoot: config.repo.sourceRoot ?? ".",
+    ...(config.workTracking ? { workTracking: config.workTracking } : {}),
+    relationships: [],
+  };
+}
+
+function validateProjectComponentsConfig(
+  value: unknown,
+  fallback: Pick<NexusProjectConfig, "name" | "repo" | "workTracking">,
+): NexusProjectComponentConfig[] {
+  if (value === undefined) {
+    return [defaultPrimaryComponentFromRepo(fallback)];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.components must be an array");
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError("project config.components must not be empty");
+  }
+
+  const components = value.map((entry, index) =>
+    validateProjectComponent(entry, index),
+  );
+  const ids = new Set<string>();
+  for (const component of components) {
+    if (ids.has(component.id)) {
+      throw new NexusConfigError(
+        `project config.components contains duplicate id: ${component.id}`,
+      );
+    }
+    ids.add(component.id);
+  }
+  const primaryComponents = components.filter(
+    (component) => component.role === "primary",
+  );
+  if (primaryComponents.length !== 1) {
+    throw new NexusConfigError(
+      "project config.components must contain exactly one primary component",
+    );
+  }
+  for (const component of components) {
+    for (const relationship of component.relationships) {
+      if (!ids.has(relationship.componentId)) {
+        throw new NexusConfigError(
+          `project config.components.${component.id} relationship references unknown component: ${relationship.componentId}`,
+        );
+      }
+    }
+  }
+
+  return components;
+}
+
 export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const record = assertRecord(value, "project config");
   if (record.version !== 1) {
@@ -697,18 +1010,24 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
   const automation = validateNexusAutomationConfig(record.automation);
-
-  return {
-    version: 1,
+  const repo = validateRepoConfig(record.repo);
+  const worktreesRoot =
+    optionalString(record, "worktreesRoot", "project config") ??
+    nexusProjectWorktreesDirectoryName;
+  const common = {
+    version: 1 as const,
     id: requiredString(record, "id", "project config"),
     name: requiredString(record, "name", "project config"),
     home: nullableString(record, "home", "project config"),
-    repo: validateRepoConfig(record.repo),
-    worktreesRoot:
-      optionalString(record, "worktreesRoot", "project config") ??
-      nexusProjectWorktreesDirectoryName,
+    repo,
+    worktreesRoot,
     kanban: validateKanbanConfig(record.kanban),
     ...(workTracking ? { workTracking } : {}),
+  };
+
+  return {
+    ...common,
+    components: validateProjectComponentsConfig(record.components, common),
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
     ...(skills ? { skills } : {}),

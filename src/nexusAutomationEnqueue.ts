@@ -5,7 +5,10 @@ import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import {
+  resolvePrimaryProjectComponent,
+  type ResolvedNexusProjectComponent,
+} from "./nexusProjectLifecycle.js";
 import {
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
@@ -20,7 +23,8 @@ export interface EnqueueNexusAutomationWorkItemProviderContext {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
-  workTracking: NonNullable<NexusProjectConfig["workTracking"]>;
+  component: ResolvedNexusProjectComponent;
+  workTracking: NonNullable<ResolvedNexusProjectComponent["workTracking"]>;
 }
 
 export type EnqueueNexusAutomationWorkItemProviderFactory = (
@@ -67,13 +71,14 @@ export async function enqueueNexusAutomationWorkItem(
       "Project automation is not enabled",
     );
   }
-  if (!projectConfig.workTracking) {
+  const primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  if (!primaryComponent.workTracking) {
     throw new NexusAutomationEnqueueError(
-      "Project work tracking is not configured",
+      "Primary component work tracking is not configured",
     );
   }
 
-  const sourceRoot = resolveProjectSourceRoot(projectRoot, projectConfig);
+  const sourceRoot = primaryComponent.sourceRoot;
   const status = resolveEnqueueStatus(automationConfig, options.status);
   const labels = resolveSelectorStrings(
     "labels",
@@ -97,6 +102,7 @@ export async function enqueueNexusAutomationWorkItem(
     projectRoot,
     sourceRoot,
     projectConfig,
+    component: primaryComponent,
   });
   const workItem = await provider.createWorkItem({
     projectRoot,
@@ -128,11 +134,12 @@ function resolveProvider(options: {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
 }): WorkTrackerProvider {
-  const workTracking = options.projectConfig.workTracking;
+  const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationEnqueueError(
-      "Project work tracking is not configured",
+      "Primary component work tracking is not configured",
     );
   }
   if (options.options.provider) {
@@ -143,6 +150,7 @@ function resolveProvider(options: {
       projectRoot: options.projectRoot,
       sourceRoot: options.sourceRoot,
       projectConfig: options.projectConfig,
+      component: options.component,
       workTracking,
     });
   }

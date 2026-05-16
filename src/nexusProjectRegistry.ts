@@ -11,6 +11,8 @@ import {
   ensureUniqueProject,
   loadProjectConfigIfExists,
   NexusProjectError,
+  resolveProjectComponents,
+  type ResolvedNexusProjectComponent,
   samePath,
 } from "./nexusProjectLifecycle.js";
 import type { WorkTrackingConfig } from "./workTrackingTypes.js";
@@ -32,6 +34,7 @@ export interface NexusProjectStatusBase {
   name: string;
   projectRoot: string;
   repo: NexusProjectConfig["repo"] | null;
+  components: ResolvedNexusProjectComponent[];
   workTracking: WorkTrackingConfig | null;
   vibeKanbanProjectId: string | null;
   vibeKanbanRepoId: string | null;
@@ -98,12 +101,14 @@ export function buildNexusProjectStatus(
   const config = options.projectConfig ?? loadProjectConfigIfExists(projectRoot);
   const resolvedProjectConfigPath = projectConfigPath(projectRoot);
   const resolvedWorktreesRoot = projectWorktreesRootPath(projectRoot, config);
+  const components = config ? resolveProjectComponents(projectRoot, config) : [];
 
   return {
     id: config?.id ?? reference.id,
     name: config?.name ?? reference.name,
     projectRoot,
     repo: config?.repo ?? null,
+    components,
     workTracking: config?.workTracking ?? null,
     vibeKanbanProjectId:
       config?.kanban.projectId ?? reference.vibeKanbanProjectId ?? null,

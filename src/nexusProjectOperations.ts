@@ -156,17 +156,30 @@ export function buildProjectConfig(
   forceGit = false,
   extensions?: NexusProjectExtensionsConfig,
 ): NexusProjectConfig {
+  const repo = {
+    kind: from || sourceRoot || forceGit ? "git" as const : "local" as const,
+    remoteUrl: from ?? null,
+    defaultBranch,
+    ...(sourceRoot ? { sourceRoot } : {}),
+  };
   return {
     version: 1,
     id: projectId,
     name,
     home: null,
-    repo: {
-      kind: from || sourceRoot || forceGit ? "git" : "local",
-      remoteUrl: from ?? null,
-      defaultBranch,
-      ...(sourceRoot ? { sourceRoot } : {}),
-    },
+    repo,
+    components: [
+      {
+        id: "primary",
+        name,
+        kind: repo.kind,
+        role: "primary",
+        remoteUrl: repo.remoteUrl,
+        defaultBranch: repo.defaultBranch,
+        sourceRoot: sourceRoot ?? ".",
+        relationships: [],
+      },
+    ],
     worktreesRoot: nexusProjectWorktreesDirectoryName,
     kanban: {
       provider: "vibe-kanban",
@@ -481,6 +494,14 @@ export function configureNexusProjectTrackerInRegistry(
   const updatedProjectConfig: NexusProjectConfig = {
     ...projectConfig,
     workTracking,
+    components: projectConfig.components.map((component) =>
+      component.role === "primary"
+        ? {
+            ...component,
+            workTracking,
+          }
+        : component,
+    ),
   };
   const projectConfigFilePath = saveProjectConfig(projectRoot, updatedProjectConfig);
   const reference = upsertNexusProjectReference(

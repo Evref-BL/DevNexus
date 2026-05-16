@@ -11,12 +11,20 @@ import {
   type NexusAutomationRunLedger,
 } from "./nexusAutomation.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
-import { preflightNexusAutomationAgentLaunch } from "./nexusAutomationAgentLaunch.js";
+import {
+  preflightNexusAutomationAgentLaunch,
+  type NexusAutomationAgentLaunchComponentProvider,
+  type NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationAgentLaunch.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import {
+  resolvePrimaryProjectComponent,
+  resolveProjectComponents,
+  type ResolvedNexusProjectComponent,
+} from "./nexusProjectLifecycle.js";
 import {
   preflightNexusAutomationRunOnce,
   type NexusAutomationPreflightCheck,
@@ -68,6 +76,7 @@ export interface GetNexusAutomationStatusOptions {
 export interface NexusAutomationStatus {
   projectRoot: string;
   sourceRoot: string | null;
+  components: ResolvedNexusProjectComponent[];
   projectConfig: NexusProjectConfig;
   automationConfig: NexusAutomationConfig | null;
   status: NexusAutomationStatusKind;
@@ -79,6 +88,7 @@ export interface NexusAutomationStatus {
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkItems: WorkItem[] | null;
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] | null;
   selectedWorkItem: WorkItem | null;
 }
 
@@ -95,10 +105,14 @@ export async function getNexusAutomationStatus(
   const projectRoot = path.resolve(requiredNonEmptyString(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
   const automationConfig = projectConfig.automation ?? null;
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  const sourceRoot = primaryComponent.sourceRoot;
   if (!automationConfig?.enabled) {
     return statusResult({
       projectRoot,
-      sourceRoot: null,
+      sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "disabled",
@@ -115,13 +129,13 @@ export async function getNexusAutomationStatus(
   }
 
   const now = currentIso(options.now);
-  const sourceRoot = resolveProjectSourceRoot(projectRoot, projectConfig);
   const ledger = readNexusAutomationRunLedger(projectRoot, automationConfig);
   const lock = readNexusAutomationStatusLock(projectRoot, automationConfig, now);
   if (lock.status === "active") {
     return statusResult({
       projectRoot,
       sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "locked",
@@ -140,6 +154,7 @@ export async function getNexusAutomationStatus(
     return statusResult({
       projectRoot,
       sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "blocked",
@@ -164,6 +179,7 @@ export async function getNexusAutomationStatus(
     return statusResult({
       projectRoot,
       sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "backoff",
@@ -179,11 +195,107 @@ export async function getNexusAutomationStatus(
     });
   }
 
-  if (!projectConfig.workTracking) {
-    const summary = "Project work tracking is not configured";
+  if (automationConfig.mode === "agent_launch") {
+    const componentProviders = createStatusComponentProviders({
+      options,
+      projectRoot,
+      projectConfig,
+      components,
+    });
+    if (componentProviders.length === 0) {
+      const summary = "No project component has work tracking configured";
+      return statusResult({
+        projectRoot,
+        sourceRoot,
+        components,
+        projectConfig,
+        automationConfig,
+        status: "blocked",
+        summary,
+        lock,
+        ledger,
+        backoff,
+        preflight: [
+          {
+            name: "workTracking",
+            status: "failed",
+            message: summary,
+          },
+        ],
+        selectorQuery: null,
+        candidateCount: null,
+        eligibleWorkItems: null,
+        selectedWorkItem: null,
+      });
+    }
+    const preflight = preflightNexusAutomationAgentLaunch({
+      components,
+      componentProviders,
+    });
+    const failedChecks = preflight.filter((check) => check.status === "failed");
+    if (failedChecks.length > 0) {
+      return statusResult({
+        projectRoot,
+        sourceRoot,
+        components,
+        projectConfig,
+        automationConfig,
+        status: "blocked",
+        summary: failedChecks.map((check) => check.message).join("; "),
+        lock,
+        ledger,
+        backoff,
+        preflight,
+        selectorQuery: null,
+        candidateCount: null,
+        eligibleWorkItems: null,
+        selectedWorkItem: null,
+      });
+    }
+
+    const selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
+    const componentEligibleWorkItems = await listStatusEligibleWorkItemsByComponent(
+      componentProviders,
+      selectorQuery,
+      automationConfig,
+      projectRoot,
+    );
+    const eligibleWorkItems = componentEligibleWorkItems.flatMap(
+      (component) => component.workItems,
+    );
+    const status: NexusAutomationStatusKind =
+      eligibleWorkItems.length > 0 ? "ready" : "idle";
+    const summary =
+      eligibleWorkItems.length > 0
+        ? `Agent launch ready with ${eligibleWorkItems.length} eligible work item(s)`
+        : "No eligible work item matched the automation selector";
+
     return statusResult({
       projectRoot,
       sourceRoot,
+      components,
+      projectConfig,
+      automationConfig,
+      status,
+      summary,
+      lock,
+      ledger,
+      backoff,
+      preflight,
+      selectorQuery,
+      candidateCount: eligibleWorkItems.length,
+      eligibleWorkItems,
+      componentEligibleWorkItems,
+      selectedWorkItem: null,
+    });
+  }
+
+  if (!primaryComponent.workTracking) {
+    const summary = "Primary component work tracking is not configured";
+    return statusResult({
+      projectRoot,
+      sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "blocked",
@@ -210,70 +322,14 @@ export async function getNexusAutomationStatus(
     projectRoot,
     sourceRoot,
     projectConfig,
+    component: primaryComponent,
   });
-  if (automationConfig.mode === "agent_launch") {
-    const preflight = preflightNexusAutomationAgentLaunch({
-      sourceRoot,
-      projectConfig,
-      provider,
-    });
-    const failedChecks = preflight.filter((check) => check.status === "failed");
-    if (failedChecks.length > 0) {
-      return statusResult({
-        projectRoot,
-        sourceRoot,
-        projectConfig,
-        automationConfig,
-        status: "blocked",
-        summary: failedChecks.map((check) => check.message).join("; "),
-        lock,
-        ledger,
-        backoff,
-        preflight,
-        selectorQuery: null,
-        candidateCount: null,
-        eligibleWorkItems: null,
-        selectedWorkItem: null,
-      });
-    }
-
-    const selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
-    const eligibleWorkItems = eligibleNexusAutomationWorkItems(
-      await provider.listWorkItems({
-        ...selectorQuery,
-        projectRoot,
-      }),
-      automationConfig,
-    );
-    const status: NexusAutomationStatusKind =
-      eligibleWorkItems.length > 0 ? "ready" : "idle";
-    const summary =
-      eligibleWorkItems.length > 0
-        ? `Agent launch ready with ${eligibleWorkItems.length} eligible work item(s)`
-        : "No eligible work item matched the automation selector";
-
-    return statusResult({
-      projectRoot,
-      sourceRoot,
-      projectConfig,
-      automationConfig,
-      status,
-      summary,
-      lock,
-      ledger,
-      backoff,
-      preflight,
-      selectorQuery,
-      candidateCount: eligibleWorkItems.length,
-      eligibleWorkItems,
-      selectedWorkItem: null,
-    });
-  }
 
   const preflight = preflightNexusAutomationRunOnce({
     projectRoot,
     sourceRoot,
     projectConfig,
+    component: primaryComponent,
     automationConfig,
     provider,
   });
@@ -282,6 +338,7 @@ export async function getNexusAutomationStatus(
     return statusResult({
       projectRoot,
       sourceRoot,
+      components,
       projectConfig,
       automationConfig,
       status: "blocked",
@@ -312,6 +369,7 @@ export async function getNexusAutomationStatus(
   return statusResult({
     projectRoot,
     sourceRoot,
+    components,
     projectConfig,
     automationConfig,
     status,
@@ -394,11 +452,12 @@ function createStatusProvider(options: {
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
 }): WorkTrackerProvider {
-  const workTracking = options.projectConfig.workTracking;
+  const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationStatusError(
-      "Project work tracking is not configured",
+      "Primary component work tracking is not configured",
     );
   }
   if (options.options.provider) {
@@ -409,6 +468,7 @@ function createStatusProvider(options: {
       projectRoot: options.projectRoot,
       sourceRoot: options.sourceRoot,
       projectConfig: options.projectConfig,
+      component: options.component,
       workTracking,
     } satisfies NexusAutomationProviderContext);
   }
@@ -420,8 +480,94 @@ function createStatusProvider(options: {
   });
 }
 
-function statusResult(result: NexusAutomationStatus): NexusAutomationStatus {
-  return result;
+function createStatusComponentProviders(options: {
+  options: GetNexusAutomationStatusOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  components: ResolvedNexusProjectComponent[];
+}): NexusAutomationAgentLaunchComponentProvider[] {
+  return options.components
+    .filter((component) => component.workTracking)
+    .map((component) => ({
+      component,
+      provider: createStatusComponentProvider({
+        options: options.options,
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+        component,
+      }),
+    }));
+}
+
+function createStatusComponentProvider(options: {
+  options: GetNexusAutomationStatusOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
+}): WorkTrackerProvider {
+  const workTracking = options.component.workTracking;
+  if (!workTracking) {
+    throw new NexusAutomationStatusError(
+      `Component ${options.component.id} work tracking is not configured`,
+    );
+  }
+  if (options.options.provider) {
+    return options.options.provider;
+  }
+  if (options.options.providerFactory) {
+    return options.options.providerFactory({
+      projectRoot: options.projectRoot,
+      sourceRoot: options.component.sourceRoot,
+      projectConfig: options.projectConfig,
+      component: options.component,
+      workTracking,
+    } satisfies NexusAutomationProviderContext);
+  }
+
+  return createWorkTrackerProvider(workTracking, {
+    ...options.options.providerOptions,
+    projectRoot: options.projectRoot,
+    now: options.options.now,
+  });
+}
+
+async function listStatusEligibleWorkItemsByComponent(
+  componentProviders: NexusAutomationAgentLaunchComponentProvider[],
+  selectorQuery: WorkItemQuery,
+  automationConfig: NexusAutomationConfig,
+  projectRoot: string,
+): Promise<NexusAutomationComponentEligibleWorkItems[]> {
+  const grouped: NexusAutomationComponentEligibleWorkItems[] = [];
+  for (const { component, provider } of componentProviders) {
+    grouped.push({
+      componentId: component.id,
+      workItems: eligibleNexusAutomationWorkItems(
+        await provider.listWorkItems({
+          ...selectorQuery,
+          projectRoot,
+        }),
+        automationConfig,
+      ),
+    });
+  }
+
+  return grouped;
+}
+
+type AutomationStatusInput = Omit<
+  NexusAutomationStatus,
+  "componentEligibleWorkItems" | "components"
+> &
+  Partial<
+    Pick<NexusAutomationStatus, "componentEligibleWorkItems" | "components">
+  >;
+
+function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
+  return {
+    ...result,
+    components: result.components ?? [],
+    componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
+  };
 }
 
 function currentIso(now?: () => Date | string): string {

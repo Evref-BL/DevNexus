@@ -713,7 +713,12 @@ describe("dev-nexus cli", () => {
         "add",
         "-b",
         "codex/demo-project/local-1/run-cli",
-        path.join(projectRoot, "worktrees", "codex-demo-project-local-1-run-cli"),
+        path.join(
+          projectRoot,
+          "worktrees",
+          "primary",
+          "codex-demo-project-local-1-run-cli",
+        ),
         "main",
       ],
       cwd: path.join(projectRoot, "source"),
@@ -966,14 +971,15 @@ describe("dev-nexus cli", () => {
     expect(gitCalls[0]).toMatchObject({
       args: [
         "worktree",
-        "add",
-        "-b",
-        "codex/demo-project/local-1/scheduled-20260516-t100000-000-z-1",
-        path.join(
-          projectRoot,
-          "worktrees",
-          "codex-demo-project-local-1-scheduled-20260516-t100000-000-z-1",
-        ),
+          "add",
+          "-b",
+          "codex/demo-project/local-1/scheduled-20260516-t100000-000-z-1",
+          path.join(
+            projectRoot,
+            "worktrees",
+            "primary",
+            "codex-demo-project-local-1-scheduled-20260516-t100000-000-z-1",
+          ),
         "main",
       ],
       cwd: path.join(projectRoot, "source"),

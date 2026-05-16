@@ -41,6 +41,50 @@ describe("project config", () => {
         defaultBranch: "main",
         sourceRoot: "source",
       },
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git" as const,
+          role: "primary" as const,
+          remoteUrl: "https://github.com/example/my-project.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          worktreesRoot: "worktrees/core",
+          workTracking: {
+            provider: "github" as const,
+            repository: {
+              owner: "example",
+              name: "my-project",
+            },
+          },
+          verification: {
+            focusedCommands: ["npm test"],
+            requirePassing: true,
+          },
+          publication: {
+            strategy: "review_handoff" as const,
+            remote: "origin",
+            targetBranch: "main",
+          },
+          relationships: [],
+        },
+        {
+          id: "addon",
+          name: "Addon",
+          kind: "local" as const,
+          role: "addon" as const,
+          remoteUrl: null,
+          defaultBranch: null,
+          sourceRoot: "components/addon",
+          relationships: [
+            {
+              kind: "extends" as const,
+              componentId: "core",
+            },
+          ],
+        },
+      ],
       worktreesRoot: "worktrees",
       kanban: {
         provider: "vibe-kanban" as const,
@@ -121,6 +165,18 @@ describe("project config", () => {
         remoteUrl: null,
         defaultBranch: null,
       },
+      components: [
+        {
+          id: "primary",
+          name: "Legacy Project",
+          kind: "local",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: null,
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
       worktreesRoot: "worktrees",
       kanban: {
         provider: "vibe-kanban",

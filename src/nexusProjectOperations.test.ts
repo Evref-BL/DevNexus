@@ -116,6 +116,13 @@ describe("project operations", () => {
       projectConfig: {
         id: "plain-tool",
         name: "PlainTool",
+        components: [
+          {
+            id: "primary",
+            role: "primary",
+            sourceRoot: ".",
+          },
+        ],
       },
       reference: {
         id: "plain-tool",
@@ -191,6 +198,15 @@ describe("project operations", () => {
       defaultBranch: "trunk",
       sourceRoot: "git",
     });
+    expect(result.projectConfig.components).toMatchObject([
+      {
+        id: "primary",
+        role: "primary",
+        remoteUrl: "https://github.com/example/remote-project.git",
+        defaultBranch: "trunk",
+        sourceRoot: "git",
+      },
+    ]);
   });
 
   it("imports an existing Git repository into a separate managed root", () => {
@@ -218,6 +234,13 @@ describe("project operations", () => {
         defaultBranch: "main",
         sourceRoot,
       },
+      components: [
+        {
+          id: "primary",
+          role: "primary",
+          sourceRoot,
+        },
+      ],
     });
     expect(fs.existsSync(path.join(result.projectRoot, devNexusProjectConfigFileName))).toBe(true);
     expect(fs.existsSync(path.join(sourceRoot, devNexusProjectConfigFileName))).toBe(false);
@@ -324,6 +347,12 @@ describe("project operations", () => {
       },
     });
     expect(loadProjectConfig(projectRoot).workTracking).toEqual(result.workTracking);
+    expect(loadProjectConfig(projectRoot).components).toMatchObject([
+      {
+        id: "primary",
+        workTracking: result.workTracking,
+      },
+    ]);
     expect(projectRegistry.projects).toEqual([
       {
         id: "tracked",

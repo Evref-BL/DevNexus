@@ -10,7 +10,7 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe("Vibe work tracker provider", () => {
-  it("registers the source checkout as the Vibe project", async () => {
+  it("registers the component source root as the Vibe project", async () => {
     const fetchMock = vi.fn(
       async (_input: string | URL | Request, _init?: RequestInit) =>
         jsonResponse({

@@ -4,6 +4,9 @@ import path from "node:path";
 import {
   loadProjectConfig,
   projectConfigPath,
+  projectWorktreesRootPath,
+  validateProjectConfig,
+  type NexusProjectComponentConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 
@@ -110,18 +113,107 @@ export function assertFileDoesNotExist(filePath: string): void {
 
 export const defaultSourceCheckoutDirectoryName = "git";
 
+export interface ResolvedNexusProjectComponent {
+  id: string;
+  name: string;
+  kind: NexusProjectComponentConfig["kind"];
+  role: NexusProjectComponentConfig["role"];
+  remoteUrl: string | null;
+  defaultBranch: string | null;
+  sourceRoot: string;
+  sourceRootExists: boolean;
+  worktreesRoot: string;
+  worktreesRootExists: boolean;
+  workTracking: NexusProjectComponentConfig["workTracking"] | null;
+  verification: NexusProjectComponentConfig["verification"] | null;
+  publication: NexusProjectComponentConfig["publication"] | null;
+  relationships: NexusProjectComponentConfig["relationships"];
+}
+
 export function resolveProjectSourceRoot(
   projectRoot: string,
   projectConfig: NexusProjectConfig,
 ): string {
-  const sourceRoot = projectConfig.repo.sourceRoot;
-  if (!sourceRoot) {
-    return path.resolve(projectRoot);
+  return resolvePrimaryProjectComponent(projectRoot, projectConfig).sourceRoot;
+}
+
+export function resolvePrimaryProjectComponent(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): ResolvedNexusProjectComponent {
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const primary =
+    components.find((component) => component.role === "primary") ?? components[0];
+  if (!primary) {
+    throw new NexusProjectError("DevNexus project has no components");
   }
 
-  return path.isAbsolute(sourceRoot)
-    ? path.resolve(sourceRoot)
-    : path.resolve(projectRoot, sourceRoot);
+  return primary;
+}
+
+export function resolveProjectComponents(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): ResolvedNexusProjectComponent[] {
+  const normalizedConfig = validateProjectConfig(projectConfig);
+  return normalizedConfig.components.map((component) =>
+    resolveProjectComponent(projectRoot, normalizedConfig, component),
+  );
+}
+
+export function resolveProjectComponent(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  component: NexusProjectComponentConfig,
+): ResolvedNexusProjectComponent {
+  const sourceRoot = resolveProjectPath(
+    projectRoot,
+    component.sourceRoot ?? `components/${component.id}`,
+  );
+  const worktreesRoot = resolveComponentWorktreesRoot(
+    projectRoot,
+    projectConfig,
+    component,
+  );
+
+  return {
+    id: component.id,
+    name: component.name,
+    kind: component.kind,
+    role: component.role,
+    remoteUrl: component.remoteUrl,
+    defaultBranch: component.defaultBranch,
+    sourceRoot,
+    sourceRootExists: directoryExists(sourceRoot),
+    worktreesRoot,
+    worktreesRootExists: directoryExists(worktreesRoot),
+    workTracking: component.workTracking ?? null,
+    verification: component.verification ?? null,
+    publication: component.publication ?? null,
+    relationships: component.relationships,
+  };
+}
+
+function resolveComponentWorktreesRoot(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  component: NexusProjectComponentConfig,
+): string {
+  if (component.worktreesRoot) {
+    return resolveProjectPath(projectRoot, component.worktreesRoot);
+  }
+
+  return path.join(projectWorktreesRootPath(projectRoot, projectConfig), component.id);
+}
+
+function resolveProjectPath(projectRoot: string, value: string): string {
+  return path.isAbsolute(value)
+    ? path.resolve(value)
+    : path.resolve(projectRoot, value);
+}
+
+function directoryExists(directoryPath: string): boolean {
+  return fs.existsSync(directoryPath) && fs.statSync(directoryPath).isDirectory();
 }
 
 export function defaultProjectGitRunner(

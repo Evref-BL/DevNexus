@@ -120,6 +120,26 @@ describe("project registry helpers", () => {
         remoteUrl: null,
         defaultBranch: "main",
       },
+      components: [
+        {
+          id: "primary",
+          name: "Config Project",
+          kind: "local",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: root,
+          sourceRootExists: true,
+          worktreesRoot: path.join(root, "worktrees", "primary"),
+          worktreesRootExists: false,
+          workTracking: {
+            provider: "local",
+          },
+          verification: null,
+          publication: null,
+          relationships: [],
+        },
+      ],
       workTracking: {
         provider: "local",
       },

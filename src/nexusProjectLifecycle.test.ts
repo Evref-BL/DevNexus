@@ -15,6 +15,7 @@ import {
   pathForProjectConfig,
   type ProjectGitCommandResult,
   type ProjectGitRunner,
+  resolveProjectComponents,
   resolveProjectSourceRoot,
   runProjectGitCommand,
   safeProjectDirectoryName,
@@ -163,6 +164,78 @@ describe("project lifecycle helpers", () => {
         },
       }),
     ).toBe(sourceRoot);
+  });
+
+  it("resolves component source and worktree roots independently", () => {
+    const projectRoot = path.join(makeTempDir("dev-nexus-project-"), "project");
+    const primaryRoot = path.join(projectRoot, "components", "primary");
+    const addonRoot = path.join(projectRoot, "components", "addon");
+    fs.mkdirSync(primaryRoot, { recursive: true });
+
+    expect(
+      resolveProjectComponents(projectRoot, {
+        version: 1,
+        id: "project",
+        name: "Project",
+        home: null,
+        repo: {
+          kind: "git",
+          remoteUrl: null,
+          defaultBranch: "main",
+        },
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/primary",
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+        worktreesRoot: "worktrees",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+      }),
+    ).toMatchObject([
+      {
+        id: "primary",
+        sourceRoot: primaryRoot,
+        sourceRootExists: true,
+        worktreesRoot: path.join(projectRoot, "worktrees", "primary"),
+      },
+      {
+        id: "addon",
+        sourceRoot: addonRoot,
+        sourceRootExists: false,
+        worktreesRoot: path.join(projectRoot, "worktrees", "addon"),
+        relationships: [
+          {
+            kind: "extends",
+            componentId: "primary",
+          },
+        ],
+      },
+    ]);
   });
 
   it("loads project config only when one exists", () => {
