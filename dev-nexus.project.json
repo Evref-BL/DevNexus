@@ -227,7 +227,7 @@
       "command": null,
       "timeoutMs": 2400000,
       "coordinatorProfileId": "codex-5-5-xhigh",
-      "maxConcurrentSubagents": 3,
+      "maxConcurrentSubagents": 8,
       "profiles": [
         {
           "id": "codex-5-5-xhigh",
