@@ -19,6 +19,7 @@ import type {
 export interface WorkItemProjectSelector {
   project?: string;
   projectRoot?: string;
+  componentId?: string;
 }
 
 export interface ResolvedWorkItemProjectContext
@@ -127,7 +128,12 @@ export class WorkItemService {
   }
 
   async createWorkItem(input: CreateProjectWorkItemInput): Promise<WorkItem> {
-    const { project: _project, projectRoot: _projectRoot, ...item } = input;
+    const {
+      project: _project,
+      projectRoot: _projectRoot,
+      componentId: _componentId,
+      ...item
+    } = input;
     const context = await this.resolveProviderContext(input);
     return context.provider.createWorkItem({
       ...item,
@@ -136,7 +142,12 @@ export class WorkItemService {
   }
 
   async listWorkItems(input: ListProjectWorkItemsInput): Promise<WorkItem[]> {
-    const { project: _project, projectRoot: _projectRoot, ...query } = input;
+    const {
+      project: _project,
+      projectRoot: _projectRoot,
+      componentId: _componentId,
+      ...query
+    } = input;
     const context = await this.resolveProviderContext(input);
     return context.provider.listWorkItems({
       ...query,
@@ -145,7 +156,12 @@ export class WorkItemService {
   }
 
   async getWorkItem(input: GetProjectWorkItemInput): Promise<WorkItem> {
-    const { project: _project, projectRoot: _projectRoot, ...ref } = input;
+    const {
+      project: _project,
+      projectRoot: _projectRoot,
+      componentId: _componentId,
+      ...ref
+    } = input;
     const context = await this.resolveProviderContext(input);
     return context.provider.getWorkItem(
       normalizeWorkItemRef(ref, context.provider.provider),
@@ -227,6 +243,7 @@ function normalizeProjectSelectorObject(
 ): WorkItemProjectSelector {
   const project = optionalNonEmptyString(selector.project, "project");
   const projectRoot = optionalNonEmptyString(selector.projectRoot, "projectRoot");
+  const componentId = optionalNonEmptyString(selector.componentId, "componentId");
   if (project && projectRoot) {
     throw new WorkItemServiceError("Provide either project or projectRoot, not both");
   }
@@ -234,7 +251,10 @@ function normalizeProjectSelectorObject(
     throw new WorkItemServiceError("project or projectRoot is required");
   }
 
-  return project ? { project } : { projectRoot };
+  return {
+    ...(project ? { project } : { projectRoot }),
+    ...(componentId ? { componentId } : {}),
+  };
 }
 
 function optionalNonEmptyString(

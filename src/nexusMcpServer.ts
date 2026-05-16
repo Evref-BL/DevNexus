@@ -17,6 +17,7 @@ import {
 } from "./nexusProjectHomeService.js";
 import {
   resolvePrimaryProjectComponent,
+  resolveProjectComponents,
 } from "./nexusProjectLifecycle.js";
 import {
   buildNexusProjectStatusForPath,
@@ -98,6 +99,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         title: { type: "string" },
         description: { type: ["string", "null"] },
         status: { type: "string" },
@@ -118,6 +120,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         status: {
           oneOf: [
             { type: "string" },
@@ -141,6 +144,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -158,6 +162,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -181,6 +186,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -200,6 +206,7 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+        componentId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -385,9 +392,17 @@ function resolveWorkItemProject(
         project: requiredPlainString(selector.project, "project"),
       }).project.projectRoot;
   const config = loadProjectConfig(projectRoot);
-  const primaryComponent = resolvePrimaryProjectComponent(projectRoot, config);
-  if (!primaryComponent.workTracking) {
-    throw new Error("Primary component work tracking is not configured");
+  const componentId = selector.componentId;
+  const component = componentId
+    ? resolveProjectComponents(projectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(projectRoot, config);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  if (!component.workTracking) {
+    throw new Error(`Component ${component.id} work tracking is not configured`);
   }
 
   return {
@@ -395,10 +410,10 @@ function resolveWorkItemProject(
     projectRoot,
     projectId: config.id,
     projectName: config.name,
-    componentId: primaryComponent.id,
-    componentName: primaryComponent.name,
-    sourceRoot: primaryComponent.sourceRoot,
-    workTracking: primaryComponent.workTracking,
+    componentId: component.id,
+    componentName: component.name,
+    sourceRoot: component.sourceRoot,
+    workTracking: component.workTracking,
   };
 }
 
@@ -454,9 +469,11 @@ function homePathFromArgs(args: Record<string, unknown>): string {
 function projectSelectorFromArgs(args: Record<string, unknown>): WorkItemProjectSelector {
   const project = optionalString(args, "project", "arguments");
   const projectRoot = optionalString(args, "projectRoot", "arguments");
+  const componentId = optionalString(args, "componentId", "arguments");
   return {
     ...(project ? { project } : {}),
     ...(projectRoot ? { projectRoot } : {}),
+    ...(componentId ? { componentId } : {}),
   };
 }
 

@@ -210,6 +210,91 @@ describe("DevNexus MCP server", () => {
     ]);
   });
 
+  it("targets component-scoped work items through MCP tool arguments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), {
+      recursive: true,
+    });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+              storePath: ".dev-nexus/work-items-primary.json",
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:mcp/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            workTracking: {
+              provider: "local",
+              storePath: ".dev-nexus/work-items-addon.json",
+            },
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const created = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_create",
+        {
+          projectRoot,
+          componentId: "addon",
+          title: "Addon MCP task",
+          status: "ready",
+        },
+        { now: fixedClock("2026-05-16T10:00:00.000Z") },
+      ),
+    );
+    const addonList = toolJson(
+      await callDevNexusMcpTool("work_item_list", {
+        projectRoot,
+        componentId: "addon",
+      }),
+    );
+    const primaryList = toolJson(
+      await callDevNexusMcpTool("work_item_list", {
+        projectRoot,
+      }),
+    );
+
+    expect(created.workItem).toMatchObject({
+      id: "local-1",
+      title: "Addon MCP task",
+    });
+    expect(addonList.workItems).toMatchObject([
+      {
+        id: "local-1",
+        title: "Addon MCP task",
+      },
+    ]);
+    expect(primaryList.workItems).toEqual([]);
+  });
+
   it("handles MCP JSON-RPC initialize, tools/list, and tools/call", async () => {
     const initialized = await handleDevNexusMcpJsonRpcMessage({
       jsonrpc: "2.0",

@@ -87,6 +87,10 @@ work_item_comment
 work_item_set_status
 ```
 
+Work-item tools accept `componentId` when a project has multiple component
+trackers. Omitting it preserves the compatibility behavior and uses the
+primary component.
+
 Projects can still use the CLI for the same boundaries. The MCP server exists
 so agents can use DevNexus directly without depending on a specialization
 adapter for generic project orchestration.
@@ -139,6 +143,9 @@ component, but explicit multi-component configs should put the work-item
 service on the component that owns those items. A component can use a local
 store, GitHub Issues, GitHub Projects, GitLab issues, Jira, or another
 configured provider as those adapters become available.
+
+CLI work-item commands accept `--component <component-id>` for component-owned
+trackers and default to the primary component when the option is omitted.
 
 Example:
 

@@ -62,7 +62,10 @@ import {
   type ListNexusProjectsResult,
   type NexusProjectHomeStore,
 } from "./nexusProjectHomeService.js";
-import { resolvePrimaryProjectComponent } from "./nexusProjectLifecycle.js";
+import {
+  resolvePrimaryProjectComponent,
+  resolveProjectComponents,
+} from "./nexusProjectLifecycle.js";
 import {
   buildNexusProjectStatusForPath,
   type NexusProjectStatusBase,
@@ -159,6 +162,7 @@ interface ParsedProjectTrackerLinkCommand {
 
 interface ParsedWorkItemCreateCommand {
   projectRoot: string;
+  componentId?: string;
   title: string;
   description?: string | null;
   status?: WorkStatus;
@@ -170,6 +174,7 @@ interface ParsedWorkItemCreateCommand {
 
 interface ParsedWorkItemListCommand {
   projectRoot: string;
+  componentId?: string;
   statuses: WorkStatus[];
   labels: string[];
   assignees: string[];
@@ -180,12 +185,14 @@ interface ParsedWorkItemListCommand {
 
 interface ParsedWorkItemGetCommand {
   projectRoot: string;
+  componentId?: string;
   itemId: string;
   json?: boolean;
 }
 
 interface ParsedWorkItemUpdateCommand {
   projectRoot: string;
+  componentId?: string;
   itemId: string;
   patch: WorkItemPatch;
   json?: boolean;
@@ -193,6 +200,7 @@ interface ParsedWorkItemUpdateCommand {
 
 interface ParsedWorkItemCommentCommand {
   projectRoot: string;
+  componentId?: string;
   itemId: string;
   body: string;
   json?: boolean;
@@ -310,6 +318,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item create:",
+    "  --component <id>          defaults to the primary component",
     "  --title <title>",
     "  --description <text>",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>",
@@ -319,6 +328,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item list:",
+    "  --component <id>          defaults to the primary component",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>  repeatable",
     "  --label <label>            repeatable",
     "  --assignee <assignee>      repeatable",
@@ -327,9 +337,11 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item get:",
+    "  --component <id>          defaults to the primary component",
     "  --json",
     "",
     "Options for work-item update:",
+    "  --component <id>          defaults to the primary component",
     "  --title <title>",
     "  --description <text>",
     "  --clear-description",
@@ -343,6 +355,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item comment:",
+    "  --component <id>          defaults to the primary component",
     "  --body <text>",
     "  --json",
     "",
@@ -597,6 +610,7 @@ async function handleWorkItemCommand(
     const item = await workItemService(parsed.projectRoot, dependencies)
       .createWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
+        componentId: parsed.componentId,
         title: parsed.title,
         description: parsed.description,
         status: parsed.status,
@@ -613,6 +627,7 @@ async function handleWorkItemCommand(
     const items = await workItemService(parsed.projectRoot, dependencies)
       .listWorkItems({
         projectRoot: path.resolve(parsed.projectRoot),
+        componentId: parsed.componentId,
         status: statusQuery(parsed.statuses),
         labels: parsed.labels,
         assignees: parsed.assignees,
@@ -628,6 +643,7 @@ async function handleWorkItemCommand(
     const item = await workItemService(parsed.projectRoot, dependencies)
       .getWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
+        componentId: parsed.componentId,
         id: parsed.itemId,
       });
     printWorkItemGetResult(item, parsed, dependencies.stdout ?? process.stdout);
@@ -639,6 +655,7 @@ async function handleWorkItemCommand(
     const item = await workItemService(parsed.projectRoot, dependencies)
       .updateWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
+        componentId: parsed.componentId,
         ref: { id: parsed.itemId },
         patch: parsed.patch,
       });
@@ -651,6 +668,7 @@ async function handleWorkItemCommand(
     const comment = await workItemService(parsed.projectRoot, dependencies)
       .addComment({
         projectRoot: path.resolve(parsed.projectRoot),
+        componentId: parsed.componentId,
         ref: { id: parsed.itemId },
         body: parsed.body,
       });
@@ -841,17 +859,28 @@ function workItemService(
   dependencies: DevNexusCliDependencies,
 ) {
   return createWorkItemService({
-    resolveProject: () => resolveDirectProject(projectRoot),
+    resolveProject: (selector) =>
+      resolveDirectProject(projectRoot, selector.componentId),
     now: dependencies.now,
   });
 }
 
-function resolveDirectProject(projectRoot: string): ResolvedWorkItemProjectContext {
+function resolveDirectProject(
+  projectRoot: string,
+  componentId?: string,
+): ResolvedWorkItemProjectContext {
   const resolvedProjectRoot = path.resolve(projectRoot);
   const config = loadProjectConfig(resolvedProjectRoot);
-  const primaryComponent = resolvePrimaryProjectComponent(resolvedProjectRoot, config);
-  if (!primaryComponent.workTracking) {
-    throw new Error("Primary component work tracking is not configured");
+  const component = componentId
+    ? resolveProjectComponents(resolvedProjectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  if (!component.workTracking) {
+    throw new Error(`Component ${component.id} work tracking is not configured`);
   }
 
   return {
@@ -859,10 +888,10 @@ function resolveDirectProject(projectRoot: string): ResolvedWorkItemProjectConte
     projectRoot: resolvedProjectRoot,
     projectId: config.id,
     projectName: config.name,
-    componentId: primaryComponent.id,
-    componentName: primaryComponent.name,
-    sourceRoot: primaryComponent.sourceRoot,
-    workTracking: primaryComponent.workTracking,
+    componentId: component.id,
+    componentName: component.name,
+    sourceRoot: component.sourceRoot,
+    workTracking: component.workTracking,
   };
 }
 
@@ -1224,6 +1253,9 @@ function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand
     };
 
     switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
       case "--title":
         parsed.title = next();
         break;
@@ -1281,6 +1313,9 @@ function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
     };
 
     switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
       case "--status":
         parsed.statuses.push(parseWorkStatus(next(), arg));
         break;
@@ -1317,8 +1352,21 @@ function parseWorkItemGetCommand(argv: string[]): ParsedWorkItemGetCommand {
   }
 
   const parsed: ParsedWorkItemGetCommand = { projectRoot, itemId };
-  for (const arg of rest) {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
     switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -1358,6 +1406,9 @@ function parseWorkItemUpdateCommand(argv: string[]): ParsedWorkItemUpdateCommand
     };
 
     switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
       case "--title":
         parsed.patch.title = next();
         break;
@@ -1458,6 +1509,9 @@ function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentComma
     };
 
     switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
       case "--body":
         parsed.body = next();
         break;

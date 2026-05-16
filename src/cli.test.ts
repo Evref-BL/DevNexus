@@ -408,6 +408,120 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("targets component-scoped local work items through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), {
+      recursive: true,
+    });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+              storePath: ".dev-nexus/work-items-primary.json",
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:demo/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            workTracking: {
+              provider: "local",
+              storePath: ".dev-nexus/work-items-addon.json",
+            },
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const createOutput = captureOutput();
+    const addonListOutput = captureOutput();
+    const primaryListOutput = captureOutput();
+    const updateOutput = captureOutput();
+
+    await main(
+      [
+        "work-item",
+        "create",
+        projectRoot,
+        "--component",
+        "addon",
+        "--title",
+        "Addon task",
+        "--status",
+        "ready",
+        "--json",
+      ],
+      {
+        stdout: createOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      ["work-item", "list", projectRoot, "--component", "addon", "--json"],
+      {
+        stdout: addonListOutput.writer,
+      },
+    );
+    await main(["work-item", "list", projectRoot, "--json"], {
+      stdout: primaryListOutput.writer,
+    });
+    await main(
+      [
+        "work-item",
+        "update",
+        projectRoot,
+        "local-1",
+        "--component",
+        "addon",
+        "--status",
+        "done",
+        "--json",
+      ],
+      {
+        stdout: updateOutput.writer,
+      },
+    );
+
+    expect(JSON.parse(createOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Addon task",
+      status: "ready",
+    });
+    expect(JSON.parse(addonListOutput.output()).workItems).toMatchObject([
+      {
+        id: "local-1",
+        title: "Addon task",
+      },
+    ]);
+    expect(JSON.parse(primaryListOutput.output()).workItems).toEqual([]);
+    expect(JSON.parse(updateOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
+    });
+  });
+
   it("gets, updates, and comments on local work items", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
