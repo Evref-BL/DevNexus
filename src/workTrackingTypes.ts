@@ -174,6 +174,37 @@ export interface TrackerCapabilities {
   webhooks: boolean;
 }
 
+export type WorkTrackerCapabilityName =
+  | "create"
+  | "list"
+  | "get"
+  | "update"
+  | "comment"
+  | "labels"
+  | "assignees"
+  | "milestones"
+  | "board"
+  | "boardStatus";
+
+export interface WorkTrackerActionCapabilities {
+  create: boolean;
+  list: boolean;
+  get: boolean;
+  update: boolean;
+  comment: boolean;
+  labels: boolean;
+  assignees: boolean;
+  milestones: boolean;
+  board: boolean;
+  boardStatus: boolean;
+}
+
+export interface WorkTrackerCapabilityReport {
+  provider: WorkTrackingProviderName | string;
+  capabilities: WorkTrackerActionCapabilities;
+  unsupported: WorkTrackerCapabilityName[];
+}
+
 export interface TrackerProjectRef {
   provider: WorkTrackingProviderName | string;
   id: string;

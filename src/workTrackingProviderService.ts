@@ -27,6 +27,9 @@ import type {
   GitLabWorkTrackingConfig,
   JiraWorkTrackingConfig,
   VibeKanbanWorkTrackingConfig,
+  WorkTrackerActionCapabilities,
+  WorkTrackerCapabilityName,
+  WorkTrackerCapabilityReport,
   WorkTrackingConfig,
   WorkTrackerProvider,
   TrackerCapabilities,
@@ -47,6 +50,19 @@ export class WorkTrackingProviderServiceError extends Error {
     this.name = "WorkTrackingProviderServiceError";
   }
 }
+
+const workTrackerCapabilityNames: WorkTrackerCapabilityName[] = [
+  "create",
+  "list",
+  "get",
+  "update",
+  "comment",
+  "labels",
+  "assignees",
+  "milestones",
+  "board",
+  "boardStatus",
+];
 
 export function createWorkTrackerProvider(
   config: WorkTrackingConfig,
@@ -101,6 +117,40 @@ export function createWorkTrackerProvider(
   );
 }
 
+export function workTrackerCapabilityReportForConfig(
+  config: WorkTrackingConfig,
+): WorkTrackerCapabilityReport {
+  return workTrackerCapabilityReportFromCapabilities(
+    config.provider,
+    workTrackerCapabilitiesForConfig(config),
+  );
+}
+
+export function workTrackerCapabilityReport(
+  provider: Pick<WorkTrackerProvider, "provider" | "capabilities">,
+): WorkTrackerCapabilityReport {
+  return workTrackerCapabilityReportFromCapabilities(
+    provider.provider,
+    provider.capabilities,
+  );
+}
+
+export function assertWorkTrackerCapability(
+  provider: Pick<WorkTrackerProvider, "provider" | "capabilities">,
+  capability: WorkTrackerCapabilityName,
+  operation: string,
+): void {
+  const report = workTrackerCapabilityReport(provider);
+  if (report.capabilities[capability]) {
+    return;
+  }
+
+  throw new WorkTrackingProviderServiceError(
+    `Work tracking provider "${provider.provider}" cannot ${operation}; ` +
+      `required capability "${capability}" is disabled`,
+  );
+}
+
 export function workTrackerCapabilitiesForConfig(
   config: WorkTrackingConfig,
 ): TrackerCapabilities {
@@ -124,4 +174,36 @@ export function workTrackerCapabilitiesForConfig(
   throw new WorkTrackingProviderServiceError(
     `Work tracking provider is not available in DevNexus core: ${providerName}`,
   );
+}
+
+function workTrackerCapabilityReportFromCapabilities(
+  provider: string,
+  capabilities: TrackerCapabilities,
+): WorkTrackerCapabilityReport {
+  const actionCapabilities = workTrackerActionCapabilities(capabilities);
+  return {
+    provider,
+    capabilities: actionCapabilities,
+    unsupported: workTrackerCapabilityNames.filter(
+      (capability) => !actionCapabilities[capability],
+    ),
+  };
+}
+
+function workTrackerActionCapabilities(
+  capabilities: TrackerCapabilities,
+): WorkTrackerActionCapabilities {
+  const board = capabilities.board;
+  return {
+    create: capabilities.createItem,
+    list: capabilities.listItems,
+    get: capabilities.getItem,
+    update: capabilities.updateItem,
+    comment: capabilities.comment,
+    labels: capabilities.labels,
+    assignees: capabilities.assignees,
+    milestones: capabilities.milestones,
+    board,
+    boardStatus: board && capabilities.boardStatus,
+  };
 }

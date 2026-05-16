@@ -439,4 +439,33 @@ describe("GitLab work tracker provider", () => {
       provider.createWorkItem({ title: "Invalid", milestone: "M1" }),
     ).rejects.toThrow(/milestone must be a positive integer/);
   });
+
+  it("reports missing credentials when GitLab rejects an unauthenticated write", async () => {
+    const fake = queuedFetch([
+      {
+        status: 401,
+        body: {
+          message: "401 Unauthorized",
+        },
+      },
+    ]);
+    const provider = createGitLabWorkTrackerProvider({
+      config: gitLabConfig(),
+      fetch: fake.fetch,
+      env: {},
+      credentialRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr: "credential helper unavailable",
+      }),
+    });
+
+    await expect(
+      provider.createWorkItem({ title: "Needs credentials" }),
+    ).rejects.toThrow(
+      /No GitLab token or git credential was available for gitlab.com/,
+    );
+    expect(fake.calls[0]?.headers.Authorization).toBeUndefined();
+    expect(fake.calls[0]?.headers["PRIVATE-TOKEN"]).toBeUndefined();
+  });
 });

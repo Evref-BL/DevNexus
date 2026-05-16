@@ -63,7 +63,7 @@ export const localWorkTrackerCapabilities: TrackerCapabilities = {
   assignees: true,
   milestones: true,
   board: false,
-  boardStatus: true,
+  boardStatus: false,
   draftItems: false,
   webhooks: false,
 };

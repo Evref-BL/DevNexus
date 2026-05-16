@@ -280,10 +280,11 @@ export class GitLabWorkTrackerProvider implements WorkTrackerProvider {
     body?: Record<string, unknown>,
   ): Promise<T> {
     const url = new URL(pathAndQuery.replace(/^\/+/, ""), `${this.apiBaseUrl}/`);
+    const authorizationHeaders = this.authorizationHeaders();
     const headers: Record<string, string> = {
       Accept: "application/json",
       "User-Agent": "dev-nexus",
-      ...this.authorizationHeaders(),
+      ...authorizationHeaders,
     };
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
@@ -296,8 +297,14 @@ export class GitLabWorkTrackerProvider implements WorkTrackerProvider {
     });
 
     if (!response.ok) {
+      const message = await gitLabErrorMessage(response, method, url);
       throw new GitLabWorkTrackerProviderError(
-        await gitLabErrorMessage(response, method, url),
+        gitLabErrorMessageWithCredentialHint(
+          message,
+          response,
+          authorizationHeaders,
+          this.config,
+        ),
       );
     }
 
@@ -784,4 +791,25 @@ function gitLabErrorDetail(body: GitLabErrorBody): string | undefined {
   }
 
   return undefined;
+}
+
+function gitLabErrorMessageWithCredentialHint(
+  message: string,
+  response: Response,
+  authorizationHeaders: Record<string, string>,
+  config: Pick<GitLabWorkTrackingConfig, "host" | "repository">,
+): string {
+  if (
+    authorizationHeaders.Authorization ||
+    authorizationHeaders["PRIVATE-TOKEN"] ||
+    (response.status !== 401 && response.status !== 403)
+  ) {
+    return message;
+  }
+
+  return (
+    `${message}. No GitLab token or git credential was available for ` +
+    `${normalizeGitLabCredentialHost(config.host)}. Configure GITLAB_TOKEN, ` +
+    "GL_TOKEN, or a git credential helper."
+  );
 }

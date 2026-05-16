@@ -491,4 +491,32 @@ describe("Jira work tracker provider", () => {
       }),
     ).rejects.toThrow(/only one assignee/);
   });
+
+  it("reports missing credentials when Jira rejects an unauthenticated write", async () => {
+    const fake = queuedFetch([
+      {
+        status: 401,
+        body: {
+          errorMessages: ["Unauthorized"],
+        },
+      },
+    ]);
+    const provider = createJiraWorkTrackerProvider({
+      config: jiraConfig(),
+      fetch: fake.fetch,
+      env: {},
+      credentialRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr: "credential helper unavailable",
+      }),
+    });
+
+    await expect(
+      provider.createWorkItem({ title: "Needs credentials" }),
+    ).rejects.toThrow(
+      /No Jira token, API token, or git credential was available for example.atlassian.net/,
+    );
+    expect(fake.calls[0]?.headers.Authorization).toBeUndefined();
+  });
 });
