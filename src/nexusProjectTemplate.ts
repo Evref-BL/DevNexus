@@ -72,7 +72,7 @@ export function buildNexusProjectTemplateLayout(
       path: devNexusProjectConfigFileName,
       sourceControl: "source",
       description:
-        "Project, component, work-item service, automation, skills, and agent MCP configuration.",
+        "Project, component, work-item service, automation, skills, plugins, and agent MCP configuration.",
     },
     {
       area: "project_state",

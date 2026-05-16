@@ -31,8 +31,11 @@ human instruction; DevNexus supplies the configured launch gates, schedule,
 component context, relaunch loop, and run records.
 
 Language, runtime, framework, and toolchain-specific behavior belongs in
-extensions. DevNexus provides the core contracts and extension hooks without
-depending on any specific specialization.
+extensions or plugins. DevNexus provides the core contracts and hooks without
+depending on any specific specialization. Plugins are additive capability
+declarations: they can describe setup policy, projected skills, MCP servers
+and tools, environment hints, cleanup hooks, and agent affordances, but they do
+not own the project or replace the generic coordinator launch boundary.
 
 ## Project CLI
 
@@ -70,6 +73,7 @@ terms used by the code:
 | Project state | `.dev-nexus/README.md`, component worktree roots under `<worktreesRoot>/<component-id>/` | Generated support or local runtime |
 | Target state | `automation.target.statePath`, defaulting to `.dev-nexus/automation/target-state.md` | User-authored target memory, not overwritten by refresh |
 | Skills | `.dev-nexus/skills/`, optional `.agents/skills/` or `.claude/skills/` projections | Generated from curated or extension skill definitions |
+| Plugin capabilities | `dev-nexus.project.json` `plugins` records | User-authored additive capability metadata projected into agent context |
 | Agent MCP projection | `.codex/config.toml`, `.mcp.json`, or configured agent target paths | Generated from `mcp.agentTargets` |
 
 Component worktree roots are component-scoped even when a project has one
@@ -154,6 +158,79 @@ The Codex target writes or updates `.codex/config.toml` with a
 `.mcp.json`. Generated support config is excluded from Git by default;
 set `sourceControl` to `source` when the project should commit the agent MCP
 configuration.
+
+## Plugin Capabilities
+
+`dev-nexus.project.json` can include a `plugins` array. A project may configure
+more than one plugin, and each enabled plugin contributes additive capability
+records. DevNexus core keeps those records generic and projects them into the
+agent launch context plus the low-token `agent_profiles` MCP/CLI surface as
+`pluginCapabilities`.
+
+Supported capability record kinds are:
+
+- `projected_skill`: a skill id and optional target agents.
+- `mcp_server`: an MCP server name plus optional tool names and descriptions.
+- `setup_obligation`: setup policy the coordinator should account for before work.
+- `environment_hint`: environment variables or paths relevant to plugin tools.
+- `cleanup_hook`: cleanup policy to consider after plugin-assisted work.
+- `agent_affordance`: a concise capability or interaction the plugin makes available.
+
+Example:
+
+```json
+{
+  "plugins": [
+    {
+      "id": "analysis-tools",
+      "name": "Analysis Tools",
+      "version": "0.1.0",
+      "capabilities": [
+        {
+          "kind": "projected_skill",
+          "id": "deep-review-skill",
+          "skillId": "deep-review",
+          "targetAgents": ["codex"]
+        },
+        {
+          "kind": "mcp_server",
+          "id": "analysis-mcp",
+          "serverName": "analysis_tools",
+          "tools": [
+            {
+              "name": "inspect_facts",
+              "description": "Read plugin-supplied facts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workspace-policy",
+      "capabilities": [
+        {
+          "kind": "setup_obligation",
+          "id": "review-local-docs",
+          "description": "Review project-local setup notes before editing.",
+          "required": true
+        },
+        {
+          "kind": "cleanup_hook",
+          "id": "remove-temporary-cache",
+          "description": "Remove temporary cache files created by plugin tools.",
+          "trigger": "after_run"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Plugin records are not runners and do not select implementation work. They are
+available capability and setup-policy facts for the launched coordinator. The
+coordinator still chooses the work item batch, decides how many subagents to
+run, assigns profiles, supervises implementation, and reports durable facts
+back through DevNexus.
 
 ## Project Components
 
@@ -320,16 +397,16 @@ work items to take, how many subagents to launch, what model and reasoning
 profile each subagent should use, and how to report progress back to each
 component's work-item service.
 
-The same context also includes the configured automation `target` and `agent`
-policy. `automation.target` carries the user-requested objective, the
-project-relative target-state Markdown file, optional cycle and work-item
-bounds, and the stop condition for no remaining eligible work. Agents should
-keep that target-state file concise: retain current direction, active
-decisions, blockers, and near-term risks, and drop stale detail as the target
-evolves. `automation.agent.maxConcurrentSubagents` caps parallel subagent
-work, and `automation.agent.profiles` names the executor/model/version or
-variant/reasoning or intelligence/safety profiles that a launched agent may
-assign to subagents.
+The same context also includes the configured automation `target`, `agent`
+policy, and enabled `pluginCapabilities`. `automation.target` carries the
+user-requested objective, the project-relative target-state Markdown file,
+optional cycle and work-item bounds, and the stop condition for no remaining
+eligible work. Agents should keep that target-state file concise: retain
+current direction, active decisions, blockers, and near-term risks, and drop
+stale detail as the target evolves. `automation.agent.maxConcurrentSubagents`
+caps parallel subagent work, and `automation.agent.profiles` names the
+executor/model/version or variant/reasoning or intelligence/safety profiles
+that a launched agent may assign to subagents.
 `automation.agent.coordinatorProfileId` may name one of those profiles as the
 coordinator launch profile. A profile can carry `command` and `args`; DevNexus
 uses that executable template when no raw `automation.agent.command` or CLI
@@ -425,7 +502,10 @@ For a low-token coordinator cycle, start with `automation eligible-work --json`
 and `automation agent-profiles --json`, then use component-scoped `work-item`
 and `target-cycle` commands to record the work the coordinator chose. The
 full `automation status --json` remains available when the agent needs the
-complete target context.
+complete target context. `automation agent-profiles --json` includes enabled
+`pluginCapabilities`, so coordinators can see generic plugin-provided skills,
+MCP tools, setup obligations, environment hints, cleanup hooks, and affordances
+without reading the full project config.
 
 Projects can also store the shell command under `automation.agent.command` for
 agent-launch mode or `automation.executor.command` for the older generated

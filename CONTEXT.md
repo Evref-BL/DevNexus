@@ -12,6 +12,8 @@
 - DevNexus user: A human or an agent acting under human instruction that configures DevNexus and asks it to launch agent work.
 - DevNexus Model Context Protocol (MCP) server: The generic stdio tool server that exposes DevNexus project, automation, and work-item APIs to agents without specialization adapters.
 - Agent MCP target: A configured project-local agent integration, such as Codex `.codex/config.toml` or Claude `.mcp.json`, that registers the DevNexus Model Context Protocol (MCP) server for that agent.
+- DevNexus plugin: An additive, generic project capability declaration. A project may configure multiple plugins; each plugin contributes metadata about projected skills, MCP servers and tools, setup obligations, environment hints, cleanup hooks, or agent affordances.
+- Plugin capability projection: The agent-facing summary of enabled plugin capability records. It tells launched coordinators what capabilities and setup policy are available, but it does not run setup, choose work, assign subagents, or supervise implementation.
 - Target: The user-requested outcome for a DevNexus automation loop, such as completing selected work items or continuing until no eligible issue remains.
 - Target state: Concise project memory for the current target, stored in a configured Markdown file and updated by agents as the useful context changes.
 - Target cycle: One caller-reported pass through a target loop, such as reading context, dispatching subagents, waiting for results, or recording a blocker.
@@ -24,5 +26,6 @@
 ## Avoided Aliases
 
 - Do not treat "project" as an alias for one repository, one source checkout, one work-item service, or one component.
+- Do not treat a plugin as owning a DevNexus project, replacing the generic core, or acting as an alternate runner.
 - Do not describe DevNexus as choosing or supervising implementation work; agents do that after DevNexus launches them with context.
 - Prefer "work-item service" or "work tracking provider" over "board" when the provider can be issue-based, project-based, or local.

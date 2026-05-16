@@ -514,6 +514,135 @@ describe("project config", () => {
     });
   });
 
+  it("accepts multiple additive plugin capability records", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "analysis-tools",
+            name: "Analysis Tools",
+            version: "0.1.0",
+            capabilities: [
+              {
+                kind: "projected_skill",
+                id: "deep-review-skill",
+                skillId: "deep-review",
+                description: "Project a review skill into configured agents.",
+                targetAgents: ["codex", "claude"],
+              },
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                tools: [
+                  {
+                    name: "inspect_facts",
+                    description: "Read plugin-supplied facts.",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "workspace-policy",
+            capabilities: [
+              {
+                kind: "setup_obligation",
+                id: "review-local-docs",
+                description: "Review project-local setup notes before editing.",
+                required: true,
+              },
+              {
+                kind: "environment_hint",
+                id: "cache-dir",
+                variable: "EXAMPLE_CACHE_DIR",
+                description: "Optional cache directory used by plugin tools.",
+                valueHint: ".cache/example",
+              },
+              {
+                kind: "cleanup_hook",
+                id: "remove-temporary-cache",
+                description: "Remove temporary cache files created by plugin tools.",
+                trigger: "after_run",
+              },
+              {
+                kind: "agent_affordance",
+                id: "read-only-inspection",
+                description: "Agents can inspect plugin facts without mutating source.",
+              },
+            ],
+          },
+        ],
+      }).plugins,
+    ).toEqual([
+      {
+        id: "analysis-tools",
+        name: "Analysis Tools",
+        version: "0.1.0",
+        enabled: true,
+        capabilities: [
+          {
+            kind: "projected_skill",
+            id: "deep-review-skill",
+            skillId: "deep-review",
+            description: "Project a review skill into configured agents.",
+            targetAgents: ["codex", "claude"],
+          },
+          {
+            kind: "mcp_server",
+            id: "analysis-mcp",
+            serverName: "analysis_tools",
+            tools: [
+              {
+                name: "inspect_facts",
+                description: "Read plugin-supplied facts.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: "workspace-policy",
+        enabled: true,
+        capabilities: [
+          {
+            kind: "setup_obligation",
+            id: "review-local-docs",
+            description: "Review project-local setup notes before editing.",
+            required: true,
+          },
+          {
+            kind: "environment_hint",
+            id: "cache-dir",
+            variable: "EXAMPLE_CACHE_DIR",
+            description: "Optional cache directory used by plugin tools.",
+            valueHint: ".cache/example",
+            required: false,
+          },
+          {
+            kind: "cleanup_hook",
+            id: "remove-temporary-cache",
+            description: "Remove temporary cache files created by plugin tools.",
+            trigger: "after_run",
+            required: false,
+          },
+          {
+            kind: "agent_affordance",
+            id: "read-only-inspection",
+            description: "Agents can inspect plugin facts without mutating source.",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("rejects invalid project and work tracking config", () => {
     expect(() =>
       validateProjectConfig({
@@ -785,6 +914,29 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.agent\.profiles\[0\]\.safety\.profile/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-plugin-capability",
+        name: "Invalid Plugin Capability",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "plugin-a",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "missing-server-name",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/project config\.plugins\[0\]\.capabilities\[0\]\.serverName/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

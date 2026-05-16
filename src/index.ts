@@ -17,6 +17,7 @@ export * from "./nexusCoordination.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusMcpServer.js";
+export * from "./nexusPluginCapabilities.js";
 export * from "./nexusProjectScaffold.js";
 export * from "./nexusProjectTemplate.js";
 export * from "./processSupervisor.js";

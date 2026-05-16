@@ -24,6 +24,10 @@ import {
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
 import {
+  projectPluginCapabilityProjections,
+  type NexusPluginCapabilityProjection,
+} from "./nexusPluginCapabilities.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -111,6 +115,7 @@ export interface NexusAutomationAgentLaunchContext {
     coordinatorProfile: NexusAutomationAgentPolicy["coordinatorProfile"];
     profiles: NexusAutomationAgentPolicy["profiles"];
   };
+  pluginCapabilities: NexusPluginCapabilityProjection[];
   result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
@@ -865,6 +870,7 @@ function buildAgentLaunchContext(
       config: input.automationConfig,
     }),
     agent: normalizeNexusAutomationAgentPolicy(input.automationConfig),
+    pluginCapabilities: projectPluginCapabilityProjections(input.projectConfig),
     result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
     componentEligibleWorkItems: input.componentEligibleWorkItems,

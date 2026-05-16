@@ -5,6 +5,10 @@ import {
   getNexusAutomationStatus,
   type GetNexusAutomationStatusOptions,
 } from "./nexusAutomationStatus.js";
+import {
+  projectPluginCapabilityProjections,
+  type NexusPluginCapabilityProjection,
+} from "./nexusPluginCapabilities.js";
 import { loadProjectConfig } from "./nexusProjectConfig.js";
 import type { WorkItem } from "./workTrackingTypes.js";
 
@@ -67,6 +71,7 @@ export interface NexusAutomationAgentProfileSummary {
   maxConcurrentSubagents: number | null;
   safety: NexusAutomationConfig["safety"] | null;
   profiles: NexusAutomationAgentProfilePolicySummary[];
+  pluginCapabilities: NexusPluginCapabilityProjection[];
 }
 
 export async function getNexusAutomationEligibleWorkSummary(
@@ -154,6 +159,7 @@ export function getNexusAutomationAgentProfileSummary(
         commandConfigured: profile.command !== null,
         argsCount: profile.args.length,
       })) ?? [],
+    pluginCapabilities: projectPluginCapabilityProjections(projectConfig),
   };
 }
 

@@ -146,6 +146,64 @@ describe("DevNexus MCP server", () => {
     ]);
   });
 
+  it("reports generic plugin capabilities through the agent profile surface", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "projected_skill",
+                id: "deep-review-skill",
+                skillId: "deep-review",
+                description: "Project a review skill into configured agents.",
+                targetAgents: ["codex"],
+              },
+              {
+                kind: "environment_hint",
+                id: "cache-dir",
+                variable: "EXAMPLE_CACHE_DIR",
+                description: "Optional cache directory used by plugin tools.",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const result = toolJson(
+      await callDevNexusMcpTool("agent_profiles", { projectRoot }),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      pluginCapabilities: [
+        {
+          pluginId: "analysis-tools",
+          capabilityCount: 2,
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "deep-review-skill",
+              skillId: "deep-review",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "environment_hint",
+              id: "cache-dir",
+              variable: "EXAMPLE_CACHE_DIR",
+              required: false,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("records and reports coordination handoffs through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");

@@ -18,6 +18,14 @@ import type {
   NexusSkillMaterializationMode,
   NexusSkillSourceControl,
 } from "./nexusSkills.js";
+import type {
+  NexusPluginCapabilityKind,
+  NexusPluginCapabilityRecord,
+  NexusPluginCleanupHookTrigger,
+  NexusPluginMcpToolCapability,
+  NexusProjectPluginConfig,
+  NexusProjectPluginsConfig,
+} from "./nexusPluginCapabilities.js";
 import {
   validateNexusAutomationConfig,
   type NexusAutomationConfig,
@@ -116,6 +124,7 @@ export interface NexusProjectConfig {
   agent?: NexusAgentConfig;
   mcp?: NexusProjectMcpConfig;
   skills?: NexusProjectSkillsConfig;
+  plugins?: NexusProjectPluginsConfig;
   automation?: NexusAutomationConfig;
 }
 
@@ -461,6 +470,202 @@ function validateProjectSkillsConfig(
         }
       : {}),
   };
+}
+
+function validatePluginCapabilityKind(
+  value: unknown,
+  pathName: string,
+): NexusPluginCapabilityKind {
+  if (
+    value === "projected_skill" ||
+    value === "mcp_server" ||
+    value === "setup_obligation" ||
+    value === "environment_hint" ||
+    value === "cleanup_hook" ||
+    value === "agent_affordance"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, or agent_affordance`,
+  );
+}
+
+function validatePluginCleanupHookTrigger(
+  value: unknown,
+  pathName: string,
+): NexusPluginCleanupHookTrigger | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "before_run" || value === "after_run" || value === "manual") {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be before_run, after_run, or manual`,
+  );
+}
+
+function validatePluginMcpTools(
+  value: unknown,
+  pathName: string,
+): NexusPluginMcpToolCapability[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+
+  return value.map((tool, index) => {
+    const toolPath = `${pathName}[${index}]`;
+    const record = assertRecord(tool, toolPath);
+    const description = optionalString(record, "description", toolPath);
+
+    return {
+      name: requiredString(record, "name", toolPath),
+      ...(description !== undefined ? { description } : {}),
+    };
+  });
+}
+
+function validatePluginCapabilityRecord(
+  value: unknown,
+  index: number,
+  pluginPathName: string,
+): NexusPluginCapabilityRecord {
+  const pathName = `${pluginPathName}.capabilities[${index}]`;
+  const record = assertRecord(value, pathName);
+  const kind = validatePluginCapabilityKind(record.kind, `${pathName}.kind`);
+  const id = requiredString(record, "id", pathName);
+  const description = optionalString(record, "description", pathName);
+
+  if (kind === "projected_skill") {
+    const targetAgents = optionalStringArray(record, "targetAgents", pathName);
+    return {
+      kind,
+      id,
+      ...(description !== undefined ? { description } : {}),
+      skillId: requiredString(record, "skillId", pathName),
+      ...(targetAgents !== undefined ? { targetAgents } : {}),
+    };
+  }
+
+  if (kind === "mcp_server") {
+    const tools = validatePluginMcpTools(record.tools, `${pathName}.tools`);
+    return {
+      kind,
+      id,
+      ...(description !== undefined ? { description } : {}),
+      serverName: requiredString(record, "serverName", pathName),
+      ...(tools !== undefined ? { tools } : {}),
+    };
+  }
+
+  if (kind === "setup_obligation") {
+    return {
+      kind,
+      id,
+      description: requiredString(record, "description", pathName),
+      required: optionalBoolean(record, "required", pathName) ?? false,
+    };
+  }
+
+  if (kind === "environment_hint") {
+    const valueHint = optionalString(record, "valueHint", pathName);
+    return {
+      kind,
+      id,
+      ...(description !== undefined ? { description } : {}),
+      variable: requiredString(record, "variable", pathName),
+      ...(valueHint !== undefined ? { valueHint } : {}),
+      required: optionalBoolean(record, "required", pathName) ?? false,
+    };
+  }
+
+  if (kind === "cleanup_hook") {
+    const trigger = validatePluginCleanupHookTrigger(
+      record.trigger,
+      `${pathName}.trigger`,
+    );
+    return {
+      kind,
+      id,
+      description: requiredString(record, "description", pathName),
+      ...(trigger !== undefined ? { trigger } : {}),
+      required: optionalBoolean(record, "required", pathName) ?? false,
+    };
+  }
+
+  return {
+    kind,
+    id,
+    description: requiredString(record, "description", pathName),
+  };
+}
+
+function validateProjectPluginConfig(
+  value: unknown,
+  index: number,
+): NexusProjectPluginConfig {
+  const pathName = `project config.plugins[${index}]`;
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName) ?? true;
+  const name = optionalString(record, "name", pathName);
+  const version = optionalString(record, "version", pathName);
+  const capabilitiesValue = record.capabilities;
+  if (capabilitiesValue !== undefined && !Array.isArray(capabilitiesValue)) {
+    throw new NexusConfigError(`${pathName}.capabilities must be an array`);
+  }
+  const capabilities = (capabilitiesValue ?? []).map((capability, capabilityIndex) =>
+    validatePluginCapabilityRecord(capability, capabilityIndex, pathName),
+  );
+  const ids = new Set<string>();
+  for (const capability of capabilities) {
+    if (ids.has(capability.id)) {
+      throw new NexusConfigError(
+        `${pathName}.capabilities contains duplicate id: ${capability.id}`,
+      );
+    }
+    ids.add(capability.id);
+  }
+
+  return {
+    id: requiredString(record, "id", pathName),
+    enabled,
+    ...(name !== undefined ? { name } : {}),
+    ...(version !== undefined ? { version } : {}),
+    capabilities,
+  };
+}
+
+function validateProjectPluginsConfig(
+  value: unknown,
+): NexusProjectPluginsConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.plugins must be an array");
+  }
+
+  const plugins = value.map((plugin, index) =>
+    validateProjectPluginConfig(plugin, index),
+  );
+  const ids = new Set<string>();
+  for (const plugin of plugins) {
+    if (ids.has(plugin.id)) {
+      throw new NexusConfigError(
+        `project config.plugins contains duplicate id: ${plugin.id}`,
+      );
+    }
+    ids.add(plugin.id);
+  }
+
+  return plugins;
 }
 
 function validateProjectMcpAgentTarget(
@@ -1095,6 +1300,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
+  const plugins = validateProjectPluginsConfig(record.plugins);
   const mcp = validateProjectMcpConfig(record.mcp);
   const automation = validateNexusAutomationConfig(record.automation);
   const repo = validateRepoConfig(record.repo);
@@ -1119,6 +1325,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(agent ? { agent } : {}),
     ...(mcp ? { mcp } : {}),
     ...(skills ? { skills } : {}),
+    ...(plugins ? { plugins } : {}),
     ...(automation ? { automation } : {}),
   };
 }

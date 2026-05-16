@@ -2934,6 +2934,13 @@ function printAutomationAgentProfilesResult(
       `    ${profile.id} executor=${profile.executor} model=${profile.model ?? "none"} version=${profile.version ?? "none"} variant=${profile.variant ?? "none"} reasoning=${profile.reasoning ?? "none"} intelligence=${profile.intelligence ?? "none"} intendedUse=${profile.intendedUse} safety=${profile.safety.profile} command=${profile.commandConfigured ? "yes" : "no"} args=${profile.argsCount}`,
     );
   }
+  writeLine(stdout, `  Plugin capabilities: ${result.pluginCapabilities.length}`);
+  for (const plugin of result.pluginCapabilities) {
+    writeLine(
+      stdout,
+      `    ${plugin.pluginId} capabilities=${plugin.capabilityCount}`,
+    );
+  }
 }
 
 function formatAutomationSelector(

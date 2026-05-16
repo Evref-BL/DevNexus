@@ -97,6 +97,49 @@ describe("nexus automation agent launch", () => {
     saveProjectConfig(
       projectRoot,
       projectConfig({
+        plugins: [
+          {
+            id: "analysis-tools",
+            name: "Analysis Tools",
+            capabilities: [
+              {
+                kind: "projected_skill",
+                id: "deep-review-skill",
+                skillId: "deep-review",
+                description: "Project a review skill into configured agents.",
+                targetAgents: ["codex"],
+              },
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                tools: [
+                  {
+                    name: "inspect_facts",
+                    description: "Read plugin-supplied facts.",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "workspace-policy",
+            capabilities: [
+              {
+                kind: "setup_obligation",
+                id: "review-local-docs",
+                description: "Review project-local setup notes before editing.",
+                required: true,
+              },
+              {
+                kind: "cleanup_hook",
+                id: "remove-temporary-cache",
+                description: "Remove temporary cache files created by plugin tools.",
+                trigger: "after_run",
+              },
+            ],
+          },
+        ],
         automation: {
           ...projectConfig().automation!,
           agent: {
@@ -238,6 +281,56 @@ describe("nexus automation agent launch", () => {
             },
           ],
         },
+        pluginCapabilities: [
+          {
+            pluginId: "analysis-tools",
+            pluginName: "Analysis Tools",
+            version: null,
+            capabilityCount: 2,
+            capabilities: [
+              {
+                kind: "projected_skill",
+                id: "deep-review-skill",
+                description: "Project a review skill into configured agents.",
+                skillId: "deep-review",
+                targetAgents: ["codex"],
+              },
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                description: null,
+                serverName: "analysis_tools",
+                tools: [
+                  {
+                    name: "inspect_facts",
+                    description: "Read plugin-supplied facts.",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            pluginId: "workspace-policy",
+            pluginName: null,
+            version: null,
+            capabilityCount: 2,
+            capabilities: [
+              {
+                kind: "setup_obligation",
+                id: "review-local-docs",
+                description: "Review project-local setup notes before editing.",
+                required: true,
+              },
+              {
+                kind: "cleanup_hook",
+                id: "remove-temporary-cache",
+                description: "Remove temporary cache files created by plugin tools.",
+                trigger: "after_run",
+                required: false,
+              },
+            ],
+          },
+        ],
         result: {
           file: options.env.DEV_NEXUS_AGENT_RESULT_FILE,
           requiredFields: ["status", "summary"],
