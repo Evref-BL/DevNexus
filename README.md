@@ -25,6 +25,13 @@ branch-backed worktree, invokes an injected executor, records execution
 metadata under the worktree support directory, appends the run ledger, and
 updates the tracker with conservative status and comments.
 
+Generated worktrees can declare setup-only dependency links through
+`automation.setup.dependencyLinks`. Each link copies no package data and runs
+no installer; it only links an existing reviewed path from the source checkout
+into the generated worktree and records the target in the worktree Git exclude
+file. Required links are checked during read-only status so unsafe or missing
+dependencies block before worktree creation.
+
 The package also ships a generic `dev-nexus` CLI for the same boundary:
 
 ```bash

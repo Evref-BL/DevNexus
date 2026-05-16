@@ -46,6 +46,16 @@ export interface NexusAutomationScheduleConfig {
   intervalMs: number;
 }
 
+export interface NexusAutomationDependencyLinkConfig {
+  source: string;
+  target: string;
+  required: boolean;
+}
+
+export interface NexusAutomationSetupConfig {
+  dependencyLinks: NexusAutomationDependencyLinkConfig[];
+}
+
 export interface NexusAutomationSafetyConfig {
   profile: NexusAutomationSafetyProfile;
   allowHostMutation: boolean;
@@ -69,6 +79,7 @@ export interface NexusAutomationConfig {
   lock: NexusAutomationLockConfig;
   backoff: NexusAutomationBackoffConfig;
   schedule: NexusAutomationScheduleConfig;
+  setup: NexusAutomationSetupConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
 }
@@ -105,6 +116,9 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   schedule: {
     enabled: true,
     intervalMs: 15 * 60 * 1000,
+  },
+  setup: {
+    dependencyLinks: [],
   },
   safety: {
     profile: "local",
@@ -147,6 +161,7 @@ export function validateNexusAutomationConfig(
   const lock = validateLockConfig(record.lock);
   const backoff = validateBackoffConfig(record.backoff);
   const schedule = validateScheduleConfig(record.schedule);
+  const setup = validateSetupConfig(record.setup);
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePublicationConfig(record.publication);
 
@@ -176,6 +191,10 @@ export function validateNexusAutomationConfig(
     schedule: {
       ...defaultNexusAutomationConfig.schedule,
       ...schedule,
+    },
+    setup: {
+      ...defaultNexusAutomationConfig.setup,
+      ...setup,
     },
     safety: {
       ...defaultNexusAutomationConfig.safety,
@@ -308,6 +327,48 @@ function validateScheduleConfig(
   return {
     ...optionalBooleanField(record, "enabled", pathName),
     ...optionalPositiveIntegerField(record, "intervalMs", pathName),
+  };
+}
+
+function validateSetupConfig(
+  value: unknown,
+): Partial<NexusAutomationSetupConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.setup";
+  const record = assertRecord(value, pathName);
+  const dependencyLinks = record.dependencyLinks;
+  if (dependencyLinks === undefined) {
+    return {};
+  }
+  if (!Array.isArray(dependencyLinks)) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.dependencyLinks must be an array`,
+    );
+  }
+
+  return {
+    dependencyLinks: dependencyLinks.map((link, index) =>
+      validateDependencyLinkConfig(
+        link,
+        `${pathName}.dependencyLinks[${index}]`,
+      ),
+    ),
+  };
+}
+
+function validateDependencyLinkConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationDependencyLinkConfig {
+  const record = assertRecord(value, pathName);
+
+  return {
+    source: requiredNonEmptyString(record.source, `${pathName}.source`),
+    target: requiredNonEmptyString(record.target, `${pathName}.target`),
+    required: optionalBoolean(record, "required", pathName) ?? false,
   };
 }
 

@@ -226,6 +226,15 @@ describe("project config", () => {
             focusedCommands: ["npm test"],
             fullCommands: ["npm run check"],
           },
+          setup: {
+            dependencyLinks: [
+              {
+                source: "node_modules",
+                target: "node_modules",
+                required: false,
+              },
+            ],
+          },
           publication: {
             strategy: "direct_integration",
             targetBranch: "main",
@@ -265,6 +274,15 @@ describe("project config", () => {
       schedule: {
         enabled: true,
         intervalMs: 900000,
+      },
+      setup: {
+        dependencyLinks: [
+          {
+            source: "node_modules",
+            target: "node_modules",
+            required: false,
+          },
+        ],
       },
       safety: {
         profile: "local",

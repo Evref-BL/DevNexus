@@ -146,4 +146,52 @@ describe("nexus automation status", () => {
       },
     });
   });
+
+  it("blocks readiness when a required dependency link source is missing", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          setup: {
+            dependencyLinks: [
+              {
+                source: "node_modules",
+                target: "node_modules",
+                required: true,
+              },
+            ],
+          },
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Blocked dependency task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      candidateCount: null,
+      selectedWorkItem: null,
+    });
+    expect(result.preflight.at(-1)).toMatchObject({
+      name: "dependencyLink:0",
+      status: "failed",
+    });
+    expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
 });

@@ -74,6 +74,9 @@ function executorInput(config: NexusAutomationConfig): NexusAutomationExecutorIn
         commands: [],
       },
     },
+    setup: {
+      links: [],
+    },
   };
 }
 

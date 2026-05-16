@@ -20,6 +20,11 @@ import {
 } from "./nexusAutomation.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
+  materializeNexusAutomationWorktreeSetup,
+  preflightNexusAutomationWorktreeSetup,
+  type NexusAutomationWorktreeSetupResult,
+} from "./nexusAutomationWorktreeSetup.js";
+import {
   loadProjectConfig,
   projectWorktreesRootPath,
   type NexusProjectConfig,
@@ -60,6 +65,7 @@ export interface NexusAutomationExecutorInput {
   automationConfig: NexusAutomationConfig;
   workItem: WorkItem;
   worktree: PrepareGitWorktreeResult;
+  setup: NexusAutomationWorktreeSetupResult;
 }
 
 export interface NexusAutomationExecutorResult {
@@ -123,6 +129,7 @@ export interface RunNexusAutomationOnceResult {
   preflight: NexusAutomationPreflightCheck[];
   workItem: WorkItem | null;
   worktree: PrepareGitWorktreeResult | null;
+  setup: NexusAutomationWorktreeSetupResult | null;
   execution: WorktreeExecutionMetadata | null;
   comments: WorkComment[];
   updatedWorkItem: WorkItem | null;
@@ -148,6 +155,7 @@ export async function runNexusAutomationOnce(
   let workItem: WorkItem | null = null;
   let updatedWorkItem: WorkItem | null = null;
   let worktree: PrepareGitWorktreeResult | null = null;
+  let setup: NexusAutomationWorktreeSetupResult | null = null;
   let ledger: NexusAutomationRunLedger | null = null;
   let provider: WorkTrackerProvider | null = null;
   let preflight: NexusAutomationPreflightCheck[] = [];
@@ -166,6 +174,7 @@ export async function runNexusAutomationOnce(
       preflight: [],
       workItem,
       worktree,
+      setup,
       execution: null,
       comments,
       updatedWorkItem,
@@ -217,6 +226,7 @@ export async function runNexusAutomationOnce(
         preflight: [],
         workItem,
         worktree,
+        setup,
         execution: null,
         comments,
         updatedWorkItem,
@@ -262,6 +272,7 @@ export async function runNexusAutomationOnce(
         preflight,
         workItem,
         worktree,
+        setup,
         execution: null,
         comments,
         updatedWorkItem,
@@ -312,6 +323,7 @@ export async function runNexusAutomationOnce(
         preflight,
         workItem,
         worktree,
+        setup,
         execution: null,
         comments,
         updatedWorkItem,
@@ -353,6 +365,7 @@ export async function runNexusAutomationOnce(
         preflight,
         workItem,
         worktree,
+        setup,
         execution: null,
         comments,
         updatedWorkItem,
@@ -368,6 +381,12 @@ export async function runNexusAutomationOnce(
       branchName,
       ...(options.worktreeName ? { worktreeName: options.worktreeName } : {}),
       ...(baseRef ? { baseRef } : {}),
+      ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
+    });
+    setup = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreePath: worktree.worktreePath,
+      automationConfig,
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });
 
@@ -388,6 +407,7 @@ export async function runNexusAutomationOnce(
       automationConfig,
       workItem,
       worktree,
+      setup,
     });
     const finishedAt = currentIso(options.now);
     const execution = executionMetadataFromExecutorResult(
@@ -447,6 +467,7 @@ export async function runNexusAutomationOnce(
       preflight,
       workItem,
       worktree,
+      setup,
       execution,
       comments,
       updatedWorkItem,
@@ -493,6 +514,7 @@ export async function runNexusAutomationOnce(
       preflight,
       workItem,
       worktree,
+      setup,
       execution: null,
       comments,
       updatedWorkItem,
@@ -563,6 +585,10 @@ export function preflightNexusAutomationRunOnce(options: {
       "Project worktrees root stays inside the project root",
       `Automation worktreesRoot must resolve inside the project root: ${worktreesRoot}`,
     ),
+    ...preflightNexusAutomationWorktreeSetup({
+      sourceRoot: options.sourceRoot,
+      automationConfig: options.automationConfig,
+    }),
   ];
 }
 

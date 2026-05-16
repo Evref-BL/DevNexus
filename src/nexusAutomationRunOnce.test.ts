@@ -37,6 +37,14 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
     if (argsArray[0] === "worktree" && argsArray[1] === "add") {
       fs.mkdirSync(argsArray[4]!, { recursive: true });
     }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+      return {
+        args: argsArray,
+        stdout: path.join(cwd ?? "", ".git", "info", "exclude"),
+        stderr: "",
+        exitCode: 0,
+      };
+    }
 
     return {
       args: argsArray,
@@ -225,6 +233,90 @@ describe("nexus automation run once", () => {
       status: "done",
     });
     expect(store.comments["local-1"]).toHaveLength(2);
+  });
+
+  it("materializes configured dependency links before executor work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-run-once-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    fs.mkdirSync(sourceDependency, { recursive: true });
+    fs.writeFileSync(path.join(sourceDependency, "tool.txt"), "ready\n", "utf8");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          setup: {
+            dependencyLinks: [
+              {
+                source: "node_modules",
+                target: "node_modules",
+                required: true,
+              },
+            ],
+          },
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Run with dependencies",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = await runNexusAutomationOnce({
+      projectRoot,
+      runId: "run-deps",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+        "2026-05-16T10:02:00.000Z",
+        "2026-05-16T10:03:00.000Z",
+      ),
+      gitRunner: fakeGitRunner(gitCalls),
+      executor: ({ setup, worktree }) => {
+        expect(setup.links).toMatchObject([
+          {
+            source: "node_modules",
+            target: "node_modules",
+            required: true,
+            status: "linked",
+          },
+        ]);
+        expect(
+          fs.existsSync(path.join(worktree.worktreePath, "node_modules", "tool.txt")),
+        ).toBe(true);
+
+        return {
+          status: "completed",
+          summary: "Dependencies linked",
+        };
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.setup?.links).toMatchObject([
+      {
+        sourcePath: sourceDependency,
+        targetPath: path.join(result.worktree!.worktreePath, "node_modules"),
+        status: "linked",
+      },
+    ]);
+    expect(
+      fs
+        .readFileSync(
+          path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
+          "utf8",
+        )
+        .trim(),
+    ).toBe("node_modules/");
+    expect(gitCalls.some((call) => call.args[0] === "rev-parse")).toBe(true);
   });
 
   it("blocks before worktree preparation when project work tracking is missing", async () => {
