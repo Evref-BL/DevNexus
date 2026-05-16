@@ -8,11 +8,20 @@ integration, and publication handoff across language ecosystems.
 
 DevNexus is not the work-planning agent. It should not decide which work item
 to implement, supervise the implementation, or plan parallel worktrees itself.
-Its automation role is to launch a configured agent such as Codex or Claude in
-a prepared project context. The launched agent chooses the work item or items,
-creates and coordinates Git worktrees when useful, verifies the result, and
-reports commits, publication, blockers, and notes back through DevNexus-owned
-records.
+A user drives DevNexus by configuring projects, schedules, launch policies, and
+agent commands. A user can be a human or an agent acting under human
+instruction. DevNexus executes that infrastructure and schedule by launching a
+configured agent such as Codex or Claude in a prepared project context. The
+launched agent chooses the work item or items, creates and coordinates Git
+worktrees when useful, verifies the result, and reports commits, publication,
+blockers, and notes back through DevNexus-owned records. DevNexus can relaunch
+the agent while eligible work remains when the user has configured that
+behavior.
+
+For example, a human can tell Codex to use DevNexus to work on a project until
+no eligible issue remains. In that flow, Codex is the user of DevNexus under
+human instruction; DevNexus supplies the configured launch gates, schedule,
+project context, relaunch loop, and run records.
 
 Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions. DevNexus provides the core contracts and extension hooks without
@@ -42,25 +51,26 @@ which is useful for local smoke checks and generated worktrees.
 ## Automation Foundation
 
 Projects can opt into generic agent-launch automation through
-`dev-nexus.project.json`. The core schema covers launch eligibility filters,
+`dev-nexus.project.json`. The core schema covers user-configured launch gates,
 verification hints, run ledgers, stale-aware locks, retry backoff, safety
 policy, and publication policy. These APIs model launch state and record what
 the agent reports; execution adapters decide how to start agents and tools for
 a project.
 
-The configured automation selector is a launch gate and context filter. It can
-answer whether a project has candidate work that makes another agent launch
-worthwhile, but it is not a mandate for DevNexus to choose the task. The
+The configured automation selector is a user-authored launch gate and context
+filter. It can decide whether the user's configured conditions for launching an
+agent are met, but it is not a mandate for DevNexus to choose the task. The
 launched agent must inspect the tracker context, choose the work item or items
-to take, decide whether parallel Git worktrees are useful, and supervise the
+to take, decide whether parallel Git worktrees are useful, and supervise
 implementation through verification and publication.
 
 `runNexusAutomationOnce` is the current low-level orchestration boundary for
 those adapters. It still exposes selected-work data so existing status and
 smoke workflows can run, but that is an interim shape. New automation work
 should move toward the launch-only boundary: DevNexus prepares safe context,
-starts the configured agent, records the agent's reported result, and can be
-configured to relaunch while eligible work remains.
+starts the configured agent when the user-requested or scheduled launch policy
+fires, can relaunch while eligible work remains when the user has configured
+that behavior, and records the agent's reported result.
 
 Generated worktrees can declare setup-only dependency links through
 `automation.setup.dependencyLinks`. Each link copies no package data and runs
@@ -91,7 +101,8 @@ launch.
 
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an
-agent before any worktree or tracker mutation happens.
+agent under the user-configured launch policy before any worktree or tracker
+mutation happens.
 
 `automation enqueue` creates a work item that matches the configured automation
 launch filter. It derives the default status, labels, and assignees from
