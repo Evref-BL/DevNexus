@@ -6,6 +6,14 @@ DevNexus agent-launch loop to advance eligible work.
 
 Immediate direction:
 
+- The forward plan has been handed into this clean dogfood project as
+  `PLAN.md`. New cycles should use that file instead of relying on chat memory
+  or the older PharoNexus-Control handoff.
+- New ready work item `dev-nexus:local-5` should use the curated `to-issues`
+  skill to split `PLAN.md` into the next component-owned work-item batch.
+- `dev-nexus:local-3` has been corrected to `done`; its implementation was
+  already published as `1863d04` and had a completion comment.
+
 - The seeded local work-item stores have been refined with component ownership,
   acceptance criteria, readiness labels, blockers, and safe verification notes.
 - DevNexus core result-file contract hardening and component worktree guidance
@@ -22,8 +30,11 @@ Immediate direction:
     `1f3070b`.
   - MCP-Pharo static/live verification boundary was documented as local
     review-handoff commit `0a38755` on `develop`.
-- There are no remaining `ready` + `dogfood` work items. Remaining dogfood work
-  is intentionally blocked live-runtime follow-up work:
+- The first seeded dogfood target completed, but the transferred-plan handoff
+  intentionally creates one new `ready` + `dogfood` planning item so the next
+  cycle can split the current plan from durable local state.
+- Remaining runtime dogfood work is intentionally blocked live-runtime
+  follow-up work:
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the isolated runner.
 - Next direction requires human approval of the isolated runner inputs,

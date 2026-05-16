@@ -7,6 +7,10 @@ components until the live plan has been split into component-owned work items
 and the remaining eligible work can be advanced through the DevNexus
 launch/relaunch workflow.
 
+The transferred plan now lives in `PLAN.md`. Use it as the source for the next
+target and for `to-issues` splitting instead of relying on chat history or the
+older control-project handoff.
+
 ## Components
 
 - `dev-nexus`: generic core and primary component.

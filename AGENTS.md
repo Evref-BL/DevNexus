@@ -18,8 +18,8 @@ separate from the older PharoNexus-Control staging root.
 
 ## Per-Cycle Workflow
 
-1. Read `DEV_NEXUS_AGENT_CONTEXT_FILE`, this file, `CONTEXT.md`, and
-   `.dev-nexus/automation/target-state.md`.
+1. Read `DEV_NEXUS_AGENT_CONTEXT_FILE`, this file, `CONTEXT.md`, `PLAN.md`,
+   and `.dev-nexus/automation/target-state.md`.
 2. Inspect component working trees and preserve unrelated changes.
 3. Choose the largest safe bounded batch from eligible work items, respecting
    `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS`.
@@ -31,6 +31,13 @@ separate from the older PharoNexus-Control staging root.
 8. Keep this project state concise: update target state with current decisions,
    active blockers, and next direction; remove stale detail.
 9. Write `DEV_NEXUS_AGENT_RESULT_FILE` as JSON before exiting.
+
+## Plan Handoff
+
+`PLAN.md` is the durable handoff from the older PharoNexus-Control staging
+project into this clean dogfood project. Treat it as the forward plan for new
+targets. The old control handoff remains historical reference, not the primary
+source for future dogfood cycles.
 
 ## Result File Shape
 
