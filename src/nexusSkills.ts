@@ -260,6 +260,26 @@ Use this skill when a change touches module boundaries, ownership, or long-lived
 `,
   ),
   curatedCoreSkill(
+    "setup-agent-skills",
+    "setup-agent-skills",
+    "Repository setup workflow for documenting issue tracker, triage label, and domain-document context used by agent skills.",
+    `
+# Setup Agent Skills
+
+Use this skill when a project first enables curated agent skills, or when skills are missing repository-specific context about tracking, triage, or domain documentation.
+
+1. Inspect the repository before writing: Git remotes, existing \`AGENTS.md\` or \`CLAUDE.md\`, \`docs/agents\`, \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, \`docs/adr\`, and any local issue or work-item directories.
+2. Present what exists and what is missing, then confirm setup decisions one at a time instead of asking for every choice at once.
+3. Record where work items live: configured DevNexus tracker, GitHub Issues, GitLab Issues, Jira, Linear, local work items, or another project-specific tracker.
+4. Record triage labels or status values for the canonical flow: needs triage, needs information, autonomous agent-ready (AFK), ready for human, and will not fix.
+5. Record domain-document layout: single-context \`CONTEXT.md\`, multi-context \`CONTEXT-MAP.md\`, and where Architecture Decision Records (ADRs) live.
+6. Draft the exact changes before writing: an \`Agent skills\` section in the existing agent instruction file, plus \`docs/agents/issue-tracker.md\`, \`docs/agents/triage-labels.md\`, and \`docs/agents/domain.md\`.
+7. Edit the existing agent instruction file. If both \`CLAUDE.md\` and \`AGENTS.md\` exist, prefer the one already used by the project; if neither exists, ask before creating one.
+8. Preserve unrelated instructions and update an existing \`Agent skills\` section in place rather than appending a duplicate.
+9. Keep generated setup docs local to the project. Do not include external catalog or author names in generated skill names, headings, or operational instructions.
+`,
+  ),
+  curatedCoreSkill(
     "grill-with-docs",
     "grill-with-docs",
     "Plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records.",

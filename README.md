@@ -67,6 +67,7 @@ directory. The default core pack includes:
 - `handoff`
 - `triage`
 - `architecture-review`
+- `setup-agent-skills`
 - `grill-with-docs`
 - `to-issues`
 - `to-prd` for Product Requirements Document (PRD) synthesis

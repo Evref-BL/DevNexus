@@ -70,6 +70,7 @@ describe("nexus skills", () => {
       "handoff",
       "triage",
       "architecture-review",
+      "setup-agent-skills",
       "grill-with-docs",
       "to-issues",
       "to-prd",
@@ -88,6 +89,13 @@ describe("nexus skills", () => {
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",
     );
+    expect(skillMarkdown["setup-agent-skills"]).toContain(
+      "Architecture Decision Records (ADRs)",
+    );
+    expect(skillMarkdown["setup-agent-skills"]).toContain(
+      "autonomous agent-ready (AFK)",
+    );
+    expect(skillMarkdown["setup-agent-skills"]).not.toContain("matt");
     expect(skillMarkdown["to-issues"]).toContain(
       "Product Requirements Document (PRD)",
     );
