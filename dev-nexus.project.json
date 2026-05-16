@@ -127,7 +127,7 @@
       "kind": "git",
       "role": "dependency",
       "remoteUrl": "https://github.com/Evref-BL/MCP.git",
-      "defaultBranch": "develop",
+      "defaultBranch": "main",
       "sourceRoot": "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
       "worktreesRoot": "worktrees/mcp-pharo",
       "workTracking": {
@@ -137,7 +137,7 @@
       "publication": {
         "strategy": "review_handoff",
         "remote": "origin",
-        "targetBranch": "develop",
+        "targetBranch": "main",
         "push": false
       },
       "relationships": [

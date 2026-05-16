@@ -143,8 +143,8 @@ Current component publication state:
   portability coverage`).
 - pharo-launcher-mcp is clean and pushed to `origin/main` through `8a8b5eb`
   (`Detach Pharo image launches`).
-- MCP-Pharo is clean and aligned with `origin/develop` through `0fe8ef0`
-  (`Remove unused imports from MCP baseline`).
+- MCP-Pharo is clean and aligned with `origin/main` through `faef856`
+  (`Stabilize Pharo 13 repository tests`).
 
 The first seeded dogfood target completed through real user-local Codex launch
 cycles. The target report reached `completed` with relaunch decision `stop`
@@ -202,9 +202,8 @@ Priority candidates:
 7. Add external coordination requests so agents can ask provider-backed
    humans/agents for approval, feedback, review, or choices and then continue
    from durable responses.
-8. Decide MCP-Pharo publication path for `0a38755`: keep it as local review
-   handoff, push a review branch, or publish it to `develop` after the needed
-   review.
+8. MCP-Pharo has moved to `main`; keep new MCP-Pharo review handoffs and
+   automatic loads aligned with `origin/main`.
 9. Split the remaining DevNexus plan into component-owned local work items,
    with each item carrying readiness, blocker, acceptance, verification, and
    publication notes.

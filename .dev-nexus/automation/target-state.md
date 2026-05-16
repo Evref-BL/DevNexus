@@ -19,6 +19,9 @@ Immediate direction:
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
   - None. The automation selector now reports no ready `dogfood` work items.
+- MCP-Pharo branch migration:
+  - MCP-Pharo is now merged to `origin/main`; DevNexus component metadata and
+    PLexus automatic Metacello loading must target `main`, not `develop`.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
     agent setup after the generic plugin and scoped PLexus contracts are
@@ -168,10 +171,8 @@ Durable completed foundation:
   `916e1d5`.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as
   `1f3070b`.
-- MCP-Pharo static/live verification boundary was merged into `origin/develop`
-  through `9d90fd8`, preserving commits `0a38755` and `4c37fb0`; the temporary
-  review branch `origin/review/mcp-pharo-verification-boundary-20260516` was
-  removed after merge verification.
+- MCP-Pharo static/live verification boundary was merged through `origin/main`;
+  automatic loads and DevNexus component defaults now target `main`.
 
 Active boundaries:
 
