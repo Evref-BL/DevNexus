@@ -177,6 +177,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
+    expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation run-once");
@@ -528,6 +529,55 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
+  it("refreshes project agent MCP config through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(
+      [
+        "project",
+        "mcp",
+        "refresh",
+        projectRoot,
+        "--agent",
+        "codex",
+        "--agent",
+        "claude",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      agentTargets: [
+        {
+          agent: "codex",
+          serverName: "dev_nexus",
+        },
+        {
+          agent: "claude",
+          serverName: "dev_nexus",
+        },
+      ],
+    });
+    expect(
+      fs.readFileSync(path.join(projectRoot, ".codex", "config.toml"), "utf8"),
+    ).toContain("[mcp_servers.dev_nexus]");
+    expect(
+      JSON.parse(fs.readFileSync(path.join(projectRoot, ".mcp.json"), "utf8"))
+        .mcpServers.dev_nexus,
+    ).toEqual({
+      command: "dev-nexus",
+      args: ["mcp-stdio"],
+    });
   });
 
   it("enqueues work items that match the automation selector", async () => {

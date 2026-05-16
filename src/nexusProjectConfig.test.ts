@@ -107,6 +107,23 @@ describe("project config", () => {
         model: "gpt-5.4",
         reasoning: "high",
       },
+      mcp: {
+        sourceControl: "support" as const,
+        serverName: "dev_nexus",
+        command: "dev-nexus",
+        args: ["mcp-stdio"],
+        agentTargets: [
+          {
+            agent: "codex",
+            configPath: ".codex/config.toml",
+          },
+          {
+            agent: "claude",
+            configPath: ".mcp.json",
+            sourceControl: "source" as const,
+          },
+        ],
+      },
       skills: {
         materialization: "copy" as const,
         sourceControl: "support" as const,
@@ -555,6 +572,41 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.skills\.agentTargets\[0\]\.sourceControl/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-mcp-agent-targets",
+        name: "Invalid MCP Agent Targets",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        mcp: {
+          agentTargets: "codex",
+        },
+      }),
+    ).toThrow(/project config\.mcp\.agentTargets must be an array/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-mcp-agent-target",
+        name: "Invalid MCP Agent Target",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        mcp: {
+          agentTargets: [
+            {
+              agent: "codex",
+              args: "mcp-stdio",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/project config\.mcp\.agentTargets\[0\]\.args/);
 
     expect(() =>
       validateProjectConfig({

@@ -344,6 +344,7 @@ export function createNexusProjectInRegistry(
     worktreesRoot,
     projectConfig,
     skills: projectConfig.skills,
+    mcp: projectConfig.mcp,
     extensions: options.scaffoldExtensions,
   });
 
@@ -448,6 +449,7 @@ export function importNexusProjectInRegistry(
     worktreesRoot,
     projectConfig,
     skills: projectConfig.skills,
+    mcp: projectConfig.mcp,
     extensions: options.scaffoldExtensions,
   });
 

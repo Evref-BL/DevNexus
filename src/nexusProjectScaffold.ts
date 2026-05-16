@@ -5,6 +5,12 @@ import type {
   NexusProjectSkillsContext,
 } from "./nexusExtension.js";
 import {
+  emptyNexusProjectAgentMcpConfigResult,
+  materializeNexusProjectAgentMcpConfig,
+  type MaterializeNexusProjectAgentMcpConfigResult,
+} from "./nexusAgentMcpConfig.js";
+import type { NexusProjectMcpConfig } from "./nexusProjectConfig.js";
+import {
   materializeNexusProjectSkills,
   type MaterializeNexusProjectSkillsResult,
   type NexusProjectSkillsConfig,
@@ -19,12 +25,14 @@ export interface ScaffoldNexusProjectOptions<ProjectConfig = unknown> {
   extensions?: NexusExtension<ProjectConfig>[];
   skills?: NexusProjectSkillsConfig | false;
   skillDefinitions?: NexusSkillDefinition[];
+  mcp?: NexusProjectMcpConfig | false;
 }
 
 export interface ScaffoldNexusProjectResult {
   projectRoot: string;
   worktreesRoot: string;
   skills: MaterializeNexusProjectSkillsResult;
+  agentMcp: MaterializeNexusProjectAgentMcpConfigResult;
   extensionResults: Record<string, unknown>;
 }
 
@@ -73,11 +81,19 @@ export function scaffoldNexusProject<ProjectConfig>(
             ...(options.skillDefinitions ?? []),
           ],
         });
+  const agentMcp =
+    options.mcp === undefined || options.mcp === false
+      ? emptyNexusProjectAgentMcpConfigResult()
+      : materializeNexusProjectAgentMcpConfig({
+          projectRoot: options.projectRoot,
+          mcpConfig: options.mcp,
+        });
 
   return {
     projectRoot: options.projectRoot,
     worktreesRoot: options.worktreesRoot,
     skills,
+    agentMcp,
     extensionResults,
   };
 }

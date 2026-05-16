@@ -46,6 +46,7 @@ dev-nexus project import <source-root> --home <home-path> --name <name>
 dev-nexus project list --home <home-path>
 dev-nexus project status <project-id-or-root> --home <home-path>
 dev-nexus project status <project-root>
+dev-nexus project mcp refresh <project-root> --agent codex --agent claude
 dev-nexus project tracker configure <project> --home <home-path> --provider local
 dev-nexus project tracker link <project> --home <home-path> --tracker-project-id <id>
 dev-nexus mcp-stdio
@@ -89,6 +90,31 @@ work_item_set_status
 Projects can still use the CLI for the same boundaries. The MCP server exists
 so agents can use DevNexus directly without depending on a specialization
 adapter for generic project orchestration.
+
+Project-local agent configuration can be generated with:
+
+```bash
+dev-nexus project mcp refresh <project-root> --agent codex
+```
+
+or through project configuration:
+
+```json
+{
+  "mcp": {
+    "agentTargets": [
+      { "agent": "codex" },
+      { "agent": "claude", "sourceControl": "source" }
+    ]
+  }
+}
+```
+
+The Codex target writes or updates `.codex/config.toml` with a
+`dev_nexus` stdio server. The Claude target writes or updates project
+`.mcp.json`. Generated support config is excluded from Git by default;
+set `sourceControl` to `source` when the project should commit the agent MCP
+configuration.
 
 ## Project Components
 

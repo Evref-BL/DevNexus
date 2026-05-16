@@ -29,6 +29,10 @@ import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import {
+  materializeNexusProjectAgentMcpConfig,
+  type MaterializeNexusProjectAgentMcpConfigResult,
+} from "./nexusAgentMcpConfig.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
   createDefaultNexusHomeConfigBase,
@@ -123,6 +127,12 @@ interface ParsedProjectListCommand {
 interface ParsedProjectStatusCommand {
   homePath?: string;
   project: string;
+  json?: boolean;
+}
+
+interface ParsedProjectMcpRefreshCommand {
+  projectRoot: string;
+  agents: string[];
   json?: boolean;
 }
 
@@ -241,6 +251,7 @@ export function usage(): string {
     "  dev-nexus project import <source-root> [options]",
     "  dev-nexus project list [options]",
     "  dev-nexus project status <project-id-or-root> [options]",
+    "  dev-nexus project mcp refresh <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
@@ -275,6 +286,10 @@ export function usage(): string {
     "  --project-root <path>",
     "  --name <name>",
     "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for project mcp refresh:",
+    "  --agent <codex|claude>    repeatable; defaults to project mcp.agentTargets or codex",
     "  --json",
     "",
     "Options for project tracker configure:",
@@ -487,11 +502,38 @@ async function handleProjectCommand(
     return 0;
   }
 
+  if (command === "mcp") {
+    return handleProjectMcpCommand(argv, dependencies);
+  }
+
   if (command === "tracker") {
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, import, list, status, or tracker");
+  throw new Error("project requires create, import, list, status, mcp, or tracker");
+}
+
+async function handleProjectMcpCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  if (command !== "refresh") {
+    throw new Error("project mcp requires refresh");
+  }
+
+  const parsed = parseProjectMcpRefreshCommand(argv);
+  const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const result = materializeNexusProjectAgentMcpConfig({
+    projectRoot,
+    mcpConfig: projectConfig.mcp,
+    ...(parsed.agents.length > 0
+      ? { agentTargets: parsed.agents.map((agent) => ({ agent })) }
+      : {}),
+  });
+  printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
+  return 0;
 }
 
 async function handleProjectTrackerCommand(
@@ -1010,6 +1052,44 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
         break;
       default:
         throw new Error(`Unknown project status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectMcpRefreshCommand(
+  argv: string[],
+): ParsedProjectMcpRefreshCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("project mcp refresh requires a project root");
+  }
+
+  const parsed: ParsedProjectMcpRefreshCommand = {
+    projectRoot,
+    agents: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--agent":
+        parsed.agents.push(next());
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project mcp refresh option: ${arg}`);
     }
   }
 
@@ -1687,6 +1767,30 @@ function printProjectStatusResult(
   }
   writeLine(stdout, `  Config exists: ${project.projectConfigExists}`);
   writeLine(stdout, `  Worktrees root: ${project.worktreesRoot}`);
+}
+
+function printProjectMcpRefreshResult(
+  result: MaterializeNexusProjectAgentMcpConfigResult,
+  parsed: ParsedProjectMcpRefreshCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus MCP agent config refreshed.");
+  writeLine(stdout, `  Agent targets: ${result.agentTargets.length}`);
+  for (const target of result.agentTargets) {
+    writeLine(
+      stdout,
+      `    ${target.agent}: ${target.configPath} (${target.serverName})`,
+    );
+  }
+  if (result.gitExcludeEntries.length > 0) {
+    writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
+  }
 }
 
 function printProjectTrackerConfigureResult(

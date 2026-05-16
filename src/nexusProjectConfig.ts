@@ -83,6 +83,25 @@ export interface NexusProjectKanbanConfig {
 
 export type NexusProjectExtensionsConfig = Record<string, Record<string, unknown>>;
 
+export interface NexusProjectAgentMcpTarget {
+  agent: string;
+  enabled?: boolean;
+  configPath?: string;
+  sourceControl?: NexusSkillSourceControl;
+  serverName?: string;
+  command?: string;
+  args?: string[];
+}
+
+export interface NexusProjectMcpConfig {
+  enabled?: boolean;
+  sourceControl?: NexusSkillSourceControl;
+  serverName?: string;
+  command?: string;
+  args?: string[];
+  agentTargets?: NexusProjectAgentMcpTarget[];
+}
+
 export interface NexusProjectConfig {
   version: 1;
   id: string;
@@ -95,6 +114,7 @@ export interface NexusProjectConfig {
   workTracking?: WorkTrackingConfig;
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
+  mcp?: NexusProjectMcpConfig;
   skills?: NexusProjectSkillsConfig;
   automation?: NexusAutomationConfig;
 }
@@ -437,6 +457,72 @@ function validateProjectSkillsConfig(
       ? {
           items: items.map((item, index) =>
             validateProjectSkillSelection(item, index),
+          ),
+        }
+      : {}),
+  };
+}
+
+function validateProjectMcpAgentTarget(
+  value: unknown,
+  index: number,
+): NexusProjectAgentMcpTarget {
+  const pathName = `project config.mcp.agentTargets[${index}]`;
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName);
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+  const configPath = optionalString(record, "configPath", pathName);
+  const serverName = optionalString(record, "serverName", pathName);
+  const command = optionalString(record, "command", pathName);
+  const args = optionalStringArray(record, "args", pathName);
+
+  return {
+    agent: requiredString(record, "agent", pathName),
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(configPath !== undefined ? { configPath } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(serverName !== undefined ? { serverName } : {}),
+    ...(command !== undefined ? { command } : {}),
+    ...(args !== undefined ? { args } : {}),
+  };
+}
+
+function validateProjectMcpConfig(
+  value: unknown,
+): NexusProjectMcpConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, "project config.mcp");
+  const enabled = optionalBoolean(record, "enabled", "project config.mcp");
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    "project config.mcp.sourceControl",
+  );
+  const serverName = optionalString(record, "serverName", "project config.mcp");
+  const command = optionalString(record, "command", "project config.mcp");
+  const args = optionalStringArray(record, "args", "project config.mcp");
+  const agentTargets = record.agentTargets;
+  if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
+    throw new NexusConfigError(
+      "project config.mcp.agentTargets must be an array",
+    );
+  }
+
+  return {
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(serverName !== undefined ? { serverName } : {}),
+    ...(command !== undefined ? { command } : {}),
+    ...(args !== undefined ? { args } : {}),
+    ...(agentTargets
+      ? {
+          agentTargets: agentTargets.map((target, index) =>
+            validateProjectMcpAgentTarget(target, index),
           ),
         }
       : {}),
@@ -1009,6 +1095,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
+  const mcp = validateProjectMcpConfig(record.mcp);
   const automation = validateNexusAutomationConfig(record.automation);
   const repo = validateRepoConfig(record.repo);
   const worktreesRoot =
@@ -1030,6 +1117,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     components: validateProjectComponentsConfig(record.components, common),
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
+    ...(mcp ? { mcp } : {}),
     ...(skills ? { skills } : {}),
     ...(automation ? { automation } : {}),
   };

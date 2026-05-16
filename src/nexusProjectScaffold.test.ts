@@ -115,4 +115,35 @@ describe("nexus project scaffold", () => {
       ),
     ).toBe(true);
   });
+
+  it("materializes configured agent MCP files", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+    fs.mkdirSync(path.join(projectRoot, ".git", "info"), { recursive: true });
+
+    const result = scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig: {
+        id: "project-1",
+      },
+      mcp: {
+        agentTargets: [
+          {
+            agent: "codex",
+          },
+        ],
+      },
+    });
+
+    expect(result.agentMcp.agentTargets).toMatchObject([
+      {
+        agent: "codex",
+      },
+    ]);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
+    ).toBe(true);
+  });
 });

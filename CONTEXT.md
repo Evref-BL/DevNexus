@@ -9,6 +9,7 @@
 - Work-item service: The tracker or issue provider configured for a component, such as a local store, GitHub Issues, GitHub Projects, GitLab issues, or Jira.
 - DevNexus user: A human or an agent acting under human instruction that configures DevNexus and asks it to launch agent work.
 - DevNexus Model Context Protocol (MCP) server: The generic stdio tool server that exposes DevNexus project, automation, and work-item APIs to agents without specialization adapters.
+- Agent MCP target: A configured project-local agent integration, such as Codex `.codex/config.toml` or Claude `.mcp.json`, that registers the DevNexus Model Context Protocol (MCP) server for that agent.
 - Target: The user-requested outcome for a DevNexus automation loop, such as completing selected work items or continuing until no eligible issue remains.
 - Target state: Concise project memory for the current target, stored in a configured Markdown file and updated by agents as the useful context changes.
 - Launched agent: The thinking process started by DevNexus that chooses work items, supervises subagents, coordinates worktrees, verifies changes, and reports results.
