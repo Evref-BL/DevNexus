@@ -28,6 +28,7 @@ import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import { projectPluginWorkerFragments } from "./nexusPluginCapabilities.js";
 import {
   resolvePrimaryProjectComponent,
   type ResolvedNexusProjectComponent,
@@ -423,6 +424,9 @@ export async function runNexusAutomationOnce(
           baseRef: worktree.baseRef,
           workItem: worktree.workItem,
         },
+        pluginFragments: projectPluginWorkerFragments(projectConfig, {
+          componentId: primaryComponent.id,
+        }),
       },
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });

@@ -344,7 +344,50 @@ describe("nexus automation run once", () => {
     const projectRoot = makeTempDir("dev-nexus-run-once-project-");
     const sourceRoot = path.join(projectRoot, "source");
     fs.mkdirSync(sourceRoot, { recursive: true });
-    saveProjectConfig(projectRoot, projectConfig());
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        plugins: [
+          {
+            id: "fake-briefing",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "worker_briefing_fragment",
+                id: "setup-note",
+                title: "Fake Setup Note",
+                body: "Use this fake plugin note as advisory setup context.",
+                provenance: "fake-briefing manifest",
+                targetComponents: ["primary"],
+              },
+            ],
+          },
+          {
+            id: "fake-context",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "worker_context_fragment",
+                id: "component-facts",
+                title: "Fake Component Facts",
+                body: "These facts apply to the generated primary worktree.",
+                provenance: "fake-context manifest",
+                targetAgents: ["codex"],
+                targetComponents: ["primary"],
+              },
+              {
+                kind: "worker_context_fragment",
+                id: "other-component-facts",
+                title: "Other Component Facts",
+                body: "This fragment is intended for another component.",
+                provenance: "fake-context manifest",
+                targetComponents: ["other"],
+              },
+            ],
+          },
+        ],
+      }),
+    );
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
       now: fixedClock("2026-05-16T09:00:00.000Z"),
@@ -421,10 +464,54 @@ describe("nexus automation run once", () => {
           title: "Run with worker context",
         },
       },
+      pluginFragments: {
+        context: [
+          {
+            kind: "worker_context_fragment",
+            id: "component-facts",
+            title: "Fake Component Facts",
+            body: "These facts apply to the generated primary worktree.",
+            provenance: "fake-context manifest",
+            advisory: true,
+            targetAgents: ["codex"],
+            targetComponents: ["primary"],
+            source: {
+              pluginId: "fake-context",
+              pluginName: null,
+              version: null,
+              capabilityId: "component-facts",
+            },
+          },
+        ],
+        briefing: [
+          {
+            kind: "worker_briefing_fragment",
+            id: "setup-note",
+            title: "Fake Setup Note",
+            body: "Use this fake plugin note as advisory setup context.",
+            provenance: "fake-briefing manifest",
+            advisory: true,
+            targetAgents: [],
+            targetComponents: ["primary"],
+            source: {
+              pluginId: "fake-briefing",
+              pluginName: null,
+              version: null,
+              capabilityId: "setup-note",
+            },
+          },
+        ],
+      },
     });
-    expect(fs.readFileSync(observedSetup.context.briefingPath, "utf8")).toContain(
+    const briefing = fs.readFileSync(observedSetup.context.briefingPath, "utf8");
+    expect(briefing).toContain(
       "Source and Git commands run from the component checkout root",
     );
+    expect(briefing).toContain("Fake Setup Note");
+    expect(briefing).toContain(
+      "Use this fake plugin note as advisory setup context.",
+    );
+    expect(briefing).not.toContain("Other Component Facts");
     const excludeEntries = fs
       .readFileSync(
         path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),

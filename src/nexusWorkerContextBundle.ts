@@ -5,6 +5,12 @@ import type {
   WorkStatus,
   WorkTrackingProviderName,
 } from "./workTrackingTypes.js";
+import type {
+  NexusPluginWorkerFragmentCapabilityKind,
+  NexusPluginWorkerFragmentProjection,
+  NexusPluginWorkerFragmentSource,
+  NexusPluginWorkerFragmentsProjection,
+} from "./nexusPluginCapabilities.js";
 
 export type NexusWorkerContextFileId =
   | "agents"
@@ -95,6 +101,7 @@ export interface NexusWorkerContextBundle {
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   projectContext: NexusWorkerProjectContextReferences;
+  pluginFragments: NexusPluginWorkerFragmentsProjection;
   boundaries: NexusWorkerContextBoundaries;
 }
 
@@ -111,6 +118,7 @@ export interface NexusWorkerContextBundleOptions {
   workItem: NexusWorkerContextBundleWorkItem | null;
   targetStatePath?: string | null;
   skills?: NexusWorkerContextSkills;
+  pluginFragments?: NexusPluginWorkerFragmentsProjection;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -189,6 +197,9 @@ export function buildNexusWorkerContextBundle(
     targetStatePath: options.targetStatePath,
   });
   const skills = normalizeWorkerContextSkills(projectRoot, options.skills);
+  const pluginFragments = normalizeWorkerPluginFragments(
+    options.pluginFragments,
+  );
   const worktree = {
     componentId,
     sourceRoot,
@@ -215,6 +226,7 @@ export function buildNexusWorkerContextBundle(
     ownership: worktree,
     worktree,
     projectContext,
+    pluginFragments,
     boundaries: {
       commandWorkingDirectory: worktreePath,
       gitWorkingDirectory: worktreePath,
@@ -268,6 +280,7 @@ export function renderNexusWorkerBriefing(
     `Project-managed skills: ${context.skills.projectManagedRoot}`,
     ...renderSkillProjectionLines(context.skills),
     "",
+    ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
 }
 
@@ -419,6 +432,149 @@ function normalizeWorkerContextWorkItem(
   };
 }
 
+function normalizeWorkerPluginFragments(
+  pluginFragments: NexusPluginWorkerFragmentsProjection | undefined,
+): NexusPluginWorkerFragmentsProjection {
+  return {
+    context: normalizeWorkerPluginFragmentList(
+      pluginFragments?.context ?? [],
+      "worker_context_fragment",
+    ),
+    briefing: normalizeWorkerPluginFragmentList(
+      pluginFragments?.briefing ?? [],
+      "worker_briefing_fragment",
+    ),
+  };
+}
+
+function normalizeWorkerPluginFragmentList(
+  fragments: NexusPluginWorkerFragmentProjection[],
+  expectedKind: NexusPluginWorkerFragmentCapabilityKind,
+): NexusPluginWorkerFragmentProjection[] {
+  return fragments
+    .map((fragment) => normalizeWorkerPluginFragment(fragment, expectedKind))
+    .sort(compareWorkerPluginFragments);
+}
+
+function normalizeWorkerPluginFragment(
+  fragment: NexusPluginWorkerFragmentProjection,
+  expectedKind: NexusPluginWorkerFragmentCapabilityKind,
+): NexusPluginWorkerFragmentProjection {
+  const kind = requiredNonEmptyString(
+    fragment.kind,
+    "pluginFragments.kind",
+  ) as NexusPluginWorkerFragmentCapabilityKind;
+  if (kind !== expectedKind) {
+    throw new NexusWorkerContextBundleError(
+      `pluginFragments.${expectedKind} entries must have kind ${expectedKind}`,
+    );
+  }
+
+  return {
+    kind,
+    id: requiredNonEmptyString(fragment.id, "pluginFragments.id"),
+    title: requiredNonEmptyString(fragment.title, "pluginFragments.title"),
+    body: requiredNonEmptyString(fragment.body, "pluginFragments.body"),
+    provenance: requiredNonEmptyString(
+      fragment.provenance,
+      "pluginFragments.provenance",
+    ),
+    advisory: true,
+    targetAgents: normalizeStringArray(
+      fragment.targetAgents,
+      "pluginFragments.targetAgents",
+    ),
+    targetComponents: normalizeStringArray(
+      fragment.targetComponents,
+      "pluginFragments.targetComponents",
+    ),
+    source: normalizeWorkerPluginFragmentSource(fragment.source),
+  };
+}
+
+function normalizeWorkerPluginFragmentSource(
+  source: NexusPluginWorkerFragmentSource,
+): NexusPluginWorkerFragmentSource {
+  return {
+    pluginId: requiredNonEmptyString(
+      source.pluginId,
+      "pluginFragments.source.pluginId",
+    ),
+    pluginName:
+      optionalNullableString(
+        source.pluginName,
+        "pluginFragments.source.pluginName",
+      ) ?? null,
+    version:
+      optionalNullableString(
+        source.version,
+        "pluginFragments.source.version",
+      ) ?? null,
+    capabilityId: requiredNonEmptyString(
+      source.capabilityId,
+      "pluginFragments.source.capabilityId",
+    ),
+  };
+}
+
+function normalizeStringArray(value: string[], name: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new NexusWorkerContextBundleError(`${name} must be an array`);
+  }
+
+  return value.map((entry, index) =>
+    requiredNonEmptyString(entry, `${name}[${index}]`),
+  );
+}
+
+function compareWorkerPluginFragments(
+  left: NexusPluginWorkerFragmentProjection,
+  right: NexusPluginWorkerFragmentProjection,
+): number {
+  return (
+    compareStrings(left.source.pluginId, right.source.pluginId) ||
+    compareStrings(left.id, right.id) ||
+    compareStrings(left.kind, right.kind) ||
+    compareStrings(left.provenance, right.provenance)
+  );
+}
+
+function renderPluginBriefingFragments(
+  fragments: NexusPluginWorkerFragmentProjection[],
+): string[] {
+  if (fragments.length === 0) {
+    return [];
+  }
+
+  return [
+    "## Plugin Briefing Fragments",
+    "",
+    "These fragments are advisory setup/context only; they do not select work, launch subagents, or supervise implementation.",
+    "",
+    ...fragments.flatMap(renderPluginBriefingFragment),
+  ];
+}
+
+function renderPluginBriefingFragment(
+  fragment: NexusPluginWorkerFragmentProjection,
+): string[] {
+  return [
+    `### ${fragment.title}`,
+    "",
+    `Source: ${fragment.source.pluginId}:${fragment.source.capabilityId}`,
+    `Provenance: ${fragment.provenance}`,
+    ...renderTargetLine("Intended agents", fragment.targetAgents),
+    ...renderTargetLine("Intended components", fragment.targetComponents),
+    "",
+    fragment.body.trim(),
+    "",
+  ];
+}
+
+function renderTargetLine(label: string, targets: string[]): string[] {
+  return targets.length > 0 ? [`${label}: ${targets.join(", ")}`] : [];
+}
+
 function resolveInsideProjectRoot(
   projectRoot: string,
   value: string,
@@ -446,6 +602,17 @@ function assertPathInsideRoot(
 
 function uniquePaths(paths: string[]): string[] {
   return [...new Set(paths)];
+}
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+
+  return 0;
 }
 
 function normalizedAbsolutePath(value: unknown, name: string): string {

@@ -27,6 +27,7 @@ import {
   type NexusSkillMaterializationMode,
   type NexusSkillSourceControl,
 } from "./nexusSkills.js";
+import type { NexusPluginWorkerFragmentsProjection } from "./nexusPluginCapabilities.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -90,6 +91,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   };
   ownership: NexusWorkerContextBundleWorktree;
   targetStatePath?: string | null;
+  pluginFragments?: NexusPluginWorkerFragmentsProjection;
 }
 
 export interface NexusAutomationWorktreeSetupOptions {
@@ -271,6 +273,7 @@ function materializeWorkerContext(options: {
       projectRoot,
       options.skillProjections,
     ),
+    pluginFragments: options.context.pluginFragments,
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,
