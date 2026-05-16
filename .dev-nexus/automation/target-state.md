@@ -18,7 +18,24 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - None. The automation selector now reports no ready `dogfood` work items.
+  - `dev-nexus:local-19` materialize worker context bundles for component
+    worktrees.
+- Worker context direction:
+  - Keep `worktreePath` as the component Git checkout root for now.
+  - Generate DevNexus-owned `.dev-nexus/context/context.json` and
+    `.dev-nexus/context/briefing.md` inside prepared component worktrees
+    instead of copying root `AGENTS.md`, `PLAN.md`, or target-state files into
+    source roots.
+  - Project-local skills remain DevNexus-managed under `.dev-nexus/skills` and
+    agent-native projections such as `.agents/skills`; follow-up
+    `dev-nexus:local-20` makes those project-local skills discoverable from
+    prepared worker contexts without global installation.
+  - Follow-up `dev-nexus:local-21` lets plugins contribute bounded worker
+    briefing fragments. `pharo-nexus:local-4` owns the Pharo-specific fragment
+    for scoped PLexus and direct Pharo MCP guidance.
+  - Defer nested generated execution workspaces until the simpler context
+    bundle has been exercised; `dev-nexus:local-22` tracks the human decision
+    and architecture review.
 - MCP-Pharo branch migration:
   - MCP-Pharo is now merged to `origin/main`; DevNexus component metadata and
     PLexus automatic Metacello loading must target `main`, not `develop`.
