@@ -129,6 +129,7 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation run-once");
+    expect(output.output()).toContain("dev-nexus automation schedule");
   });
 
   it("creates and lists local work items", async () => {
@@ -284,6 +285,106 @@ describe("dev-nexus cli", () => {
         "-b",
         "codex/demo-project/local-1/run-cli",
         path.join(projectRoot, "worktrees", "codex-demo-project-local-1-run-cli"),
+        "main",
+      ],
+      cwd: path.join(projectRoot, "source"),
+    });
+    expect(
+      loadLocalWorkTrackingStore(defaultLocalWorkTrackingStorePath(projectRoot))
+        .items[0],
+    ).toMatchObject({
+      id: "local-1",
+      status: "done",
+    });
+  });
+
+  it("schedules bounded automation through the command executor", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Scheduled CLI task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+    const commandRuns: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commandRuns.push(command);
+      expect(options.env.DEV_NEXUS_WORK_ITEM_ID).toBe("local-1");
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    await main(
+      [
+        "automation",
+        "schedule",
+        projectRoot,
+        "--command",
+        "node task.js",
+        "--max-runs",
+        "1",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        commandRunner,
+        gitRunner: fakeGitRunner(gitCalls),
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      stoppedReason: "max_runs",
+      ticks: [
+        {
+          action: "ran",
+          status: {
+            status: "ready",
+          },
+          run: {
+            status: "completed",
+            workItem: {
+              id: "local-1",
+            },
+          },
+        },
+      ],
+      runs: [
+        {
+          status: "completed",
+          workItem: {
+            id: "local-1",
+          },
+        },
+      ],
+    });
+    expect(commandRuns).toEqual(["node task.js", "npm test"]);
+    expect(gitCalls[0]).toMatchObject({
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/demo-project/local-1/scheduled-20260516-t100000-000-z-1",
+        path.join(
+          projectRoot,
+          "worktrees",
+          "codex-demo-project-local-1-scheduled-20260516-t100000-000-z-1",
+        ),
         "main",
       ],
       cwd: path.join(projectRoot, "source"),

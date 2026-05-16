@@ -41,6 +41,11 @@ export interface NexusAutomationBackoffConfig {
   maxDelayMs: number;
 }
 
+export interface NexusAutomationScheduleConfig {
+  enabled: boolean;
+  intervalMs: number;
+}
+
 export interface NexusAutomationSafetyConfig {
   profile: NexusAutomationSafetyProfile;
   allowHostMutation: boolean;
@@ -63,6 +68,7 @@ export interface NexusAutomationConfig {
   ledger: NexusAutomationLedgerConfig;
   lock: NexusAutomationLockConfig;
   backoff: NexusAutomationBackoffConfig;
+  schedule: NexusAutomationScheduleConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
 }
@@ -95,6 +101,10 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     failureLimit: 3,
     baseDelayMs: 5 * 60 * 1000,
     maxDelayMs: 60 * 60 * 1000,
+  },
+  schedule: {
+    enabled: true,
+    intervalMs: 15 * 60 * 1000,
   },
   safety: {
     profile: "local",
@@ -136,6 +146,7 @@ export function validateNexusAutomationConfig(
   const ledger = validateLedgerConfig(record.ledger);
   const lock = validateLockConfig(record.lock);
   const backoff = validateBackoffConfig(record.backoff);
+  const schedule = validateScheduleConfig(record.schedule);
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePublicationConfig(record.publication);
 
@@ -161,6 +172,10 @@ export function validateNexusAutomationConfig(
     backoff: {
       ...defaultNexusAutomationConfig.backoff,
       ...backoff,
+    },
+    schedule: {
+      ...defaultNexusAutomationConfig.schedule,
+      ...schedule,
     },
     safety: {
       ...defaultNexusAutomationConfig.safety,
@@ -278,6 +293,21 @@ function validateBackoffConfig(
     ...optionalPositiveIntegerField(record, "failureLimit", pathName),
     ...optionalPositiveIntegerField(record, "baseDelayMs", pathName),
     ...optionalPositiveIntegerField(record, "maxDelayMs", pathName),
+  };
+}
+
+function validateScheduleConfig(
+  value: unknown,
+): Partial<NexusAutomationScheduleConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.schedule";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalBooleanField(record, "enabled", pathName),
+    ...optionalPositiveIntegerField(record, "intervalMs", pathName),
   };
 }
 

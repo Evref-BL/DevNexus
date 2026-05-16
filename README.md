@@ -32,6 +32,7 @@ dev-nexus work-item create <project-root> --title "Implement task" --status read
 dev-nexus work-item list <project-root> --status ready
 dev-nexus automation status <project-root>
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
+dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
 
 `automation status` is read-only. It reports whether automation is disabled,
@@ -42,3 +43,9 @@ work item before any worktree or tracker mutation happens.
 `DEV_NEXUS_*` environment variables for the selected work item and worktree,
 runs configured focused verification commands, records new commits relative to
 the base ref when available, and writes the normal retained run ledger.
+
+`automation schedule` repeatedly checks the same read-only status boundary and
+dispatches `automation run-once` only when the project is ready. It honors
+project `automation.schedule.intervalMs`, waits until active locks or retry
+backoff expire, and supports `--max-ticks` or `--max-runs` for bounded local
+smokes and supervised runners.

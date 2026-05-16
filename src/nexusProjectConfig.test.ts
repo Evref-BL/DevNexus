@@ -262,6 +262,10 @@ describe("project config", () => {
         baseDelayMs: 300000,
         maxDelayMs: 3600000,
       },
+      schedule: {
+        enabled: true,
+        intervalMs: 900000,
+      },
       safety: {
         profile: "local",
         allowHostMutation: false,

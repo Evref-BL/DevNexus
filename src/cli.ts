@@ -12,6 +12,11 @@ import {
   type RunNexusAutomationOnceResult,
 } from "./nexusAutomationRunOnce.js";
 import {
+  runNexusAutomationScheduler,
+  type NexusAutomationSchedulerTick,
+  type RunNexusAutomationSchedulerResult,
+} from "./nexusAutomationScheduler.js";
+import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
@@ -78,6 +83,20 @@ interface ParsedAutomationStatusCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationScheduleCommand {
+  projectRoot: string;
+  command: string;
+  owner?: string;
+  baseRef?: string;
+  intervalMs?: number;
+  maxTicks?: number;
+  maxRuns?: number;
+  runIdPrefix?: string;
+  timeoutMs?: number;
+  runFullVerification?: boolean;
+  json?: boolean;
+}
+
 export function usage(): string {
   return [
     "Usage:",
@@ -86,6 +105,7 @@ export function usage(): string {
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation run-once <project-root> --command <command> [options]",
+    "  dev-nexus automation schedule <project-root> --command <command> [options]",
     "",
     "Options for work-item create:",
     "  --title <title>",
@@ -114,6 +134,18 @@ export function usage(): string {
     "  --branch <name>",
     "  --worktree-name <name>",
     "  --base-ref <ref>",
+    "  --full                     also run configured full verification commands",
+    "  --timeout-ms <ms>          applies to each command",
+    "  --json",
+    "",
+    "Options for automation schedule:",
+    "  --command <command>        shell command to run for each selected work item",
+    "  --owner <name>",
+    "  --base-ref <ref>",
+    "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
+    "  --max-ticks <count>        stop after this many scheduler polls",
+    "  --max-runs <count>         stop after this many run-once executions",
+    "  --run-id-prefix <prefix>",
     "  --full                     also run configured full verification commands",
     "  --timeout-ms <ms>          applies to each command",
     "  --json",
@@ -197,8 +229,36 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "schedule") {
+    const parsed = parseAutomationScheduleCommand(argv);
+    const stdout = dependencies.stdout ?? process.stdout;
+    const result = await runNexusAutomationScheduler({
+      projectRoot: parsed.projectRoot,
+      owner: parsed.owner,
+      baseRef: parsed.baseRef,
+      intervalMs: parsed.intervalMs,
+      maxTicks: parsed.maxTicks,
+      maxRuns: parsed.maxRuns,
+      runIdPrefix: parsed.runIdPrefix,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+      onTick: parsed.json
+        ? undefined
+        : (tick) => printAutomationScheduleTick(tick, stdout),
+      executor: createNexusAutomationCommandExecutor({
+        command: parsed.command,
+        commandRunner: dependencies.commandRunner,
+        gitRunner: dependencies.gitRunner,
+        runFullVerification: parsed.runFullVerification,
+        timeoutMs: parsed.timeoutMs,
+      }),
+    });
+    printAutomationScheduleResult(result, parsed, stdout);
+    return 0;
+  }
+
   if (argv[1] !== "run-once") {
-    throw new Error("automation requires status or run-once");
+    throw new Error("automation requires status, run-once, or schedule");
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
@@ -442,6 +502,69 @@ function parseAutomationStatusCommand(
   return parsed;
 }
 
+function parseAutomationScheduleCommand(
+  argv: string[],
+): ParsedAutomationScheduleCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation schedule requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationScheduleCommand> = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--command":
+        parsed.command = next();
+        break;
+      case "--owner":
+        parsed.owner = next();
+        break;
+      case "--base-ref":
+        parsed.baseRef = next();
+        break;
+      case "--interval-ms":
+        parsed.intervalMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--max-ticks":
+        parsed.maxTicks = parsePositiveInteger(next(), arg);
+        break;
+      case "--max-runs":
+        parsed.maxRuns = parsePositiveInteger(next(), arg);
+        break;
+      case "--run-id-prefix":
+        parsed.runIdPrefix = next();
+        break;
+      case "--timeout-ms":
+        parsed.timeoutMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--full":
+        parsed.runFullVerification = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation schedule option: ${arg}`);
+    }
+  }
+
+  if (!parsed.command) {
+    throw new Error("automation schedule requires --command");
+  }
+
+  return parsed as ParsedAutomationScheduleCommand;
+}
+
 function printWorkItemCreateResult(
   item: WorkItem,
   parsed: ParsedWorkItemCreateCommand,
@@ -473,6 +596,40 @@ function printWorkItemListResult(
   writeLine(stdout, `DevNexus work items: ${items.length}`);
   for (const item of items) {
     writeLine(stdout, `  ${item.id} [${item.status}] ${item.title}`);
+  }
+}
+
+function printAutomationScheduleTick(
+  tick: NexusAutomationSchedulerTick,
+  stdout: TextWriter,
+): void {
+  const runStatus = tick.run ? ` run=${tick.run.status}` : "";
+  const wait = tick.waitMs === null ? "" : ` waitMs=${tick.waitMs}`;
+  writeLine(
+    stdout,
+    `DevNexus scheduler tick ${tick.index}: ${tick.status.status} action=${tick.action}${runStatus}${wait}`,
+  );
+}
+
+function printAutomationScheduleResult(
+  result: RunNexusAutomationSchedulerResult,
+  parsed: ParsedAutomationScheduleCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus automation scheduler stopped.");
+  writeLine(stdout, `  Reason: ${result.stoppedReason}`);
+  writeLine(stdout, `  Ticks: ${result.ticks.length}`);
+  writeLine(stdout, `  Runs: ${result.runs.length}`);
+  const lastTick = result.ticks.at(-1);
+  if (lastTick) {
+    writeLine(stdout, `  Last status: ${lastTick.status.status}`);
+    writeLine(stdout, `  Last action: ${lastTick.action}`);
   }
 }
 
