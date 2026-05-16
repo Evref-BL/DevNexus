@@ -105,6 +105,30 @@ function fakeGitRunner(repositoryPath: string): GitRunner {
     if (joined === "rev-list --left-right --count HEAD...@{u}") {
       return ok(argsArray, "0\t0\n");
     }
+    if (joined === "rev-parse --verify main") {
+      return ok(argsArray, "target123\n");
+    }
+    if (joined === "rev-parse --verify codex/shared-coordination") {
+      return ok(argsArray, "abc123def456\n");
+    }
+    if (joined === "merge-base main codex/shared-coordination") {
+      return ok(argsArray, "base123\n");
+    }
+    if (joined === "diff --name-only main...codex/shared-coordination") {
+      return ok(argsArray, "src/nexusCoordination.ts\n");
+    }
+    if (joined === "merge-tree --write-tree --quiet main codex/shared-coordination") {
+      return ok(argsArray, "");
+    }
+    if (
+      joined ===
+      "merge-tree --write-tree --name-only --messages main codex/shared-coordination"
+    ) {
+      return ok(argsArray, "src/nexusCoordination.ts\n");
+    }
+    if (joined === "range-diff base123..main base123..codex/shared-coordination") {
+      return ok(argsArray, "");
+    }
 
     return ok(argsArray, "");
   };
@@ -137,6 +161,7 @@ describe("DevNexus MCP server", () => {
       "target_report",
       "coordination_status",
       "coordination_handoff",
+      "coordination_integrate",
       "work_item_create",
       "work_item_list",
       "work_item_get",
@@ -281,6 +306,78 @@ describe("DevNexus MCP server", () => {
             },
           ],
         },
+      },
+    });
+  });
+
+  it("returns coordination integration plan shape through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-15");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Plan coordination integration",
+      status: "in_progress",
+    });
+
+    await callDevNexusMcpTool(
+      "coordination_handoff",
+      {
+        projectRoot,
+        workItemId: "local-1",
+        status: "ready",
+        changedAreas: ["src/nexusCoordination.ts"],
+        decisions: ["Keep integration planning read-only."],
+        currentPath: worktreePath,
+      },
+      {
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(worktreePath),
+      },
+    );
+    const plan = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_integrate",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          targetBranch: "main",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-16T10:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+
+    expect(plan).toMatchObject({
+      ok: true,
+      plan: {
+        mutatesSource: false,
+        target: {
+          ref: "main",
+          commit: "target123",
+        },
+        branches: [
+          {
+            branch: "codex/shared-coordination",
+            merge: {
+              status: "clean",
+              changedFiles: ["src/nexusCoordination.ts"],
+            },
+          },
+        ],
+        suggestedOrder: [
+          {
+            branch: "codex/shared-coordination",
+          },
+        ],
       },
     });
   });

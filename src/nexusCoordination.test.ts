@@ -6,7 +6,10 @@ import {
   coordinationHandoffCommentMarker,
   createLocalWorkTrackerProvider,
   createNexusCoordinationHandoff,
+  defaultNexusAutomationConfig,
+  defaultGitRunner,
   getNexusCoordinationStatus,
+  getNexusCoordinationIntegrationPlan,
   loadLocalWorkTrackingStore,
   saveProjectConfig,
   type GitCommandResult,
@@ -111,6 +114,69 @@ function ok(args: string[], stdout: string): GitCommandResult {
     stderr: "",
     exitCode: 0,
   };
+}
+
+function runGit(cwd: string, args: string[]): string {
+  const result = defaultGitRunner(args, cwd);
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args.join(" ")} failed: ${result.stderr || result.stdout}`,
+    );
+  }
+
+  return result.stdout.trim();
+}
+
+function writeText(filePath: string, text: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, text, "utf8");
+}
+
+function commitAll(repositoryPath: string, message: string): string {
+  runGit(repositoryPath, ["add", "."]);
+  runGit(repositoryPath, ["commit", "-m", message]);
+  return runGit(repositoryPath, ["rev-parse", "HEAD"]);
+}
+
+function initGitProjectFixture(name: string): {
+  projectRoot: string;
+  sourceRoot: string;
+  storePath: string;
+} {
+  const projectRoot = makeTempDir(`dev-nexus-${name}-project-`);
+  const sourceRoot = path.join(projectRoot, "source");
+  const storePath = ".dev-nexus/work-items-dev-nexus.json";
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  runGit(sourceRoot, ["init", "-b", "main"]);
+  runGit(sourceRoot, ["config", "user.email", "dev-nexus@example.invalid"]);
+  runGit(sourceRoot, ["config", "user.name", "DevNexus Test"]);
+  runGit(sourceRoot, ["config", "core.autocrlf", "false"]);
+  writeText(path.join(sourceRoot, "README.md"), "base\n");
+  commitAll(sourceRoot, "base");
+  saveProjectConfig(
+    projectRoot,
+    projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+  );
+
+  return { projectRoot, sourceRoot, storePath };
+}
+
+async function createFixtureWorkItem(
+  projectRoot: string,
+  storePath: string,
+  title: string,
+): Promise<string> {
+  const item = await createLocalWorkTrackerProvider({
+    projectRoot,
+    config: { provider: "local", storePath },
+    now: () => "2026-05-16T09:00:00.000Z",
+  }).createWorkItem({
+    projectRoot,
+    title,
+    status: "in_progress",
+  });
+
+  return item.id;
 }
 
 afterEach(() => {
@@ -263,5 +329,283 @@ describe("nexus coordination", () => {
       "Handoff for local-1 from 2026-05-16T10:00:00.000Z is stale.",
     );
     expect(status.blocking).toBe(false);
+  });
+
+  it("plans a clean handoff branch merge without mutating the source checkout", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initGitProjectFixture("coordination-clean");
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Clean integration",
+    );
+    runGit(sourceRoot, ["switch", "-c", "codex/clean-branch"]);
+    writeText(path.join(sourceRoot, "src", "clean.ts"), "export const clean = true;\n");
+    const featureCommit = commitAll(sourceRoot, "clean branch change");
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      status: "ready",
+      hostId: "windows-devbox",
+      agentId: "codex",
+      changedAreas: ["src/clean.ts"],
+      decisions: ["Keep the integration planner read-only."],
+      verificationSummary: "focused tests passed",
+      integrationPreference: "direct_integration",
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    runGit(sourceRoot, ["switch", "main"]);
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      targetBranch: "main",
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.mutatesSource).toBe(false);
+    expect(plan.target.ref).toBe("main");
+    expect(plan.branches).toMatchObject([
+      {
+        branch: "codex/clean-branch",
+        headCommit: featureCommit,
+        merge: {
+          status: "clean",
+          changedFiles: ["src/clean.ts"],
+          conflictFiles: [],
+        },
+        handoff: {
+          decisions: ["Keep the integration planner read-only."],
+          integrationPreference: "direct_integration",
+          stale: false,
+        },
+      },
+    ]);
+    expect(plan.suggestedOrder.map((step) => step.branch)).toEqual([
+      "codex/clean-branch",
+    ]);
+    expect(runGit(sourceRoot, ["branch", "--show-current"])).toBe("main");
+  }, 15000);
+
+  it("reports concise textual conflicts from merge-tree", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initGitProjectFixture("coordination-conflict");
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Conflicting integration",
+    );
+    writeText(path.join(sourceRoot, "settings.txt"), "mode=base\n");
+    commitAll(sourceRoot, "add settings");
+    runGit(sourceRoot, ["switch", "-c", "codex/conflicting-branch"]);
+    writeText(path.join(sourceRoot, "settings.txt"), "mode=feature\n");
+    commitAll(sourceRoot, "feature settings change");
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      status: "ready",
+      changedAreas: ["settings.txt"],
+      decisions: ["Feature branch owns the settings mode."],
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    runGit(sourceRoot, ["switch", "main"]);
+    writeText(path.join(sourceRoot, "settings.txt"), "mode=main\n");
+    commitAll(sourceRoot, "main settings change");
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      targetBranch: "main",
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.branches).toMatchObject([
+      {
+        branch: "codex/conflicting-branch",
+        merge: {
+          status: "conflict",
+          conflictFiles: ["settings.txt"],
+        },
+      },
+    ]);
+    expect(plan.branches[0]!.merge.summary).toContain("settings.txt");
+    expect(plan.branches[0]!.merge.messages.join("\n").length).toBeLessThan(800);
+    expect(plan.nextAction).toContain("Resolve textual conflicts");
+  }, 15000);
+
+  it("surfaces competing recorded decisions before recommending merge order", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initGitProjectFixture("coordination-decisions");
+    const firstWorkItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "First decision",
+    );
+    const secondWorkItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Second decision",
+    );
+    runGit(sourceRoot, ["switch", "-c", "codex/use-json"]);
+    writeText(path.join(sourceRoot, "src", "json.ts"), "export const format = 'json';\n");
+    commitAll(sourceRoot, "json decision");
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: firstWorkItemId,
+      status: "ready",
+      changedAreas: ["src/contracts.ts"],
+      decisions: ["Represent integration facts as JSON records."],
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    runGit(sourceRoot, ["switch", "main"]);
+    runGit(sourceRoot, ["switch", "-c", "codex/use-yaml"]);
+    writeText(path.join(sourceRoot, "src", "yaml.ts"), "export const format = 'yaml';\n");
+    commitAll(sourceRoot, "yaml decision");
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: secondWorkItemId,
+      status: "ready",
+      changedAreas: ["src/contracts.ts"],
+      decisions: ["Represent integration facts as YAML records."],
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:05:00.000Z",
+    });
+    runGit(sourceRoot, ["switch", "main"]);
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      targetBranch: "main",
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.decisionConflicts).toMatchObject([
+      {
+        kind: "changed_area",
+        changedArea: "src/contracts.ts",
+        branches: expect.arrayContaining(["codex/use-json", "codex/use-yaml"]),
+      },
+    ]);
+    expect(plan.suggestedOrder).toEqual([]);
+    expect(plan.nextAction).toContain("Resolve competing handoff decisions");
+  }, 15000);
+
+  it("keeps stale handoffs visible but excludes them from the suggested order", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initGitProjectFixture("coordination-stale");
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Stale integration",
+    );
+    runGit(sourceRoot, ["switch", "-c", "codex/stale-branch"]);
+    writeText(path.join(sourceRoot, "src", "stale.ts"), "export const stale = true;\n");
+    commitAll(sourceRoot, "stale branch change");
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      status: "ready",
+      changedAreas: ["src/stale.ts"],
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    runGit(sourceRoot, ["switch", "main"]);
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      targetBranch: "main",
+      currentPath: sourceRoot,
+      gitRunner: defaultGitRunner,
+      now: () => "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(plan.handoffs.staleCount).toBe(1);
+    expect(plan.branches).toMatchObject([
+      {
+        branch: "codex/stale-branch",
+        stale: true,
+        merge: {
+          status: "skipped",
+        },
+      },
+    ]);
+    expect(plan.suggestedOrder).toEqual([]);
+    expect(plan.warnings).toContain(
+      "Handoff for local-1 from 2026-05-16T10:00:00.000Z is stale.",
+    );
+  }, 15000);
+
+  it("fetches configured remotes only when automation safety allows host mutation", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-fetch-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-15");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+      automation: {
+        ...defaultNexusAutomationConfig,
+        safety: {
+          ...defaultNexusAutomationConfig.safety,
+          allowHostMutation: true,
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          remote: "origin",
+          targetBranch: "main",
+        },
+      },
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      currentPath: worktreePath,
+      fetch: true,
+      gitRunner: fakeGitRunner(worktreePath, gitCalls),
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.fetch).toMatchObject({
+      requested: true,
+      allowed: true,
+      remote: "origin",
+      targetBranch: "main",
+      ran: true,
+      exitCode: 0,
+    });
+    expect(plan.target.ref).toBe("origin/main");
+    expect(gitCalls.map((call) => call.args)).toContainEqual([
+      "fetch",
+      "--prune",
+      "origin",
+      "main",
+    ]);
+    expect(plan.mutatesSource).toBe(false);
   });
 });

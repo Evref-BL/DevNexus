@@ -97,6 +97,102 @@ export interface NexusCoordinationHandoffCollection {
   warnings: string[];
 }
 
+export type NexusCoordinationIntegrationScope =
+  | "work_item"
+  | "component"
+  | "target_branch";
+
+export type NexusCoordinationMergeStatus =
+  | "clean"
+  | "conflict"
+  | "skipped"
+  | "unknown";
+
+export interface NexusCoordinationIntegrationFetchPlan {
+  requested: boolean;
+  allowed: boolean;
+  remote: string | null;
+  targetBranch: string | null;
+  ran: boolean;
+  exitCode: number | null;
+  warning: string | null;
+}
+
+export interface NexusCoordinationIntegrationBranchMerge {
+  status: NexusCoordinationMergeStatus;
+  mergeBase: string | null;
+  targetCommit: string | null;
+  branchCommit: string | null;
+  changedFiles: string[];
+  conflictFiles: string[];
+  messages: string[];
+  summary: string;
+  rangeDiff: string[];
+}
+
+export interface NexusCoordinationIntegrationBranchPlan {
+  workItemId: string;
+  branch: string;
+  status: NexusCoordinationHandoffStatus;
+  stale: boolean;
+  headCommit: string | null;
+  handoff: {
+    hostId: string;
+    agentId: string | null;
+    status: NexusCoordinationHandoffStatus;
+    createdAt: string;
+    stale: boolean;
+    changedAreas: string[];
+    decisions: string[];
+    verificationSummary: string | null;
+    integrationPreference: string | null;
+    note: string | null;
+  };
+  merge: NexusCoordinationIntegrationBranchMerge;
+}
+
+export interface NexusCoordinationDecisionConflict {
+  kind: "changed_area" | "integration_preference";
+  branches: string[];
+  changedArea: string | null;
+  decisions: string[];
+  summary: string;
+}
+
+export interface NexusCoordinationSuggestedMergeStep {
+  branch: string;
+  workItemId: string;
+  direction: string;
+  reason: string;
+}
+
+export interface NexusCoordinationIntegrationPlan {
+  project: NexusCoordinationStatus["project"];
+  component: NexusCoordinationStatus["component"];
+  scope: NexusCoordinationIntegrationScope;
+  target: {
+    branch: string | null;
+    ref: string;
+    commit: string | null;
+  };
+  fetch: NexusCoordinationIntegrationFetchPlan;
+  handoffs: {
+    available: boolean;
+    provider: string | null;
+    totalCount: number;
+    activeCount: number;
+    staleCount: number;
+    records: NexusCoordinationHandoffSummary[];
+    warnings: string[];
+  };
+  branches: NexusCoordinationIntegrationBranchPlan[];
+  decisionConflicts: NexusCoordinationDecisionConflict[];
+  suggestedOrder: NexusCoordinationSuggestedMergeStep[];
+  nextAction: string;
+  warnings: string[];
+  mutatesSource: false;
+}
+
 export interface NexusCoordinationStatus {
   project: {
     id: string;
@@ -140,6 +236,12 @@ export interface NexusCoordinationHandoffOptions
   verificationSummary?: string | null;
   integrationPreference?: string | null;
   note?: string | null;
+}
+
+export interface NexusCoordinationIntegrationOptions
+  extends NexusCoordinationStatusOptions {
+  targetBranch?: string;
+  fetch?: boolean;
 }
 
 export interface NexusCoordinationHandoffResult {
@@ -247,6 +349,99 @@ export async function createNexusCoordinationHandoff(
     record,
     comment,
     git,
+  };
+}
+
+export async function getNexusCoordinationIntegrationPlan(
+  options: NexusCoordinationIntegrationOptions,
+): Promise<NexusCoordinationIntegrationPlan> {
+  const context = resolveCoordinationContext(options);
+  const runner = options.gitRunner ?? defaultGitRunner;
+  const now = currentTimestamp(options.now);
+  const maxHandoffAgeMs =
+    options.maxHandoffAgeMs ?? defaultCoordinationHandoffStaleAfterMs;
+  const git = getCoordinationGitStatus(context, runner);
+  const targetBranch = integrationTargetBranch(context, options, git);
+  const fetch = maybeFetchIntegrationTarget({
+    context,
+    repositoryPath: git.repositoryPath,
+    runner,
+    requested: options.fetch === true,
+    targetBranch,
+  });
+  const targetRef = integrationTargetRef({ fetch, git, targetBranch });
+  const handoffCollection = readCoordinationHandoffs({
+    context,
+    workItemId: options.workItemId,
+    now,
+    maxHandoffAgeMs,
+  });
+  const scope: NexusCoordinationIntegrationScope = options.workItemId
+    ? "work_item"
+    : options.targetBranch
+      ? "target_branch"
+      : "component";
+  const relatedRecords = relatedIntegrationHandoffs({
+    records: handoffCollection.records,
+    targetBranch,
+    filterByTargetBranch: scope === "target_branch",
+  });
+  const uniqueRecords = latestHandoffPerBranch(relatedRecords);
+  const repositoryPath = git.repositoryPath;
+  const targetCommit = repositoryPath
+    ? gitStdout(runOptionalGit(runner, ["rev-parse", "--verify", targetRef], repositoryPath))
+    : null;
+  const branches = uniqueRecords.map((record) =>
+    integrationBranchPlan({
+      record,
+      runner,
+      repositoryPath,
+      targetRef,
+      targetCommit,
+    }),
+  );
+  const decisionConflicts = findDecisionConflicts(branches);
+  const suggestedOrder = suggestMergeOrder({
+    branches,
+    targetRef,
+    decisionConflicts,
+  });
+  const warnings = [
+    ...git.warnings,
+    ...handoffCollection.warnings,
+    ...(fetch.warning ? [fetch.warning] : []),
+    ...branches.flatMap((branch) =>
+      branch.merge.status === "unknown" ? [branch.merge.summary] : [],
+    ),
+  ];
+
+  return {
+    project: projectSummary(context),
+    component: componentSummary(context.component),
+    scope,
+    target: {
+      branch: targetBranch,
+      ref: targetRef,
+      commit: targetCommit,
+    },
+    fetch,
+    handoffs: {
+      available: handoffCollection.available,
+      provider: handoffCollection.provider,
+      totalCount: relatedRecords.length,
+      activeCount: branches.filter(
+        (branch) => !branch.stale && branch.status !== "merged",
+      ).length,
+      staleCount: relatedRecords.filter((record) => record.stale).length,
+      records: relatedRecords,
+      warnings: handoffCollection.warnings,
+    },
+    branches,
+    decisionConflicts,
+    suggestedOrder,
+    nextAction: integrationNextAction(branches, decisionConflicts),
+    warnings,
+    mutatesSource: false,
   };
 }
 
@@ -438,6 +633,572 @@ function getCoordinationGitStatus(
     pushed: upstream && aheadBehind.ahead !== null ? aheadBehind.ahead === 0 : null,
     warnings,
   };
+}
+
+function integrationTargetBranch(
+  context: ResolvedCoordinationContext,
+  options: NexusCoordinationIntegrationOptions,
+  git: NexusCoordinationGitStatus,
+): string | null {
+  return (
+    optionalTrimmedString(options.targetBranch) ??
+    context.component.publication?.targetBranch ??
+    context.projectConfig.automation?.publication.targetBranch ??
+    context.component.defaultBranch ??
+    git.baseRef
+  );
+}
+
+function integrationTargetRef(options: {
+  fetch: NexusCoordinationIntegrationFetchPlan;
+  git: NexusCoordinationGitStatus;
+  targetBranch: string | null;
+}): string {
+  if (
+    options.fetch.ran &&
+    options.fetch.exitCode === 0 &&
+    options.fetch.remote &&
+    options.targetBranch
+  ) {
+    return `${options.fetch.remote}/${options.targetBranch}`;
+  }
+
+  return options.targetBranch ?? options.git.baseRef ?? "HEAD";
+}
+
+function integrationRemote(context: ResolvedCoordinationContext): string | null {
+  return (
+    context.component.publication?.remote ??
+    context.projectConfig.automation?.publication.remote ??
+    null
+  );
+}
+
+function maybeFetchIntegrationTarget(options: {
+  context: ResolvedCoordinationContext;
+  repositoryPath: string | null;
+  runner: GitRunner;
+  requested: boolean;
+  targetBranch: string | null;
+}): NexusCoordinationIntegrationFetchPlan {
+  const remote = integrationRemote(options.context);
+  const allowed =
+    options.context.projectConfig.automation?.safety.allowHostMutation === true;
+  const base: NexusCoordinationIntegrationFetchPlan = {
+    requested: options.requested,
+    allowed,
+    remote,
+    targetBranch: options.targetBranch,
+    ran: false,
+    exitCode: null,
+    warning: null,
+  };
+  if (!options.requested) {
+    return base;
+  }
+  if (!options.repositoryPath) {
+    return {
+      ...base,
+      warning: "Fetch requested but no git repository was resolved.",
+    };
+  }
+  if (!remote) {
+    return {
+      ...base,
+      warning: "Fetch requested but no integration remote is configured.",
+    };
+  }
+  if (!allowed) {
+    return {
+      ...base,
+      warning:
+        "Fetch requested but automation safety does not allow host mutation.",
+    };
+  }
+
+  const result = runGitNoThrow(
+    options.runner,
+    [
+      "fetch",
+      "--prune",
+      remote,
+      ...(options.targetBranch ? [options.targetBranch] : []),
+    ],
+    options.repositoryPath,
+  );
+
+  return {
+    ...base,
+    ran: true,
+    exitCode: result?.exitCode ?? null,
+    warning:
+      result && result.exitCode !== 0
+        ? conciseGitFailure("Fetch failed", result)
+        : null,
+  };
+}
+
+function relatedIntegrationHandoffs(options: {
+  records: NexusCoordinationHandoffSummary[];
+  targetBranch: string | null;
+  filterByTargetBranch: boolean;
+}): NexusCoordinationHandoffSummary[] {
+  if (!options.filterByTargetBranch || !options.targetBranch) {
+    return options.records;
+  }
+
+  return options.records.filter((record) =>
+    handoffTargetsBranch(record, options.targetBranch!),
+  );
+}
+
+function handoffTargetsBranch(
+  record: NexusCoordinationHandoffSummary,
+  targetBranch: string,
+): boolean {
+  const normalizedTarget = normalizedBranchTail(targetBranch);
+  const candidates = [
+    record.baseRef,
+    record.upstream,
+    record.integrationPreference,
+  ].filter((value): value is string => Boolean(value));
+  if (candidates.length === 0) {
+    return true;
+  }
+
+  return candidates.some((candidate) =>
+    normalizedBranchTail(candidate).endsWith(normalizedTarget),
+  );
+}
+
+function normalizedBranchTail(value: string): string {
+  return value
+    .trim()
+    .replace(/^refs\/heads\//u, "")
+    .replace(/^refs\/remotes\//u, "")
+    .replace(/^origin\//u, "");
+}
+
+function latestHandoffPerBranch(
+  records: NexusCoordinationHandoffSummary[],
+): NexusCoordinationHandoffSummary[] {
+  const byBranch = new Map<string, NexusCoordinationHandoffSummary>();
+  for (const record of records) {
+    const branch = optionalTrimmedString(record.branch ?? undefined);
+    if (!branch || byBranch.has(branch)) {
+      continue;
+    }
+    byBranch.set(branch, record);
+  }
+
+  return [...byBranch.values()];
+}
+
+function integrationBranchPlan(options: {
+  record: NexusCoordinationHandoffSummary;
+  runner: GitRunner;
+  repositoryPath: string | null;
+  targetRef: string;
+  targetCommit: string | null;
+}): NexusCoordinationIntegrationBranchPlan {
+  const branch = options.record.branch!;
+  const skipReason = skippedMergeReason(options.record, options.repositoryPath);
+  const merge = skipReason
+    ? skippedMerge(skipReason)
+    : analyzeBranchMerge({
+        runner: options.runner,
+        repositoryPath: options.repositoryPath!,
+        targetRef: options.targetRef,
+        targetCommit: options.targetCommit,
+        branch,
+      });
+
+  return {
+    workItemId: options.record.workItemId,
+    branch,
+    status: options.record.status,
+    stale: options.record.stale,
+    headCommit: options.record.headCommit,
+    handoff: {
+      hostId: options.record.hostId,
+      agentId: options.record.agentId,
+      status: options.record.status,
+      createdAt: options.record.createdAt,
+      stale: options.record.stale,
+      changedAreas: options.record.changedAreas,
+      decisions: options.record.decisions,
+      verificationSummary: options.record.verificationSummary,
+      integrationPreference: options.record.integrationPreference,
+      note: options.record.note,
+    },
+    merge,
+  };
+}
+
+function skippedMergeReason(
+  record: NexusCoordinationHandoffSummary,
+  repositoryPath: string | null,
+): string | null {
+  if (!repositoryPath) {
+    return "No git repository was resolved for integration planning.";
+  }
+  if (record.stale) {
+    return "Skipped stale handoff; refresh the handoff before integration.";
+  }
+  if (record.status === "merged") {
+    return "Skipped merged handoff.";
+  }
+
+  return null;
+}
+
+function skippedMerge(summary: string): NexusCoordinationIntegrationBranchMerge {
+  return {
+    status: "skipped",
+    mergeBase: null,
+    targetCommit: null,
+    branchCommit: null,
+    changedFiles: [],
+    conflictFiles: [],
+    messages: [summary],
+    summary,
+    rangeDiff: [],
+  };
+}
+
+function analyzeBranchMerge(options: {
+  runner: GitRunner;
+  repositoryPath: string;
+  targetRef: string;
+  targetCommit: string | null;
+  branch: string;
+}): NexusCoordinationIntegrationBranchMerge {
+  const branchCommit = gitStdout(
+    runOptionalGit(
+      options.runner,
+      ["rev-parse", "--verify", options.branch],
+      options.repositoryPath,
+    ),
+  );
+  const mergeBase = gitStdout(
+    runOptionalGit(
+      options.runner,
+      ["merge-base", options.targetRef, options.branch],
+      options.repositoryPath,
+    ),
+  );
+  const changedFiles = uniqueSortedStrings(
+    linesFromGitResult(
+      runOptionalGit(
+        options.runner,
+        ["diff", "--name-only", `${options.targetRef}...${options.branch}`],
+        options.repositoryPath,
+      ),
+    ),
+  );
+  const quietMerge = runGitNoThrow(
+    options.runner,
+    ["merge-tree", "--write-tree", "--quiet", options.targetRef, options.branch],
+    options.repositoryPath,
+  );
+  const detailMerge = runGitNoThrow(
+    options.runner,
+    [
+      "merge-tree",
+      "--write-tree",
+      "--name-only",
+      "--messages",
+      options.targetRef,
+      options.branch,
+    ],
+    options.repositoryPath,
+  );
+  const mergeStatus = mergeStatusFromResult(quietMerge);
+  const messages = conciseMergeMessages(detailMerge);
+  const conflictFiles =
+    mergeStatus === "conflict"
+      ? uniqueSortedStrings([
+          ...mergeTreeConflictFiles(detailMerge),
+          ...conflictFilesFromMessages(messages),
+        ])
+      : [];
+  const rangeDiff = mergeBase
+    ? conciseOutputLines(
+        runGitNoThrow(
+          options.runner,
+          [
+            "range-diff",
+            `${mergeBase}..${options.targetRef}`,
+            `${mergeBase}..${options.branch}`,
+          ],
+          options.repositoryPath,
+        ),
+      )
+    : [];
+
+  return {
+    status: mergeStatus,
+    mergeBase,
+    targetCommit: options.targetCommit,
+    branchCommit,
+    changedFiles,
+    conflictFiles,
+    messages,
+    summary: mergeSummary({
+      status: mergeStatus,
+      branch: options.branch,
+      targetRef: options.targetRef,
+      changedFiles,
+      conflictFiles,
+    }),
+    rangeDiff,
+  };
+}
+
+function mergeStatusFromResult(
+  result: GitCommandResult | null,
+): NexusCoordinationMergeStatus {
+  if (!result) {
+    return "unknown";
+  }
+  if (result.exitCode === 0) {
+    return "clean";
+  }
+  if (result.exitCode === 1) {
+    return "conflict";
+  }
+
+  return "unknown";
+}
+
+function mergeSummary(options: {
+  status: NexusCoordinationMergeStatus;
+  branch: string;
+  targetRef: string;
+  changedFiles: string[];
+  conflictFiles: string[];
+}): string {
+  if (options.status === "clean") {
+    return `${options.branch} merges cleanly into ${options.targetRef} with ${options.changedFiles.length} changed file(s).`;
+  }
+  if (options.status === "conflict") {
+    const files = options.conflictFiles.length > 0
+      ? options.conflictFiles.join(", ")
+      : "unknown files";
+    return `${options.branch} has textual conflicts against ${options.targetRef}: ${files}.`;
+  }
+  if (options.status === "skipped") {
+    return "Merge analysis skipped.";
+  }
+
+  return `Merge analysis for ${options.branch} against ${options.targetRef} is unknown.`;
+}
+
+function runGitNoThrow(
+  gitRunner: GitRunner,
+  args: readonly string[],
+  cwd: string,
+): GitCommandResult | null {
+  try {
+    return gitRunner(args, cwd);
+  } catch {
+    return null;
+  }
+}
+
+function linesFromGitResult(result: GitCommandResult | null): string[] {
+  return result?.stdout ? nonEmptyLines(result.stdout) : [];
+}
+
+function conciseMergeMessages(result: GitCommandResult | null): string[] {
+  const lines = [
+    ...nonEmptyLines(result?.stdout ?? ""),
+    ...nonEmptyLines(result?.stderr ?? ""),
+  ].filter((line) => !/^[0-9a-f]{40}$/iu.test(line));
+  return conciseLines(lines.filter((line) => !looksLikeMergeTreePathLine(line)));
+}
+
+function conciseOutputLines(result: GitCommandResult | null): string[] {
+  if (!result || (result.exitCode !== 0 && !result.stdout.trim())) {
+    return [];
+  }
+
+  return conciseLines(nonEmptyLines(result.stdout));
+}
+
+function conciseLines(lines: string[]): string[] {
+  return lines.slice(0, 8).map((line) =>
+    line.length > 140 ? `${line.slice(0, 137)}...` : line,
+  );
+}
+
+function mergeTreeConflictFiles(result: GitCommandResult | null): string[] {
+  if (!result?.stdout) {
+    return [];
+  }
+  const files: string[] = [];
+  const lines = nonEmptyLines(result.stdout);
+  for (const line of lines) {
+    if (/^[0-9a-f]{40}$/iu.test(line)) {
+      continue;
+    }
+    if (line.startsWith("Auto-merging ") || line.startsWith("CONFLICT ")) {
+      continue;
+    }
+    if (looksLikeMergeTreePathLine(line)) {
+      files.push(line);
+    }
+  }
+
+  return files;
+}
+
+function conflictFilesFromMessages(messages: string[]): string[] {
+  const files: string[] = [];
+  for (const message of messages) {
+    const match = /\bin\s+(.+)$/u.exec(message);
+    if (message.startsWith("CONFLICT ") && match?.[1]) {
+      files.push(match[1].trim());
+    }
+  }
+
+  return files;
+}
+
+function looksLikeMergeTreePathLine(line: string): boolean {
+  return (
+    !line.includes(": ") &&
+    !line.includes(" ") &&
+    !line.startsWith("CONFLICT") &&
+    !line.startsWith("Auto-merging") &&
+    !/^[0-9a-f]{40}$/iu.test(line)
+  );
+}
+
+function nonEmptyLines(output: string): string[] {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function uniqueSortedStrings(values: string[]): string[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
+function conciseGitFailure(prefix: string, result: GitCommandResult): string {
+  const detail = (result.stderr || result.stdout).trim();
+  return detail ? `${prefix}: ${detail}` : `${prefix}.`;
+}
+
+function findDecisionConflicts(
+  branches: NexusCoordinationIntegrationBranchPlan[],
+): NexusCoordinationDecisionConflict[] {
+  const activeBranches = branches.filter(
+    (branch) => !branch.stale && branch.status !== "merged",
+  );
+  const conflicts: NexusCoordinationDecisionConflict[] = [];
+  const conflictsByArea = new Map<string, NexusCoordinationIntegrationBranchPlan[]>();
+  for (const branch of activeBranches) {
+    const areas = branch.handoff.changedAreas.length > 0
+      ? branch.handoff.changedAreas
+      : branch.merge.changedFiles;
+    for (const area of areas) {
+      const existing = conflictsByArea.get(area) ?? [];
+      existing.push(branch);
+      conflictsByArea.set(area, existing);
+    }
+  }
+  for (const [area, areaBranches] of conflictsByArea) {
+    const decisionSets = uniqueSortedStrings(
+      areaBranches.flatMap((branch) => branch.handoff.decisions),
+    );
+    if (areaBranches.length > 1 && decisionSets.length > 1) {
+      conflicts.push({
+        kind: "changed_area",
+        changedArea: area,
+        branches: uniqueSortedStrings(areaBranches.map((branch) => branch.branch)),
+        decisions: decisionSets,
+        summary: `Multiple handoff branches record different decisions for ${area}.`,
+      });
+    }
+  }
+
+  const preferences = new Map<string, NexusCoordinationIntegrationBranchPlan[]>();
+  for (const branch of activeBranches) {
+    const preference = branch.handoff.integrationPreference;
+    if (!preference) {
+      continue;
+    }
+    const group = preferences.get(preference) ?? [];
+    group.push(branch);
+    preferences.set(preference, group);
+  }
+  if (preferences.size > 1) {
+    conflicts.push({
+      kind: "integration_preference",
+      changedArea: null,
+      branches: uniqueSortedStrings(activeBranches.map((branch) => branch.branch)),
+      decisions: uniqueSortedStrings([...preferences.keys()]),
+      summary: "Handoff branches record different integration preferences.",
+    });
+  }
+
+  return conflicts;
+}
+
+function suggestMergeOrder(options: {
+  branches: NexusCoordinationIntegrationBranchPlan[];
+  targetRef: string;
+  decisionConflicts: NexusCoordinationDecisionConflict[];
+}): NexusCoordinationSuggestedMergeStep[] {
+  if (options.decisionConflicts.length > 0) {
+    return [];
+  }
+
+  return options.branches
+    .filter(
+      (branch) =>
+        !branch.stale &&
+        branch.status === "ready" &&
+        branch.merge.status === "clean",
+    )
+    .sort((a, b) => a.handoff.createdAt.localeCompare(b.handoff.createdAt))
+    .map((branch) => ({
+      branch: branch.branch,
+      workItemId: branch.workItemId,
+      direction: `${branch.branch} -> ${options.targetRef}`,
+      reason: branch.handoff.integrationPreference
+        ? `Handoff preference: ${branch.handoff.integrationPreference}`
+        : "Ready handoff merges cleanly.",
+    }));
+}
+
+function integrationNextAction(
+  branches: NexusCoordinationIntegrationBranchPlan[],
+  decisionConflicts: NexusCoordinationDecisionConflict[],
+): string {
+  if (decisionConflicts.length > 0) {
+    return "Resolve competing handoff decisions before choosing merge order.";
+  }
+  if (branches.some((branch) => branch.merge.status === "conflict")) {
+    return "Resolve textual conflicts before merging affected branches.";
+  }
+  if (
+    branches.some(
+      (branch) =>
+        !branch.stale &&
+        branch.status === "ready" &&
+        branch.merge.status === "clean",
+    )
+  ) {
+    return "Merge clean ready handoff branches in the suggested order.";
+  }
+  if (branches.some((branch) => branch.stale)) {
+    return "Refresh stale handoffs before integration.";
+  }
+
+  return "No active handoff branches are ready for integration.";
 }
 
 function findGitRepositoryPath(

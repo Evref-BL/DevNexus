@@ -162,6 +162,70 @@ function fakeProjectGitRunner(
   };
 }
 
+function fakeCoordinationIntegrationGitRunner(
+  repositoryPath: string,
+  calls: Array<{ args: string[]; cwd?: string }> = [],
+): GitRunner {
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    calls.push({ args: argsArray, cwd });
+    const joined = argsArray.join(" ");
+    if (joined === "rev-parse --show-toplevel") {
+      return ok(argsArray, `${repositoryPath}\n`);
+    }
+    if (joined === "symbolic-ref --short HEAD") {
+      return ok(argsArray, "codex/shared-coordination\n");
+    }
+    if (joined === "rev-parse HEAD") {
+      return ok(argsArray, "feature123\n");
+    }
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return ok(argsArray, "origin/codex/shared-coordination\n");
+    }
+    if (joined === "status --porcelain=v1") {
+      return ok(argsArray, "");
+    }
+    if (joined === "rev-list --left-right --count HEAD...@{u}") {
+      return ok(argsArray, "0\t0\n");
+    }
+    if (joined === "rev-parse --verify main") {
+      return ok(argsArray, "target123\n");
+    }
+    if (joined === "rev-parse --verify codex/shared-coordination") {
+      return ok(argsArray, "feature123\n");
+    }
+    if (joined === "merge-base main codex/shared-coordination") {
+      return ok(argsArray, "base123\n");
+    }
+    if (joined === "diff --name-only main...codex/shared-coordination") {
+      return ok(argsArray, "src/nexusCoordination.ts\n");
+    }
+    if (joined === "merge-tree --write-tree --quiet main codex/shared-coordination") {
+      return ok(argsArray, "");
+    }
+    if (
+      joined ===
+      "merge-tree --write-tree --name-only --messages main codex/shared-coordination"
+    ) {
+      return ok(argsArray, "src/nexusCoordination.ts\n");
+    }
+    if (joined === "range-diff base123..main base123..codex/shared-coordination") {
+      return ok(argsArray, "");
+    }
+
+    return ok(argsArray, "");
+  };
+}
+
+function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
+  return {
+    args,
+    stdout,
+    stderr: "",
+    exitCode,
+  };
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -767,6 +831,94 @@ describe("dev-nexus cli", () => {
             },
           ],
         },
+      },
+    });
+  });
+
+  it("prints coordination integration plans through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-15");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Plan shared coordination integration",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner = fakeCoordinationIntegrationGitRunner(worktreePath);
+
+    await main(
+      [
+        "coordination",
+        "handoff",
+        projectRoot,
+        "local-1",
+        "--status",
+        "ready",
+        "--changed-area",
+        "src/nexusCoordination.ts",
+        "--decision",
+        "Keep integration planning read-only.",
+        "--integration-preference",
+        "direct_integration",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: captureOutput().writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "coordination",
+        "integrate",
+        projectRoot,
+        "--work-item",
+        "local-1",
+        "--target-branch",
+        "main",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:15:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      plan: {
+        mutatesSource: false,
+        target: {
+          ref: "main",
+          commit: "target123",
+        },
+        branches: [
+          {
+            branch: "codex/shared-coordination",
+            merge: {
+              status: "clean",
+              changedFiles: ["src/nexusCoordination.ts"],
+            },
+          },
+        ],
+        suggestedOrder: [
+          {
+            branch: "codex/shared-coordination",
+            direction: "codex/shared-coordination -> main",
+          },
+        ],
       },
     });
   });

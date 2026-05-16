@@ -43,6 +43,7 @@ import {
 } from "./nexusAutomationTargetReport.js";
 import {
   createNexusCoordinationHandoff,
+  getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
   parseNexusCoordinationHandoffStatus,
 } from "./nexusCoordination.js";
@@ -268,6 +269,24 @@ const tools: McpTool[] = [
         currentPath: { type: "string" },
       },
       required: ["workItemId", "status"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_integrate",
+    description: "Build a read-only integration plan from related handoff branches, Git merge analysis, and recorded decisions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        workItemId: { type: "string" },
+        targetBranch: { type: "string" },
+        fetch: { type: "boolean" },
+        currentPath: { type: "string" },
+      },
       additionalProperties: false,
     },
   },
@@ -505,6 +524,23 @@ export async function callDevNexusMcpTool(
             gitRunner: context.gitRunner,
             now: context.now,
           })),
+        });
+      case "coordination_integrate":
+        return toolResult({
+          ok: true,
+          plan: await getNexusCoordinationIntegrationPlan({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            workItemId: optionalString(args, "workItemId", "arguments"),
+            targetBranch: optionalString(args, "targetBranch", "arguments"),
+            fetch: optionalBoolean(args, "fetch", "arguments"),
+            currentPath:
+              optionalString(args, "currentPath", "arguments") ??
+              context.currentPath ??
+              process.cwd(),
+            gitRunner: context.gitRunner,
+            now: context.now,
+          }),
         });
       case "work_item_create":
         return toolResult({
@@ -1086,6 +1122,22 @@ function optionalStringArray(
 
     return item.trim();
   });
+}
+
+function optionalBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): boolean | undefined {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(`${pathName}.${key} must be a boolean`);
+  }
+
+  return value;
 }
 
 function optionalPositiveInteger(

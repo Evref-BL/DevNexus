@@ -52,10 +52,12 @@ import {
 } from "./nexusAutomationTargetReport.js";
 import {
   createNexusCoordinationHandoff,
+  getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
   parseNexusCoordinationHandoffStatus,
   type NexusCoordinationHandoffResult,
   type NexusCoordinationHandoffStatus,
+  type NexusCoordinationIntegrationPlan,
   type NexusCoordinationStatus,
 } from "./nexusCoordination.js";
 import {
@@ -321,6 +323,16 @@ interface ParsedCoordinationHandoffCommand {
   json?: boolean;
 }
 
+interface ParsedCoordinationIntegrateCommand {
+  projectRoot: string;
+  componentId?: string;
+  workItemId?: string;
+  targetBranch?: string;
+  fetch?: boolean;
+  currentPath?: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -350,6 +362,7 @@ export function usage(): string {
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
+    "  dev-nexus coordination integrate <project-root> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
@@ -427,6 +440,14 @@ export function usage(): string {
     "  --integration-preference <text>",
     "  --note <text>",
     "  --worktree <path>         git worktree or source checkout used for status",
+    "  --json",
+    "",
+    "Options for coordination integrate:",
+    "  --component <id>          defaults to component inferred from --worktree or current directory",
+    "  --work-item <id>",
+    "  --target-branch <branch>  defaults to component or automation publication target",
+    "  --fetch                   fetch configured remote when automation safety allows host mutation",
+    "  --worktree <path>         git worktree or source checkout used for planning",
     "  --json",
     "",
     "Options for work-item create:",
@@ -792,7 +813,27 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status or handoff");
+  if (command === "integrate") {
+    const parsed = parseCoordinationIntegrateCommand(argv);
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      targetBranch: parsed.targetBranch,
+      fetch: parsed.fetch,
+      currentPath: parsed.currentPath ?? process.cwd(),
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationIntegrationPlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("coordination requires status, handoff, or integrate");
 }
 
 async function handleWorkItemCommand(
@@ -1653,6 +1694,53 @@ function parseCoordinationHandoffCommand(
   }
 
   return parsed as ParsedCoordinationHandoffCommand;
+}
+
+function parseCoordinationIntegrateCommand(
+  argv: string[],
+): ParsedCoordinationIntegrateCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination integrate requires a project root");
+  }
+
+  const parsed: ParsedCoordinationIntegrateCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--target-branch":
+        parsed.targetBranch = next();
+        break;
+      case "--fetch":
+        parsed.fetch = true;
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination integrate option: ${arg}`);
+    }
+  }
+
+  return parsed;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -2516,6 +2604,36 @@ function printCoordinationHandoffResult(
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
   writeLine(stdout, `  Comment: ${result.comment.id}`);
+}
+
+function printCoordinationIntegrationPlan(
+  plan: NexusCoordinationIntegrationPlan,
+  parsed: ParsedCoordinationIntegrateCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination integration plan.");
+  writeLine(stdout, `  Project: ${plan.project.id}`);
+  writeLine(stdout, `  Component: ${plan.component.id}`);
+  writeLine(stdout, `  Target: ${plan.target.ref}`);
+  writeLine(stdout, `  Handoff branches: ${plan.branches.length}`);
+  writeLine(
+    stdout,
+    `  Conflicts: ${plan.branches.filter((branch) => branch.merge.status === "conflict").length}`,
+  );
+  writeLine(stdout, `  Decision conflicts: ${plan.decisionConflicts.length}`);
+  if (plan.suggestedOrder.length > 0) {
+    writeLine(stdout, "  Suggested order:");
+    for (const step of plan.suggestedOrder) {
+      writeLine(stdout, `    ${step.direction}`);
+    }
+  }
+  writeLine(stdout, `  Next action: ${plan.nextAction}`);
 }
 
 function printWorkItemCreateResult(

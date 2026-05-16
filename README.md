@@ -118,6 +118,9 @@ agent_profiles
 target_cycle_list
 target_cycle_record
 target_report
+coordination_status
+coordination_handoff
+coordination_integrate
 work_item_create
 work_item_list
 work_item_get
@@ -133,6 +136,24 @@ primary component.
 Projects can still use the CLI for the same boundaries. The MCP server exists
 so agents can use DevNexus directly without depending on a specialization
 adapter for generic project orchestration.
+
+## Shared Coordination
+
+DevNexus exposes advisory coordination tools for parallel agents working from
+Git worktrees. The tools record durable handoff facts in the configured
+component work-item service and read Git state, but they do not choose or
+supervise implementation work.
+
+```bash
+dev-nexus coordination status <project-root> --work-item local-1 --worktree <path>
+dev-nexus coordination handoff <project-root> local-1 --status ready --worktree <path>
+dev-nexus coordination integrate <project-root> --work-item local-1 --target-branch main --worktree <path>
+```
+
+`coordination integrate` builds a read-only plan from related handoff branches,
+recorded decisions, `git merge-base`, `git merge-tree`, changed files, and
+range-diff output when useful. `--fetch` fetches the configured remote only
+when project automation safety explicitly allows host mutation.
 
 Project-local agent configuration can be generated with:
 
