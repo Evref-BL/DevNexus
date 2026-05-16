@@ -15,16 +15,22 @@ Immediate direction:
 - Low-token coordinator discovery is now available through DevNexus CLI
   `automation eligible-work` and `automation agent-profiles`, plus native MCP
   tools `eligible_work` and `agent_profiles`.
-- No ready `dogfood` work item currently matches the automation selector; the
-  latest target report is `completed` with relaunch decision `stop`.
-- Possible next target choices:
-  - Resolve the Pharo MCP worker-infrastructure gap before promoting more
-    MCP-Pharo source work: subagents must have direct Pharo MCP access rather
-    than editing Pharo source files from disk.
-  - After direct Pharo MCP access is available in component worktrees, resume
-    the blocked MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5`.
-  - Choose a new non-live component focus from the remaining PLexus backlog or
-    approve the isolated runner before live-runtime work.
+- New plugin-composition plan work is tracked. DevNexus remains the generic
+  infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
+- Current ready `dogfood` work matching the automation selector:
+  - `dev-nexus:local-13` add the generic plugin capability/projection contract.
+  - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
+- Dependent non-eligible plugin work:
+  - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
+    agent setup after the generic plugin and scoped PLexus contracts are
+    stable.
+  - `pharo-launcher-mcp:local-3` confirm launcher image delete/status contract
+    only if PLexus identifies a concrete launcher-side cleanup gap.
+- Blocked plugin/live verification work:
+  - `pharo-nexus:local-5` verify that subagents receive direct Pharo MCP access
+    through PharoNexus-provided scoped PLexus setup.
+  - After direct Pharo MCP access is proven in component worktrees, resume the
+    blocked MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5`.
 - Later or dependent non-eligible work:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
@@ -32,6 +38,8 @@ Immediate direction:
   - `plexus:local-3` build the approved isolated PLexus live-smoke runner
     harness after runner inputs and cleanup policy are approved.
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
+  - `pharo-nexus:local-5` verify PharoNexus-provided Pharo MCP access in
+    subagent worktrees.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the approved
     isolated runner.
 
@@ -79,7 +87,7 @@ Durable completed foundation:
   - MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5` were blocked
     because worker contexts had no direct Pharo MCP namespace, no registered
     PLexus image route, and no `imageId` for routed MCP calls.
-- PharoNexus specialization alignment was completed and published as `c6629df`.
+- PharoNexus adapter alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as

@@ -14,8 +14,8 @@ older control-project handoff.
 ## Components
 
 - `dev-nexus`: generic core and primary component.
-- `pharo-nexus`: specialization adapter over DevNexus.
-- `plexus`: runtime gateway dependency for the specialization.
+- `pharo-nexus`: Pharo plugin for DevNexus.
+- `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
 
@@ -23,6 +23,12 @@ older control-project handoff.
 
 - This project is the clean dogfood root. The older PharoNexus-Control and
   DevNexusProject roots remain staging history.
+- DevNexus plugins are additive project capabilities, not alternate project
+  runners. A project can load multiple plugins, such as PharoNexus for Pharo
+  work and a future TypeScript plugin for TypeScript work.
+- PharoNexus is responsible for Pharo agent setup: scoped PLexus project
+  context, safe launcher affordances, gateway routing, and direct Pharo MCP
+  access for subagents.
 - Work items are local per component for immediate dogfooding. They can later
   move to GitHub Issues, GitHub Projects, Jira, GitLab Issues, or Vibe Kanban
   once those providers can list and update neutral work items well enough for

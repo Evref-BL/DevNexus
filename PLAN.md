@@ -20,6 +20,10 @@ consulting older control-project notes.
   implementation, verifies results, and reports facts back to DevNexus.
 - DevNexus may relaunch the configured coordinator while eligible work remains
   when the project target says to do so.
+- DevNexus supports additive plugins. Plugins are loaded into a DevNexus
+  project to contribute capabilities, setup policy, skills, MCP wiring, and
+  component-specific agent affordances. Plugins do not replace DevNexus and do
+  not choose or supervise implementation work.
 - DevNexus projects are multi-component by default. Component arity one is
   only the smallest normal case, not a special architecture.
 - Each component can have its own source root, generated worktree root,
@@ -29,6 +33,32 @@ consulting older control-project notes.
 - DevNexus should expose a simple agent-facing MCP and CLI surface so agents
   spend fewer tokens discovering project state, eligible work, target progress,
   and publication expectations.
+
+## Plugin Direction
+
+Plugins should compose inside one DevNexus project. For example, a project may
+load a Pharo plugin and a TypeScript plugin at the same time, with each plugin
+contributing only the tools and setup policy needed for its domain.
+
+PharoNexus is the Pharo plugin for DevNexus. It should supply Pharo-specific
+agent setup rather than act as an alternate project runner. In particular,
+PharoNexus should prepare scoped PLexus project context for subagents, project
+the MCP configuration they need, expose safe scoped launcher operations, and
+route image-side Pharo MCP calls through the PLexus gateway.
+
+The intended Pharo agent setup is:
+
+- DevNexus remains the generic project, target, work-item, agent-profile, and
+  relaunch infrastructure.
+- PharoNexus contributes the Pharo plugin manifest, setup hooks, skills, and
+  MCP projection needed by Pharo work.
+- PLexus supplies scoped project/workspace/image lifecycle and gateway routing
+  capabilities for those Pharo agents.
+- pharo-launcher-mcp supplies launcher-owned image and VM operations, without
+  DevNexus, PharoNexus, or PLexus policy.
+- MCP-Pharo supplies the image-side Pharo MCP server. Agents working on
+  MCP-Pharo should use the Pharo MCP directly, not edit Smalltalk source files
+  from disk as a substitute for image-side work.
 
 ## Dependency Direction
 
@@ -43,9 +73,9 @@ Keep project knowledge flowing downward:
   because it scopes launcher operations and routes image MCP calls. It must not
   depend on DevNexus or PharoNexus concepts.
 - `pharo-nexus` may know about DevNexus, PLexus, pharo-launcher-mcp, and Pharo
-  MCP because it is the specialization/plugin that composes them.
-- DevNexus remains generic and must not contain specialization-specific source,
-  docs, or comments.
+  MCP because it is the DevNexus plugin that composes them for Pharo work.
+- DevNexus remains generic and must not contain plugin-specific source, docs,
+  or comments.
 
 ## Current Dogfood Project
 
@@ -63,23 +93,23 @@ targets.
 Configured components:
 
 - `dev-nexus`: generic core and primary component.
-- `pharo-nexus`: specialization adapter over DevNexus.
-- `plexus`: runtime gateway dependency for the specialization.
+- `pharo-nexus`: Pharo plugin for DevNexus.
+- `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
 
 Current component publication state:
 
-- DevNexus is clean and pushed to `origin/main` through `1863d04` (`Fix target
-  report relaunch run ids`).
-- PharoNexus is clean and pushed to `origin/main` through `c6629df` (`Align MCP
-  adapter with DevNexus automation tools`).
-- PLexus is clean and pushed to `origin/main` through `916e1d5` (`Document
-  isolated live-smoke runner boundary`).
-- pharo-launcher-mcp is clean and pushed to `origin/main` through `1f3070b`
-  (`Document launcher cleanup hook boundary`).
-- MCP-Pharo is clean but ahead of `origin/develop` by local review-handoff
-  commit `0a38755` (`Document DevNexus verification boundary`).
+- DevNexus is clean and pushed to `origin/main` through `3891e3e` (`Handle
+  legacy project configs in template layout`).
+- PharoNexus is clean and pushed to `origin/main` through `3135210` (`Align
+  project service test with generated worktree roots`).
+- PLexus is clean and pushed to `origin/main` through `a616dd4` (`Merge PLexus
+  portability coverage`).
+- pharo-launcher-mcp is clean and pushed to `origin/main` through `8a8b5eb`
+  (`Detach Pharo image launches`).
+- MCP-Pharo is clean and aligned with `origin/develop` through `0fe8ef0`
+  (`Remove unused imports from MCP baseline`).
 
 The first seeded dogfood target completed through real user-local Codex launch
 cycles. The target report reached `completed` with relaunch decision `stop`
@@ -97,8 +127,7 @@ follow-ups remain blocked until an isolated runner is approved.
   into agent-native targets such as `.agents/skills` for Codex and
   `.claude/skills` for Claude.
 - Native DevNexus MCP exposes generic project/status/automation/work-item
-  surfaces. Generic DevNexus workflows should not depend on the specialization
-  adapter.
+  surfaces. Generic DevNexus workflows should not depend on a plugin adapter.
 - DevNexus project configs support `components[]` with source roots,
   relationships, per-component work trackers, verification hints, publication
   hints, and generated worktree roots.
@@ -119,35 +148,47 @@ bounded enough that verification and publication can complete cleanly.
 
 Priority candidates:
 
-1. Decide MCP-Pharo publication path for `0a38755`: keep it as local review
+1. Add the generic DevNexus plugin capability/projection contract so multiple
+   plugins can contribute agent setup without replacing DevNexus or supervising
+   work.
+2. Make PharoNexus an explicit DevNexus plugin that provisions scoped PLexus
+   project context, safe launcher affordances, gateway routes, and image-side
+   Pharo MCP access for subagents.
+3. Add the PLexus scoped project/image context needed by plugins, while keeping
+   live image create/start/stop/delete behind the approved isolated runner
+   boundary.
+4. Verify that a subagent in a component worktree receives direct Pharo MCP
+   access through PharoNexus-provided setup before resuming MCP-Pharo source
+   items.
+5. Decide MCP-Pharo publication path for `0a38755`: keep it as local review
    handoff, push a review branch, or publish it to `develop` after the needed
    review.
-2. Split the remaining DevNexus plan into component-owned local work items,
+6. Split the remaining DevNexus plan into component-owned local work items,
    with each item carrying readiness, blocker, acceptance, verification, and
    publication notes.
-3. Implement coordinator/subagent dispatch semantics so a coordinator can
+7. Implement coordinator/subagent dispatch semantics so a coordinator can
    launch one subagent per selected work item, obey a configured subagent cap,
    and keep work-item progress visible.
-4. Add or harden DevNexus worktree-parallel support for multi-component
+8. Add or harden DevNexus worktree-parallel support for multi-component
    targets, including component-scoped generated worktrees and clear ownership
    records.
-5. Improve target observability and final reporting so DevNexus can produce a
+9. Improve target observability and final reporting so DevNexus can produce a
    factual JSON report for target completion, active blockers, per-component
    progress, commits, verification, and publication decisions.
-6. Improve the generic MCP/CLI surface for agent use: simple project status,
+10. Improve the generic MCP/CLI surface for agent use: simple project status,
    target report, eligible work listing, work-item update/comment, cycle
    record, and agent profile inspection should be obvious and low-token.
-7. Expand work tracker support beyond the local provider when needed:
+11. Expand work tracker support beyond the local provider when needed:
    GitHub Issues, GitHub Projects, GitLab Issues, Jira, and Vibe Kanban should
    all map to neutral component work items without forcing one project equals
    one repository.
-8. Harden agent profile configuration for Codex and Claude, including model,
+12. Harden agent profile configuration for Codex and Claude, including model,
    version, reasoning or intelligence level, sandbox/safety policy, and
    per-target subagent caps.
-9. Before live PLexus, launcher, Docker, or image work, define and approve the
+13. Before live PLexus, launcher, Docker, or image work, define and approve the
    isolated runner, disposable image/runtime boundary, timeout budget, artifact
    retention, process ownership, cleanup sequence, and failure policy.
-10. Once the dogfood loop is reliable, create a fresh production-quality
+14. Once the dogfood loop is reliable, create a fresh production-quality
     DevNexus project shape from this evidence instead of carrying forward
     historical staging-project clutter.
 
@@ -160,8 +201,8 @@ Priority candidates:
   implementation. Vibe can be inspected or updated only as a tracker/system of
   record when a component is configured for it.
 - Preserve unrelated changes in every component working tree.
-- Keep DevNexus generic. Specialization-specific behavior belongs in the
-  specialization component or its dependencies.
+- Keep DevNexus generic. Plugin-specific behavior belongs in plugin components
+  or their dependencies.
 - Prefer substantial bounded batches over tiny symbolic steps. A normal
   automated cycle should be allowed to spend meaningful time, roughly
   30-40 minutes when there is enough safe eligible work.
