@@ -28,6 +28,10 @@ import {
   getNexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  getNexusAutomationAgentProfileSummary,
+  getNexusAutomationEligibleWorkSummary,
+} from "./nexusAutomationAgentSurface.js";
+import {
   appendNexusAutomationTargetCycleRecord,
   readNexusAutomationTargetCycleLedger,
   type NexusAutomationTargetCycleStatus,
@@ -90,6 +94,32 @@ const tools: McpTool[] = [
   {
     name: "automation_status",
     description: "Read DevNexus automation readiness, target context, and eligible work without mutating state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "eligible_work",
+    description: "List concise DevNexus eligible work grouped by component using the configured automation selector.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "agent_profiles",
+    description: "Inspect concise DevNexus coordinator and subagent profile policy without dumping full project config.",
     inputSchema: {
       type: "object",
       properties: {
@@ -317,6 +347,19 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             now: context.now,
           })),
+        });
+      case "eligible_work":
+        return toolResult({
+          ok: true,
+          ...(await getNexusAutomationEligibleWorkSummary({
+            projectRoot: projectRootFromArgs(args),
+            now: context.now,
+          })),
+        });
+      case "agent_profiles":
+        return toolResult({
+          ok: true,
+          ...getNexusAutomationAgentProfileSummary(projectRootFromArgs(args)),
         });
       case "target_cycle_list":
         return toolResult({

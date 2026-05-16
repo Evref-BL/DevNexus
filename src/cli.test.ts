@@ -647,6 +647,193 @@ describe("dev-nexus cli", () => {
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
 
+  it("prints concise eligible work grouped by component", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), {
+      recursive: true,
+    });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            workTracking: {
+              provider: "local",
+              storePath: primaryStorePath,
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:demo/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            workTracking: {
+              provider: "local",
+              storePath: addonStorePath,
+            },
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: fixedClock("2026-05-16T09:05:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+
+    await main(["automation", "eligible-work", projectRoot, "--json"], {
+      stdout: output.writer,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      project: {
+        id: "demo-project",
+        name: "Demo Project",
+      },
+      status: "ready",
+      eligibleWorkItemCount: 2,
+      selector: {
+        statuses: ["ready"],
+        labels: ["automation"],
+        limit: 5,
+      },
+      components: [
+        {
+          componentId: "primary",
+          componentName: "Primary",
+          workItems: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              title: "Primary task",
+              status: "ready",
+            },
+          ],
+        },
+        {
+          componentId: "addon",
+          componentName: "Addon",
+          workItems: [
+            {
+              componentId: "addon",
+              id: "local-1",
+              title: "Addon task",
+              status: "ready",
+            },
+          ],
+        },
+      ],
+    });
+    expect(payload.projectConfig).toBeUndefined();
+  });
+
+  it("prints concise agent profile policy", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+          agent: {
+            ...projectConfig().automation!.agent,
+            coordinatorProfileId: "codex-deep",
+            maxConcurrentSubagents: 2,
+            profiles: [
+              {
+                id: "codex-deep",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "xhigh",
+                command: "codex",
+                args: ["exec"],
+              },
+            ],
+          },
+          safety: {
+            profile: "host-authorized",
+            allowHostMutation: true,
+            allowDependencyInstall: false,
+            allowLiveServices: false,
+          },
+        },
+      }),
+    );
+    const output = captureOutput();
+
+    await main(["automation", "agent-profiles", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      project: {
+        id: "demo-project",
+      },
+      automationMode: "agent_launch",
+      coordinatorProfileId: "codex-deep",
+      maxConcurrentSubagents: 2,
+      safety: {
+        profile: "host-authorized",
+        allowHostMutation: true,
+        allowDependencyInstall: false,
+        allowLiveServices: false,
+      },
+      profiles: [
+        {
+          id: "codex-deep",
+          executor: "codex",
+          model: "gpt-5.5",
+          reasoning: "xhigh",
+          commandConfigured: true,
+          argsCount: 1,
+        },
+      ],
+    });
+    expect(payload.projectConfig).toBeUndefined();
+  });
+
   it("refreshes project agent MCP config through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

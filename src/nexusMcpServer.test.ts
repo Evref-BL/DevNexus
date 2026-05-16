@@ -91,6 +91,8 @@ describe("DevNexus MCP server", () => {
     expect(listDevNexusMcpTools().map((tool) => tool.name)).toEqual([
       "project_status",
       "automation_status",
+      "eligible_work",
+      "agent_profiles",
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
@@ -174,6 +176,52 @@ describe("DevNexus MCP server", () => {
         },
       ],
     });
+
+    const eligibleWork = toolJson(
+      await callDevNexusMcpTool(
+        "eligible_work",
+        {
+          projectRoot,
+        },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+    expect(eligibleWork).toMatchObject({
+      ok: true,
+      project: {
+        id: "mcp-demo",
+      },
+      eligibleWorkItemCount: 1,
+      components: [
+        {
+          componentId: "primary",
+          workItems: [
+            {
+              id: "local-1",
+              title: "Split the plan",
+            },
+          ],
+        },
+      ],
+    });
+    expect(eligibleWork.projectConfig).toBeUndefined();
+
+    const agentProfiles = toolJson(
+      await callDevNexusMcpTool("agent_profiles", {
+        projectRoot,
+      }),
+    );
+    expect(agentProfiles).toMatchObject({
+      ok: true,
+      automationMode: "agent_launch",
+      coordinatorProfileId: null,
+      maxConcurrentSubagents: 1,
+      safety: {
+        profile: "local",
+      },
+      profiles: [],
+    });
+    expect(agentProfiles.projectConfig).toBeUndefined();
 
     const updated = toolJson(
       await callDevNexusMcpTool("work_item_update", {

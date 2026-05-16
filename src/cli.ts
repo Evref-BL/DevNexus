@@ -33,6 +33,12 @@ import {
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  getNexusAutomationAgentProfileSummary,
+  getNexusAutomationEligibleWorkSummary,
+  type NexusAutomationAgentProfileSummary,
+  type NexusAutomationEligibleWorkSummary,
+} from "./nexusAutomationAgentSurface.js";
+import {
   appendNexusAutomationTargetCycleRecord,
   readNexusAutomationTargetCycleLedger,
   type NexusAutomationTargetCycleRecordInput,
@@ -238,6 +244,16 @@ interface ParsedAutomationStatusCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationEligibleWorkCommand {
+  projectRoot: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationAgentProfilesCommand {
+  projectRoot: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationEnqueueCommand {
   projectRoot: string;
   title: string;
@@ -305,6 +321,8 @@ export function usage(): string {
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus automation status <project-root> [options]",
+    "  dev-nexus automation eligible-work <project-root> [options]",
+    "  dev-nexus automation agent-profiles <project-root> [options]",
     "  dev-nexus automation enqueue <project-root> --title <title> [options]",
     "  dev-nexus automation target-cycle list <project-root> [options]",
     "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
@@ -400,6 +418,12 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation status:",
+    "  --json",
+    "",
+    "Options for automation eligible-work:",
+    "  --json",
+    "",
+    "Options for automation agent-profiles:",
     "  --json",
     "",
     "Options for automation enqueue:",
@@ -758,6 +782,31 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "eligible-work") {
+    const parsed = parseAutomationEligibleWorkCommand(argv);
+    const result = await getNexusAutomationEligibleWorkSummary({
+      projectRoot: parsed.projectRoot,
+      now: dependencies.now,
+    });
+    printAutomationEligibleWorkResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "agent-profiles") {
+    const parsed = parseAutomationAgentProfilesCommand(argv);
+    const result = getNexusAutomationAgentProfileSummary(parsed.projectRoot);
+    printAutomationAgentProfilesResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "enqueue") {
     const parsed = parseAutomationEnqueueCommand(argv);
     const result = await enqueueNexusAutomationWorkItem({
@@ -840,7 +889,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, enqueue, target-cycle, target-report, run-once, or schedule",
+      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, or schedule",
     );
   }
 
@@ -1922,6 +1971,50 @@ function parseAutomationStatusCommand(
   return parsed;
 }
 
+function parseAutomationEligibleWorkCommand(
+  argv: string[],
+): ParsedAutomationEligibleWorkCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation eligible-work requires a project root");
+  }
+
+  const parsed: ParsedAutomationEligibleWorkCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation eligible-work option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseAutomationAgentProfilesCommand(
+  argv: string[],
+): ParsedAutomationAgentProfilesCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation agent-profiles requires a project root");
+  }
+
+  const parsed: ParsedAutomationAgentProfilesCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation agent-profiles option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationScheduleCommand(
   argv: string[],
 ): ParsedAutomationScheduleCommand {
@@ -2482,6 +2575,99 @@ function printAutomationStatusResult(
       );
     }
   }
+}
+
+function printAutomationEligibleWorkResult(
+  result: NexusAutomationEligibleWorkSummary,
+  parsed: ParsedAutomationEligibleWorkCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus eligible work: ${result.eligibleWorkItemCount}.`);
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(stdout, `  Status: ${result.status}`);
+  if (result.selector) {
+    writeLine(stdout, `  Selector: ${formatAutomationSelector(result.selector)}`);
+  }
+  for (const component of result.components) {
+    writeLine(
+      stdout,
+      `  ${component.componentId} (${component.componentName}): ${component.workItems.length}`,
+    );
+    for (const item of component.workItems) {
+      writeLine(stdout, `    ${item.id} [${item.status}] ${item.title}`);
+    }
+  }
+}
+
+function printAutomationAgentProfilesResult(
+  result: NexusAutomationAgentProfileSummary,
+  parsed: ParsedAutomationAgentProfilesCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus agent profiles.");
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(
+    stdout,
+    `  Automation: ${result.automationEnabled ? result.automationMode : "disabled"}`,
+  );
+  if (result.coordinatorProfileId) {
+    writeLine(stdout, `  Coordinator profile: ${result.coordinatorProfileId}`);
+  }
+  if (result.maxConcurrentSubagents !== null) {
+    writeLine(
+      stdout,
+      `  Max concurrent subagents: ${result.maxConcurrentSubagents}`,
+    );
+  }
+  if (result.safety) {
+    writeLine(
+      stdout,
+      `  Safety: ${result.safety.profile} hostMutation=${result.safety.allowHostMutation} dependencyInstall=${result.safety.allowDependencyInstall} liveServices=${result.safety.allowLiveServices}`,
+    );
+  }
+  writeLine(stdout, `  Profiles: ${result.profiles.length}`);
+  for (const profile of result.profiles) {
+    writeLine(
+      stdout,
+      `    ${profile.id} executor=${profile.executor} model=${profile.model ?? "none"} reasoning=${profile.reasoning ?? "none"} command=${profile.commandConfigured ? "yes" : "no"} args=${profile.argsCount}`,
+    );
+  }
+}
+
+function formatAutomationSelector(
+  selector: NonNullable<NexusAutomationEligibleWorkSummary["selector"]>,
+): string {
+  const parts: string[] = [];
+  if (selector.statuses.length > 0) {
+    parts.push(`status=${selector.statuses.join(",")}`);
+  }
+  if (selector.labels.length > 0) {
+    parts.push(`label=${selector.labels.join(",")}`);
+  }
+  if (selector.excludeLabels.length > 0) {
+    parts.push(`excludeLabel=${selector.excludeLabels.join(",")}`);
+  }
+  if (selector.assignees.length > 0) {
+    parts.push(`assignee=${selector.assignees.join(",")}`);
+  }
+  if (selector.search) {
+    parts.push(`search=${selector.search}`);
+  }
+  parts.push(`limit=${selector.limit}`);
+
+  return parts.length > 0 ? parts.join(" ") : "none";
 }
 
 function projectLabel(config: NexusProjectConfig): string {

@@ -81,6 +81,8 @@ The native MCP tools are:
 ```text
 project_status
 automation_status
+eligible_work
+agent_profiles
 target_cycle_list
 target_cycle_record
 target_report
@@ -329,6 +331,12 @@ or missing dependencies block before worktree creation.
 The package also ships a generic `dev-nexus` CLI for the same boundary:
 
 ```bash
+dev-nexus automation eligible-work <project-root> --json
+dev-nexus automation agent-profiles <project-root> --json
+dev-nexus automation target-report <project-root> --json
+dev-nexus work-item update <project-root> local-1 --component core --status in_progress
+dev-nexus work-item comment <project-root> local-1 --component core --body "Started focused verification."
+dev-nexus automation target-cycle record <project-root> --status completed --work-item core:local-1 --eligible-work-items 0
 dev-nexus work-item create <project-root> --title "Implement task" --status ready --label automation
 dev-nexus work-item list <project-root> --status ready
 dev-nexus work-item get <project-root> local-1
@@ -342,6 +350,12 @@ dev-nexus automation target-report <project-root> --json
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
+
+For a low-token coordinator cycle, start with `automation eligible-work --json`
+and `automation agent-profiles --json`, then use component-scoped `work-item`
+and `target-cycle` commands to record the work the coordinator chose. The
+full `automation status --json` remains available when the agent needs the
+complete target context.
 
 Projects can also store the shell command under `automation.agent.command` for
 agent-launch mode or `automation.executor.command` for the older generated
