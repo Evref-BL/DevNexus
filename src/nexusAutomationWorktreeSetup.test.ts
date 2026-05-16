@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import process from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
@@ -10,6 +11,7 @@ import {
   type GitCommandResult,
   type GitRunner,
   type NexusAutomationConfig,
+  type NexusAutomationPluginDependencyProjection,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -58,6 +60,52 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
       exitCode: 0,
     };
   };
+}
+
+function jsToolchainProjection(
+  overrides: Partial<NexusAutomationPluginDependencyProjection> = {},
+): NexusAutomationPluginDependencyProjection {
+  return {
+    id: "typescript-node-modules",
+    source: "node_modules",
+    target: "node_modules",
+    required: true,
+    sourceControl: "support",
+    reason: "Reuse already-installed JavaScript dependencies in generated worktrees.",
+    sourceMetadata: {
+      pluginId: "typescript-dev-nexus",
+      pluginName: "TypeScript DevNexus",
+      version: "0.1.0",
+      capabilityId: "node-modules",
+    },
+    ...overrides,
+  };
+}
+
+function resolveLocalBinFromWorktree(
+  worktreePath: string,
+  command: string,
+): string | null {
+  const binDirectory = path.join(worktreePath, "node_modules", ".bin");
+  const candidates =
+    process.platform === "win32"
+      ? [
+          command,
+          ...((process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+            .split(";")
+            .filter(Boolean)
+            .map((extension) => `${command}${extension.toLowerCase()}`)),
+        ]
+      : [command];
+
+  for (const candidate of candidates) {
+    const candidatePath = path.join(binDirectory, candidate);
+    if (fs.existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  return null;
 }
 
 afterEach(() => {
@@ -140,6 +188,252 @@ describe("nexus automation worktree setup", () => {
         cwd: worktreePath,
       },
     ]);
+  });
+
+  it("materializes plugin dependency projections and applies source-control policy", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreePath = makeTempDir("dev-nexus-setup-worktree-");
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    const sourceFixture = path.join(sourceRoot, "fixtures");
+    const sourceCache = path.join(sourceRoot, ".dev-cache");
+    fs.mkdirSync(sourceDependency, { recursive: true });
+    fs.mkdirSync(sourceFixture, { recursive: true });
+    fs.mkdirSync(sourceCache, { recursive: true });
+    fs.writeFileSync(path.join(sourceDependency, "tool.txt"), "ok\n", "utf8");
+    fs.writeFileSync(path.join(sourceFixture, "fixture.txt"), "fixture\n", "utf8");
+    fs.writeFileSync(path.join(sourceCache, "cache.txt"), "cache\n", "utf8");
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [
+            {
+              source: ".dev-cache",
+              target: ".dev-cache",
+              required: true,
+            },
+          ],
+        },
+      }),
+      pluginDependencyProjections: [
+        jsToolchainProjection(),
+        jsToolchainProjection({
+          id: "typescript-fixtures",
+          source: "fixtures",
+          target: "fixtures",
+          sourceControl: "source",
+          reason: null,
+          sourceMetadata: {
+            pluginId: "typescript-dev-nexus",
+            pluginName: "TypeScript DevNexus",
+            version: "0.1.0",
+            capabilityId: "fixtures",
+          },
+        }),
+      ],
+      gitRunner: fakeGitRunner(gitCalls),
+    });
+
+    expect(result.links).toMatchObject([
+      {
+        source: ".dev-cache",
+        target: ".dev-cache",
+        status: "linked",
+      },
+    ]);
+    expect(result.dependencyProjections).toMatchObject([
+      {
+        id: "typescript-node-modules",
+        source: "node_modules",
+        target: "node_modules",
+        sourcePath: sourceDependency,
+        targetPath: path.join(worktreePath, "node_modules"),
+        required: true,
+        sourceControl: "support",
+        reason: "Reuse already-installed JavaScript dependencies in generated worktrees.",
+        status: "linked",
+        sourceMetadata: {
+          pluginId: "typescript-dev-nexus",
+          pluginName: "TypeScript DevNexus",
+          version: "0.1.0",
+          capabilityId: "node-modules",
+        },
+      },
+      {
+        id: "typescript-fixtures",
+        source: "fixtures",
+        target: "fixtures",
+        sourcePath: sourceFixture,
+        targetPath: path.join(worktreePath, "fixtures"),
+        required: true,
+        sourceControl: "source",
+        reason: null,
+        status: "linked",
+      },
+    ]);
+    expect(fs.readFileSync(path.join(worktreePath, "node_modules", "tool.txt"), "utf8"))
+      .toBe("ok\n");
+    expect(fs.readFileSync(path.join(worktreePath, "fixtures", "fixture.txt"), "utf8"))
+      .toBe("fixture\n");
+    expect(
+      fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
+    ).toBe(".dev-cache/\nnode_modules/\n");
+  });
+
+  it("skips optional missing plugin projections and records them in worker context", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "codex-demo-project-local-23-run-1");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const ownership = {
+      componentId: "primary",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/demo-project/local-23/run-1",
+      baseRef: "main",
+      workItem: {
+        id: "local-23",
+        title: "Let toolchain plugins project dependencies into worker worktrees",
+      },
+    };
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      pluginDependencyProjections: [
+        jsToolchainProjection({
+          required: false,
+          source: "node_modules",
+          target: "node_modules",
+        }),
+      ],
+      gitRunner: fakeGitRunner(gitCalls),
+      context: {
+        project: {
+          id: "demo-project",
+          name: "Demo Project",
+          root: projectRoot,
+        },
+        ownership,
+      },
+    });
+
+    expect(result.dependencyProjections).toMatchObject([
+      {
+        id: "typescript-node-modules",
+        required: false,
+        status: "skipped",
+        message: expect.stringContaining("Optional plugin dependency projection source is absent"),
+      },
+    ]);
+    const context = JSON.parse(fs.readFileSync(result.context!.contextJsonPath, "utf8"));
+    expect(context.dependencySupport.pluginDependencyProjections).toMatchObject([
+      {
+        id: "typescript-node-modules",
+        required: false,
+        status: "skipped",
+        sourceMetadata: {
+          pluginId: "typescript-dev-nexus",
+          capabilityId: "node-modules",
+        },
+      },
+    ]);
+    expect(result.context!.briefingMarkdown).toContain("Dependency support:");
+    expect(result.context!.briefingMarkdown).toContain(
+      "- skipped typescript-node-modules: node_modules",
+    );
+    expect(
+      fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
+    ).toBe(".dev-nexus/context/\n");
+  });
+
+  it("fails preflight and materialization for required missing plugin projections", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreePath = makeTempDir("dev-nexus-setup-worktree-");
+    const projection = jsToolchainProjection({
+      id: "missing-node-modules",
+      source: "node_modules",
+      target: "node_modules",
+      required: true,
+    });
+
+    expect(
+      preflightNexusAutomationWorktreeSetup({
+        sourceRoot,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [projection],
+      }),
+    ).toEqual([
+      {
+        name: "pluginDependencyProjection:missing-node-modules",
+        status: "failed",
+        message: `Required plugin dependency projection source does not exist: ${path.join(
+          sourceRoot,
+          "node_modules",
+        )}`,
+      },
+    ]);
+
+    expect(() =>
+      materializeNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreePath,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [projection],
+        gitRunner: fakeGitRunner([]),
+      }),
+    ).toThrow(/Required plugin dependency projection source does not exist/);
+  });
+
+  it("projects JavaScript toolchain dependencies so local binaries resolve from the worktree", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreePath = makeTempDir("dev-nexus-setup-worktree-");
+    const sourceBin = path.join(sourceRoot, "node_modules", ".bin");
+    fs.mkdirSync(sourceBin, { recursive: true });
+    const vitestBinName = process.platform === "win32" ? "vitest.cmd" : "vitest";
+    const sourceVitest = path.join(sourceBin, vitestBinName);
+    fs.writeFileSync(sourceVitest, "echo local vitest\n", "utf8");
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      pluginDependencyProjections: [jsToolchainProjection()],
+      gitRunner: fakeGitRunner([]),
+    });
+
+    const resolvedVitest = resolveLocalBinFromWorktree(worktreePath, "vitest");
+    expect(result.dependencyProjections[0]).toMatchObject({
+      id: "typescript-node-modules",
+      status: "linked",
+    });
+    expect(resolvedVitest).toBe(path.join(worktreePath, "node_modules", ".bin", vitestBinName));
+    expect(fs.realpathSync(resolvedVitest!)).toBe(fs.realpathSync(sourceVitest));
   });
 
   it("materializes a generated worker context bundle and excludes it", () => {

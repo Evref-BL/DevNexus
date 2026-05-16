@@ -232,6 +232,90 @@ describe("nexus worker context bundle", () => {
     );
   });
 
+  it("records dependency support projections in context and briefing surfaces", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
+    const worktreePath = path.join(worktreesRoot, "local-23");
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    const targetDependency = path.join(worktreePath, "node_modules");
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-23-dependency-projections",
+      baseRef: "origin/main",
+      workItem: {
+        id: "local-23",
+        title: "Let toolchain plugins project dependencies into worker worktrees",
+      },
+      dependencyProjections: [
+        {
+          id: "typescript-node-modules",
+          source: "node_modules",
+          target: "node_modules",
+          sourcePath: sourceDependency,
+          targetPath: targetDependency,
+          required: true,
+          sourceControl: "support",
+          reason: "Reuse already-installed JavaScript dependencies.",
+          status: "linked",
+          message: `Linked plugin dependency projection ${sourceDependency} -> ${targetDependency}`,
+          sourceMetadata: {
+            pluginId: "typescript-dev-nexus",
+            pluginName: "TypeScript DevNexus",
+            version: "0.1.0",
+            capabilityId: "node-modules",
+          },
+        },
+      ],
+    });
+
+    expect(result.context.dependencySupport.pluginDependencyProjections).toEqual([
+      {
+        id: "typescript-node-modules",
+        source: "node_modules",
+        target: "node_modules",
+        sourcePath: sourceDependency,
+        targetPath: targetDependency,
+        required: true,
+        sourceControl: "support",
+        reason: "Reuse already-installed JavaScript dependencies.",
+        status: "linked",
+        message: `Linked plugin dependency projection ${sourceDependency} -> ${targetDependency}`,
+        sourceMetadata: {
+          pluginId: "typescript-dev-nexus",
+          pluginName: "TypeScript DevNexus",
+          version: "0.1.0",
+          capabilityId: "node-modules",
+        },
+      },
+    ]);
+
+    const contextJson = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(worktreePath), "utf8"),
+    );
+    expect(contextJson.dependencySupport.pluginDependencyProjections[0])
+      .toMatchObject({
+        id: "typescript-node-modules",
+        status: "linked",
+        sourceMetadata: {
+          pluginId: "typescript-dev-nexus",
+          capabilityId: "node-modules",
+        },
+      });
+    expect(result.briefingMarkdown).toContain("Dependency support:");
+    expect(result.briefingMarkdown).toContain(
+      "- linked typescript-node-modules: node_modules",
+    );
+    expect(result.briefingMarkdown).toContain(
+      "Source: typescript-dev-nexus:node-modules",
+    );
+  });
+
   it("renders generic plugin fragments into worker context and briefing surfaces", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "core");
