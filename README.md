@@ -62,6 +62,7 @@ dev-nexus work-item get <project-root> local-1
 dev-nexus work-item update <project-root> local-1 --status in_progress
 dev-nexus work-item comment <project-root> local-1 --body "Started focused verification."
 dev-nexus automation status <project-root>
+dev-nexus automation enqueue <project-root> --title "Implement task"
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
@@ -75,6 +76,11 @@ run.
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready with a selected
 work item before any worktree or tracker mutation happens.
+
+`automation enqueue` creates a work item that matches the configured automation
+selector. It derives the default status, labels, and assignees from
+`automation.selector`, lets callers add extra labels or assignees, and refuses
+inputs that would be excluded from scheduler pickup.
 
 `automation run-once` runs the command in the prepared worktree, exposes
 `DEV_NEXUS_*` environment variables for the selected work item and worktree,

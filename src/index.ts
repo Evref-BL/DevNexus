@@ -3,6 +3,7 @@ export * from "./gitWorktreeService.js";
 export * from "./nexusAutomation.js";
 export * from "./nexusAutomationCommandExecutor.js";
 export * from "./nexusAutomationConfig.js";
+export * from "./nexusAutomationEnqueue.js";
 export * from "./nexusAutomationRunOnce.js";
 export * from "./nexusAutomationScheduler.js";
 export * from "./nexusAutomationStatus.js";

@@ -177,6 +177,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus work-item create");
+    expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
   });
@@ -526,6 +527,118 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
+  it("enqueues work items that match the automation selector", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        selector: {
+          ...config.automation!.selector,
+          statuses: ["ready"],
+          labels: ["automation"],
+          assignees: ["agent-a"],
+          search: "queue",
+        },
+      },
+    });
+    const enqueueOutput = captureOutput();
+    const statusOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "enqueue",
+        projectRoot,
+        "--title",
+        "Queue runnable task",
+        "--description",
+        "Created by automation enqueue.",
+        "--label",
+        "dogfood",
+        "--json",
+      ],
+      {
+        stdout: enqueueOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(["automation", "status", projectRoot, "--json"], {
+      stdout: statusOutput.writer,
+      now: fixedClock("2026-05-16T10:05:00.000Z"),
+    });
+
+    expect(JSON.parse(enqueueOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Queue runnable task",
+      status: "ready",
+      labels: ["automation", "dogfood"],
+      assignees: ["agent-a"],
+    });
+    expect(JSON.parse(statusOutput.output())).toMatchObject({
+      ok: true,
+      status: "ready",
+      selectedWorkItem: {
+        id: "local-1",
+        title: "Queue runnable task",
+      },
+    });
+  });
+
+  it("refuses to enqueue work items outside the automation selector", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        selector: {
+          ...config.automation!.selector,
+          statuses: ["ready"],
+          excludeLabels: ["blocked"],
+        },
+      },
+    });
+
+    await expect(
+      main(
+        [
+          "automation",
+          "enqueue",
+          projectRoot,
+          "--title",
+          "Bad task",
+          "--status",
+          "todo",
+          "--json",
+        ],
+        {
+          stdout: captureOutput().writer,
+        },
+      ),
+    ).rejects.toThrow("--status must match automation selector statuses: ready");
+    await expect(
+      main(
+        [
+          "automation",
+          "enqueue",
+          projectRoot,
+          "--title",
+          "Blocked task",
+          "--label",
+          "blocked",
+          "--json",
+        ],
+        {
+          stdout: captureOutput().writer,
+        },
+      ),
+    ).rejects.toThrow("labels conflict with automation selector exclusions: blocked");
   });
 
   it("runs automation once through the command executor", async () => {

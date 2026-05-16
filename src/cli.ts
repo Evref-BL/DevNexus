@@ -8,6 +8,10 @@ import {
   type NexusAutomationCommandRunner,
 } from "./nexusAutomationCommandExecutor.js";
 import {
+  enqueueNexusAutomationWorkItem,
+  type EnqueueNexusAutomationWorkItemResult,
+} from "./nexusAutomationEnqueue.js";
+import {
   runNexusAutomationOnce,
   type RunNexusAutomationOnceResult,
 } from "./nexusAutomationRunOnce.js";
@@ -196,6 +200,17 @@ interface ParsedAutomationStatusCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationEnqueueCommand {
+  projectRoot: string;
+  title: string;
+  description?: string | null;
+  status?: WorkStatus;
+  labels: string[];
+  assignees: string[];
+  milestone?: string | null;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -227,6 +242,7 @@ export function usage(): string {
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus automation status <project-root> [options]",
+    "  dev-nexus automation enqueue <project-root> --title <title> [options]",
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
     "",
@@ -309,6 +325,15 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation status:",
+    "  --json",
+    "",
+    "Options for automation enqueue:",
+    "  --title <title>",
+    "  --description <text>",
+    "  --status <todo|ready|in_progress|blocked|done|wont_do>",
+    "  --label <label>            repeatable, added after selector labels",
+    "  --assignee <assignee>      repeatable, added after selector assignees",
+    "  --milestone <text>",
     "  --json",
     "",
     "Options for automation run-once:",
@@ -605,6 +630,26 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "enqueue") {
+    const parsed = parseAutomationEnqueueCommand(argv);
+    const result = await enqueueNexusAutomationWorkItem({
+      projectRoot: parsed.projectRoot,
+      title: parsed.title,
+      description: parsed.description,
+      status: parsed.status,
+      labels: parsed.labels,
+      assignees: parsed.assignees,
+      milestone: parsed.milestone,
+      now: dependencies.now,
+    });
+    printAutomationEnqueueResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
     const executorOptions = resolveAutomationExecutorCliOptions(
@@ -638,7 +683,7 @@ async function handleAutomationCommand(
   }
 
   if (argv[1] !== "run-once") {
-    throw new Error("automation requires status, run-once, or schedule");
+    throw new Error("automation requires status, enqueue, run-once, or schedule");
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
@@ -1296,6 +1341,64 @@ function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentComma
   return parsed as ParsedWorkItemCommentCommand;
 }
 
+function parseAutomationEnqueueCommand(
+  argv: string[],
+): ParsedAutomationEnqueueCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation enqueue requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationEnqueueCommand> = {
+    projectRoot,
+    labels: [],
+    assignees: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--title":
+        parsed.title = next();
+        break;
+      case "--description":
+        parsed.description = next();
+        break;
+      case "--status":
+        parsed.status = parseWorkStatus(next(), arg);
+        break;
+      case "--label":
+        parsed.labels?.push(next());
+        break;
+      case "--assignee":
+        parsed.assignees?.push(next());
+        break;
+      case "--milestone":
+        parsed.milestone = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation enqueue option: ${arg}`);
+    }
+  }
+
+  if (!parsed.title) {
+    throw new Error("automation enqueue requires --title");
+  }
+
+  return parsed as ParsedAutomationEnqueueCommand;
+}
+
 function parseAutomationRunOnceCommand(
   argv: string[],
 ): ParsedAutomationRunOnceCommand {
@@ -1648,6 +1751,24 @@ function printAutomationScheduleTick(
     stdout,
     `DevNexus scheduler tick ${tick.index}: ${tick.status.status} action=${tick.action}${runStatus}${wait}`,
   );
+}
+
+function printAutomationEnqueueResult(
+  result: EnqueueNexusAutomationWorkItemResult,
+  parsed: ParsedAutomationEnqueueCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus automation work item enqueued.");
+  writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
+  writeLine(stdout, `  Id: ${result.workItem.id}`);
+  writeLine(stdout, `  Title: ${result.workItem.title}`);
+  writeLine(stdout, `  Status: ${result.workItem.status}`);
 }
 
 function printAutomationScheduleResult(
