@@ -16,9 +16,9 @@ Immediate direction:
   `automation eligible-work` and `automation agent-profiles`, plus native MCP
   tools `eligible_work` and `agent_profiles`.
 - New plugin-composition plan work is tracked. DevNexus remains the generic
-  infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
+  infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - none after completing `pharo-nexus:local-4`; rerun eligible-work after
+  - none after completing `dev-nexus-pharo:local-8`; rerun eligible-work after
     reopening a dependent static item or resolving a human-in-the-loop blocker.
 - Scoped npm dogfood prereleases were published on 2026-05-17 so other
   machines can install without sibling checkout assumptions:
@@ -27,12 +27,21 @@ Immediate direction:
   - `@evref-bl/plexus-core@0.1.0-alpha.0` and
     `@evref-bl/plexus-gateway@0.1.0-alpha.0` published with `dogfood` tag and
     PLexus source commit `ecac759`.
-  - `@evref-bl/pharo-nexus@0.1.0-alpha.0` published with `dogfood` tag and
-    PharoNexus source commit `f9a64eb`. Registry access/dist-tags, normal
-    packument lookup, tarball install, and name-based `npm exec` smoke all
-    pass.
-  - PharoNexus now consumes DevNexus through the npm alias
+  - `@evref-bl/dev-nexus-pharo@0.1.0-alpha.0` published with `dogfood` and
+    `latest` tags and DevNexus-Pharo source commit `8024fa2`. npm reports
+    public access and dist-tags. After registry propagation, packument lookup
+    and a clean temp-directory `npm exec --package` smoke both pass.
+  - The former npm package name was unpublished with `--force`; dist-tags are
+    gone, though `npm view` may still show cached metadata briefly.
+  - DevNexus-Pharo now consumes DevNexus through the npm alias
     `dev-nexus -> @evref-bl/dev-nexus@0.1.0-alpha.0`, not `file:../DevNexus`.
+  - `dev-nexus-pharo:local-8` completed the rename to DevNexus-Pharo in
+    source/package/docs/config identifiers and published source commit
+    `8024fa2`. The GitHub repository is renamed to
+    `Evref-BL/DevNexus-Pharo`, and the local source remote plus dogfood
+    component metadata now point at the new SSH URL. The obsolete GitHub
+    redirect for the former repository slug has been retired; the old API,
+    web, and Git URLs now return not found.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
   - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
@@ -46,7 +55,7 @@ Immediate direction:
     `.agents/skills` without global installation.
   - `dev-nexus:local-21` is complete and published through DevNexus `5895ea2`.
     Plugins can now contribute bounded worker briefing/context fragments.
-    `pharo-nexus:local-4` owns the Pharo-specific fragment for scoped PLexus
+    `dev-nexus-pharo:local-4` owns the Pharo-specific fragment for scoped PLexus
     and direct Pharo MCP guidance.
   - `dev-nexus:local-23` is complete and published through DevNexus
     `6c0501c`. DevNexus core now accepts declarative plugin dependency
@@ -54,13 +63,13 @@ Immediate direction:
     records the resulting support in setup/context surfaces. JavaScript/
     TypeScript is covered by fixtures; Java can reuse the same hook later for
     JDK/Maven/Gradle hints.
-  - `pharo-nexus:local-4` is complete and published through PharoNexus
-    `75a038c`. PharoNexus now declares a DevNexus plugin config with Pharo
+  - `dev-nexus-pharo:local-4` is complete and published through DevNexus-Pharo
+    `75a038c`. DevNexus-Pharo now declares a DevNexus plugin config with Pharo
     skills, scoped PLexus and direct Pharo MCP capabilities, setup obligations,
     environment hints, cleanup expectations, agent affordances, and worker
-    context/briefing fragments. PharoNexus-created/imported projects persist
+    context/briefing fragments. DevNexus-Pharo-created/imported projects persist
     the plugin entry without replacing DevNexus. The dogfood project also
-    records a component-scoped `pharo-nexus` plugin entry for future generated
+    records a component-scoped `dev-nexus-pharo` plugin entry for future generated
     worker contexts.
   - Defer nested generated execution workspaces until the simpler context
     bundle has been exercised; `dev-nexus:local-22` tracks the human decision
@@ -95,14 +104,14 @@ Immediate direction:
   - `dev-nexus:local-18` choose external coordination posting policy before
     live GitHub/GitLab/Jira comments or review requests are automated.
 - Blocked plugin/live verification work:
-  - `pharo-nexus:local-5` verify that subagents receive direct Pharo MCP access
-    through PharoNexus-provided scoped PLexus setup.
+  - `dev-nexus-pharo:local-5` verify that subagents receive direct Pharo MCP access
+    through DevNexus-Pharo-provided scoped PLexus setup.
   - After direct Pharo MCP access is proven in component worktrees, resume the
     blocked MCP-Pharo query API item `mcp-pharo:local-4`.
 - Later or dependent non-eligible work:
-  - `dev-nexus:local-24` tracks a follow-up from the PharoNexus worker
+  - `dev-nexus:local-24` tracks a follow-up from the DevNexus-Pharo worker
     verification gap: support declared related-component dependency projections
-    such as PharoNexus worker worktrees needing a sibling DevNexus checkout,
+    such as DevNexus-Pharo worker worktrees needing a sibling DevNexus checkout,
     without allowing arbitrary outside-path projection.
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
@@ -112,7 +121,7 @@ Immediate direction:
   - `plexus:local-3` build the approved isolated PLexus live-smoke runner
     harness after runner inputs and cleanup policy are approved.
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
-  - `pharo-nexus:local-5` verify PharoNexus-provided Pharo MCP access in
+  - `dev-nexus-pharo:local-5` verify DevNexus-Pharo-provided Pharo MCP access in
     subagent worktrees.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the approved
     isolated runner.
@@ -121,11 +130,11 @@ Vibe backlog reconciliation:
 
 - Inspected old Vibe Kanban issues as tracker/history only; no Vibe
   workspaces, sessions, executions, workers, or issue mutations were created.
-- Publication-only Vibe blockers for PharoNexus `932e663`, PLexus `11b9c6a`,
+- Publication-only Vibe blockers for DevNexus-Pharo `932e663`, PLexus `11b9c6a`,
   and pharo-launcher-mcp `0f75151` are stale because those commits are now
   contained in `origin/main`.
 - Added local DevNexus backlog items for still-relevant Vibe findings:
-  - `pharo-nexus:local-3` approved self-hosted startup smoke.
+  - `dev-nexus-pharo:local-3` approved self-hosted startup smoke.
   - `plexus:local-4` gateway/lifecycle package boundary split.
   - `plexus:local-5` prepared image cache model and safe service boundary.
   - `plexus:local-6` scoped launcher create/stop contract alignment.
@@ -219,7 +228,7 @@ Durable completed foundation:
 - Component wave `parallel-component-wave-20260516` completed with verified
   source changes:
   - DevNexus project template scaffold was published through `3891e3e`.
-  - PharoNexus Codex worktree Pharo MCP config projection was published
+  - DevNexus-Pharo Codex worktree Pharo MCP config projection was published
     through `3135210`; live route validation still requires approved runtime
     infrastructure.
   - PLexus gateway lifecycle/package boundary and portability coverage were
@@ -227,7 +236,7 @@ Durable completed foundation:
   - MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5` were blocked
     because worker contexts had no direct Pharo MCP namespace, no registered
     PLexus image route, and no `imageId` for routed MCP calls.
-- PharoNexus adapter alignment was completed and published as `c6629df`.
+- DevNexus-Pharo adapter alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as

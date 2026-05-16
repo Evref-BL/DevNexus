@@ -1,7 +1,6 @@
 # DevNexus Dogfood Plan
 
-This file is the durable handoff from the older
-`C:\dev\code\pharo-nexus\PharoNexus-Control` staging project into this clean
+This file is the durable handoff from the older staging project into this clean
 DevNexus dogfood project. Future coordinator agents should treat this file,
 `AGENTS.md`, `CONTEXT.md`, `dev-nexus.project.json`, and
 `.dev-nexus/automation/target-state.md` as the local source of truth before
@@ -40,9 +39,9 @@ Plugins should compose inside one DevNexus project. For example, a project may
 load a Pharo plugin and a TypeScript plugin at the same time, with each plugin
 contributing only the tools and setup policy needed for its domain.
 
-PharoNexus is the Pharo plugin for DevNexus. It should supply Pharo-specific
+DevNexus-Pharo is the Pharo plugin for DevNexus. It should supply Pharo-specific
 agent setup rather than act as an alternate project runner. In particular,
-PharoNexus should prepare scoped PLexus project context for subagents, project
+DevNexus-Pharo should prepare scoped PLexus project context for subagents, project
 the MCP configuration they need, expose safe scoped launcher operations, and
 route image-side Pharo MCP calls through the PLexus gateway.
 
@@ -50,12 +49,12 @@ The intended Pharo agent setup is:
 
 - DevNexus remains the generic project, target, work-item, agent-profile, and
   relaunch infrastructure.
-- PharoNexus contributes the Pharo plugin manifest, setup hooks, skills, and
+- DevNexus-Pharo contributes the Pharo plugin manifest, setup hooks, skills, and
   MCP projection needed by Pharo work.
 - PLexus supplies scoped project/workspace/image lifecycle and gateway routing
   capabilities for those Pharo agents.
 - pharo-launcher-mcp supplies launcher-owned image and VM operations, without
-  DevNexus, PharoNexus, or PLexus policy.
+  DevNexus, DevNexus-Pharo, or PLexus policy.
 - MCP-Pharo supplies the image-side Pharo MCP server. Agents working on
   MCP-Pharo should use the Pharo MCP directly, not edit Smalltalk source files
   from disk as a substitute for image-side work.
@@ -100,14 +99,14 @@ See `docs/shared-multi-host-coordination-prd.md` for the feature plan.
 Keep project knowledge flowing downward:
 
 - `pharo-launcher-mcp` knows only about its own launcher MCP contract and Pharo
-  Launcher behavior. It must not mention DevNexus, PharoNexus, PLexus, or Pharo
+  Launcher behavior. It must not mention DevNexus, DevNexus-Pharo, PLexus, or Pharo
   MCP project policy.
 - `mcp-pharo` knows only about its own Pharo image-side MCP server. It must not
-  mention DevNexus, PharoNexus, PLexus, or pharo-launcher-mcp policy.
+  mention DevNexus, DevNexus-Pharo, PLexus, or pharo-launcher-mcp policy.
 - `plexus` may know about `pharo-launcher-mcp` and the Pharo MCP contract,
   because it scopes launcher operations and routes image MCP calls. It must not
-  depend on DevNexus or PharoNexus concepts.
-- `pharo-nexus` may know about DevNexus, PLexus, pharo-launcher-mcp, and Pharo
+  depend on DevNexus or DevNexus-Pharo concepts.
+- `dev-nexus-pharo` may know about DevNexus, PLexus, pharo-launcher-mcp, and Pharo
   MCP because it is the DevNexus plugin that composes them for Pharo work.
 - DevNexus remains generic and must not contain plugin-specific source, docs,
   or comments.
@@ -120,15 +119,14 @@ Project root:
 C:\dev\code\dev-nexus-dogfood
 ```
 
-This project is intentionally separate from the historical
-`PharoNexus-Control` and `DevNexusProject` staging roots. The old roots remain
-useful historical evidence, but this root is the clean dogfood context for new
-targets.
+This project is intentionally separate from the historical staging roots. The
+old roots remain useful historical evidence, but this root is the clean dogfood
+context for new targets.
 
 Configured components:
 
 - `dev-nexus`: generic core and primary component.
-- `pharo-nexus`: Pharo plugin for DevNexus.
+- `dev-nexus-pharo`: Pharo plugin for DevNexus.
 - `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
@@ -137,8 +135,8 @@ Current component publication state:
 
 - DevNexus is clean and pushed to `origin/main` through `3891e3e` (`Handle
   legacy project configs in template layout`).
-- PharoNexus is clean and pushed to `origin/main` through `3135210` (`Align
-  project service test with generated worktree roots`).
+- DevNexus-Pharo is clean and pushed to `origin/main` through `8024fa2`; the
+  GitHub repository has been renamed to `Evref-BL/DevNexus-Pharo`.
 - PLexus is clean and pushed to `origin/main` through `a616dd4` (`Merge PLexus
   portability coverage`).
 - pharo-launcher-mcp is clean and pushed to `origin/main` through `8a8b5eb`
@@ -186,14 +184,14 @@ Priority candidates:
 1. Add the generic DevNexus plugin capability/projection contract so multiple
    plugins can contribute agent setup without replacing DevNexus or supervising
    work.
-2. Make PharoNexus an explicit DevNexus plugin that provisions scoped PLexus
+2. Make DevNexus-Pharo an explicit DevNexus plugin that provisions scoped PLexus
    project context, safe launcher affordances, gateway routes, and image-side
    Pharo MCP access for subagents.
 3. Add the PLexus scoped project/image context needed by plugins, while keeping
    live image create/start/stop/delete behind the approved isolated runner
    boundary.
 4. Verify that a subagent in a component worktree receives direct Pharo MCP
-   access through PharoNexus-provided setup before resuming MCP-Pharo source
+   access through DevNexus-Pharo-provided setup before resuming MCP-Pharo source
    items.
 5. Add shared multi-host coordination status and handoff records so Mac and
    Windows agents can publish current branch intent without hard locks.

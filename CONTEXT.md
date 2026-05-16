@@ -14,19 +14,19 @@ older control-project handoff.
 ## Components
 
 - `dev-nexus`: generic core and primary component.
-- `pharo-nexus`: Pharo plugin for DevNexus.
+- `dev-nexus-pharo`: Pharo plugin for DevNexus.
 - `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
 
 ## Decisions
 
-- This project is the clean dogfood root. The older PharoNexus-Control and
-  DevNexusProject roots remain staging history.
+- This project is the clean dogfood root. The older staging roots remain
+  historical context.
 - DevNexus plugins are additive project capabilities, not alternate project
-  runners. A project can load multiple plugins, such as PharoNexus for Pharo
+  runners. A project can load multiple plugins, such as DevNexus-Pharo for Pharo
   work and a future TypeScript plugin for TypeScript work.
-- PharoNexus is responsible for Pharo agent setup: scoped PLexus project
+- DevNexus-Pharo is responsible for Pharo agent setup: scoped PLexus project
   context, safe launcher affordances, gateway routing, and direct Pharo MCP
   access for subagents.
 - Mac and Windows agents should coordinate through shared work-item intent,

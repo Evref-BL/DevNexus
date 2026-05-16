@@ -1,7 +1,7 @@
 # Agent Guide For DevNexus Dogfood
 
 This is the clean DevNexus dogfood managed project. It is intentionally
-separate from the older PharoNexus-Control staging root.
+separate from the older staging root.
 
 ## Operating Boundary
 
@@ -34,10 +34,10 @@ separate from the older PharoNexus-Control staging root.
 
 ## Plan Handoff
 
-`PLAN.md` is the durable handoff from the older PharoNexus-Control staging
-project into this clean dogfood project. Treat it as the forward plan for new
-targets. The old control handoff remains historical reference, not the primary
-source for future dogfood cycles.
+`PLAN.md` is the durable handoff from the older staging project into this clean
+dogfood project. Treat it as the forward plan for new targets. The old control
+handoff remains historical reference, not the primary source for future dogfood
+cycles.
 
 ## Result File Shape
 
