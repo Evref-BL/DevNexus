@@ -33,6 +33,7 @@ import {
 } from "./nexusAutomationAgentSurface.js";
 import {
   appendNexusAutomationTargetCycleRecord,
+  maxNexusAutomationTargetCycleNoteLength,
   readNexusAutomationTargetCycleLedger,
   type NexusAutomationTargetCycleStatus,
   type NexusAutomationTargetCycleWorkItemInput,
@@ -154,7 +155,10 @@ const tools: McpTool[] = [
         projectRoot: { type: "string" },
         cycleId: { type: "string" },
         runId: { type: "string" },
-        status: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["started", "dispatched", "completed", "blocked", "failed", "skipped"],
+        },
         summary: { type: ["string", "null"] },
         eligibleWorkItemCount: { type: ["number", "null"] },
         workItems: {
@@ -166,16 +170,37 @@ const tools: McpTool[] = [
               id: { type: "string" },
               title: { type: ["string", "null"] },
               status: { type: ["string", "null"] },
-              cycleStatus: { type: ["string", "null"] },
+              cycleStatus: {
+                type: ["string", "null"],
+                enum: [
+                  "eligible",
+                  "selected",
+                  "dispatched",
+                  "in_progress",
+                  "completed",
+                  "blocked",
+                  "skipped",
+                  null,
+                ],
+              },
               agentProfileId: { type: ["string", "null"] },
-              notes: { type: ["string", "null"] },
+              notes: {
+                type: ["string", "null"],
+                maxLength: maxNexusAutomationTargetCycleNoteLength,
+              },
             },
             required: ["id"],
             additionalProperties: false,
           },
         },
         blockers: { type: "array", items: { type: "string" } },
-        notes: { type: "array", items: { type: "string" } },
+        notes: {
+          type: "array",
+          items: {
+            type: "string",
+            maxLength: maxNexusAutomationTargetCycleNoteLength,
+          },
+        },
       },
       required: ["status"],
       additionalProperties: false,

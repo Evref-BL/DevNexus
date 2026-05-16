@@ -297,10 +297,14 @@ work, assigning subagent profiles, and reporting facts back to DevNexus.
 to `.dev-nexus/automation/target-cycles.json`. A launched coordinator agent
 can record `started`, `dispatched`, `completed`, `blocked`, `failed`, or
 `skipped` cycle facts through `target_cycle_record` or the CLI. These records
-are factual caller reports: DevNexus stores the run id, target id, selected or
-dispatched work item refs, blockers, notes, and summary, but it still does not
-decide which work should be selected. `automation status` reads the same
-ledger and exposes cycle counts plus the latest cycle.
+are factual caller reports: DevNexus stores the run id, target id, component
+work item refs, per-item progress states, agent profile ids, bounded notes,
+blockers, and summary, but it still does not decide which work should be
+selected or supervise subagents. Work item progress states can be `selected`,
+`dispatched`, `in_progress`, `completed`, `blocked`, or `skipped`; item and
+cycle notes are capped at 1000 characters each so the durable ledger stays
+concise. `automation status` reads the same ledger and exposes cycle counts
+plus the latest cycle.
 
 `target_report` and `automation target-report` build read-only factual JSON
 from the target context, target cycle ledger, automation run ledger, recorded
@@ -337,6 +341,7 @@ dev-nexus automation target-report <project-root> --json
 dev-nexus work-item update <project-root> local-1 --component core --status in_progress
 dev-nexus work-item comment <project-root> local-1 --component core --body "Started focused verification."
 dev-nexus automation target-cycle record <project-root> --status completed --work-item core:local-1 --eligible-work-items 0
+dev-nexus automation target-cycle record <project-root> --status dispatched --work-item core:local-1 --work-item-status dispatched --work-item-agent-profile codex-local --work-item-note "Subagent launched."
 dev-nexus work-item create <project-root> --title "Implement task" --status ready --label automation
 dev-nexus work-item list <project-root> --status ready
 dev-nexus work-item get <project-root> local-1
@@ -350,6 +355,11 @@ dev-nexus automation target-report <project-root> --json
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
+
+For `automation target-cycle record`, `--work-item-status`,
+`--work-item-agent-profile`, and `--work-item-note` apply to the most recent
+`--work-item` argument. They record what the coordinator reports; DevNexus does
+not assign profiles, launch implementation subagents, or supervise their work.
 
 For a low-token coordinator cycle, start with `automation eligible-work --json`
 and `automation agent-profiles --json`, then use component-scoped `work-item`

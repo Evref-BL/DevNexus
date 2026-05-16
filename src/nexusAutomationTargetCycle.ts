@@ -3,6 +3,8 @@ import path from "node:path";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import type { WorkStatus } from "./workTrackingTypes.js";
 
+export const maxNexusAutomationTargetCycleNoteLength = 1000;
+
 export type NexusAutomationTargetCycleStatus =
   | "started"
   | "dispatched"
@@ -308,7 +310,11 @@ function normalizeTargetCycleRecord(
     ),
     workItems: normalizeWorkItems(record.workItems),
     blockers: normalizeStringArray(record.blockers, "target cycle.blockers"),
-    notes: normalizeStringArray(record.notes, "target cycle.notes"),
+    notes: normalizeStringArray(
+      record.notes,
+      "target cycle.notes",
+      maxNexusAutomationTargetCycleNoteLength,
+    ),
     nextCycleNotBefore: optionalIsoString(
       record.nextCycleNotBefore,
       "target cycle.nextCycleNotBefore",
@@ -351,7 +357,12 @@ function normalizeWorkItem(
       `${pathName}.cycleStatus`,
     ),
     agentProfileId: optionalNullableString(record.agentProfileId) ?? null,
-    notes: optionalNullableString(record.notes) ?? null,
+    notes:
+      boundedOptionalNullableString(
+        record.notes,
+        `${pathName}.notes`,
+        maxNexusAutomationTargetCycleNoteLength,
+      ) ?? null,
   };
 }
 
@@ -447,7 +458,11 @@ function optionalWorkStatus(value: unknown, name: string): WorkStatus | null {
   );
 }
 
-function normalizeStringArray(value: unknown, name: string): string[] {
+function normalizeStringArray(
+  value: unknown,
+  name: string,
+  maxLength?: number,
+): string[] {
   if (value === undefined || value === null) {
     return [];
   }
@@ -455,9 +470,16 @@ function normalizeStringArray(value: unknown, name: string): string[] {
     throw new NexusAutomationTargetCycleError(`${name} must be an array`);
   }
 
-  return value.map((item, index) =>
-    requiredNonEmptyString(item, `${name}[${index}]`),
-  );
+  return value.map((item, index) => {
+    const stringValue = requiredNonEmptyString(item, `${name}[${index}]`);
+    if (maxLength !== undefined && stringValue.length > maxLength) {
+      throw new NexusAutomationTargetCycleError(
+        `${name}[${index}] must be at most ${maxLength} characters`,
+      );
+    }
+
+    return stringValue;
+  });
 }
 
 function optionalNullableNonNegativeInteger(
@@ -505,7 +527,28 @@ function dateFrom(value: Date | string, name: string): Date {
   return date;
 }
 
-function optionalNullableString(value: unknown): string | null | undefined {
+function boundedOptionalNullableString(
+  value: unknown,
+  name: string,
+  maxLength: number,
+): string | null | undefined {
+  const stringValue = optionalNullableString(value, name);
+  if (stringValue === undefined || stringValue === null) {
+    return stringValue;
+  }
+  if (stringValue.length > maxLength) {
+    throw new NexusAutomationTargetCycleError(
+      `${name} must be at most ${maxLength} characters`,
+    );
+  }
+
+  return stringValue;
+}
+
+function optionalNullableString(
+  value: unknown,
+  name = "value",
+): string | null | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -513,7 +556,7 @@ function optionalNullableString(value: unknown): string | null | undefined {
     return null;
   }
 
-  return requiredNonEmptyString(value, "value");
+  return requiredNonEmptyString(value, name);
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {

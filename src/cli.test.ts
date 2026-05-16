@@ -957,6 +957,136 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(listOutput.output()).ledger.cycles).toHaveLength(1);
   });
 
+  it("records coordinator subagent dispatch progress through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        mode: "agent_launch",
+        target: {
+          ...projectConfig().automation!.target,
+          id: "dogfood",
+        },
+      },
+    });
+    const output = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "target-cycle",
+        "record",
+        projectRoot,
+        "--cycle-id",
+        "cycle-dispatch",
+        "--status",
+        "dispatched",
+        "--work-item",
+        "primary:local-1",
+        "--work-item-status",
+        "selected",
+        "--work-item-agent-profile",
+        "codex-coordinator",
+        "--work-item-note",
+        "Selected for the bounded batch.",
+        "--work-item",
+        "primary:local-2",
+        "--work-item-status",
+        "dispatched",
+        "--work-item-agent-profile",
+        "codex-local",
+        "--work-item-note",
+        "Subagent launched.",
+        "--work-item",
+        "addon:local-3",
+        "--work-item-status",
+        "in_progress",
+        "--work-item-agent-profile",
+        "codex-local",
+        "--work-item-note",
+        "Focused tests running.",
+        "--work-item",
+        "addon:local-4",
+        "--work-item-status",
+        "completed",
+        "--work-item-agent-profile",
+        "codex-local",
+        "--work-item-note",
+        "Verification passed.",
+        "--work-item",
+        "tools:local-5",
+        "--work-item-status",
+        "blocked",
+        "--work-item-agent-profile",
+        "codex-local",
+        "--work-item-note",
+        "Waiting for credentials.",
+        "--work-item",
+        "tools:local-6",
+        "--work-item-status",
+        "skipped",
+        "--work-item-agent-profile",
+        "codex-local",
+        "--work-item-note",
+        "Dependency remained blocked.",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      record: {
+        id: "cycle-dispatch",
+        status: "dispatched",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "selected",
+            agentProfileId: "codex-coordinator",
+            notes: "Selected for the bounded batch.",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            cycleStatus: "dispatched",
+            agentProfileId: "codex-local",
+          },
+          {
+            componentId: "addon",
+            id: "local-3",
+            cycleStatus: "in_progress",
+            agentProfileId: "codex-local",
+          },
+          {
+            componentId: "addon",
+            id: "local-4",
+            cycleStatus: "completed",
+            agentProfileId: "codex-local",
+          },
+          {
+            componentId: "tools",
+            id: "local-5",
+            cycleStatus: "blocked",
+            agentProfileId: "codex-local",
+          },
+          {
+            componentId: "tools",
+            id: "local-6",
+            cycleStatus: "skipped",
+            agentProfileId: "codex-local",
+          },
+        ],
+      },
+    });
+  });
+
   it("builds target reports through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

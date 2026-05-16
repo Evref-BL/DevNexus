@@ -44,6 +44,7 @@ import {
   type NexusAutomationTargetCycleRecordInput,
   type NexusAutomationTargetCycleStatus,
   type NexusAutomationTargetCycleWorkItemInput,
+  type NexusAutomationTargetCycleWorkItemStatus,
 } from "./nexusAutomationTargetCycle.js";
 import {
   buildNexusAutomationTargetReport,
@@ -445,6 +446,9 @@ export function usage(): string {
     "  --summary <text>",
     "  --eligible-work-items <count>",
     "  --work-item <component-id:id>  repeatable",
+    "  --work-item-status <selected|dispatched|in_progress|completed|blocked|skipped>",
+    "  --work-item-agent-profile <id>",
+    "  --work-item-note <text>",
     "  --blocker <text>              repeatable",
     "  --note <text>                 repeatable",
     "  --json",
@@ -1850,6 +1854,16 @@ function parseAutomationTargetCycleRecordCommand(
       case "--work-item":
         parsed.workItems?.push(parseTargetCycleWorkItem(next(), arg));
         break;
+      case "--work-item-status":
+        lastParsedTargetCycleWorkItem(parsed, arg).cycleStatus =
+          parseTargetCycleWorkItemStatus(next(), arg);
+        break;
+      case "--work-item-agent-profile":
+        lastParsedTargetCycleWorkItem(parsed, arg).agentProfileId = next();
+        break;
+      case "--work-item-note":
+        lastParsedTargetCycleWorkItem(parsed, arg).notes = next();
+        break;
       case "--blocker":
         parsed.blockers?.push(next());
         break;
@@ -2784,6 +2798,25 @@ function parseTargetCycleStatus(
   throw new Error(`${optionName} must be a valid target cycle status`);
 }
 
+function parseTargetCycleWorkItemStatus(
+  value: string,
+  optionName: string,
+): NexusAutomationTargetCycleWorkItemStatus {
+  if (
+    value === "eligible" ||
+    value === "selected" ||
+    value === "dispatched" ||
+    value === "in_progress" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid target cycle work item status`);
+}
+
 function parseTargetCycleWorkItem(
   value: string,
   optionName: string,
@@ -2811,6 +2844,18 @@ function parseTargetCycleWorkItem(
     id,
     cycleStatus: "selected",
   };
+}
+
+function lastParsedTargetCycleWorkItem(
+  parsed: Partial<ParsedAutomationTargetCycleRecordCommand>,
+  optionName: string,
+): NexusAutomationTargetCycleWorkItemInput {
+  const item = parsed.workItems?.at(-1);
+  if (!item) {
+    throw new Error(`${optionName} requires a preceding --work-item`);
+  }
+
+  return item;
 }
 
 function parseTrackerProvider(
