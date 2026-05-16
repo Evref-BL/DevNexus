@@ -70,6 +70,40 @@ export interface NexusWorkerContextSkills {
   agentNativeProjections: NexusWorkerContextAgentSkillProjection[];
 }
 
+export type NexusWorkerContextDependencyProjectionSourceControl =
+  | "support"
+  | "source";
+
+export type NexusWorkerContextDependencyProjectionStatus =
+  | "linked"
+  | "present"
+  | "skipped";
+
+export interface NexusWorkerContextDependencyProjectionSourceMetadata {
+  pluginId: string;
+  pluginName: string | null;
+  version: string | null;
+  capabilityId: string;
+}
+
+export interface NexusWorkerContextDependencyProjection {
+  id: string;
+  source: string;
+  target: string;
+  sourcePath: string;
+  targetPath: string;
+  required: boolean;
+  sourceControl: NexusWorkerContextDependencyProjectionSourceControl;
+  reason: string | null;
+  status: NexusWorkerContextDependencyProjectionStatus;
+  message: string;
+  sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata;
+}
+
+export interface NexusWorkerContextDependencySupport {
+  pluginDependencyProjections: NexusWorkerContextDependencyProjection[];
+}
+
 export interface NexusWorkerContextBundleWorkItem {
   id: string;
   title: string | null;
@@ -98,6 +132,7 @@ export interface NexusWorkerContextBundle {
     sourceRoot: string;
   };
   skills: NexusWorkerContextSkills;
+  dependencySupport: NexusWorkerContextDependencySupport;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   projectContext: NexusWorkerProjectContextReferences;
@@ -118,6 +153,7 @@ export interface NexusWorkerContextBundleOptions {
   workItem: NexusWorkerContextBundleWorkItem | null;
   targetStatePath?: string | null;
   skills?: NexusWorkerContextSkills;
+  dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
 }
 
@@ -197,6 +233,9 @@ export function buildNexusWorkerContextBundle(
     targetStatePath: options.targetStatePath,
   });
   const skills = normalizeWorkerContextSkills(projectRoot, options.skills);
+  const dependencySupport = normalizeWorkerDependencySupport(
+    options.dependencyProjections,
+  );
   const pluginFragments = normalizeWorkerPluginFragments(
     options.pluginFragments,
   );
@@ -223,6 +262,7 @@ export function buildNexusWorkerContextBundle(
       sourceRoot,
     },
     skills,
+    dependencySupport,
     ownership: worktree,
     worktree,
     projectContext,
@@ -279,6 +319,9 @@ export function renderNexusWorkerBriefing(
     "Skills:",
     `Project-managed skills: ${context.skills.projectManagedRoot}`,
     ...renderSkillProjectionLines(context.skills),
+    "",
+    "Dependency support:",
+    ...renderDependencyProjectionLines(context.dependencySupport),
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
@@ -411,6 +454,122 @@ function renderSkillProjectionLines(
   return skills.agentNativeProjections.map(
     (projection) => `- ${projection.agent} skills: ${projection.skillsDirectory}`,
   );
+}
+
+function normalizeWorkerDependencySupport(
+  dependencyProjections: NexusWorkerContextDependencyProjection[] | undefined,
+): NexusWorkerContextDependencySupport {
+  return {
+    pluginDependencyProjections: (dependencyProjections ?? []).map(
+      normalizeWorkerDependencyProjection,
+    ),
+  };
+}
+
+function normalizeWorkerDependencyProjection(
+  projection: NexusWorkerContextDependencyProjection,
+): NexusWorkerContextDependencyProjection {
+  return {
+    id: requiredNonEmptyString(projection.id, "dependencyProjections.id"),
+    source: requiredNonEmptyString(
+      projection.source,
+      "dependencyProjections.source",
+    ),
+    target: requiredNonEmptyString(
+      projection.target,
+      "dependencyProjections.target",
+    ),
+    sourcePath: normalizedAbsolutePath(
+      projection.sourcePath,
+      "dependencyProjections.sourcePath",
+    ),
+    targetPath: normalizedAbsolutePath(
+      projection.targetPath,
+      "dependencyProjections.targetPath",
+    ),
+    required: projection.required === true,
+    sourceControl: normalizeDependencyProjectionSourceControl(
+      projection.sourceControl,
+      "dependencyProjections.sourceControl",
+    ),
+    reason:
+      optionalNullableString(projection.reason, "dependencyProjections.reason") ??
+      null,
+    status: normalizeDependencyProjectionStatus(
+      projection.status,
+      "dependencyProjections.status",
+    ),
+    message: requiredNonEmptyString(
+      projection.message,
+      "dependencyProjections.message",
+    ),
+    sourceMetadata: normalizeDependencyProjectionSourceMetadata(
+      projection.sourceMetadata,
+    ),
+  };
+}
+
+function normalizeDependencyProjectionSourceControl(
+  value: NexusWorkerContextDependencyProjectionSourceControl,
+  name: string,
+): NexusWorkerContextDependencyProjectionSourceControl {
+  if (value === "support" || value === "source") {
+    return value;
+  }
+
+  throw new NexusWorkerContextBundleError(`${name} must be support or source`);
+}
+
+function normalizeDependencyProjectionStatus(
+  value: NexusWorkerContextDependencyProjectionStatus,
+  name: string,
+): NexusWorkerContextDependencyProjectionStatus {
+  if (value === "linked" || value === "present" || value === "skipped") {
+    return value;
+  }
+
+  throw new NexusWorkerContextBundleError(
+    `${name} must be linked, present, or skipped`,
+  );
+}
+
+function normalizeDependencyProjectionSourceMetadata(
+  sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata,
+): NexusWorkerContextDependencyProjectionSourceMetadata {
+  return {
+    pluginId: requiredNonEmptyString(
+      sourceMetadata.pluginId,
+      "dependencyProjections.sourceMetadata.pluginId",
+    ),
+    pluginName:
+      optionalNullableString(
+        sourceMetadata.pluginName,
+        "dependencyProjections.sourceMetadata.pluginName",
+      ) ?? null,
+    version:
+      optionalNullableString(
+        sourceMetadata.version,
+        "dependencyProjections.sourceMetadata.version",
+      ) ?? null,
+    capabilityId: requiredNonEmptyString(
+      sourceMetadata.capabilityId,
+      "dependencyProjections.sourceMetadata.capabilityId",
+    ),
+  };
+}
+
+function renderDependencyProjectionLines(
+  dependencySupport: NexusWorkerContextDependencySupport,
+): string[] {
+  if (dependencySupport.pluginDependencyProjections.length === 0) {
+    return ["- plugin dependency projections: none"];
+  }
+
+  return dependencySupport.pluginDependencyProjections.flatMap((projection) => [
+    `- ${projection.status} ${projection.id}: ${projection.target}`,
+    `  Source: ${projection.sourceMetadata.pluginId}:${projection.sourceMetadata.capabilityId}`,
+    ...(projection.reason ? [`  Reason: ${projection.reason}`] : []),
+  ]);
 }
 
 function normalizeWorkerContextWorkItem(

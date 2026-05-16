@@ -12,6 +12,10 @@ import type {
 import {
   materializeNexusWorkerContextBundle,
   type MaterializeNexusWorkerContextBundleResult,
+  type NexusWorkerContextDependencyProjection,
+  type NexusWorkerContextDependencyProjectionSourceControl,
+  type NexusWorkerContextDependencyProjectionSourceMetadata,
+  type NexusWorkerContextDependencyProjectionStatus,
   type NexusWorkerContextAgentSkillProjection,
   type NexusWorkerContextSkillReference,
   type NexusWorkerContextBundleWorktree,
@@ -50,6 +54,21 @@ export interface NexusAutomationWorktreeSetupLinkResult {
   message: string;
 }
 
+export interface NexusAutomationPluginDependencyProjection {
+  id: string;
+  source: string;
+  target: string;
+  required: boolean;
+  sourceControl: NexusWorkerContextDependencyProjectionSourceControl;
+  reason: string | null;
+  sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata;
+}
+
+export interface NexusAutomationWorktreeDependencyProjectionResult
+  extends NexusWorkerContextDependencyProjection {
+  status: NexusWorkerContextDependencyProjectionStatus;
+}
+
 export type NexusAutomationWorktreeSkillProjectionStatus =
   | "missing"
   | "stale"
@@ -79,6 +98,7 @@ export interface NexusAutomationWorktreeSkillProjectionResult {
 
 export interface NexusAutomationWorktreeSetupResult {
   links: NexusAutomationWorktreeSetupLinkResult[];
+  dependencyProjections: NexusAutomationWorktreeDependencyProjectionResult[];
   skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
   context?: MaterializeNexusWorkerContextBundleResult;
 }
@@ -99,6 +119,7 @@ export interface NexusAutomationWorktreeSetupOptions {
   worktreesRoot?: string;
   worktreePath: string;
   automationConfig: NexusAutomationConfig;
+  pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
   skillsConfig?: NexusProjectSkillsConfig;
   context?: NexusAutomationWorktreeSetupContextInput;
   gitRunner?: GitRunner;
@@ -115,45 +136,57 @@ export class NexusAutomationWorktreeSetupError extends Error {
 export function preflightNexusAutomationWorktreeSetup(options: {
   sourceRoot: string;
   automationConfig: NexusAutomationConfig;
+  pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
 }): NexusAutomationWorktreeSetupPreflightCheck[] {
   const sourceRoot = path.resolve(
     requiredNonEmptyString(options.sourceRoot, "sourceRoot"),
   );
 
-  return options.automationConfig.setup.dependencyLinks.map((link, index) => {
+  const dependencyLinkChecks: NexusAutomationWorktreeSetupPreflightCheck[] =
+    options.automationConfig.setup.dependencyLinks.map((link, index) => {
       const name = `dependencyLink:${index}`;
       try {
         const sourcePath = resolveInsideRoot(sourceRoot, link.source, "source");
-      resolveInsideRoot(sourceRoot, link.target, "target");
-      if (!fs.existsSync(sourcePath)) {
-        if (link.required) {
+        resolveInsideRoot(sourceRoot, link.target, "target");
+        if (!fs.existsSync(sourcePath)) {
+          if (link.required) {
+            return {
+              name,
+              status: "failed",
+              message: `Required dependency link source does not exist: ${sourcePath}`,
+            };
+          }
+
           return {
             name,
-            status: "failed",
-            message: `Required dependency link source does not exist: ${sourcePath}`,
+            status: "passed",
+            message: `Optional dependency link source is absent and will be skipped: ${sourcePath}`,
           };
         }
 
         return {
           name,
           status: "passed",
-          message: `Optional dependency link source is absent and will be skipped: ${sourcePath}`,
+          message: `Dependency link ${link.source} -> ${link.target} is safe to materialize`,
+        };
+      } catch (error) {
+        return {
+          name,
+          status: "failed",
+          message: errorMessage(error),
         };
       }
+    });
+  const pluginProjectionChecks = (
+    options.pluginDependencyProjections ?? []
+  ).map((projection) =>
+    preflightPluginDependencyProjection({
+      projection,
+      sourceRoot,
+    }),
+  );
 
-      return {
-        name,
-        status: "passed",
-        message: `Dependency link ${link.source} -> ${link.target} is safe to materialize`,
-      };
-    } catch (error) {
-      return {
-        name,
-        status: "failed",
-        message: errorMessage(error),
-      };
-    }
-  });
+  return [...dependencyLinkChecks, ...pluginProjectionChecks];
 }
 
 export function materializeNexusAutomationWorktreeSetup(
@@ -180,6 +213,17 @@ export function materializeNexusAutomationWorktreeSetup(
       platform,
     }),
   );
+  const dependencyProjections = (
+    options.pluginDependencyProjections ?? []
+  ).map((projection) =>
+    materializePluginDependencyProjection({
+      projection,
+      sourceRoot,
+      worktreePath,
+      gitRunner,
+      platform,
+    }),
+  );
   const skillProjections = options.context
     ? materializeWorkerSkillProjections({
         projectRoot: options.context.project.root,
@@ -198,11 +242,13 @@ export function materializeNexusAutomationWorktreeSetup(
         worktreePath,
         gitRunner,
         skillProjections,
+        dependencyProjections,
       })
     : undefined;
 
   return {
     links,
+    dependencyProjections,
     skillProjections,
     ...(context ? { context } : {}),
   };
@@ -216,6 +262,7 @@ function materializeWorkerContext(options: {
   worktreePath: string;
   gitRunner: GitRunner;
   skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
+  dependencyProjections: NexusAutomationWorktreeDependencyProjectionResult[];
 }): MaterializeNexusWorkerContextBundleResult {
   const projectRoot = path.resolve(
     requiredNonEmptyString(options.context.project.root, "context.project.root"),
@@ -273,6 +320,7 @@ function materializeWorkerContext(options: {
       projectRoot,
       options.skillProjections,
     ),
+    dependencyProjections: options.dependencyProjections,
     pluginFragments: options.context.pluginFragments,
   });
   addGitInfoExclude({
@@ -686,6 +734,230 @@ function isNexusSkillManifest(value: unknown): value is NexusSkillManifest {
   );
 }
 
+function preflightPluginDependencyProjection(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourceRoot: string;
+}): NexusAutomationWorktreeSetupPreflightCheck {
+  const name = `pluginDependencyProjection:${requiredNonEmptyString(
+    options.projection.id,
+    "pluginDependencyProjection.id",
+  )}`;
+
+  try {
+    const sourcePath = resolveInsideRoot(
+      options.sourceRoot,
+      options.projection.source,
+      "plugin dependency projection source",
+    );
+    resolveInsideRoot(
+      options.sourceRoot,
+      options.projection.target,
+      "plugin dependency projection target",
+    );
+    normalizeDependencyProjectionSourceControl(
+      options.projection.sourceControl,
+      "plugin dependency projection sourceControl",
+    );
+    normalizePluginDependencyProjectionSourceMetadata(
+      options.projection.sourceMetadata,
+    );
+
+    if (!fs.existsSync(sourcePath)) {
+      if (options.projection.required) {
+        return {
+          name,
+          status: "failed",
+          message: `Required plugin dependency projection source does not exist: ${sourcePath}`,
+        };
+      }
+
+      return {
+        name,
+        status: "passed",
+        message: `Optional plugin dependency projection source is absent and will be skipped: ${sourcePath}`,
+      };
+    }
+
+    return {
+      name,
+      status: "passed",
+      message: `Plugin dependency projection ${options.projection.source} -> ${options.projection.target} is safe to materialize`,
+    };
+  } catch (error) {
+    return {
+      name,
+      status: "failed",
+      message: errorMessage(error),
+    };
+  }
+}
+
+function materializePluginDependencyProjection(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourceRoot: string;
+  worktreePath: string;
+  gitRunner: GitRunner;
+  platform: NodeJS.Platform;
+}): NexusAutomationWorktreeDependencyProjectionResult {
+  const projection = normalizePluginDependencyProjection(options.projection);
+  const sourcePath = resolveInsideRoot(
+    options.sourceRoot,
+    projection.source,
+    "plugin dependency projection source",
+  );
+  const targetPath = resolveInsideRoot(
+    options.worktreePath,
+    projection.target,
+    "plugin dependency projection target",
+  );
+
+  if (!fs.existsSync(sourcePath)) {
+    if (projection.required) {
+      throw new NexusAutomationWorktreeSetupError(
+        `Required plugin dependency projection source does not exist: ${sourcePath}`,
+      );
+    }
+
+    return dependencyProjectionResult({
+      projection,
+      sourcePath,
+      targetPath,
+      status: "skipped",
+      message: `Optional plugin dependency projection source is absent: ${sourcePath}`,
+    });
+  }
+
+  const sourceStats = fs.statSync(sourcePath);
+  if (fs.existsSync(targetPath)) {
+    if (projection.sourceControl === "support") {
+      addGitInfoExclude({
+        worktreePath: options.worktreePath,
+        targetPath,
+        isDirectory: sourceStats.isDirectory(),
+        gitRunner: options.gitRunner,
+      });
+    }
+
+    return dependencyProjectionResult({
+      projection,
+      sourcePath,
+      targetPath,
+      status: "present",
+      message: `Plugin dependency projection target already exists: ${targetPath}`,
+    });
+  }
+
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.symlinkSync(
+    sourcePath,
+    targetPath,
+    symlinkType(sourceStats, options.platform),
+  );
+  if (projection.sourceControl === "support") {
+    addGitInfoExclude({
+      worktreePath: options.worktreePath,
+      targetPath,
+      isDirectory: sourceStats.isDirectory(),
+      gitRunner: options.gitRunner,
+    });
+  }
+
+  return dependencyProjectionResult({
+    projection,
+    sourcePath,
+    targetPath,
+    status: "linked",
+    message: `Linked plugin dependency projection ${sourcePath} -> ${targetPath}`,
+  });
+}
+
+function normalizePluginDependencyProjection(
+  projection: NexusAutomationPluginDependencyProjection,
+): NexusAutomationPluginDependencyProjection {
+  return {
+    id: requiredNonEmptyString(projection.id, "plugin dependency projection id"),
+    source: requiredNonEmptyString(
+      projection.source,
+      "plugin dependency projection source",
+    ),
+    target: requiredNonEmptyString(
+      projection.target,
+      "plugin dependency projection target",
+    ),
+    required: projection.required === true,
+    sourceControl: normalizeDependencyProjectionSourceControl(
+      projection.sourceControl,
+      "plugin dependency projection sourceControl",
+    ),
+    reason:
+      optionalNullableString(
+        projection.reason,
+        "plugin dependency projection reason",
+      ) ?? null,
+    sourceMetadata: normalizePluginDependencyProjectionSourceMetadata(
+      projection.sourceMetadata,
+    ),
+  };
+}
+
+function normalizeDependencyProjectionSourceControl(
+  value: NexusWorkerContextDependencyProjectionSourceControl,
+  name: string,
+): NexusWorkerContextDependencyProjectionSourceControl {
+  if (value === "support" || value === "source") {
+    return value;
+  }
+
+  throw new NexusAutomationWorktreeSetupError(`${name} must be support or source`);
+}
+
+function normalizePluginDependencyProjectionSourceMetadata(
+  sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata,
+): NexusWorkerContextDependencyProjectionSourceMetadata {
+  return {
+    pluginId: requiredNonEmptyString(
+      sourceMetadata.pluginId,
+      "plugin dependency projection sourceMetadata.pluginId",
+    ),
+    pluginName:
+      optionalNullableString(
+        sourceMetadata.pluginName,
+        "plugin dependency projection sourceMetadata.pluginName",
+      ) ?? null,
+    version:
+      optionalNullableString(
+        sourceMetadata.version,
+        "plugin dependency projection sourceMetadata.version",
+      ) ?? null,
+    capabilityId: requiredNonEmptyString(
+      sourceMetadata.capabilityId,
+      "plugin dependency projection sourceMetadata.capabilityId",
+    ),
+  };
+}
+
+function dependencyProjectionResult(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourcePath: string;
+  targetPath: string;
+  status: NexusWorkerContextDependencyProjectionStatus;
+  message: string;
+}): NexusAutomationWorktreeDependencyProjectionResult {
+  return {
+    id: options.projection.id,
+    source: options.projection.source,
+    target: options.projection.target,
+    sourcePath: options.sourcePath,
+    targetPath: options.targetPath,
+    required: options.projection.required,
+    sourceControl: options.projection.sourceControl,
+    reason: options.projection.reason,
+    status: options.status,
+    message: options.message,
+    sourceMetadata: options.projection.sourceMetadata,
+  };
+}
+
 function materializeDependencyLink(options: {
   link: NexusAutomationDependencyLinkConfig;
   sourceRoot: string;
@@ -868,6 +1140,20 @@ function assertWorktreePathInsideRoot(
       `worktreePath must resolve inside worktreesRoot: ${resolvedWorktreePath}`,
     );
   }
+}
+
+function optionalNullableString(
+  value: unknown,
+  name: string,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+
+  return requiredNonEmptyString(value, name);
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {
