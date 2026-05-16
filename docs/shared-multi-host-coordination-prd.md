@@ -25,6 +25,11 @@ state durable, shared, and easy for agents to consume.
   whenever possible.
 - Support Mac and Windows as peers without choosing one permanent integration
   machine.
+- Coordinate with external humans and agents through existing provider systems,
+  such as GitHub Issues, GitHub pull requests, GitLab issues, GitLab merge
+  requests, Jira issues, and review comments.
+- Turn approval waits, feedback waits, and design questions into durable
+  provider-backed coordination records.
 - Keep transport replaceable: Git remotes and the shared work tracker are the
   durable state; Tailscale can expose a private DevNexus coordination MCP for
   faster direct access.
@@ -33,7 +38,9 @@ state durable, shared, and easy for agents to consume.
 
 - No mandatory hard work locks or exclusive leases in the first version.
 - No freeform chat as the primary source of truth.
+- No provider-specific workflow vocabulary in the generic agent-facing API.
 - No automatic semantic conflict resolution.
+- No automatic approval, review dismissal, or merge based only on a comment.
 - No live Pharo image, PLexus, Docker, or host process work as part of this
   generic coordination feature.
 - No shared absolute source paths, tool binary paths, runtime ports, secrets,
@@ -47,10 +54,13 @@ state durable, shared, and easy for agents to consume.
 - An integration agent that must merge branches from either host using the
   current shared vision instead of stale local context.
 - A human reviewing the current multi-host state.
+- An external reviewer responding in a GitHub pull request, GitLab merge
+  request, Jira issue, or similar provider.
+- A third-party agent participating through a provider issue or review thread.
 
 ## Dumb API
 
-The DevNexus MCP and CLI should expose three high-level operations. Required
+The DevNexus MCP and CLI should expose four high-level operations. Required
 arguments should be minimal; the tool should infer the rest from the current
 project, worktree, Git branch, shared tracker, and target state.
 
@@ -115,6 +125,33 @@ Automation:
 - Create an integration work item or integration branch only when configured
   policy allows mutation.
 
+### `coordination_request`
+
+Asks for external feedback, records waits, and later summarizes responses.
+
+Inputs:
+
+- Required intent: `approval`, `feedback`, `choice`, or `review`.
+- Optional question or short note.
+- Optional target: work item, branch, pull request, merge request, issue, or
+  reviewer identity.
+
+Automation:
+
+- Infer current component, work item, branch, commits, changed areas, and
+  relevant provider object.
+- Choose the configured provider channel for the target: issue comment, pull
+  request review comment, merge request note, Jira comment, or a DevNexus
+  coordination record.
+- Draft or post the smallest provider-native question with context, options,
+  branch links, verification evidence, and explicit response expectations.
+- Mark the local work item, target cycle, or coordination record as waiting for
+  external input when policy allows.
+- Poll or read provider responses, summarize decisions, unresolved questions,
+  approvals, requested changes, and stale waits.
+- Convert provider-specific states into neutral statuses: `waiting`,
+  `answered`, `approved`, `changes_requested`, `timed_out`, or `blocked`.
+
 ## Shared Data Model
 
 Coordination records should be tracker-backed and portable. A record should be
@@ -132,6 +169,8 @@ Fields:
 - Verification commands and outcomes.
 - Related branches or work items.
 - Integration preference, when known.
+- External request intent and provider target, when present.
+- Waiting status, responder identity, response summary, and requested changes.
 - Created and updated timestamps.
 
 Freshness is advisory. A stale record means "check before trusting" rather than
@@ -142,6 +181,8 @@ Freshness is advisory. A stale record means "check before trusting" rather than
 - Git remotes hold source branches and integration branches.
 - The shared work tracker holds work intent, handoffs, decisions, and
   integration records.
+- Provider-native issue, pull request, merge request, review, or Jira threads
+  hold external feedback where those systems are the right audience.
 - The portable DevNexus project repo holds logical project configuration,
   plugin declarations, shared plans, and policy defaults.
 - Host-local DevNexus overlays hold absolute paths, local command paths,
@@ -162,6 +203,12 @@ Freshness is advisory. A stale record means "check before trusting" rather than
   merge order, and the work-item decisions that explain why.
 - As a human, I can inspect one shared work item and understand current work
   across both machines.
+- As a coordinator agent, I can ask a reviewer for approval on a design choice
+  without manually composing a long provider comment.
+- As a worker agent, I can see that an item is waiting on a GitHub pull request
+  review or Jira answer and avoid inventing a decision locally.
+- As an integration agent, I can summarize external feedback and requested
+  changes before merging.
 
 ## Implementation Decisions
 
@@ -175,6 +222,12 @@ Freshness is advisory. A stale record means "check before trusting" rather than
   before integration mutation exists.
 - Integration mutation should be gated by project policy and should start with
   integration plans before automatic merges.
+- External coordination should reuse provider-native discussion surfaces
+  instead of creating a separate chat system.
+- The generic API should use neutral request intents and statuses while provider
+  adapters handle GitHub, GitLab, Jira, or other wording.
+- Agents may draft external requests without posting when provider mutation is
+  not approved.
 
 ## Testing Decisions
 
@@ -186,6 +239,9 @@ Freshness is advisory. A stale record means "check before trusting" rather than
 - Unit-test integration planning against synthetic branches with clean merges,
   textual conflicts, and diverging decisions.
 - Add CLI and MCP coverage for the three high-level operations.
+- Add CLI and MCP coverage for external request draft/post/read/summarize
+  behavior with mocked providers.
+- Test neutral status mapping from GitHub/GitLab/Jira-style responses.
 - Avoid live network, Tailscale, or external tracker dependencies in core tests;
   use provider mocks.
 
@@ -198,3 +254,7 @@ Freshness is advisory. A stale record means "check before trusting" rather than
 - How should host identity be named when multiple agents run on one host?
 - Should integration planning create a tracker item automatically when
   conflicts are detected, or only suggest one?
+- Which provider actions can be performed automatically, and which should be
+  draft-only until a human approves?
+- How should DevNexus represent silence or stale external waits without
+  repeatedly pinging people?

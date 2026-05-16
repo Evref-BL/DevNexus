@@ -31,9 +31,19 @@ Immediate direction:
 - Dependent non-eligible shared coordination work:
   - `dev-nexus:local-15` add shared coordination integration planning after
     status and handoff records exist.
+- External coordination extension:
+  - Add `coordination_request` so agents can ask external humans or agents for
+    approval, feedback, choices, or review through provider-native issue,
+    pull-request, merge-request, Jira, or review threads.
+  - `dev-nexus:local-17` tracks the provider-neutral API and mocked provider
+    implementation.
+  - `dev-nexus:local-18` tracks the human decision for which live provider
+    posting actions are allowed versus draft-only.
 - Human-in-the-loop shared coordination decision:
   - `dev-nexus:local-16` choose the real shared tracker/provider and Tailscale
     transport role for Mac/Windows dogfood.
+  - `dev-nexus:local-18` choose external coordination posting policy before
+    live GitHub/GitLab/Jira comments or review requests are automated.
 - Blocked plugin/live verification work:
   - `pharo-nexus:local-5` verify that subagents receive direct Pharo MCP access
     through PharoNexus-provided scoped PLexus setup.
@@ -76,9 +86,15 @@ Shared coordination planning:
 - Added `docs/shared-multi-host-coordination-prd.md` to define the feature.
 - The planned coordination API is intentionally small:
   `coordination_status`, `coordination_handoff`, and
-  `coordination_integrate`.
+  `coordination_integrate`; external coordination extends it with
+  `coordination_request`.
 - Git worktrees and branches remain the parallelism mechanism. Coordination
   records are shared intent and handoff facts, not hard locks.
+- External approval, feedback, review, and choice questions should be posted to
+  provider-native systems when configured, then summarized back into neutral
+  DevNexus coordination records.
+- Live external provider posting remains policy-gated; the first implementation
+  should support draft/mocked flows without credentials.
 - Durable multi-host state should live in Git remotes and the shared work
   tracker. Tailscale can provide private MCP transport, but should not be the
   only source of truth.

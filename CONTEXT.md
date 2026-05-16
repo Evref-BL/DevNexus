@@ -33,9 +33,14 @@ older control-project handoff.
   structured handoffs, pushed branches, and integration records. Avoid hard
   locks by default; keep Git worktrees useful for parallel work.
 - The planned shared coordination API is intentionally small:
-  `coordination_status`, `coordination_handoff`, and `coordination_integrate`.
-  DevNexus should automate host/worktree/branch detection, handoff facts,
-  conflict forecasting, and integration planning behind those simple calls.
+  `coordination_status`, `coordination_handoff`, `coordination_integrate`, and
+  `coordination_request`. DevNexus should automate host/worktree/branch
+  detection, handoff facts, conflict forecasting, integration planning, and
+  external approval/feedback requests behind those simple calls.
+- External coordination should use provider-native systems such as GitHub
+  Issues, GitHub pull requests, GitLab issues or merge requests, Jira issues,
+  and review comments while mapping their states into neutral DevNexus
+  coordination records.
 - Work items are local per component for immediate dogfooding. They can later
   move to GitHub Issues, GitHub Projects, Jira, GitLab Issues, or Vibe Kanban
   once those providers can list and update neutral work items well enough for
