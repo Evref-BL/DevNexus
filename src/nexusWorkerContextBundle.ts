@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { NexusSkillSourceControl } from "./nexusSkills.js";
 import type {
   WorkStatus,
   WorkTrackingProviderName,
@@ -44,6 +45,25 @@ export interface NexusWorkerProjectContextReferences {
   files: NexusWorkerContextFileReference[];
 }
 
+export interface NexusWorkerContextSkillReference {
+  id: string;
+  sourceSkillRoot: string;
+  projectedSkillRoot: string;
+  skillPath: string | null;
+}
+
+export interface NexusWorkerContextAgentSkillProjection {
+  agent: string;
+  skillsDirectory: string;
+  sourceControl: NexusSkillSourceControl;
+  skills: NexusWorkerContextSkillReference[];
+}
+
+export interface NexusWorkerContextSkills {
+  projectManagedRoot: string;
+  agentNativeProjections: NexusWorkerContextAgentSkillProjection[];
+}
+
 export interface NexusWorkerContextBundleWorkItem {
   id: string;
   title: string | null;
@@ -71,6 +91,7 @@ export interface NexusWorkerContextBundle {
     id: string;
     sourceRoot: string;
   };
+  skills: NexusWorkerContextSkills;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   projectContext: NexusWorkerProjectContextReferences;
@@ -89,6 +110,7 @@ export interface NexusWorkerContextBundleOptions {
   baseRef: string | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
   targetStatePath?: string | null;
+  skills?: NexusWorkerContextSkills;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -104,6 +126,8 @@ export const nexusWorkerContextJsonFileName = "context.json";
 export const nexusWorkerBriefingFileName = "briefing.md";
 export const defaultNexusWorkerTargetStatePath =
   ".dev-nexus/automation/target-state.md";
+export const defaultNexusWorkerProjectManagedSkillsPath =
+  ".dev-nexus/skills";
 
 export class NexusWorkerContextBundleError extends Error {
   constructor(message: string) {
@@ -164,6 +188,7 @@ export function buildNexusWorkerContextBundle(
     projectRoot,
     targetStatePath: options.targetStatePath,
   });
+  const skills = normalizeWorkerContextSkills(projectRoot, options.skills);
   const worktree = {
     componentId,
     sourceRoot,
@@ -186,6 +211,7 @@ export function buildNexusWorkerContextBundle(
       id: componentId,
       sourceRoot,
     },
+    skills,
     ownership: worktree,
     worktree,
     projectContext,
@@ -237,6 +263,10 @@ export function renderNexusWorkerBriefing(
     `- CONTEXT.md: ${context.projectContext.contextPath}`,
     `- PLAN.md: ${context.projectContext.planPath}`,
     `- target-state: ${context.projectContext.targetStatePath}`,
+    "",
+    "Skills:",
+    `Project-managed skills: ${context.skills.projectManagedRoot}`,
+    ...renderSkillProjectionLines(context.skills),
     "",
   ].join("\n");
 }
@@ -295,6 +325,79 @@ function projectContextReferences(options: {
     targetStatePath,
     files,
   };
+}
+
+function normalizeWorkerContextSkills(
+  projectRoot: string,
+  skills: NexusWorkerContextSkills | undefined,
+): NexusWorkerContextSkills {
+  const projectManagedRoot = skills?.projectManagedRoot
+    ? normalizedAbsolutePath(skills.projectManagedRoot, "skills.projectManagedRoot")
+    : path.join(projectRoot, defaultNexusWorkerProjectManagedSkillsPath);
+
+  return {
+    projectManagedRoot,
+    agentNativeProjections: (skills?.agentNativeProjections ?? []).map(
+      (projection, projectionIndex) => ({
+        agent: requiredNonEmptyString(
+          projection.agent,
+          `skills.agentNativeProjections[${projectionIndex}].agent`,
+        ),
+        skillsDirectory: normalizedAbsolutePath(
+          projection.skillsDirectory,
+          `skills.agentNativeProjections[${projectionIndex}].skillsDirectory`,
+        ),
+        sourceControl: normalizeSkillSourceControl(
+          projection.sourceControl,
+          `skills.agentNativeProjections[${projectionIndex}].sourceControl`,
+        ),
+        skills: projection.skills.map((skill, skillIndex) => ({
+          id: requiredNonEmptyString(
+            skill.id,
+            `skills.agentNativeProjections[${projectionIndex}].skills[${skillIndex}].id`,
+          ),
+          sourceSkillRoot: normalizedAbsolutePath(
+            skill.sourceSkillRoot,
+            `skills.agentNativeProjections[${projectionIndex}].skills[${skillIndex}].sourceSkillRoot`,
+          ),
+          projectedSkillRoot: normalizedAbsolutePath(
+            skill.projectedSkillRoot,
+            `skills.agentNativeProjections[${projectionIndex}].skills[${skillIndex}].projectedSkillRoot`,
+          ),
+          skillPath:
+            skill.skillPath === null
+              ? null
+              : normalizedAbsolutePath(
+                  skill.skillPath,
+                  `skills.agentNativeProjections[${projectionIndex}].skills[${skillIndex}].skillPath`,
+                ),
+        })),
+      }),
+    ),
+  };
+}
+
+function normalizeSkillSourceControl(
+  value: NexusSkillSourceControl,
+  name: string,
+): NexusSkillSourceControl {
+  if (value === "support" || value === "source") {
+    return value;
+  }
+
+  throw new NexusWorkerContextBundleError(`${name} must be support or source`);
+}
+
+function renderSkillProjectionLines(
+  skills: NexusWorkerContextSkills,
+): string[] {
+  if (skills.agentNativeProjections.length === 0) {
+    return ["- agent-native projections: none"];
+  }
+
+  return skills.agentNativeProjections.map(
+    (projection) => `- ${projection.agent} skills: ${projection.skillsDirectory}`,
+  );
 }
 
 function normalizeWorkerContextWorkItem(

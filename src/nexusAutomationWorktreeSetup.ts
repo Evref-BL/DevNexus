@@ -12,8 +12,21 @@ import type {
 import {
   materializeNexusWorkerContextBundle,
   type MaterializeNexusWorkerContextBundleResult,
+  type NexusWorkerContextAgentSkillProjection,
+  type NexusWorkerContextSkillReference,
   type NexusWorkerContextBundleWorktree,
 } from "./nexusWorkerContextBundle.js";
+import {
+  nexusSkillManifestFileName,
+  nexusSkillMarkdownFileName,
+  nexusSkillsDirectoryName,
+  nexusSkillSupportDirectoryName,
+  type NexusProjectSkillAgentTarget,
+  type NexusProjectSkillsConfig,
+  type NexusSkillManifest,
+  type NexusSkillMaterializationMode,
+  type NexusSkillSourceControl,
+} from "./nexusSkills.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -36,8 +49,36 @@ export interface NexusAutomationWorktreeSetupLinkResult {
   message: string;
 }
 
+export type NexusAutomationWorktreeSkillProjectionStatus =
+  | "missing"
+  | "stale"
+  | "present";
+
+export interface NexusAutomationWorktreeSkillProjectionSkillResult {
+  id: string;
+  name: string;
+  version: string;
+  materialization: NexusSkillMaterializationMode;
+  sourceSkillRoot: string;
+  projectedSkillRoot: string;
+  skillPath: string | null;
+  beforeStatus: NexusAutomationWorktreeSkillProjectionStatus;
+  afterStatus: NexusAutomationWorktreeSkillProjectionStatus;
+  refreshed: boolean;
+  reasons: string[];
+}
+
+export interface NexusAutomationWorktreeSkillProjectionResult {
+  agent: string;
+  projectManagedSkillsRoot: string;
+  skillsDirectory: string;
+  sourceControl: NexusSkillSourceControl;
+  skills: NexusAutomationWorktreeSkillProjectionSkillResult[];
+}
+
 export interface NexusAutomationWorktreeSetupResult {
   links: NexusAutomationWorktreeSetupLinkResult[];
+  skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
   context?: MaterializeNexusWorkerContextBundleResult;
 }
 
@@ -56,6 +97,7 @@ export interface NexusAutomationWorktreeSetupOptions {
   worktreesRoot?: string;
   worktreePath: string;
   automationConfig: NexusAutomationConfig;
+  skillsConfig?: NexusProjectSkillsConfig;
   context?: NexusAutomationWorktreeSetupContextInput;
   gitRunner?: GitRunner;
   platform?: NodeJS.Platform;
@@ -136,6 +178,15 @@ export function materializeNexusAutomationWorktreeSetup(
       platform,
     }),
   );
+  const skillProjections = options.context
+    ? materializeWorkerSkillProjections({
+        projectRoot: options.context.project.root,
+        worktreePath,
+        skillsConfig: options.skillsConfig,
+        gitRunner,
+        platform,
+      })
+    : [];
   const context = options.context
     ? materializeWorkerContext({
         context: options.context,
@@ -144,11 +195,13 @@ export function materializeNexusAutomationWorktreeSetup(
         worktreesRoot: options.worktreesRoot,
         worktreePath,
         gitRunner,
+        skillProjections,
       })
     : undefined;
 
   return {
     links,
+    skillProjections,
     ...(context ? { context } : {}),
   };
 }
@@ -160,6 +213,7 @@ function materializeWorkerContext(options: {
   worktreesRoot?: string;
   worktreePath: string;
   gitRunner: GitRunner;
+  skillProjections: NexusAutomationWorktreeSkillProjectionResult[];
 }): MaterializeNexusWorkerContextBundleResult {
   const projectRoot = path.resolve(
     requiredNonEmptyString(options.context.project.root, "context.project.root"),
@@ -213,6 +267,10 @@ function materializeWorkerContext(options: {
     workItem: ownership.workItem,
     targetStatePath:
       options.context.targetStatePath ?? options.automationConfig.target.statePath,
+    skills: workerContextSkillsFromProjections(
+      projectRoot,
+      options.skillProjections,
+    ),
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,
@@ -222,6 +280,407 @@ function materializeWorkerContext(options: {
   });
 
   return result;
+}
+
+interface ProjectManagedSkillEntry {
+  id: string;
+  manifest: NexusSkillManifest;
+  skillRoot: string;
+}
+
+function materializeWorkerSkillProjections(options: {
+  projectRoot: string;
+  worktreePath: string;
+  skillsConfig?: NexusProjectSkillsConfig;
+  gitRunner: GitRunner;
+  platform: NodeJS.Platform;
+}): NexusAutomationWorktreeSkillProjectionResult[] {
+  const enabledTargets = (options.skillsConfig?.agentTargets ?? []).filter(
+    (target) => target.enabled !== false,
+  );
+  if (enabledTargets.length === 0) {
+    return [];
+  }
+
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const worktreePath = path.resolve(
+    requiredNonEmptyString(options.worktreePath, "worktreePath"),
+  );
+  const projectManagedSkillsRoot = path.join(
+    projectRoot,
+    nexusSkillSupportDirectoryName,
+    nexusSkillsDirectoryName,
+  );
+  if (!fs.existsSync(projectManagedSkillsRoot)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `Project-managed skills root does not exist: ${projectManagedSkillsRoot}`,
+    );
+  }
+
+  const installedSkills = readProjectManagedSkills(projectManagedSkillsRoot);
+  const selectedSkillIds = selectedProjectSkillIds(
+    installedSkills.map((skill) => skill.id),
+    options.skillsConfig,
+  );
+  const installedById = new Map(
+    installedSkills.map((skill) => [skill.id, skill] as const),
+  );
+
+  return enabledTargets.map((target) => {
+    const skillsDirectory = resolveWorkerAgentSkillsDirectory(
+      worktreePath,
+      target,
+    );
+    const sourceControl =
+      target.sourceControl ?? options.skillsConfig?.sourceControl ?? "support";
+    const skills = selectedSkillIds
+      .map((skillId) => installedById.get(skillId))
+      .filter((skill): skill is ProjectManagedSkillEntry => Boolean(skill))
+      .filter((skill) => skill.manifest.supportedAgents.includes(target.agent))
+      .map((skill) =>
+        materializeProjectedWorkerSkill({
+          skill,
+          skillsDirectory,
+          platform: options.platform,
+        }),
+      );
+
+    if (sourceControl === "support" && skills.length > 0) {
+      addGitInfoExclude({
+        worktreePath,
+        targetPath: skillsDirectory,
+        isDirectory: true,
+        gitRunner: options.gitRunner,
+      });
+    }
+
+    return {
+      agent: target.agent,
+      projectManagedSkillsRoot,
+      skillsDirectory,
+      sourceControl,
+      skills,
+    };
+  });
+}
+
+function workerContextSkillsFromProjections(
+  projectRoot: string,
+  skillProjections: NexusAutomationWorktreeSkillProjectionResult[],
+): {
+  projectManagedRoot: string;
+  agentNativeProjections: NexusWorkerContextAgentSkillProjection[];
+} {
+  const projectManagedRoot =
+    skillProjections[0]?.projectManagedSkillsRoot ??
+    path.join(
+      projectRoot,
+      nexusSkillSupportDirectoryName,
+      nexusSkillsDirectoryName,
+    );
+
+  return {
+    projectManagedRoot,
+    agentNativeProjections: skillProjections.map((projection) => ({
+      agent: projection.agent,
+      skillsDirectory: projection.skillsDirectory,
+      sourceControl: projection.sourceControl,
+      skills: projection.skills.map(
+        (skill): NexusWorkerContextSkillReference => ({
+          id: skill.id,
+          sourceSkillRoot: skill.sourceSkillRoot,
+          projectedSkillRoot: skill.projectedSkillRoot,
+          skillPath: skill.skillPath,
+        }),
+      ),
+    })),
+  };
+}
+
+function readProjectManagedSkills(
+  projectManagedSkillsRoot: string,
+): ProjectManagedSkillEntry[] {
+  return fs
+    .readdirSync(projectManagedSkillsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) =>
+      readProjectManagedSkill(
+        path.join(projectManagedSkillsRoot, entry.name),
+      ),
+    )
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function readProjectManagedSkill(skillRoot: string): ProjectManagedSkillEntry {
+  const manifestPath = path.join(skillRoot, nexusSkillManifestFileName);
+  if (!fs.existsSync(manifestPath)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `Project-managed skill manifest is missing: ${manifestPath}`,
+    );
+  }
+
+  const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  if (!isNexusSkillManifest(parsed)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `Project-managed skill manifest is invalid: ${manifestPath}`,
+    );
+  }
+
+  return {
+    id: parsed.id,
+    manifest: parsed,
+    skillRoot,
+  };
+}
+
+function selectedProjectSkillIds(
+  installedSkillIds: string[],
+  skillsConfig: NexusProjectSkillsConfig | undefined,
+): string[] {
+  const selected =
+    skillsConfig?.defaultCorePack === false ? new Set<string>() : new Set(installedSkillIds);
+  const order =
+    skillsConfig?.defaultCorePack === false ? [] : [...installedSkillIds].sort();
+
+  for (const item of skillsConfig?.items ?? []) {
+    if (item.enabled === false) {
+      selected.delete(item.id);
+      continue;
+    }
+
+    if (!selected.has(item.id)) {
+      order.push(item.id);
+    }
+    selected.add(item.id);
+  }
+
+  return order.filter((skillId) => selected.has(skillId));
+}
+
+function materializeProjectedWorkerSkill(options: {
+  skill: ProjectManagedSkillEntry;
+  skillsDirectory: string;
+  platform: NodeJS.Platform;
+}): NexusAutomationWorktreeSkillProjectionSkillResult {
+  const projectedSkillRoot = path.join(
+    options.skillsDirectory,
+    options.skill.manifest.id,
+  );
+  const skillPath =
+    options.skill.manifest.materialization === "reference"
+      ? null
+      : path.join(projectedSkillRoot, nexusSkillMarkdownFileName);
+  const before = inspectProjectedWorkerSkill({
+    skill: options.skill,
+    projectedSkillRoot,
+  });
+
+  if (before.status !== "present") {
+    refreshProjectedWorkerSkill({
+      sourceSkillRoot: options.skill.skillRoot,
+      projectedSkillRoot,
+      materialization: options.skill.manifest.materialization,
+      platform: options.platform,
+    });
+  }
+
+  const after = inspectProjectedWorkerSkill({
+    skill: options.skill,
+    projectedSkillRoot,
+  });
+
+  return {
+    id: options.skill.manifest.id,
+    name: options.skill.manifest.name,
+    version: options.skill.manifest.version,
+    materialization: options.skill.manifest.materialization,
+    sourceSkillRoot: options.skill.skillRoot,
+    projectedSkillRoot,
+    skillPath,
+    beforeStatus: before.status,
+    afterStatus: after.status,
+    refreshed: before.status !== "present",
+    reasons: before.reasons,
+  };
+}
+
+function inspectProjectedWorkerSkill(options: {
+  skill: ProjectManagedSkillEntry;
+  projectedSkillRoot: string;
+}): {
+  status: NexusAutomationWorktreeSkillProjectionStatus;
+  reasons: string[];
+} {
+  if (!fs.existsSync(options.projectedSkillRoot)) {
+    return {
+      status: "missing",
+      reasons: ["projected skill is missing"],
+    };
+  }
+
+  const reasons: string[] = [];
+  if (options.skill.manifest.materialization === "symlink") {
+    const stat = fs.lstatSync(options.projectedSkillRoot);
+    if (!stat.isSymbolicLink()) {
+      reasons.push("projected skill root is not a symlink");
+    } else {
+      const actual = fs.realpathSync(options.projectedSkillRoot);
+      const expected = fs.realpathSync(options.skill.skillRoot);
+      if (actual !== expected) {
+        reasons.push("projected skill symlink points at a different source");
+      }
+    }
+  } else if (options.skill.manifest.materialization === "copy") {
+    const sourceFiles = relativeSkillFiles(options.skill.skillRoot, false);
+    const targetFiles = relativeSkillFiles(options.projectedSkillRoot, true);
+    const expectedFiles = new Set(sourceFiles);
+    for (const filePath of sourceFiles) {
+      const sourcePath = path.join(options.skill.skillRoot, filePath);
+      const targetPath = path.join(options.projectedSkillRoot, filePath);
+      if (!fs.existsSync(targetPath)) {
+        reasons.push(`projected skill file is missing: ${filePath}`);
+        continue;
+      }
+      if (fs.readFileSync(targetPath, "utf8") !== fs.readFileSync(sourcePath, "utf8")) {
+        reasons.push(`projected skill file differs: ${filePath}`);
+      }
+    }
+    for (const filePath of targetFiles) {
+      if (!expectedFiles.has(filePath)) {
+        reasons.push(`projected skill has an unexpected file: ${filePath}`);
+      }
+    }
+  }
+
+  return {
+    status: reasons.length > 0 ? "stale" : "present",
+    reasons,
+  };
+}
+
+function refreshProjectedWorkerSkill(options: {
+  sourceSkillRoot: string;
+  projectedSkillRoot: string;
+  materialization: NexusSkillMaterializationMode;
+  platform: NodeJS.Platform;
+}): void {
+  fs.rmSync(options.projectedSkillRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(options.projectedSkillRoot), { recursive: true });
+  if (options.materialization === "symlink") {
+    fs.symlinkSync(
+      options.sourceSkillRoot,
+      options.projectedSkillRoot,
+      options.platform === "win32" ? "junction" : "dir",
+    );
+    return;
+  }
+
+  if (options.materialization === "reference") {
+    fs.mkdirSync(options.projectedSkillRoot, { recursive: true });
+    return;
+  }
+
+  copySkillProjectionFiles(options.sourceSkillRoot, options.projectedSkillRoot);
+}
+
+function copySkillProjectionFiles(sourceRoot: string, targetRoot: string): void {
+  for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
+    if (entry.name === nexusSkillManifestFileName) {
+      continue;
+    }
+
+    const sourcePath = path.join(sourceRoot, entry.name);
+    const targetPath = path.join(targetRoot, entry.name);
+    if (entry.isDirectory()) {
+      copySkillProjectionFiles(sourcePath, targetPath);
+      continue;
+    }
+
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
+function relativeSkillFiles(root: string, includeManifest: boolean): string[] {
+  if (!fs.existsSync(root)) {
+    return [];
+  }
+
+  const files: string[] = [];
+  collectRelativeSkillFiles(root, root, includeManifest, files);
+  return files.sort();
+}
+
+function collectRelativeSkillFiles(
+  root: string,
+  current: string,
+  includeManifest: boolean,
+  files: string[],
+): void {
+  for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+    const entryPath = path.join(current, entry.name);
+    const relative = path.relative(root, entryPath).split(path.sep).join("/");
+    if (entry.isDirectory()) {
+      collectRelativeSkillFiles(root, entryPath, includeManifest, files);
+      continue;
+    }
+    if (!includeManifest && relative === nexusSkillManifestFileName) {
+      continue;
+    }
+
+    files.push(relative);
+  }
+}
+
+function resolveWorkerAgentSkillsDirectory(
+  worktreePath: string,
+  target: NexusProjectSkillAgentTarget,
+): string {
+  const directory = target.directory ?? defaultWorkerAgentSkillsDirectory(target.agent);
+  if (!directory) {
+    throw new NexusAutomationWorktreeSetupError(
+      `Agent skill target ${target.agent} must define directory`,
+    );
+  }
+
+  return resolveInsideRoot(worktreePath, directory, "skills agent target directory");
+}
+
+function defaultWorkerAgentSkillsDirectory(agent: string): string | null {
+  if (agent === "codex") {
+    return path.join(".agents", "skills");
+  }
+  if (agent === "claude") {
+    return path.join(".claude", "skills");
+  }
+
+  return null;
+}
+
+function isNexusSkillManifest(value: unknown): value is NexusSkillManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.name === "string" &&
+    typeof record.description === "string" &&
+    typeof record.version === "string" &&
+    typeof record.license === "string" &&
+    record.source !== null &&
+    typeof record.source === "object" &&
+    !Array.isArray(record.source) &&
+    Array.isArray(record.supportedAgents) &&
+    record.supportedAgents.every((agent) => typeof agent === "string") &&
+    (record.materialization === "copy" ||
+      record.materialization === "symlink" ||
+      record.materialization === "reference") &&
+    (record.sourceControl === "support" || record.sourceControl === "source")
+  );
 }
 
 function materializeDependencyLink(options: {

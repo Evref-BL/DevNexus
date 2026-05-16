@@ -160,6 +160,78 @@ describe("nexus worker context bundle", () => {
     });
   });
 
+  it("records project-managed skills and worker-local agent projections", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
+    const worktreePath = path.join(worktreesRoot, "local-20");
+    const projectManagedRoot = path.join(projectRoot, ".dev-nexus", "skills");
+    const skillsDirectory = path.join(worktreePath, ".agents", "skills");
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-20-project-local-skills",
+      baseRef: "origin/main",
+      workItem: null,
+      skills: {
+        projectManagedRoot,
+        agentNativeProjections: [
+          {
+            agent: "codex",
+            skillsDirectory,
+            sourceControl: "support",
+            skills: [
+              {
+                id: "tdd",
+                sourceSkillRoot: path.join(projectManagedRoot, "tdd"),
+                projectedSkillRoot: path.join(skillsDirectory, "tdd"),
+                skillPath: path.join(skillsDirectory, "tdd", "SKILL.md"),
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(result.context.skills).toEqual({
+      projectManagedRoot,
+      agentNativeProjections: [
+        {
+          agent: "codex",
+          skillsDirectory,
+          sourceControl: "support",
+          skills: [
+            {
+              id: "tdd",
+              sourceSkillRoot: path.join(projectManagedRoot, "tdd"),
+              projectedSkillRoot: path.join(skillsDirectory, "tdd"),
+              skillPath: path.join(skillsDirectory, "tdd", "SKILL.md"),
+            },
+          ],
+        },
+      ],
+    });
+
+    const contextJson = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(worktreePath), "utf8"),
+    );
+    expect(contextJson.skills.projectManagedRoot).toBe(projectManagedRoot);
+    expect(contextJson.skills.agentNativeProjections[0]).toMatchObject({
+      agent: "codex",
+      skillsDirectory,
+      sourceControl: "support",
+    });
+    expect(fs.readFileSync(nexusWorkerBriefingPath(worktreePath), "utf8"))
+      .toContain(`Project-managed skills: ${projectManagedRoot}`);
+    expect(result.briefingMarkdown).toContain(
+      `- codex skills: ${skillsDirectory}`,
+    );
+  });
+
   it("rejects a worktree outside the component worktrees root", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const outsideWorktreePath = makeTempDir("dev-nexus-worker-outside-");

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
   materializeNexusAutomationWorktreeSetup,
+  materializeNexusProjectSkills,
   preflightNexusAutomationWorktreeSetup,
   type GitCommandResult,
   type GitRunner,
@@ -209,6 +210,170 @@ describe("nexus automation worktree setup", () => {
         cwd: worktreePath,
       },
     ]);
+  });
+
+  it("refreshes missing and stale worker skill projections from project-managed skills", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "codex-demo-project-local-20-run-1");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const selectedSkills = {
+      defaultCorePack: false,
+      items: [{ id: "tdd" }, { id: "handoff" }],
+    };
+    materializeNexusProjectSkills({
+      projectRoot,
+      skillsConfig: selectedSkills,
+      excludeFromGit: false,
+    });
+    const staleSkillPath = path.join(
+      worktreePath,
+      ".agents",
+      "skills",
+      "tdd",
+      "SKILL.md",
+    );
+    fs.mkdirSync(path.dirname(staleSkillPath), { recursive: true });
+    fs.writeFileSync(staleSkillPath, "# stale local projection\n", "utf8");
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const ownership = {
+      componentId: "primary",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/demo-project/local-20/run-1",
+      baseRef: "main",
+      workItem: {
+        id: "local-20",
+        title: "Project local skills into prepared worker contexts",
+      },
+    };
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      skillsConfig: {
+        ...selectedSkills,
+        agentTargets: [{ agent: "codex" }],
+      },
+      gitRunner: fakeGitRunner(gitCalls),
+      context: {
+        project: {
+          id: "demo-project",
+          name: "Demo Project",
+          root: projectRoot,
+        },
+        ownership,
+      },
+    });
+
+    expect(result.skillProjections).toHaveLength(1);
+    expect(result.skillProjections[0]).toMatchObject({
+      agent: "codex",
+      projectManagedSkillsRoot: path.join(projectRoot, ".dev-nexus", "skills"),
+      skillsDirectory: path.join(worktreePath, ".agents", "skills"),
+      sourceControl: "support",
+    });
+    expect(result.skillProjections[0].skills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "tdd",
+          beforeStatus: "stale",
+          afterStatus: "present",
+          refreshed: true,
+        }),
+        expect.objectContaining({
+          id: "handoff",
+          beforeStatus: "missing",
+          afterStatus: "present",
+          refreshed: true,
+        }),
+      ]),
+    );
+    expect(fs.readFileSync(staleSkillPath, "utf8")).toContain(
+      "Test-Driven Development (TDD)",
+    );
+    expect(
+      fs.readFileSync(
+        path.join(worktreePath, ".agents", "skills", "handoff", "SKILL.md"),
+        "utf8",
+      ),
+    ).toContain("Continuation workflow");
+    expect(
+      fs.existsSync(
+        path.join(
+          worktreePath,
+          ".agents",
+          "skills",
+          "tdd",
+          "dev-nexus.skill.json",
+        ),
+      ),
+    ).toBe(false);
+    expect(JSON.parse(fs.readFileSync(result.context!.contextJsonPath, "utf8")))
+      .toMatchObject({
+        skills: {
+          projectManagedRoot: path.join(projectRoot, ".dev-nexus", "skills"),
+          agentNativeProjections: [
+            {
+              agent: "codex",
+              skillsDirectory: path.join(worktreePath, ".agents", "skills"),
+              sourceControl: "support",
+              skills: [
+                {
+                  id: "tdd",
+                  sourceSkillRoot: path.join(projectRoot, ".dev-nexus", "skills", "tdd"),
+                  projectedSkillRoot: path.join(
+                    worktreePath,
+                    ".agents",
+                    "skills",
+                    "tdd",
+                  ),
+                  skillPath: staleSkillPath,
+                },
+                {
+                  id: "handoff",
+                  sourceSkillRoot: path.join(
+                    projectRoot,
+                    ".dev-nexus",
+                    "skills",
+                    "handoff",
+                  ),
+                  projectedSkillRoot: path.join(
+                    worktreePath,
+                    ".agents",
+                    "skills",
+                    "handoff",
+                  ),
+                  skillPath: path.join(
+                    worktreePath,
+                    ".agents",
+                    "skills",
+                    "handoff",
+                    "SKILL.md",
+                  ),
+                },
+              ],
+            },
+          ],
+        },
+      });
+    const excludeEntries = fs
+      .readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8")
+      .trim()
+      .split(/\r?\n/u);
+    expect(excludeEntries).toContain(".dev-nexus/context/");
+    expect(excludeEntries).toContain(".agents/skills/");
+    expect(fs.existsSync(path.join(sourceRoot, ".agents"))).toBe(false);
+    expect(fs.existsSync(path.join(sourceRoot, ".dev-nexus"))).toBe(false);
   });
 
   it("rejects setup for a worktree outside the component worktrees root", () => {

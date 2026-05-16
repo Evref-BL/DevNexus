@@ -595,6 +595,12 @@ directories:
 
 This keeps DevNexus responsible for curated, pinned skill material while the
 configured agents load skills from the locations they actually understand.
+
+Prepared component worktrees receive their own generated agent-native skill
+projection when `skills.agentTargets` is configured. DevNexus refreshes those
+worker-local paths, such as `.agents/skills/`, from the project-managed
+`.dev-nexus/skills` source and excludes them from the component worktree Git
+index by default.
 The default core pack includes:
 
 - `diagnose`

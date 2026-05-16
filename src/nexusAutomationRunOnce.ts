@@ -407,6 +407,7 @@ export async function runNexusAutomationOnce(
       worktreesRoot: primaryComponent.worktreesRoot,
       worktreePath: worktree.worktreePath,
       automationConfig,
+      skillsConfig: projectConfig.skills,
       context: {
         project: {
           id: projectConfig.id,
