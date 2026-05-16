@@ -5,6 +5,7 @@ export type NexusPluginCapabilityKind =
   | "environment_hint"
   | "cleanup_hook"
   | "agent_affordance"
+  | "dependency_projection"
   | "worker_context_fragment"
   | "worker_briefing_fragment";
 
@@ -16,6 +17,10 @@ export type NexusPluginCleanupHookTrigger =
   | "before_run"
   | "after_run"
   | "manual";
+
+export type NexusPluginDependencyProjectionSourceControl =
+  | "support"
+  | "source";
 
 export const nexusPluginWorkerFragmentTitleMaxLength = 160;
 export const nexusPluginWorkerFragmentBodyMaxLength = 4000;
@@ -75,6 +80,18 @@ export interface NexusPluginAgentAffordanceCapability
   description: string;
 }
 
+export interface NexusPluginDependencyProjectionCapability
+  extends NexusPluginCapabilityBase {
+  kind: "dependency_projection";
+  source: string;
+  target: string;
+  required?: boolean;
+  sourceControl?: NexusPluginDependencyProjectionSourceControl;
+  targetAgents?: string[];
+  targetComponents?: string[];
+  reason?: string;
+}
+
 export interface NexusPluginWorkerFragmentCapability
   extends NexusPluginCapabilityBase {
   kind: NexusPluginWorkerFragmentCapabilityKind;
@@ -92,6 +109,7 @@ export type NexusPluginCapabilityRecord =
   | NexusPluginEnvironmentHintCapability
   | NexusPluginCleanupHookCapability
   | NexusPluginAgentAffordanceCapability
+  | NexusPluginDependencyProjectionCapability
   | NexusPluginWorkerFragmentCapability;
 
 export interface NexusProjectPluginConfig {
@@ -149,6 +167,18 @@ export type NexusPluginCapabilityProjectionRecord =
       description: string;
     }
   | {
+      kind: "dependency_projection";
+      id: string;
+      description: string | null;
+      source: string;
+      target: string;
+      required: boolean;
+      sourceControl: NexusPluginDependencyProjectionSourceControl;
+      targetAgents: string[];
+      targetComponents: string[];
+      reason: string | null;
+    }
+  | {
       kind: NexusPluginWorkerFragmentCapabilityKind;
       id: string;
       description: string | null;
@@ -197,6 +227,32 @@ export interface ProjectPluginWorkerFragmentsOptions {
   agent?: string | null;
 }
 
+export interface NexusPluginDependencyProjectionSource {
+  pluginId: string;
+  pluginName: string | null;
+  version: string | null;
+  capabilityId: string;
+}
+
+export interface NexusPluginDependencyProjection {
+  kind: "dependency_projection";
+  id: string;
+  description: string | null;
+  source: string;
+  target: string;
+  required: boolean;
+  sourceControl: NexusPluginDependencyProjectionSourceControl;
+  targetAgents: string[];
+  targetComponents: string[];
+  reason: string | null;
+  pluginSource: NexusPluginDependencyProjectionSource;
+}
+
+export interface ProjectPluginDependencyProjectionsOptions {
+  componentId?: string | null;
+  agent?: string | null;
+}
+
 export function projectPluginCapabilityProjections(config: {
   plugins?: NexusProjectPluginsConfig;
 }): NexusPluginCapabilityProjection[] {
@@ -236,6 +292,23 @@ export function projectPluginWorkerFragments(
       (fragment) => fragment.kind === "worker_briefing_fragment",
     ),
   };
+}
+
+export function projectPluginDependencyProjections(
+  config: { plugins?: NexusProjectPluginsConfig },
+  options: ProjectPluginDependencyProjectionsOptions = {},
+): NexusPluginDependencyProjection[] {
+  return (config.plugins ?? [])
+    .filter((plugin) => plugin.enabled !== false)
+    .flatMap((plugin) =>
+      plugin.capabilities
+        .filter(isDependencyProjectionCapability)
+        .filter((capability) =>
+          dependencyProjectionMatchesScope(capability, options),
+        )
+        .map((capability) => projectDependencyProjection(plugin, capability)),
+    )
+    .sort(compareProjectedDependencyProjections);
 }
 
 function projectCapabilityRecord(
@@ -294,6 +367,21 @@ function projectCapabilityRecord(
     };
   }
 
+  if (isDependencyProjectionCapability(capability)) {
+    return {
+      kind: capability.kind,
+      id: capability.id,
+      description: capability.description ?? null,
+      source: capability.source,
+      target: capability.target,
+      required: capability.required ?? false,
+      sourceControl: capability.sourceControl ?? "support",
+      targetAgents: capability.targetAgents ?? [],
+      targetComponents: capability.targetComponents ?? [],
+      reason: capability.reason ?? null,
+    };
+  }
+
   if (isWorkerFragmentCapability(capability)) {
     return {
       kind: capability.kind,
@@ -312,6 +400,30 @@ function projectCapabilityRecord(
     kind: capability.kind,
     id: capability.id,
     description: capability.description,
+  };
+}
+
+function projectDependencyProjection(
+  plugin: NexusProjectPluginConfig,
+  capability: NexusPluginDependencyProjectionCapability,
+): NexusPluginDependencyProjection {
+  return {
+    kind: capability.kind,
+    id: capability.id,
+    description: capability.description ?? null,
+    source: capability.source,
+    target: capability.target,
+    required: capability.required ?? false,
+    sourceControl: capability.sourceControl ?? "support",
+    targetAgents: capability.targetAgents ?? [],
+    targetComponents: capability.targetComponents ?? [],
+    reason: capability.reason ?? null,
+    pluginSource: {
+      pluginId: plugin.id,
+      pluginName: plugin.name ?? null,
+      version: plugin.version ?? null,
+      capabilityId: capability.id,
+    },
   };
 }
 
@@ -337,12 +449,28 @@ function projectWorkerFragment(
   };
 }
 
+function isDependencyProjectionCapability(
+  capability: NexusPluginCapabilityRecord,
+): capability is NexusPluginDependencyProjectionCapability {
+  return capability.kind === "dependency_projection";
+}
+
 function isWorkerFragmentCapability(
   capability: NexusPluginCapabilityRecord,
 ): capability is NexusPluginWorkerFragmentCapability {
   return (
     capability.kind === "worker_context_fragment" ||
     capability.kind === "worker_briefing_fragment"
+  );
+}
+
+function dependencyProjectionMatchesScope(
+  capability: NexusPluginDependencyProjectionCapability,
+  options: ProjectPluginDependencyProjectionsOptions,
+): boolean {
+  return (
+    targetMatches(capability.targetComponents, options.componentId) &&
+    targetMatches(capability.targetAgents, options.agent)
   );
 }
 
@@ -365,6 +493,18 @@ function targetMatches(
   }
 
   return targets.includes(activeTarget);
+}
+
+function compareProjectedDependencyProjections(
+  left: NexusPluginDependencyProjection,
+  right: NexusPluginDependencyProjection,
+): number {
+  return (
+    compareStrings(left.pluginSource.pluginId, right.pluginSource.pluginId) ||
+    compareStrings(left.id, right.id) ||
+    compareStrings(left.source, right.source) ||
+    compareStrings(left.target, right.target)
+  );
 }
 
 function compareProjectedWorkerFragments(

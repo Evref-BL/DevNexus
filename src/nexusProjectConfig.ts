@@ -25,6 +25,7 @@ import {
   type NexusPluginCapabilityKind,
   type NexusPluginCapabilityRecord,
   type NexusPluginCleanupHookTrigger,
+  type NexusPluginDependencyProjectionSourceControl,
   type NexusPluginMcpToolCapability,
   type NexusProjectPluginConfig,
   type NexusProjectPluginsConfig,
@@ -215,6 +216,26 @@ function optionalString(
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new NexusConfigError(
       `${pathName}.${key} must be a non-empty string`,
+    );
+  }
+
+  return value;
+}
+
+function requiredProjectRelativePath(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string {
+  const value = requiredString(record, key, pathName).trim();
+  if (
+    value.split(/[\\/]/u).some((part) => part === "..") ||
+    /^[A-Za-z]:/u.test(value) ||
+    value.startsWith("/") ||
+    value.startsWith("\\")
+  ) {
+    throw new NexusConfigError(
+      `${pathName}.${key} must be a project-relative path`,
     );
   }
 
@@ -502,6 +523,7 @@ function validatePluginCapabilityKind(
     value === "environment_hint" ||
     value === "cleanup_hook" ||
     value === "agent_affordance" ||
+    value === "dependency_projection" ||
     value === "worker_context_fragment" ||
     value === "worker_briefing_fragment"
   ) {
@@ -509,7 +531,7 @@ function validatePluginCapabilityKind(
   }
 
   throw new NexusConfigError(
-    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, agent_affordance, worker_context_fragment, or worker_briefing_fragment`,
+    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, agent_affordance, dependency_projection, worker_context_fragment, or worker_briefing_fragment`,
   );
 }
 
@@ -528,6 +550,21 @@ function validatePluginCleanupHookTrigger(
   throw new NexusConfigError(
     `${pathName} must be before_run, after_run, or manual`,
   );
+}
+
+function validatePluginDependencyProjectionSourceControl(
+  value: unknown,
+  pathName: string,
+): NexusPluginDependencyProjectionSourceControl | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "support" || value === "source") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be support or source`);
 }
 
 function validatePluginMcpTools(
@@ -618,6 +655,33 @@ function validatePluginCapabilityRecord(
       description: requiredString(record, "description", pathName),
       ...(trigger !== undefined ? { trigger } : {}),
       required: optionalBoolean(record, "required", pathName) ?? false,
+    };
+  }
+
+  if (kind === "dependency_projection") {
+    const sourceControl = validatePluginDependencyProjectionSourceControl(
+      record.sourceControl,
+      `${pathName}.sourceControl`,
+    );
+    const targetAgents = optionalStringArray(record, "targetAgents", pathName);
+    const targetComponents = optionalStringArray(
+      record,
+      "targetComponents",
+      pathName,
+    );
+    const reason = optionalString(record, "reason", pathName);
+
+    return {
+      kind,
+      id,
+      ...(description !== undefined ? { description } : {}),
+      source: requiredProjectRelativePath(record, "source", pathName),
+      target: requiredProjectRelativePath(record, "target", pathName),
+      required: optionalBoolean(record, "required", pathName) ?? false,
+      sourceControl: sourceControl ?? "support",
+      ...(targetAgents !== undefined ? { targetAgents } : {}),
+      ...(targetComponents !== undefined ? { targetComponents } : {}),
+      ...(reason !== undefined ? { reason } : {}),
     };
   }
 
