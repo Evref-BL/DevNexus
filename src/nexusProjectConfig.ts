@@ -13,6 +13,7 @@ import type {
 } from "./workTrackingTypes.js";
 import type {
   NexusProjectSkillsConfig,
+  NexusProjectSkillAgentTarget,
   NexusProjectSkillSelection,
   NexusSkillMaterializationMode,
   NexusSkillSourceControl,
@@ -328,6 +329,30 @@ function validateProjectSkillSelection(
   };
 }
 
+function validateProjectSkillAgentTarget(
+  value: unknown,
+  index: number,
+): NexusProjectSkillAgentTarget {
+  const pathName = `project config.skills.agentTargets[${index}]`;
+  const record = assertRecord(value, pathName);
+  const enabled = record.enabled;
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    throw new NexusConfigError(`${pathName}.enabled must be a boolean`);
+  }
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+  const directory = optionalString(record, "directory", pathName);
+
+  return {
+    agent: requiredString(record, "agent", pathName),
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(directory !== undefined ? { directory } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+  };
+}
+
 function validateProjectSkillsConfig(
   value: unknown,
 ): NexusProjectSkillsConfig | undefined {
@@ -346,6 +371,12 @@ function validateProjectSkillsConfig(
   if (items !== undefined && !Array.isArray(items)) {
     throw new NexusConfigError("project config.skills.items must be an array");
   }
+  const agentTargets = record.agentTargets;
+  if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
+    throw new NexusConfigError(
+      "project config.skills.agentTargets must be an array",
+    );
+  }
   const materialization = validateSkillMaterialization(
     record.materialization,
     "project config.skills.materialization",
@@ -359,6 +390,13 @@ function validateProjectSkillsConfig(
     ...(defaultCorePack !== undefined ? { defaultCorePack } : {}),
     ...(materialization !== undefined ? { materialization } : {}),
     ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(agentTargets
+      ? {
+          agentTargets: agentTargets.map((target, index) =>
+            validateProjectSkillAgentTarget(target, index),
+          ),
+        }
+      : {}),
     ...(items
       ? {
           items: items.map((item, index) =>

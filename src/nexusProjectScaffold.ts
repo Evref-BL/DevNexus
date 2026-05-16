@@ -61,6 +61,7 @@ export function scaffoldNexusProject<ProjectConfig>(
       ? {
           skillsDirectory: "",
           installed: [],
+          agentTargets: [],
           gitExcludePath: null,
           gitExcludeEntries: [],
         }

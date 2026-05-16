@@ -8,6 +8,14 @@ export const nexusSkillMarkdownFileName = "SKILL.md";
 
 export type NexusSkillMaterializationMode = "copy" | "symlink" | "reference";
 export type NexusSkillSourceControl = "support" | "source";
+export type NexusSkillAgentId = string;
+
+export interface NexusProjectSkillAgentTarget {
+  agent: NexusSkillAgentId;
+  enabled?: boolean;
+  directory?: string;
+  sourceControl?: NexusSkillSourceControl;
+}
 
 export interface NexusSkillSource {
   type: "curated" | "git" | "url" | "local";
@@ -46,6 +54,7 @@ export interface NexusProjectSkillsConfig {
   defaultCorePack?: boolean;
   materialization?: NexusSkillMaterializationMode;
   sourceControl?: NexusSkillSourceControl;
+  agentTargets?: NexusProjectSkillAgentTarget[];
   items?: NexusProjectSkillSelection[];
 }
 
@@ -67,9 +76,26 @@ export interface MaterializedNexusSkill {
   skillPath: string | null;
 }
 
+export interface MaterializedNexusAgentSkill {
+  id: string;
+  name: string;
+  version: string;
+  materialization: NexusSkillMaterializationMode;
+  skillRoot: string;
+  skillPath: string | null;
+}
+
+export interface MaterializedNexusAgentSkillTarget {
+  agent: NexusSkillAgentId;
+  skillsDirectory: string;
+  sourceControl: NexusSkillSourceControl;
+  installed: MaterializedNexusAgentSkill[];
+}
+
 export interface MaterializeNexusProjectSkillsResult {
   skillsDirectory: string;
   installed: MaterializedNexusSkill[];
+  agentTargets: MaterializedNexusAgentSkillTarget[];
   gitExcludePath: string | null;
   gitExcludeEntries: string[];
 }
@@ -163,7 +189,7 @@ function curatedCoreSkill(
         type: "curated",
         uri: "dev-nexus:core",
       },
-      supportedAgents: ["codex"],
+      supportedAgents: ["codex", "claude"],
       materialization: "copy",
       sourceControl: "support",
     },
@@ -487,6 +513,44 @@ function writeJsonFile(filePath: string, value: unknown): void {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function writeSkillFiles(
+  skillRoot: string,
+  definition: NexusSkillDefinition,
+  manifest: NexusSkillManifest,
+): string | null {
+  fs.mkdirSync(skillRoot, { recursive: true });
+  if (manifest.materialization === "reference") {
+    return null;
+  }
+
+  if (manifest.materialization === "symlink") {
+    if (!definition.sourcePath) {
+      throw new NexusSkillError(
+        `Skill ${manifest.id} cannot be symlinked without a sourcePath`,
+      );
+    }
+    const target = path.join(skillRoot, nexusSkillMarkdownFileName);
+    if (!fs.existsSync(target)) {
+      fs.symlinkSync(definition.sourcePath, target);
+    }
+
+    return target;
+  }
+
+  let skillPath: string | null = null;
+  for (const [filePath, content] of Object.entries(definition.files)) {
+    assertRelativeFilePath(filePath);
+    const targetPath = path.join(skillRoot, filePath);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, content, "utf8");
+    if (filePath === nexusSkillMarkdownFileName) {
+      skillPath = targetPath;
+    }
+  }
+
+  return skillPath;
+}
+
 function materializeSkill(
   projectRoot: string,
   definition: NexusSkillDefinition,
@@ -501,53 +565,7 @@ function materializeSkill(
   const manifestPath = path.join(skillRoot, nexusSkillManifestFileName);
   fs.mkdirSync(skillRoot, { recursive: true });
   writeJsonFile(manifestPath, manifest);
-
-  if (manifest.materialization === "reference") {
-    return {
-      id: manifest.id,
-      name: manifest.name,
-      version: manifest.version,
-      materialization: manifest.materialization,
-      sourceControl: manifest.sourceControl,
-      skillRoot,
-      manifestPath,
-      skillPath: null,
-    };
-  }
-
-  if (manifest.materialization === "symlink") {
-    if (!definition.sourcePath) {
-      throw new NexusSkillError(
-        `Skill ${manifest.id} cannot be symlinked without a sourcePath`,
-      );
-    }
-    const target = path.join(skillRoot, nexusSkillMarkdownFileName);
-    if (!fs.existsSync(target)) {
-      fs.symlinkSync(definition.sourcePath, target);
-    }
-
-    return {
-      id: manifest.id,
-      name: manifest.name,
-      version: manifest.version,
-      materialization: manifest.materialization,
-      sourceControl: manifest.sourceControl,
-      skillRoot,
-      manifestPath,
-      skillPath: target,
-    };
-  }
-
-  let skillPath: string | null = null;
-  for (const [filePath, content] of Object.entries(definition.files)) {
-    assertRelativeFilePath(filePath);
-    const targetPath = path.join(skillRoot, filePath);
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, content, "utf8");
-    if (filePath === nexusSkillMarkdownFileName) {
-      skillPath = targetPath;
-    }
-  }
+  const skillPath = writeSkillFiles(skillRoot, definition, manifest);
 
   return {
     id: manifest.id,
@@ -557,6 +575,23 @@ function materializeSkill(
     sourceControl: manifest.sourceControl,
     skillRoot,
     manifestPath,
+    skillPath,
+  };
+}
+
+function materializeAgentSkill(
+  skillRoot: string,
+  definition: NexusSkillDefinition,
+  manifest: NexusSkillManifest,
+): MaterializedNexusAgentSkill {
+  const skillPath = writeSkillFiles(skillRoot, definition, manifest);
+
+  return {
+    id: manifest.id,
+    name: manifest.name,
+    version: manifest.version,
+    materialization: manifest.materialization,
+    skillRoot,
     skillPath,
   };
 }
@@ -609,6 +644,46 @@ function projectSkillsDirectory(projectRoot: string): string {
     nexusSkillSupportDirectoryName,
     nexusSkillsDirectoryName,
   );
+}
+
+function defaultAgentSkillsDirectory(agent: string): string | null {
+  if (agent === "codex") {
+    return path.join(".agents", "skills");
+  }
+  if (agent === "claude") {
+    return path.join(".claude", "skills");
+  }
+
+  return null;
+}
+
+function resolveAgentSkillsDirectory(
+  projectRoot: string,
+  target: NexusProjectSkillAgentTarget,
+): string {
+  const directory = target.directory ?? defaultAgentSkillsDirectory(target.agent);
+  if (!directory) {
+    throw new NexusSkillError(
+      `Agent skill target ${target.agent} must define directory`,
+    );
+  }
+  if (
+    path.isAbsolute(directory) ||
+    directory.split(/[\\/]/u).some((part) => part === "..")
+  ) {
+    throw new NexusSkillError(
+      `Agent skill target directory must be project-relative: ${directory}`,
+    );
+  }
+
+  return path.join(projectRoot, directory);
+}
+
+function gitExcludeEntryForDirectory(
+  projectRoot: string,
+  directory: string,
+): string {
+  return `${path.relative(projectRoot, directory).replace(/\\/gu, "/")}/`;
 }
 
 function expectedSkillEntries(
@@ -901,23 +976,51 @@ export function materializeNexusProjectSkills(
   options: MaterializeNexusProjectSkillsOptions,
 ): MaterializeNexusProjectSkillsResult {
   const skillsDirectory = projectSkillsDirectory(options.projectRoot);
-  const selected = selectedSkillDefinitions(
+  const expected = expectedSkillEntries(
     options.skillsConfig,
     options.skillDefinitions ?? [],
   );
-  const installed = selected.map((definition) => {
-    const selection = selectionForSkill(options.skillsConfig, definition.manifest.id);
-    return materializeSkill(
-      options.projectRoot,
-      definition,
-      manifestWithOverrides(definition.manifest, selection, options.skillsConfig),
-    );
-  });
+  const installed = expected.map(({ definition, manifest }) =>
+    materializeSkill(options.projectRoot, definition, manifest),
+  );
+  const agentTargets = (options.skillsConfig?.agentTargets ?? [])
+    .filter((target) => target.enabled !== false)
+    .map((target) => {
+      const targetSkillsDirectory = resolveAgentSkillsDirectory(
+        options.projectRoot,
+        target,
+      );
+      const targetSourceControl =
+        target.sourceControl ?? options.skillsConfig?.sourceControl ?? "support";
+      const targetInstalled = expected
+        .filter(({ manifest }) => manifest.supportedAgents.includes(target.agent))
+        .map(({ definition, manifest }) =>
+          materializeAgentSkill(
+            path.join(targetSkillsDirectory, manifest.id),
+            definition,
+            manifest,
+          ),
+        );
+
+      return {
+        agent: target.agent,
+        skillsDirectory: targetSkillsDirectory,
+        sourceControl: targetSourceControl,
+        installed: targetInstalled,
+      };
+    });
   const supportEntries = installed.some(
     (skill) => skill.sourceControl === "support",
   )
     ? [`${nexusSkillSupportDirectoryName}/${nexusSkillsDirectoryName}/`]
     : [];
+  for (const target of agentTargets) {
+    if (target.sourceControl === "support" && target.installed.length > 0) {
+      supportEntries.push(
+        gitExcludeEntryForDirectory(options.projectRoot, target.skillsDirectory),
+      );
+    }
+  }
   const gitExclude =
     options.excludeFromGit === false
       ? { gitExcludePath: null, gitExcludeEntries: [] }
@@ -926,6 +1029,7 @@ export function materializeNexusProjectSkills(
   return {
     skillsDirectory,
     installed,
+    agentTargets,
     gitExcludePath: gitExclude.gitExcludePath,
     gitExcludeEntries: gitExclude.gitExcludeEntries,
   };

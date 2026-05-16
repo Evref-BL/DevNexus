@@ -111,8 +111,18 @@ smokes and supervised runners.
 
 ## Curated Skills
 
-DevNexus materializes reviewed support skills under the managed project support
-directory. The default core pack includes:
+DevNexus keeps reviewed skill definitions under its managed project support
+directory, `.dev-nexus/skills`, as DevNexus-owned state. That directory is not
+the agent-facing install location. Projects can also configure
+`skills.agentTargets` so DevNexus projects selected skills into agent-native
+directories:
+
+- `codex` -> `.agents/skills/<skill-id>/SKILL.md`
+- `claude` -> `.claude/skills/<skill-id>/SKILL.md`
+
+This keeps DevNexus responsible for curated, pinned skill material while the
+configured agents load skills from the locations they actually understand.
+The default core pack includes:
 
 - `diagnose`
 - `tdd` for Test-Driven Development (TDD)

@@ -61,6 +61,74 @@ describe("nexus skills", () => {
     });
   });
 
+  it("projects selected skills into configured agent-native directories", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    fs.mkdirSync(path.join(projectRoot, ".git", "info"), { recursive: true });
+
+    const result = materializeNexusProjectSkills({
+      projectRoot,
+      skillsConfig: {
+        defaultCorePack: false,
+        sourceControl: "support",
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+          { agent: "other", directory: ".other-agent/skills", enabled: false },
+        ],
+        items: [{ id: "grill-with-docs" }],
+      },
+    });
+
+    expect(result.installed.map((skill) => skill.id)).toEqual([
+      "grill-with-docs",
+    ]);
+    expect(result.agentTargets).toHaveLength(2);
+    expect(result.agentTargets.map((target) => target.agent)).toEqual([
+      "codex",
+      "claude",
+    ]);
+    expect(result.gitExcludeEntries).toEqual([
+      ".dev-nexus/skills/",
+      ".agents/skills/",
+      ".claude/skills/",
+    ]);
+    expect(
+      fs.readFileSync(
+        path.join(
+          projectRoot,
+          ".agents",
+          "skills",
+          "grill-with-docs",
+          "SKILL.md",
+        ),
+        "utf8",
+      ),
+    ).toContain("name: grill-with-docs");
+    expect(
+      fs.readFileSync(
+        path.join(
+          projectRoot,
+          ".claude",
+          "skills",
+          "grill-with-docs",
+          "SKILL.md",
+        ),
+        "utf8",
+      ),
+    ).toContain("Architecture Decision Records (ADRs)");
+    expect(
+      fs.existsSync(
+        path.join(
+          projectRoot,
+          ".agents",
+          "skills",
+          "grill-with-docs",
+          nexusSkillManifestFileName,
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it("includes planning and documentation skills with expanded acronyms", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
@@ -106,6 +174,9 @@ describe("nexus skills", () => {
     expect(skillMarkdown["to-prd"]).toContain(
       "Product Requirements Document (PRD)",
     );
+    for (const skill of defaultCoreSkillPack) {
+      expect(skill.manifest.supportedAgents).toEqual(["codex", "claude"]);
+    }
   });
 
   it("lets projects disable defaults and select extension skills", () => {

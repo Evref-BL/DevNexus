@@ -66,6 +66,16 @@ describe("project config", () => {
       skills: {
         materialization: "copy" as const,
         sourceControl: "support" as const,
+        agentTargets: [
+          {
+            agent: "codex",
+          },
+          {
+            agent: "claude",
+            directory: ".claude/skills",
+            sourceControl: "source" as const,
+          },
+        ],
         items: [
           {
             id: "diagnose",
@@ -371,6 +381,41 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.skills\.materialization/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-skill-agent-targets",
+        name: "Invalid Skill Agent Targets",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        skills: {
+          agentTargets: "codex",
+        },
+      }),
+    ).toThrow(/project config\.skills\.agentTargets must be an array/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-skill-agent-target",
+        name: "Invalid Skill Agent Target",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        skills: {
+          agentTargets: [
+            {
+              agent: "codex",
+              sourceControl: "shared",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/project config\.skills\.agentTargets\[0\]\.sourceControl/);
 
     expect(() =>
       validateProjectConfig({
