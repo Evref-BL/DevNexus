@@ -37,6 +37,10 @@ import {
   type NexusAutomationTargetCycleWorkItemInput,
 } from "./nexusAutomationTargetCycle.js";
 import {
+  buildNexusAutomationTargetReport,
+  type NexusAutomationTargetReport,
+} from "./nexusAutomationTargetReport.js";
+import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
@@ -260,6 +264,11 @@ interface ParsedAutomationTargetCycleRecordCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationTargetReportCommand {
+  projectRoot: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -296,6 +305,7 @@ export function usage(): string {
     "  dev-nexus automation enqueue <project-root> --title <title> [options]",
     "  dev-nexus automation target-cycle list <project-root> [options]",
     "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
+    "  dev-nexus automation target-report <project-root> [options]",
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
     "",
@@ -410,6 +420,9 @@ export function usage(): string {
     "  --work-item <component-id:id>  repeatable",
     "  --blocker <text>              repeatable",
     "  --note <text>                 repeatable",
+    "  --json",
+    "",
+    "Options for automation target-report:",
     "  --json",
     "",
     "Options for automation run-once:",
@@ -766,6 +779,20 @@ async function handleAutomationCommand(
     return handleAutomationTargetCycleCommand(argv, dependencies);
   }
 
+  if (argv[1] === "target-report") {
+    const parsed = parseAutomationTargetReportCommand(argv);
+    const result = buildNexusAutomationTargetReport({
+      projectRoot: parsed.projectRoot,
+      now: dependencies.now?.(),
+    });
+    printAutomationTargetReportResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
     const commandOptions = resolveAutomationCommandCliOptions(
@@ -810,7 +837,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, enqueue, target-cycle, run-once, or schedule",
+      "automation requires status, enqueue, target-cycle, target-report, run-once, or schedule",
     );
   }
 
@@ -1785,6 +1812,28 @@ function parseAutomationTargetCycleRecordCommand(
   return parsed as ParsedAutomationTargetCycleRecordCommand;
 }
 
+function parseAutomationTargetReportCommand(
+  argv: string[],
+): ParsedAutomationTargetReportCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation target-report requires a project root");
+  }
+
+  const parsed: ParsedAutomationTargetReportCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation target-report option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationRunOnceCommand(
   argv: string[],
 ): ParsedAutomationRunOnceCommand {
@@ -2234,6 +2283,40 @@ function printAutomationTargetCycleRecordResult(
   writeLine(stdout, `  Cycle: ${result.record.id}`);
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Cycles recorded: ${result.ledger.cycles.length}`);
+}
+
+function printAutomationTargetReportResult(
+  result: NexusAutomationTargetReport,
+  parsed: ParsedAutomationTargetReportCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, report: result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus target report: ${result.status}.`);
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(stdout, `  Reason: ${result.statusReason}`);
+  if (result.target?.objective) {
+    writeLine(stdout, `  Objective: ${result.target.objective}`);
+  }
+  if (result.cycleSummary) {
+    writeLine(stdout, `  Target cycles: ${result.cycleSummary.cycleCount}`);
+  }
+  if (result.runSummary) {
+    writeLine(stdout, `  Automation runs: ${result.runSummary.runCount}`);
+  }
+  if (result.workItemSummary) {
+    writeLine(
+      stdout,
+      `  Work item refs: ${result.workItemSummary.uniqueReferences.length}`,
+    );
+  }
+  if (result.blockers.length > 0) {
+    writeLine(stdout, `  Blockers: ${result.blockers.length}`);
+  }
 }
 
 function printAutomationScheduleResult(

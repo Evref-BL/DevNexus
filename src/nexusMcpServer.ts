@@ -34,6 +34,9 @@ import {
   type NexusAutomationTargetCycleWorkItemInput,
 } from "./nexusAutomationTargetCycle.js";
 import {
+  buildNexusAutomationTargetReport,
+} from "./nexusAutomationTargetReport.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
@@ -145,6 +148,19 @@ const tools: McpTool[] = [
         notes: { type: "array", items: { type: "string" } },
       },
       required: ["status"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "target_report",
+    description: "Build a factual DevNexus target report from recorded target, cycle, run, and work-item facts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
       additionalProperties: false,
     },
   },
@@ -311,6 +327,14 @@ export async function callDevNexusMcpTool(
         return toolResult({
           ok: true,
           ...appendTargetCycleFromArgs(args, context),
+        });
+      case "target_report":
+        return toolResult({
+          ok: true,
+          report: buildNexusAutomationTargetReport({
+            projectRoot: projectRootFromArgs(args),
+            now: context.now?.(),
+          }),
         });
       case "work_item_create":
         return toolResult({

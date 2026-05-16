@@ -72,8 +72,9 @@ intentionally covers the core self-use loop: read project status, read
 automation readiness and target context, and create/list/get/update/comment
 work items through the configured work tracker. It can also record
 caller-reported target cycle facts so the next launch can reason from durable
-state instead of chat memory. It does not choose work or launch subagents
-itself; those decisions remain with the human or launched coordinator agent.
+state instead of chat memory, then build a factual target report from those
+records. It does not choose work or launch subagents itself; those decisions
+remain with the human or launched coordinator agent.
 
 The native MCP tools are:
 
@@ -82,6 +83,7 @@ project_status
 automation_status
 target_cycle_list
 target_cycle_record
+target_report
 work_item_create
 work_item_list
 work_item_get
@@ -260,6 +262,13 @@ dispatched work item refs, blockers, notes, and summary, but it still does not
 decide which work should be selected. `automation status` reads the same
 ledger and exposes cycle counts plus the latest cycle.
 
+`target_report` and `automation target-report` build read-only factual JSON
+from the target context, target cycle ledger, automation run ledger, recorded
+work item refs, blockers, and notes. The report status is derived from the
+latest recorded target cycle when present, otherwise the latest automation run.
+It is intended for final user reporting and relaunch decisions by a human or
+coordinator agent; it does not query trackers or infer hidden work state.
+
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That
 selected-work path is interim. New automation work should prefer
@@ -287,6 +296,7 @@ dev-nexus automation status <project-root>
 dev-nexus automation enqueue <project-root> --title "Implement task"
 dev-nexus automation target-cycle record <project-root> --status dispatched --work-item primary:local-1
 dev-nexus automation target-cycle list <project-root>
+dev-nexus automation target-report <project-root> --json
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```

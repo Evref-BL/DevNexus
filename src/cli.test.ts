@@ -181,6 +181,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
+    expect(output.output()).toContain("dev-nexus automation target-report");
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
   });
@@ -767,6 +768,77 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(JSON.parse(listOutput.output()).ledger.cycles).toHaveLength(1);
+  });
+
+  it("builds target reports through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        mode: "agent_launch",
+        target: {
+          ...projectConfig().automation!.target,
+          id: "dogfood",
+          objective: "Use the project until no eligible work remains.",
+        },
+      },
+    });
+    const recordOutput = captureOutput();
+    const reportOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "target-cycle",
+        "record",
+        projectRoot,
+        "--cycle-id",
+        "cycle-1",
+        "--status",
+        "completed",
+        "--summary",
+        "Target completed.",
+        "--work-item",
+        "primary:local-1",
+        "--json",
+      ],
+      {
+        stdout: recordOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(["automation", "target-report", projectRoot, "--json"], {
+      stdout: reportOutput.writer,
+      now: fixedClock("2026-05-16T10:05:00.000Z"),
+    });
+
+    expect(JSON.parse(reportOutput.output())).toMatchObject({
+      ok: true,
+      report: {
+        status: "completed",
+        statusReason: "Latest target cycle cycle-1 is completed",
+        project: {
+          id: "demo-project",
+        },
+        target: {
+          id: "dogfood",
+        },
+        cycleSummary: {
+          cycleCount: 1,
+          completedCycleCount: 1,
+        },
+        workItemSummary: {
+          uniqueReferences: [
+            {
+              componentId: "primary",
+              id: "local-1",
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("enqueues work items that match the automation selector", async () => {

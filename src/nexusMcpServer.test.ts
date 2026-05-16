@@ -93,6 +93,7 @@ describe("DevNexus MCP server", () => {
       "automation_status",
       "target_cycle_list",
       "target_cycle_record",
+      "target_report",
       "work_item_create",
       "work_item_list",
       "work_item_get",
@@ -264,6 +265,59 @@ describe("DevNexus MCP server", () => {
       },
     });
     expect(listed.ledger.cycles).toHaveLength(1);
+  });
+
+  it("builds target reports through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    await callDevNexusMcpTool(
+      "target_cycle_record",
+      {
+        projectRoot,
+        cycleId: "cycle-1",
+        status: "completed",
+        summary: "Target completed.",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "completed",
+          },
+        ],
+      },
+      { now: fixedClock("2026-05-16T10:00:00.000Z") },
+    );
+    const report = toolJson(
+      await callDevNexusMcpTool(
+        "target_report",
+        {
+          projectRoot,
+        },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+
+    expect(report).toMatchObject({
+      ok: true,
+      report: {
+        status: "completed",
+        statusReason: "Latest target cycle cycle-1 is completed",
+        project: {
+          id: "mcp-demo",
+        },
+        workItemSummary: {
+          uniqueReferences: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              latestCycleStatus: "completed",
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("targets component-scoped work items through MCP tool arguments", async () => {
