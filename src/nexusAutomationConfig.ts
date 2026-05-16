@@ -71,11 +71,14 @@ export interface NexusAutomationAgentProfileConfig {
   executor: string;
   model: string | null;
   reasoning: string | null;
+  command: string | null;
+  args: string[];
 }
 
 export interface NexusAutomationAgentConfig {
   command: string | null;
   timeoutMs: number | null;
+  coordinatorProfileId: string | null;
   maxConcurrentSubagents: number;
   profiles: NexusAutomationAgentProfileConfig[];
   relaunch: NexusAutomationAgentRelaunchConfig;
@@ -166,6 +169,7 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   agent: {
     command: null,
     timeoutMs: null,
+    coordinatorProfileId: null,
     maxConcurrentSubagents: 1,
     profiles: [],
     relaunch: {
@@ -464,16 +468,37 @@ function validateAgentConfig(
 
   const pathName = "project config.automation.agent";
   const record = assertRecord(value, pathName);
+  const coordinatorProfileId = optionalNullableStringField(
+    record,
+    "coordinatorProfileId",
+    pathName,
+  );
+  const profiles = optionalArrayField(
+    record,
+    "profiles",
+    pathName,
+    validateAgentProfileConfig,
+  );
+  if (profiles.profiles) {
+    assertUniqueAgentProfileIds(profiles.profiles, `${pathName}.profiles`);
+  }
+  if (coordinatorProfileId.coordinatorProfileId) {
+    const profile = profiles.profiles?.find(
+      (item) => item.id === coordinatorProfileId.coordinatorProfileId,
+    );
+    if (!profile) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.coordinatorProfileId must reference a configured agent profile`,
+      );
+    }
+  }
+
   return {
     ...optionalNullableStringField(record, "command", pathName),
     ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
+    ...coordinatorProfileId,
     ...optionalPositiveIntegerField(record, "maxConcurrentSubagents", pathName),
-    ...optionalArrayField(
-      record,
-      "profiles",
-      pathName,
-      validateAgentProfileConfig,
-    ),
+    ...profiles,
     ...validateAgentRelaunchConfig(record.relaunch),
   };
 }
@@ -490,7 +515,24 @@ function validateAgentProfileConfig(
     model: optionalNullableString(record.model, `${pathName}.model`) ?? null,
     reasoning:
       optionalNullableString(record.reasoning, `${pathName}.reasoning`) ?? null,
+    command: optionalNullableString(record.command, `${pathName}.command`) ?? null,
+    args: optionalStringArray(record.args, `${pathName}.args`) ?? [],
   };
+}
+
+function assertUniqueAgentProfileIds(
+  profiles: NexusAutomationAgentProfileConfig[],
+  pathName: string,
+): void {
+  const ids = new Set<string>();
+  for (const profile of profiles) {
+    if (ids.has(profile.id)) {
+      throw new NexusAutomationConfigError(
+        `${pathName} contains duplicate id: ${profile.id}`,
+      );
+    }
+    ids.add(profile.id);
+  }
 }
 
 function validateAgentRelaunchConfig(
@@ -743,6 +785,22 @@ function optionalArrayField<Key extends string, Item>(
       normalizeItem(item, `${pathName}.${key}[${index}]`),
     ),
   } as Record<Key, Item[]>;
+}
+
+function optionalStringArray(
+  value: unknown,
+  pathName: string,
+): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusAutomationConfigError(`${pathName} must be an array`);
+  }
+
+  return value.map((item, index) =>
+    requiredNonEmptyString(item, `${pathName}[${index}]`),
+  );
 }
 
 function optionalSafetyProfileField<Key extends string>(

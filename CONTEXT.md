@@ -18,7 +18,7 @@
 - Target cycle ledger: DevNexus-managed JSON records of target cycle facts, including selected or dispatched work item refs, summaries, blockers, notes, and terminal or still-active cycle status.
 - Target report: A read-only factual JSON synthesis over target context, target cycles, run records, recorded work item refs, blockers, and notes. A report must not invent tracker state or choose the next work.
 - Launched agent: The thinking process started by DevNexus that chooses work items, supervises subagents, coordinates worktrees, verifies changes, and reports results.
-- Agent profile: A named executor/model/reasoning configuration that a launched agent can use when selecting subagents.
+- Agent profile: A named executor/model/reasoning configuration that may also include a launch command template. A coordinator profile starts the launched agent; other profiles are policy hints the launched agent can assign to subagents.
 - Subagent cap: The maximum number of subagents the launched agent should run concurrently for one DevNexus automation cycle.
 
 ## Avoided Aliases

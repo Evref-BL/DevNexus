@@ -127,7 +127,18 @@ describe("nexus automation status", () => {
           mode: "agent_launch",
           agent: {
             ...projectConfig().automation!.agent,
+            coordinatorProfileId: "codex-deep",
             maxConcurrentSubagents: 2,
+            profiles: [
+              {
+                id: "codex-deep",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "xhigh",
+                command: "codex",
+                args: ["exec"],
+              },
+            ],
           },
           target: {
             ...projectConfig().automation!.target,
@@ -169,6 +180,7 @@ describe("nexus automation status", () => {
         stateMarkdown: "Current target state.\n",
       },
       agent: {
+        coordinatorProfileId: "codex-deep",
         maxConcurrentSubagents: 2,
       },
       selectedWorkItem: null,

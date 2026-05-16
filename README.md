@@ -229,8 +229,8 @@ implementation through verification and publication.
 
 `automation.mode: "agent_launch"` uses the launch-only boundary. DevNexus
 checks the selector as an eligibility gate, writes an agent context file under
-the project `.dev-nexus/automation` state directory, starts
-`automation.agent.command`, and records the result reported by the agent. The
+the project `.dev-nexus/automation` state directory, starts the configured
+agent command, and records the result reported by the agent. The
 agent receives `DEV_NEXUS_AGENT_CONTEXT_FILE` and
 `DEV_NEXUS_AGENT_RESULT_FILE`; it can write status, summary, commits,
 verification records, publication decisions, blockers, and notes to the result
@@ -252,6 +252,12 @@ decisions, blockers, and near-term risks, and drop stale detail as the target
 evolves. `automation.agent.maxConcurrentSubagents` caps parallel subagent
 work, and `automation.agent.profiles` names the executor/model/reasoning
 profiles that a launched agent may assign to subagents.
+`automation.agent.coordinatorProfileId` may name one of those profiles as the
+coordinator launch profile. A profile can carry `command` and `args`; DevNexus
+uses that executable template when no raw `automation.agent.command` or CLI
+`--command` override is provided. The profile still describes infrastructure:
+the launched coordinator remains responsible for reading the context, choosing
+work, assigning subagent profiles, and reporting facts back to DevNexus.
 
 `automation.target.cycleLedgerPath` stores the target cycle ledger, defaulting
 to `.dev-nexus/automation/target-cycles.json`. A launched coordinator agent
@@ -303,9 +309,11 @@ dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-sc
 
 Projects can also store the shell command under `automation.agent.command` for
 agent-launch mode or `automation.executor.command` for the older generated
-worktree executor mode. `automation run-once` and `automation schedule` may
-omit `--command` when the relevant command is configured. Command-line options
-still override the configured command and timeout.
+worktree executor mode. For agent-launch mode, projects may instead set
+`automation.agent.coordinatorProfileId` to a profile with `command` and
+`args`. `automation run-once` and `automation schedule` may omit `--command`
+when the relevant command source is configured. Command-line options still
+override the configured command and timeout.
 
 Manual `work-item` commands accept `--component <component-id>` for
 component-owned work-item services. Omitting it targets the primary component

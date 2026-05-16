@@ -380,6 +380,7 @@ describe("project config", () => {
       agent: {
         command: null,
         timeoutMs: null,
+        coordinatorProfileId: null,
         maxConcurrentSubagents: 1,
         profiles: [],
         relaunch: {
@@ -423,7 +424,7 @@ describe("project config", () => {
         automation: {
           mode: "agent_launch",
           agent: {
-            command: "codex run",
+            coordinatorProfileId: "codex-heavy",
             timeoutMs: 600000,
             maxConcurrentSubagents: 4,
             profiles: [
@@ -432,6 +433,14 @@ describe("project config", () => {
                 executor: "codex",
                 model: "gpt-5.5",
                 reasoning: "xhigh",
+                command: "codex",
+                args: [
+                  "exec",
+                  "--model",
+                  "gpt-5.5",
+                  "--reasoning-effort",
+                  "xhigh",
+                ],
               },
             ],
             relaunch: {
@@ -450,7 +459,8 @@ describe("project config", () => {
     ).toMatchObject({
       mode: "agent_launch",
       agent: {
-        command: "codex run",
+        command: null,
+        coordinatorProfileId: "codex-heavy",
         timeoutMs: 600000,
         maxConcurrentSubagents: 4,
         profiles: [
@@ -459,6 +469,14 @@ describe("project config", () => {
             executor: "codex",
             model: "gpt-5.5",
             reasoning: "xhigh",
+            command: "codex",
+            args: [
+              "exec",
+              "--model",
+              "gpt-5.5",
+              "--reasoning-effort",
+              "xhigh",
+            ],
           },
         ],
         relaunch: {
@@ -676,6 +694,29 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.agent\.maxConcurrentSubagents/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-agent-profile",
+        name: "Invalid Agent Profile",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          agent: {
+            coordinatorProfileId: "missing",
+            profiles: [
+              {
+                id: "codex",
+                executor: "codex",
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/coordinatorProfileId/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

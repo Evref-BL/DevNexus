@@ -101,6 +101,7 @@ export interface NexusAutomationAgentLaunchContext {
   };
   target: NexusAutomationTargetContext;
   agent: {
+    coordinatorProfileId: string | null;
     maxConcurrentSubagents: number;
     profiles: NexusAutomationConfig["agent"]["profiles"];
   };
@@ -776,6 +777,7 @@ function buildAgentLaunchContext(
       config: input.automationConfig,
     }),
     agent: {
+      coordinatorProfileId: input.automationConfig.agent.coordinatorProfileId,
       maxConcurrentSubagents: input.automationConfig.agent.maxConcurrentSubagents,
       profiles: input.automationConfig.agent.profiles,
     },
@@ -862,6 +864,8 @@ function agentLaunchEnvironment(
       projectRoot: input.projectRoot,
       config: input.automationConfig,
     }).cycleLedgerPath,
+    DEV_NEXUS_COORDINATOR_PROFILE_ID:
+      input.automationConfig.agent.coordinatorProfileId ?? "",
     DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS:
       input.automationConfig.agent.maxConcurrentSubagents.toString(),
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_COUNT: input.eligibleWorkItems.length.toString(),

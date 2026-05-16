@@ -1196,6 +1196,92 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("runs agent launch automation through a coordinator profile command", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          ...config.automation!.agent,
+          command: null,
+          timeoutMs: 8765,
+          coordinatorProfileId: "codex-deep",
+          profiles: [
+            {
+              id: "codex-deep",
+              executor: "codex",
+              model: "gpt-5.5",
+              reasoning: "xhigh",
+              command: "codex",
+              args: [
+                "exec",
+                "--model",
+                "gpt-5.5",
+                "--reasoning-effort",
+                "xhigh",
+                "Use DEV_NEXUS_AGENT_CONTEXT_FILE.",
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Profile-launched task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+    const commandRuns: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commandRuns.push(command);
+      expect(options.timeoutMs).toBe(8765);
+      expect(options.env.DEV_NEXUS_COORDINATOR_PROFILE_ID).toBe("codex-deep");
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator profile launched",
+        })}\n`,
+        "utf8",
+      );
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(["automation", "run-once", projectRoot, "--json"], {
+      stdout: output.writer,
+      commandRunner,
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+    });
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "completed",
+      summary: "Coordinator profile launched",
+    });
+    expect(commandRuns).toEqual([
+      'codex exec --model gpt-5.5 --reasoning-effort xhigh "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
+    ]);
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

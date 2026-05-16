@@ -96,6 +96,7 @@ export interface NexusAutomationStatus {
   target: NexusAutomationTargetContext | null;
   targetCycles: NexusAutomationTargetCycleSummary | null;
   agent: {
+    coordinatorProfileId: string | null;
     maxConcurrentSubagents: number;
     profiles: NexusAutomationConfig["agent"]["profiles"];
   } | null;
@@ -600,6 +601,8 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     result.agent ??
     (result.automationConfig
       ? {
+          coordinatorProfileId:
+            result.automationConfig.agent.coordinatorProfileId,
           maxConcurrentSubagents:
             result.automationConfig.agent.maxConcurrentSubagents,
           profiles: result.automationConfig.agent.profiles,

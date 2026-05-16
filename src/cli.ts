@@ -13,6 +13,9 @@ import {
   type RunNexusAutomationAgentLaunchOnceResult,
 } from "./nexusAutomationAgentLaunch.js";
 import {
+  resolveNexusAutomationAgentCommand,
+} from "./nexusAutomationAgentProfile.js";
+import {
   enqueueNexusAutomationWorkItem,
   type EnqueueNexusAutomationWorkItemResult,
 } from "./nexusAutomationEnqueue.js";
@@ -426,7 +429,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation run-once:",
-    "  --command <command>        shell command to run; overrides automation.executor.command or automation.agent.command",
+    "  --command <command>        shell command to run; overrides automation.executor.command, automation.agent.command, or coordinator profile command",
     "  --run-id <id>",
     "  --owner <name>",
     "  --branch <name>",
@@ -437,7 +440,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation schedule:",
-    "  --command <command>        shell command to run; overrides automation.executor.command or automation.agent.command",
+    "  --command <command>        shell command to run; overrides automation.executor.command, automation.agent.command, or coordinator profile command",
     "  --owner <name>",
     "  --base-ref <ref>",
     "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
@@ -961,15 +964,22 @@ function resolveAutomationCommandCliOptions(
 } {
   const config = loadProjectConfig(path.resolve(parsed.projectRoot));
   const mode = config.automation?.mode ?? "run_once";
+  const automationConfig = config.automation;
   const configuredCommand =
     mode === "agent_launch"
-      ? config.automation?.agent.command
-      : config.automation?.executor.command;
+      ? automationConfig
+        ? resolveNexusAutomationAgentCommand({
+            automationConfig,
+            overrideCommand: parsed.command,
+            commandName,
+          }).command
+        : parsed.command
+      : parsed.command ?? automationConfig?.executor.command;
   const configuredTimeoutMs =
     mode === "agent_launch"
-      ? config.automation?.agent.timeoutMs
-      : config.automation?.executor.timeoutMs;
-  const command = parsed.command ?? configuredCommand ?? undefined;
+      ? automationConfig?.agent.timeoutMs
+      : automationConfig?.executor.timeoutMs;
+  const command = configuredCommand ?? undefined;
   if (!command) {
     throw new Error(
       mode === "agent_launch"
@@ -2423,6 +2433,12 @@ function printAutomationStatusResult(
     }
   }
   if (result.agent) {
+    if (result.agent.coordinatorProfileId) {
+      writeLine(
+        stdout,
+        `  Coordinator profile: ${result.agent.coordinatorProfileId}`,
+      );
+    }
     writeLine(
       stdout,
       `  Max concurrent subagents: ${result.agent.maxConcurrentSubagents}`,

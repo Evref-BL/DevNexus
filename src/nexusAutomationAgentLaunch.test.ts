@@ -101,6 +101,7 @@ describe("nexus automation agent launch", () => {
           ...projectConfig().automation!,
           agent: {
             ...projectConfig().automation!.agent,
+            coordinatorProfileId: "codex-deep",
             maxConcurrentSubagents: 3,
             profiles: [
               {
@@ -108,6 +109,8 @@ describe("nexus automation agent launch", () => {
                 executor: "codex",
                 model: "gpt-5.5",
                 reasoning: "xhigh",
+                command: "codex",
+                args: ["exec", "--model", "gpt-5.5"],
               },
             ],
           },
@@ -149,6 +152,7 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_TARGET_CYCLE_LEDGER_FILE).toBe(
         path.join(projectRoot, ".dev-nexus", "automation", "target-cycles.json"),
       );
+      expect(options.env.DEV_NEXUS_COORDINATOR_PROFILE_ID).toBe("codex-deep");
       expect(options.env.DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS).toBe("3");
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
@@ -171,6 +175,7 @@ describe("nexus automation agent launch", () => {
           maxWorkItems: 25,
         },
         agent: {
+          coordinatorProfileId: "codex-deep",
           maxConcurrentSubagents: 3,
           profiles: [
             {
@@ -178,6 +183,8 @@ describe("nexus automation agent launch", () => {
               executor: "codex",
               model: "gpt-5.5",
               reasoning: "xhigh",
+              command: "codex",
+              args: ["exec", "--model", "gpt-5.5"],
             },
           ],
         },
