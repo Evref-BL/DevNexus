@@ -432,7 +432,17 @@ describe("project config", () => {
                 id: "codex-heavy",
                 executor: "codex",
                 model: "gpt-5.5",
+                version: "2026-05",
+                variant: "pro",
                 reasoning: "xhigh",
+                intelligence: "deep",
+                intendedUse: "coordinator",
+                safety: {
+                  profile: "isolated",
+                  allowHostMutation: false,
+                  allowDependencyInstall: false,
+                  allowLiveServices: false,
+                },
                 command: "codex",
                 args: [
                   "exec",
@@ -468,7 +478,17 @@ describe("project config", () => {
             id: "codex-heavy",
             executor: "codex",
             model: "gpt-5.5",
+            version: "2026-05",
+            variant: "pro",
             reasoning: "xhigh",
+            intelligence: "deep",
+            intendedUse: "coordinator",
+            safety: {
+              profile: "isolated",
+              allowHostMutation: false,
+              allowDependencyInstall: false,
+              allowLiveServices: false,
+            },
             command: "codex",
             args: [
               "exec",
@@ -717,6 +737,54 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/coordinatorProfileId/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-agent-profile-use",
+        name: "Invalid Agent Profile Use",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          agent: {
+            profiles: [
+              {
+                id: "codex",
+                executor: "codex",
+                intendedUse: "planner",
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.agent\.profiles\[0\]\.intendedUse/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-agent-profile-safety",
+        name: "Invalid Agent Profile Safety",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          agent: {
+            profiles: [
+              {
+                id: "codex",
+                executor: "codex",
+                safety: {
+                  profile: "host",
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.agent\.profiles\[0\]\.safety\.profile/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

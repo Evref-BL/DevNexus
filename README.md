@@ -299,14 +299,22 @@ bounds, and the stop condition for no remaining eligible work. Agents should
 keep that target-state file concise: retain current direction, active
 decisions, blockers, and near-term risks, and drop stale detail as the target
 evolves. `automation.agent.maxConcurrentSubagents` caps parallel subagent
-work, and `automation.agent.profiles` names the executor/model/reasoning
-profiles that a launched agent may assign to subagents.
+work, and `automation.agent.profiles` names the executor/model/version or
+variant/reasoning or intelligence/safety profiles that a launched agent may
+assign to subagents.
 `automation.agent.coordinatorProfileId` may name one of those profiles as the
 coordinator launch profile. A profile can carry `command` and `args`; DevNexus
 uses that executable template when no raw `automation.agent.command` or CLI
-`--command` override is provided. The profile still describes infrastructure:
-the launched coordinator remains responsible for reading the context, choosing
-work, assigning subagent profiles, and reporting facts back to DevNexus.
+`--command` override is provided. A coordinator profile must be launch-capable:
+its `intendedUse` must be `coordinator` or `any`, and it must include a
+`command` when it is selected by `coordinatorProfileId`. `intendedUse` defaults
+to `any` for existing profile configs. Profile `safety` overrides the project
+automation safety posture for that profile only; otherwise profiles inherit
+`automation.safety`. The profile and subagent cap settings still describe
+infrastructure policy. DevNexus exposes the normalized policy to the launched
+coordinator, but the coordinator remains responsible for reading the context,
+choosing work, assigning subagent profiles, and reporting facts back to
+DevNexus.
 
 `automation.target.cycleLedgerPath` stores the target cycle ledger, defaulting
 to `.dev-nexus/automation/target-cycles.json`. A launched coordinator agent
@@ -398,6 +406,12 @@ worktree executor mode. For agent-launch mode, projects may instead set
 `args`. `automation run-once` and `automation schedule` may omit `--command`
 when the relevant command source is configured. Command-line options still
 override the configured command and timeout.
+
+Profile selection is infrastructure policy, not work supervision. A
+coordinator may use `automation.agent.profiles` and
+`automation.agent.maxConcurrentSubagents` to decide how many subagents to run
+and which executor/model/safety profile each one should receive, but DevNexus
+does not select the work item batch or supervise subagent execution.
 
 Manual `work-item` commands accept `--component <component-id>` for
 component-owned work-item services. Omitting it targets the primary component

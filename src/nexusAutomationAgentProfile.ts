@@ -1,6 +1,8 @@
 import type {
+  NexusAutomationAgentProfileIntendedUse,
   NexusAutomationAgentProfileConfig,
   NexusAutomationConfig,
+  NexusAutomationSafetyConfig,
 } from "./nexusAutomationConfig.js";
 
 export type NexusAutomationAgentCommandSource =
@@ -12,6 +14,28 @@ export interface ResolvedNexusAutomationAgentCommand {
   command: string;
   source: NexusAutomationAgentCommandSource;
   profile: NexusAutomationAgentProfileConfig | null;
+}
+
+export interface NexusAutomationAgentProfilePolicy {
+  id: string;
+  executor: string;
+  model: string | null;
+  version: string | null;
+  variant: string | null;
+  reasoning: string | null;
+  intelligence: string | null;
+  intendedUse: NexusAutomationAgentProfileIntendedUse;
+  safety: NexusAutomationSafetyConfig;
+  command: string | null;
+  args: string[];
+}
+
+export interface NexusAutomationAgentPolicy {
+  coordinatorProfileId: string | null;
+  maxConcurrentSubagents: number;
+  safety: NexusAutomationSafetyConfig;
+  coordinatorProfile: NexusAutomationAgentProfilePolicy | null;
+  profiles: NexusAutomationAgentProfilePolicy[];
 }
 
 export interface ResolveNexusAutomationAgentCommandOptions {
@@ -79,6 +103,53 @@ export function resolveNexusAutomationAgentCommand(
   };
 }
 
+export function normalizeNexusAutomationAgentPolicy(
+  automationConfig: NexusAutomationConfig,
+): NexusAutomationAgentPolicy {
+  const profiles = automationConfig.agent.profiles.map((profile) =>
+    normalizeNexusAutomationAgentProfilePolicy(
+      profile,
+      automationConfig.safety,
+    ),
+  );
+  const coordinatorProfile =
+    profiles.find(
+      (profile) => profile.id === automationConfig.agent.coordinatorProfileId,
+    ) ?? null;
+
+  return {
+    coordinatorProfileId: automationConfig.agent.coordinatorProfileId,
+    maxConcurrentSubagents: automationConfig.agent.maxConcurrentSubagents,
+    safety: automationConfig.safety,
+    coordinatorProfile,
+    profiles,
+  };
+}
+
+function normalizeNexusAutomationAgentProfilePolicy(
+  profile: NexusAutomationAgentProfileConfig,
+  fallbackSafety: NexusAutomationSafetyConfig,
+): NexusAutomationAgentProfilePolicy {
+  return {
+    id: requiredNonEmptyString(profile.id, "profile.id"),
+    executor: requiredNonEmptyString(profile.executor, "profile.executor"),
+    model: optionalNullableString(profile.model, "profile.model") ?? null,
+    version: optionalNullableString(profile.version, "profile.version") ?? null,
+    variant: optionalNullableString(profile.variant, "profile.variant") ?? null,
+    reasoning: optionalNullableString(profile.reasoning, "profile.reasoning") ??
+      null,
+    intelligence:
+      optionalNullableString(profile.intelligence, "profile.intelligence") ??
+      null,
+    intendedUse: profile.intendedUse ?? "any",
+    safety: profile.safety ?? fallbackSafety,
+    command: optionalNullableString(profile.command, "profile.command") ?? null,
+    args: profile.args.map((arg) =>
+      requiredNonEmptyString(arg, "profile.args[]"),
+    ),
+  };
+}
+
 export function shellCommandFromProfile(
   profile: NexusAutomationAgentProfileConfig,
 ): string {
@@ -106,6 +177,20 @@ function optionalNonEmptyString(value: string | null | undefined): string | null
   }
 
   return requiredNonEmptyString(value, "value");
+}
+
+function optionalNullableString(
+  value: string | null | undefined,
+  name: string,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+
+  return requiredNonEmptyString(value, name);
 }
 
 function requiredNonEmptyString(

@@ -108,7 +108,17 @@ describe("nexus automation agent launch", () => {
                 id: "codex-deep",
                 executor: "codex",
                 model: "gpt-5.5",
+                version: "2026-05",
+                variant: "pro",
                 reasoning: "xhigh",
+                intelligence: "deep",
+                intendedUse: "coordinator",
+                safety: {
+                  profile: "isolated",
+                  allowHostMutation: false,
+                  allowDependencyInstall: false,
+                  allowLiveServices: false,
+                },
                 command: "codex",
                 args: ["exec", "--model", "gpt-5.5"],
               },
@@ -183,12 +193,46 @@ describe("nexus automation agent launch", () => {
         agent: {
           coordinatorProfileId: "codex-deep",
           maxConcurrentSubagents: 3,
+          safety: {
+            profile: "local",
+            allowHostMutation: false,
+            allowDependencyInstall: false,
+            allowLiveServices: false,
+          },
+          coordinatorProfile: {
+            id: "codex-deep",
+            executor: "codex",
+            model: "gpt-5.5",
+            version: "2026-05",
+            variant: "pro",
+            reasoning: "xhigh",
+            intelligence: "deep",
+            intendedUse: "coordinator",
+            safety: {
+              profile: "isolated",
+              allowHostMutation: false,
+              allowDependencyInstall: false,
+              allowLiveServices: false,
+            },
+            command: "codex",
+            args: ["exec", "--model", "gpt-5.5"],
+          },
           profiles: [
             {
               id: "codex-deep",
               executor: "codex",
               model: "gpt-5.5",
+              version: "2026-05",
+              variant: "pro",
               reasoning: "xhigh",
+              intelligence: "deep",
+              intendedUse: "coordinator",
+              safety: {
+                profile: "isolated",
+                allowHostMutation: false,
+                allowDependencyInstall: false,
+                allowLiveServices: false,
+              },
               command: "codex",
               args: ["exec", "--model", "gpt-5.5"],
             },
@@ -331,6 +375,65 @@ describe("nexus automation agent launch", () => {
         },
       ],
     });
+  });
+
+  it("blocks incomplete coordinator profile policy before launching", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          agent: {
+            ...projectConfig().automation!.agent,
+            coordinatorProfileId: "codex-worker",
+            profiles: [
+              {
+                id: "codex-worker",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "high",
+                intendedUse: "subagent",
+                command: null,
+                args: [],
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-profile-preflight",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: expect.stringContaining("codex-worker"),
+      contextFile: null,
+      resultFile: null,
+      launch: null,
+    });
+    expect(result.preflight).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "agentProfile:codex-worker:intendedUse",
+          status: "failed",
+          message: expect.stringContaining("intendedUse"),
+        }),
+        expect.objectContaining({
+          name: "agentProfile:codex-worker:command",
+          status: "failed",
+          message: expect.stringContaining("command"),
+        }),
+      ]),
+    );
   });
 
   it("launches with component-scoped work items across multiple components", async () => {
