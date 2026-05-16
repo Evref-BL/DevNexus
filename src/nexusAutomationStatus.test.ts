@@ -264,10 +264,20 @@ describe("nexus automation status", () => {
           workTracking: {
             provider: "local",
           },
+          workTrackingCapabilities: {
+            createItem: true,
+            listItems: true,
+            updateItem: true,
+            comment: true,
+          },
         },
         {
           id: "addon",
           role: "addon",
+          workTrackingCapabilities: {
+            createItem: true,
+            listItems: true,
+          },
           relationships: [
             {
               kind: "extends",

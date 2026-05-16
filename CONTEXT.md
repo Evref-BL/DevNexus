@@ -7,6 +7,7 @@
 - Primary component: The component that legacy single-target commands use when a command cannot yet operate across every component.
 - Component arity: The number of components configured in a DevNexus project; arity one follows the same model as any larger arity.
 - Work-item service: The tracker or issue provider configured for a component, such as a local store, GitHub Issues, GitHub Projects, GitLab issues, or Jira.
+- Work-tracker capabilities: Provider feature flags that tell an agent whether a component's tracker can list, create, get, update, comment, use labels, use assignees, use milestones, use boards, or update board status.
 - DevNexus user: A human or an agent acting under human instruction that configures DevNexus and asks it to launch agent work.
 - DevNexus Model Context Protocol (MCP) server: The generic stdio tool server that exposes DevNexus project, automation, and work-item APIs to agents without specialization adapters.
 - Agent MCP target: A configured project-local agent integration, such as Codex `.codex/config.toml` or Claude `.mcp.json`, that registers the DevNexus Model Context Protocol (MCP) server for that agent.

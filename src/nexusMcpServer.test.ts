@@ -121,6 +121,12 @@ describe("DevNexus MCP server", () => {
             workTracking: {
               provider: "local",
             },
+            workTrackingCapabilities: {
+              createItem: true,
+              listItems: true,
+              updateItem: true,
+              comment: true,
+            },
           },
         ],
       },

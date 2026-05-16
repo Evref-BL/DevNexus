@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createWorkTrackerProvider,
+  workTrackerCapabilitiesForConfig,
   WorkTrackingProviderServiceError,
 } from "./workTrackingProviderService.js";
 
@@ -88,5 +89,35 @@ describe("work tracking provider service", () => {
         projectId: "project-1",
       }),
     ).toThrow(WorkTrackingProviderServiceError);
+  });
+
+  it("reports configured capabilities without requiring provider credentials", () => {
+    expect(
+      workTrackerCapabilitiesForConfig({
+        provider: "vibe-kanban",
+        projectId: "project-1",
+      }),
+    ).toMatchObject({
+      board: true,
+      listItems: false,
+    });
+    expect(
+      workTrackerCapabilitiesForConfig({
+        provider: "github",
+        repository: { owner: "owner", name: "repo" },
+        board: {
+          kind: "github-project-v2",
+          projectId: "project-node",
+          statusFieldId: "field-node",
+          statusOptions: {
+            ready: "option-node",
+          },
+        },
+      }),
+    ).toMatchObject({
+      listItems: true,
+      board: true,
+      boardStatus: true,
+    });
   });
 });
