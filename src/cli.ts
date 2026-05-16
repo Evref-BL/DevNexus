@@ -30,7 +30,12 @@ import {
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
 import type { GitRunner } from "./gitWorktreeService.js";
-import type { WorkItem, WorkStatus } from "./workTrackingTypes.js";
+import type {
+  WorkComment,
+  WorkItem,
+  WorkItemPatch,
+  WorkStatus,
+} from "./workTrackingTypes.js";
 
 interface TextWriter {
   write(chunk: string): unknown;
@@ -62,6 +67,26 @@ interface ParsedWorkItemListCommand {
   assignees: string[];
   search?: string;
   limit?: number;
+  json?: boolean;
+}
+
+interface ParsedWorkItemGetCommand {
+  projectRoot: string;
+  itemId: string;
+  json?: boolean;
+}
+
+interface ParsedWorkItemUpdateCommand {
+  projectRoot: string;
+  itemId: string;
+  patch: WorkItemPatch;
+  json?: boolean;
+}
+
+interface ParsedWorkItemCommentCommand {
+  projectRoot: string;
+  itemId: string;
+  body: string;
   json?: boolean;
 }
 
@@ -103,6 +128,9 @@ export function usage(): string {
     "  dev-nexus --help",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
+    "  dev-nexus work-item get <project-root> <work-item-id> [options]",
+    "  dev-nexus work-item update <project-root> <work-item-id> [options]",
+    "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation run-once <project-root> --command <command> [options]",
     "  dev-nexus automation schedule <project-root> --command <command> [options]",
@@ -122,6 +150,26 @@ export function usage(): string {
     "  --assignee <assignee>      repeatable",
     "  --search <text>",
     "  --limit <count>",
+    "  --json",
+    "",
+    "Options for work-item get:",
+    "  --json",
+    "",
+    "Options for work-item update:",
+    "  --title <title>",
+    "  --description <text>",
+    "  --clear-description",
+    "  --status <todo|ready|in_progress|blocked|done|wont_do>",
+    "  --label <label>            repeatable, replaces labels when provided",
+    "  --clear-labels",
+    "  --assignee <assignee>      repeatable, replaces assignees when provided",
+    "  --clear-assignees",
+    "  --milestone <text>",
+    "  --clear-milestone",
+    "  --json",
+    "",
+    "Options for work-item comment:",
+    "  --body <text>",
     "  --json",
     "",
     "Options for automation status:",
@@ -208,7 +256,46 @@ async function handleWorkItemCommand(
     return 0;
   }
 
-  throw new Error("work-item requires create or list");
+  if (command === "get") {
+    const parsed = parseWorkItemGetCommand(argv);
+    const item = await workItemService(parsed.projectRoot, dependencies)
+      .getWorkItem({
+        projectRoot: path.resolve(parsed.projectRoot),
+        id: parsed.itemId,
+      });
+    printWorkItemGetResult(item, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "update") {
+    const parsed = parseWorkItemUpdateCommand(argv);
+    const item = await workItemService(parsed.projectRoot, dependencies)
+      .updateWorkItem({
+        projectRoot: path.resolve(parsed.projectRoot),
+        ref: { id: parsed.itemId },
+        patch: parsed.patch,
+      });
+    printWorkItemUpdateResult(item, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "comment") {
+    const parsed = parseWorkItemCommentCommand(argv);
+    const comment = await workItemService(parsed.projectRoot, dependencies)
+      .addComment({
+        projectRoot: path.resolve(parsed.projectRoot),
+        ref: { id: parsed.itemId },
+        body: parsed.body,
+      });
+    printWorkItemCommentResult(
+      comment,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("work-item requires create, list, get, update, or comment");
 }
 
 async function handleAutomationCommand(
@@ -420,6 +507,175 @@ function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
   return parsed;
 }
 
+function parseWorkItemGetCommand(argv: string[]): ParsedWorkItemGetCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item get requires a project root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item get requires a work item id");
+  }
+
+  const parsed: ParsedWorkItemGetCommand = { projectRoot, itemId };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item get option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseWorkItemUpdateCommand(argv: string[]): ParsedWorkItemUpdateCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item update requires a project root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item update requires a work item id");
+  }
+
+  const parsed: ParsedWorkItemUpdateCommand = {
+    projectRoot,
+    itemId,
+    patch: {},
+  };
+  let replaceLabels: string[] | undefined;
+  let replaceAssignees: string[] | undefined;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--title":
+        parsed.patch.title = next();
+        break;
+      case "--description":
+        if (parsed.patch.description === null) {
+          throw new Error("--description conflicts with --clear-description");
+        }
+        parsed.patch.description = next();
+        break;
+      case "--clear-description":
+        if (parsed.patch.description !== undefined) {
+          throw new Error("--clear-description conflicts with --description");
+        }
+        parsed.patch.description = null;
+        break;
+      case "--status":
+        parsed.patch.status = parseWorkStatus(next(), arg);
+        break;
+      case "--label":
+        if (replaceLabels === undefined) {
+          replaceLabels = [];
+        }
+        replaceLabels.push(next());
+        break;
+      case "--clear-labels":
+        if (replaceLabels && replaceLabels.length > 0) {
+          throw new Error("--clear-labels conflicts with --label");
+        }
+        replaceLabels = [];
+        break;
+      case "--assignee":
+        if (replaceAssignees === undefined) {
+          replaceAssignees = [];
+        }
+        replaceAssignees.push(next());
+        break;
+      case "--clear-assignees":
+        if (replaceAssignees && replaceAssignees.length > 0) {
+          throw new Error("--clear-assignees conflicts with --assignee");
+        }
+        replaceAssignees = [];
+        break;
+      case "--milestone":
+        if (parsed.patch.milestone === null) {
+          throw new Error("--milestone conflicts with --clear-milestone");
+        }
+        parsed.patch.milestone = next();
+        break;
+      case "--clear-milestone":
+        if (parsed.patch.milestone !== undefined) {
+          throw new Error("--clear-milestone conflicts with --milestone");
+        }
+        parsed.patch.milestone = null;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item update option: ${arg}`);
+    }
+  }
+
+  if (replaceLabels !== undefined) {
+    parsed.patch.labels = replaceLabels;
+  }
+  if (replaceAssignees !== undefined) {
+    parsed.patch.assignees = replaceAssignees;
+  }
+  if (Object.keys(parsed.patch).length === 0) {
+    throw new Error("work-item update requires at least one field to update");
+  }
+
+  return parsed;
+}
+
+function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item comment requires a project root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item comment requires a work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemCommentCommand> = {
+    projectRoot,
+    itemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--body":
+        parsed.body = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item comment option: ${arg}`);
+    }
+  }
+
+  if (!parsed.body) {
+    throw new Error("work-item comment requires --body");
+  }
+
+  return parsed as ParsedWorkItemCommentCommand;
+}
+
 function parseAutomationRunOnceCommand(
   argv: string[],
 ): ParsedAutomationRunOnceCommand {
@@ -597,6 +853,54 @@ function printWorkItemListResult(
   for (const item of items) {
     writeLine(stdout, `  ${item.id} [${item.status}] ${item.title}`);
   }
+}
+
+function printWorkItemGetResult(
+  item: WorkItem,
+  parsed: ParsedWorkItemGetCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, workItem: item };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus work item ${item.id}.`);
+  writeLine(stdout, `  Title: ${item.title}`);
+  writeLine(stdout, `  Status: ${item.status}`);
+}
+
+function printWorkItemUpdateResult(
+  item: WorkItem,
+  parsed: ParsedWorkItemUpdateCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, workItem: item };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item updated.");
+  writeLine(stdout, `  Id: ${item.id}`);
+  writeLine(stdout, `  Title: ${item.title}`);
+  writeLine(stdout, `  Status: ${item.status}`);
+}
+
+function printWorkItemCommentResult(
+  comment: WorkComment,
+  parsed: ParsedWorkItemCommentCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, comment };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item comment added.");
+  writeLine(stdout, `  Id: ${comment.id}`);
 }
 
 function printAutomationScheduleTick(

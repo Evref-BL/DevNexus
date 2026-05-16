@@ -37,6 +37,9 @@ The package also ships a generic `dev-nexus` CLI for the same boundary:
 ```bash
 dev-nexus work-item create <project-root> --title "Implement task" --status ready --label automation
 dev-nexus work-item list <project-root> --status ready
+dev-nexus work-item get <project-root> local-1
+dev-nexus work-item update <project-root> local-1 --status in_progress
+dev-nexus work-item comment <project-root> local-1 --body "Started focused verification."
 dev-nexus automation status <project-root>
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1

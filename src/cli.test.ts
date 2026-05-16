@@ -176,6 +176,93 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("gets, updates, and comments on local work items", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Draft task",
+      description: "Initial",
+      status: "todo",
+      labels: ["draft"],
+      assignees: ["agent-a"],
+      milestone: "m1",
+    });
+    const getOutput = captureOutput();
+    const updateOutput = captureOutput();
+    const commentOutput = captureOutput();
+
+    await main(["work-item", "get", projectRoot, "local-1", "--json"], {
+      stdout: getOutput.writer,
+    });
+    await main(
+      [
+        "work-item",
+        "update",
+        projectRoot,
+        "local-1",
+        "--title",
+        "Ready task",
+        "--clear-description",
+        "--status",
+        "ready",
+        "--label",
+        "automation",
+        "--clear-assignees",
+        "--clear-milestone",
+        "--json",
+      ],
+      {
+        stdout: updateOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "work-item",
+        "comment",
+        projectRoot,
+        "local-1",
+        "--body",
+        "Ready for scheduler pickup.",
+        "--json",
+      ],
+      {
+        stdout: commentOutput.writer,
+        now: fixedClock("2026-05-16T10:05:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(getOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Draft task",
+      status: "todo",
+    });
+    expect(JSON.parse(updateOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Ready task",
+      description: null,
+      status: "ready",
+      labels: ["automation"],
+      assignees: [],
+      milestone: null,
+      closedAt: null,
+    });
+    expect(JSON.parse(commentOutput.output()).comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Ready for scheduler pickup.",
+    });
+    const store = loadLocalWorkTrackingStore(
+      defaultLocalWorkTrackingStorePath(projectRoot),
+    );
+    expect(store.comments["local-1"]).toHaveLength(1);
+  });
+
   it("prints read-only automation status", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
