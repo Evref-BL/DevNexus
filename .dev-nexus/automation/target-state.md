@@ -47,6 +47,9 @@ Immediate direction:
 - MCP-Pharo branch migration:
   - MCP-Pharo is now merged to `origin/main`; DevNexus component metadata and
     PLexus automatic Metacello loading must target `main`, not `develop`.
+  - MCP-Pharo was refreshed to `origin/main` commit `f84ae31` on 2026-05-17.
+    That pull added the repo-local `pharo-ci-repro` skill and Docker
+    smalltalkCI reproduction helper.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
     agent setup after the generic plugin and scoped PLexus contracts are
@@ -77,7 +80,7 @@ Immediate direction:
   - `pharo-nexus:local-5` verify that subagents receive direct Pharo MCP access
     through PharoNexus-provided scoped PLexus setup.
   - After direct Pharo MCP access is proven in component worktrees, resume the
-    blocked MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5`.
+    blocked MCP-Pharo query API item `mcp-pharo:local-4`.
 - Later or dependent non-eligible work:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
@@ -205,6 +208,10 @@ Durable completed foundation:
   `1f3070b`.
 - MCP-Pharo static/live verification boundary was merged through `origin/main`;
   automatic loads and DevNexus component defaults now target `main`.
+- MCP-Pharo `mcp-pharo:local-5` was completed by upstream commit `f84ae31`,
+  which added a repo-local Pharo CI reproduction skill, Docker smalltalkCI
+  helper script, and log-reading reference. No Docker or live image run was
+  performed during the dogfood refresh.
 
 Active boundaries:
 
