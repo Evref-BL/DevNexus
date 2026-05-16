@@ -21,15 +21,44 @@ import {
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  createDefaultNexusHomeConfigBase,
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  nexusHomeConfigPath,
+  resolveNexusHome,
+  saveNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+  type NexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import {
+  configureNexusProjectTracker,
+  createNexusProject,
+  getNexusProjectStatus,
+  importNexusProject,
+  linkNexusProjectTracker,
+  listNexusProjects,
+  type ConfigureNexusProjectTrackerResult,
+  type CreateNexusProjectResult,
+  type ImportNexusProjectResult,
+  type LinkNexusProjectTrackerResult,
+  type ListNexusProjectsResult,
+  type NexusProjectHomeStore,
+} from "./nexusProjectHomeService.js";
 import { resolveProjectSourceRoot } from "./nexusProjectLifecycle.js";
+import {
+  buildNexusProjectStatusForPath,
+  type NexusProjectStatusBase,
+} from "./nexusProjectRegistry.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
 import type { GitRunner } from "./gitWorktreeService.js";
+import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
 import type {
   WorkComment,
   WorkItem,
@@ -46,7 +75,66 @@ export interface DevNexusCliDependencies {
   stderr?: TextWriter;
   commandRunner?: NexusAutomationCommandRunner;
   gitRunner?: GitRunner;
+  projectGitRunner?: ProjectGitRunner;
   now?: () => Date | string;
+}
+
+interface ParsedHomeInitCommand {
+  homePath: string;
+  projectsRoot?: string;
+  workspacesRoot?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectCreateCommand {
+  homePath?: string;
+  name: string;
+  root?: string;
+  from?: string;
+  gitInit?: boolean;
+  trackerProjectId?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectImportCommand {
+  homePath?: string;
+  root: string;
+  projectRoot?: string;
+  name?: string;
+  trackerProjectId?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectListCommand {
+  homePath?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectStatusCommand {
+  homePath?: string;
+  project: string;
+  json?: boolean;
+}
+
+interface ParsedProjectTrackerConfigureCommand {
+  homePath?: string;
+  project: string;
+  provider: "local" | "github" | "gitlab" | "jira";
+  host?: string;
+  repositoryOwner?: string;
+  repositoryName?: string;
+  repositoryId?: string;
+  projectKey?: string;
+  issueType?: string;
+  storePath?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectTrackerLinkCommand {
+  homePath?: string;
+  project: string;
+  trackerProjectId: string;
+  json?: boolean;
 }
 
 interface ParsedWorkItemCreateCommand {
@@ -126,6 +214,13 @@ export function usage(): string {
   return [
     "Usage:",
     "  dev-nexus --help",
+    "  dev-nexus home init [home-path] [options]",
+    "  dev-nexus project create <name> [options]",
+    "  dev-nexus project import <source-root> [options]",
+    "  dev-nexus project list [options]",
+    "  dev-nexus project status <project-id-or-root> [options]",
+    "  dev-nexus project tracker configure <project> --provider <provider> [options]",
+    "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
@@ -134,6 +229,47 @@ export function usage(): string {
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
+    "",
+    "Options for home init:",
+    "  --projects-root <path>",
+    "  --workspaces-root <path>",
+    "  --json",
+    "",
+    "Options for project commands:",
+    "  --home <path>             defaults to DEV_NEXUS_HOME or ~/.dev-nexus",
+    "  --json",
+    "",
+    "Options for project create:",
+    "  --home <path>",
+    "  --root <path>",
+    "  --from <git-url>",
+    "  --git-init",
+    "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for project import:",
+    "  --home <path>",
+    "  --project-root <path>",
+    "  --name <name>",
+    "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for project tracker configure:",
+    "  --home <path>",
+    "  --provider <local|github|gitlab|jira>",
+    "  --host <host>",
+    "  --repository-owner <owner>",
+    "  --repository-name <name>",
+    "  --repository-id <id>",
+    "  --project-key <key>",
+    "  --issue-type <type>",
+    "  --store-path <path>",
+    "  --json",
+    "",
+    "Options for project tracker link:",
+    "  --home <path>",
+    "  --tracker-project-id <id>",
+    "  --json",
     "",
     "Options for work-item create:",
     "  --title <title>",
@@ -210,6 +346,12 @@ export async function main(
     return 0;
   }
 
+  if (argv[0] === "home") {
+    return handleHomeCommand(argv, dependencies);
+  }
+  if (argv[0] === "project") {
+    return handleProjectCommand(argv, dependencies);
+  }
   if (argv[0] === "work-item") {
     return handleWorkItemCommand(argv, dependencies);
   }
@@ -217,7 +359,154 @@ export async function main(
     return handleAutomationCommand(argv, dependencies);
   }
 
-  throw new Error("dev-nexus requires work-item, automation, or --help");
+  throw new Error("dev-nexus requires home, project, work-item, automation, or --help");
+}
+
+async function handleHomeCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  if (argv[1] !== "init") {
+    throw new Error("home requires init");
+  }
+
+  const parsed = parseHomeInitCommand(argv);
+  const homePath = resolveNexusHome(parsed.homePath);
+  const configPath = nexusHomeConfigPath(homePath);
+  if (fs.existsSync(configPath)) {
+    throw new Error(`DevNexus home already exists: ${configPath}`);
+  }
+
+  const config = createDefaultNexusHomeConfigBase(homePath, {
+    ...(parsed.projectsRoot !== undefined ? { projectsRoot: parsed.projectsRoot } : {}),
+    ...(parsed.workspacesRoot !== undefined ? { workspacesRoot: parsed.workspacesRoot } : {}),
+  });
+  const savedPath = saveNexusHomeConfigFile(
+    homePath,
+    config,
+    validateNexusHomeConfigBase,
+  );
+  printHomeInitResult(
+    { homePath, configPath: savedPath, config },
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
+  return 0;
+}
+
+async function handleProjectCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "create") {
+    const parsed = parseProjectCreateCommand(argv);
+    const result = createNexusProject({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+      name: parsed.name,
+      ...(parsed.root !== undefined ? { root: parsed.root } : {}),
+      ...(parsed.from !== undefined ? { from: parsed.from } : {}),
+      ...(parsed.gitInit !== undefined ? { gitInit: parsed.gitInit } : {}),
+      ...(parsed.trackerProjectId !== undefined
+        ? { vibeKanbanProjectId: parsed.trackerProjectId }
+        : {}),
+      ...(dependencies.projectGitRunner ? { gitRunner: dependencies.projectGitRunner } : {}),
+    });
+    printProjectCreateResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "import") {
+    const parsed = parseProjectImportCommand(argv);
+    const result = importNexusProject({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+      root: parsed.root,
+      ...(parsed.projectRoot !== undefined ? { projectRoot: parsed.projectRoot } : {}),
+      ...(parsed.name !== undefined ? { name: parsed.name } : {}),
+      ...(parsed.trackerProjectId !== undefined
+        ? { vibeKanbanProjectId: parsed.trackerProjectId }
+        : {}),
+      ...(dependencies.projectGitRunner ? { gitRunner: dependencies.projectGitRunner } : {}),
+    });
+    printProjectImportResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "list") {
+    const parsed = parseProjectListCommand(argv);
+    const result = listNexusProjects({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+    });
+    printProjectListResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "status") {
+    const parsed = parseProjectStatusCommand(argv);
+    const result = resolveProjectStatusForCli(parsed);
+    printProjectStatusResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "tracker") {
+    return handleProjectTrackerCommand(argv, dependencies);
+  }
+
+  throw new Error("project requires create, import, list, status, or tracker");
+}
+
+async function handleProjectTrackerCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  if (command === "configure") {
+    const parsed = parseProjectTrackerConfigureCommand(argv);
+    const result = configureNexusProjectTracker({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+      project: parsed.project,
+      provider: parsed.provider,
+      ...(parsed.host !== undefined ? { host: parsed.host } : {}),
+      ...(parsed.repositoryOwner !== undefined
+        ? { repositoryOwner: parsed.repositoryOwner }
+        : {}),
+      ...(parsed.repositoryName !== undefined
+        ? { repositoryName: parsed.repositoryName }
+        : {}),
+      ...(parsed.repositoryId !== undefined ? { repositoryId: parsed.repositoryId } : {}),
+      ...(parsed.projectKey !== undefined ? { projectKey: parsed.projectKey } : {}),
+      ...(parsed.issueType !== undefined ? { issueType: parsed.issueType } : {}),
+      ...(parsed.storePath !== undefined ? { storePath: parsed.storePath } : {}),
+    });
+    printProjectTrackerConfigureResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "link") {
+    const parsed = parseProjectTrackerLinkCommand(argv);
+    const result = linkNexusProjectTracker({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+      project: parsed.project,
+      trackerProjectId: parsed.trackerProjectId,
+    });
+    printProjectTrackerLinkResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("project tracker requires configure or link");
 }
 
 async function handleWorkItemCommand(
@@ -433,6 +722,303 @@ function resolveDirectProject(projectRoot: string): ResolvedWorkItemProjectConte
     sourceRoot: resolveProjectSourceRoot(resolvedProjectRoot, config),
     workTracking: config.workTracking,
   };
+}
+
+function parseHomeInitCommand(argv: string[]): ParsedHomeInitCommand {
+  const rest = argv.slice(2);
+  const parsed: ParsedHomeInitCommand = {
+    homePath: defaultNexusHomePath(),
+  };
+  let homePathProvided = false;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--projects-root":
+        parsed.projectsRoot = next();
+        break;
+      case "--workspaces-root":
+        parsed.workspacesRoot = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        if (arg.startsWith("--")) {
+          throw new Error(`Unknown home init option: ${arg}`);
+        }
+        if (homePathProvided) {
+          throw new Error("home init accepts at most one home path");
+        }
+        homePathProvided = true;
+        parsed.homePath = arg;
+        break;
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectCreateCommand(argv: string[]): ParsedProjectCreateCommand {
+  const [, , name, ...rest] = argv;
+  if (!name || name.startsWith("--")) {
+    throw new Error("project create requires a name");
+  }
+
+  const parsed: ParsedProjectCreateCommand = { name };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--root":
+        parsed.root = next();
+        break;
+      case "--from":
+        parsed.from = next();
+        break;
+      case "--git-init":
+        parsed.gitInit = true;
+        break;
+      case "--tracker-project-id":
+        parsed.trackerProjectId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project create option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
+  const [, , root, ...rest] = argv;
+  if (!root || root.startsWith("--")) {
+    throw new Error("project import requires a source root");
+  }
+
+  const parsed: ParsedProjectImportCommand = { root };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--project-root":
+        parsed.projectRoot = next();
+        break;
+      case "--name":
+        parsed.name = next();
+        break;
+      case "--tracker-project-id":
+        parsed.trackerProjectId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project import option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectListCommand(argv: string[]): ParsedProjectListCommand {
+  const rest = argv.slice(2);
+  const parsed: ParsedProjectListCommand = {};
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project list option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
+  const [, , project, ...rest] = argv;
+  if (!project || project.startsWith("--")) {
+    throw new Error("project status requires a project id or root");
+  }
+
+  const parsed: ParsedProjectStatusCommand = { project };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectTrackerConfigureCommand(
+  argv: string[],
+): ParsedProjectTrackerConfigureCommand {
+  const [, , , project, ...rest] = argv;
+  if (!project || project.startsWith("--")) {
+    throw new Error("project tracker configure requires a project");
+  }
+
+  const parsed: Partial<ParsedProjectTrackerConfigureCommand> = { project };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--provider":
+        parsed.provider = parseTrackerProvider(next(), arg);
+        break;
+      case "--host":
+        parsed.host = next();
+        break;
+      case "--repository-owner":
+        parsed.repositoryOwner = next();
+        break;
+      case "--repository-name":
+        parsed.repositoryName = next();
+        break;
+      case "--repository-id":
+        parsed.repositoryId = next();
+        break;
+      case "--project-key":
+        parsed.projectKey = next();
+        break;
+      case "--issue-type":
+        parsed.issueType = next();
+        break;
+      case "--store-path":
+        parsed.storePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project tracker configure option: ${arg}`);
+    }
+  }
+
+  if (!parsed.provider) {
+    throw new Error("project tracker configure requires --provider");
+  }
+
+  return parsed as ParsedProjectTrackerConfigureCommand;
+}
+
+function parseProjectTrackerLinkCommand(
+  argv: string[],
+): ParsedProjectTrackerLinkCommand {
+  const [, , , project, ...rest] = argv;
+  if (!project || project.startsWith("--")) {
+    throw new Error("project tracker link requires a project");
+  }
+
+  const parsed: Partial<ParsedProjectTrackerLinkCommand> = { project };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--tracker-project-id":
+        parsed.trackerProjectId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project tracker link option: ${arg}`);
+    }
+  }
+
+  if (!parsed.trackerProjectId) {
+    throw new Error("project tracker link requires --tracker-project-id");
+  }
+
+  return parsed as ParsedProjectTrackerLinkCommand;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -847,6 +1433,129 @@ function parseAutomationScheduleCommand(
   return parsed as ParsedAutomationScheduleCommand;
 }
 
+function printHomeInitResult(
+  result: {
+    homePath: string;
+    configPath: string;
+    config: NexusHomeConfigBase;
+  },
+  parsed: ParsedHomeInitCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus home initialized.");
+  writeLine(stdout, `  Home: ${result.homePath}`);
+  writeLine(stdout, `  Config: ${result.configPath}`);
+  writeLine(stdout, `  Projects root: ${result.config.paths.projectsRoot}`);
+}
+
+function printProjectCreateResult(
+  result: CreateNexusProjectResult,
+  parsed: ParsedProjectCreateCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project created.");
+  printProjectStatusText(result.reference, stdout);
+  writeLine(stdout, `  Config: ${result.projectConfigPath}`);
+}
+
+function printProjectImportResult(
+  result: ImportNexusProjectResult,
+  parsed: ParsedProjectImportCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project imported.");
+  printProjectStatusText(result.reference, stdout);
+  writeLine(stdout, `  Config: ${result.projectConfigPath}`);
+}
+
+function printProjectListResult(
+  result: ListNexusProjectsResult,
+  parsed: ParsedProjectListCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus projects: ${result.projects.length}`);
+  for (const project of result.projects) {
+    writeLine(stdout, `  ${project.id} ${project.projectRoot}`);
+  }
+}
+
+function printProjectStatusResult(
+  project: NexusProjectStatusBase,
+  parsed: ParsedProjectStatusCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, project };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus project ${project.id}.`);
+  printProjectStatusText(project, stdout);
+  writeLine(
+    stdout,
+    `  Work tracking: ${project.workTracking?.provider ?? "not configured"}`,
+  );
+  writeLine(stdout, `  Config exists: ${project.projectConfigExists}`);
+  writeLine(stdout, `  Worktrees root: ${project.worktreesRoot}`);
+}
+
+function printProjectTrackerConfigureResult(
+  result: ConfigureNexusProjectTrackerResult,
+  parsed: ParsedProjectTrackerConfigureCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project tracker configured.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Provider: ${result.workTracking.provider}`);
+}
+
+function printProjectTrackerLinkResult(
+  result: LinkNexusProjectTrackerResult,
+  parsed: ParsedProjectTrackerLinkCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project tracker linked.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Tracker project: ${result.vibeKanbanProjectId}`);
+}
+
 function printWorkItemCreateResult(
   item: WorkItem,
   parsed: ParsedWorkItemCreateCommand,
@@ -1036,6 +1745,59 @@ function projectLabel(config: NexusProjectConfig): string {
   return `${config.id} (${config.name})`;
 }
 
+function printProjectStatusText(
+  project: Pick<NexusProjectStatusBase, "id" | "name" | "projectRoot">,
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  Id: ${project.id}`);
+  writeLine(stdout, `  Name: ${project.name}`);
+  writeLine(stdout, `  Root: ${project.projectRoot}`);
+}
+
+function fileProjectHomeStore(): NexusProjectHomeStore<NexusHomeConfigBase> {
+  return {
+    resolveHomePath: resolveNexusHome,
+    loadHomeConfig: (homePath) =>
+      loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
+    saveHomeConfig: (homePath, registry) =>
+      saveNexusHomeConfigFile(
+        homePath,
+        registry,
+        validateNexusHomeConfigBase,
+      ),
+  };
+}
+
+function resolvedCommandHomePath(homePath: string | undefined): string {
+  return resolveNexusHome(homePath ?? defaultNexusHomePath());
+}
+
+function resolveProjectStatusForCli(
+  parsed: ParsedProjectStatusCommand,
+): NexusProjectStatusBase {
+  if (parsed.homePath) {
+    return getNexusProjectStatus({
+      homePath: resolvedCommandHomePath(parsed.homePath),
+      homeStore: fileProjectHomeStore(),
+      project: parsed.project,
+    }).project;
+  }
+
+  try {
+    return buildNexusProjectStatusForPath(parsed.project);
+  } catch (pathError) {
+    try {
+      return getNexusProjectStatus({
+        homePath: resolvedCommandHomePath(undefined),
+        homeStore: fileProjectHomeStore(),
+        project: parsed.project,
+      }).project;
+    } catch {
+      throw pathError;
+    }
+  }
+}
+
 function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefined {
   if (statuses.length === 0) {
     return undefined;
@@ -1057,6 +1819,22 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   }
 
   throw new Error(`${optionName} must be a valid work status`);
+}
+
+function parseTrackerProvider(
+  value: string,
+  optionName: string,
+): ParsedProjectTrackerConfigureCommand["provider"] {
+  if (
+    value === "local" ||
+    value === "github" ||
+    value === "gitlab" ||
+    value === "jira"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be local, github, gitlab, or jira`);
 }
 
 function parsePositiveInteger(value: string, optionName: string): number {

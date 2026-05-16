@@ -13,6 +13,8 @@ import {
   type GitRunner,
   type NexusAutomationCommandRunner,
   type NexusProjectConfig,
+  type ProjectGitCommandResult,
+  type ProjectGitRunner,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -115,6 +117,51 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
   };
 }
 
+function fakeProjectGitRunner(
+  calls: string[][],
+  options: { branch?: string; remoteUrl?: string | null } = {},
+): ProjectGitRunner {
+  return (args: readonly string[]): ProjectGitCommandResult => {
+    const argsArray = [...args];
+    calls.push(argsArray);
+
+    if (argsArray[0] === "clone") {
+      fs.mkdirSync(argsArray[2]!, { recursive: true });
+    }
+    if (argsArray.includes("rev-parse")) {
+      return {
+        args: argsArray,
+        stdout: "true\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+    if (argsArray.includes("remote.origin.url")) {
+      return {
+        args: argsArray,
+        stdout: options.remoteUrl ? `${options.remoteUrl}\n` : "",
+        stderr: "",
+        exitCode: options.remoteUrl ? 0 : 1,
+      };
+    }
+    if (argsArray.includes("symbolic-ref")) {
+      return {
+        args: argsArray,
+        stdout: `${options.branch ?? "main"}\n`,
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+
+    return {
+      args: argsArray,
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    };
+  };
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -127,9 +174,191 @@ describe("dev-nexus cli", () => {
 
     await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
 
+    expect(output.output()).toContain("dev-nexus home init");
+    expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
+  });
+
+  it("initializes a home and manages projects through the CLI", async () => {
+    const homePath = makeTempDir("dev-nexus-cli-home-");
+    const initOutput = captureOutput();
+    const createOutput = captureOutput();
+    const listOutput = captureOutput();
+    const registryStatusOutput = captureOutput();
+    const pathStatusOutput = captureOutput();
+    const gitCalls: string[][] = [];
+
+    await main(
+      [
+        "home",
+        "init",
+        homePath,
+        "--projects-root",
+        "projects",
+        "--workspaces-root",
+        "workspaces",
+        "--json",
+      ],
+      {
+        stdout: initOutput.writer,
+      },
+    );
+    await main(["project", "create", "HomeTool", "--home", homePath, "--json"], {
+      stdout: createOutput.writer,
+      projectGitRunner: fakeProjectGitRunner(gitCalls),
+    });
+    await main(["project", "list", "--home", homePath, "--json"], {
+      stdout: listOutput.writer,
+    });
+
+    const created = JSON.parse(createOutput.output());
+    await main(
+      ["project", "status", "home-tool", "--home", homePath, "--json"],
+      {
+        stdout: registryStatusOutput.writer,
+      },
+    );
+    await main(["project", "status", created.projectRoot, "--json"], {
+      stdout: pathStatusOutput.writer,
+    });
+
+    expect(JSON.parse(initOutput.output())).toMatchObject({
+      ok: true,
+      homePath,
+      config: {
+        projects: [],
+      },
+    });
+    expect(created).toMatchObject({
+      ok: true,
+      projectConfig: {
+        id: "home-tool",
+        name: "HomeTool",
+      },
+      reference: {
+        id: "home-tool",
+      },
+    });
+    expect(JSON.parse(listOutput.output()).projects).toMatchObject([
+      {
+        id: "home-tool",
+        projectConfigExists: true,
+      },
+    ]);
+    expect(JSON.parse(registryStatusOutput.output()).project).toMatchObject({
+      id: "home-tool",
+      projectRoot: created.projectRoot,
+    });
+    expect(JSON.parse(pathStatusOutput.output()).project).toMatchObject({
+      id: "home-tool",
+      projectRoot: created.projectRoot,
+    });
+    expect(gitCalls).toEqual([
+      ["init", created.projectRoot],
+      ["-C", created.projectRoot, "symbolic-ref", "--short", "HEAD"],
+    ]);
+  });
+
+  it("imports projects and configures trackers through the CLI", async () => {
+    const homePath = makeTempDir("dev-nexus-cli-home-");
+    const sourceRoot = path.join(makeTempDir("dev-nexus-cli-source-"), "Imported");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const importOutput = captureOutput();
+    const configureOutput = captureOutput();
+    const linkOutput = captureOutput();
+    const gitCalls: string[][] = [];
+
+    await main(["home", "init", homePath], {
+      stdout: captureOutput().writer,
+    });
+    await main(
+      [
+        "project",
+        "import",
+        sourceRoot,
+        "--home",
+        homePath,
+        "--name",
+        "Imported",
+        "--json",
+      ],
+      {
+        stdout: importOutput.writer,
+        projectGitRunner: fakeProjectGitRunner(gitCalls, {
+          branch: "trunk",
+          remoteUrl: "https://example.invalid/imported.git",
+        }),
+      },
+    );
+    await main(
+      [
+        "project",
+        "tracker",
+        "configure",
+        "imported",
+        "--home",
+        homePath,
+        "--provider",
+        "local",
+        "--store-path",
+        ".dev-nexus/work-items.json",
+        "--json",
+      ],
+      {
+        stdout: configureOutput.writer,
+      },
+    );
+    await main(
+      [
+        "project",
+        "tracker",
+        "link",
+        "imported",
+        "--home",
+        homePath,
+        "--tracker-project-id",
+        "tracker-1",
+        "--json",
+      ],
+      {
+        stdout: linkOutput.writer,
+      },
+    );
+
+    expect(JSON.parse(importOutput.output())).toMatchObject({
+      ok: true,
+      projectConfig: {
+        id: "imported",
+        repo: {
+          kind: "git",
+          remoteUrl: "https://example.invalid/imported.git",
+          defaultBranch: "trunk",
+          sourceRoot,
+        },
+      },
+    });
+    expect(JSON.parse(configureOutput.output())).toMatchObject({
+      ok: true,
+      workTracking: {
+        provider: "local",
+        storePath: ".dev-nexus/work-items.json",
+      },
+    });
+    expect(JSON.parse(linkOutput.output())).toMatchObject({
+      ok: true,
+      vibeKanbanProjectId: "tracker-1",
+      project: {
+        id: "imported",
+      },
+    });
+    expect(gitCalls).toContainEqual([
+      "-C",
+      sourceRoot,
+      "rev-parse",
+      "--is-inside-work-tree",
+    ]);
   });
 
   it("creates and lists local work items", async () => {

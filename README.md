@@ -10,6 +10,27 @@ Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions. DevNexus provides the core contracts and extension hooks without
 depending on any specific specialization.
 
+## Project CLI
+
+The package ships a generic `dev-nexus` CLI for initializing a DevNexus home
+and managing generic project roots:
+
+```bash
+dev-nexus home init <home-path>
+dev-nexus project create <name> --home <home-path>
+dev-nexus project import <source-root> --home <home-path> --name <name>
+dev-nexus project list --home <home-path>
+dev-nexus project status <project-id-or-root> --home <home-path>
+dev-nexus project status <project-root>
+dev-nexus project tracker configure <project> --home <home-path> --provider local
+dev-nexus project tracker link <project> --home <home-path> --tracker-project-id <id>
+```
+
+Commands that need a registry use `--home`; when it is omitted they fall back
+to `DEV_NEXUS_HOME` and then the default user home path. `project status` can
+also inspect an initialized project root directly without a home registry,
+which is useful for local smoke checks and generated worktrees.
+
 ## Automation Foundation
 
 Projects can opt into generic run-once automation through
