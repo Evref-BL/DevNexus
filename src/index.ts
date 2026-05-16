@@ -13,6 +13,7 @@ export * from "./nexusAutomationStatus.js";
 export * from "./nexusAutomationTarget.js";
 export * from "./nexusAutomationTargetCycle.js";
 export * from "./nexusAutomationTargetReport.js";
+export * from "./nexusCoordination.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusMcpServer.js";

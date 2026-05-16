@@ -4,10 +4,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   callDevNexusMcpTool,
+  createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
   saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -80,6 +83,42 @@ function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
 }
 
+function fakeGitRunner(repositoryPath: string): GitRunner {
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    const joined = argsArray.join(" ");
+    if (joined === "rev-parse --show-toplevel") {
+      return ok(argsArray, `${repositoryPath}\n`);
+    }
+    if (joined === "symbolic-ref --short HEAD") {
+      return ok(argsArray, "codex/shared-coordination\n");
+    }
+    if (joined === "rev-parse HEAD") {
+      return ok(argsArray, "abc123def456\n");
+    }
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return ok(argsArray, "origin/codex/shared-coordination\n");
+    }
+    if (joined === "status --porcelain=v1") {
+      return ok(argsArray, "");
+    }
+    if (joined === "rev-list --left-right --count HEAD...@{u}") {
+      return ok(argsArray, "0\t0\n");
+    }
+
+    return ok(argsArray, "");
+  };
+}
+
+function ok(args: string[], stdout: string): GitCommandResult {
+  return {
+    args,
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -96,6 +135,8 @@ describe("DevNexus MCP server", () => {
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
+      "coordination_status",
+      "coordination_handoff",
       "work_item_create",
       "work_item_list",
       "work_item_get",
@@ -103,6 +144,87 @@ describe("DevNexus MCP server", () => {
       "work_item_comment",
       "work_item_set_status",
     ]);
+  });
+
+  it("records and reports coordination handoffs through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate shared work",
+      status: "in_progress",
+    });
+
+    const handoff = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_handoff",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          status: "ready",
+          hostId: "windows-devbox",
+          agentId: "codex",
+          changedAreas: ["src/nexusCoordination.ts"],
+          decisions: ["Use advisory records."],
+          verificationSummary: "focused tests passed",
+          integrationPreference: "direct_integration",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-16T10:00:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+    const status = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_status",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-16T10:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+
+    expect(handoff).toMatchObject({
+      ok: true,
+      record: {
+        status: "ready",
+        branch: "codex/shared-coordination",
+        pushed: true,
+      },
+      comment: {
+        id: "local-comment-1",
+      },
+    });
+    expect(status).toMatchObject({
+      ok: true,
+      status: {
+        git: {
+          dirty: false,
+          pushed: true,
+        },
+        handoffs: {
+          records: [
+            {
+              status: "ready",
+              stale: false,
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("serves project, automation, and work-item calls without specialization adapters", async () => {

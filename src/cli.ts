@@ -51,6 +51,14 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  createNexusCoordinationHandoff,
+  getNexusCoordinationStatus,
+  parseNexusCoordinationHandoffStatus,
+  type NexusCoordinationHandoffResult,
+  type NexusCoordinationHandoffStatus,
+  type NexusCoordinationStatus,
+} from "./nexusCoordination.js";
+import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
@@ -289,6 +297,30 @@ interface ParsedAutomationTargetReportCommand {
   json?: boolean;
 }
 
+interface ParsedCoordinationStatusCommand {
+  projectRoot: string;
+  componentId?: string;
+  workItemId?: string;
+  currentPath?: string;
+  json?: boolean;
+}
+
+interface ParsedCoordinationHandoffCommand {
+  projectRoot: string;
+  componentId?: string;
+  workItemId: string;
+  status: NexusCoordinationHandoffStatus;
+  hostId?: string;
+  agentId?: string;
+  changedAreas: string[];
+  decisions: string[];
+  verificationSummary?: string | null;
+  integrationPreference?: string | null;
+  note?: string | null;
+  currentPath?: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -316,6 +348,8 @@ export function usage(): string {
     "  dev-nexus project mcp refresh <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
+    "  dev-nexus coordination status <project-root> [options]",
+    "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
@@ -374,6 +408,25 @@ export function usage(): string {
     "Options for project tracker link:",
     "  --home <path>",
     "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for coordination status:",
+    "  --component <id>          defaults to component inferred from --worktree or current directory",
+    "  --work-item <id>",
+    "  --worktree <path>         git worktree or source checkout used for status",
+    "  --json",
+    "",
+    "Options for coordination handoff:",
+    "  --component <id>          defaults to component inferred from --worktree or current directory",
+    "  --status <working|ready|blocked|merged>",
+    "  --host <id>",
+    "  --agent <id>",
+    "  --changed-area <path>      repeatable",
+    "  --decision <text>          repeatable",
+    "  --verification <text>",
+    "  --integration-preference <text>",
+    "  --note <text>",
+    "  --worktree <path>         git worktree or source checkout used for status",
     "  --json",
     "",
     "Options for work-item create:",
@@ -497,6 +550,9 @@ export async function main(
   if (argv[0] === "project") {
     return handleProjectCommand(argv, dependencies);
   }
+  if (argv[0] === "coordination") {
+    return handleCoordinationCommand(argv, dependencies);
+  }
   if (argv[0] === "work-item") {
     return handleWorkItemCommand(argv, dependencies);
   }
@@ -508,7 +564,9 @@ export async function main(
     return 0;
   }
 
-  throw new Error("dev-nexus requires home, project, work-item, automation, mcp-stdio, or --help");
+  throw new Error(
+    "dev-nexus requires home, project, coordination, work-item, automation, mcp-stdio, or --help",
+  );
 }
 
 async function handleHomeCommand(
@@ -683,6 +741,58 @@ async function handleProjectTrackerCommand(
   }
 
   throw new Error("project tracker requires configure or link");
+}
+
+async function handleCoordinationCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "status") {
+    const parsed = parseCoordinationStatusCommand(argv);
+    const status = await getNexusCoordinationStatus({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      currentPath: parsed.currentPath ?? process.cwd(),
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationStatusResult(
+      status,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "handoff") {
+    const parsed = parseCoordinationHandoffCommand(argv);
+    const result = await createNexusCoordinationHandoff({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      status: parsed.status,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      changedAreas: parsed.changedAreas,
+      decisions: parsed.decisions,
+      verificationSummary: parsed.verificationSummary,
+      integrationPreference: parsed.integrationPreference,
+      note: parsed.note,
+      currentPath: parsed.currentPath ?? process.cwd(),
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationHandoffResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("coordination requires status or handoff");
 }
 
 async function handleWorkItemCommand(
@@ -1428,6 +1538,121 @@ function parseProjectTrackerLinkCommand(
   }
 
   return parsed as ParsedProjectTrackerLinkCommand;
+}
+
+function parseCoordinationStatusCommand(
+  argv: string[],
+): ParsedCoordinationStatusCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination status requires a project root");
+  }
+
+  const parsed: ParsedCoordinationStatusCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseCoordinationHandoffCommand(
+  argv: string[],
+): ParsedCoordinationHandoffCommand {
+  const [, , projectRoot, workItemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination handoff requires a project root");
+  }
+  if (!workItemId || workItemId.startsWith("--")) {
+    throw new Error("coordination handoff requires a work item id");
+  }
+
+  const parsed: Partial<ParsedCoordinationHandoffCommand> = {
+    projectRoot,
+    workItemId,
+    changedAreas: [],
+    decisions: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--status":
+        parsed.status = parseNexusCoordinationHandoffStatus(next(), arg);
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--changed-area":
+        parsed.changedAreas?.push(next());
+        break;
+      case "--decision":
+        parsed.decisions?.push(next());
+        break;
+      case "--verification":
+        parsed.verificationSummary = next();
+        break;
+      case "--integration-preference":
+        parsed.integrationPreference = next();
+        break;
+      case "--note":
+        parsed.note = next();
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination handoff option: ${arg}`);
+    }
+  }
+
+  if (!parsed.status) {
+    throw new Error("coordination handoff requires --status");
+  }
+
+  return parsed as ParsedCoordinationHandoffCommand;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -2240,6 +2465,57 @@ function printProjectTrackerLinkResult(
   writeLine(stdout, "DevNexus project tracker linked.");
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Tracker project: ${result.vibeKanbanProjectId}`);
+}
+
+function printCoordinationStatusResult(
+  status: NexusCoordinationStatus,
+  parsed: ParsedCoordinationStatusCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, status };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination status.");
+  writeLine(stdout, `  Project: ${status.project.id}`);
+  writeLine(stdout, `  Component: ${status.component.id}`);
+  if (status.workItem) {
+    writeLine(stdout, `  Work item: ${status.workItem.id} ${status.workItem.title}`);
+  }
+  writeLine(stdout, `  Repository: ${status.git.repositoryPath ?? "not resolved"}`);
+  writeLine(stdout, `  Branch: ${status.git.branch ?? "unknown"}`);
+  writeLine(
+    stdout,
+    `  Dirty: ${status.git.dirty === null ? "unknown" : String(status.git.dirty)}`,
+  );
+  writeLine(
+    stdout,
+    `  Pushed: ${status.git.pushed === null ? "unknown" : String(status.git.pushed)}`,
+  );
+  writeLine(stdout, `  Handoffs: ${status.handoffs.records.length}`);
+  writeLine(stdout, `  Next action: ${status.nextAction}`);
+}
+
+function printCoordinationHandoffResult(
+  result: NexusCoordinationHandoffResult,
+  parsed: ParsedCoordinationHandoffCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination handoff recorded.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Component: ${result.component.id}`);
+  writeLine(stdout, `  Work item: ${result.record.workItemId}`);
+  writeLine(stdout, `  Status: ${result.record.status}`);
+  writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
+  writeLine(stdout, `  Comment: ${result.comment.id}`);
 }
 
 function printWorkItemCreateResult(

@@ -178,6 +178,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
+    expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
@@ -609,6 +610,165 @@ describe("dev-nexus cli", () => {
       defaultLocalWorkTrackingStorePath(projectRoot),
     );
     expect(store.comments["local-1"]).toHaveLength(1);
+  });
+
+  it("records and reports coordination handoffs through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate shared work",
+      status: "in_progress",
+    });
+    const handoffOutput = captureOutput();
+    const statusOutput = captureOutput();
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return {
+          args: argsArray,
+          stdout: `${worktreePath}\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "symbolic-ref --short HEAD") {
+        return {
+          args: argsArray,
+          stdout: "codex/shared-coordination\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-parse HEAD") {
+        return {
+          args: argsArray,
+          stdout: "abc123\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+        return {
+          args: argsArray,
+          stdout: "origin/codex/shared-coordination\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "status --porcelain=v1") {
+        return {
+          args: argsArray,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-list --left-right --count HEAD...@{u}") {
+        return {
+          args: argsArray,
+          stdout: "0\t0\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(
+      [
+        "coordination",
+        "handoff",
+        projectRoot,
+        "local-1",
+        "--status",
+        "ready",
+        "--host",
+        "windows-devbox",
+        "--agent",
+        "codex",
+        "--changed-area",
+        "src/nexusCoordination.ts",
+        "--decision",
+        "Use advisory records.",
+        "--verification",
+        "focused tests passed",
+        "--integration-preference",
+        "direct_integration",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: handoffOutput.writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "coordination",
+        "status",
+        projectRoot,
+        "--work-item",
+        "local-1",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: statusOutput.writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:15:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(handoffOutput.output())).toMatchObject({
+      ok: true,
+      record: {
+        status: "ready",
+        hostId: "windows-devbox",
+        agentId: "codex",
+        branch: "codex/shared-coordination",
+      },
+      comment: {
+        id: "local-comment-1",
+      },
+    });
+    expect(JSON.parse(statusOutput.output())).toMatchObject({
+      ok: true,
+      status: {
+        workItem: {
+          id: "local-1",
+        },
+        git: {
+          dirty: false,
+          pushed: true,
+        },
+        handoffs: {
+          records: [
+            {
+              status: "ready",
+              stale: false,
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("prints read-only automation status", async () => {

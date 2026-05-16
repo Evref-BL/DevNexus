@@ -42,10 +42,16 @@ import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  createNexusCoordinationHandoff,
+  getNexusCoordinationStatus,
+  parseNexusCoordinationHandoffStatus,
+} from "./nexusCoordination.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
 } from "./workItemService.js";
+import type { GitRunner } from "./gitWorktreeService.js";
 import type {
   WorkItemPatch,
   WorkItemRef,
@@ -71,6 +77,8 @@ export interface McpTool {
 
 export interface DevNexusMcpToolContext {
   now?: () => Date | string;
+  gitRunner?: GitRunner;
+  currentPath?: string;
 }
 
 export interface DevNexusMcpToolResult {
@@ -216,6 +224,50 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_status",
+    description: "Report advisory shared coordination status for a component worktree and optional work item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        workItemId: { type: "string" },
+        currentPath: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_handoff",
+    description: "Record an advisory structured coordination handoff as a tracker-backed work-item comment.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        workItemId: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["working", "ready", "blocked", "merged"],
+        },
+        hostId: { type: "string" },
+        agentId: { type: "string" },
+        changedAreas: { type: "array", items: { type: "string" } },
+        decisions: { type: "array", items: { type: "string" } },
+        verificationSummary: { type: ["string", "null"] },
+        integrationPreference: { type: ["string", "null"] },
+        note: { type: ["string", "null"] },
+        currentPath: { type: "string" },
+      },
+      required: ["workItemId", "status"],
       additionalProperties: false,
     },
   },
@@ -403,6 +455,56 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             now: context.now?.(),
           }),
+        });
+      case "coordination_status":
+        return toolResult({
+          ok: true,
+          status: await getNexusCoordinationStatus({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            workItemId: optionalString(args, "workItemId", "arguments"),
+            currentPath:
+              optionalString(args, "currentPath", "arguments") ??
+              context.currentPath ??
+              process.cwd(),
+            gitRunner: context.gitRunner,
+            now: context.now,
+          }),
+        });
+      case "coordination_handoff":
+        return toolResult({
+          ok: true,
+          ...(await createNexusCoordinationHandoff({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            workItemId: requiredString(args, "workItemId", "arguments"),
+            status: parseNexusCoordinationHandoffStatus(
+              requiredString(args, "status", "arguments"),
+              "arguments.status",
+            ),
+            hostId: optionalString(args, "hostId", "arguments"),
+            agentId: optionalString(args, "agentId", "arguments"),
+            changedAreas:
+              optionalStringArray(args, "changedAreas", "arguments") ?? [],
+            decisions: optionalStringArray(args, "decisions", "arguments") ?? [],
+            verificationSummary: optionalNullableString(
+              args,
+              "verificationSummary",
+              "arguments",
+            ),
+            integrationPreference: optionalNullableString(
+              args,
+              "integrationPreference",
+              "arguments",
+            ),
+            note: optionalNullableString(args, "note", "arguments"),
+            currentPath:
+              optionalString(args, "currentPath", "arguments") ??
+              context.currentPath ??
+              process.cwd(),
+            gitRunner: context.gitRunner,
+            now: context.now,
+          })),
         });
       case "work_item_create":
         return toolResult({
