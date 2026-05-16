@@ -22,13 +22,17 @@ import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
   materializeNexusAutomationWorktreeSetup,
   preflightNexusAutomationWorktreeSetup,
+  type NexusAutomationPluginDependencyProjection,
   type NexusAutomationWorktreeSetupResult,
 } from "./nexusAutomationWorktreeSetup.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { projectPluginWorkerFragments } from "./nexusPluginCapabilities.js";
+import {
+  projectPluginDependencyProjections,
+  projectPluginWorkerFragments,
+} from "./nexusPluginCapabilities.js";
 import {
   resolvePrimaryProjectComponent,
   type ResolvedNexusProjectComponent,
@@ -166,6 +170,8 @@ export async function runNexusAutomationOnce(
   let provider: WorkTrackerProvider | null = null;
   let primaryComponent: ResolvedNexusProjectComponent | null = null;
   let preflight: NexusAutomationPreflightCheck[] = [];
+  let pluginDependencyProjections: NexusAutomationPluginDependencyProjection[] =
+    [];
 
   if (!automationConfig?.enabled) {
     return {
@@ -288,6 +294,10 @@ export async function runNexusAutomationOnce(
       });
     }
 
+    pluginDependencyProjections = automationPluginDependencyProjections(
+      projectConfig,
+      primaryComponent.id,
+    );
     provider = createAutomationProvider({
       options,
       projectRoot,
@@ -302,6 +312,7 @@ export async function runNexusAutomationOnce(
       component: primaryComponent,
       automationConfig,
       provider,
+      pluginDependencyProjections,
     });
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
@@ -408,6 +419,7 @@ export async function runNexusAutomationOnce(
       worktreesRoot: primaryComponent.worktreesRoot,
       worktreePath: worktree.worktreePath,
       automationConfig,
+      pluginDependencyProjections,
       skillsConfig: projectConfig.skills,
       context: {
         project: {
@@ -581,6 +593,7 @@ export function preflightNexusAutomationRunOnce(options: {
   component: ResolvedNexusProjectComponent;
   automationConfig: NexusAutomationConfig;
   provider: WorkTrackerProvider;
+  pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
 }): NexusAutomationPreflightCheck[] {
   const worktreesRoot = options.component.worktreesRoot;
 
@@ -630,8 +643,31 @@ export function preflightNexusAutomationRunOnce(options: {
     ...preflightNexusAutomationWorktreeSetup({
       sourceRoot: options.sourceRoot,
       automationConfig: options.automationConfig,
+      pluginDependencyProjections: options.pluginDependencyProjections,
     }),
   ];
+}
+
+function automationPluginDependencyProjections(
+  projectConfig: NexusProjectConfig,
+  componentId: string,
+): NexusAutomationPluginDependencyProjection[] {
+  return projectPluginDependencyProjections(projectConfig, {
+    componentId,
+  }).map((projection) => ({
+    id: projection.id,
+    source: projection.source,
+    target: projection.target,
+    required: projection.required,
+    sourceControl: projection.sourceControl,
+    reason: projection.reason,
+    sourceMetadata: {
+      pluginId: projection.pluginSource.pluginId,
+      pluginName: projection.pluginSource.pluginName,
+      version: projection.pluginSource.version,
+      capabilityId: projection.pluginSource.capabilityId,
+    },
+  }));
 }
 
 export function generateNexusAutomationRunId(

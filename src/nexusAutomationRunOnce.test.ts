@@ -340,6 +340,168 @@ describe("nexus automation run once", () => {
     expect(gitCalls.some((call) => call.args[0] === "rev-parse")).toBe(true);
   });
 
+  it("materializes plugin dependency projections before executor work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-run-once-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    fs.mkdirSync(sourceDependency, { recursive: true });
+    fs.writeFileSync(path.join(sourceDependency, "tool.txt"), "ready\n", "utf8");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        plugins: [
+          {
+            id: "typescript",
+            enabled: true,
+            name: "TypeScript Tooling",
+            version: "0.1.0",
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "node-modules",
+                source: "node_modules",
+                target: "node_modules",
+                required: true,
+                reason: "Resolve local npm binaries from generated worker worktrees.",
+                targetComponents: ["primary"],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Run with plugin-projected dependencies",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = await runNexusAutomationOnce({
+      projectRoot,
+      runId: "run-plugin-deps",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+        "2026-05-16T10:02:00.000Z",
+        "2026-05-16T10:03:00.000Z",
+      ),
+      gitRunner: fakeGitRunner(gitCalls),
+      executor: ({ setup, worktree }) => {
+        expect(setup.dependencyProjections).toMatchObject([
+          {
+            id: "node-modules",
+            source: "node_modules",
+            target: "node_modules",
+            required: true,
+            sourceControl: "support",
+            status: "linked",
+            sourceMetadata: {
+              pluginId: "typescript",
+              pluginName: "TypeScript Tooling",
+              version: "0.1.0",
+              capabilityId: "node-modules",
+            },
+          },
+        ]);
+        expect(
+          fs.existsSync(path.join(worktree.worktreePath, "node_modules", "tool.txt")),
+        ).toBe(true);
+
+        return {
+          status: "completed",
+          summary: "Plugin dependencies linked",
+        };
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.setup?.dependencyProjections).toMatchObject([
+      {
+        sourcePath: sourceDependency,
+        targetPath: path.join(result.worktree!.worktreePath, "node_modules"),
+        status: "linked",
+      },
+    ]);
+    const contextJson = JSON.parse(
+      fs.readFileSync(result.setup!.context!.contextJsonPath, "utf8"),
+    );
+    expect(contextJson.dependencySupport.pluginDependencyProjections)
+      .toMatchObject([
+        {
+          id: "node-modules",
+          status: "linked",
+          sourceMetadata: {
+            pluginId: "typescript",
+            capabilityId: "node-modules",
+          },
+        },
+      ]);
+    const excludeEntries = fs
+      .readFileSync(
+        path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
+        "utf8",
+      )
+      .trim()
+      .split(/\r?\n/u);
+    expect(excludeEntries).toContain("node_modules/");
+  });
+
+  it("blocks before worktree preparation when a required plugin dependency projection is missing", async () => {
+    const projectRoot = makeTempDir("dev-nexus-run-once-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        plugins: [
+          {
+            id: "typescript",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "node-modules",
+                source: "node_modules",
+                target: "node_modules",
+                required: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = await runNexusAutomationOnce({
+      projectRoot,
+      runId: "run-missing-plugin-deps",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      gitRunner: fakeGitRunner(gitCalls),
+      executor: () => {
+        throw new Error("executor should not run");
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.summary).toContain(
+      "Required plugin dependency projection source does not exist",
+    );
+    expect(result.preflight).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "pluginDependencyProjection:node-modules",
+          status: "failed",
+        }),
+      ]),
+    );
+    expect(gitCalls).toEqual([]);
+  });
+
   it("passes worker context bundle paths and metadata to the executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-run-once-project-");
     const sourceRoot = path.join(projectRoot, "source");

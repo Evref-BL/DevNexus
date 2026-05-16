@@ -34,9 +34,9 @@ Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions or plugins. DevNexus provides the core contracts and hooks without
 depending on any specific specialization. Plugins are additive capability
 declarations: they can describe setup policy, projected skills, MCP servers
-and tools, environment hints, cleanup hooks, worker context or briefing
-fragments, and agent affordances, but they do not own the project or replace
-the generic coordinator launch boundary.
+and tools, dependency projections, environment hints, cleanup hooks, worker
+context or briefing fragments, and agent affordances, but they do not own the
+project or replace the generic coordinator launch boundary.
 
 ## Project CLI
 
@@ -197,6 +197,8 @@ Supported capability record kinds are:
 - `environment_hint`: environment variables or paths relevant to plugin tools.
 - `cleanup_hook`: cleanup policy to consider after plugin-assisted work.
 - `agent_affordance`: a concise capability or interaction the plugin makes available.
+- `dependency_projection`: setup-only links from a component source root into a
+  generated worker worktree, such as already-reviewed toolchain dependencies.
 - `worker_context_fragment`: bounded advisory context rendered into generated worker `context.json`.
 - `worker_briefing_fragment`: bounded advisory Markdown rendered into generated worker `briefing.md`.
 
@@ -243,6 +245,15 @@ Example:
           "id": "remove-temporary-cache",
           "description": "Remove temporary cache files created by plugin tools.",
           "trigger": "after_run"
+        },
+        {
+          "kind": "dependency_projection",
+          "id": "node-modules",
+          "source": "node_modules",
+          "target": "node_modules",
+          "required": false,
+          "sourceControl": "support",
+          "reason": "Resolve local npm binaries from generated worker worktrees."
         },
         {
           "kind": "worker_briefing_fragment",
@@ -507,6 +518,14 @@ source root into the generated worktree and records the target in the worktree
 Git exclude file. Required links are checked during read-only status so unsafe
 or missing dependencies block before worktree creation.
 
+Enabled plugins can contribute the same setup behavior through
+`dependency_projection` capabilities. DevNexus lowers those plugin records into
+worker setup, applies component and agent targeting, links existing dependency
+paths without running installers, and records projection status in both the
+setup result and generated worker context. `sourceControl: "support"` excludes
+the projected target from the worker checkout's Git state; `"source"` leaves it
+visible when a project intentionally wants the target committed.
+
 Dependency-link setup also treats the component worktrees root as a safety
 boundary when provided: the target worktree path must remain inside that root
 before any link is created. This keeps shared dependencies scoped to the
@@ -567,8 +586,8 @@ and `target-cycle` commands to record the work the coordinator chose. The
 full `automation status --json` remains available when the agent needs the
 complete target context. `automation agent-profiles --json` includes enabled
 `pluginCapabilities`, so coordinators can see generic plugin-provided skills,
-MCP tools, setup obligations, environment hints, cleanup hooks, and affordances
-without reading the full project config.
+MCP tools, setup obligations, dependency projections, environment hints,
+cleanup hooks, and affordances without reading the full project config.
 
 Projects can also store the shell command under `automation.agent.command` for
 agent-launch mode or `automation.executor.command` for the older generated
