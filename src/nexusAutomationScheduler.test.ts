@@ -213,6 +213,82 @@ describe("nexus automation scheduler", () => {
     });
   });
 
+  it("schedules agent launches without preparing worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-scheduler-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          command: "codex run",
+          timeoutMs: null,
+          relaunch: {
+            whileEligible: true,
+          },
+        },
+      },
+    });
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Agent launch task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationScheduler({
+      projectRoot,
+      maxRuns: 1,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      agentLauncher: ({ eligibleWorkItems }) => ({
+        status: "completed",
+        summary: `Agent saw ${eligibleWorkItems.length} item(s)`,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      stoppedReason: "max_runs",
+      ticks: [
+        {
+          action: "ran",
+          waitMs: 0,
+          status: {
+            status: "ready",
+            selectedWorkItem: null,
+            eligibleWorkItems: [
+              {
+                id: "local-1",
+              },
+            ],
+          },
+          run: {
+            status: "completed",
+            summary: "Agent saw 1 item(s)",
+            eligibleWorkItems: [
+              {
+                id: "local-1",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+    expect(
+      loadLocalWorkTrackingStore(defaultLocalWorkTrackingStorePath(projectRoot))
+        .items[0],
+    ).toMatchObject({
+      id: "local-1",
+      status: "ready",
+    });
+  });
+
   it("uses retry and lock timestamps as the next scheduler delay", () => {
     expect(
       nextNexusAutomationSchedulerDelayMs(

@@ -7,6 +7,11 @@ import {
   type NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
 import {
+  runNexusAutomationAgentLaunchOnce,
+  type NexusAutomationAgentLauncher,
+  type RunNexusAutomationAgentLaunchOnceResult,
+} from "./nexusAutomationAgentLaunch.js";
+import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
@@ -19,6 +24,9 @@ export type NexusAutomationSchedulerStopReason =
   | "max_runs"
   | "max_ticks"
   | "stopped";
+export type NexusAutomationSchedulerRunResult =
+  | RunNexusAutomationOnceResult
+  | RunNexusAutomationAgentLaunchOnceResult;
 
 export interface NexusAutomationSchedulerTick {
   index: number;
@@ -27,12 +35,13 @@ export interface NexusAutomationSchedulerTick {
   status: NexusAutomationStatus;
   action: NexusAutomationSchedulerAction;
   waitMs: number | null;
-  run: RunNexusAutomationOnceResult | null;
+  run: NexusAutomationSchedulerRunResult | null;
 }
 
 export interface RunNexusAutomationSchedulerOptions {
   projectRoot: string;
-  executor: NexusAutomationExecutor;
+  executor?: NexusAutomationExecutor;
+  agentLauncher?: NexusAutomationAgentLauncher;
   owner?: string | null;
   baseRef?: string | null;
   provider?: WorkTrackerProvider;
@@ -54,7 +63,7 @@ export interface RunNexusAutomationSchedulerResult {
   startedAt: string;
   finishedAt: string;
   ticks: NexusAutomationSchedulerTick[];
-  runs: RunNexusAutomationOnceResult[];
+  runs: NexusAutomationSchedulerRunResult[];
   stoppedReason: NexusAutomationSchedulerStopReason;
 }
 
@@ -75,7 +84,7 @@ export async function runNexusAutomationScheduler(
   const sleep = options.sleep ?? defaultSleep;
   const startedAt = currentIso(options.now);
   const ticks: NexusAutomationSchedulerTick[] = [];
-  const runs: RunNexusAutomationOnceResult[] = [];
+  const runs: NexusAutomationSchedulerRunResult[] = [];
   let stoppedReason: NexusAutomationSchedulerStopReason = "stopped";
 
   while (true) {
@@ -115,24 +124,55 @@ export async function runNexusAutomationScheduler(
       intervalMs,
       tickStartedAt,
     );
-    let run: RunNexusAutomationOnceResult | null = null;
+    let run: NexusAutomationSchedulerRunResult | null = null;
 
     if (status.status === "ready") {
-      run = await runNexusAutomationOnce({
-        projectRoot,
-        provider: options.provider,
-        providerFactory: options.providerFactory,
-        providerOptions: options.providerOptions,
-        gitRunner: options.gitRunner,
-        now: options.now,
-        owner: options.owner ?? "scheduler",
-        baseRef: options.baseRef,
-        runId: schedulerRunId(options.runIdPrefix, ticks.length + 1, tickStartedAt),
-        executor: options.executor,
-      });
+      const runId = schedulerRunId(
+        options.runIdPrefix,
+        ticks.length + 1,
+        tickStartedAt,
+      );
+      if (status.automationConfig?.mode === "agent_launch") {
+        if (!options.agentLauncher) {
+          throw new NexusAutomationSchedulerError(
+            "agentLauncher is required when automation.mode is agent_launch",
+          );
+        }
+        run = await runNexusAutomationAgentLaunchOnce({
+          projectRoot,
+          provider: options.provider,
+          providerFactory: options.providerFactory,
+          providerOptions: options.providerOptions,
+          now: options.now,
+          owner: options.owner ?? "scheduler",
+          runId,
+          launcher: options.agentLauncher,
+        });
+        waitMs = status.automationConfig.agent.relaunch.whileEligible &&
+          maxRuns !== undefined
+          ? 0
+          : intervalMs;
+      } else {
+        if (!options.executor) {
+          throw new NexusAutomationSchedulerError(
+            "executor is required when automation.mode is run_once",
+          );
+        }
+        run = await runNexusAutomationOnce({
+          projectRoot,
+          provider: options.provider,
+          providerFactory: options.providerFactory,
+          providerOptions: options.providerOptions,
+          gitRunner: options.gitRunner,
+          now: options.now,
+          owner: options.owner ?? "scheduler",
+          baseRef: options.baseRef,
+          runId,
+          executor: options.executor,
+        });
+      }
       runs.push(run);
       action = "ran";
-      waitMs = intervalMs;
     }
 
     const tick = schedulerTick({

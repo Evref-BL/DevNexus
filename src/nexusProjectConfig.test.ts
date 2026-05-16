@@ -304,6 +304,13 @@ describe("project config", () => {
         timeoutMs: 120000,
         runFullVerification: true,
       },
+      agent: {
+        command: null,
+        timeoutMs: null,
+        relaunch: {
+          whileEligible: false,
+        },
+      },
       safety: {
         profile: "local",
         allowHostMutation: false,
@@ -315,6 +322,39 @@ describe("project config", () => {
         remote: "origin",
         targetBranch: "main",
         push: true,
+      },
+    });
+  });
+
+  it("accepts agent launch automation mode", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "agent-launch-project",
+        name: "Agent Launch Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          mode: "agent_launch",
+          agent: {
+            command: "codex run",
+            timeoutMs: 600000,
+            relaunch: {
+              whileEligible: true,
+            },
+          },
+        },
+      }).automation,
+    ).toMatchObject({
+      mode: "agent_launch",
+      agent: {
+        command: "codex run",
+        timeoutMs: 600000,
+        relaunch: {
+          whileEligible: true,
+        },
       },
     });
   });

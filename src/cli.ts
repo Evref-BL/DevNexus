@@ -8,6 +8,11 @@ import {
   type NexusAutomationCommandRunner,
 } from "./nexusAutomationCommandExecutor.js";
 import {
+  createNexusAutomationAgentCommandLauncher,
+  runNexusAutomationAgentLaunchOnce,
+  type RunNexusAutomationAgentLaunchOnceResult,
+} from "./nexusAutomationAgentLaunch.js";
+import {
   enqueueNexusAutomationWorkItem,
   type EnqueueNexusAutomationWorkItemResult,
 } from "./nexusAutomationEnqueue.js";
@@ -337,7 +342,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation run-once:",
-    "  --command <command>        shell command to run; overrides automation.executor.command",
+    "  --command <command>        shell command to run; overrides automation.executor.command or automation.agent.command",
     "  --run-id <id>",
     "  --owner <name>",
     "  --branch <name>",
@@ -348,7 +353,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation schedule:",
-    "  --command <command>        shell command to run; overrides automation.executor.command",
+    "  --command <command>        shell command to run; overrides automation.executor.command or automation.agent.command",
     "  --owner <name>",
     "  --base-ref <ref>",
     "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
@@ -652,7 +657,7 @@ async function handleAutomationCommand(
 
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
-    const executorOptions = resolveAutomationExecutorCliOptions(
+    const commandOptions = resolveAutomationCommandCliOptions(
       "schedule",
       parsed,
     );
@@ -670,13 +675,23 @@ async function handleAutomationCommand(
       onTick: parsed.json
         ? undefined
         : (tick) => printAutomationScheduleTick(tick, stdout),
-      executor: createNexusAutomationCommandExecutor({
-        command: executorOptions.command,
-        commandRunner: dependencies.commandRunner,
-        gitRunner: dependencies.gitRunner,
-        runFullVerification: executorOptions.runFullVerification,
-        timeoutMs: executorOptions.timeoutMs,
-      }),
+      ...(commandOptions.mode === "agent_launch"
+        ? {
+            agentLauncher: createNexusAutomationAgentCommandLauncher({
+              command: commandOptions.command,
+              commandRunner: dependencies.commandRunner,
+              timeoutMs: commandOptions.timeoutMs,
+            }),
+          }
+        : {
+            executor: createNexusAutomationCommandExecutor({
+              command: commandOptions.command,
+              commandRunner: dependencies.commandRunner,
+              gitRunner: dependencies.gitRunner,
+              runFullVerification: commandOptions.runFullVerification,
+              timeoutMs: commandOptions.timeoutMs,
+            }),
+          }),
     });
     printAutomationScheduleResult(result, parsed, stdout);
     return 0;
@@ -687,57 +702,88 @@ async function handleAutomationCommand(
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
-  const executorOptions = resolveAutomationExecutorCliOptions("run-once", parsed);
-  const result = await runNexusAutomationOnce({
-    projectRoot: parsed.projectRoot,
-    runId: parsed.runId,
-    owner: parsed.owner,
-    branchName: parsed.branchName,
-    worktreeName: parsed.worktreeName,
-    baseRef: parsed.baseRef,
-    gitRunner: dependencies.gitRunner,
-    now: dependencies.now,
-    executor: createNexusAutomationCommandExecutor({
-      command: executorOptions.command,
-      commandRunner: dependencies.commandRunner,
+  const commandOptions = resolveAutomationCommandCliOptions("run-once", parsed);
+  if (commandOptions.mode === "agent_launch") {
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot: parsed.projectRoot,
+      runId: parsed.runId,
+      owner: parsed.owner,
+      now: dependencies.now,
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: commandOptions.command,
+        commandRunner: dependencies.commandRunner,
+        timeoutMs: commandOptions.timeoutMs,
+      }),
+    });
+    printAutomationAgentLaunchResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+  } else {
+    const result = await runNexusAutomationOnce({
+      projectRoot: parsed.projectRoot,
+      runId: parsed.runId,
+      owner: parsed.owner,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      baseRef: parsed.baseRef,
       gitRunner: dependencies.gitRunner,
-      runFullVerification: executorOptions.runFullVerification,
-      timeoutMs: executorOptions.timeoutMs,
-    }),
-  });
-  printAutomationRunOnceResult(
-    result,
-    parsed,
-    dependencies.stdout ?? process.stdout,
-  );
+      now: dependencies.now,
+      executor: createNexusAutomationCommandExecutor({
+        command: commandOptions.command,
+        commandRunner: dependencies.commandRunner,
+        gitRunner: dependencies.gitRunner,
+        runFullVerification: commandOptions.runFullVerification,
+        timeoutMs: commandOptions.timeoutMs,
+      }),
+    });
+    printAutomationRunOnceResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+  }
   return 0;
 }
 
-function resolveAutomationExecutorCliOptions(
+function resolveAutomationCommandCliOptions(
   commandName: "run-once" | "schedule",
   parsed: ParsedAutomationRunOnceCommand | ParsedAutomationScheduleCommand,
 ): {
+  mode: "run_once" | "agent_launch";
   command: string;
   runFullVerification: boolean;
   timeoutMs?: number;
 } {
   const config = loadProjectConfig(path.resolve(parsed.projectRoot));
-  const configuredExecutor = config.automation?.executor;
-  const command = parsed.command ?? configuredExecutor?.command ?? undefined;
+  const mode = config.automation?.mode ?? "run_once";
+  const configuredCommand =
+    mode === "agent_launch"
+      ? config.automation?.agent.command
+      : config.automation?.executor.command;
+  const configuredTimeoutMs =
+    mode === "agent_launch"
+      ? config.automation?.agent.timeoutMs
+      : config.automation?.executor.timeoutMs;
+  const command = parsed.command ?? configuredCommand ?? undefined;
   if (!command) {
     throw new Error(
-      `automation ${commandName} requires --command or project config automation.executor.command`,
+      mode === "agent_launch"
+        ? `automation ${commandName} requires --command or project config automation.agent.command`
+        : `automation ${commandName} requires --command or project config automation.executor.command`,
     );
   }
 
   return {
+    mode,
     command,
     runFullVerification:
       parsed.runFullVerification ??
-      configuredExecutor?.runFullVerification ??
+      config.automation?.executor.runFullVerification ??
       false,
-    ...(parsed.timeoutMs ?? configuredExecutor?.timeoutMs
-      ? { timeoutMs: parsed.timeoutMs ?? configuredExecutor?.timeoutMs ?? undefined }
+    ...(parsed.timeoutMs ?? configuredTimeoutMs
+      ? { timeoutMs: parsed.timeoutMs ?? configuredTimeoutMs ?? undefined }
       : {}),
   };
 }
@@ -1824,6 +1870,36 @@ function printAutomationRunOnceResult(
   }
 }
 
+function printAutomationAgentLaunchResult(
+  result: RunNexusAutomationAgentLaunchOnceResult,
+  parsed: ParsedAutomationRunOnceCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus automation agent launch ${result.status}.`);
+  writeLine(stdout, `  Run: ${result.runId}`);
+  writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  writeLine(stdout, `  Eligible work items: ${result.eligibleWorkItems.length}`);
+  if (result.contextFile) {
+    writeLine(stdout, `  Context: ${result.contextFile}`);
+  }
+  if (result.resultFile) {
+    writeLine(stdout, `  Result file: ${result.resultFile}`);
+  }
+  if (result.launch?.verification) {
+    writeLine(stdout, `  Verification: ${result.launch.verification.length} record(s)`);
+  }
+  if (result.launch?.commitIds) {
+    writeLine(stdout, `  Commits: ${result.launch.commitIds.length}`);
+  }
+}
+
 function printAutomationStatusResult(
   result: NexusAutomationStatus,
   parsed: ParsedAutomationStatusCommand,
@@ -1843,6 +1919,9 @@ function printAutomationStatusResult(
       stdout,
       `  Selected work item: ${result.selectedWorkItem.id} ${result.selectedWorkItem.title}`,
     );
+  }
+  if (result.eligibleWorkItems) {
+    writeLine(stdout, `  Eligible work items: ${result.eligibleWorkItems.length}`);
   }
   if (result.candidateCount !== null) {
     writeLine(stdout, `  Candidates: ${result.candidateCount}`);

@@ -1,6 +1,7 @@
 export * from "./browserOpener.js";
 export * from "./gitWorktreeService.js";
 export * from "./nexusAutomation.js";
+export * from "./nexusAutomationAgentLaunch.js";
 export * from "./nexusAutomationCommandExecutor.js";
 export * from "./nexusAutomationConfig.js";
 export * from "./nexusAutomationEnqueue.js";

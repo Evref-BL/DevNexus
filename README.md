@@ -64,13 +64,22 @@ launched agent must inspect the tracker context, choose the work item or items
 to take, decide whether parallel Git worktrees are useful, and supervise
 implementation through verification and publication.
 
-`runNexusAutomationOnce` is the current low-level orchestration boundary for
-those adapters. It still exposes selected-work data so existing status and
-smoke workflows can run, but that is an interim shape. New automation work
-should move toward the launch-only boundary: DevNexus prepares safe context,
-starts the configured agent when the user-requested or scheduled launch policy
-fires, can relaunch while eligible work remains when the user has configured
-that behavior, and records the agent's reported result.
+`automation.mode: "agent_launch"` uses the launch-only boundary. DevNexus
+checks the selector as an eligibility gate, writes an agent context file under
+the project `.dev-nexus/automation` state directory, starts
+`automation.agent.command`, and records the result reported by the agent. The
+agent receives `DEV_NEXUS_AGENT_CONTEXT_FILE` and
+`DEV_NEXUS_AGENT_RESULT_FILE`; it can write status, summary, commits,
+verification records, publication decisions, blockers, and notes to the result
+file for DevNexus to retain in the run ledger.
+
+`runNexusAutomationOnce` remains available for older local command smokes that
+prepare one generated worktree and run `automation.executor.command`. That
+selected-work path is interim. New automation work should prefer
+`runNexusAutomationAgentLaunchOnce`: DevNexus prepares safe context, starts the
+configured agent when the user-requested or scheduled launch policy fires, can
+relaunch while eligible work remains when the user has configured that
+behavior, and records the agent's reported result.
 
 Generated worktrees can declare setup-only dependency links through
 `automation.setup.dependencyLinks`. Each link copies no package data and runs
@@ -93,11 +102,11 @@ dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-sc
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
 
-Projects can also store the shell command under
-`automation.executor.command`. In that mode, `automation run-once` and
-`automation schedule` may omit `--command`; command-line options still override
-the configured command, timeout, and full-verification setting for an agent
-launch.
+Projects can also store the shell command under `automation.agent.command` for
+agent-launch mode or `automation.executor.command` for the older generated
+worktree executor mode. `automation run-once` and `automation schedule` may
+omit `--command` when the relevant command is configured. Command-line options
+still override the configured command and timeout.
 
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an
@@ -111,8 +120,9 @@ inputs that would be invisible to the configured agent-launch loop.
 
 `automation run-once` runs the configured command with `DEV_NEXUS_*`
 environment variables for project context and writes the retained run ledger.
-The target command should normally launch an agent with enough context to make
-its own work-selection and supervision decisions.
+In agent-launch mode, no work item is selected and no generated worktree is
+prepared by DevNexus; the target command launches an agent with enough context
+to make its own work-selection and supervision decisions.
 
 `automation schedule` repeatedly checks the same read-only status boundary and
 dispatches `automation run-once` only when the project is ready. It honors

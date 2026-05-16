@@ -796,6 +796,89 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("runs agent launch automation through the command launcher", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          command: "codex run",
+          timeoutMs: 4321,
+          relaunch: {
+            whileEligible: false,
+          },
+        },
+      },
+    });
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Agent-launch task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+    const commandRuns: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commandRuns.push(command);
+      expect(options.cwd).toBe(projectRoot);
+      expect(options.timeoutMs).toBe(4321);
+      expect(options.env.DEV_NEXUS_AUTOMATION_MODE).toBe("agent_launch");
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "blocked",
+          summary: "Agent recorded a blocker",
+          error: "needs user decision",
+        })}\n`,
+        "utf8",
+      );
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(["automation", "run-once", projectRoot, "--json"], {
+      stdout: output.writer,
+      commandRunner,
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+    });
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "blocked",
+      summary: "Agent recorded a blocker",
+      eligibleWorkItems: [
+        {
+          id: "local-1",
+        },
+      ],
+    });
+    expect(commandRuns).toEqual(["codex run"]);
+    expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+    expect(
+      loadLocalWorkTrackingStore(defaultLocalWorkTrackingStorePath(projectRoot))
+        .items[0],
+    ).toMatchObject({
+      id: "local-1",
+      status: "ready",
+    });
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

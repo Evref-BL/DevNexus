@@ -1,6 +1,6 @@
 import type { WorkStatus } from "./workTrackingTypes.js";
 
-export type NexusAutomationMode = "run_once";
+export type NexusAutomationMode = "run_once" | "agent_launch";
 export type NexusAutomationSafetyProfile =
   | "local"
   | "isolated"
@@ -62,6 +62,16 @@ export interface NexusAutomationExecutorConfig {
   runFullVerification: boolean;
 }
 
+export interface NexusAutomationAgentRelaunchConfig {
+  whileEligible: boolean;
+}
+
+export interface NexusAutomationAgentConfig {
+  command: string | null;
+  timeoutMs: number | null;
+  relaunch: NexusAutomationAgentRelaunchConfig;
+}
+
 export interface NexusAutomationSafetyConfig {
   profile: NexusAutomationSafetyProfile;
   allowHostMutation: boolean;
@@ -87,6 +97,7 @@ export interface NexusAutomationConfig {
   schedule: NexusAutomationScheduleConfig;
   setup: NexusAutomationSetupConfig;
   executor: NexusAutomationExecutorConfig;
+  agent: NexusAutomationAgentConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
 }
@@ -132,6 +143,13 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     timeoutMs: null,
     runFullVerification: false,
   },
+  agent: {
+    command: null,
+    timeoutMs: null,
+    relaunch: {
+      whileEligible: false,
+    },
+  },
   safety: {
     profile: "local",
     allowHostMutation: false,
@@ -175,6 +193,7 @@ export function validateNexusAutomationConfig(
   const schedule = validateScheduleConfig(record.schedule);
   const setup = validateSetupConfig(record.setup);
   const executor = validateExecutorConfig(record.executor);
+  const agent = validateAgentConfig(record.agent);
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePublicationConfig(record.publication);
 
@@ -213,6 +232,14 @@ export function validateNexusAutomationConfig(
       ...defaultNexusAutomationConfig.executor,
       ...executor,
     },
+    agent: {
+      ...defaultNexusAutomationConfig.agent,
+      ...agent,
+      relaunch: {
+        ...defaultNexusAutomationConfig.agent.relaunch,
+        ...agent.relaunch,
+      },
+    },
     safety: {
       ...defaultNexusAutomationConfig.safety,
       ...safety,
@@ -231,11 +258,11 @@ function validateMode(
   if (value === undefined) {
     return undefined;
   }
-  if (value === "run_once") {
+  if (value === "run_once" || value === "agent_launch") {
     return value;
   }
 
-  throw new NexusAutomationConfigError(`${pathName} must be run_once`);
+  throw new NexusAutomationConfigError(`${pathName} must be run_once or agent_launch`);
 }
 
 function validateSelectorConfig(
@@ -389,6 +416,39 @@ function validateExecutorConfig(
     ...optionalNullableStringField(record, "command", pathName),
     ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
     ...optionalBooleanField(record, "runFullVerification", pathName),
+  };
+}
+
+function validateAgentConfig(
+  value: unknown,
+): Partial<NexusAutomationAgentConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.agent";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalNullableStringField(record, "command", pathName),
+    ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
+    ...validateAgentRelaunchConfig(record.relaunch),
+  };
+}
+
+function validateAgentRelaunchConfig(
+  value: unknown,
+): Partial<Pick<NexusAutomationAgentConfig, "relaunch">> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.agent.relaunch";
+  const record = assertRecord(value, pathName);
+  return {
+    relaunch: {
+      ...defaultNexusAutomationConfig.agent.relaunch,
+      ...optionalBooleanField(record, "whileEligible", pathName),
+    },
   };
 }
 

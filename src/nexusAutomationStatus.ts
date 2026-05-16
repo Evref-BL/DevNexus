@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   buildNexusAutomationWorkItemQuery,
+  eligibleNexusAutomationWorkItems,
   evaluateNexusAutomationLedgerBackoff,
   nexusAutomationLockPath,
   readNexusAutomationRunLedger,
@@ -10,6 +11,7 @@ import {
   type NexusAutomationRunLedger,
 } from "./nexusAutomation.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import { preflightNexusAutomationAgentLaunch } from "./nexusAutomationAgentLaunch.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -76,6 +78,7 @@ export interface NexusAutomationStatus {
   preflight: NexusAutomationPreflightCheck[];
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
+  eligibleWorkItems: WorkItem[] | null;
   selectedWorkItem: WorkItem | null;
 }
 
@@ -106,6 +109,7 @@ export async function getNexusAutomationStatus(
       preflight: [],
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -128,6 +132,7 @@ export async function getNexusAutomationStatus(
       preflight: [],
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -145,6 +150,7 @@ export async function getNexusAutomationStatus(
       preflight: [],
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -168,6 +174,7 @@ export async function getNexusAutomationStatus(
       preflight: [],
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -193,6 +200,7 @@ export async function getNexusAutomationStatus(
       ],
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -203,6 +211,65 @@ export async function getNexusAutomationStatus(
     sourceRoot,
     projectConfig,
   });
+  if (automationConfig.mode === "agent_launch") {
+    const preflight = preflightNexusAutomationAgentLaunch({
+      sourceRoot,
+      projectConfig,
+      provider,
+    });
+    const failedChecks = preflight.filter((check) => check.status === "failed");
+    if (failedChecks.length > 0) {
+      return statusResult({
+        projectRoot,
+        sourceRoot,
+        projectConfig,
+        automationConfig,
+        status: "blocked",
+        summary: failedChecks.map((check) => check.message).join("; "),
+        lock,
+        ledger,
+        backoff,
+        preflight,
+        selectorQuery: null,
+        candidateCount: null,
+        eligibleWorkItems: null,
+        selectedWorkItem: null,
+      });
+    }
+
+    const selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
+    const eligibleWorkItems = eligibleNexusAutomationWorkItems(
+      await provider.listWorkItems({
+        ...selectorQuery,
+        projectRoot,
+      }),
+      automationConfig,
+    );
+    const status: NexusAutomationStatusKind =
+      eligibleWorkItems.length > 0 ? "ready" : "idle";
+    const summary =
+      eligibleWorkItems.length > 0
+        ? `Agent launch ready with ${eligibleWorkItems.length} eligible work item(s)`
+        : "No eligible work item matched the automation selector";
+
+    return statusResult({
+      projectRoot,
+      sourceRoot,
+      projectConfig,
+      automationConfig,
+      status,
+      summary,
+      lock,
+      ledger,
+      backoff,
+      preflight,
+      selectorQuery,
+      candidateCount: eligibleWorkItems.length,
+      eligibleWorkItems,
+      selectedWorkItem: null,
+    });
+  }
+
   const preflight = preflightNexusAutomationRunOnce({
     projectRoot,
     sourceRoot,
@@ -225,6 +292,7 @@ export async function getNexusAutomationStatus(
       preflight,
       selectorQuery: null,
       candidateCount: null,
+      eligibleWorkItems: null,
       selectedWorkItem: null,
     });
   }
@@ -254,6 +322,7 @@ export async function getNexusAutomationStatus(
     preflight,
     selectorQuery,
     candidateCount: candidates.length,
+    eligibleWorkItems: null,
     selectedWorkItem,
   });
 }

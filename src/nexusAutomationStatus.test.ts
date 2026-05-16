@@ -108,6 +108,49 @@ describe("nexus automation status", () => {
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
 
+  it("reports agent launch readiness without selecting one work item", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Agent should choose",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      summary: "Agent launch ready with 1 eligible work item(s)",
+      candidateCount: 1,
+      eligibleWorkItems: [
+        {
+          id: "local-1",
+          title: "Agent should choose",
+        },
+      ],
+      selectedWorkItem: null,
+    });
+    expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
   it("reports an active run lock before listing candidate work", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     const config = projectConfig();

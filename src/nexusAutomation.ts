@@ -292,6 +292,13 @@ export function selectNexusAutomationWorkItem(
   return items.find((item) => matchesSelector(item, config.selector));
 }
 
+export function eligibleNexusAutomationWorkItems(
+  items: readonly WorkItem[],
+  config: NexusAutomationConfig,
+): WorkItem[] {
+  return items.filter((item) => matchesSelector(item, config.selector));
+}
+
 export function evaluateNexusAutomationBackoff(
   config: NexusAutomationConfig,
   consecutiveFailures: number,
