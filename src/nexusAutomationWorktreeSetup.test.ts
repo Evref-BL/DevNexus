@@ -141,6 +141,76 @@ describe("nexus automation worktree setup", () => {
     ]);
   });
 
+  it("materializes a generated worker context bundle and excludes it", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "codex-demo-project-local-19-run-1");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const ownership = {
+      componentId: "primary",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/demo-project/local-19/run-1",
+      baseRef: "main",
+      workItem: {
+        id: "local-19",
+        title: "Materialize worker context bundles for component worktrees",
+      },
+    };
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      gitRunner: fakeGitRunner(gitCalls),
+      context: {
+        project: {
+          id: "demo-project",
+          name: "Demo Project",
+          root: projectRoot,
+        },
+        ownership,
+      },
+    });
+
+    const contextDir = path.join(worktreePath, ".dev-nexus", "context");
+    const contextJsonPath = path.join(contextDir, "context.json");
+    const briefingPath = path.join(contextDir, "briefing.md");
+    expect(result.context).toMatchObject({
+      contextJsonPath,
+      briefingPath,
+    });
+    expect(JSON.parse(fs.readFileSync(contextJsonPath, "utf8"))).toMatchObject({
+      project: {
+        id: "demo-project",
+        name: "Demo Project",
+        root: projectRoot,
+      },
+      ownership,
+    });
+    expect(fs.readFileSync(briefingPath, "utf8")).toContain(
+      "Source and Git commands run from the component checkout root",
+    );
+    expect(
+      fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
+    ).toBe(".dev-nexus/context/\n");
+    expect(gitCalls).toEqual([
+      {
+        args: ["rev-parse", "--git-path", "info/exclude"],
+        cwd: worktreePath,
+      },
+    ]);
+  });
+
   it("rejects setup for a worktree outside the component worktrees root", () => {
     const sourceRoot = makeTempDir("dev-nexus-setup-source-");
     const componentWorktreesRoot = path.join(

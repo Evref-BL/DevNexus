@@ -187,24 +187,22 @@ describe("nexus automation run once", () => {
         title: "Implement run once",
       },
     });
-    expect(gitCalls).toEqual([
-      {
-        cwd: path.join(projectRoot, "source"),
-        args: [
-          "worktree",
-          "add",
-          "-b",
-          "codex/demo-project/local-1/run-1",
-          path.join(
-            projectRoot,
-            "worktrees",
-            "primary",
-            "codex-demo-project-local-1-run-1",
-          ),
-          "main",
-        ],
-      },
-    ]);
+    expect(gitCalls[0]).toEqual({
+      cwd: path.join(projectRoot, "source"),
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/demo-project/local-1/run-1",
+        path.join(
+          projectRoot,
+          "worktrees",
+          "primary",
+          "codex-demo-project-local-1-run-1",
+        ),
+        "main",
+      ],
+    });
     expect(result.execution).toMatchObject({
       worktree: {
         componentId: "primary",
@@ -331,15 +329,110 @@ describe("nexus automation run once", () => {
         status: "linked",
       },
     ]);
-    expect(
-      fs
-        .readFileSync(
-          path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
-          "utf8",
-        )
-        .trim(),
-    ).toBe("node_modules/");
+    const excludeEntries = fs
+      .readFileSync(
+        path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
+        "utf8",
+      )
+      .trim()
+      .split(/\r?\n/u);
+    expect(excludeEntries).toContain("node_modules/");
     expect(gitCalls.some((call) => call.args[0] === "rev-parse")).toBe(true);
+  });
+
+  it("passes worker context bundle paths and metadata to the executor", async () => {
+    const projectRoot = makeTempDir("dev-nexus-run-once-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Run with worker context",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    let observedSetup: {
+      context?: {
+        contextJsonPath: string;
+        briefingPath: string;
+      };
+    } | null = null;
+    let observedWorktree: { worktreePath: string } | null = null;
+
+    const result = await runNexusAutomationOnce({
+      projectRoot,
+      runId: "run-context",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+        "2026-05-16T10:02:00.000Z",
+        "2026-05-16T10:03:00.000Z",
+      ),
+      gitRunner: fakeGitRunner(gitCalls),
+      executor: ({ setup, worktree }) => {
+        observedSetup = setup;
+        observedWorktree = worktree;
+        return {
+          status: "completed",
+          summary: "Worker context available",
+        };
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(observedSetup).not.toBeNull();
+    expect(observedWorktree).not.toBeNull();
+    const observedWorktreePath = observedWorktree!.worktreePath;
+    const contextDir = path.join(
+      observedWorktreePath,
+      ".dev-nexus",
+      "context",
+    );
+    const expectedContext = {
+      contextJsonPath: path.join(contextDir, "context.json"),
+      briefingPath: path.join(contextDir, "briefing.md"),
+    };
+    expect(observedSetup.context).toMatchObject(expectedContext);
+    expect(result.setup?.context).toMatchObject(expectedContext);
+
+    const contextJson = JSON.parse(
+      fs.readFileSync(observedSetup.context.contextJsonPath, "utf8"),
+    );
+    expect(contextJson).toMatchObject({
+      project: {
+        id: "demo-project",
+        name: "Demo Project",
+        root: projectRoot,
+      },
+      ownership: {
+        componentId: "primary",
+        sourceRoot,
+        worktreesRoot: path.join(projectRoot, "worktrees", "primary"),
+        worktreePath: observedWorktreePath,
+        branchName: "codex/demo-project/local-1/run-context",
+        baseRef: "main",
+        workItem: {
+          id: "local-1",
+          title: "Run with worker context",
+        },
+      },
+    });
+    expect(fs.readFileSync(observedSetup.context.briefingPath, "utf8")).toContain(
+      "Source and Git commands run from the component checkout root",
+    );
+    const excludeEntries = fs
+      .readFileSync(
+        path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
+        "utf8",
+      )
+      .trim()
+      .split(/\r?\n/u);
+    expect(excludeEntries).toContain(".dev-nexus/context/");
   });
 
   it("blocks before worktree preparation when project work tracking is missing", async () => {

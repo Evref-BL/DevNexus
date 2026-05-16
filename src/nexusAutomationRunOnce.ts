@@ -407,6 +407,22 @@ export async function runNexusAutomationOnce(
       worktreesRoot: primaryComponent.worktreesRoot,
       worktreePath: worktree.worktreePath,
       automationConfig,
+      context: {
+        project: {
+          id: projectConfig.id,
+          name: projectConfig.name,
+          root: projectRoot,
+        },
+        ownership: {
+          componentId: worktree.componentId,
+          sourceRoot: worktree.sourceRoot,
+          worktreesRoot: worktree.worktreesRoot,
+          worktreePath: worktree.worktreePath,
+          branchName: worktree.branchName,
+          baseRef: worktree.baseRef,
+          workItem: worktree.workItem,
+        },
+      },
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });
 

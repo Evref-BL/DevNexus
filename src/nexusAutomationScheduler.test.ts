@@ -34,6 +34,14 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
     if (argsArray[0] === "worktree" && argsArray[1] === "add") {
       fs.mkdirSync(argsArray[4]!, { recursive: true });
     }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+      return {
+        args: argsArray,
+        stdout: path.join(cwd ?? "", ".git", "info", "exclude"),
+        stderr: "",
+        exitCode: 0,
+      };
+    }
     if (argsArray[0] === "rev-list") {
       return {
         args: argsArray,

@@ -9,6 +9,11 @@ import type {
   NexusAutomationConfig,
   NexusAutomationDependencyLinkConfig,
 } from "./nexusAutomationConfig.js";
+import {
+  materializeNexusWorkerContextBundle,
+  type MaterializeNexusWorkerContextBundleResult,
+  type NexusWorkerContextBundleWorktree,
+} from "./nexusWorkerContextBundle.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -33,6 +38,17 @@ export interface NexusAutomationWorktreeSetupLinkResult {
 
 export interface NexusAutomationWorktreeSetupResult {
   links: NexusAutomationWorktreeSetupLinkResult[];
+  context?: MaterializeNexusWorkerContextBundleResult;
+}
+
+export interface NexusAutomationWorktreeSetupContextInput {
+  project: {
+    id?: string | null;
+    name?: string | null;
+    root: string;
+  };
+  ownership: NexusWorkerContextBundleWorktree;
+  targetStatePath?: string | null;
 }
 
 export interface NexusAutomationWorktreeSetupOptions {
@@ -40,6 +56,7 @@ export interface NexusAutomationWorktreeSetupOptions {
   worktreesRoot?: string;
   worktreePath: string;
   automationConfig: NexusAutomationConfig;
+  context?: NexusAutomationWorktreeSetupContextInput;
   gitRunner?: GitRunner;
   platform?: NodeJS.Platform;
 }
@@ -110,17 +127,101 @@ export function materializeNexusAutomationWorktreeSetup(
   const gitRunner = options.gitRunner ?? defaultGitRunner;
   const platform = options.platform ?? process.platform;
 
-  return {
-    links: options.automationConfig.setup.dependencyLinks.map((link) =>
-      materializeDependencyLink({
-        link,
+  const links = options.automationConfig.setup.dependencyLinks.map((link) =>
+    materializeDependencyLink({
+      link,
+      sourceRoot,
+      worktreePath,
+      gitRunner,
+      platform,
+    }),
+  );
+  const context = options.context
+    ? materializeWorkerContext({
+        context: options.context,
+        automationConfig: options.automationConfig,
         sourceRoot,
+        worktreesRoot: options.worktreesRoot,
         worktreePath,
         gitRunner,
-        platform,
-      }),
-    ),
+      })
+    : undefined;
+
+  return {
+    links,
+    ...(context ? { context } : {}),
   };
+}
+
+function materializeWorkerContext(options: {
+  context: NexusAutomationWorktreeSetupContextInput;
+  automationConfig: NexusAutomationConfig;
+  sourceRoot: string;
+  worktreesRoot?: string;
+  worktreePath: string;
+  gitRunner: GitRunner;
+}): MaterializeNexusWorkerContextBundleResult {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.context.project.root, "context.project.root"),
+  );
+  const ownership = options.context.ownership;
+  const ownershipSourceRoot = path.resolve(
+    requiredNonEmptyString(ownership.sourceRoot, "context.ownership.sourceRoot"),
+  );
+  const ownershipWorktreesRoot = path.resolve(
+    requiredNonEmptyString(
+      ownership.worktreesRoot,
+      "context.ownership.worktreesRoot",
+    ),
+  );
+  const ownershipWorktreePath = path.resolve(
+    requiredNonEmptyString(
+      ownership.worktreePath,
+      "context.ownership.worktreePath",
+    ),
+  );
+
+  if (ownershipSourceRoot !== options.sourceRoot) {
+    throw new NexusAutomationWorktreeSetupError(
+      `context.ownership.sourceRoot must match sourceRoot: ${ownershipSourceRoot}`,
+    );
+  }
+  if (options.worktreesRoot) {
+    const setupWorktreesRoot = path.resolve(options.worktreesRoot);
+    if (ownershipWorktreesRoot !== setupWorktreesRoot) {
+      throw new NexusAutomationWorktreeSetupError(
+        `context.ownership.worktreesRoot must match worktreesRoot: ${ownershipWorktreesRoot}`,
+      );
+    }
+  }
+  if (ownershipWorktreePath !== options.worktreePath) {
+    throw new NexusAutomationWorktreeSetupError(
+      `context.ownership.worktreePath must match worktreePath: ${ownershipWorktreePath}`,
+    );
+  }
+
+  const result = materializeNexusWorkerContextBundle({
+    projectRoot,
+    projectId: options.context.project.id ?? null,
+    projectName: options.context.project.name ?? null,
+    componentId: ownership.componentId,
+    sourceRoot: ownershipSourceRoot,
+    worktreesRoot: ownershipWorktreesRoot,
+    worktreePath: ownershipWorktreePath,
+    branchName: ownership.branchName,
+    baseRef: ownership.baseRef,
+    workItem: ownership.workItem,
+    targetStatePath:
+      options.context.targetStatePath ?? options.automationConfig.target.statePath,
+  });
+  addGitInfoExclude({
+    worktreePath: options.worktreePath,
+    targetPath: result.contextDirectoryPath,
+    isDirectory: true,
+    gitRunner: options.gitRunner,
+  });
+
+  return result;
 }
 
 function materializeDependencyLink(options: {

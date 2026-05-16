@@ -210,6 +210,12 @@ function executorEnvironment(
     DEV_NEXUS_WORKTREE_BRANCH: input.worktree.branchName,
     DEV_NEXUS_WORK_ITEM_ID: input.workItem.id,
     DEV_NEXUS_WORK_ITEM_TITLE: input.workItem.title,
+    ...(input.setup.context
+      ? {
+          DEV_NEXUS_CONTEXT_FILE: input.setup.context.contextJsonPath,
+          DEV_NEXUS_BRIEFING_FILE: input.setup.context.briefingPath,
+        }
+      : {}),
   };
 }
 

@@ -490,6 +490,19 @@ boundary when provided: the target worktree path must remain inside that root
 before any link is created. This keeps shared dependencies scoped to the
 component worktree that the coordinator selected.
 
+Generated component worktrees also receive a DevNexus-owned worker context
+bundle under `.dev-nexus/context/`. The bundle contains machine-readable
+`context.json` ownership and project metadata plus an agent-readable
+`briefing.md`. DevNexus generates these bundle files for the worker checkout
+instead of copying root `AGENTS.md`, `PLAN.md`, or automation target-state
+files into the component source tree. The generated context directory is
+excluded from Git along with any setup-only dependency links.
+
+The context bundle does not move command roots. Source edits, verification
+commands, and Git commands still run from the component checkout root. DevNexus
+project commands continue to use the configured project root when they need
+project-owned state such as automation ledgers or target records.
+
 The package also ships a generic `dev-nexus` CLI for the same boundary:
 
 ```bash

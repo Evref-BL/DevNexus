@@ -99,6 +99,14 @@ function fakeGitRunner(calls: Array<{ args: string[]; cwd?: string }>): GitRunne
         exitCode: 0,
       };
     }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+      return {
+        args: argsArray,
+        stdout: path.join(cwd ?? "", ".git", "info", "exclude"),
+        stderr: "",
+        exitCode: 0,
+      };
+    }
     if (argsArray[0] === "rev-list") {
       return {
         args: argsArray,
