@@ -105,10 +105,20 @@ export interface NexusAutomationAgentLaunchContext {
     maxConcurrentSubagents: number;
     profiles: NexusAutomationConfig["agent"]["profiles"];
   };
+  result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
+}
+
+export interface NexusAutomationAgentResultContract {
+  file: string;
+  requiredFields: string[];
+  optionalFields: string[];
+  statuses: NexusAutomationAgentLaunchStatus[];
+  verificationStatuses: WorktreeVerificationStatus[];
+  publicationDecisionTypes: WorktreePublicationDecisionInput["type"][];
 }
 
 export interface NexusAutomationAgentLaunchInput {
@@ -453,9 +463,12 @@ export async function runNexusAutomationAgentLaunchOnce(
       });
     }
 
-    const launchFiles = writeNexusAutomationAgentLaunchContext({
+    const launchFiles = nexusAutomationAgentLaunchFiles({
       projectRoot,
       runId,
+    });
+    writeNexusAutomationAgentLaunchContext({
+      contextFile: launchFiles.contextFile,
       context: buildAgentLaunchContext({
         runId,
         startedAt,
@@ -467,6 +480,7 @@ export async function runNexusAutomationAgentLaunchOnce(
         selectorQuery,
         eligibleWorkItems,
         componentEligibleWorkItems,
+        resultFile: launchFiles.resultFile,
       }),
     });
     contextFile = launchFiles.contextFile;
@@ -762,7 +776,7 @@ function buildAgentLaunchContext(
   input: Omit<
     NexusAutomationAgentLaunchInput,
     "contextFile" | "resultFile"
-  >,
+  > & { resultFile: string },
 ): NexusAutomationAgentLaunchContext {
   return {
     version: 1,
@@ -790,6 +804,7 @@ function buildAgentLaunchContext(
       maxConcurrentSubagents: input.automationConfig.agent.maxConcurrentSubagents,
       profiles: input.automationConfig.agent.profiles,
     },
+    result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
     componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
@@ -820,9 +835,20 @@ function componentContext(
 }
 
 function writeNexusAutomationAgentLaunchContext(options: {
+  contextFile: string;
+  context: NexusAutomationAgentLaunchContext;
+}): void {
+  fs.mkdirSync(path.dirname(options.contextFile), { recursive: true });
+  fs.writeFileSync(
+    options.contextFile,
+    `${JSON.stringify(options.context, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function nexusAutomationAgentLaunchFiles(options: {
   projectRoot: string;
   runId: string;
-  context: NexusAutomationAgentLaunchContext;
 }): { contextFile: string; resultFile: string } {
   const launchDir = path.join(
     options.projectRoot,
@@ -833,14 +859,30 @@ function writeNexusAutomationAgentLaunchContext(options: {
   );
   const contextFile = path.join(launchDir, "context.json");
   const resultFile = path.join(launchDir, "result.json");
-  fs.mkdirSync(launchDir, { recursive: true });
-  fs.writeFileSync(
-    contextFile,
-    `${JSON.stringify(options.context, null, 2)}\n`,
-    "utf8",
-  );
 
   return { contextFile, resultFile };
+}
+
+function agentResultContract(resultFile: string): NexusAutomationAgentResultContract {
+  return {
+    file: resultFile,
+    requiredFields: ["status", "summary"],
+    optionalFields: [
+      "commitIds",
+      "verification",
+      "publicationDecision",
+      "error",
+    ],
+    statuses: ["completed", "failed", "blocked"],
+    verificationStatuses: ["passed", "failed", "not_run"],
+    publicationDecisionTypes: [
+      "not_decided",
+      "local_only",
+      "direct_integration",
+      "review_handoff",
+      "blocked",
+    ],
+  };
 }
 
 function agentLaunchEnvironment(
@@ -864,6 +906,9 @@ function agentLaunchEnvironment(
       "",
     DEV_NEXUS_AGENT_CONTEXT_FILE: input.contextFile,
     DEV_NEXUS_AGENT_RESULT_FILE: input.resultFile,
+    DEV_NEXUS_AGENT_RESULT_REQUIRED_FIELDS: "status,summary",
+    DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS:
+      "commitIds,verification,publicationDecision,error",
     DEV_NEXUS_TARGET_ID: input.automationConfig.target.id ?? "",
     DEV_NEXUS_TARGET_STATE_FILE: readNexusAutomationTargetContext({
       projectRoot: input.projectRoot,

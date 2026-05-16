@@ -154,6 +154,12 @@ describe("nexus automation agent launch", () => {
       );
       expect(options.env.DEV_NEXUS_COORDINATOR_PROFILE_ID).toBe("codex-deep");
       expect(options.env.DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS).toBe("3");
+      expect(options.env.DEV_NEXUS_AGENT_RESULT_REQUIRED_FIELDS).toBe(
+        "status,summary",
+      );
+      expect(options.env.DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS).toBe(
+        "commitIds,verification,publicationDecision,error",
+      );
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
       );
@@ -186,6 +192,25 @@ describe("nexus automation agent launch", () => {
               command: "codex",
               args: ["exec", "--model", "gpt-5.5"],
             },
+          ],
+        },
+        result: {
+          file: options.env.DEV_NEXUS_AGENT_RESULT_FILE,
+          requiredFields: ["status", "summary"],
+          optionalFields: [
+            "commitIds",
+            "verification",
+            "publicationDecision",
+            "error",
+          ],
+          statuses: ["completed", "failed", "blocked"],
+          verificationStatuses: ["passed", "failed", "not_run"],
+          publicationDecisionTypes: [
+            "not_decided",
+            "local_only",
+            "direct_integration",
+            "review_handoff",
+            "blocked",
           ],
         },
         eligibleWorkItems: [

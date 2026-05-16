@@ -142,6 +142,16 @@ status before choosing a workflow. Component worktrees default under
 `<project worktreesRoot>/<component-id>` so arity one is not a special
 directory case.
 
+Launched agents should treat each component as an independent source and
+tracking boundary. The launch context reports the component `sourceRoot`,
+`worktreesRoot`, Git defaults, relationships, and tracker capability flags so
+an agent can decide whether to work in the active checkout or create its own
+component worktree. When an agent takes work across components, it should keep
+branches and generated worktrees component-scoped, check for unrelated dirty
+state before editing, and report per-component progress through that
+component's work-item service. In `agent_launch` mode DevNexus does not create
+those implementation worktrees for the agent.
+
 Work tracking is component-scoped. Older project-level `workTracking` remains
 accepted for legacy configs and is normalized onto the generated primary
 component, but explicit multi-component configs should put the work-item
@@ -236,6 +246,11 @@ agent receives `DEV_NEXUS_AGENT_CONTEXT_FILE` and
 JSON to that result path before exiting; otherwise DevNexus records the launch
 as failed. The required fields are `status` and `summary`. Optional fields are
 `commitIds`, `verification`, `publicationDecision`, and `error`.
+The context also carries a `result` contract with the exact result file path,
+required fields, optional fields, allowed launch statuses, verification
+statuses, and publication decision types. The same required and optional field
+lists are exposed in `DEV_NEXUS_AGENT_RESULT_REQUIRED_FIELDS` and
+`DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS`.
 
 ```json
 {
