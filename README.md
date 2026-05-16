@@ -48,12 +48,47 @@ dev-nexus project status <project-id-or-root> --home <home-path>
 dev-nexus project status <project-root>
 dev-nexus project tracker configure <project> --home <home-path> --provider local
 dev-nexus project tracker link <project> --home <home-path> --tracker-project-id <id>
+dev-nexus mcp-stdio
 ```
 
 Commands that need a registry use `--home`; when it is omitted they fall back
 to `DEV_NEXUS_HOME` and then the default user home path. `project status` can
 also inspect an initialized project root directly without a home registry,
 which is useful for local smoke checks and generated worktrees.
+
+## MCP Server
+
+DevNexus exposes a generic stdio Model Context Protocol (MCP) server for
+agents:
+
+```bash
+dev-nexus mcp-stdio
+```
+
+Agent configuration should register that command as a project-local MCP server
+when the agent needs direct DevNexus tools. The first native server slice
+intentionally covers the core self-use loop: read project status, read
+automation readiness and target context, and create/list/get/update/comment
+work items through the configured work tracker. It does not choose work or
+launch subagents itself; those decisions remain with the human or launched
+coordinator agent.
+
+The native MCP tools are:
+
+```text
+project_status
+automation_status
+work_item_create
+work_item_list
+work_item_get
+work_item_update
+work_item_comment
+work_item_set_status
+```
+
+Projects can still use the CLI for the same boundaries. The MCP server exists
+so agents can use DevNexus directly without depending on a specialization
+adapter for generic project orchestration.
 
 ## Project Components
 

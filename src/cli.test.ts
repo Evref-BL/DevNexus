@@ -175,6 +175,7 @@ describe("dev-nexus cli", () => {
     await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
 
     expect(output.output()).toContain("dev-nexus home init");
+    expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");

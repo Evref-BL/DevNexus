@@ -29,6 +29,7 @@ import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
   createDefaultNexusHomeConfigBase,
   defaultNexusHomePath,
@@ -234,6 +235,7 @@ export function usage(): string {
   return [
     "Usage:",
     "  dev-nexus --help",
+    "  dev-nexus mcp-stdio",
     "  dev-nexus home init [home-path] [options]",
     "  dev-nexus project create <name> [options]",
     "  dev-nexus project import <source-root> [options]",
@@ -388,8 +390,12 @@ export async function main(
   if (argv[0] === "automation") {
     return handleAutomationCommand(argv, dependencies);
   }
+  if (argv[0] === "mcp-stdio") {
+    await runDevNexusMcpStdioServer();
+    return 0;
+  }
 
-  throw new Error("dev-nexus requires home, project, work-item, automation, or --help");
+  throw new Error("dev-nexus requires home, project, work-item, automation, mcp-stdio, or --help");
 }
 
 async function handleHomeCommand(
