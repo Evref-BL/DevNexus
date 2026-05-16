@@ -29,12 +29,30 @@ Immediate direction:
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
   - `mcp-pharo:local-3` decide the publication path for local review-handoff
-    commit `0a38755`.
+    commits `0a38755` and `4c37fb0`.
   - `plexus:local-3` build the approved isolated PLexus live-smoke runner
     harness after runner inputs and cleanup policy are approved.
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the approved
     isolated runner.
+
+Vibe backlog reconciliation:
+
+- Inspected old Vibe Kanban issues as tracker/history only; no Vibe
+  workspaces, sessions, executions, workers, or issue mutations were created.
+- Publication-only Vibe blockers for PharoNexus `932e663`, PLexus `11b9c6a`,
+  and pharo-launcher-mcp `0f75151` are stale because those commits are now
+  contained in `origin/main`.
+- Added local DevNexus backlog items for still-relevant Vibe findings:
+  - `pharo-nexus:local-3` approved self-hosted startup smoke.
+  - `plexus:local-4` gateway/lifecycle package boundary split.
+  - `plexus:local-5` prepared image cache model and safe service boundary.
+  - `plexus:local-6` scoped launcher create/stop contract alignment.
+  - `plexus:local-7` OS-agnostic config tests and docs.
+  - `mcp-pharo:local-4` `where` predicate mode API simplification.
+  - `mcp-pharo:local-5` isolated local SmalltalkCI runner documentation.
+- Folded Vibe worker/provider reliability evidence into `dev-nexus:local-10`
+  instead of creating new work that depends on Vibe implementation workers.
 
 Durable completed foundation:
 
