@@ -18,8 +18,10 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - none after completing `dev-nexus-pharo:local-8`; rerun eligible-work after
-    reopening a dependent static item or resolving a human-in-the-loop blocker.
+  - `dev-nexus:local-17` add draft-only/mocked `coordination_request` support
+    without live external provider posting.
+  - `dev-nexus:local-24` support declared related-component dependency
+    projections for worker worktrees.
 - Scoped npm dogfood prereleases were published on 2026-05-17 so other
   machines can install without sibling checkout assumptions:
   - `@evref-bl/dev-nexus@0.1.0-alpha.0` published with `dogfood` tag and
@@ -42,6 +44,8 @@ Immediate direction:
     component metadata now point at the new SSH URL. The obsolete GitHub
     redirect for the former repository slug has been retired; the old API,
     web, and Git URLs now return not found.
+  - The stale ignored local work-item store for the former component id was
+    removed; the active tracker store is `.dev-nexus/work-items/dev-nexus-pharo.json`.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
   - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
@@ -94,8 +98,8 @@ Immediate direction:
   - Add `coordination_request` so agents can ask external humans or agents for
     approval, feedback, choices, or review through provider-native issue,
     pull-request, merge-request, Jira, or review threads.
-  - `dev-nexus:local-17` tracks the provider-neutral API and mocked provider
-    implementation.
+  - `dev-nexus:local-17` is ready for provider-neutral API and mocked/draft-only
+    provider implementation.
   - `dev-nexus:local-18` tracks the human decision for which live provider
     posting actions are allowed versus draft-only.
 - Human-in-the-loop shared coordination decision:
@@ -109,10 +113,6 @@ Immediate direction:
   - After direct Pharo MCP access is proven in component worktrees, resume the
     blocked MCP-Pharo query API item `mcp-pharo:local-4`.
 - Later or dependent non-eligible work:
-  - `dev-nexus:local-24` tracks a follow-up from the DevNexus-Pharo worker
-    verification gap: support declared related-component dependency projections
-    such as DevNexus-Pharo worker worktrees needing a sibling DevNexus checkout,
-    without allowing arbitrary outside-path projection.
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
