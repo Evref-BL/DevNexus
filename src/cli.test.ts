@@ -385,10 +385,89 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("uses the configured automation executor command when omitted", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        executor: {
+          command: "node configured-task.js",
+          timeoutMs: 1234,
+          runFullVerification: true,
+        },
+        verification: {
+          ...config.automation!.verification,
+          fullCommands: ["npm run check"],
+        },
+      },
+    });
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Configured task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+    const commandRuns: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commandRuns.push(command);
+      expect(options.timeoutMs).toBe(1234);
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(["automation", "run-once", projectRoot, "--json"], {
+      stdout: output.writer,
+      commandRunner,
+      gitRunner: fakeGitRunner([]),
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+        "2026-05-16T10:02:00.000Z",
+        "2026-05-16T10:03:00.000Z",
+      ),
+    });
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      status: "completed",
+      workItem: {
+        id: "local-1",
+      },
+    });
+    expect(commandRuns).toEqual([
+      "node configured-task.js",
+      "npm test",
+      "npm run check",
+    ]);
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    saveProjectConfig(projectRoot, projectConfig());
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        executor: {
+          ...config.automation!.executor,
+          command: "node scheduled-task.js",
+        },
+      },
+    });
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
       now: fixedClock("2026-05-16T09:00:00.000Z"),
@@ -419,8 +498,6 @@ describe("dev-nexus cli", () => {
         "automation",
         "schedule",
         projectRoot,
-        "--command",
-        "node task.js",
         "--max-runs",
         "1",
         "--json",
@@ -460,7 +537,7 @@ describe("dev-nexus cli", () => {
         },
       ],
     });
-    expect(commandRuns).toEqual(["node task.js", "npm test"]);
+    expect(commandRuns).toEqual(["node scheduled-task.js", "npm test"]);
     expect(gitCalls[0]).toMatchObject({
       args: [
         "worktree",

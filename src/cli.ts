@@ -92,7 +92,7 @@ interface ParsedWorkItemCommentCommand {
 
 interface ParsedAutomationRunOnceCommand {
   projectRoot: string;
-  command: string;
+  command?: string;
   runId?: string;
   owner?: string;
   branchName?: string;
@@ -110,7 +110,7 @@ interface ParsedAutomationStatusCommand {
 
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
-  command: string;
+  command?: string;
   owner?: string;
   baseRef?: string;
   intervalMs?: number;
@@ -132,8 +132,8 @@ export function usage(): string {
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus automation status <project-root> [options]",
-    "  dev-nexus automation run-once <project-root> --command <command> [options]",
-    "  dev-nexus automation schedule <project-root> --command <command> [options]",
+    "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
+    "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
     "",
     "Options for work-item create:",
     "  --title <title>",
@@ -176,7 +176,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation run-once:",
-    "  --command <command>        shell command to run in the prepared worktree",
+    "  --command <command>        shell command to run; overrides automation.executor.command",
     "  --run-id <id>",
     "  --owner <name>",
     "  --branch <name>",
@@ -187,7 +187,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation schedule:",
-    "  --command <command>        shell command to run for each selected work item",
+    "  --command <command>        shell command to run; overrides automation.executor.command",
     "  --owner <name>",
     "  --base-ref <ref>",
     "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
@@ -318,6 +318,10 @@ async function handleAutomationCommand(
 
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
+    const executorOptions = resolveAutomationExecutorCliOptions(
+      "schedule",
+      parsed,
+    );
     const stdout = dependencies.stdout ?? process.stdout;
     const result = await runNexusAutomationScheduler({
       projectRoot: parsed.projectRoot,
@@ -333,11 +337,11 @@ async function handleAutomationCommand(
         ? undefined
         : (tick) => printAutomationScheduleTick(tick, stdout),
       executor: createNexusAutomationCommandExecutor({
-        command: parsed.command,
+        command: executorOptions.command,
         commandRunner: dependencies.commandRunner,
         gitRunner: dependencies.gitRunner,
-        runFullVerification: parsed.runFullVerification,
-        timeoutMs: parsed.timeoutMs,
+        runFullVerification: executorOptions.runFullVerification,
+        timeoutMs: executorOptions.timeoutMs,
       }),
     });
     printAutomationScheduleResult(result, parsed, stdout);
@@ -349,6 +353,7 @@ async function handleAutomationCommand(
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
+  const executorOptions = resolveAutomationExecutorCliOptions("run-once", parsed);
   const result = await runNexusAutomationOnce({
     projectRoot: parsed.projectRoot,
     runId: parsed.runId,
@@ -359,11 +364,11 @@ async function handleAutomationCommand(
     gitRunner: dependencies.gitRunner,
     now: dependencies.now,
     executor: createNexusAutomationCommandExecutor({
-      command: parsed.command,
+      command: executorOptions.command,
       commandRunner: dependencies.commandRunner,
       gitRunner: dependencies.gitRunner,
-      runFullVerification: parsed.runFullVerification,
-      timeoutMs: parsed.timeoutMs,
+      runFullVerification: executorOptions.runFullVerification,
+      timeoutMs: executorOptions.timeoutMs,
     }),
   });
   printAutomationRunOnceResult(
@@ -372,6 +377,35 @@ async function handleAutomationCommand(
     dependencies.stdout ?? process.stdout,
   );
   return 0;
+}
+
+function resolveAutomationExecutorCliOptions(
+  commandName: "run-once" | "schedule",
+  parsed: ParsedAutomationRunOnceCommand | ParsedAutomationScheduleCommand,
+): {
+  command: string;
+  runFullVerification: boolean;
+  timeoutMs?: number;
+} {
+  const config = loadProjectConfig(path.resolve(parsed.projectRoot));
+  const configuredExecutor = config.automation?.executor;
+  const command = parsed.command ?? configuredExecutor?.command ?? undefined;
+  if (!command) {
+    throw new Error(
+      `automation ${commandName} requires --command or project config automation.executor.command`,
+    );
+  }
+
+  return {
+    command,
+    runFullVerification:
+      parsed.runFullVerification ??
+      configuredExecutor?.runFullVerification ??
+      false,
+    ...(parsed.timeoutMs ?? configuredExecutor?.timeoutMs
+      ? { timeoutMs: parsed.timeoutMs ?? configuredExecutor?.timeoutMs ?? undefined }
+      : {}),
+  };
 }
 
 function workItemService(
@@ -729,10 +763,6 @@ function parseAutomationRunOnceCommand(
     }
   }
 
-  if (!parsed.command) {
-    throw new Error("automation run-once requires --command");
-  }
-
   return parsed as ParsedAutomationRunOnceCommand;
 }
 
@@ -812,10 +842,6 @@ function parseAutomationScheduleCommand(
       default:
         throw new Error(`Unknown automation schedule option: ${arg}`);
     }
-  }
-
-  if (!parsed.command) {
-    throw new Error("automation schedule requires --command");
   }
 
   return parsed as ParsedAutomationScheduleCommand;

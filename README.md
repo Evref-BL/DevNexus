@@ -45,6 +45,12 @@ dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-sc
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
 
+Projects can also store the shell command under
+`automation.executor.command`. In that mode, `automation run-once` and
+`automation schedule` may omit `--command`; command-line options still override
+the configured command, timeout, and full-verification setting for a supervised
+run.
+
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready with a selected
 work item before any worktree or tracker mutation happens.

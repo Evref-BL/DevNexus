@@ -235,6 +235,11 @@ describe("project config", () => {
               },
             ],
           },
+          executor: {
+            command: "node task.js",
+            timeoutMs: 120000,
+            runFullVerification: true,
+          },
           publication: {
             strategy: "direct_integration",
             targetBranch: "main",
@@ -283,6 +288,11 @@ describe("project config", () => {
             required: false,
           },
         ],
+      },
+      executor: {
+        command: "node task.js",
+        timeoutMs: 120000,
+        runFullVerification: true,
       },
       safety: {
         profile: "local",

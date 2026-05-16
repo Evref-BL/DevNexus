@@ -56,6 +56,12 @@ export interface NexusAutomationSetupConfig {
   dependencyLinks: NexusAutomationDependencyLinkConfig[];
 }
 
+export interface NexusAutomationExecutorConfig {
+  command: string | null;
+  timeoutMs: number | null;
+  runFullVerification: boolean;
+}
+
 export interface NexusAutomationSafetyConfig {
   profile: NexusAutomationSafetyProfile;
   allowHostMutation: boolean;
@@ -80,6 +86,7 @@ export interface NexusAutomationConfig {
   backoff: NexusAutomationBackoffConfig;
   schedule: NexusAutomationScheduleConfig;
   setup: NexusAutomationSetupConfig;
+  executor: NexusAutomationExecutorConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
 }
@@ -119,6 +126,11 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   },
   setup: {
     dependencyLinks: [],
+  },
+  executor: {
+    command: null,
+    timeoutMs: null,
+    runFullVerification: false,
   },
   safety: {
     profile: "local",
@@ -162,6 +174,7 @@ export function validateNexusAutomationConfig(
   const backoff = validateBackoffConfig(record.backoff);
   const schedule = validateScheduleConfig(record.schedule);
   const setup = validateSetupConfig(record.setup);
+  const executor = validateExecutorConfig(record.executor);
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePublicationConfig(record.publication);
 
@@ -195,6 +208,10 @@ export function validateNexusAutomationConfig(
     setup: {
       ...defaultNexusAutomationConfig.setup,
       ...setup,
+    },
+    executor: {
+      ...defaultNexusAutomationConfig.executor,
+      ...executor,
     },
     safety: {
       ...defaultNexusAutomationConfig.safety,
@@ -359,6 +376,22 @@ function validateSetupConfig(
   };
 }
 
+function validateExecutorConfig(
+  value: unknown,
+): Partial<NexusAutomationExecutorConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.executor";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalNullableStringField(record, "command", pathName),
+    ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
+    ...optionalBooleanField(record, "runFullVerification", pathName),
+  };
+}
+
 function validateDependencyLinkConfig(
   value: unknown,
   pathName: string,
@@ -488,6 +521,27 @@ function optionalPositiveIntegerField<Key extends string>(
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     throw new NexusAutomationConfigError(
       `${pathName}.${key} must be a positive integer`,
+    );
+  }
+
+  return { [key]: value } as Record<Key, number>;
+}
+
+function optionalNullablePositiveIntegerField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, number | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<Key, null>;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.${key} must be a positive integer or null`,
     );
   }
 
