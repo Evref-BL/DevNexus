@@ -2,9 +2,17 @@
 
 DevNexus is a generic development orchestration core.
 
-It owns project and work tracking, local work items, Codex worktree
-orchestration, execution metadata, verification records, credential-aware
-forge integration, and publication handoff across language ecosystems.
+It owns project and work tracking, local work items, agent launch
+configuration, execution metadata, verification records, credential-aware forge
+integration, and publication handoff across language ecosystems.
+
+DevNexus is not the work-planning agent. It should not decide which work item
+to implement, supervise the implementation, or plan parallel worktrees itself.
+Its automation role is to launch a configured agent such as Codex or Claude in
+a prepared project context. The launched agent chooses the work item or items,
+creates and coordinates Git worktrees when useful, verifies the result, and
+reports commits, publication, blockers, and notes back through DevNexus-owned
+records.
 
 Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions. DevNexus provides the core contracts and extension hooks without
@@ -33,18 +41,26 @@ which is useful for local smoke checks and generated worktrees.
 
 ## Automation Foundation
 
-Projects can opt into generic run-once automation through
-`dev-nexus.project.json`. The core schema covers work-item selection,
-verification commands, run ledgers, stale-aware locks, retry backoff, safety
-policy, and publication policy. These APIs only model and record automation
-state; execution adapters decide how to run agents and tools for a project.
+Projects can opt into generic agent-launch automation through
+`dev-nexus.project.json`. The core schema covers launch eligibility filters,
+verification hints, run ledgers, stale-aware locks, retry backoff, safety
+policy, and publication policy. These APIs model launch state and record what
+the agent reports; execution adapters decide how to start agents and tools for
+a project.
 
-`runNexusAutomationOnce` provides the generic orchestration boundary for those
-adapters. It loads the project config, selects eligible work from the configured
-tracker, preflights tracker and Git worktree requirements, prepares a
-branch-backed worktree, invokes an injected executor, records execution
-metadata under the worktree support directory, appends the run ledger, and
-updates the tracker with conservative status and comments.
+The configured automation selector is a launch gate and context filter. It can
+answer whether a project has candidate work that makes another agent launch
+worthwhile, but it is not a mandate for DevNexus to choose the task. The
+launched agent must inspect the tracker context, choose the work item or items
+to take, decide whether parallel Git worktrees are useful, and supervise the
+implementation through verification and publication.
+
+`runNexusAutomationOnce` is the current low-level orchestration boundary for
+those adapters. It still exposes selected-work data so existing status and
+smoke workflows can run, but that is an interim shape. New automation work
+should move toward the launch-only boundary: DevNexus prepares safe context,
+starts the configured agent, records the agent's reported result, and can be
+configured to relaunch while eligible work remains.
 
 Generated worktrees can declare setup-only dependency links through
 `automation.setup.dependencyLinks`. Each link copies no package data and runs
@@ -70,22 +86,22 @@ dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-sc
 Projects can also store the shell command under
 `automation.executor.command`. In that mode, `automation run-once` and
 `automation schedule` may omit `--command`; command-line options still override
-the configured command, timeout, and full-verification setting for a supervised
-run.
+the configured command, timeout, and full-verification setting for an agent
+launch.
 
 `automation status` is read-only. It reports whether automation is disabled,
-locked, in retry backoff, blocked by preflight, idle, or ready with a selected
-work item before any worktree or tracker mutation happens.
+locked, in retry backoff, blocked by preflight, idle, or ready to launch an
+agent before any worktree or tracker mutation happens.
 
 `automation enqueue` creates a work item that matches the configured automation
-selector. It derives the default status, labels, and assignees from
+launch filter. It derives the default status, labels, and assignees from
 `automation.selector`, lets callers add extra labels or assignees, and refuses
-inputs that would be excluded from scheduler pickup.
+inputs that would be invisible to the configured agent-launch loop.
 
-`automation run-once` runs the command in the prepared worktree, exposes
-`DEV_NEXUS_*` environment variables for the selected work item and worktree,
-runs configured focused verification commands, records new commits relative to
-the base ref when available, and writes the normal retained run ledger.
+`automation run-once` runs the configured command with `DEV_NEXUS_*`
+environment variables for project context and writes the retained run ledger.
+The target command should normally launch an agent with enough context to make
+its own work-selection and supervision decisions.
 
 `automation schedule` repeatedly checks the same read-only status boundary and
 dispatches `automation run-once` only when the project is ready. It honors
