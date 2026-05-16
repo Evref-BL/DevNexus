@@ -12,10 +12,13 @@ Immediate direction:
   were implemented and published as `95cec72`.
 - DevNexus core target-report/relaunch readiness was completed and published as
   `1863d04`; focused target-report/CLI/MCP tests and the full check are green.
-- Next safe implementation work is the PharoNexus specialization alignment
-  item.
-- Runtime and image work stays planning-only until the isolated runner,
-  disposable runtime boundary, and cleanup plan are explicit.
+- PharoNexus specialization alignment was completed and published as `c6629df`;
+  the adapter now delegates DevNexus automation target/report and neutral
+  work-item tools to native DevNexus MCP surfaces.
+- Next safe work is the remaining runtime/image boundary planning: PLexus
+  isolated live-smoke runner boundary, launcher cleanup hooks, and MCP-Pharo
+  verification boundary. Runtime and image work stays planning-only until the
+  isolated runner, disposable runtime boundary, and cleanup plan are explicit.
 
 Active boundaries:
 
