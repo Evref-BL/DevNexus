@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
+  normalizeNexusAutomationAgentPolicy,
   resolveNexusAutomationAgentCommand,
   shellCommandFromProfile,
 } from "./index.js";
@@ -147,5 +148,118 @@ describe("nexus automation agent profile command resolution", () => {
         },
       }),
     ).toThrow(/command must be configured/);
+  });
+
+  it("normalizes profile policy for coordinator and subagent selection", () => {
+    const policy = normalizeNexusAutomationAgentPolicy({
+      ...defaultNexusAutomationConfig,
+      safety: {
+        profile: "host-authorized",
+        allowHostMutation: true,
+        allowDependencyInstall: false,
+        allowLiveServices: true,
+      },
+      agent: {
+        ...defaultNexusAutomationConfig.agent,
+        coordinatorProfileId: "codex-coordinator",
+        maxConcurrentSubagents: 2,
+        profiles: [
+          {
+            id: "codex-coordinator",
+            executor: "codex",
+            model: "gpt-5.5",
+            version: "2026-05",
+            variant: "pro",
+            reasoning: "xhigh",
+            intelligence: "deep",
+            intendedUse: "coordinator",
+            safety: {
+              profile: "isolated",
+              allowHostMutation: false,
+              allowDependencyInstall: false,
+              allowLiveServices: false,
+            },
+            command: "codex",
+            args: ["exec"],
+          },
+          {
+            id: "claude-subagent",
+            executor: "claude",
+            model: "claude-sonnet",
+            reasoning: null,
+            intendedUse: "subagent",
+            command: null,
+            args: [],
+          },
+        ],
+      },
+    });
+
+    expect(policy).toEqual({
+      coordinatorProfileId: "codex-coordinator",
+      maxConcurrentSubagents: 2,
+      safety: {
+        profile: "host-authorized",
+        allowHostMutation: true,
+        allowDependencyInstall: false,
+        allowLiveServices: true,
+      },
+      coordinatorProfile: {
+        id: "codex-coordinator",
+        executor: "codex",
+        model: "gpt-5.5",
+        version: "2026-05",
+        variant: "pro",
+        reasoning: "xhigh",
+        intelligence: "deep",
+        intendedUse: "coordinator",
+        safety: {
+          profile: "isolated",
+          allowHostMutation: false,
+          allowDependencyInstall: false,
+          allowLiveServices: false,
+        },
+        command: "codex",
+        args: ["exec"],
+      },
+      profiles: [
+        {
+          id: "codex-coordinator",
+          executor: "codex",
+          model: "gpt-5.5",
+          version: "2026-05",
+          variant: "pro",
+          reasoning: "xhigh",
+          intelligence: "deep",
+          intendedUse: "coordinator",
+          safety: {
+            profile: "isolated",
+            allowHostMutation: false,
+            allowDependencyInstall: false,
+            allowLiveServices: false,
+          },
+          command: "codex",
+          args: ["exec"],
+        },
+        {
+          id: "claude-subagent",
+          executor: "claude",
+          model: "claude-sonnet",
+          version: null,
+          variant: null,
+          reasoning: null,
+          intelligence: null,
+          intendedUse: "subagent",
+          safety: {
+            profile: "host-authorized",
+            allowHostMutation: true,
+            allowDependencyInstall: false,
+            allowLiveServices: true,
+          },
+          command: null,
+          args: [],
+        },
+      ],
+    });
   });
 });

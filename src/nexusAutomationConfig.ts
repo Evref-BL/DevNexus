@@ -9,6 +9,10 @@ export type NexusAutomationPublicationStrategy =
   | "local_only"
   | "direct_integration"
   | "review_handoff";
+export type NexusAutomationAgentProfileIntendedUse =
+  | "any"
+  | "coordinator"
+  | "subagent";
 
 export interface NexusAutomationSelectorConfig {
   statuses: WorkStatus[];
@@ -70,7 +74,12 @@ export interface NexusAutomationAgentProfileConfig {
   id: string;
   executor: string;
   model: string | null;
+  version?: string | null;
+  variant?: string | null;
   reasoning: string | null;
+  intelligence?: string | null;
+  intendedUse?: NexusAutomationAgentProfileIntendedUse;
+  safety?: NexusAutomationSafetyConfig | null;
   command: string | null;
   args: string[];
 }
@@ -513,10 +522,55 @@ function validateAgentProfileConfig(
     id: requiredNonEmptyString(record.id, `${pathName}.id`),
     executor: requiredNonEmptyString(record.executor, `${pathName}.executor`),
     model: optionalNullableString(record.model, `${pathName}.model`) ?? null,
+    version:
+      optionalNullableString(record.version, `${pathName}.version`) ?? null,
+    variant:
+      optionalNullableString(record.variant, `${pathName}.variant`) ?? null,
     reasoning:
       optionalNullableString(record.reasoning, `${pathName}.reasoning`) ?? null,
+    intelligence:
+      optionalNullableString(record.intelligence, `${pathName}.intelligence`) ??
+      null,
+    intendedUse: validateAgentProfileIntendedUse(
+      record.intendedUse,
+      `${pathName}.intendedUse`,
+    ),
+    safety: validateAgentProfileSafetyConfig(
+      record.safety,
+      `${pathName}.safety`,
+    ),
     command: optionalNullableString(record.command, `${pathName}.command`) ?? null,
     args: optionalStringArray(record.args, `${pathName}.args`) ?? [],
+  };
+}
+
+function validateAgentProfileIntendedUse(
+  value: unknown,
+  pathName: string,
+): NexusAutomationAgentProfileIntendedUse {
+  if (value === undefined) {
+    return "any";
+  }
+  if (value === "any" || value === "coordinator" || value === "subagent") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be any, coordinator, or subagent`,
+  );
+}
+
+function validateAgentProfileSafetyConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationSafetyConfig | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return {
+    ...defaultNexusAutomationConfig.safety,
+    ...validateSafetyConfigAt(value, pathName),
   };
 }
 
@@ -588,11 +642,17 @@ function validateDependencyLinkConfig(
 function validateSafetyConfig(
   value: unknown,
 ): Partial<NexusAutomationSafetyConfig> {
+  return validateSafetyConfigAt(value, "project config.automation.safety");
+}
+
+function validateSafetyConfigAt(
+  value: unknown,
+  pathName: string,
+): Partial<NexusAutomationSafetyConfig> {
   if (value === undefined) {
     return {};
   }
 
-  const pathName = "project config.automation.safety";
   const record = assertRecord(value, pathName);
   return {
     ...optionalSafetyProfileField(record, "profile", pathName),

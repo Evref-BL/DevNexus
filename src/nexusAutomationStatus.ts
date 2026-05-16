@@ -17,6 +17,10 @@ import {
   type NexusAutomationComponentEligibleWorkItems,
 } from "./nexusAutomationAgentLaunch.js";
 import {
+  normalizeNexusAutomationAgentPolicy,
+  type NexusAutomationAgentPolicy,
+} from "./nexusAutomationAgentProfile.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -95,11 +99,7 @@ export interface NexusAutomationStatus {
   preflight: NexusAutomationPreflightCheck[];
   target: NexusAutomationTargetContext | null;
   targetCycles: NexusAutomationTargetCycleSummary | null;
-  agent: {
-    coordinatorProfileId: string | null;
-    maxConcurrentSubagents: number;
-    profiles: NexusAutomationConfig["agent"]["profiles"];
-  } | null;
+  agent: NexusAutomationAgentPolicy | null;
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkItems: WorkItem[] | null;
@@ -246,6 +246,7 @@ export async function getNexusAutomationStatus(
     const preflight = preflightNexusAutomationAgentLaunch({
       components,
       componentProviders,
+      automationConfig,
     });
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
@@ -600,13 +601,7 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
   const agent =
     result.agent ??
     (result.automationConfig
-      ? {
-          coordinatorProfileId:
-            result.automationConfig.agent.coordinatorProfileId,
-          maxConcurrentSubagents:
-            result.automationConfig.agent.maxConcurrentSubagents,
-          profiles: result.automationConfig.agent.profiles,
-        }
+      ? normalizeNexusAutomationAgentPolicy(result.automationConfig)
       : null);
   const targetCycles =
     result.targetCycles ??

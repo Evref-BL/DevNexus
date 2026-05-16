@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import { normalizeNexusAutomationAgentPolicy } from "./nexusAutomationAgentProfile.js";
 import {
   getNexusAutomationStatus,
   type GetNexusAutomationStatusOptions,
@@ -47,7 +48,12 @@ export interface NexusAutomationAgentProfilePolicySummary {
   id: string;
   executor: string;
   model: string | null;
+  version: string | null;
+  variant: string | null;
   reasoning: string | null;
+  intelligence: string | null;
+  intendedUse: string;
+  safety: NexusAutomationConfig["safety"];
   commandConfigured: boolean;
   argsCount: number;
 }
@@ -119,6 +125,9 @@ export function getNexusAutomationAgentProfileSummary(
   const resolvedProjectRoot = path.resolve(projectRoot);
   const projectConfig = loadProjectConfig(resolvedProjectRoot);
   const automationConfig = projectConfig.automation ?? null;
+  const agentPolicy = automationConfig
+    ? normalizeNexusAutomationAgentPolicy(automationConfig)
+    : null;
 
   return {
     projectRoot: resolvedProjectRoot,
@@ -128,16 +137,20 @@ export function getNexusAutomationAgentProfileSummary(
     },
     automationEnabled: automationConfig?.enabled ?? false,
     automationMode: automationConfig?.mode ?? null,
-    coordinatorProfileId: automationConfig?.agent.coordinatorProfileId ?? null,
-    maxConcurrentSubagents:
-      automationConfig?.agent.maxConcurrentSubagents ?? null,
+    coordinatorProfileId: agentPolicy?.coordinatorProfileId ?? null,
+    maxConcurrentSubagents: agentPolicy?.maxConcurrentSubagents ?? null,
     safety: automationConfig?.safety ?? null,
     profiles:
-      automationConfig?.agent.profiles.map((profile) => ({
+      agentPolicy?.profiles.map((profile) => ({
         id: profile.id,
         executor: profile.executor,
         model: profile.model,
+        version: profile.version,
+        variant: profile.variant,
         reasoning: profile.reasoning,
+        intelligence: profile.intelligence,
+        intendedUse: profile.intendedUse,
+        safety: profile.safety,
         commandConfigured: profile.command !== null,
         argsCount: profile.args.length,
       })) ?? [],

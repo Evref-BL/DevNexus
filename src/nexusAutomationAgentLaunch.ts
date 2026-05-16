@@ -20,6 +20,10 @@ import {
 } from "./nexusAutomationCommandExecutor.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
+  normalizeNexusAutomationAgentPolicy,
+  type NexusAutomationAgentPolicy,
+} from "./nexusAutomationAgentProfile.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -103,7 +107,9 @@ export interface NexusAutomationAgentLaunchContext {
   agent: {
     coordinatorProfileId: string | null;
     maxConcurrentSubagents: number;
-    profiles: NexusAutomationConfig["agent"]["profiles"];
+    safety: NexusAutomationAgentPolicy["safety"];
+    coordinatorProfile: NexusAutomationAgentPolicy["coordinatorProfile"];
+    profiles: NexusAutomationAgentPolicy["profiles"];
   };
   result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
@@ -375,6 +381,7 @@ export async function runNexusAutomationAgentLaunchOnce(
     preflight = preflightNexusAutomationAgentLaunch({
       components,
       componentProviders,
+      automationConfig,
     });
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
@@ -659,8 +666,10 @@ export function createNexusAutomationAgentCommandLauncher(
 export function preflightNexusAutomationAgentLaunch(options: {
   components: ResolvedNexusProjectComponent[];
   componentProviders: NexusAutomationAgentLaunchComponentProvider[];
+  automationConfig: NexusAutomationConfig;
 }): NexusAutomationPreflightCheck[] {
   return [
+    ...preflightNexusAutomationAgentPolicy(options.automationConfig),
     check(
       "workTracking",
       options.componentProviders.length > 0,
@@ -684,6 +693,62 @@ export function preflightNexusAutomationAgentLaunch(options: {
       ),
     ),
   ];
+}
+
+function preflightNexusAutomationAgentPolicy(
+  automationConfig: NexusAutomationConfig,
+): NexusAutomationPreflightCheck[] {
+  const policy = normalizeNexusAutomationAgentPolicy(automationConfig);
+  const checks: NexusAutomationPreflightCheck[] = [
+    check(
+      "agent:maxConcurrentSubagents",
+      policy.maxConcurrentSubagents > 0,
+      `Agent subagent cap is ${policy.maxConcurrentSubagents}`,
+      "automation.agent.maxConcurrentSubagents must be a positive integer",
+    ),
+  ];
+
+  if (!policy.coordinatorProfileId) {
+    checks.push(
+      check(
+        "agent:coordinatorProfile",
+        true,
+        "No coordinator profile is configured; command policy must come from automation.agent.command or caller override",
+        "Coordinator profile is not configured",
+      ),
+    );
+    return checks;
+  }
+
+  const coordinatorProfile = policy.coordinatorProfile;
+  checks.push(
+    check(
+      "agent:coordinatorProfile",
+      coordinatorProfile !== null,
+      `Coordinator profile ${policy.coordinatorProfileId} is configured`,
+      `automation.agent.coordinatorProfileId references missing profile: ${policy.coordinatorProfileId}`,
+    ),
+  );
+  if (!coordinatorProfile) {
+    return checks;
+  }
+
+  checks.push(
+    check(
+      `agentProfile:${coordinatorProfile.id}:intendedUse`,
+      coordinatorProfile.intendedUse !== "subagent",
+      `Coordinator profile ${coordinatorProfile.id} intendedUse allows coordinator launch`,
+      `automation.agent.profiles.${coordinatorProfile.id}.intendedUse must be coordinator or any for coordinator launch`,
+    ),
+    check(
+      `agentProfile:${coordinatorProfile.id}:command`,
+      coordinatorProfile.command !== null,
+      `Coordinator profile ${coordinatorProfile.id} command is configured`,
+      `automation.agent.profiles.${coordinatorProfile.id}.command must be configured for coordinator launch`,
+    ),
+  );
+
+  return checks;
 }
 
 export function generateNexusAutomationAgentRunId(
@@ -799,11 +864,7 @@ function buildAgentLaunchContext(
       projectRoot: input.projectRoot,
       config: input.automationConfig,
     }),
-    agent: {
-      coordinatorProfileId: input.automationConfig.agent.coordinatorProfileId,
-      maxConcurrentSubagents: input.automationConfig.agent.maxConcurrentSubagents,
-      profiles: input.automationConfig.agent.profiles,
-    },
+    agent: normalizeNexusAutomationAgentPolicy(input.automationConfig),
     result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
     componentEligibleWorkItems: input.componentEligibleWorkItems,
