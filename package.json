@@ -1,12 +1,12 @@
 {
-  "name": "dev-nexus",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@evref-bl/dev-nexus",
+  "version": "0.1.0-alpha.0",
+  "private": false,
   "description": "Language-neutral project/work tracking and local execution core.",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "dev-nexus": "./dist/cli.js"
+    "dev-nexus": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -18,6 +18,9 @@
     "README.md",
     "package.json"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24"
   },
