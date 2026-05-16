@@ -13,10 +13,11 @@ Immediate direction:
   - `dev-nexus:local-6` coordinator subagent dispatch progress surfaces.
   - `dev-nexus:local-7` component-scoped parallel worktree records.
   - `dev-nexus:local-8` component-aware target completion reporting.
-  - `dev-nexus:local-9` low-token agent-facing status and eligible-work
-    commands.
   - `dev-nexus:local-10` neutral work-tracker provider conformance.
   - `dev-nexus:local-11` Codex and Claude agent profile policy schema.
+- Low-token coordinator discovery is now available through DevNexus CLI
+  `automation eligible-work` and `automation agent-profiles`, plus native MCP
+  tools `eligible_work` and `agent_profiles`.
 - The coordinator should choose the largest safe bounded subset of the ready
   DevNexus batch, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS` when running
   under agent launch.
@@ -58,6 +59,8 @@ Durable completed foundation:
   were implemented and published as `95cec72`.
 - DevNexus core target-report/relaunch readiness was completed and published as
   `1863d04`.
+- DevNexus low-token agent-facing automation surfaces were completed and
+  published as `f332378`.
 - PharoNexus specialization alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
