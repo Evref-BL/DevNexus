@@ -28,8 +28,6 @@ Immediate direction:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
-  - `mcp-pharo:local-3` decide the publication path for local review-handoff
-    commits `0a38755` and `4c37fb0`.
   - `plexus:local-3` build the approved isolated PLexus live-smoke runner
     harness after runner inputs and cleanup policy are approved.
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
@@ -66,7 +64,8 @@ Durable completed foundation:
 - pharo-launcher-mcp cleanup hook boundary was documented and published as
   `1f3070b`.
 - MCP-Pharo static/live verification boundary was documented as local
-  review-handoff commit `0a38755` on `develop`.
+  review-handoff commits `0a38755` and `4c37fb0`, now pushed to
+  `origin/review/mcp-pharo-verification-boundary-20260516`.
 
 Active boundaries:
 
