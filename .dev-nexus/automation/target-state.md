@@ -18,9 +18,9 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-23` let toolchain plugins project dependencies into
-    worker worktrees so JS/TS commands can resolve local binaries without
-    global installs or ad hoc package fetches.
+  - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
+    agent setup. This is a static setup/config slice only; do not run live
+    images, PLexus open/close, or gateway live routes.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
   - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
@@ -36,11 +36,12 @@ Immediate direction:
     Plugins can now contribute bounded worker briefing/context fragments.
     `pharo-nexus:local-4` owns the Pharo-specific fragment for scoped PLexus
     and direct Pharo MCP guidance.
-  - New ready follow-up `dev-nexus:local-23` handles toolchain dependency
-    projection. Keep it generic: DevNexus core should accept declarative
-    plugin setup contributions; JavaScript/TypeScript is the first concrete
-    fixture, while Java should reuse the same hook later for JDK/Maven/Gradle
-    hints.
+  - `dev-nexus:local-23` is complete and published through DevNexus
+    `6c0501c`. DevNexus core now accepts declarative plugin dependency
+    projections, materializes them into worker worktrees without installs, and
+    records the resulting support in setup/context surfaces. JavaScript/
+    TypeScript is covered by fixtures; Java can reuse the same hook later for
+    JDK/Maven/Gradle hints.
   - Defer nested generated execution workspaces until the simpler context
     bundle has been exercised; `dev-nexus:local-22` tracks the human decision
     and architecture review.
@@ -51,9 +52,6 @@ Immediate direction:
     That pull added the repo-local `pharo-ci-repro` skill and Docker
     smalltalkCI reproduction helper.
 - Dependent non-eligible plugin work:
-  - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
-    agent setup after the generic plugin and scoped PLexus contracts are
-    stable.
   - `pharo-launcher-mcp:local-3` confirm launcher image delete/status contract
     only if PLexus identifies a concrete launcher-side cleanup gap.
 - Completed shared coordination baseline:
@@ -186,6 +184,10 @@ Durable completed foundation:
 - DevNexus worker context follow-ups were published through `5895ea2`,
   covering worker-local project skill projections and generic plugin
   worker-context/briefing fragments.
+- DevNexus plugin dependency projection support was published through
+  `6c0501c`, covering generic `dependency_projection` plugin capabilities,
+  generated worktree materialization, Git exclusion, worker context reporting,
+  JS/TS binary-resolution fixtures, and run-once preflight/setup wiring.
 - PLexus scoped plugin context was published through `de0d5c6`, covering
   project/workspace/target/image ownership context, scoped lifecycle
   affordance descriptions, cleanup metadata, and gateway `imageId` route
