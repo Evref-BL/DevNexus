@@ -6,13 +6,15 @@ DevNexus agent-launch loop to advance eligible work.
 
 Immediate direction:
 
-- Seed the initial local work-item stores from the live plan.
-- Verify the native DevNexus MCP config and local Codex coordinator profile in
-  this fresh project.
-- Use the `to-issues` skill to refine the seeded plan into clear, bounded
-  component-owned work items.
-- Start with DevNexus core work that improves dogfooding reliability before
-  touching live runtime/image boundaries.
+- The seeded local work-item stores have been refined with component ownership,
+  acceptance criteria, readiness labels, blockers, and safe verification notes.
+- DevNexus core result-file contract hardening and component worktree guidance
+  were implemented and published as `95cec72`.
+- Next DevNexus core work should advance the remaining target-report/relaunch
+  readiness item, then continue into specialization alignment only after core
+  dogfood reliability remains green.
+- Runtime and image work stays planning-only until the isolated runner,
+  disposable runtime boundary, and cleanup plan are explicit.
 
 Active boundaries:
 
