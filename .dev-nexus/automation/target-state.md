@@ -19,8 +19,8 @@ Immediate direction:
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
   - `dev-nexus:local-13` add the generic plugin capability/projection contract.
-  - `dev-nexus:local-14` add shared coordination status and handoff records for
-    Mac/Windows parallel work without hard locks.
+  - `dev-nexus:local-15` add shared coordination integration planning now that
+    status and handoff records exist.
   - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
@@ -28,9 +28,10 @@ Immediate direction:
     stable.
   - `pharo-launcher-mcp:local-3` confirm launcher image delete/status contract
     only if PLexus identifies a concrete launcher-side cleanup gap.
-- Dependent non-eligible shared coordination work:
-  - `dev-nexus:local-15` add shared coordination integration planning after
-    status and handoff records exist.
+- Completed shared coordination baseline:
+  - `dev-nexus:local-14` added generic `coordination_status` and
+    `coordination_handoff` through CLI and MCP, with advisory stale handoff
+    warnings and tracker-backed local comments.
 - External coordination extension:
   - Add `coordination_request` so agents can ask external humans or agents for
     approval, feedback, choices, or review through provider-native issue,
@@ -84,9 +85,9 @@ Vibe backlog reconciliation:
 Shared coordination planning:
 
 - Added `docs/shared-multi-host-coordination-prd.md` to define the feature.
-- The planned coordination API is intentionally small:
-  `coordination_status`, `coordination_handoff`, and
-  `coordination_integrate`; external coordination extends it with
+- The coordination API remains intentionally small. `coordination_status` and
+  `coordination_handoff` are implemented; `coordination_integrate` remains the
+  next generic integration-planning slice. External coordination extends it with
   `coordination_request`.
 - Git worktrees and branches remain the parallelism mechanism. Coordination
   records are shared intent and handoff facts, not hard locks.
@@ -114,6 +115,9 @@ Durable completed foundation:
 - DevNexus parallel wave `parallel-dev-nexus-wave-2-20260516` completed and
   was published through `e11df67`, covering component-aware target completion
   reporting and hardened Codex/Claude agent profile policy schema.
+- DevNexus shared coordination baseline was published through `c0cb6d8`,
+  covering generic CLI/MCP `coordination_status` and `coordination_handoff`
+  records backed by work-item comments.
 - Component wave `parallel-component-wave-20260516` completed with verified
   source changes:
   - DevNexus project template scaffold was published through `3891e3e`.
