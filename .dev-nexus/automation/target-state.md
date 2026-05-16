@@ -22,6 +22,8 @@ Immediate direction:
   - `dev-nexus:local-15` add shared coordination integration planning now that
     status and handoff records exist.
   - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
+  - `plexus:local-9` make `gateway` the normal agent-facing Pharo MCP proxy and
+    hide raw `plexus_route_to_image` behind explicit opt-in.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
     agent setup after the generic plugin and scoped PLexus contracts are
@@ -99,6 +101,20 @@ Shared coordination planning:
 - Durable multi-host state should live in Git remotes and the shared work
   tracker. Tailscale can provide private MCP transport, but should not be the
   only source of truth.
+
+PLexus agent-facing surface direction:
+
+- Normal agents should see two PLexus MCP concepts:
+  - `pharo-launcher` for scoped image lifecycle such as list, create, start,
+    stop, delete, and info.
+  - `gateway` for typed project Pharo MCP tools routed to a selected image by
+    explicit `imageId`.
+- `plexus_route_to_image` remains a raw routing escape hatch only when an
+  explicit opt-in setting enables it. Generated default agent config should not
+  expose it.
+- Route registration, unregister, status, and stale-route cleanup are
+  internal/admin plumbing for PLexus core or operators, not a third normal
+  agent-facing surface.
 
 Durable completed foundation:
 
