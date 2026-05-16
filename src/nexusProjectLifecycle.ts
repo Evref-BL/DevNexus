@@ -9,8 +9,14 @@ import {
   type NexusProjectComponentConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { workTrackerCapabilitiesForConfig } from "./workTrackingProviderService.js";
-import type { TrackerCapabilities } from "./workTrackingTypes.js";
+import {
+  workTrackerCapabilityReportForConfig,
+  workTrackerCapabilitiesForConfig,
+} from "./workTrackingProviderService.js";
+import type {
+  TrackerCapabilities,
+  WorkTrackerCapabilityReport,
+} from "./workTrackingTypes.js";
 
 export interface ProjectGitCommandResult {
   args: string[];
@@ -128,6 +134,7 @@ export interface ResolvedNexusProjectComponent {
   worktreesRootExists: boolean;
   workTracking: NexusProjectComponentConfig["workTracking"] | null;
   workTrackingCapabilities: TrackerCapabilities | null;
+  workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
   verification: NexusProjectComponentConfig["verification"] | null;
   publication: NexusProjectComponentConfig["publication"] | null;
   relationships: NexusProjectComponentConfig["relationships"];
@@ -193,6 +200,9 @@ export function resolveProjectComponent(
     workTracking: component.workTracking ?? null,
     workTrackingCapabilities: component.workTracking
       ? workTrackerCapabilitiesForConfig(component.workTracking)
+      : null,
+    workTrackingCapabilityReport: component.workTracking
+      ? workTrackerCapabilityReportForConfig(component.workTracking)
       : null,
     verification: component.verification ?? null,
     publication: component.publication ?? null,

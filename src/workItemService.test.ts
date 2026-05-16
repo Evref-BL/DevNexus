@@ -9,6 +9,12 @@ import {
   type ResolvedWorkItemProjectContext,
   WorkItemServiceError,
 } from "./workItemService.js";
+import type {
+  TrackerCapabilities,
+  WorkComment,
+  WorkItem,
+  WorkTrackerProvider,
+} from "./workTrackingTypes.js";
 
 const tempDirs: string[] = [];
 
@@ -48,6 +54,37 @@ function createProjectResolver(project: ResolvedWorkItemProjectContext) {
     }
 
     throw new WorkItemServiceError("project not found");
+  };
+}
+
+const noWorkItemCapabilities: TrackerCapabilities = {
+  createItem: false,
+  listItems: false,
+  getItem: false,
+  updateItem: false,
+  comment: false,
+  labels: false,
+  assignees: false,
+  milestones: false,
+  board: true,
+  boardStatus: false,
+  draftItems: false,
+  webhooks: false,
+};
+
+function unsupportedProvider(): WorkTrackerProvider {
+  const shouldNotRun = async (): Promise<never> => {
+    throw new Error("provider method should not run");
+  };
+
+  return {
+    provider: "vibe-kanban",
+    capabilities: noWorkItemCapabilities,
+    createWorkItem: shouldNotRun,
+    listWorkItems: shouldNotRun,
+    getWorkItem: shouldNotRun,
+    updateWorkItem: shouldNotRun,
+    addComment: shouldNotRun,
   };
 }
 
@@ -207,5 +244,107 @@ describe("work item service", () => {
     await expect(
       service.resolveProviderContext({ project: "tracked-project" }),
     ).rejects.toThrow(/tracked-project.*vibe-kanban.*not available/);
+  });
+
+  it("fails before provider calls when neutral capabilities are disabled", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      workTracking: {
+        provider: "vibe-kanban",
+        projectId: "legacy-vibe-project",
+      },
+    });
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      providerFactory: unsupportedProvider,
+    });
+
+    await expect(
+      service.createWorkItem({
+        project: "tracked-project",
+        title: "Unsupported create",
+      }),
+    ).rejects.toThrow(
+      /provider "vibe-kanban" cannot create work items; required capability "create" is disabled/,
+    );
+    await expect(
+      service.listWorkItems({ project: "tracked-project" }),
+    ).rejects.toThrow(
+      /provider "vibe-kanban" cannot list work items; required capability "list" is disabled/,
+    );
+    await expect(
+      service.addComment({
+        project: "tracked-project",
+        ref: { id: "vibe-1" },
+        body: "Unsupported comment",
+      }),
+    ).rejects.toThrow(
+      /provider "vibe-kanban" cannot add comments; required capability "comment" is disabled/,
+    );
+  });
+
+  it("reports field-level capability gaps before writing unsupported metadata", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot);
+    const provider: WorkTrackerProvider = {
+      provider: "minimal",
+      capabilities: {
+        ...noWorkItemCapabilities,
+        createItem: true,
+        listItems: true,
+        getItem: true,
+        updateItem: true,
+        comment: true,
+        board: false,
+      },
+      createWorkItem: async (): Promise<WorkItem> => ({
+        id: "minimal-1",
+        title: "Created",
+        status: "todo",
+        provider: "minimal",
+      }),
+      listWorkItems: async (): Promise<WorkItem[]> => [],
+      getWorkItem: async (): Promise<WorkItem> => ({
+        id: "minimal-1",
+        title: "Created",
+        status: "todo",
+        provider: "minimal",
+      }),
+      updateWorkItem: async (): Promise<WorkItem> => ({
+        id: "minimal-1",
+        title: "Created",
+        status: "todo",
+        provider: "minimal",
+      }),
+      addComment: async (): Promise<WorkComment> => ({
+        id: "minimal-comment-1",
+        body: "Comment",
+      }),
+    };
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      providerFactory: () => provider,
+    });
+
+    await expect(
+      service.createWorkItem({
+        project: "tracked-project",
+        title: "Needs labels",
+        labels: ["bug"],
+      }),
+    ).rejects.toThrow(
+      /provider "minimal" cannot set labels on created work items; required capability "labels" is disabled/,
+    );
+    await expect(
+      service.updateWorkItem({
+        project: "tracked-project",
+        ref: { id: "minimal-1" },
+        patch: {
+          assignees: ["alice"],
+        },
+      }),
+    ).rejects.toThrow(
+      /provider "minimal" cannot set assignees on updated work items; required capability "assignees" is disabled/,
+    );
   });
 });

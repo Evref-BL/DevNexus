@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  assertWorkTrackerCapability,
   createWorkTrackerProvider,
+  workTrackerCapabilityReportForConfig,
   workTrackerCapabilitiesForConfig,
   WorkTrackingProviderServiceError,
 } from "./workTrackingProviderService.js";
@@ -93,6 +95,26 @@ describe("work tracking provider service", () => {
 
   it("reports configured capabilities without requiring provider credentials", () => {
     expect(
+      workTrackerCapabilityReportForConfig({
+        provider: "local",
+      }),
+    ).toMatchObject({
+      provider: "local",
+      capabilities: {
+        create: true,
+        list: true,
+        get: true,
+        update: true,
+        comment: true,
+        labels: true,
+        assignees: true,
+        milestones: true,
+        board: false,
+        boardStatus: false,
+      },
+      unsupported: ["board", "boardStatus"],
+    });
+    expect(
       workTrackerCapabilitiesForConfig({
         provider: "vibe-kanban",
         projectId: "project-1",
@@ -119,5 +141,46 @@ describe("work tracking provider service", () => {
       board: true,
       boardStatus: true,
     });
+    expect(
+      workTrackerCapabilityReportForConfig({
+        provider: "jira",
+        host: "https://example.atlassian.net",
+        projectKey: "NEX",
+        board: {
+          kind: "jira-workflow",
+          statusOptions: {
+            blocked: "31",
+          },
+        },
+      }),
+    ).toMatchObject({
+      provider: "jira",
+      capabilities: {
+        board: true,
+        boardStatus: true,
+        milestones: false,
+      },
+      unsupported: ["milestones"],
+    });
+  });
+
+  it("uses explicit capability names in unsupported-operation diagnostics", () => {
+    const provider = createWorkTrackerProvider(
+      {
+        provider: "vibe-kanban",
+        projectId: "project-1",
+      },
+      {
+        vibeKanban: {
+          port: 3000,
+        },
+      },
+    );
+
+    expect(() =>
+      assertWorkTrackerCapability(provider, "list", "discover eligible work"),
+    ).toThrow(
+      /provider "vibe-kanban" cannot discover eligible work; required capability "list" is disabled/,
+    );
   });
 });

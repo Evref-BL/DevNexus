@@ -1,4 +1,5 @@
 import {
+  assertWorkTrackerCapability,
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
   WorkTrackingProviderServiceError,
@@ -135,6 +136,12 @@ export class WorkItemService {
       ...item
     } = input;
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(
+      context.provider,
+      "create",
+      "create work items",
+    );
+    assertCreateFieldCapabilities(context.provider, item);
     return context.provider.createWorkItem({
       ...item,
       projectRoot: context.projectRoot,
@@ -149,6 +156,11 @@ export class WorkItemService {
       ...query
     } = input;
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(
+      context.provider,
+      "list",
+      "list work items",
+    );
     return context.provider.listWorkItems({
       ...query,
       projectRoot: context.projectRoot,
@@ -163,6 +175,7 @@ export class WorkItemService {
       ...ref
     } = input;
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(context.provider, "get", "get work items");
     return context.provider.getWorkItem(
       normalizeWorkItemRef(ref, context.provider.provider),
     );
@@ -170,6 +183,12 @@ export class WorkItemService {
 
   async updateWorkItem(input: UpdateProjectWorkItemInput): Promise<WorkItem> {
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(
+      context.provider,
+      "update",
+      "update work items",
+    );
+    assertPatchFieldCapabilities(context.provider, input.patch);
     return context.provider.updateWorkItem(
       normalizeWorkItemRef(input.ref, context.provider.provider),
       input.patch,
@@ -180,6 +199,11 @@ export class WorkItemService {
     input: AddProjectWorkItemCommentInput,
   ): Promise<WorkComment> {
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(
+      context.provider,
+      "comment",
+      "add comments",
+    );
     return context.provider.addComment(
       normalizeWorkItemRef(input.ref, context.provider.provider),
       input.body,
@@ -188,6 +212,11 @@ export class WorkItemService {
 
   async setStatus(input: SetProjectWorkItemStatusInput): Promise<WorkItem> {
     const context = await this.resolveProviderContext(input);
+    assertWorkTrackerCapability(
+      context.provider,
+      "update",
+      "set work item status",
+    );
     const ref = normalizeWorkItemRef(input.ref, context.provider.provider);
     if (context.provider.setStatus) {
       return context.provider.setStatus(ref, input.status);
@@ -255,6 +284,60 @@ function normalizeProjectSelectorObject(
     ...(project ? { project } : { projectRoot }),
     ...(componentId ? { componentId } : {}),
   };
+}
+
+function assertCreateFieldCapabilities(
+  provider: WorkTrackerProvider,
+  input: Omit<CreateWorkItemInput, "projectRoot">,
+): void {
+  if (input.labels && input.labels.length > 0) {
+    assertWorkTrackerCapability(
+      provider,
+      "labels",
+      "set labels on created work items",
+    );
+  }
+  if (input.assignees && input.assignees.length > 0) {
+    assertWorkTrackerCapability(
+      provider,
+      "assignees",
+      "set assignees on created work items",
+    );
+  }
+  if (input.milestone !== undefined && input.milestone !== null) {
+    assertWorkTrackerCapability(
+      provider,
+      "milestones",
+      "set milestones on created work items",
+    );
+  }
+}
+
+function assertPatchFieldCapabilities(
+  provider: WorkTrackerProvider,
+  patch: WorkItemPatch,
+): void {
+  if (patch.labels !== undefined) {
+    assertWorkTrackerCapability(
+      provider,
+      "labels",
+      "set labels on updated work items",
+    );
+  }
+  if (patch.assignees !== undefined) {
+    assertWorkTrackerCapability(
+      provider,
+      "assignees",
+      "set assignees on updated work items",
+    );
+  }
+  if (patch.milestone !== undefined) {
+    assertWorkTrackerCapability(
+      provider,
+      "milestones",
+      "set milestones on updated work items",
+    );
+  }
 }
 
 function optionalNonEmptyString(

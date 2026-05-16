@@ -137,10 +137,14 @@ publication hints, and explicit relationships to other components.
 The primary component is the compatibility anchor for legacy commands that can
 operate on only one component. New automation and project status surfaces expose
 all configured components, including each component's source root and whether
-that root exists. Components with work tracking also expose provider capability
-flags so a coordinator agent can see whether a component tracker can list,
-create, update, comment, manage labels, manage assignees, or update board
-status before choosing a workflow. Component worktrees default under
+that root exists. Components with work tracking also expose raw provider
+capability flags and an action-oriented `workTrackingCapabilityReport` so a
+coordinator agent can see whether a component tracker can list, create, get,
+update, comment, manage labels, manage assignees, use milestones, use a board,
+or update board status before choosing a workflow. `boardStatus` means a
+configured board or workflow status field can be synchronized; a provider can
+still update neutral item status without claiming board-status support.
+Component worktrees default under
 `<project worktreesRoot>/<component-id>` so arity one is not a special
 directory case.
 

@@ -167,9 +167,12 @@ export const jiraWorkTrackerCapabilities: TrackerCapabilities = {
 export function jiraWorkTrackerCapabilitiesForConfig(
   config: Pick<JiraWorkTrackingConfig, "board">,
 ): TrackerCapabilities {
+  const hasWorkflowBoard = config.board?.kind === "jira-workflow";
   return {
     ...jiraWorkTrackerCapabilities,
-    boardStatus: Object.keys(jiraStatusTransitionOptions(config)).length > 0,
+    board: hasWorkflowBoard,
+    boardStatus:
+      hasWorkflowBoard && Object.keys(jiraStatusTransitionOptions(config)).length > 0,
   };
 }
 
@@ -398,8 +401,14 @@ export class JiraWorkTrackerProvider implements WorkTrackerProvider {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
+      const message = await jiraErrorMessage(response, method, url);
       throw new JiraWorkTrackerProviderError(
-        await jiraErrorMessage(response, method, url),
+        jiraErrorMessageWithCredentialHint(
+          message,
+          response,
+          authorizationHeader,
+          this.config,
+        ),
       );
     }
     if (response.status === 204) {
@@ -976,4 +985,25 @@ function jiraErrorDetail(body: JiraErrorBody): string | undefined {
   }
 
   return undefined;
+}
+
+function jiraErrorMessageWithCredentialHint(
+  message: string,
+  response: Response,
+  authorizationHeader: string | undefined,
+  config: Pick<JiraWorkTrackingConfig, "host">,
+): string {
+  if (
+    authorizationHeader ||
+    (response.status !== 401 && response.status !== 403)
+  ) {
+    return message;
+  }
+
+  return (
+    `${message}. No Jira token, API token, or git credential was available ` +
+    `for ${normalizeJiraCredentialHost(config.host)}. Configure JIRA_TOKEN, ` +
+    "JIRA_EMAIL with JIRA_API_TOKEN, ATLASSIAN_EMAIL with " +
+    "ATLASSIAN_API_TOKEN, or a git credential helper."
+  );
 }

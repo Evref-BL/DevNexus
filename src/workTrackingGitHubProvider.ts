@@ -409,8 +409,14 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
     });
 
     if (!response.ok) {
+      const message = await githubErrorMessage(response, method, url);
       throw new GitHubWorkTrackerProviderError(
-        await githubErrorMessage(response, method, url),
+        gitHubErrorMessageWithCredentialHint(
+          message,
+          response,
+          authorizationHeader,
+          this.config,
+        ),
       );
     }
 
@@ -439,8 +445,18 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
     });
 
     if (!response.ok) {
+      const message = await githubErrorMessage(
+        response,
+        "POST",
+        new URL(this.graphqlApiUrl),
+      );
       throw new GitHubWorkTrackerProviderError(
-        await githubErrorMessage(response, "POST", new URL(this.graphqlApiUrl)),
+        gitHubErrorMessageWithCredentialHint(
+          message,
+          response,
+          authorizationHeader,
+          this.config,
+        ),
       );
     }
 
@@ -992,4 +1008,24 @@ async function githubErrorMessage(
     `GitHub request failed: ${method} ${url.pathname} returned ${response.status}`,
     detail ? `: ${detail}` : "",
   ].join("");
+}
+
+function gitHubErrorMessageWithCredentialHint(
+  message: string,
+  response: Response,
+  authorizationHeader: string | undefined,
+  config: Pick<GitHubWorkTrackingConfig, "host" | "repository">,
+): string {
+  if (
+    authorizationHeader ||
+    (response.status !== 401 && response.status !== 403)
+  ) {
+    return message;
+  }
+
+  return (
+    `${message}. No GitHub token or git credential was available for ` +
+    `${normalizeGitHubCredentialHost(config.host)}. Configure GITHUB_TOKEN, ` +
+    "GH_TOKEN, or a git credential helper."
+  );
 }

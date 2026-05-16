@@ -642,4 +642,32 @@ describe("GitHub work tracker provider", () => {
 
     expect(fake.calls[0]?.headers.Authorization).toBe("bearer encoded-token");
   });
+
+  it("reports missing credentials when GitHub rejects an unauthenticated write", async () => {
+    const fake = queuedFetch([
+      {
+        status: 401,
+        body: {
+          message: "Bad credentials",
+        },
+      },
+    ]);
+    const provider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      fetch: fake.fetch,
+      env: {},
+      credentialRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr: "credential helper unavailable",
+      }),
+    });
+
+    await expect(
+      provider.createWorkItem({ title: "Needs credentials" }),
+    ).rejects.toThrow(
+      /No GitHub token or git credential was available for github.com/,
+    );
+    expect(fake.calls[0]?.headers.Authorization).toBeUndefined();
+  });
 });
