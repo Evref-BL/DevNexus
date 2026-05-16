@@ -486,4 +486,108 @@ describe("nexus automation agent launch", () => {
       ],
     });
   });
+
+  it("fails a successful agent command that does not write a result file", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs durable result",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-missing-result",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner: (command, options) => ({
+          command,
+          cwd: options.cwd,
+          stdout: "agent exited",
+          stderr: "",
+          exitCode: 0,
+        }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary: expect.stringContaining("Agent result file was not written"),
+      launch: {
+        error: expect.stringContaining("Agent result file was not written"),
+        verification: [
+          {
+            command: "codex run",
+            status: "passed",
+          },
+        ],
+      },
+    });
+  });
+
+  it("fails malformed agent result files before recording completion", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs valid result",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-invalid-result",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner: (command, options) => {
+          fs.writeFileSync(
+            options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+            `${JSON.stringify({ summary: "missing status" })}\n`,
+            "utf8",
+          );
+
+          return {
+            command,
+            cwd: options.cwd,
+            stdout: "agent exited",
+            stderr: "",
+            exitCode: 0,
+          };
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary: "Agent result file is invalid: agent result.status must be a non-empty string",
+      launch: {
+        error: "Agent result file is invalid: agent result.status must be a non-empty string",
+        verification: [
+          {
+            command: "codex run",
+            status: "passed",
+          },
+        ],
+      },
+    });
+  });
 });

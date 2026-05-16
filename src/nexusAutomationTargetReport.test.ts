@@ -181,8 +181,74 @@ describe("nexus automation target report", () => {
           blocked: 1,
         },
       },
+      relaunchDecision: {
+        type: "report_blocked",
+        reason: "Latest target cycle cycle-2 is blocked",
+        latestCycleId: "cycle-2",
+        latestRunId: "run-1",
+      },
       blockers: ["Credentials are missing."],
       notes: ["Cycle remains active."],
+    });
+  });
+
+  it("makes relaunch and stop decisions from latest recorded eligible work", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          relaunch: {
+            whileEligible: true,
+          },
+        },
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:05:00.000Z",
+      record: {
+        id: "cycle-1",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        status: "completed",
+        summary: "Completed one bounded batch.",
+        eligibleWorkItemCount: 3,
+      },
+    });
+
+    expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
+      relaunchDecision: {
+        type: "relaunch",
+        eligibleWorkItemCount: 3,
+        latestCycleId: "cycle-1",
+      },
+    });
+
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:30:00.000Z",
+      record: {
+        id: "cycle-2",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        status: "completed",
+        summary: "No eligible work remains.",
+        eligibleWorkItemCount: 0,
+      },
+    });
+
+    expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
+      relaunchDecision: {
+        type: "stop",
+        eligibleWorkItemCount: 0,
+        latestCycleId: "cycle-2",
+      },
     });
   });
 
@@ -199,6 +265,10 @@ describe("nexus automation target report", () => {
       },
       runSummary: {
         runCount: 0,
+      },
+      relaunchDecision: {
+        type: "not_ready",
+        reason: "No target cycle is recorded",
       },
     });
   });

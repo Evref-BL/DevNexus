@@ -232,9 +232,26 @@ checks the selector as an eligibility gate, writes an agent context file under
 the project `.dev-nexus/automation` state directory, starts the configured
 agent command, and records the result reported by the agent. The
 agent receives `DEV_NEXUS_AGENT_CONTEXT_FILE` and
-`DEV_NEXUS_AGENT_RESULT_FILE`; it can write status, summary, commits,
-verification records, publication decisions, blockers, and notes to the result
-file for DevNexus to retain in the run ledger.
+`DEV_NEXUS_AGENT_RESULT_FILE`. A successful agent command must write valid
+JSON to that result path before exiting; otherwise DevNexus records the launch
+as failed. The required fields are `status` and `summary`. Optional fields are
+`commitIds`, `verification`, `publicationDecision`, and `error`.
+
+```json
+{
+  "status": "completed",
+  "summary": "Agent reported completion",
+  "commitIds": [],
+  "verification": [],
+  "publicationDecision": {
+    "type": "direct_integration",
+    "remote": "origin",
+    "targetBranch": "main",
+    "reason": "Published verified source change."
+  },
+  "error": null
+}
+```
 
 The agent context includes `components` and `componentEligibleWorkItems`.
 DevNexus groups eligible work items by component and does not collapse that
@@ -272,8 +289,12 @@ ledger and exposes cycle counts plus the latest cycle.
 from the target context, target cycle ledger, automation run ledger, recorded
 work item refs, blockers, and notes. The report status is derived from the
 latest recorded target cycle when present, otherwise the latest automation run.
-It is intended for final user reporting and relaunch decisions by a human or
-coordinator agent; it does not query trackers or infer hidden work state.
+The report also includes a `relaunchDecision` field with one of `relaunch`,
+`stop`, `wait`, `report_blocked`, `report_failed`, or `not_ready`, based on
+the latest recorded cycle status, recorded eligible work count, target stop
+policy, and relaunch policy. It is intended for final user reporting and
+relaunch decisions by a human or coordinator agent; it does not query trackers
+or infer hidden work state.
 
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That

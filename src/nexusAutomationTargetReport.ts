@@ -35,6 +35,14 @@ export type NexusAutomationTargetReportStatus =
   | "failed"
   | "skipped";
 
+export type NexusAutomationTargetReportRelaunchDecisionType =
+  | "relaunch"
+  | "stop"
+  | "wait"
+  | "report_blocked"
+  | "report_failed"
+  | "not_ready";
+
 export interface BuildNexusAutomationTargetReportOptions {
   projectRoot: string;
   now?: Date | string;
@@ -72,6 +80,14 @@ export interface NexusAutomationTargetReportComponentWorkItemSummary {
   uniqueWorkItemCount: number;
 }
 
+export interface NexusAutomationTargetReportRelaunchDecision {
+  type: NexusAutomationTargetReportRelaunchDecisionType;
+  reason: string;
+  eligibleWorkItemCount: number | null;
+  latestCycleId: string | null;
+  latestRunId: string | null;
+}
+
 export interface NexusAutomationTargetReport {
   version: 1;
   generatedAt: string;
@@ -87,6 +103,7 @@ export interface NexusAutomationTargetReport {
   cycleSummary: NexusAutomationTargetCycleSummary | null;
   runSummary: NexusAutomationTargetReportRunSummary | null;
   workItemSummary: NexusAutomationTargetReportWorkItemSummary | null;
+  relaunchDecision: NexusAutomationTargetReportRelaunchDecision;
   blockers: string[];
   notes: string[];
 }
@@ -118,6 +135,13 @@ export function buildNexusAutomationTargetReport(
       cycleSummary: null,
       runSummary: null,
       workItemSummary: null,
+      relaunchDecision: {
+        type: "not_ready",
+        reason: "Project automation is not configured",
+        eligibleWorkItemCount: null,
+        latestCycleId: null,
+        latestRunId: null,
+      },
       blockers: [],
       notes: [],
     };
@@ -150,8 +174,141 @@ export function buildNexusAutomationTargetReport(
     cycleSummary,
     runSummary,
     workItemSummary: summarizeCycleWorkItems(cycleLedger),
+    relaunchDecision: relaunchDecision({
+      automationConfig,
+      lastCycle: cycleSummary.lastCycle,
+      lastRun: runSummary.lastRun,
+    }),
     blockers: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.blockers)),
     notes: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.notes)),
+  };
+}
+
+function relaunchDecision(options: {
+  automationConfig: NonNullable<NexusProjectConfig["automation"]>;
+  lastCycle: NexusAutomationTargetCycleRecord | null;
+  lastRun: NexusAutomationRunRecord | null;
+}): NexusAutomationTargetReportRelaunchDecision {
+  const { automationConfig, lastCycle, lastRun } = options;
+  if (!lastCycle) {
+    if (lastRun?.status === "blocked") {
+      return decision(
+        "report_blocked",
+        `Latest automation run ${lastRun.id} is blocked and no target cycle is recorded`,
+        null,
+        null,
+        lastRun.id,
+      );
+    }
+    if (lastRun?.status === "failed") {
+      return decision(
+        "report_failed",
+        `Latest automation run ${lastRun.id} failed and no target cycle is recorded`,
+        null,
+        null,
+        lastRun.id,
+      );
+    }
+
+    return decision(
+      "not_ready",
+      "No target cycle is recorded",
+      null,
+      null,
+      lastRun?.id ?? null,
+    );
+  }
+
+  if (lastCycle.status === "started" || lastCycle.status === "dispatched") {
+    return decision(
+      "wait",
+      `Latest target cycle ${lastCycle.id} is still ${lastCycle.status}`,
+      lastCycle.eligibleWorkItemCount,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+  if (lastCycle.status === "blocked") {
+    return decision(
+      "report_blocked",
+      `Latest target cycle ${lastCycle.id} is blocked`,
+      lastCycle.eligibleWorkItemCount,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+  if (lastCycle.status === "failed") {
+    return decision(
+      "report_failed",
+      `Latest target cycle ${lastCycle.id} failed`,
+      lastCycle.eligibleWorkItemCount,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+
+  const eligibleWorkItemCount = lastCycle.eligibleWorkItemCount;
+  if (eligibleWorkItemCount === null) {
+    return decision(
+      "not_ready",
+      `Latest target cycle ${lastCycle.id} did not record eligible work item count`,
+      null,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+  if (eligibleWorkItemCount > 0) {
+    if (automationConfig.agent.relaunch.whileEligible) {
+      return decision(
+        "relaunch",
+        `Latest target cycle ${lastCycle.id} recorded ${eligibleWorkItemCount} eligible work item(s) and relaunch while eligible is enabled`,
+        eligibleWorkItemCount,
+        lastCycle.id,
+        lastRun?.id ?? null,
+      );
+    }
+
+    return decision(
+      "wait",
+      `Latest target cycle ${lastCycle.id} recorded ${eligibleWorkItemCount} eligible work item(s), but relaunch while eligible is disabled`,
+      eligibleWorkItemCount,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+
+  if (automationConfig.target.stopWhenNoEligibleWork) {
+    return decision(
+      "stop",
+      `Latest target cycle ${lastCycle.id} recorded no eligible work item(s)`,
+      eligibleWorkItemCount,
+      lastCycle.id,
+      lastRun?.id ?? null,
+    );
+  }
+
+  return decision(
+    "wait",
+    `Latest target cycle ${lastCycle.id} recorded no eligible work item(s), but stopWhenNoEligibleWork is disabled`,
+    eligibleWorkItemCount,
+    lastCycle.id,
+    lastRun?.id ?? null,
+  );
+}
+
+function decision(
+  type: NexusAutomationTargetReportRelaunchDecisionType,
+  reason: string,
+  eligibleWorkItemCount: number | null,
+  latestCycleId: string | null,
+  latestRunId: string | null,
+): NexusAutomationTargetReportRelaunchDecision {
+  return {
+    type,
+    reason,
+    eligibleWorkItemCount,
+    latestCycleId,
+    latestRunId,
   };
 }
 

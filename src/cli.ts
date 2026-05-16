@@ -2318,6 +2318,10 @@ function printAutomationTargetReportResult(
   if (result.runSummary) {
     writeLine(stdout, `  Automation runs: ${result.runSummary.runCount}`);
   }
+  writeLine(
+    stdout,
+    `  Relaunch decision: ${result.relaunchDecision.type} (${result.relaunchDecision.reason})`,
+  );
   if (result.workItemSummary) {
     writeLine(
       stdout,

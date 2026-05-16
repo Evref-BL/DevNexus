@@ -621,6 +621,15 @@ export function createNexusAutomationAgentCommandLauncher(
       };
     }
 
+    if (reported.status === "missing") {
+      return {
+        status: "failed",
+        summary: reported.summary,
+        verification,
+        error: reported.error,
+      };
+    }
+
     const status = normalizeAgentStatus(reported.result?.status);
     return {
       status,
@@ -877,17 +886,24 @@ function agentLaunchEnvironment(
 
 function readAgentResultFile(resultFile: string): {
   status: "missing" | "loaded" | "failed";
-  summary?: string;
-  error?: string;
+  summary: string;
+  error: string | null;
   result?: NexusAutomationAgentLaunchResult;
 } {
   if (!fs.existsSync(resultFile)) {
-    return { status: "missing" };
+    const message = `Agent result file was not written: ${resultFile}`;
+    return {
+      status: "missing",
+      summary: message,
+      error: message,
+    };
   }
 
   try {
     return {
       status: "loaded",
+      summary: "Agent result file loaded",
+      error: null,
       result: normalizeAgentResult(
         JSON.parse(fs.readFileSync(resultFile, "utf8").replace(/^\uFEFF/, "")),
       ),
@@ -909,12 +925,10 @@ function normalizeAgentResult(value: unknown): NexusAutomationAgentLaunchResult 
 
   const record = value as Record<string, unknown>;
   return {
-    ...(record.status === undefined
-      ? {}
-      : { status: normalizeAgentStatus(record.status) }),
-    ...(record.summary === undefined
-      ? {}
-      : { summary: optionalNullableString(record.summary) ?? null }),
+    status: normalizeAgentStatus(
+      requiredNonEmptyString(record.status, "agent result.status"),
+    ),
+    summary: requiredNonEmptyString(record.summary, "agent result.summary"),
     ...(record.commitIds === undefined
       ? {}
       : { commitIds: normalizeStringArray(record.commitIds, "agent result.commitIds") }),
