@@ -18,6 +18,9 @@ import {
   saveProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import {
+  createLocalWorkTrackerProvider,
+} from "./workTrackingLocalProvider.js";
 
 const tempDirs: string[] = [];
 
@@ -190,6 +193,319 @@ describe("nexus automation target report", () => {
       blockers: ["Credentials are missing."],
       notes: ["Cycle remains active."],
     });
+  });
+
+  it("summarizes component progress and execution facts with local tracker work item details", async () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "components", "addon"), {
+      recursive: true,
+    });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    const config = projectConfig({
+      workTracking: undefined,
+      components: [
+        {
+          id: "primary",
+          name: "Primary",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:report/demo.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          workTracking: {
+            provider: "local",
+            storePath: primaryStorePath,
+          },
+          relationships: [],
+        },
+        {
+          id: "addon",
+          name: "Addon",
+          kind: "git",
+          role: "addon",
+          remoteUrl: "git@example.invalid:report/addon.git",
+          defaultBranch: "main",
+          sourceRoot: "components/addon",
+          workTracking: {
+            provider: "local",
+            storePath: addonStorePath,
+          },
+          relationships: [],
+        },
+      ],
+    });
+    saveProjectConfig(projectRoot, config);
+    const primaryTracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-16T09:00:00.000Z",
+    });
+    await primaryTracker.createWorkItem({
+      projectRoot,
+      title: "Ready primary work",
+      status: "ready",
+    });
+    await primaryTracker.createWorkItem({
+      projectRoot,
+      title: "Completed primary work",
+      status: "done",
+    });
+    const addonTracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: () => "2026-05-16T09:05:00.000Z",
+    });
+    await addonTracker.createWorkItem({
+      projectRoot,
+      title: "Waiting on human approval",
+      status: "blocked",
+    });
+    await addonTracker.createWorkItem({
+      projectRoot,
+      title: "Skipped addon work",
+      status: "wont_do",
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "run-primary",
+        projectId: "report-demo",
+        componentId: "primary",
+        status: "completed",
+        workItemId: "local-3",
+        workItemTitle: "Dispatch target reporter",
+        commitIds: ["abc123"],
+        summary: "Primary implementation finished.",
+        verification: [
+          {
+            command: "npm test -- nexusAutomationTargetReport.test.ts",
+            status: "passed",
+            summary: "Focused report tests passed.",
+            recordedAt: "2026-05-16T10:10:00.000Z",
+          },
+        ],
+        publicationDecision: {
+          type: "direct_integration",
+          remote: "origin",
+          targetBranch: "main",
+          prUrl: null,
+          reason: "Ready for direct integration.",
+          decidedAt: "2026-05-16T10:12:00.000Z",
+        },
+      },
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:15:00.000Z",
+      record: {
+        id: "run-addon",
+        projectId: "report-demo",
+        componentId: "addon",
+        status: "blocked",
+        workItemId: "local-1",
+        summary: "Addon work needs approval.",
+        error: "Human approval is missing.",
+      },
+    });
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:20:00.000Z",
+      record: {
+        id: "cycle-1",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        runId: "run-addon",
+        status: "blocked",
+        summary: "Blocked after component batch.",
+        eligibleWorkItemCount: 1,
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "eligible",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            cycleStatus: "completed",
+          },
+          {
+            componentId: "primary",
+            id: "local-3",
+            title: "Dispatch target reporter",
+            status: "in_progress",
+            cycleStatus: "dispatched",
+            agentProfileId: "codex-local",
+          },
+          {
+            componentId: "addon",
+            id: "local-1",
+            cycleStatus: "blocked",
+            notes: "Needs human approval.",
+          },
+          {
+            componentId: "addon",
+            id: "local-2",
+            cycleStatus: "skipped",
+          },
+        ],
+        blockers: ["Human approval is missing."],
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:30:00.000Z",
+    });
+
+    expect(report.activeBlockers).toMatchObject([
+      {
+        source: "cycle",
+        componentId: null,
+        cycleId: "cycle-1",
+        runId: "run-addon",
+        workItemId: null,
+        message: "Human approval is missing.",
+      },
+      {
+        source: "work_item",
+        componentId: "addon",
+        cycleId: "cycle-1",
+        runId: "run-addon",
+        workItemId: "local-1",
+        workItemTitle: "Waiting on human approval",
+        message: "Needs human approval.",
+      },
+      {
+        source: "run",
+        componentId: "addon",
+        cycleId: "cycle-1",
+        runId: "run-addon",
+        workItemId: "local-1",
+        workItemTitle: "Waiting on human approval",
+        message: "Human approval is missing.",
+      },
+    ]);
+    expect(report.workItemSummary).toMatchObject({
+      uniqueReferences: [
+        {
+          componentId: "primary",
+          id: "local-1",
+          title: "Ready primary work",
+          status: "ready",
+          latestCycleStatus: "eligible",
+        },
+        {
+          componentId: "primary",
+          id: "local-2",
+          title: "Completed primary work",
+          status: "done",
+          latestCycleStatus: "completed",
+        },
+        {
+          componentId: "primary",
+          id: "local-3",
+          title: "Dispatch target reporter",
+          status: "in_progress",
+          latestCycleStatus: "dispatched",
+        },
+        {
+          componentId: "addon",
+          id: "local-1",
+          title: "Waiting on human approval",
+          status: "blocked",
+          latestCycleStatus: "blocked",
+        },
+        {
+          componentId: "addon",
+          id: "local-2",
+          title: "Skipped addon work",
+          status: "wont_do",
+          latestCycleStatus: "skipped",
+        },
+      ],
+      progress: {
+        readyEligibleWork: [{ componentId: "primary", id: "local-1" }],
+        selectedWork: [{ componentId: "primary", id: "local-3" }],
+        blockedHitlWork: [{ componentId: "addon", id: "local-1" }],
+        completedWork: [{ componentId: "primary", id: "local-2" }],
+        skippedWork: [{ componentId: "addon", id: "local-2" }],
+      },
+    });
+    expect(report.executionSummary).toMatchObject({
+      commitIds: ["abc123"],
+      verification: [
+        {
+          runId: "run-primary",
+          componentId: "primary",
+          workItemId: "local-3",
+          command: "npm test -- nexusAutomationTargetReport.test.ts",
+          status: "passed",
+        },
+      ],
+      publicationDecisions: [
+        {
+          runId: "run-primary",
+          componentId: "primary",
+          workItemId: "local-3",
+          type: "direct_integration",
+          remote: "origin",
+          targetBranch: "main",
+        },
+      ],
+    });
+    expect(report.componentProgress).toMatchObject([
+      {
+        componentId: "primary",
+        componentName: "Primary",
+        workItemCount: 3,
+        commitIds: ["abc123"],
+        workItems: {
+          readyEligibleWork: [{ id: "local-1" }],
+          selectedWork: [{ id: "local-3" }],
+          completedWork: [{ id: "local-2" }],
+        },
+        runs: [
+          {
+            runId: "run-primary",
+            status: "completed",
+            workItemId: "local-3",
+          },
+        ],
+      },
+      {
+        componentId: "addon",
+        componentName: "Addon",
+        workItemCount: 2,
+        activeBlockers: [
+          {
+            source: "work_item",
+            workItemId: "local-1",
+          },
+          {
+            source: "run",
+            workItemId: "local-1",
+          },
+        ],
+        workItems: {
+          blockedHitlWork: [{ id: "local-1" }],
+          skippedWork: [{ id: "local-2" }],
+        },
+        runs: [
+          {
+            runId: "run-addon",
+            status: "blocked",
+            workItemId: "local-1",
+          },
+        ],
+      },
+    ]);
   });
 
   it("makes relaunch and stop decisions from latest recorded eligible work", () => {

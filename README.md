@@ -329,8 +329,12 @@ The report also includes a `relaunchDecision` field with one of `relaunch`,
 `stop`, `wait`, `report_blocked`, `report_failed`, or `not_ready`, based on
 the latest recorded cycle status, recorded eligible work count, target stop
 policy, and relaunch policy. It is intended for final user reporting and
-relaunch decisions by a human or coordinator agent; it does not query trackers
-or infer hidden work state.
+relaunch decisions by a human or coordinator agent. It avoids live external
+tracker calls, may read configured local work-item stores to fill missing
+titles/statuses, and does not infer hidden work state. Component progress,
+active blockers, commits, verification records, and publication decisions are
+summarized only from durable cycle/run facts and locally recorded work-item
+state.
 
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That

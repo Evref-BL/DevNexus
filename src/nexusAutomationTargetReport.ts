@@ -3,6 +3,7 @@ import {
   readNexusAutomationRunLedger,
   type NexusAutomationRunLedger,
   type NexusAutomationRunRecord,
+  type NexusAutomationRunStatus,
 } from "./nexusAutomation.js";
 import {
   loadProjectConfig,
@@ -26,6 +27,15 @@ import {
   type NexusAutomationTargetCycleWorkItem,
   type NexusAutomationTargetCycleWorkItemStatus,
 } from "./nexusAutomationTargetCycle.js";
+import {
+  loadLocalWorkTrackingStore,
+  resolveLocalWorkTrackingStorePath,
+} from "./workTrackingLocalProvider.js";
+import type { WorkStatus } from "./workTrackingTypes.js";
+import type {
+  WorktreePublicationDecision,
+  WorktreeVerificationRecord,
+} from "./worktreeExecutionMetadata.js";
 
 export type NexusAutomationTargetReportStatus =
   | "not_started"
@@ -62,12 +72,14 @@ export interface NexusAutomationTargetReportWorkItemSummary {
   uniqueReferences: NexusAutomationTargetReportWorkItemReference[];
   byComponent: NexusAutomationTargetReportComponentWorkItemSummary[];
   byCycleStatus: Record<NexusAutomationTargetCycleWorkItemStatus, number>;
+  progress: NexusAutomationTargetReportWorkItemProgressSummary;
 }
 
 export interface NexusAutomationTargetReportWorkItemReference {
   componentId: string | null;
   id: string;
   title: string | null;
+  status: WorkStatus | null;
   latestCycleStatus: NexusAutomationTargetCycleWorkItemStatus | null;
   latestCycleId: string;
   agentProfileId: string | null;
@@ -78,6 +90,80 @@ export interface NexusAutomationTargetReportComponentWorkItemSummary {
   componentId: string | null;
   totalReferences: number;
   uniqueWorkItemCount: number;
+}
+
+export interface NexusAutomationTargetReportWorkItemProgressSummary {
+  readyEligibleWork: NexusAutomationTargetReportWorkItemReference[];
+  selectedWork: NexusAutomationTargetReportWorkItemReference[];
+  blockedHitlWork: NexusAutomationTargetReportWorkItemReference[];
+  completedWork: NexusAutomationTargetReportWorkItemReference[];
+  skippedWork: NexusAutomationTargetReportWorkItemReference[];
+}
+
+export type NexusAutomationTargetReportActiveBlockerSource =
+  | "cycle"
+  | "work_item"
+  | "run";
+
+export interface NexusAutomationTargetReportActiveBlocker {
+  source: NexusAutomationTargetReportActiveBlockerSource;
+  componentId: string | null;
+  cycleId: string | null;
+  runId: string | null;
+  workItemId: string | null;
+  workItemTitle: string | null;
+  message: string | null;
+}
+
+export interface NexusAutomationTargetReportExecutionRunSummary {
+  runId: string;
+  componentId: string | null;
+  status: NexusAutomationRunStatus;
+  workItemId: string | null;
+  workItemTitle: string | null;
+  workItemStatus: WorkStatus | null;
+  commitIds: string[];
+  summary: string | null;
+  error: string | null;
+}
+
+export interface NexusAutomationTargetReportVerificationSummary
+  extends WorktreeVerificationRecord {
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  workItemTitle: string | null;
+}
+
+export interface NexusAutomationTargetReportPublicationDecisionSummary
+  extends WorktreePublicationDecision {
+  runId: string;
+  componentId: string | null;
+  workItemId: string | null;
+  workItemTitle: string | null;
+}
+
+export interface NexusAutomationTargetReportExecutionSummary {
+  runCount: number;
+  commitIds: string[];
+  verification: NexusAutomationTargetReportVerificationSummary[];
+  publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
+  runs: NexusAutomationTargetReportExecutionRunSummary[];
+}
+
+export interface NexusAutomationTargetReportComponentProgressSummary {
+  componentId: string | null;
+  componentName: string | null;
+  role: ResolvedNexusProjectComponent["role"] | null;
+  sourceRoot: string | null;
+  workTrackingProvider: string | null;
+  workItemCount: number;
+  workItems: NexusAutomationTargetReportWorkItemProgressSummary;
+  activeBlockers: NexusAutomationTargetReportActiveBlocker[];
+  commitIds: string[];
+  verification: NexusAutomationTargetReportVerificationSummary[];
+  publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
+  runs: NexusAutomationTargetReportExecutionRunSummary[];
 }
 
 export interface NexusAutomationTargetReportRelaunchDecision {
@@ -103,7 +189,10 @@ export interface NexusAutomationTargetReport {
   cycleSummary: NexusAutomationTargetCycleSummary | null;
   runSummary: NexusAutomationTargetReportRunSummary | null;
   workItemSummary: NexusAutomationTargetReportWorkItemSummary | null;
+  executionSummary: NexusAutomationTargetReportExecutionSummary | null;
+  componentProgress: NexusAutomationTargetReportComponentProgressSummary[];
   relaunchDecision: NexusAutomationTargetReportRelaunchDecision;
+  activeBlockers: NexusAutomationTargetReportActiveBlocker[];
   blockers: string[];
   notes: string[];
 }
@@ -135,6 +224,8 @@ export function buildNexusAutomationTargetReport(
       cycleSummary: null,
       runSummary: null,
       workItemSummary: null,
+      executionSummary: null,
+      componentProgress: [],
       relaunchDecision: {
         type: "not_ready",
         reason: "Project automation is not configured",
@@ -142,6 +233,7 @@ export function buildNexusAutomationTargetReport(
         latestCycleId: null,
         latestRunId: null,
       },
+      activeBlockers: [],
       blockers: [],
       notes: [],
     };
@@ -162,6 +254,17 @@ export function buildNexusAutomationTargetReport(
   const runLedger = readNexusAutomationRunLedger(projectRoot, automationConfig);
   const runSummary = summarizeRuns(runLedger);
   const status = reportStatus(cycleLedger, runLedger);
+  const workItemResolver = localWorkItemResolver(projectRoot, components);
+  const workItemSummary = summarizeCycleWorkItems(
+    cycleLedger,
+    workItemResolver,
+  );
+  const executionSummary = summarizeExecution(runLedger, workItemResolver);
+  const activeBlockers = summarizeActiveBlockers({
+    lastCycle: cycleSummary.lastCycle,
+    lastRun: runSummary.lastRun,
+    workItemResolver,
+  });
 
   return {
     version: 1,
@@ -173,12 +276,20 @@ export function buildNexusAutomationTargetReport(
     statusReason: reportStatusReason(status, cycleSummary.lastCycle, runSummary.lastRun),
     cycleSummary,
     runSummary,
-    workItemSummary: summarizeCycleWorkItems(cycleLedger),
+    workItemSummary,
+    executionSummary,
+    componentProgress: summarizeComponentProgress({
+      components,
+      workItemSummary,
+      executionSummary,
+      activeBlockers,
+    }),
     relaunchDecision: relaunchDecision({
       automationConfig,
       lastCycle: cycleSummary.lastCycle,
       lastRun: runSummary.lastRun,
     }),
+    activeBlockers,
     blockers: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.blockers)),
     notes: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.notes)),
   };
@@ -340,8 +451,19 @@ function summarizeRuns(
   };
 }
 
+interface WorkItemSnapshot {
+  title: string;
+  status: WorkStatus;
+}
+
+type LocalWorkItemResolver = (
+  componentId: string | null,
+  id: string,
+) => WorkItemSnapshot | null;
+
 function summarizeCycleWorkItems(
   ledger: NexusAutomationTargetCycleLedger,
+  workItemResolver: LocalWorkItemResolver,
 ): NexusAutomationTargetReportWorkItemSummary {
   const all = ledger.cycles.flatMap((cycle) =>
     cycle.workItems.map((item) => ({ cycle, item })),
@@ -363,10 +485,12 @@ function summarizeCycleWorkItems(
 
   for (const { cycle, item } of all) {
     const key = workItemKey(item);
+    const resolved = workItemResolver(item.componentId, item.id);
     unique.set(key, {
       componentId: item.componentId,
       id: item.id,
-      title: item.title,
+      title: item.title ?? resolved?.title ?? null,
+      status: item.status ?? resolved?.status ?? null,
       latestCycleStatus: item.cycleStatus,
       latestCycleId: cycle.id,
       agentProfileId: item.agentProfileId,
@@ -388,15 +512,332 @@ function summarizeCycleWorkItems(
     }
   }
 
+  const uniqueReferences = [...unique.values()];
   return {
     totalReferences: all.length,
-    uniqueReferences: [...unique.values()],
+    uniqueReferences,
     byComponent: [...componentCounts.values()].map((component) => ({
       componentId: component.componentId,
       totalReferences: component.totalReferences,
       uniqueWorkItemCount: component.uniqueIds.size,
     })),
     byCycleStatus,
+    progress: summarizeWorkItemProgress(uniqueReferences),
+  };
+}
+
+function summarizeExecution(
+  ledger: NexusAutomationRunLedger,
+  workItemResolver: LocalWorkItemResolver,
+): NexusAutomationTargetReportExecutionSummary {
+  const runs = ledger.runs.map((run) => {
+    const resolved = run.workItemId
+      ? workItemResolver(run.componentId, run.workItemId)
+      : null;
+    return {
+      runId: run.id,
+      componentId: run.componentId,
+      status: run.status,
+      workItemId: run.workItemId,
+      workItemTitle: run.workItemTitle ?? resolved?.title ?? null,
+      workItemStatus: resolved?.status ?? null,
+      commitIds: run.commitIds,
+      summary: run.summary,
+      error: run.error,
+    } satisfies NexusAutomationTargetReportExecutionRunSummary;
+  });
+  const runById = new Map(runs.map((run) => [run.runId, run]));
+  const verification = ledger.runs.flatMap((run) => {
+    const summary = runById.get(run.id);
+    return run.verification.map((record) => ({
+      runId: run.id,
+      componentId: run.componentId,
+      workItemId: run.workItemId,
+      workItemTitle: summary?.workItemTitle ?? null,
+      ...record,
+    }));
+  });
+  const publicationDecisions = ledger.runs.flatMap((run) => {
+    if (!run.publicationDecision) {
+      return [];
+    }
+    const summary = runById.get(run.id);
+    return [
+      {
+        runId: run.id,
+        componentId: run.componentId,
+        workItemId: run.workItemId,
+        workItemTitle: summary?.workItemTitle ?? null,
+        ...run.publicationDecision,
+      },
+    ];
+  });
+
+  return {
+    runCount: ledger.runs.length,
+    commitIds: uniqueStrings(ledger.runs.flatMap((run) => run.commitIds)),
+    verification,
+    publicationDecisions,
+    runs,
+  };
+}
+
+function summarizeActiveBlockers(options: {
+  lastCycle: NexusAutomationTargetCycleRecord | null;
+  lastRun: NexusAutomationRunRecord | null;
+  workItemResolver: LocalWorkItemResolver;
+}): NexusAutomationTargetReportActiveBlocker[] {
+  const { lastCycle, lastRun, workItemResolver } = options;
+  const active: NexusAutomationTargetReportActiveBlocker[] = [];
+  if (
+    lastCycle &&
+    (lastCycle.status === "completed" || lastCycle.status === "skipped")
+  ) {
+    return active;
+  }
+
+  if (lastCycle) {
+    for (const blocker of lastCycle.blockers) {
+      active.push({
+        source: "cycle",
+        componentId: null,
+        cycleId: lastCycle.id,
+        runId: lastCycle.runId,
+        workItemId: null,
+        workItemTitle: null,
+        message: blocker,
+      });
+    }
+    for (const item of lastCycle.workItems) {
+      const resolved = workItemResolver(item.componentId, item.id);
+      const status = item.status ?? resolved?.status ?? null;
+      if (item.cycleStatus !== "blocked" && status !== "blocked") {
+        continue;
+      }
+      active.push({
+        source: "work_item",
+        componentId: item.componentId,
+        cycleId: lastCycle.id,
+        runId: lastCycle.runId,
+        workItemId: item.id,
+        workItemTitle: item.title ?? resolved?.title ?? null,
+        message: item.notes,
+      });
+    }
+  }
+
+  if (
+    lastRun &&
+    (lastRun.status === "blocked" || lastRun.status === "failed") &&
+    (!lastCycle || lastCycle.runId === lastRun.id)
+  ) {
+    const resolved = lastRun.workItemId
+      ? workItemResolver(lastRun.componentId, lastRun.workItemId)
+      : null;
+    active.push({
+      source: "run",
+      componentId: lastRun.componentId,
+      cycleId: lastCycle?.id ?? null,
+      runId: lastRun.id,
+      workItemId: lastRun.workItemId,
+      workItemTitle: lastRun.workItemTitle ?? resolved?.title ?? null,
+      message: lastRun.error,
+    });
+  }
+
+  return active;
+}
+
+function summarizeComponentProgress(options: {
+  components: ResolvedNexusProjectComponent[];
+  workItemSummary: NexusAutomationTargetReportWorkItemSummary;
+  executionSummary: NexusAutomationTargetReportExecutionSummary;
+  activeBlockers: NexusAutomationTargetReportActiveBlocker[];
+}): NexusAutomationTargetReportComponentProgressSummary[] {
+  const drafts = new Map<
+    string,
+    {
+      component: ResolvedNexusProjectComponent | null;
+      componentId: string | null;
+      workItems: NexusAutomationTargetReportWorkItemReference[];
+      activeBlockers: NexusAutomationTargetReportActiveBlocker[];
+      runs: NexusAutomationTargetReportExecutionRunSummary[];
+    }
+  >();
+  const ensureDraft = (
+    componentId: string | null,
+    component: ResolvedNexusProjectComponent | null = null,
+  ): {
+    component: ResolvedNexusProjectComponent | null;
+    componentId: string | null;
+    workItems: NexusAutomationTargetReportWorkItemReference[];
+    activeBlockers: NexusAutomationTargetReportActiveBlocker[];
+    runs: NexusAutomationTargetReportExecutionRunSummary[];
+  } => {
+    const key = componentId ?? "";
+    const existing = drafts.get(key);
+    if (existing) {
+      if (!existing.component && component) {
+        existing.component = component;
+      }
+      return existing;
+    }
+
+    const draft = {
+      component,
+      componentId,
+      workItems: [],
+      activeBlockers: [],
+      runs: [],
+    };
+    drafts.set(key, draft);
+    return draft;
+  };
+
+  for (const component of options.components) {
+    ensureDraft(component.id, component);
+  }
+  for (const item of options.workItemSummary.uniqueReferences) {
+    ensureDraft(item.componentId).workItems.push(item);
+  }
+  for (const blocker of options.activeBlockers) {
+    if (blocker.componentId !== null) {
+      ensureDraft(blocker.componentId).activeBlockers.push(blocker);
+    }
+  }
+  for (const run of options.executionSummary.runs) {
+    ensureDraft(run.componentId).runs.push(run);
+  }
+
+  return [...drafts.values()].map((draft) => {
+    const componentId = draft.component?.id ?? draft.componentId;
+    const verification = options.executionSummary.verification.filter(
+      (record) => record.componentId === componentId,
+    );
+    const publicationDecisions =
+      options.executionSummary.publicationDecisions.filter(
+        (decisionRecord) => decisionRecord.componentId === componentId,
+      );
+
+    return {
+      componentId,
+      componentName: draft.component?.name ?? componentId,
+      role: draft.component?.role ?? null,
+      sourceRoot: draft.component?.sourceRoot ?? null,
+      workTrackingProvider: draft.component?.workTracking?.provider ?? null,
+      workItemCount: draft.workItems.length,
+      workItems: summarizeWorkItemProgress(draft.workItems),
+      activeBlockers: draft.activeBlockers,
+      commitIds: uniqueStrings(draft.runs.flatMap((run) => run.commitIds)),
+      verification,
+      publicationDecisions,
+      runs: draft.runs,
+    };
+  });
+}
+
+function summarizeWorkItemProgress(
+  references: NexusAutomationTargetReportWorkItemReference[],
+): NexusAutomationTargetReportWorkItemProgressSummary {
+  const progress = emptyWorkItemProgress();
+  for (const reference of references) {
+    const bucket = workItemProgressBucket(reference);
+    if (bucket) {
+      progress[bucket].push(reference);
+    }
+  }
+
+  return progress;
+}
+
+function emptyWorkItemProgress(): NexusAutomationTargetReportWorkItemProgressSummary {
+  return {
+    readyEligibleWork: [],
+    selectedWork: [],
+    blockedHitlWork: [],
+    completedWork: [],
+    skippedWork: [],
+  };
+}
+
+function workItemProgressBucket(
+  reference: NexusAutomationTargetReportWorkItemReference,
+): keyof NexusAutomationTargetReportWorkItemProgressSummary | null {
+  switch (reference.latestCycleStatus) {
+    case "eligible":
+      return "readyEligibleWork";
+    case "selected":
+    case "dispatched":
+    case "in_progress":
+      return "selectedWork";
+    case "blocked":
+      return "blockedHitlWork";
+    case "completed":
+      return "completedWork";
+    case "skipped":
+      return "skippedWork";
+    default:
+      break;
+  }
+
+  switch (reference.status) {
+    case "ready":
+      return "readyEligibleWork";
+    case "in_progress":
+      return "selectedWork";
+    case "blocked":
+      return "blockedHitlWork";
+    case "done":
+      return "completedWork";
+    case "wont_do":
+      return "skippedWork";
+    default:
+      return null;
+  }
+}
+
+function localWorkItemResolver(
+  projectRoot: string,
+  components: ResolvedNexusProjectComponent[],
+): LocalWorkItemResolver {
+  const primaryComponentId =
+    components.find((component) => component.role === "primary")?.id ??
+    components[0]?.id ??
+    null;
+  const itemsByComponent = new Map<string, Map<string, WorkItemSnapshot>>();
+  for (const component of components) {
+    const workTracking = component.workTracking;
+    if (workTracking?.provider !== "local") {
+      continue;
+    }
+    try {
+      const store = loadLocalWorkTrackingStore(
+        resolveLocalWorkTrackingStorePath(projectRoot, workTracking),
+      );
+      itemsByComponent.set(
+        component.id,
+        new Map(
+          store.items.map((item) => [
+            item.id,
+            {
+              title: item.title,
+              status: item.status,
+            },
+          ]),
+        ),
+      );
+    } catch {
+      continue;
+    }
+  }
+
+  return (componentId, id) => {
+    const resolvedComponentId = componentId ?? primaryComponentId;
+    if (!resolvedComponentId) {
+      return null;
+    }
+
+    return itemsByComponent.get(resolvedComponentId)?.get(id) ?? null;
   };
 }
 
