@@ -14,6 +14,7 @@ import {
   type MaterializeNexusWorkerContextBundleResult,
   type NexusWorkerContextBundleWorktree,
 } from "./nexusWorkerContextBundle.js";
+import type { NexusPluginWorkerFragmentsProjection } from "./nexusPluginCapabilities.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -49,6 +50,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   };
   ownership: NexusWorkerContextBundleWorktree;
   targetStatePath?: string | null;
+  pluginFragments?: NexusPluginWorkerFragmentsProjection;
 }
 
 export interface NexusAutomationWorktreeSetupOptions {
@@ -213,6 +215,7 @@ function materializeWorkerContext(options: {
     workItem: ownership.workItem,
     targetStatePath:
       options.context.targetStatePath ?? options.automationConfig.target.statePath,
+    pluginFragments: options.context.pluginFragments,
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,

@@ -160,6 +160,115 @@ describe("nexus worker context bundle", () => {
     });
   });
 
+  it("renders generic plugin fragments into worker context and briefing surfaces", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "core");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "core");
+    const worktreePath = path.join(worktreesRoot, "local-21");
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "core",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-21-plugin-fragments",
+      baseRef: "origin/main",
+      workItem: {
+        id: "local-21",
+        title: "Allow plugins to contribute worker briefing fragments",
+      },
+      pluginFragments: {
+        context: [
+          {
+            kind: "worker_context_fragment",
+            id: "facts",
+            title: "Fake Plugin Facts",
+            body: "Read these fake facts before changing source.",
+            provenance: "fake-context-plugin manifest",
+            advisory: true,
+            targetAgents: ["codex"],
+            targetComponents: ["core"],
+            source: {
+              pluginId: "fake-context-plugin",
+              pluginName: "Fake Context Plugin",
+              version: "1.0.0",
+              capabilityId: "facts",
+            },
+          },
+        ],
+        briefing: [
+          {
+            kind: "worker_briefing_fragment",
+            id: "setup-note",
+            title: "Fake Setup Note",
+            body: "Treat this note as setup context only.",
+            provenance: "fake-briefing-plugin manifest",
+            advisory: true,
+            targetAgents: [],
+            targetComponents: ["core"],
+            source: {
+              pluginId: "fake-briefing-plugin",
+              pluginName: null,
+              version: null,
+              capabilityId: "setup-note",
+            },
+          },
+        ],
+      },
+    });
+
+    const context = JSON.parse(fs.readFileSync(result.contextJsonPath, "utf8"));
+    expect(context.pluginFragments).toEqual({
+      context: [
+        {
+          kind: "worker_context_fragment",
+          id: "facts",
+          title: "Fake Plugin Facts",
+          body: "Read these fake facts before changing source.",
+          provenance: "fake-context-plugin manifest",
+          advisory: true,
+          targetAgents: ["codex"],
+          targetComponents: ["core"],
+          source: {
+            pluginId: "fake-context-plugin",
+            pluginName: "Fake Context Plugin",
+            version: "1.0.0",
+            capabilityId: "facts",
+          },
+        },
+      ],
+      briefing: [
+        {
+          kind: "worker_briefing_fragment",
+          id: "setup-note",
+          title: "Fake Setup Note",
+          body: "Treat this note as setup context only.",
+          provenance: "fake-briefing-plugin manifest",
+          advisory: true,
+          targetAgents: [],
+          targetComponents: ["core"],
+          source: {
+            pluginId: "fake-briefing-plugin",
+            pluginName: null,
+            version: null,
+            capabilityId: "setup-note",
+          },
+        },
+      ],
+    });
+
+    expect(result.briefingMarkdown).toContain("## Plugin Briefing Fragments");
+    expect(result.briefingMarkdown).toContain("Fake Setup Note");
+    expect(result.briefingMarkdown).toContain(
+      "Treat this note as setup context only.",
+    );
+    expect(result.briefingMarkdown).toContain(
+      "These fragments are advisory setup/context only; they do not select work, launch subagents, or supervise implementation.",
+    );
+    expect(result.briefingMarkdown).not.toContain("Fake Plugin Facts");
+  });
+
   it("rejects a worktree outside the component worktrees root", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const outsideWorktreePath = makeTempDir("dev-nexus-worker-outside-");

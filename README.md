@@ -34,8 +34,9 @@ Language, runtime, framework, and toolchain-specific behavior belongs in
 extensions or plugins. DevNexus provides the core contracts and hooks without
 depending on any specific specialization. Plugins are additive capability
 declarations: they can describe setup policy, projected skills, MCP servers
-and tools, environment hints, cleanup hooks, and agent affordances, but they do
-not own the project or replace the generic coordinator launch boundary.
+and tools, environment hints, cleanup hooks, worker context or briefing
+fragments, and agent affordances, but they do not own the project or replace
+the generic coordinator launch boundary.
 
 ## Project CLI
 
@@ -196,6 +197,8 @@ Supported capability record kinds are:
 - `environment_hint`: environment variables or paths relevant to plugin tools.
 - `cleanup_hook`: cleanup policy to consider after plugin-assisted work.
 - `agent_affordance`: a concise capability or interaction the plugin makes available.
+- `worker_context_fragment`: bounded advisory context rendered into generated worker `context.json`.
+- `worker_briefing_fragment`: bounded advisory Markdown rendered into generated worker `briefing.md`.
 
 Example:
 
@@ -240,6 +243,15 @@ Example:
           "id": "remove-temporary-cache",
           "description": "Remove temporary cache files created by plugin tools.",
           "trigger": "after_run"
+        },
+        {
+          "kind": "worker_briefing_fragment",
+          "id": "review-workspace-policy",
+          "title": "Workspace Policy",
+          "body": "Read the workspace policy before using plugin-provided tools.",
+          "provenance": "workspace-policy plugin manifest",
+          "targetAgents": ["codex"],
+          "targetComponents": ["core"]
         }
       ]
     }
@@ -252,6 +264,16 @@ available capability and setup-policy facts for the launched coordinator. The
 coordinator still chooses the work item batch, decides how many subagents to
 run, assigns profiles, supervises implementation, and reports durable facts
 back through DevNexus.
+
+Worker fragment title, body, and provenance fields are bounded by the project
+config schema so generated worker files stay concise. Enabled fragment
+projection is deterministic: DevNexus filters component-targeted fragments to
+the prepared worker component, filters agent-targeted fragments when the active
+agent is known, and then orders fragments by plugin id, fragment id, kind, and
+provenance. Duplicate fragment ids from different plugins are retained rather
+than merged or overridden; each rendered fragment carries source plugin,
+capability id, and provenance. Duplicate capability ids inside one plugin are
+still rejected by project config validation.
 
 ## Project Components
 
@@ -497,6 +519,13 @@ bundle under `.dev-nexus/context/`. The bundle contains machine-readable
 instead of copying root `AGENTS.md`, `PLAN.md`, or automation target-state
 files into the component source tree. The generated context directory is
 excluded from Git along with any setup-only dependency links.
+
+Enabled plugin worker fragments are projected into the same support files
+without DevNexus depending on plugin-specific terms. Context fragments appear
+under `pluginFragments.context` in `context.json`. Briefing fragments appear
+under `pluginFragments.briefing` and are rendered into `briefing.md` with their
+source and provenance. These fragments are advisory setup/context only: they do
+not select work, launch subagents, or supervise implementation.
 
 The context bundle does not move command roots. Source edits, verification
 commands, and Git commands still run from the component checkout root. DevNexus

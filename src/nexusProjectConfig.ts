@@ -18,13 +18,16 @@ import type {
   NexusSkillMaterializationMode,
   NexusSkillSourceControl,
 } from "./nexusSkills.js";
-import type {
-  NexusPluginCapabilityKind,
-  NexusPluginCapabilityRecord,
-  NexusPluginCleanupHookTrigger,
-  NexusPluginMcpToolCapability,
-  NexusProjectPluginConfig,
-  NexusProjectPluginsConfig,
+import {
+  nexusPluginWorkerFragmentBodyMaxLength,
+  nexusPluginWorkerFragmentProvenanceMaxLength,
+  nexusPluginWorkerFragmentTitleMaxLength,
+  type NexusPluginCapabilityKind,
+  type NexusPluginCapabilityRecord,
+  type NexusPluginCleanupHookTrigger,
+  type NexusPluginMcpToolCapability,
+  type NexusProjectPluginConfig,
+  type NexusProjectPluginsConfig,
 } from "./nexusPluginCapabilities.js";
 import {
   validateNexusAutomationConfig,
@@ -177,6 +180,22 @@ function requiredString(
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new NexusConfigError(
       `${pathName}.${key} must be a non-empty string`,
+    );
+  }
+
+  return value;
+}
+
+function requiredBoundedString(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+  maxLength: number,
+): string {
+  const value = requiredString(record, key, pathName);
+  if (value.length > maxLength) {
+    throw new NexusConfigError(
+      `${pathName}.${key} must be at most ${maxLength} characters`,
     );
   }
 
@@ -482,13 +501,15 @@ function validatePluginCapabilityKind(
     value === "setup_obligation" ||
     value === "environment_hint" ||
     value === "cleanup_hook" ||
-    value === "agent_affordance"
+    value === "agent_affordance" ||
+    value === "worker_context_fragment" ||
+    value === "worker_briefing_fragment"
   ) {
     return value;
   }
 
   throw new NexusConfigError(
-    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, or agent_affordance`,
+    `${pathName} must be projected_skill, mcp_server, setup_obligation, environment_hint, cleanup_hook, agent_affordance, worker_context_fragment, or worker_briefing_fragment`,
   );
 }
 
@@ -597,6 +618,40 @@ function validatePluginCapabilityRecord(
       description: requiredString(record, "description", pathName),
       ...(trigger !== undefined ? { trigger } : {}),
       required: optionalBoolean(record, "required", pathName) ?? false,
+    };
+  }
+
+  if (kind === "worker_context_fragment" || kind === "worker_briefing_fragment") {
+    const targetAgents = optionalStringArray(record, "targetAgents", pathName);
+    const targetComponents = optionalStringArray(
+      record,
+      "targetComponents",
+      pathName,
+    );
+    return {
+      kind,
+      id,
+      ...(description !== undefined ? { description } : {}),
+      title: requiredBoundedString(
+        record,
+        "title",
+        pathName,
+        nexusPluginWorkerFragmentTitleMaxLength,
+      ),
+      body: requiredBoundedString(
+        record,
+        "body",
+        pathName,
+        nexusPluginWorkerFragmentBodyMaxLength,
+      ),
+      provenance: requiredBoundedString(
+        record,
+        "provenance",
+        pathName,
+        nexusPluginWorkerFragmentProvenanceMaxLength,
+      ),
+      ...(targetAgents !== undefined ? { targetAgents } : {}),
+      ...(targetComponents !== undefined ? { targetComponents } : {}),
     };
   }
 
