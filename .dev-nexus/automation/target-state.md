@@ -18,9 +18,7 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-15` add shared coordination integration planning now that
-    status and handoff records exist.
-  - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
+  - None. The automation selector now reports no ready `dogfood` work items.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
     agent setup after the generic plugin and scoped PLexus contracts are
@@ -31,6 +29,9 @@ Immediate direction:
   - `dev-nexus:local-14` added generic `coordination_status` and
     `coordination_handoff` through CLI and MCP, with advisory stale handoff
     warnings and tracker-backed local comments.
+  - `dev-nexus:local-15` added generic read-only `coordination_integrate`
+    planning through CLI and MCP, using recorded handoffs and Git merge
+    analysis without mutating source.
 - External coordination extension:
   - Add `coordination_request` so agents can ask external humans or agents for
     approval, feedback, choices, or review through provider-native issue,
@@ -113,8 +114,9 @@ PLexus agent-facing surface direction:
   internal/admin plumbing for PLexus core or operators, not a third normal
   agent-facing surface.
 - This naming/default surface direction is now implemented and published in
-  PLexus `4a0b813`; `plexus:local-8` still owns scoped project/workspace/image
-  context and route metadata.
+  PLexus `4a0b813`.
+- Scoped project/workspace/image context and route metadata are now implemented
+  and published in PLexus `de0d5c6`.
 
 Durable completed foundation:
 
@@ -142,6 +144,14 @@ Durable completed foundation:
   covering generated `pharo-launcher` plus `gateway` workspace MCP config,
   default hiding of `plexus_route_to_image`, and explicit raw-routing opt-in
   without exposing route-management tools on the normal `gateway` surface.
+- DevNexus coordination integration planning was published through `b2c219a`,
+  covering read-only CLI/MCP `coordination_integrate`, merge-base/merge-tree
+  conflict forecasting, recorded decision conflicts, stale handoffs, and
+  policy-gated fetch planning.
+- PLexus scoped plugin context was published through `de0d5c6`, covering
+  project/workspace/target/image ownership context, scoped lifecycle
+  affordance descriptions, cleanup metadata, and gateway `imageId` route
+  metadata for subagent handoff.
 - Component wave `parallel-component-wave-20260516` completed with verified
   source changes:
   - DevNexus project template scaffold was published through `3891e3e`.
