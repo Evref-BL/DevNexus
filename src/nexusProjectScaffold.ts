@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type {
   NexusExtension,
   NexusProjectScaffoldContext,
@@ -10,6 +9,11 @@ import {
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
 import type { NexusProjectMcpConfig } from "./nexusProjectConfig.js";
+import type { NexusProjectConfig } from "./nexusProjectConfig.js";
+import {
+  materializeNexusProjectTemplate,
+  type MaterializeNexusProjectTemplateResult,
+} from "./nexusProjectTemplate.js";
 import {
   materializeNexusProjectSkills,
   type MaterializeNexusProjectSkillsResult,
@@ -17,7 +21,9 @@ import {
   type NexusSkillDefinition,
 } from "./nexusSkills.js";
 
-export interface ScaffoldNexusProjectOptions<ProjectConfig = unknown> {
+export interface ScaffoldNexusProjectOptions<
+  ProjectConfig extends NexusProjectConfig = NexusProjectConfig,
+> {
   homePath: string;
   projectRoot: string;
   worktreesRoot: string;
@@ -31,16 +37,17 @@ export interface ScaffoldNexusProjectOptions<ProjectConfig = unknown> {
 export interface ScaffoldNexusProjectResult {
   projectRoot: string;
   worktreesRoot: string;
+  template: MaterializeNexusProjectTemplateResult;
   skills: MaterializeNexusProjectSkillsResult;
   agentMcp: MaterializeNexusProjectAgentMcpConfigResult;
   extensionResults: Record<string, unknown>;
 }
 
-export function scaffoldNexusProject<ProjectConfig>(
+export function scaffoldNexusProject<
+  ProjectConfig extends NexusProjectConfig = NexusProjectConfig,
+>(
   options: ScaffoldNexusProjectOptions<ProjectConfig>,
 ): ScaffoldNexusProjectResult {
-  fs.mkdirSync(options.worktreesRoot, { recursive: true });
-
   const context: NexusProjectScaffoldContext<ProjectConfig> = {
     homePath: options.homePath,
     projectRoot: options.projectRoot,
@@ -63,6 +70,14 @@ export function scaffoldNexusProject<ProjectConfig>(
 
     extensionResults[extension.id] = extension.installProjectFiles(context);
   }
+
+  const template = materializeNexusProjectTemplate({
+    projectRoot: options.projectRoot,
+    worktreesRoot: options.worktreesRoot,
+    projectConfig: options.projectConfig,
+    skillsConfig: options.skills,
+    mcpConfig: options.mcp,
+  });
 
   const skills =
     options.skills === false
@@ -92,6 +107,7 @@ export function scaffoldNexusProject<ProjectConfig>(
   return {
     projectRoot: options.projectRoot,
     worktreesRoot: options.worktreesRoot,
+    template,
     skills,
     agentMcp,
     extensionResults,

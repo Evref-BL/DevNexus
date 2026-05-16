@@ -57,6 +57,34 @@ to `DEV_NEXUS_HOME` and then the default user home path. `project status` can
 also inspect an initialized project root directly without a home registry,
 which is useful for local smoke checks and generated worktrees.
 
+## Project Template Shape
+
+The generic project scaffold separates project-owned support state from
+component source and local runtime records. A new or refreshed project writes a
+generated `.dev-nexus/README.md` that describes the active layout in the same
+terms used by the code:
+
+| Area | Typical paths | Owner |
+| --- | --- | --- |
+| Component configuration | `dev-nexus.project.json`, component `sourceRoot` paths | User-authored source |
+| Project state | `.dev-nexus/README.md`, component worktree roots under `<worktreesRoot>/<component-id>/` | Generated support or local runtime |
+| Target state | `automation.target.statePath`, defaulting to `.dev-nexus/automation/target-state.md` | User-authored target memory, not overwritten by refresh |
+| Skills | `.dev-nexus/skills/`, optional `.agents/skills/` or `.claude/skills/` projections | Generated from curated or extension skill definitions |
+| Agent MCP projection | `.codex/config.toml`, `.mcp.json`, or configured agent target paths | Generated from `mcp.agentTargets` |
+
+Component worktree roots are component-scoped even when a project has one
+component, so arity one uses the same `<worktreesRoot>/<component-id>/` shape as
+larger projects. Scaffold refreshes create missing component worktree
+directories and seed a missing target-state file when automation is configured,
+but existing target state is preserved.
+
+Migration notes treat historical staging roots as migration-only evidence.
+Production templates should not inherit source-specific paths, tracker ids,
+component names, or launch commands from those roots. Generated support state
+may be refreshed by DevNexus, user-authored state records durable project
+intent, and local runtime state covers locks, ledgers, local tracker files,
+agent launch records, and generated worktrees.
+
 ## MCP Server
 
 DevNexus exposes a generic stdio Model Context Protocol (MCP) server for

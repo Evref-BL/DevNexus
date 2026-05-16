@@ -2,7 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { scaffoldNexusProject } from "./nexusProjectScaffold.js";
+import {
+  defaultNexusAutomationConfig,
+  scaffoldNexusProject,
+  type NexusProjectConfig,
+} from "./index.js";
 
 const tempDirs: string[] = [];
 
@@ -10,6 +14,40 @@ function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
   return tempDir;
+}
+
+function minimalProjectConfig(
+  overrides: Partial<NexusProjectConfig> = {},
+): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "project-1",
+    name: "Project 1",
+    home: null,
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: null,
+    },
+    components: [
+      {
+        id: "primary",
+        name: "Project 1",
+        kind: "local",
+        role: "primary",
+        remoteUrl: null,
+        defaultBranch: null,
+        sourceRoot: ".",
+        relationships: [],
+      },
+    ],
+    worktreesRoot: "worktrees",
+    kanban: {
+      provider: "vibe-kanban",
+      projectId: null,
+    },
+    ...overrides,
+  };
 }
 
 afterEach(() => {
@@ -27,9 +65,9 @@ describe("nexus project scaffold", () => {
       homePath: makeTempDir("dev-nexus-home-"),
       projectRoot,
       worktreesRoot,
-      projectConfig: {
+      projectConfig: minimalProjectConfig({
         id: "project-1",
-      },
+      }),
       extensions: [
         {
           id: "example",
@@ -68,9 +106,9 @@ describe("nexus project scaffold", () => {
       homePath: makeTempDir("dev-nexus-home-"),
       projectRoot,
       worktreesRoot,
-      projectConfig: {
+      projectConfig: minimalProjectConfig({
         id: "project-1",
-      },
+      }),
       skills: {
         defaultCorePack: false,
       },
@@ -125,9 +163,9 @@ describe("nexus project scaffold", () => {
       homePath: makeTempDir("dev-nexus-home-"),
       projectRoot,
       worktreesRoot,
-      projectConfig: {
+      projectConfig: minimalProjectConfig({
         id: "project-1",
-      },
+      }),
       mcp: {
         agentTargets: [
           {
@@ -145,5 +183,206 @@ describe("nexus project scaffold", () => {
     expect(
       fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
     ).toBe(true);
+  });
+
+  it("materializes the generic project template layout without arity-one worktree special casing", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+    fs.mkdirSync(path.join(projectRoot, ".git", "info"), { recursive: true });
+    const projectConfig: NexusProjectConfig = {
+      version: 1,
+      id: "template-project",
+      name: "Template Project",
+      home: null,
+      repo: {
+        kind: "git",
+        remoteUrl: null,
+        defaultBranch: "main",
+      },
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: "components/core",
+          relationships: [],
+        },
+      ],
+      worktreesRoot: "worktrees",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      automation: {
+        ...defaultNexusAutomationConfig,
+        mode: "agent_launch",
+        target: {
+          ...defaultNexusAutomationConfig.target,
+          statePath: ".dev-nexus/automation/target-state.md",
+        },
+      },
+      skills: {
+        defaultCorePack: false,
+        items: [{ id: "diagnose" }],
+        agentTargets: [{ agent: "codex" }],
+      },
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    };
+
+    const result = scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig,
+      skills: projectConfig.skills,
+      mcp: projectConfig.mcp,
+    });
+
+    expect(fs.existsSync(path.join(worktreesRoot, "core"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".dev-nexus", "README.md")),
+    ).toBe(true);
+    expect(
+      fs.readFileSync(path.join(projectRoot, ".dev-nexus", "README.md"), "utf8"),
+    ).toContain("Project Template Layout");
+    expect(
+      fs.existsSync(
+        path.join(projectRoot, ".dev-nexus", "automation", "target-state.md"),
+      ),
+    ).toBe(true);
+    expect(result.template.entries.map((entry) => entry.area)).toEqual(
+      expect.arrayContaining([
+        "project_state",
+        "component_configuration",
+        "target_state",
+        "skills",
+        "agent_mcp_projection",
+      ]),
+    );
+    expect(result.template.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          area: "component_configuration",
+          owner: "user_authored",
+          path: "components/core",
+        }),
+        expect.objectContaining({
+          area: "project_state",
+          owner: "local_runtime",
+          path: "worktrees/core/",
+        }),
+        expect.objectContaining({
+          area: "target_state",
+          owner: "user_authored",
+          path: ".dev-nexus/automation/target-state.md",
+        }),
+        expect.objectContaining({
+          area: "skills",
+          owner: "generated",
+          path: ".agents/skills/",
+        }),
+        expect.objectContaining({
+          area: "agent_mcp_projection",
+          owner: "generated",
+          path: ".codex/config.toml",
+        }),
+      ]),
+    );
+    expect(result.template.migrationNotes.join("\n")).toContain(
+      "migration-only evidence",
+    );
+    expect(result.template.gitExcludeEntries).toEqual(
+      expect.arrayContaining([
+        ".dev-nexus/README.md",
+        ".dev-nexus/automation/runs.json",
+        ".dev-nexus/automation/run.lock",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/automation/agent-launches/",
+        "worktrees/",
+      ]),
+    );
+  });
+
+  it("preserves existing target state when refreshing the template", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+    const targetStatePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "automation",
+      "target-state.md",
+    );
+    fs.mkdirSync(path.dirname(targetStatePath), { recursive: true });
+    fs.writeFileSync(targetStatePath, "Current target direction.\n", "utf8");
+    const projectConfig: NexusProjectConfig = {
+      version: 1,
+      id: "template-project",
+      name: "Template Project",
+      home: null,
+      repo: {
+        kind: "local",
+        remoteUrl: null,
+        defaultBranch: null,
+      },
+      components: [
+        {
+          id: "primary",
+          name: "Primary",
+          kind: "local",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: null,
+          sourceRoot: ".",
+          relationships: [],
+        },
+        {
+          id: "addon",
+          name: "Addon",
+          kind: "local",
+          role: "addon",
+          remoteUrl: null,
+          defaultBranch: null,
+          sourceRoot: "components/addon",
+          relationships: [
+            {
+              kind: "related",
+              componentId: "primary",
+            },
+          ],
+        },
+      ],
+      worktreesRoot: "worktrees",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      automation: {
+        ...defaultNexusAutomationConfig,
+        target: {
+          ...defaultNexusAutomationConfig.target,
+          statePath: ".dev-nexus/automation/target-state.md",
+        },
+      },
+    };
+
+    scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig,
+      skills: false,
+      mcp: false,
+    });
+
+    expect(fs.readFileSync(targetStatePath, "utf8")).toBe(
+      "Current target direction.\n",
+    );
+    expect(fs.existsSync(path.join(worktreesRoot, "primary"))).toBe(true);
+    expect(fs.existsSync(path.join(worktreesRoot, "addon"))).toBe(true);
   });
 });
