@@ -800,6 +800,8 @@ describe("dev-nexus cli", () => {
         "completed",
         "--summary",
         "Target completed.",
+        "--eligible-work-items",
+        "0",
         "--work-item",
         "primary:local-1",
         "--json",
@@ -836,6 +838,12 @@ describe("dev-nexus cli", () => {
               id: "local-1",
             },
           ],
+        },
+        relaunchDecision: {
+          type: "stop",
+          eligibleWorkItemCount: 0,
+          latestCycleId: "cycle-1",
+          latestRunId: null,
         },
       },
     });

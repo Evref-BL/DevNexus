@@ -279,6 +279,7 @@ describe("DevNexus MCP server", () => {
         cycleId: "cycle-1",
         status: "completed",
         summary: "Target completed.",
+        eligibleWorkItemCount: 0,
         workItems: [
           {
             componentId: "primary",
@@ -315,6 +316,12 @@ describe("DevNexus MCP server", () => {
               latestCycleStatus: "completed",
             },
           ],
+        },
+        relaunchDecision: {
+          type: "stop",
+          eligibleWorkItemCount: 0,
+          latestCycleId: "cycle-1",
+          latestRunId: null,
         },
       },
     });

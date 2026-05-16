@@ -185,7 +185,7 @@ describe("nexus automation target report", () => {
         type: "report_blocked",
         reason: "Latest target cycle cycle-2 is blocked",
         latestCycleId: "cycle-2",
-        latestRunId: "run-1",
+        latestRunId: "run-2",
       },
       blockers: ["Credentials are missing."],
       notes: ["Cycle remains active."],
@@ -248,6 +248,66 @@ describe("nexus automation target report", () => {
         type: "stop",
         eligibleWorkItemCount: 0,
         latestCycleId: "cycle-2",
+      },
+    });
+  });
+
+  it("reports wait for active cycles and failed decisions", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:05:00.000Z",
+      record: {
+        id: "cycle-active",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        runId: "run-active",
+        status: "dispatched",
+        summary: "Coordinator still has a dispatched cycle.",
+        eligibleWorkItemCount: 1,
+      },
+    });
+
+    expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
+      status: "active",
+      statusReason: "Latest target cycle cycle-active is dispatched",
+      relaunchDecision: {
+        type: "wait",
+        reason: "Latest target cycle cycle-active is still dispatched",
+        eligibleWorkItemCount: 1,
+        latestCycleId: "cycle-active",
+        latestRunId: "run-active",
+      },
+    });
+
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:30:00.000Z",
+      record: {
+        id: "cycle-failed",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        runId: "run-failed",
+        status: "failed",
+        summary: "Coordinator failed verification.",
+        eligibleWorkItemCount: 1,
+      },
+    });
+
+    expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
+      status: "failed",
+      statusReason: "Latest target cycle cycle-failed is failed",
+      relaunchDecision: {
+        type: "report_failed",
+        reason: "Latest target cycle cycle-failed failed",
+        eligibleWorkItemCount: 1,
+        latestCycleId: "cycle-failed",
+        latestRunId: "run-failed",
       },
     });
   });

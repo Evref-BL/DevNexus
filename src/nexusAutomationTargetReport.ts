@@ -219,13 +219,14 @@ function relaunchDecision(options: {
     );
   }
 
+  const latestRunId = lastCycle.runId ?? lastRun?.id ?? null;
   if (lastCycle.status === "started" || lastCycle.status === "dispatched") {
     return decision(
       "wait",
       `Latest target cycle ${lastCycle.id} is still ${lastCycle.status}`,
       lastCycle.eligibleWorkItemCount,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
   if (lastCycle.status === "blocked") {
@@ -234,7 +235,7 @@ function relaunchDecision(options: {
       `Latest target cycle ${lastCycle.id} is blocked`,
       lastCycle.eligibleWorkItemCount,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
   if (lastCycle.status === "failed") {
@@ -243,7 +244,7 @@ function relaunchDecision(options: {
       `Latest target cycle ${lastCycle.id} failed`,
       lastCycle.eligibleWorkItemCount,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
 
@@ -254,7 +255,7 @@ function relaunchDecision(options: {
       `Latest target cycle ${lastCycle.id} did not record eligible work item count`,
       null,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
   if (eligibleWorkItemCount > 0) {
@@ -264,7 +265,7 @@ function relaunchDecision(options: {
         `Latest target cycle ${lastCycle.id} recorded ${eligibleWorkItemCount} eligible work item(s) and relaunch while eligible is enabled`,
         eligibleWorkItemCount,
         lastCycle.id,
-        lastRun?.id ?? null,
+        latestRunId,
       );
     }
 
@@ -273,7 +274,7 @@ function relaunchDecision(options: {
       `Latest target cycle ${lastCycle.id} recorded ${eligibleWorkItemCount} eligible work item(s), but relaunch while eligible is disabled`,
       eligibleWorkItemCount,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
 
@@ -283,7 +284,7 @@ function relaunchDecision(options: {
       `Latest target cycle ${lastCycle.id} recorded no eligible work item(s)`,
       eligibleWorkItemCount,
       lastCycle.id,
-      lastRun?.id ?? null,
+      latestRunId,
     );
   }
 
@@ -292,7 +293,7 @@ function relaunchDecision(options: {
     `Latest target cycle ${lastCycle.id} recorded no eligible work item(s), but stopWhenNoEligibleWork is disabled`,
     eligibleWorkItemCount,
     lastCycle.id,
-    lastRun?.id ?? null,
+    latestRunId,
   );
 }
 
