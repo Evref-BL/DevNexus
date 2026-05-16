@@ -18,21 +18,29 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-19` materialize worker context bundles for component
-    worktrees.
+  - `dev-nexus:local-23` let toolchain plugins project dependencies into
+    worker worktrees so JS/TS commands can resolve local binaries without
+    global installs or ad hoc package fetches.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
-  - Generate DevNexus-owned `.dev-nexus/context/context.json` and
-    `.dev-nexus/context/briefing.md` inside prepared component worktrees
+  - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
+    Prepared component worktrees now generate DevNexus-owned
+    `.dev-nexus/context/context.json` and `.dev-nexus/context/briefing.md`
     instead of copying root `AGENTS.md`, `PLAN.md`, or target-state files into
     source roots.
-  - Project-local skills remain DevNexus-managed under `.dev-nexus/skills` and
-    agent-native projections such as `.agents/skills`; follow-up
-    `dev-nexus:local-20` makes those project-local skills discoverable from
-    prepared worker contexts without global installation.
-  - Follow-up `dev-nexus:local-21` lets plugins contribute bounded worker
-    briefing fragments. `pharo-nexus:local-4` owns the Pharo-specific fragment
-    for scoped PLexus and direct Pharo MCP guidance.
+  - `dev-nexus:local-20` is complete and published through DevNexus `5895ea2`.
+    Project-local skills remain DevNexus-managed under `.dev-nexus/skills` and
+    can now be projected into worker-local agent paths such as
+    `.agents/skills` without global installation.
+  - `dev-nexus:local-21` is complete and published through DevNexus `5895ea2`.
+    Plugins can now contribute bounded worker briefing/context fragments.
+    `pharo-nexus:local-4` owns the Pharo-specific fragment for scoped PLexus
+    and direct Pharo MCP guidance.
+  - New ready follow-up `dev-nexus:local-23` handles toolchain dependency
+    projection. Keep it generic: DevNexus core should accept declarative
+    plugin setup contributions; JavaScript/TypeScript is the first concrete
+    fixture, while Java should reuse the same hook later for JDK/Maven/Gradle
+    hints.
   - Defer nested generated execution workspaces until the simpler context
     bundle has been exercised; `dev-nexus:local-22` tracks the human decision
     and architecture review.
@@ -168,6 +176,13 @@ Durable completed foundation:
   covering read-only CLI/MCP `coordination_integrate`, merge-base/merge-tree
   conflict forecasting, recorded decision conflicts, stale handoffs, and
   policy-gated fetch planning.
+- DevNexus worker context bundles were published through `508b301`, covering
+  `.dev-nexus/context/context.json`, `.dev-nexus/context/briefing.md`, Git
+  exclusion of generated context support, executor environment pointers, and
+  generic ownership/read-write boundary metadata.
+- DevNexus worker context follow-ups were published through `5895ea2`,
+  covering worker-local project skill projections and generic plugin
+  worker-context/briefing fragments.
 - PLexus scoped plugin context was published through `de0d5c6`, covering
   project/workspace/target/image ownership context, scoped lifecycle
   affordance descriptions, cleanup metadata, and gateway `imageId` route
