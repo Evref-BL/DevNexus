@@ -10,10 +10,7 @@ Immediate direction:
   using the curated `to-issues` skill. New work items include readiness,
   blocker, acceptance, verification, and publication notes.
 - The next eligible ready dogfood batch is DevNexus core:
-  - `dev-nexus:local-6` coordinator subagent dispatch progress surfaces.
-  - `dev-nexus:local-7` component-scoped parallel worktree records.
   - `dev-nexus:local-8` component-aware target completion reporting.
-  - `dev-nexus:local-10` neutral work-tracker provider conformance.
   - `dev-nexus:local-11` Codex and Claude agent profile policy schema.
 - Low-token coordinator discovery is now available through DevNexus CLI
   `automation eligible-work` and `automation agent-profiles`, plus native MCP
@@ -61,6 +58,10 @@ Durable completed foundation:
   `1863d04`.
 - DevNexus low-token agent-facing automation surfaces were completed and
   published as `f332378`.
+- DevNexus parallel wave `parallel-dev-nexus-wave-20260516` completed and was
+  published through `ac07964`, covering coordinator-reported dispatch progress
+  surfaces, component-scoped worktree ownership records, and neutral
+  work-tracker provider capability conformance.
 - PharoNexus specialization alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
