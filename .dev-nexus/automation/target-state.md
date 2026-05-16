@@ -15,10 +15,20 @@ Immediate direction:
 - PharoNexus specialization alignment was completed and published as `c6629df`;
   the adapter now delegates DevNexus automation target/report and neutral
   work-item tools to native DevNexus MCP surfaces.
-- Next safe work is the remaining runtime/image boundary planning: PLexus
-  isolated live-smoke runner boundary, launcher cleanup hooks, and MCP-Pharo
-  verification boundary. Runtime and image work stays planning-only until the
-  isolated runner, disposable runtime boundary, and cleanup plan are explicit.
+- Runtime/image boundary planning is complete:
+  - PLexus isolated live-smoke runner boundary was documented and published as
+    `916e1d5`.
+  - pharo-launcher-mcp cleanup hook boundary was documented and published as
+    `1f3070b`.
+  - MCP-Pharo static/live verification boundary was documented as local
+    review-handoff commit `0a38755` on `develop`.
+- There are no remaining `ready` + `dogfood` work items. Remaining dogfood work
+  is intentionally blocked live-runtime follow-up work:
+  - `plexus:local-2` run the approved isolated PLexus live-smoke.
+  - `mcp-pharo:local-2` run MCP-Pharo verification through the isolated runner.
+- Next direction requires human approval of the isolated runner inputs,
+  timeout budget, cleanup sequence, retained artifacts, and failure policy
+  before any live image/runtime verification is enabled.
 
 Active boundaries:
 
