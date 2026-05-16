@@ -18,13 +18,14 @@ Immediate direction:
 - No ready `dogfood` work item currently matches the automation selector; the
   latest target report is `completed` with relaunch decision `stop`.
 - Possible next target choices:
-  - Promote `dev-nexus:local-12` to ready and shape a production-quality
-    project template from this dogfood evidence.
-  - Promote dependent component backlog after choosing the next component
-    focus and preserving the live-runtime safety boundary.
+  - Resolve the Pharo MCP worker-infrastructure gap before promoting more
+    MCP-Pharo source work: subagents must have direct Pharo MCP access rather
+    than editing Pharo source files from disk.
+  - After direct Pharo MCP access is available in component worktrees, resume
+    the blocked MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5`.
+  - Choose a new non-live component focus from the remaining PLexus backlog or
+    approve the isolated runner before live-runtime work.
 - Later or dependent non-eligible work:
-  - `pharo-nexus:local-2` adapter alignment after new DevNexus coordination
-    surfaces stabilize.
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
@@ -67,6 +68,17 @@ Durable completed foundation:
 - DevNexus parallel wave `parallel-dev-nexus-wave-2-20260516` completed and
   was published through `e11df67`, covering component-aware target completion
   reporting and hardened Codex/Claude agent profile policy schema.
+- Component wave `parallel-component-wave-20260516` completed with verified
+  source changes:
+  - DevNexus project template scaffold was published through `3891e3e`.
+  - PharoNexus Codex worktree Pharo MCP config projection was published
+    through `3135210`; live route validation still requires approved runtime
+    infrastructure.
+  - PLexus gateway lifecycle/package boundary and portability coverage were
+    published through `a616dd4`.
+  - MCP-Pharo items `mcp-pharo:local-4` and `mcp-pharo:local-5` were blocked
+    because worker contexts had no direct Pharo MCP namespace, no registered
+    PLexus image route, and no `imageId` for routed MCP calls.
 - PharoNexus specialization alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
