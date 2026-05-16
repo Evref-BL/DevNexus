@@ -1,7 +1,9 @@
 import path from "node:path";
+import process from "node:process";
 import { describe, expect, it } from "vitest";
 import {
   createNexusAutomationCommandExecutor,
+  defaultNexusAutomationCommandRunner,
   type NexusAutomationCommandRunner,
 } from "./nexusAutomationCommandExecutor.js";
 import {
@@ -162,5 +164,26 @@ describe("nexus automation command executor", () => {
         summary: "exit 2: boom",
       },
     ]);
+  });
+
+  it("runs verbose default commands without overflowing the child output buffer", () => {
+    const script = [
+      "process.stdout.write('first line\\n');",
+      "process.stdout.write('x'.repeat(2 * 1024 * 1024));",
+      "process.stderr.write('warning line\\n');",
+    ].join("");
+    const result = defaultNexusAutomationCommandRunner(
+      `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`,
+      {
+        cwd: process.cwd(),
+        env: process.env,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.error).toBeUndefined();
+    expect(result.stdout).toContain("first line");
+    expect(result.stdout).toContain("[dev-nexus output truncated:");
+    expect(result.stderr).toContain("warning line");
   });
 });

@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import process from "node:process";
 import {
   defaultGitRunner,
@@ -128,22 +131,68 @@ export function defaultNexusAutomationCommandRunner(
   command: string,
   options: NexusAutomationCommandRunOptions,
 ): NexusAutomationCommandRunResult {
-  const result = spawnSync(command, {
-    cwd: options.cwd,
-    env: options.env,
-    encoding: "utf8",
-    shell: true,
-    timeout: options.timeoutMs,
-    windowsHide: true,
-  });
+  const capture = createCommandCaptureFiles();
+  let result: ReturnType<typeof spawnSync> | null = null;
+  try {
+    result = spawnSync(command, {
+      cwd: options.cwd,
+      env: options.env,
+      shell: true,
+      stdio: ["ignore", capture.stdoutFd, capture.stderrFd],
+      timeout: options.timeoutMs,
+      windowsHide: true,
+    });
+  } finally {
+    capture.close();
+  }
+
+  try {
+    return {
+      command,
+      cwd: options.cwd,
+      stdout: readOutputPreview(capture.stdoutPath),
+      stderr: readOutputPreview(capture.stderrPath),
+      exitCode: result?.status ?? null,
+      ...(result?.error ? { error: result.error.message } : {}),
+    };
+  } finally {
+    capture.remove();
+  }
+}
+
+function createCommandCaptureFiles(): {
+  stdoutPath: string;
+  stderrPath: string;
+  stdoutFd: number;
+  stderrFd: number;
+  close: () => void;
+  remove: () => void;
+} {
+  const captureDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "dev-nexus-command-"),
+  );
+  const stdoutPath = path.join(captureDir, "stdout.log");
+  const stderrPath = path.join(captureDir, "stderr.log");
+  const stdoutFd = fs.openSync(stdoutPath, "w");
+  const stderrFd = fs.openSync(stderrPath, "w");
+  let closed = false;
 
   return {
-    command,
-    cwd: options.cwd,
-    stdout: outputText(result.stdout),
-    stderr: outputText(result.stderr),
-    exitCode: result.status,
-    ...(result.error ? { error: result.error.message } : {}),
+    stdoutPath,
+    stderrPath,
+    stdoutFd,
+    stderrFd,
+    close: () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      fs.closeSync(stdoutFd);
+      fs.closeSync(stderrFd);
+    },
+    remove: () => {
+      fs.rmSync(captureDir, { recursive: true, force: true });
+    },
   };
 }
 
@@ -264,6 +313,37 @@ function outputText(value: string | Buffer | null | undefined): string {
   }
 
   return value?.toString("utf8") ?? "";
+}
+
+function readOutputPreview(filePath: string): string {
+  const maxOutputBytes = 256 * 1024;
+  const stats = fs.statSync(filePath);
+  if (stats.size <= maxOutputBytes) {
+    return outputText(fs.readFileSync(filePath));
+  }
+
+  const chunkBytes = maxOutputBytes / 2;
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const head = Buffer.alloc(chunkBytes);
+    const tail = Buffer.alloc(chunkBytes);
+    const headBytes = fs.readSync(fd, head, 0, chunkBytes, 0);
+    const tailBytes = fs.readSync(
+      fd,
+      tail,
+      0,
+      chunkBytes,
+      stats.size - chunkBytes,
+    );
+    const omittedBytes = stats.size - headBytes - tailBytes;
+    return [
+      head.subarray(0, headBytes).toString("utf8"),
+      `\n[dev-nexus output truncated: ${omittedBytes} bytes omitted]\n`,
+      tail.subarray(0, tailBytes).toString("utf8"),
+    ].join("");
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function firstNonEmptyLine(value: string): string | undefined {
