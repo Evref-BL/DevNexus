@@ -20,6 +20,19 @@ Immediate direction:
 - Current ready `dogfood` work matching the automation selector:
   - none after completing `pharo-nexus:local-4`; rerun eligible-work after
     reopening a dependent static item or resolving a human-in-the-loop blocker.
+- Scoped npm dogfood prereleases were published on 2026-05-17 so other
+  machines can install without sibling checkout assumptions:
+  - `@evref-bl/dev-nexus@0.1.0-alpha.0` published with `dogfood` tag and
+    DevNexus source commit `c6ed813`.
+  - `@evref-bl/plexus-core@0.1.0-alpha.0` and
+    `@evref-bl/plexus-gateway@0.1.0-alpha.0` published with `dogfood` tag and
+    PLexus source commit `ecac759`.
+  - `@evref-bl/pharo-nexus@0.1.0-alpha.0` published with `dogfood` tag and
+    PharoNexus source commit `f9a64eb`. Registry access/dist-tags, normal
+    packument lookup, tarball install, and name-based `npm exec` smoke all
+    pass.
+  - PharoNexus now consumes DevNexus through the npm alias
+    `dev-nexus -> @evref-bl/dev-nexus@0.1.0-alpha.0`, not `file:../DevNexus`.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
   - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
