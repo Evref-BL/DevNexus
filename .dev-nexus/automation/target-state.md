@@ -18,9 +18,8 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
-    agent setup. This is a static setup/config slice only; do not run live
-    images, PLexus open/close, or gateway live routes.
+  - none after completing `pharo-nexus:local-4`; rerun eligible-work after
+    reopening a dependent static item or resolving a human-in-the-loop blocker.
 - Worker context direction:
   - Keep `worktreePath` as the component Git checkout root for now.
   - `dev-nexus:local-19` is complete and published in DevNexus `508b301`.
@@ -42,6 +41,14 @@ Immediate direction:
     records the resulting support in setup/context surfaces. JavaScript/
     TypeScript is covered by fixtures; Java can reuse the same hook later for
     JDK/Maven/Gradle hints.
+  - `pharo-nexus:local-4` is complete and published through PharoNexus
+    `75a038c`. PharoNexus now declares a DevNexus plugin config with Pharo
+    skills, scoped PLexus and direct Pharo MCP capabilities, setup obligations,
+    environment hints, cleanup expectations, agent affordances, and worker
+    context/briefing fragments. PharoNexus-created/imported projects persist
+    the plugin entry without replacing DevNexus. The dogfood project also
+    records a component-scoped `pharo-nexus` plugin entry for future generated
+    worker contexts.
   - Defer nested generated execution workspaces until the simpler context
     bundle has been exercised; `dev-nexus:local-22` tracks the human decision
     and architecture review.
@@ -80,6 +87,10 @@ Immediate direction:
   - After direct Pharo MCP access is proven in component worktrees, resume the
     blocked MCP-Pharo query API item `mcp-pharo:local-4`.
 - Later or dependent non-eligible work:
+  - `dev-nexus:local-24` tracks a follow-up from the PharoNexus worker
+    verification gap: support declared related-component dependency projections
+    such as PharoNexus worker worktrees needing a sibling DevNexus checkout,
+    without allowing arbitrary outside-path projection.
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
