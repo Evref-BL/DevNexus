@@ -8,7 +8,11 @@
 - Component arity: The number of components configured in a DevNexus project; arity one follows the same model as any larger arity.
 - Work-item service: The tracker or issue provider configured for a component, such as a local store, GitHub Issues, GitHub Projects, GitLab issues, or Jira.
 - DevNexus user: A human or an agent acting under human instruction that configures DevNexus and asks it to launch agent work.
+- Target: The user-requested outcome for a DevNexus automation loop, such as completing selected work items or continuing until no eligible issue remains.
+- Target state: Concise project memory for the current target, stored in a configured Markdown file and updated by agents as the useful context changes.
 - Launched agent: The thinking process started by DevNexus that chooses work items, supervises subagents, coordinates worktrees, verifies changes, and reports results.
+- Agent profile: A named executor/model/reasoning configuration that a launched agent can use when selecting subagents.
+- Subagent cap: The maximum number of subagents the launched agent should run concurrently for one DevNexus automation cycle.
 
 ## Avoided Aliases
 

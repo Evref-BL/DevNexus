@@ -24,6 +24,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  readNexusAutomationTargetContext,
+  type NexusAutomationTargetContext,
+} from "./nexusAutomationTarget.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -94,6 +98,11 @@ export interface NexusAutomationAgentLaunchContext {
     mode: "agent_launch";
     selectorQuery: WorkItemQuery;
     eligibleWorkItemCount: number;
+  };
+  target: NexusAutomationTargetContext;
+  agent: {
+    maxConcurrentSubagents: number;
+    profiles: NexusAutomationConfig["agent"]["profiles"];
   };
   eligibleWorkItems: WorkItem[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
@@ -762,6 +771,14 @@ function buildAgentLaunchContext(
       selectorQuery: input.selectorQuery,
       eligibleWorkItemCount: input.eligibleWorkItems.length,
     },
+    target: readNexusAutomationTargetContext({
+      projectRoot: input.projectRoot,
+      config: input.automationConfig,
+    }),
+    agent: {
+      maxConcurrentSubagents: input.automationConfig.agent.maxConcurrentSubagents,
+      profiles: input.automationConfig.agent.profiles,
+    },
     eligibleWorkItems: input.eligibleWorkItems,
     componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
@@ -836,6 +853,13 @@ function agentLaunchEnvironment(
       "",
     DEV_NEXUS_AGENT_CONTEXT_FILE: input.contextFile,
     DEV_NEXUS_AGENT_RESULT_FILE: input.resultFile,
+    DEV_NEXUS_TARGET_ID: input.automationConfig.target.id ?? "",
+    DEV_NEXUS_TARGET_STATE_FILE: readNexusAutomationTargetContext({
+      projectRoot: input.projectRoot,
+      config: input.automationConfig,
+    }).statePath,
+    DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS:
+      input.automationConfig.agent.maxConcurrentSubagents.toString(),
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_COUNT: input.eligibleWorkItems.length.toString(),
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS: input.eligibleWorkItems
       .map((item) => item.id)

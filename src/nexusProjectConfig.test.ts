@@ -363,9 +363,19 @@ describe("project config", () => {
       agent: {
         command: null,
         timeoutMs: null,
+        maxConcurrentSubagents: 1,
+        profiles: [],
         relaunch: {
           whileEligible: false,
         },
+      },
+      target: {
+        id: null,
+        objective: null,
+        statePath: ".dev-nexus/automation/target-state.md",
+        stopWhenNoEligibleWork: true,
+        maxCycles: null,
+        maxWorkItems: null,
       },
       safety: {
         profile: "local",
@@ -397,9 +407,25 @@ describe("project config", () => {
           agent: {
             command: "codex run",
             timeoutMs: 600000,
+            maxConcurrentSubagents: 4,
+            profiles: [
+              {
+                id: "codex-heavy",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "xhigh",
+              },
+            ],
             relaunch: {
               whileEligible: true,
             },
+          },
+          target: {
+            id: "dogfood",
+            objective: "Use DevNexus to work on itself until no eligible issue remains.",
+            statePath: ".dev-nexus/automation/dogfood.md",
+            maxCycles: 12,
+            maxWorkItems: 40,
           },
         },
       }).automation,
@@ -408,9 +434,26 @@ describe("project config", () => {
       agent: {
         command: "codex run",
         timeoutMs: 600000,
+        maxConcurrentSubagents: 4,
+        profiles: [
+          {
+            id: "codex-heavy",
+            executor: "codex",
+            model: "gpt-5.5",
+            reasoning: "xhigh",
+          },
+        ],
         relaunch: {
           whileEligible: true,
         },
+      },
+      target: {
+        id: "dogfood",
+        objective: "Use DevNexus to work on itself until no eligible issue remains.",
+        statePath: ".dev-nexus/automation/dogfood.md",
+        stopWhenNoEligibleWork: true,
+        maxCycles: 12,
+        maxWorkItems: 40,
       },
     });
   });
@@ -529,6 +572,40 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.selector\.statuses/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-automation-target",
+        name: "Invalid Automation Target",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          target: {
+            statePath: "../outside.md",
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.target\.statePath/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-subagent-cap",
+        name: "Invalid Subagent Cap",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          agent: {
+            maxConcurrentSubagents: 0,
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.agent\.maxConcurrentSubagents/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

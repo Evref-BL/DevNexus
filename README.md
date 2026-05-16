@@ -167,6 +167,16 @@ work items to take, how many subagents to launch, what model and reasoning
 profile each subagent should use, and how to report progress back to each
 component's work-item service.
 
+The same context also includes the configured automation `target` and `agent`
+policy. `automation.target` carries the user-requested objective, the
+project-relative target-state Markdown file, optional cycle and work-item
+bounds, and the stop condition for no remaining eligible work. Agents should
+keep that target-state file concise: retain current direction, active
+decisions, blockers, and near-term risks, and drop stale detail as the target
+evolves. `automation.agent.maxConcurrentSubagents` caps parallel subagent
+work, and `automation.agent.profiles` names the executor/model/reasoning
+profiles that a launched agent may assign to subagents.
+
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That
 selected-work path is interim. New automation work should prefer
@@ -261,3 +271,9 @@ Requirements Document (PRD), Architecture Decision Record (ADR),
 human-in-the-loop (HITL), and autonomous agent-ready (AFK) must be expanded
 where they appear so generated guidance is understandable without external
 context.
+
+For DevNexus dogfooding, `to-issues` is the intended bridge from a target plan
+to tracker-backed execution. A human or launched agent can use the skill to
+split the current target plan into component-owned issues, mark which issues
+are autonomous agent-ready (AFK), and then let DevNexus relaunch agents while
+eligible work remains under the configured target and subagent caps.

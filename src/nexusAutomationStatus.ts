@@ -21,6 +21,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  readNexusAutomationTargetContext,
+  type NexusAutomationTargetContext,
+} from "./nexusAutomationTarget.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -85,6 +89,11 @@ export interface NexusAutomationStatus {
   ledger: NexusAutomationRunLedger | null;
   backoff: NexusAutomationBackoffDecision | null;
   preflight: NexusAutomationPreflightCheck[];
+  target: NexusAutomationTargetContext | null;
+  agent: {
+    maxConcurrentSubagents: number;
+    profiles: NexusAutomationConfig["agent"]["profiles"];
+  } | null;
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkItems: WorkItem[] | null;
@@ -556,15 +565,38 @@ async function listStatusEligibleWorkItemsByComponent(
 
 type AutomationStatusInput = Omit<
   NexusAutomationStatus,
-  "componentEligibleWorkItems" | "components"
+  "agent" | "componentEligibleWorkItems" | "components" | "target"
 > &
   Partial<
-    Pick<NexusAutomationStatus, "componentEligibleWorkItems" | "components">
+    Pick<
+      NexusAutomationStatus,
+      "agent" | "componentEligibleWorkItems" | "components" | "target"
+    >
   >;
 
 function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
+  const target =
+    result.target ??
+    (result.automationConfig
+      ? readNexusAutomationTargetContext({
+          projectRoot: result.projectRoot,
+          config: result.automationConfig,
+        })
+      : null);
+  const agent =
+    result.agent ??
+    (result.automationConfig
+      ? {
+          maxConcurrentSubagents:
+            result.automationConfig.agent.maxConcurrentSubagents,
+          profiles: result.automationConfig.agent.profiles,
+        }
+      : null);
+
   return {
     ...result,
+    target,
+    agent,
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
   };

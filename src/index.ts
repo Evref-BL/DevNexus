@@ -8,6 +8,7 @@ export * from "./nexusAutomationEnqueue.js";
 export * from "./nexusAutomationRunOnce.js";
 export * from "./nexusAutomationScheduler.js";
 export * from "./nexusAutomationStatus.js";
+export * from "./nexusAutomationTarget.js";
 export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusProjectScaffold.js";
 export * from "./processSupervisor.js";

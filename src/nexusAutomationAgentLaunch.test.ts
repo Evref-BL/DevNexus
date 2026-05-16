@@ -60,6 +60,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
         limit: 5,
       },
       agent: {
+        ...defaultNexusAutomationConfig.agent,
         command: "codex run",
         timeoutMs: 120000,
         relaunch: {
@@ -81,7 +82,46 @@ describe("nexus automation agent launch", () => {
   it("launches a configured agent with context without selecting or mutating work", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    saveProjectConfig(projectRoot, projectConfig());
+    const targetStatePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "automation",
+      "dogfood-target.md",
+    );
+    fs.mkdirSync(path.dirname(targetStatePath), { recursive: true });
+    fs.writeFileSync(
+      targetStatePath,
+      "Current target state: split the plan into implementation issues.\n",
+      "utf8",
+    );
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          agent: {
+            ...projectConfig().automation!.agent,
+            maxConcurrentSubagents: 3,
+            profiles: [
+              {
+                id: "codex-deep",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "xhigh",
+              },
+            ],
+          },
+          target: {
+            ...defaultNexusAutomationConfig.target,
+            id: "dogfood",
+            objective: "Use DevNexus to work on itself until no eligible issue remains.",
+            statePath: ".dev-nexus/automation/dogfood-target.md",
+            maxCycles: 8,
+            maxWorkItems: 25,
+          },
+        },
+      }),
+    );
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
       now: fixedClock("2026-05-16T09:00:00.000Z"),
@@ -104,6 +144,9 @@ describe("nexus automation agent launch", () => {
       expect(options.timeoutMs).toBe(120000);
       expect(options.env.DEV_NEXUS_AUTOMATION_MODE).toBe("agent_launch");
       expect(options.env.DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS).toBe("local-1");
+      expect(options.env.DEV_NEXUS_TARGET_ID).toBe("dogfood");
+      expect(options.env.DEV_NEXUS_TARGET_STATE_FILE).toBe(targetStatePath);
+      expect(options.env.DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS).toBe("3");
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
       );
@@ -113,6 +156,27 @@ describe("nexus automation agent launch", () => {
         automation: {
           mode: "agent_launch",
           eligibleWorkItemCount: 1,
+        },
+        target: {
+          id: "dogfood",
+          objective: "Use DevNexus to work on itself until no eligible issue remains.",
+          statePath: targetStatePath,
+          stateExists: true,
+          stateMarkdown:
+            "Current target state: split the plan into implementation issues.\n",
+          maxCycles: 8,
+          maxWorkItems: 25,
+        },
+        agent: {
+          maxConcurrentSubagents: 3,
+          profiles: [
+            {
+              id: "codex-deep",
+              executor: "codex",
+              model: "gpt-5.5",
+              reasoning: "xhigh",
+            },
+          ],
         },
         eligibleWorkItems: [
           {

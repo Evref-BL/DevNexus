@@ -66,10 +66,28 @@ export interface NexusAutomationAgentRelaunchConfig {
   whileEligible: boolean;
 }
 
+export interface NexusAutomationAgentProfileConfig {
+  id: string;
+  executor: string;
+  model: string | null;
+  reasoning: string | null;
+}
+
 export interface NexusAutomationAgentConfig {
   command: string | null;
   timeoutMs: number | null;
+  maxConcurrentSubagents: number;
+  profiles: NexusAutomationAgentProfileConfig[];
   relaunch: NexusAutomationAgentRelaunchConfig;
+}
+
+export interface NexusAutomationTargetConfig {
+  id: string | null;
+  objective: string | null;
+  statePath: string;
+  stopWhenNoEligibleWork: boolean;
+  maxCycles: number | null;
+  maxWorkItems: number | null;
 }
 
 export interface NexusAutomationSafetyConfig {
@@ -98,6 +116,7 @@ export interface NexusAutomationConfig {
   setup: NexusAutomationSetupConfig;
   executor: NexusAutomationExecutorConfig;
   agent: NexusAutomationAgentConfig;
+  target: NexusAutomationTargetConfig;
   safety: NexusAutomationSafetyConfig;
   publication: NexusAutomationPublicationConfig;
 }
@@ -146,9 +165,19 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   agent: {
     command: null,
     timeoutMs: null,
+    maxConcurrentSubagents: 1,
+    profiles: [],
     relaunch: {
       whileEligible: false,
     },
+  },
+  target: {
+    id: null,
+    objective: null,
+    statePath: ".dev-nexus/automation/target-state.md",
+    stopWhenNoEligibleWork: true,
+    maxCycles: null,
+    maxWorkItems: null,
   },
   safety: {
     profile: "local",
@@ -194,6 +223,7 @@ export function validateNexusAutomationConfig(
   const setup = validateSetupConfig(record.setup);
   const executor = validateExecutorConfig(record.executor);
   const agent = validateAgentConfig(record.agent);
+  const target = validateTargetConfig(record.target);
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePublicationConfig(record.publication);
 
@@ -239,6 +269,10 @@ export function validateNexusAutomationConfig(
         ...defaultNexusAutomationConfig.agent.relaunch,
         ...agent.relaunch,
       },
+    },
+    target: {
+      ...defaultNexusAutomationConfig.target,
+      ...target,
     },
     safety: {
       ...defaultNexusAutomationConfig.safety,
@@ -431,7 +465,29 @@ function validateAgentConfig(
   return {
     ...optionalNullableStringField(record, "command", pathName),
     ...optionalNullablePositiveIntegerField(record, "timeoutMs", pathName),
+    ...optionalPositiveIntegerField(record, "maxConcurrentSubagents", pathName),
+    ...optionalArrayField(
+      record,
+      "profiles",
+      pathName,
+      validateAgentProfileConfig,
+    ),
     ...validateAgentRelaunchConfig(record.relaunch),
+  };
+}
+
+function validateAgentProfileConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationAgentProfileConfig {
+  const record = assertRecord(value, pathName);
+
+  return {
+    id: requiredNonEmptyString(record.id, `${pathName}.id`),
+    executor: requiredNonEmptyString(record.executor, `${pathName}.executor`),
+    model: optionalNullableString(record.model, `${pathName}.model`) ?? null,
+    reasoning:
+      optionalNullableString(record.reasoning, `${pathName}.reasoning`) ?? null,
   };
 }
 
@@ -449,6 +505,25 @@ function validateAgentRelaunchConfig(
       ...defaultNexusAutomationConfig.agent.relaunch,
       ...optionalBooleanField(record, "whileEligible", pathName),
     },
+  };
+}
+
+function validateTargetConfig(
+  value: unknown,
+): Partial<NexusAutomationTargetConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.target";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalNullableStringField(record, "id", pathName),
+    ...optionalNullableStringField(record, "objective", pathName),
+    ...optionalRelativePathField(record, "statePath", pathName),
+    ...optionalBooleanField(record, "stopWhenNoEligibleWork", pathName),
+    ...optionalNullablePositiveIntegerField(record, "maxCycles", pathName),
+    ...optionalNullablePositiveIntegerField(record, "maxWorkItems", pathName),
   };
 }
 
@@ -551,6 +626,20 @@ function optionalStringField<Key extends string>(
   } as Record<Key, string>;
 }
 
+function optionalNullableString(
+  value: unknown,
+  pathName: string,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+
+  return requiredNonEmptyString(value, pathName);
+}
+
 function optionalNullableStringField<Key extends string>(
   record: Record<string, unknown>,
   key: Key,
@@ -567,6 +656,30 @@ function optionalNullableStringField<Key extends string>(
   return {
     [key]: requiredNonEmptyString(value, `${pathName}.${key}`),
   } as Record<Key, string>;
+}
+
+function optionalRelativePathField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, string>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  const normalized = requiredNonEmptyString(value, `${pathName}.${key}`);
+  if (
+    normalized.split(/[\\/]/u).some((part) => part === "..") ||
+    /^[A-Za-z]:/u.test(normalized) ||
+    normalized.startsWith("/") ||
+    normalized.startsWith("\\")
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.${key} must be a project-relative path`,
+    );
+  }
+
+  return { [key]: normalized } as Record<Key, string>;
 }
 
 function optionalPositiveIntegerField<Key extends string>(

@@ -1924,6 +1924,18 @@ function printAutomationStatusResult(
   writeLine(stdout, `DevNexus automation status: ${result.status}.`);
   writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
   writeLine(stdout, `  Summary: ${result.summary}`);
+  if (result.target) {
+    writeLine(stdout, `  Target state: ${result.target.statePath}`);
+    if (result.target.objective) {
+      writeLine(stdout, `  Target objective: ${result.target.objective}`);
+    }
+  }
+  if (result.agent) {
+    writeLine(
+      stdout,
+      `  Max concurrent subagents: ${result.agent.maxConcurrentSubagents}`,
+    );
+  }
   if (result.selectedWorkItem) {
     writeLine(
       stdout,

@@ -111,12 +111,28 @@ describe("nexus automation status", () => {
   it("reports agent launch readiness without selecting one work item", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const targetStatePath = path.join(
+      projectRoot,
+      ".dev-nexus",
+      "automation",
+      "target-state.md",
+    );
+    fs.mkdirSync(path.dirname(targetStatePath), { recursive: true });
+    fs.writeFileSync(targetStatePath, "Current target state.\n", "utf8");
     saveProjectConfig(
       projectRoot,
       projectConfig({
         automation: {
           ...projectConfig().automation!,
           mode: "agent_launch",
+          agent: {
+            ...projectConfig().automation!.agent,
+            maxConcurrentSubagents: 2,
+          },
+          target: {
+            ...projectConfig().automation!.target,
+            objective: "Keep working until all selected issues are resolved.",
+          },
         },
       }),
     );
@@ -146,6 +162,15 @@ describe("nexus automation status", () => {
           title: "Agent should choose",
         },
       ],
+      target: {
+        objective: "Keep working until all selected issues are resolved.",
+        statePath: targetStatePath,
+        stateExists: true,
+        stateMarkdown: "Current target state.\n",
+      },
+      agent: {
+        maxConcurrentSubagents: 2,
+      },
       selectedWorkItem: null,
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
