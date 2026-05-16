@@ -18,12 +18,9 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-13` add the generic plugin capability/projection contract.
   - `dev-nexus:local-15` add shared coordination integration planning now that
     status and handoff records exist.
   - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
-  - `plexus:local-9` make `gateway` the normal agent-facing Pharo MCP proxy and
-    hide raw `plexus_route_to_image` behind explicit opt-in.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
     agent setup after the generic plugin and scoped PLexus contracts are
@@ -115,6 +112,9 @@ PLexus agent-facing surface direction:
 - Route registration, unregister, status, and stale-route cleanup are
   internal/admin plumbing for PLexus core or operators, not a third normal
   agent-facing surface.
+- This naming/default surface direction is now implemented and published in
+  PLexus `4a0b813`; `plexus:local-8` still owns scoped project/workspace/image
+  context and route metadata.
 
 Durable completed foundation:
 
@@ -134,6 +134,14 @@ Durable completed foundation:
 - DevNexus shared coordination baseline was published through `c0cb6d8`,
   covering generic CLI/MCP `coordination_status` and `coordination_handoff`
   records backed by work-item comments.
+- DevNexus generic plugin capability projection contract was published through
+  `613ea21`, covering additive multi-plugin project config, projected skills,
+  MCP servers/tools, setup obligations, environment hints, cleanup hooks, agent
+  affordances, launch-context projection, and low-token agent profile reporting.
+- PLexus gateway agent-facing proxy defaults were published through `4a0b813`,
+  covering generated `pharo-launcher` plus `gateway` workspace MCP config,
+  default hiding of `plexus_route_to_image`, and explicit raw-routing opt-in
+  without exposing route-management tools on the normal `gateway` surface.
 - Component wave `parallel-component-wave-20260516` completed with verified
   source changes:
   - DevNexus project template scaffold was published through `3891e3e`.
