@@ -49,10 +49,13 @@ describe("git worktree service", () => {
     const calls: Array<{ args: string[]; cwd?: string }> = [];
 
     const result = prepareGitWorktree({
+      componentId: "core",
       sourceRoot,
       worktreesRoot,
       branchName: "codex/demo/FCD-1",
       baseRef: "main",
+      workItemId: "local-7",
+      workItemTitle: "Support component-scoped parallel worktree records",
       gitRunner: fakeGitRunner(calls),
     });
 
@@ -64,8 +67,13 @@ describe("git worktree service", () => {
       sourceRoot,
       worktreesRoot,
       worktreePath: expectedWorktreePath,
+      componentId: "core",
       branchName: "codex/demo/FCD-1",
       baseRef: "main",
+      workItem: {
+        id: "local-7",
+        title: "Support component-scoped parallel worktree records",
+      },
     });
     expect(calls).toEqual([
       {
@@ -90,6 +98,7 @@ describe("git worktree service", () => {
     const gitRunner = fakeGitRunner(calls);
 
     const prepared = prepareGitWorktree({
+      componentId: "core",
       sourceRoot,
       worktreesRoot,
       branchName: "feature/one",
@@ -120,12 +129,23 @@ describe("git worktree service", () => {
     const worktreesRoot = makeTempDir("dev-nexus-worktrees-");
     expect(() =>
       prepareGitWorktree({
+        componentId: "core",
         sourceRoot,
         worktreesRoot,
         branchName: "feature/one",
         worktreeName: "..",
         gitRunner: fakeGitRunner([]),
       }),
-    ).toThrow(/inside worktrees root/);
+    ).toThrow(/worktreeName/);
+    expect(() =>
+      prepareGitWorktree({
+        componentId: "core",
+        sourceRoot,
+        worktreesRoot,
+        branchName: "feature/one",
+        worktreeName: "nested/feature",
+        gitRunner: fakeGitRunner([]),
+      }),
+    ).toThrow(/worktreeName/);
   });
 });

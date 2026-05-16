@@ -24,6 +24,7 @@ export type NexusAutomationRunStatus =
 export interface NexusAutomationRunRecord {
   id: string;
   projectId: string;
+  componentId: string | null;
   status: NexusAutomationRunStatus;
   startedAt: string;
   finishedAt: string | null;
@@ -44,6 +45,7 @@ export interface NexusAutomationRunRecord {
 export interface NexusAutomationRunRecordInput {
   id: string;
   projectId: string;
+  componentId?: string | null;
   status: NexusAutomationRunStatus;
   startedAt?: string;
   finishedAt?: string | null;
@@ -516,6 +518,7 @@ function normalizeRunRecordInput(
     ...input,
     startedAt: input.startedAt ?? recordedAt,
     finishedAt: input.finishedAt ?? null,
+    componentId: input.componentId ?? null,
     workItemId: input.workItemId ?? null,
     workItemTitle: input.workItemTitle ?? null,
     sourceRoot: input.sourceRoot ?? null,
@@ -540,6 +543,7 @@ function normalizeRunRecord(value: unknown): NexusAutomationRunRecord {
   return {
     id: requiredNonEmptyString(record.id, "automation run.id"),
     projectId: requiredNonEmptyString(record.projectId, "automation run.projectId"),
+    componentId: optionalNullableString(record.componentId) ?? null,
     status: normalizeRunStatus(record.status, "automation run.status"),
     startedAt: requiredIsoString(record.startedAt, "automation run.startedAt"),
     finishedAt: optionalIsoString(record.finishedAt, "automation run.finishedAt"),

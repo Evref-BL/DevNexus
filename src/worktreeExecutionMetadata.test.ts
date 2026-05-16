@@ -30,6 +30,7 @@ afterEach(() => {
 describe("worktree execution metadata", () => {
   it("creates and normalizes empty execution metadata", () => {
     expect(emptyWorktreeExecutionMetadata()).toEqual({
+      worktree: null,
       commitIds: [],
       verification: [],
       publicationDecision: null,
@@ -71,6 +72,7 @@ describe("worktree execution metadata", () => {
     );
 
     expect(updated).toEqual({
+      worktree: null,
       commitIds: ["abc123", "def456"],
       verification: [
         {
@@ -134,6 +136,64 @@ describe("worktree execution metadata", () => {
       },
       updatedAt: null,
     });
+  });
+
+  it("normalizes and persists component-scoped worktree ownership", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
+    const worktreePath = path.join(worktreesRoot, "local-7");
+    fs.mkdirSync(worktreePath, { recursive: true });
+
+    writeWorktreeExecutionMetadata(worktreePath, {
+      worktree: {
+        componentId: "dev-nexus",
+        sourceRoot,
+        worktreesRoot,
+        worktreePath,
+        branchName: "codex/dev-nexus-local-7-worktree-records",
+        baseRef: "main",
+        workItem: {
+          id: "local-7",
+          title: "Support component-scoped parallel worktree records",
+        },
+      },
+      commitIds: [],
+      verification: [],
+      publicationDecision: null,
+      updatedAt: "2026-05-16T09:00:00.000Z",
+    });
+
+    expect(readWorktreeExecutionMetadata(worktreePath)).toMatchObject({
+      worktree: {
+        componentId: "dev-nexus",
+        sourceRoot,
+        worktreesRoot,
+        worktreePath,
+        branchName: "codex/dev-nexus-local-7-worktree-records",
+        baseRef: "main",
+        workItem: {
+          id: "local-7",
+          title: "Support component-scoped parallel worktree records",
+        },
+      },
+    });
+    expect(() =>
+      normalizeWorktreeExecutionMetadata({
+        worktree: {
+          componentId: "dev-nexus",
+          sourceRoot,
+          worktreesRoot,
+          worktreePath: path.join(projectRoot, "outside", "local-7"),
+          branchName: "codex/dev-nexus-local-7-worktree-records",
+          baseRef: "main",
+          workItem: {
+            id: "local-7",
+            title: null,
+          },
+        },
+      }),
+    ).toThrow(/inside worktreesRoot/);
   });
 
   it("reads, writes, and updates metadata under the worktree support directory", () => {
