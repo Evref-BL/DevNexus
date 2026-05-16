@@ -30,6 +30,23 @@ consulting older control-project notes.
   spend fewer tokens discovering project state, eligible work, target progress,
   and publication expectations.
 
+## Dependency Direction
+
+Keep project knowledge flowing downward:
+
+- `pharo-launcher-mcp` knows only about its own launcher MCP contract and Pharo
+  Launcher behavior. It must not mention DevNexus, PharoNexus, PLexus, or Pharo
+  MCP project policy.
+- `mcp-pharo` knows only about its own Pharo image-side MCP server. It must not
+  mention DevNexus, PharoNexus, PLexus, or pharo-launcher-mcp policy.
+- `plexus` may know about `pharo-launcher-mcp` and the Pharo MCP contract,
+  because it scopes launcher operations and routes image MCP calls. It must not
+  depend on DevNexus or PharoNexus concepts.
+- `pharo-nexus` may know about DevNexus, PLexus, pharo-launcher-mcp, and Pharo
+  MCP because it is the specialization/plugin that composes them.
+- DevNexus remains generic and must not contain specialization-specific source,
+  docs, or comments.
+
 ## Current Dogfood Project
 
 Project root:
