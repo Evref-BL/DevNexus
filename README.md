@@ -70,15 +70,18 @@ Agent configuration should register that command as a project-local MCP server
 when the agent needs direct DevNexus tools. The first native server slice
 intentionally covers the core self-use loop: read project status, read
 automation readiness and target context, and create/list/get/update/comment
-work items through the configured work tracker. It does not choose work or
-launch subagents itself; those decisions remain with the human or launched
-coordinator agent.
+work items through the configured work tracker. It can also record
+caller-reported target cycle facts so the next launch can reason from durable
+state instead of chat memory. It does not choose work or launch subagents
+itself; those decisions remain with the human or launched coordinator agent.
 
 The native MCP tools are:
 
 ```text
 project_status
 automation_status
+target_cycle_list
+target_cycle_record
 work_item_create
 work_item_list
 work_item_get
@@ -248,6 +251,15 @@ evolves. `automation.agent.maxConcurrentSubagents` caps parallel subagent
 work, and `automation.agent.profiles` names the executor/model/reasoning
 profiles that a launched agent may assign to subagents.
 
+`automation.target.cycleLedgerPath` stores the target cycle ledger, defaulting
+to `.dev-nexus/automation/target-cycles.json`. A launched coordinator agent
+can record `started`, `dispatched`, `completed`, `blocked`, `failed`, or
+`skipped` cycle facts through `target_cycle_record` or the CLI. These records
+are factual caller reports: DevNexus stores the run id, target id, selected or
+dispatched work item refs, blockers, notes, and summary, but it still does not
+decide which work should be selected. `automation status` reads the same
+ledger and exposes cycle counts plus the latest cycle.
+
 `runNexusAutomationOnce` remains available for older local command smokes that
 prepare one generated worktree and run `automation.executor.command`. That
 selected-work path is interim. New automation work should prefer
@@ -273,6 +285,8 @@ dev-nexus work-item update <project-root> local-1 --status in_progress
 dev-nexus work-item comment <project-root> local-1 --body "Started focused verification."
 dev-nexus automation status <project-root>
 dev-nexus automation enqueue <project-root> --title "Implement task"
+dev-nexus automation target-cycle record <project-root> --status dispatched --work-item primary:local-1
+dev-nexus automation target-cycle list <project-root>
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
@@ -283,9 +297,10 @@ worktree executor mode. `automation run-once` and `automation schedule` may
 omit `--command` when the relevant command is configured. Command-line options
 still override the configured command and timeout.
 
-Manual `work-item` commands currently target the primary component's work-item
-service. Agent-launch automation is the component-aware path for reading
-eligible work across all configured component services.
+Manual `work-item` commands accept `--component <component-id>` for
+component-owned work-item services. Omitting it targets the primary component
+for compatibility. Agent-launch automation reads eligible work across all
+configured component services.
 
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an

@@ -858,6 +858,10 @@ function agentLaunchEnvironment(
       projectRoot: input.projectRoot,
       config: input.automationConfig,
     }).statePath,
+    DEV_NEXUS_TARGET_CYCLE_LEDGER_FILE: readNexusAutomationTargetContext({
+      projectRoot: input.projectRoot,
+      config: input.automationConfig,
+    }).cycleLedgerPath,
     DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS:
       input.automationConfig.agent.maxConcurrentSubagents.toString(),
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_COUNT: input.eligibleWorkItems.length.toString(),

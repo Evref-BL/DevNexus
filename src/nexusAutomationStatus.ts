@@ -25,6 +25,10 @@ import {
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
 import {
+  summarizeNexusAutomationTargetCycles,
+  type NexusAutomationTargetCycleSummary,
+} from "./nexusAutomationTargetCycle.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -90,6 +94,7 @@ export interface NexusAutomationStatus {
   backoff: NexusAutomationBackoffDecision | null;
   preflight: NexusAutomationPreflightCheck[];
   target: NexusAutomationTargetContext | null;
+  targetCycles: NexusAutomationTargetCycleSummary | null;
   agent: {
     maxConcurrentSubagents: number;
     profiles: NexusAutomationConfig["agent"]["profiles"];
@@ -565,12 +570,20 @@ async function listStatusEligibleWorkItemsByComponent(
 
 type AutomationStatusInput = Omit<
   NexusAutomationStatus,
-  "agent" | "componentEligibleWorkItems" | "components" | "target"
+  | "agent"
+  | "componentEligibleWorkItems"
+  | "components"
+  | "target"
+  | "targetCycles"
 > &
   Partial<
     Pick<
       NexusAutomationStatus,
-      "agent" | "componentEligibleWorkItems" | "components" | "target"
+      | "agent"
+      | "componentEligibleWorkItems"
+      | "components"
+      | "target"
+      | "targetCycles"
     >
   >;
 
@@ -592,10 +605,19 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
           profiles: result.automationConfig.agent.profiles,
         }
       : null);
+  const targetCycles =
+    result.targetCycles ??
+    (result.automationConfig
+      ? summarizeNexusAutomationTargetCycles({
+          projectRoot: result.projectRoot,
+          config: result.automationConfig,
+        })
+      : null);
 
   return {
     ...result,
     target,
+    targetCycles,
     agent,
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,

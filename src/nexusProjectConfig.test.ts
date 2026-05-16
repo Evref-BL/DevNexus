@@ -390,6 +390,7 @@ describe("project config", () => {
         id: null,
         objective: null,
         statePath: ".dev-nexus/automation/target-state.md",
+        cycleLedgerPath: ".dev-nexus/automation/target-cycles.json",
         stopWhenNoEligibleWork: true,
         maxCycles: null,
         maxWorkItems: null,
@@ -641,6 +642,23 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.target\.statePath/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-automation-target-cycle",
+        name: "Invalid Automation Target Cycle",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          target: {
+            cycleLedgerPath: "../target-cycles.json",
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.target\.cycleLedgerPath/);
 
     expect(() =>
       validateProjectConfig({

@@ -146,6 +146,9 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS).toBe("local-1");
       expect(options.env.DEV_NEXUS_TARGET_ID).toBe("dogfood");
       expect(options.env.DEV_NEXUS_TARGET_STATE_FILE).toBe(targetStatePath);
+      expect(options.env.DEV_NEXUS_TARGET_CYCLE_LEDGER_FILE).toBe(
+        path.join(projectRoot, ".dev-nexus", "automation", "target-cycles.json"),
+      );
       expect(options.env.DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS).toBe("3");
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),

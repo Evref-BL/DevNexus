@@ -91,6 +91,8 @@ describe("DevNexus MCP server", () => {
     expect(listDevNexusMcpTools().map((tool) => tool.name)).toEqual([
       "project_status",
       "automation_status",
+      "target_cycle_list",
+      "target_cycle_record",
       "work_item_create",
       "work_item_list",
       "work_item_get",
@@ -208,6 +210,60 @@ describe("DevNexus MCP server", () => {
         status: "in_progress",
       },
     ]);
+  });
+
+  it("records target cycle facts through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const recorded = toolJson(
+      await callDevNexusMcpTool(
+        "target_cycle_record",
+        {
+          projectRoot,
+          cycleId: "cycle-1",
+          runId: "run-1",
+          status: "dispatched",
+          summary: "Coordinator dispatched work.",
+          eligibleWorkItemCount: 2,
+          workItems: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              cycleStatus: "dispatched",
+            },
+          ],
+          notes: ["One subagent launched."],
+        },
+        { now: fixedClock("2026-05-16T10:00:00.000Z") },
+      ),
+    );
+    const listed = toolJson(
+      await callDevNexusMcpTool("target_cycle_list", {
+        projectRoot,
+      }),
+    );
+
+    expect(recorded).toMatchObject({
+      ok: true,
+      record: {
+        id: "cycle-1",
+        targetId: "dogfood",
+        runId: "run-1",
+        status: "dispatched",
+        finishedAt: null,
+        eligibleWorkItemCount: 2,
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "dispatched",
+          },
+        ],
+      },
+    });
+    expect(listed.ledger.cycles).toHaveLength(1);
   });
 
   it("targets component-scoped work items through MCP tool arguments", async () => {

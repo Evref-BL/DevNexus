@@ -180,6 +180,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
+    expect(output.output()).toContain("dev-nexus automation target-cycle record");
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
   });
@@ -692,6 +693,80 @@ describe("dev-nexus cli", () => {
       command: "dev-nexus",
       args: ["mcp-stdio"],
     });
+  });
+
+  it("records and lists target cycles through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      automation: {
+        ...projectConfig().automation!,
+        mode: "agent_launch",
+        target: {
+          ...projectConfig().automation!.target,
+          id: "dogfood",
+          objective: "Use the project until no eligible work remains.",
+        },
+      },
+    });
+    const recordOutput = captureOutput();
+    const listOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "target-cycle",
+        "record",
+        projectRoot,
+        "--cycle-id",
+        "cycle-1",
+        "--run-id",
+        "run-1",
+        "--status",
+        "dispatched",
+        "--summary",
+        "Dispatched one subagent.",
+        "--eligible-work-items",
+        "1",
+        "--work-item",
+        "primary:local-1",
+        "--note",
+        "Coordinator selected the work item.",
+        "--json",
+      ],
+      {
+        stdout: recordOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      ["automation", "target-cycle", "list", projectRoot, "--json"],
+      {
+        stdout: listOutput.writer,
+      },
+    );
+
+    expect(JSON.parse(recordOutput.output())).toMatchObject({
+      ok: true,
+      record: {
+        id: "cycle-1",
+        projectId: "demo-project",
+        targetId: "dogfood",
+        runId: "run-1",
+        status: "dispatched",
+        summary: "Dispatched one subagent.",
+        eligibleWorkItemCount: 1,
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "selected",
+          },
+        ],
+      },
+    });
+    expect(JSON.parse(listOutput.output()).ledger.cycles).toHaveLength(1);
   });
 
   it("enqueues work items that match the automation selector", async () => {

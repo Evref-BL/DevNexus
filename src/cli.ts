@@ -30,6 +30,13 @@ import {
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  appendNexusAutomationTargetCycleRecord,
+  readNexusAutomationTargetCycleLedger,
+  type NexusAutomationTargetCycleRecordInput,
+  type NexusAutomationTargetCycleStatus,
+  type NexusAutomationTargetCycleWorkItemInput,
+} from "./nexusAutomationTargetCycle.js";
+import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
@@ -235,6 +242,24 @@ interface ParsedAutomationEnqueueCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationTargetCycleListCommand {
+  projectRoot: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationTargetCycleRecordCommand {
+  projectRoot: string;
+  cycleId?: string;
+  runId?: string;
+  status: NexusAutomationTargetCycleStatus;
+  summary?: string | null;
+  eligibleWorkItemCount?: number | null;
+  workItems: NexusAutomationTargetCycleWorkItemInput[];
+  blockers: string[];
+  notes: string[];
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -269,6 +294,8 @@ export function usage(): string {
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation enqueue <project-root> --title <title> [options]",
+    "  dev-nexus automation target-cycle list <project-root> [options]",
+    "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
     "",
@@ -369,6 +396,20 @@ export function usage(): string {
     "  --label <label>            repeatable, added after selector labels",
     "  --assignee <assignee>      repeatable, added after selector assignees",
     "  --milestone <text>",
+    "  --json",
+    "",
+    "Options for automation target-cycle list:",
+    "  --json",
+    "",
+    "Options for automation target-cycle record:",
+    "  --cycle-id <id>",
+    "  --run-id <id>",
+    "  --status <started|dispatched|completed|blocked|failed|skipped>",
+    "  --summary <text>",
+    "  --eligible-work-items <count>",
+    "  --work-item <component-id:id>  repeatable",
+    "  --blocker <text>              repeatable",
+    "  --note <text>                 repeatable",
     "  --json",
     "",
     "Options for automation run-once:",
@@ -721,6 +762,10 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "target-cycle") {
+    return handleAutomationTargetCycleCommand(argv, dependencies);
+  }
+
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
     const commandOptions = resolveAutomationCommandCliOptions(
@@ -764,7 +809,9 @@ async function handleAutomationCommand(
   }
 
   if (argv[1] !== "run-once") {
-    throw new Error("automation requires status, enqueue, run-once, or schedule");
+    throw new Error(
+      "automation requires status, enqueue, target-cycle, run-once, or schedule",
+    );
   }
 
   const parsed = parseAutomationRunOnceCommand(argv);
@@ -811,6 +858,69 @@ async function handleAutomationCommand(
     );
   }
   return 0;
+}
+
+async function handleAutomationTargetCycleCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  if (command === "list") {
+    const parsed = parseAutomationTargetCycleListCommand(argv);
+    const { projectConfig, automationConfig } = automationConfigForProjectRoot(
+      parsed.projectRoot,
+    );
+    const ledger = readNexusAutomationTargetCycleLedger(
+      path.resolve(parsed.projectRoot),
+      automationConfig,
+    );
+    printAutomationTargetCycleListResult(
+      {
+        projectConfig,
+        ledger,
+      },
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "record") {
+    const parsed = parseAutomationTargetCycleRecordCommand(argv);
+    const { projectConfig, automationConfig } = automationConfigForProjectRoot(
+      parsed.projectRoot,
+    );
+    const ledger = appendNexusAutomationTargetCycleRecord({
+      projectRoot: path.resolve(parsed.projectRoot),
+      config: automationConfig,
+      now: dependencies.now?.(),
+      record: {
+        ...(parsed.cycleId ? { id: parsed.cycleId } : {}),
+        projectId: projectConfig.id,
+        targetId: automationConfig.target.id,
+        objective: automationConfig.target.objective,
+        ...(parsed.runId ? { runId: parsed.runId } : {}),
+        status: parsed.status,
+        summary: parsed.summary ?? null,
+        eligibleWorkItemCount: parsed.eligibleWorkItemCount ?? null,
+        workItems: parsed.workItems,
+        blockers: parsed.blockers,
+        notes: parsed.notes,
+      },
+    });
+    printAutomationTargetCycleRecordResult(
+      {
+        projectConfig,
+        record: ledger.cycles.at(-1)!,
+        ledger,
+      },
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("automation target-cycle requires list or record");
 }
 
 function resolveAutomationCommandCliOptions(
@@ -1588,6 +1698,93 @@ function parseAutomationEnqueueCommand(
   return parsed as ParsedAutomationEnqueueCommand;
 }
 
+function parseAutomationTargetCycleListCommand(
+  argv: string[],
+): ParsedAutomationTargetCycleListCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation target-cycle list requires a project root");
+  }
+
+  const parsed: ParsedAutomationTargetCycleListCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation target-cycle list option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseAutomationTargetCycleRecordCommand(
+  argv: string[],
+): ParsedAutomationTargetCycleRecordCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation target-cycle record requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationTargetCycleRecordCommand> = {
+    projectRoot,
+    workItems: [],
+    blockers: [],
+    notes: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--cycle-id":
+        parsed.cycleId = next();
+        break;
+      case "--run-id":
+        parsed.runId = next();
+        break;
+      case "--status":
+        parsed.status = parseTargetCycleStatus(next(), arg);
+        break;
+      case "--summary":
+        parsed.summary = next();
+        break;
+      case "--eligible-work-items":
+        parsed.eligibleWorkItemCount = parseNonNegativeInteger(next(), arg);
+        break;
+      case "--work-item":
+        parsed.workItems?.push(parseTargetCycleWorkItem(next(), arg));
+        break;
+      case "--blocker":
+        parsed.blockers?.push(next());
+        break;
+      case "--note":
+        parsed.notes?.push(next());
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation target-cycle record option: ${arg}`);
+    }
+  }
+
+  if (!parsed.status) {
+    throw new Error("automation target-cycle record requires --status");
+  }
+
+  return parsed as ParsedAutomationTargetCycleRecordCommand;
+}
+
 function parseAutomationRunOnceCommand(
   argv: string[],
 ): ParsedAutomationRunOnceCommand {
@@ -1991,6 +2188,54 @@ function printAutomationEnqueueResult(
   writeLine(stdout, `  Status: ${result.workItem.status}`);
 }
 
+function printAutomationTargetCycleListResult(
+  result: {
+    projectConfig: NexusProjectConfig;
+    ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>;
+  },
+  parsed: ParsedAutomationTargetCycleListCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus target cycles.");
+  writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
+  writeLine(stdout, `  Cycles: ${result.ledger.cycles.length}`);
+  const lastCycle = result.ledger.cycles.at(-1);
+  if (lastCycle) {
+    writeLine(stdout, `  Last cycle: ${lastCycle.id} ${lastCycle.status}`);
+    if (lastCycle.summary) {
+      writeLine(stdout, `  Summary: ${lastCycle.summary}`);
+    }
+  }
+}
+
+function printAutomationTargetCycleRecordResult(
+  result: {
+    projectConfig: NexusProjectConfig;
+    record: NexusAutomationTargetCycleRecordInput;
+    ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>;
+  },
+  parsed: ParsedAutomationTargetCycleRecordCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus target cycle recorded.");
+  writeLine(stdout, `  Project: ${projectLabel(result.projectConfig)}`);
+  writeLine(stdout, `  Cycle: ${result.record.id}`);
+  writeLine(stdout, `  Status: ${result.record.status}`);
+  writeLine(stdout, `  Cycles recorded: ${result.ledger.cycles.length}`);
+}
+
 function printAutomationScheduleResult(
   result: RunNexusAutomationSchedulerResult,
   parsed: ParsedAutomationScheduleCommand,
@@ -2109,6 +2354,15 @@ function printAutomationStatusResult(
   if (result.eligibleWorkItems) {
     writeLine(stdout, `  Eligible work items: ${result.eligibleWorkItems.length}`);
   }
+  if (result.targetCycles) {
+    writeLine(stdout, `  Target cycles: ${result.targetCycles.cycleCount}`);
+    if (result.targetCycles.lastCycle) {
+      writeLine(
+        stdout,
+        `  Last target cycle: ${result.targetCycles.lastCycle.id} ${result.targetCycles.lastCycle.status}`,
+      );
+    }
+  }
   if (result.candidateCount !== null) {
     writeLine(stdout, `  Candidates: ${result.candidateCount}`);
   }
@@ -2129,6 +2383,22 @@ function printAutomationStatusResult(
 
 function projectLabel(config: NexusProjectConfig): string {
   return `${config.id} (${config.name})`;
+}
+
+function automationConfigForProjectRoot(projectRoot: string): {
+  projectConfig: NexusProjectConfig;
+  automationConfig: NonNullable<NexusProjectConfig["automation"]>;
+} {
+  const projectConfig = loadProjectConfig(path.resolve(projectRoot));
+  const automationConfig = projectConfig.automation;
+  if (!automationConfig) {
+    throw new Error("Project automation is not configured");
+  }
+
+  return {
+    projectConfig,
+    automationConfig,
+  };
 }
 
 function printProjectStatusText(
@@ -2207,6 +2477,53 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   throw new Error(`${optionName} must be a valid work status`);
 }
 
+function parseTargetCycleStatus(
+  value: string,
+  optionName: string,
+): NexusAutomationTargetCycleStatus {
+  if (
+    value === "started" ||
+    value === "dispatched" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "failed" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid target cycle status`);
+}
+
+function parseTargetCycleWorkItem(
+  value: string,
+  optionName: string,
+): NexusAutomationTargetCycleWorkItemInput {
+  const separator = value.indexOf(":");
+  if (separator < 0) {
+    if (!value.trim()) {
+      throw new Error(`${optionName} must be a non-empty work item id`);
+    }
+
+    return {
+      id: value.trim(),
+      cycleStatus: "selected",
+    };
+  }
+
+  const componentId = value.slice(0, separator).trim();
+  const id = value.slice(separator + 1).trim();
+  if (!componentId || !id) {
+    throw new Error(`${optionName} must be <component-id:id> or <id>`);
+  }
+
+  return {
+    componentId,
+    id,
+    cycleStatus: "selected",
+  };
+}
+
 function parseTrackerProvider(
   value: string,
   optionName: string,
@@ -2227,6 +2544,15 @@ function parsePositiveInteger(value: string, optionName: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${optionName} must be a positive integer`);
+  }
+
+  return parsed;
+}
+
+function parseNonNegativeInteger(value: string, optionName: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${optionName} must be a non-negative integer`);
   }
 
   return parsed;

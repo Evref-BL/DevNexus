@@ -6,6 +6,7 @@ export interface NexusAutomationTargetContext {
   id: string | null;
   objective: string | null;
   statePath: string;
+  cycleLedgerPath: string;
   stateExists: boolean;
   stateMarkdown: string | null;
   stopWhenNoEligibleWork: boolean;
@@ -29,12 +30,18 @@ export function readNexusAutomationTargetContext(options: {
     options.config.target.statePath,
     "automation.target.statePath",
   );
+  const cycleLedgerPath = resolveProjectRelativePath(
+    options.projectRoot,
+    options.config.target.cycleLedgerPath,
+    "automation.target.cycleLedgerPath",
+  );
   const stateExists = fs.existsSync(statePath);
 
   return {
     id: options.config.target.id,
     objective: options.config.target.objective,
     statePath,
+    cycleLedgerPath,
     stateExists,
     stateMarkdown: stateExists ? fs.readFileSync(statePath, "utf8") : null,
     stopWhenNoEligibleWork: options.config.target.stopWhenNoEligibleWork,

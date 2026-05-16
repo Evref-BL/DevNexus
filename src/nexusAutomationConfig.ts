@@ -85,6 +85,7 @@ export interface NexusAutomationTargetConfig {
   id: string | null;
   objective: string | null;
   statePath: string;
+  cycleLedgerPath: string;
   stopWhenNoEligibleWork: boolean;
   maxCycles: number | null;
   maxWorkItems: number | null;
@@ -175,6 +176,7 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     id: null,
     objective: null,
     statePath: ".dev-nexus/automation/target-state.md",
+    cycleLedgerPath: ".dev-nexus/automation/target-cycles.json",
     stopWhenNoEligibleWork: true,
     maxCycles: null,
     maxWorkItems: null,
@@ -521,6 +523,7 @@ function validateTargetConfig(
     ...optionalNullableStringField(record, "id", pathName),
     ...optionalNullableStringField(record, "objective", pathName),
     ...optionalRelativePathField(record, "statePath", pathName),
+    ...optionalRelativePathField(record, "cycleLedgerPath", pathName),
     ...optionalBooleanField(record, "stopWhenNoEligibleWork", pathName),
     ...optionalNullablePositiveIntegerField(record, "maxCycles", pathName),
     ...optionalNullablePositiveIntegerField(record, "maxWorkItems", pathName),

@@ -10,6 +10,7 @@ import {
 } from "./nexusHomeConfig.js";
 import {
   loadProjectConfig,
+  type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
   getNexusProjectStatus,
@@ -26,6 +27,12 @@ import {
 import {
   getNexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import {
+  appendNexusAutomationTargetCycleRecord,
+  readNexusAutomationTargetCycleLedger,
+  type NexusAutomationTargetCycleStatus,
+  type NexusAutomationTargetCycleWorkItemInput,
+} from "./nexusAutomationTargetCycle.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -87,6 +94,57 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "target_cycle_list",
+    description: "List recorded DevNexus target cycles without mutating state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "target_cycle_record",
+    description: "Record caller-reported DevNexus target cycle progress.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        cycleId: { type: "string" },
+        runId: { type: "string" },
+        status: { type: "string" },
+        summary: { type: ["string", "null"] },
+        eligibleWorkItemCount: { type: ["number", "null"] },
+        workItems: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              componentId: { type: ["string", "null"] },
+              id: { type: "string" },
+              title: { type: ["string", "null"] },
+              status: { type: ["string", "null"] },
+              cycleStatus: { type: ["string", "null"] },
+              agentProfileId: { type: ["string", "null"] },
+              notes: { type: ["string", "null"] },
+            },
+            required: ["id"],
+            additionalProperties: false,
+          },
+        },
+        blockers: { type: "array", items: { type: "string" } },
+        notes: { type: "array", items: { type: "string" } },
+      },
+      required: ["status"],
       additionalProperties: false,
     },
   },
@@ -244,6 +302,16 @@ export async function callDevNexusMcpTool(
             now: context.now,
           })),
         });
+      case "target_cycle_list":
+        return toolResult({
+          ok: true,
+          ...targetCycleLedgerFromArgs(args),
+        });
+      case "target_cycle_record":
+        return toolResult({
+          ok: true,
+          ...appendTargetCycleFromArgs(args, context),
+        });
       case "work_item_create":
         return toolResult({
           ok: true,
@@ -378,6 +446,81 @@ function workItemServiceFromArgs(
     resolveProject: (selector) => resolveWorkItemProject(selector, homePath),
     now: context.now,
   });
+}
+
+function targetCycleLedgerFromArgs(args: Record<string, unknown>): {
+  projectRoot: string;
+  projectId: string;
+  ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>;
+} {
+  const { projectRoot, projectConfig, automationConfig } =
+    targetCycleProjectFromArgs(args);
+  return {
+    projectRoot,
+    projectId: projectConfig.id,
+    ledger: readNexusAutomationTargetCycleLedger(projectRoot, automationConfig),
+  };
+}
+
+function appendTargetCycleFromArgs(
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): {
+  projectRoot: string;
+  projectId: string;
+  record: ReturnType<typeof readNexusAutomationTargetCycleLedger>["cycles"][number];
+  ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>;
+} {
+  const { projectRoot, projectConfig, automationConfig } =
+    targetCycleProjectFromArgs(args);
+  const cycleId = optionalString(args, "cycleId", "arguments");
+  const ledger = appendNexusAutomationTargetCycleRecord({
+    projectRoot,
+    config: automationConfig,
+    now: context.now?.(),
+    record: {
+      ...(cycleId ? { id: cycleId } : {}),
+      projectId: projectConfig.id,
+      targetId: automationConfig.target.id,
+      objective: automationConfig.target.objective,
+      runId: optionalNullableString(args, "runId", "arguments") ?? null,
+      status: parseTargetCycleStatus(
+        requiredString(args, "status", "arguments"),
+        "arguments.status",
+      ),
+      summary: optionalNullableString(args, "summary", "arguments") ?? null,
+      eligibleWorkItemCount: optionalNullableNonNegativeInteger(
+        args,
+        "eligibleWorkItemCount",
+        "arguments",
+      ),
+      workItems: optionalTargetCycleWorkItems(args, "workItems", "arguments") ?? [],
+      blockers: optionalStringArray(args, "blockers", "arguments") ?? [],
+      notes: optionalStringArray(args, "notes", "arguments") ?? [],
+    },
+  });
+
+  return {
+    projectRoot,
+    projectId: projectConfig.id,
+    record: ledger.cycles.at(-1)!,
+    ledger,
+  };
+}
+
+function targetCycleProjectFromArgs(args: Record<string, unknown>): {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NonNullable<NexusProjectConfig["automation"]>;
+} {
+  const projectRoot = projectRootFromArgs(args);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const automationConfig = projectConfig.automation;
+  if (!automationConfig) {
+    throw new Error("Project automation is not configured");
+  }
+
+  return { projectRoot, projectConfig, automationConfig };
 }
 
 function resolveWorkItemProject(
@@ -839,6 +982,114 @@ function optionalWorkStatusQuery(
 
     return parseWorkStatus(item, `${pathName}.${key}[${index}]`);
   });
+}
+
+function parseTargetCycleStatus(
+  value: string,
+  pathName: string,
+): NexusAutomationTargetCycleStatus {
+  if (
+    value === "started" ||
+    value === "dispatched" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "failed" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid target cycle status`);
+}
+
+function optionalNullableNonNegativeInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new Error(`${pathName}.${key} must be a non-negative integer or null`);
+  }
+
+  return value;
+}
+
+function optionalTargetCycleWorkItems(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusAutomationTargetCycleWorkItemInput[] | undefined {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${pathName}.${key} must be an array`);
+  }
+
+  return value.map((item, index) =>
+    targetCycleWorkItemFromRecord(
+      asRecord(item, `${pathName}.${key}[${index}]`),
+      `${pathName}.${key}[${index}]`,
+    ),
+  );
+}
+
+function targetCycleWorkItemFromRecord(
+  record: Record<string, unknown>,
+  pathName: string,
+): NexusAutomationTargetCycleWorkItemInput {
+  return {
+    componentId: optionalNullableString(record, "componentId", pathName) ?? null,
+    id: requiredString(record, "id", pathName),
+    title: optionalNullableString(record, "title", pathName) ?? null,
+    status: nullableWorkStatus(record, "status", pathName),
+    cycleStatus: nullableTargetCycleWorkItemStatus(
+      record,
+      "cycleStatus",
+      pathName,
+    ),
+    agentProfileId:
+      optionalNullableString(record, "agentProfileId", pathName) ?? null,
+    notes: optionalNullableString(record, "notes", pathName) ?? null,
+  };
+}
+
+function nullableWorkStatus(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): WorkStatus | null {
+  const value = optionalString(record, key, pathName);
+  return value === undefined ? null : parseWorkStatus(value, `${pathName}.${key}`);
+}
+
+function nullableTargetCycleWorkItemStatus(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusAutomationTargetCycleWorkItemInput["cycleStatus"] {
+  const value = optionalString(record, key, pathName);
+  if (value === undefined) {
+    return null;
+  }
+  if (
+    value === "eligible" ||
+    value === "selected" ||
+    value === "dispatched" ||
+    value === "in_progress" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName}.${key} must be a valid target cycle work item status`);
 }
 
 function hasOwn(record: Record<string, unknown>, key: string): boolean {
