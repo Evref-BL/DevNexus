@@ -63,9 +63,10 @@ Durable completed foundation:
   `916e1d5`.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as
   `1f3070b`.
-- MCP-Pharo static/live verification boundary was documented as local
-  review-handoff commits `0a38755` and `4c37fb0`, now pushed to
-  `origin/review/mcp-pharo-verification-boundary-20260516`.
+- MCP-Pharo static/live verification boundary was merged into `origin/develop`
+  through `9d90fd8`, preserving commits `0a38755` and `4c37fb0`; the temporary
+  review branch `origin/review/mcp-pharo-verification-boundary-20260516` was
+  removed after merge verification.
 
 Active boundaries:
 
