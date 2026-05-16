@@ -7,6 +7,7 @@ import {
   inspectNexusProjectSkills,
   materializeNexusProjectSkills,
   NexusSkillError,
+  nexusSkillMarkdownFileName,
   nexusSkillManifestFileName,
   refreshNexusProjectSkills,
 } from "./nexusSkills.js";
@@ -58,6 +59,45 @@ describe("nexus skills", () => {
       materialization: "copy",
       sourceControl: "support",
     });
+  });
+
+  it("includes planning and documentation skills with expanded acronyms", () => {
+    const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
+
+    expect(skillIds).toEqual([
+      "diagnose",
+      "tdd",
+      "handoff",
+      "triage",
+      "architecture-review",
+      "grill-with-docs",
+      "to-issues",
+      "to-prd",
+      "prototype",
+      "zoom-out",
+      "architecture-deepening",
+    ]);
+
+    const skillMarkdown = Object.fromEntries(
+      defaultCoreSkillPack.map((skill) => [
+        skill.manifest.id,
+        skill.files[nexusSkillMarkdownFileName],
+      ]),
+    );
+    expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
+    expect(skillMarkdown["grill-with-docs"]).toContain(
+      "Architecture Decision Records (ADRs)",
+    );
+    expect(skillMarkdown["to-issues"]).toContain(
+      "Product Requirements Document (PRD)",
+    );
+    expect(skillMarkdown["to-issues"]).toContain("human-in-the-loop (HITL)");
+    expect(skillMarkdown["to-issues"]).toContain(
+      "autonomous agent-ready (AFK)",
+    );
+    expect(skillMarkdown["to-prd"]).toContain(
+      "Product Requirements Document (PRD)",
+    );
   });
 
   it("lets projects disable defaults and select extension skills", () => {

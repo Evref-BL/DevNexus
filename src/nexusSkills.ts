@@ -194,9 +194,9 @@ Use this skill when a defect, failed check, or confusing behavior needs a struct
   curatedCoreSkill(
     "tdd",
     "tdd",
-    "Test-first implementation workflow for adding behavior with focused red, green, and refactor steps.",
+    "Test-driven development workflow for adding behavior with focused red, green, and refactor steps.",
     `
-# TDD
+# Test-Driven Development (TDD)
 
 Use this skill when adding or changing behavior that can be expressed with a focused automated test.
 
@@ -257,6 +257,115 @@ Use this skill when a change touches module boundaries, ownership, or long-lived
 4. Add or update tests that prove the intended ownership split.
 5. Avoid introducing compatibility paths that are not part of the target state.
 6. Record the remaining boundary work separately from the completed slice.
+`,
+  ),
+  curatedCoreSkill(
+    "grill-with-docs",
+    "grill-with-docs",
+    "Plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records.",
+    `
+# Grill With Docs
+
+Use this skill when a plan, design, or feature direction needs to be challenged before implementation.
+
+1. Read existing domain documentation first: root \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, and nearby \`docs/adr\` files when they exist.
+2. Cross-check the user's plan against code reality, existing glossary terms, and Architecture Decision Records (ADRs).
+3. Ask one high-leverage question at a time. Include your recommended answer, and explore the codebase instead of asking when the answer is discoverable.
+4. Challenge overloaded or vague words immediately. Propose one canonical term and record avoided aliases when the user confirms it.
+5. Capture resolved domain vocabulary in \`CONTEXT.md\` as a glossary, not a specification or implementation note.
+6. Offer an Architecture Decision Record only for decisions that are hard to reverse, surprising without context, and based on a real trade-off.
+7. Keep documentation updates small and inline with the conversation so decisions are not lost between runs.
+
+Glossary entries should define project-specific concepts in one sentence, list avoided aliases where useful, and describe important relationships. Architecture Decision Records should briefly state the context, decision, and reason; optional sections belong only when they add real value.
+`,
+  ),
+  curatedCoreSkill(
+    "to-issues",
+    "to-issues",
+    "Issue-slicing workflow for converting a plan or product requirements document into independently verifiable tracker issues.",
+    `
+# To Issues
+
+Use this skill when a plan, specification, or Product Requirements Document (PRD) needs to become implementation-ready tracker issues.
+
+1. Gather the source plan, existing issue context, tracker conventions, and relevant domain glossary or Architecture Decision Records.
+2. Explore enough code to understand the current implementation state before proposing issue boundaries.
+3. Split the work into tracer-bullet vertical slices: each issue should deliver a narrow end-to-end behavior that can be demonstrated or verified on its own.
+4. Mark each proposed slice as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
+5. Present the proposed issue list for review with title, type, blockers, user stories covered, and acceptance criteria.
+6. After approval, create or update tracker issues in dependency order. Do not close or rewrite the parent issue unless explicitly asked.
+7. Keep issue bodies stable: describe behavior and acceptance criteria, avoid fragile file-path instructions, and include prototype snippets only when they encode a decision more precisely than prose.
+`,
+  ),
+  curatedCoreSkill(
+    "to-prd",
+    "to-prd",
+    "Product Requirements Document synthesis workflow for turning known context into a tracker-backed planning artifact.",
+    `
+# To Product Requirements Document (PRD)
+
+Use this skill when the current conversation, notes, or exploratory findings need to become a Product Requirements Document (PRD).
+
+1. Synthesize from existing context. Do not interview the user unless the available context is contradictory or too thin to proceed safely.
+2. Explore the current code and domain documentation enough to describe the present state accurately.
+3. Write the Product Requirements Document with problem statement, solution, user stories, implementation decisions, testing decisions, out-of-scope items, and further notes.
+4. Use explicit product and domain vocabulary. Expand acronyms on first use, for example "Product Requirements Document (PRD)".
+5. Avoid file paths and code snippets unless a prototype produced a small decision-bearing shape that prose would obscure.
+6. Publish or attach the document through the configured tracker when available, using the project's normal ready-for-planning or ready-for-agent labeling policy.
+7. Hand off to the issue-slicing workflow when the Product Requirements Document is ready to become implementation issues.
+`,
+  ),
+  curatedCoreSkill(
+    "prototype",
+    "prototype",
+    "Throwaway prototyping workflow for testing a state model, data model, interaction, or user interface direction before production implementation.",
+    `
+# Prototype
+
+Use this skill when a design question needs a quick runnable answer before committing production code.
+
+1. State the question the prototype must answer before writing code.
+2. Choose the smallest useful form: a terminal or command-line prototype for state and business logic, or a local user interface route for interaction and visual alternatives.
+3. Mark prototype files clearly as throwaway and keep them close enough to the real area that the context is obvious.
+4. Provide one command to run the prototype, avoid persistent state unless persistence is the thing being tested, and surface the relevant state after each action.
+5. Skip production polish, abstractions, and broad tests. The artifact exists to learn quickly.
+6. When the question is answered, delete the prototype or fold the validated decision into production code.
+7. Record the retained decision in an issue, note, commit message, or Architecture Decision Record when the reason would matter later.
+`,
+  ),
+  curatedCoreSkill(
+    "zoom-out",
+    "zoom-out",
+    "Context-building workflow for mapping unfamiliar code before choosing an implementation or review path.",
+    `
+# Zoom Out
+
+Use this skill when an area of code is unfamiliar or the local change does not make sense without a broader map.
+
+1. Move one level up from the immediate file and identify the user-facing or system behavior it supports.
+2. Map the relevant modules, entry points, callers, adapters, data flow, and ownership boundaries.
+3. Use project domain vocabulary from \`CONTEXT.md\` or nearby documentation when available.
+4. Separate stable public contracts from implementation details that can change.
+5. Name the smallest next file or behavior to inspect after the map is clear.
+6. Keep the result concise enough that it guides the next implementation step rather than becoming a separate research report.
+`,
+  ),
+  curatedCoreSkill(
+    "architecture-deepening",
+    "architecture-deepening",
+    "Architecture-improvement workflow for finding shallow modules, weak seams, and refactors that improve locality, leverage, and testability.",
+    `
+# Architecture Deepening
+
+Use this skill when the goal is to improve codebase structure rather than implement one narrow feature.
+
+1. Read the relevant domain glossary and Architecture Decision Records before proposing structural changes.
+2. Map modules by their interface, implementation, callers, and adapters.
+3. Look for shallow modules where callers must understand almost as much complexity as the implementation itself.
+4. Apply the deletion test: if removing a module only moves complexity into callers, it is probably shallow; if removing it spreads important rules across callers, it is earning its place.
+5. Propose deepening opportunities with files, current friction, proposed change, expected locality benefit, expected leverage benefit, and better test surface.
+6. Do not implement a broad refactor until the selected opportunity has clear acceptance criteria and a safe migration path.
+7. Record rejected architectural directions when future agents are likely to suggest them again.
 `,
   ),
 ];

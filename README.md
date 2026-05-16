@@ -56,3 +56,26 @@ dispatches `automation run-once` only when the project is ready. It honors
 project `automation.schedule.intervalMs`, waits until active locks or retry
 backoff expire, and supports `--max-ticks` or `--max-runs` for bounded local
 smokes and supervised runners.
+
+## Curated Skills
+
+DevNexus materializes reviewed support skills under the managed project support
+directory. The default core pack includes:
+
+- `diagnose`
+- `tdd` for Test-Driven Development (TDD)
+- `handoff`
+- `triage`
+- `architecture-review`
+- `grill-with-docs`
+- `to-issues`
+- `to-prd` for Product Requirements Document (PRD) synthesis
+- `prototype`
+- `zoom-out`
+- `architecture-deepening`
+
+Curated skills must use explicit terminology. Acronyms such as Product
+Requirements Document (PRD), Architecture Decision Record (ADR),
+human-in-the-loop (HITL), and autonomous agent-ready (AFK) must be expanded
+where they appear so generated guidance is understandable without external
+context.
