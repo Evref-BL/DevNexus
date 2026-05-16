@@ -39,7 +39,23 @@ export interface WorktreePublicationDecision {
   decidedAt: string;
 }
 
+export interface WorktreeOwnerWorkItem {
+  id: string;
+  title: string | null;
+}
+
+export interface WorktreeOwnershipMetadata {
+  componentId: string;
+  sourceRoot: string;
+  worktreesRoot: string;
+  worktreePath: string;
+  branchName: string;
+  baseRef: string | null;
+  workItem: WorktreeOwnerWorkItem | null;
+}
+
 export interface WorktreeExecutionMetadata {
+  worktree: WorktreeOwnershipMetadata | null;
   commitIds: string[];
   verification: WorktreeVerificationRecord[];
   publicationDecision: WorktreePublicationDecision | null;
@@ -47,6 +63,7 @@ export interface WorktreeExecutionMetadata {
 }
 
 export interface WorktreeExecutionUpdate {
+  worktree?: WorktreeOwnershipMetadata | null;
   commitIds?: string[];
   verification?: WorktreeVerificationInput;
   publicationDecision?: WorktreePublicationDecisionInput;
@@ -64,6 +81,7 @@ export class WorktreeExecutionMetadataError extends Error {
 
 export function emptyWorktreeExecutionMetadata(): WorktreeExecutionMetadata {
   return {
+    worktree: null,
     commitIds: [],
     verification: [],
     publicationDecision: null,
@@ -127,7 +145,8 @@ export function hasWorktreeExecutionUpdate(
   update: WorktreeExecutionUpdate,
 ): boolean {
   return Boolean(
-    update.commitIds?.length ||
+    Object.prototype.hasOwnProperty.call(update, "worktree") ||
+      update.commitIds?.length ||
       update.verification ||
       update.publicationDecision,
   );
@@ -145,6 +164,9 @@ export function applyWorktreeExecutionUpdate(
   }
 
   const execution = normalizeWorktreeExecutionMetadata(existing);
+  const worktree = Object.prototype.hasOwnProperty.call(update, "worktree")
+    ? normalizeWorktreeOwnership(update.worktree)
+    : execution.worktree;
   const commitIds = [...execution.commitIds];
   for (const commitId of update.commitIds ?? []) {
     const normalized = requiredNonEmptyString(commitId, "commitId");
@@ -182,6 +204,7 @@ export function applyWorktreeExecutionUpdate(
     : execution.publicationDecision;
 
   return {
+    worktree,
     commitIds,
     verification,
     publicationDecision,
@@ -203,6 +226,7 @@ export function normalizeWorktreeExecutionMetadata(
 
   const record = value as Record<string, unknown>;
   return {
+    worktree: normalizeWorktreeOwnership(record.worktree),
     commitIds: normalizeStringArray(record.commitIds, "execution.commitIds"),
     verification: normalizeVerificationRecords(record.verification),
     publicationDecision: normalizePublicationDecision(record.publicationDecision),
@@ -211,6 +235,106 @@ export function normalizeWorktreeExecutionMetadata(
         ? record.updatedAt
         : null,
   };
+}
+
+export function worktreeOwnershipMetadataFromPreparedWorktree(value: {
+  componentId: string;
+  sourceRoot: string;
+  worktreesRoot: string;
+  worktreePath: string;
+  branchName: string;
+  baseRef: string | null;
+  workItem: WorktreeOwnerWorkItem | null;
+}): WorktreeOwnershipMetadata {
+  const normalized = normalizeWorktreeOwnership(value);
+  if (!normalized) {
+    throw new WorktreeExecutionMetadataError(
+      "prepared worktree ownership metadata is required",
+    );
+  }
+
+  return normalized;
+}
+
+function normalizeWorktreeOwnership(
+  value: unknown,
+): WorktreeOwnershipMetadata | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new WorktreeExecutionMetadataError(
+      "execution.worktree must be an object or null",
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  const sourceRoot = path.resolve(
+    requiredNonEmptyString(record.sourceRoot, "execution.worktree.sourceRoot"),
+  );
+  const worktreesRoot = path.resolve(
+    requiredNonEmptyString(
+      record.worktreesRoot,
+      "execution.worktree.worktreesRoot",
+    ),
+  );
+  const worktreePath = path.resolve(
+    requiredNonEmptyString(
+      record.worktreePath,
+      "execution.worktree.worktreePath",
+    ),
+  );
+  assertWorktreePathInsideRoot(worktreesRoot, worktreePath);
+
+  return {
+    componentId: requiredNonEmptyString(
+      record.componentId,
+      "execution.worktree.componentId",
+    ),
+    sourceRoot,
+    worktreesRoot,
+    worktreePath,
+    branchName: requiredNonEmptyString(
+      record.branchName,
+      "execution.worktree.branchName",
+    ),
+    baseRef: optionalNullableString(record.baseRef) ?? null,
+    workItem: normalizeWorktreeOwnerWorkItem(record.workItem),
+  };
+}
+
+function normalizeWorktreeOwnerWorkItem(
+  value: unknown,
+): WorktreeOwnerWorkItem | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new WorktreeExecutionMetadataError(
+      "execution.worktree.workItem must be an object or null",
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    id: requiredNonEmptyString(
+      record.id,
+      "execution.worktree.workItem.id",
+    ),
+    title: optionalNullableString(record.title) ?? null,
+  };
+}
+
+function assertWorktreePathInsideRoot(
+  worktreesRoot: string,
+  worktreePath: string,
+): void {
+  const relative = path.relative(worktreesRoot, worktreePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new WorktreeExecutionMetadataError(
+      `execution.worktree.worktreePath must resolve inside worktreesRoot: ${worktreePath}`,
+    );
+  }
 }
 
 function normalizeVerificationRecords(

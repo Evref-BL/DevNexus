@@ -154,6 +154,17 @@ state before editing, and report per-component progress through that
 component's work-item service. In `agent_launch` mode DevNexus does not create
 those implementation worktrees for the agent.
 
+For parallel implementation work, coordinators should pick one component-owned
+work item, inspect that component's `sourceRoot` for unrelated dirty state, and
+then either work in that checkout or prepare a generated Git worktree under that
+component's `worktreesRoot`. Prepared worktree records carry the component id,
+source root, component worktrees root, generated worktree path, branch, base ref,
+and owning work item id/title. A generated path is valid only when it resolves
+inside the component `worktreesRoot`; path-like worktree names are rejected so a
+parallel branch cannot escape into another component's tree. Agents should write
+or update worktree execution metadata in the generated worktree as verification,
+commit, and publication facts become known.
+
 Work tracking is component-scoped. Older project-level `workTracking` remains
 accepted for legacy configs and is normalized onto the generated primary
 component, but explicit multi-component configs should put the work-item
@@ -327,6 +338,11 @@ no installer; it only links an existing reviewed path from the active component
 source root into the generated worktree and records the target in the worktree
 Git exclude file. Required links are checked during read-only status so unsafe
 or missing dependencies block before worktree creation.
+
+Dependency-link setup also treats the component worktrees root as a safety
+boundary when provided: the target worktree path must remain inside that root
+before any link is created. This keeps shared dependencies scoped to the
+component worktree that the coordinator selected.
 
 The package also ships a generic `dev-nexus` CLI for the same boundary:
 

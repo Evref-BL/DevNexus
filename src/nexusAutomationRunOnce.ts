@@ -36,7 +36,9 @@ import {
   applyWorktreeExecutionUpdate,
   emptyWorktreeExecutionMetadata,
   writeWorktreeExecutionMetadata,
+  worktreeOwnershipMetadataFromPreparedWorktree,
   type WorktreeExecutionMetadata,
+  type WorktreeOwnershipMetadata,
   type WorktreePublicationDecisionInput,
   type WorktreeVerificationInput,
 } from "./worktreeExecutionMetadata.js";
@@ -256,6 +258,7 @@ export async function runNexusAutomationOnce(
         record: {
           id: runId,
           projectId: projectConfig.id,
+          componentId: primaryComponent.id,
           status: "blocked",
           startedAt,
           finishedAt: startedAt,
@@ -309,6 +312,7 @@ export async function runNexusAutomationOnce(
         record: {
           id: runId,
           projectId: projectConfig.id,
+          componentId: primaryComponent.id,
           status: "blocked",
           startedAt,
           finishedAt: startedAt,
@@ -352,6 +356,7 @@ export async function runNexusAutomationOnce(
         record: {
           id: runId,
           projectId: projectConfig.id,
+          componentId: primaryComponent.id,
           status: "skipped",
           startedAt,
           finishedAt,
@@ -387,15 +392,19 @@ export async function runNexusAutomationOnce(
     const branchName =
       options.branchName ?? defaultAutomationBranchName(projectConfig.id, workItem.id, runId);
     worktree = prepareGitWorktree({
+      componentId: primaryComponent.id,
       sourceRoot,
       worktreesRoot: primaryComponent.worktreesRoot,
       branchName,
       ...(options.worktreeName ? { worktreeName: options.worktreeName } : {}),
       ...(baseRef ? { baseRef } : {}),
+      workItemId: workItem.id,
+      workItemTitle: workItem.title,
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });
     setup = materializeNexusAutomationWorktreeSetup({
       sourceRoot,
+      worktreesRoot: primaryComponent.worktreesRoot,
       worktreePath: worktree.worktreePath,
       automationConfig,
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
@@ -424,6 +433,7 @@ export async function runNexusAutomationOnce(
     const execution = executionMetadataFromExecutorResult(
       executorResult,
       finishedAt,
+      worktree,
     );
     writeWorktreeExecutionMetadata(worktree.worktreePath, execution);
     const status = normalizeExecutorStatus(executorResult.status);
@@ -448,6 +458,7 @@ export async function runNexusAutomationOnce(
       record: {
         id: runId,
         projectId: projectConfig.id,
+        componentId: primaryComponent.id,
         status,
         startedAt,
         finishedAt,
@@ -498,6 +509,7 @@ export async function runNexusAutomationOnce(
       record: {
         id: runId,
         projectId: projectConfig.id,
+        componentId: primaryComponent?.id ?? null,
         status: "failed",
         startedAt,
         finishedAt,
@@ -649,10 +661,12 @@ function createAutomationProvider(options: {
 function executionMetadataFromExecutorResult(
   result: NexusAutomationExecutorResult,
   finishedAt: string,
+  worktree: PrepareGitWorktreeResult,
 ): WorktreeExecutionMetadata {
   let metadata = emptyWorktreeExecutionMetadata();
   const verification = result.verification ?? [];
   const initialUpdate = {
+    worktree: worktreeOwnershipMetadataFromPreparedWorktree(worktree),
     ...(result.commitIds?.length ? { commitIds: result.commitIds } : {}),
     ...(result.publicationDecision
       ? { publicationDecision: result.publicationDecision }
@@ -675,12 +689,14 @@ function executionMetadataFromExecutorResult(
 }
 
 function hasExecutionUpdate(update: {
+  worktree?: WorktreeOwnershipMetadata | null;
   commitIds?: string[];
   verification?: WorktreeVerificationInput;
   publicationDecision?: WorktreePublicationDecisionInput;
 }): boolean {
   return Boolean(
-    update.commitIds?.length ||
+    Object.prototype.hasOwnProperty.call(update, "worktree") ||
+      update.commitIds?.length ||
       update.verification ||
       update.publicationDecision,
   );

@@ -37,6 +37,7 @@ export interface NexusAutomationWorktreeSetupResult {
 
 export interface NexusAutomationWorktreeSetupOptions {
   sourceRoot: string;
+  worktreesRoot?: string;
   worktreePath: string;
   automationConfig: NexusAutomationConfig;
   gitRunner?: GitRunner;
@@ -103,6 +104,9 @@ export function materializeNexusAutomationWorktreeSetup(
   const worktreePath = path.resolve(
     requiredNonEmptyString(options.worktreePath, "worktreePath"),
   );
+  if (options.worktreesRoot) {
+    assertWorktreePathInsideRoot(options.worktreesRoot, worktreePath);
+  }
   const gitRunner = options.gitRunner ?? defaultGitRunner;
   const platform = options.platform ?? process.platform;
 
@@ -285,6 +289,22 @@ function resolveInsideRoot(root: string, value: string, name: string): string {
   }
 
   return resolved;
+}
+
+function assertWorktreePathInsideRoot(
+  worktreesRoot: string,
+  worktreePath: string,
+): void {
+  const rootPath = path.resolve(
+    requiredNonEmptyString(worktreesRoot, "worktreesRoot"),
+  );
+  const resolvedWorktreePath = path.resolve(worktreePath);
+  const relative = path.relative(rootPath, resolvedWorktreePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `worktreePath must resolve inside worktreesRoot: ${resolvedWorktreePath}`,
+    );
+  }
 }
 
 function requiredNonEmptyString(value: unknown, name: string): string {

@@ -15,20 +15,30 @@ export type GitRunner = (
 ) => GitCommandResult;
 
 export interface PrepareGitWorktreeOptions {
+  componentId: string;
   sourceRoot: string;
   worktreesRoot: string;
   branchName: string;
   worktreeName?: string;
   baseRef?: string | null;
+  workItemId?: string | null;
+  workItemTitle?: string | null;
   gitRunner?: GitRunner;
 }
 
+export interface PreparedGitWorktreeWorkItem {
+  id: string;
+  title: string | null;
+}
+
 export interface PrepareGitWorktreeResult {
+  componentId: string;
   sourceRoot: string;
   worktreesRoot: string;
   worktreePath: string;
   branchName: string;
   baseRef: string | null;
+  workItem: PreparedGitWorktreeWorkItem | null;
   git: {
     commands: GitCommandResult[];
   };
@@ -58,10 +68,18 @@ export class GitWorktreeServiceError extends Error {
 export function prepareGitWorktree(
   options: PrepareGitWorktreeOptions,
 ): PrepareGitWorktreeResult {
+  const componentId = requiredNonEmptyString(options.componentId, "componentId");
   const sourceRoot = path.resolve(options.sourceRoot);
   const worktreesRoot = path.resolve(options.worktreesRoot);
   const branchName = normalizeBranchName(options.branchName);
-  const worktreeName = options.worktreeName ?? safeDirectoryName(branchName);
+  const baseRef = optionalNullableString(options.baseRef, "baseRef");
+  const worktreeName = options.worktreeName
+    ? normalizeWorktreeName(options.worktreeName)
+    : safeDirectoryName(branchName);
+  const workItem = normalizePreparedWorktreeWorkItem(
+    options.workItemId,
+    options.workItemTitle,
+  );
   const worktreePath = path.join(worktreesRoot, worktreeName);
   assertSafeWorktreePath(worktreesRoot, worktreePath);
   if (fs.existsSync(worktreePath)) {
@@ -82,17 +100,19 @@ export function prepareGitWorktree(
       "-b",
       branchName,
       worktreePath,
-      ...(options.baseRef ? [options.baseRef] : []),
+      ...(baseRef ? [baseRef] : []),
     ],
     sourceRoot,
   );
 
   return {
+    componentId,
     sourceRoot,
     worktreesRoot,
     worktreePath,
     branchName,
-    baseRef: options.baseRef ?? null,
+    baseRef,
+    workItem,
     git: {
       commands,
     },
@@ -153,8 +173,27 @@ export function safeDirectoryName(value: string): string {
       "Worktree name must contain at least one filesystem-safe character",
     );
   }
+  if (sanitized === "." || sanitized === ".." || sanitized.includes("..")) {
+    throw new GitWorktreeServiceError(`Invalid worktreeName: ${value}`);
+  }
 
   return sanitized;
+}
+
+export function normalizeWorktreeName(value: string): string {
+  const trimmed = requiredNonEmptyString(value, "worktreeName");
+  if (
+    path.isAbsolute(trimmed) ||
+    trimmed === "." ||
+    trimmed === ".." ||
+    trimmed.includes("..") ||
+    /[\\/]/u.test(trimmed) ||
+    !/^[A-Za-z0-9._-]+$/u.test(trimmed)
+  ) {
+    throw new GitWorktreeServiceError(`Invalid worktreeName: ${value}`);
+  }
+
+  return trimmed;
 }
 
 export function assertSafeWorktreePath(
@@ -214,4 +253,37 @@ export function runGitCommand(
   }
 
   return result;
+}
+
+function normalizePreparedWorktreeWorkItem(
+  workItemId: string | null | undefined,
+  workItemTitle: string | null | undefined,
+): PreparedGitWorktreeWorkItem | null {
+  if (workItemId === undefined || workItemId === null) {
+    return null;
+  }
+
+  return {
+    id: requiredNonEmptyString(workItemId, "workItemId"),
+    title: optionalNullableString(workItemTitle, "workItemTitle"),
+  };
+}
+
+function optionalNullableString(
+  value: string | null | undefined,
+  name: string,
+): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return requiredNonEmptyString(value, name);
+}
+
+function requiredNonEmptyString(value: unknown, name: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new GitWorktreeServiceError(`${name} must be a non-empty string`);
+  }
+
+  return value.trim();
 }

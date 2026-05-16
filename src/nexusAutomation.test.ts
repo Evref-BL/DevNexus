@@ -135,6 +135,7 @@ describe("nexus automation", () => {
       record: {
         id: "run-3",
         projectId: "demo",
+        componentId: "addon",
         status: "blocked",
         nextRunNotBefore: "2026-05-15T12:00:00.000Z",
       },
@@ -154,6 +155,7 @@ describe("nexus automation", () => {
         },
         {
           id: "run-3",
+          componentId: "addon",
           status: "blocked",
           nextRunNotBefore: "2026-05-15T12:00:00.000Z",
         },

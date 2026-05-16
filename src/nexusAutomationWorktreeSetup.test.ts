@@ -140,4 +140,24 @@ describe("nexus automation worktree setup", () => {
       },
     ]);
   });
+
+  it("rejects setup for a worktree outside the component worktrees root", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const componentWorktreesRoot = path.join(
+      makeTempDir("dev-nexus-component-worktrees-"),
+      "dev-nexus",
+    );
+    const outsideWorktreePath = makeTempDir("dev-nexus-setup-outside-");
+    fs.mkdirSync(path.join(sourceRoot, "node_modules"), { recursive: true });
+
+    expect(() =>
+      materializeNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreesRoot: componentWorktreesRoot,
+        worktreePath: outsideWorktreePath,
+        automationConfig: automationConfig(),
+        gitRunner: fakeGitRunner([]),
+      }),
+    ).toThrow(/inside worktreesRoot/);
+  });
 });

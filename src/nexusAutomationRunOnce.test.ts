@@ -179,8 +179,13 @@ describe("nexus automation run once", () => {
       title: "Implement run once",
     });
     expect(result.worktree).toMatchObject({
+      componentId: "primary",
       branchName: "codex/demo-project/local-1/run-1",
       baseRef: "main",
+      workItem: {
+        id: "local-1",
+        title: "Implement run once",
+      },
     });
     expect(gitCalls).toEqual([
       {
@@ -201,6 +206,18 @@ describe("nexus automation run once", () => {
       },
     ]);
     expect(result.execution).toMatchObject({
+      worktree: {
+        componentId: "primary",
+        sourceRoot: path.join(projectRoot, "source"),
+        worktreesRoot: path.join(projectRoot, "worktrees", "primary"),
+        worktreePath: result.worktree!.worktreePath,
+        branchName: "codex/demo-project/local-1/run-1",
+        baseRef: "main",
+        workItem: {
+          id: "local-1",
+          title: "Implement run once",
+        },
+      },
       commitIds: ["abc123"],
       verification: [
         {
@@ -222,6 +239,7 @@ describe("nexus automation run once", () => {
         runs: [
           {
             id: "run-1",
+            componentId: "primary",
             status: "completed",
             workItemId: "local-1",
             worktreePath: result.worktree!.worktreePath,
