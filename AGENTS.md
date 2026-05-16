@@ -1,0 +1,62 @@
+# Agent Guide For DevNexus Dogfood
+
+This is the clean DevNexus dogfood managed project. It is intentionally
+separate from the older PharoNexus-Control staging root.
+
+## Operating Boundary
+
+- Use DevNexus as infrastructure: project metadata, component graph, work-item
+  service, target state, target cycle records, agent launch records, and
+  factual target reports.
+- The launched coordinator agent chooses work. DevNexus does not choose or
+  supervise implementation work.
+- Do not create Vibe Kanban workspaces, sessions, or executions for
+  implementation. Vibe may be inspected only as a tracker/system-of-record
+  when a component is explicitly configured for it.
+- Prefer local DevNexus MCP/CLI tools for project, automation, target, and
+  work-item operations.
+
+## Per-Cycle Workflow
+
+1. Read `DEV_NEXUS_AGENT_CONTEXT_FILE`, this file, `CONTEXT.md`, and
+   `.dev-nexus/automation/target-state.md`.
+2. Inspect component working trees and preserve unrelated changes.
+3. Choose the largest safe bounded batch from eligible work items, respecting
+   `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS`.
+4. For each selected work item, advance state or leave a clear blocker/progress
+   comment through the component work-item service.
+5. Record target cycle facts with DevNexus target-cycle tooling.
+6. Run focused verification first, then broader relevant checks when feasible.
+7. Commit and push source changes in the owning component when policy allows.
+8. Keep this project state concise: update target state with current decisions,
+   active blockers, and next direction; remove stale detail.
+9. Write `DEV_NEXUS_AGENT_RESULT_FILE` as JSON before exiting.
+
+## Result File Shape
+
+Write a JSON object like:
+
+```json
+{
+  "status": "completed",
+  "summary": "Short factual result.",
+  "commitIds": [],
+  "verification": [
+    {
+      "command": "npm run check",
+      "status": "passed",
+      "summary": "All checks passed."
+    }
+  ],
+  "publicationDecision": {
+    "type": "direct_integration",
+    "remote": "origin",
+    "targetBranch": "main",
+    "reason": "Published verified source change."
+  },
+  "error": null
+}
+```
+
+Use `blocked` when a user decision, missing credential, dirty unrelated change,
+or unsafe boundary prevents progress.

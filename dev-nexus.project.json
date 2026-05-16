@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "id": "dev-nexus-dogfood",
+  "name": "DevNexus Dogfood",
+  "home": null,
+  "repo": {
+    "kind": "local",
+    "remoteUrl": null,
+    "defaultBranch": "main"
+  },
+  "worktreesRoot": "worktrees",
+  "kanban": {
+    "provider": "vibe-kanban",
+    "projectId": null
+  },
+  "components": [
+    {
+      "id": "dev-nexus",
+      "name": "DevNexus",
+      "kind": "git",
+      "role": "primary",
+      "remoteUrl": "git@github.com:Evref-BL/DevNexus.git",
+      "defaultBranch": "main",
+      "sourceRoot": "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus",
+      "worktreesRoot": "worktrees/dev-nexus",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/dev-nexus.json"
+      },
+      "verification": {
+        "focusedCommands": [
+          "npm test -- --exclude src/processSupervisor.test.ts"
+        ],
+        "fullCommands": [
+          "npm run check"
+        ],
+        "requirePassing": true
+      },
+      "publication": {
+        "strategy": "direct_integration",
+        "remote": "origin",
+        "targetBranch": "main",
+        "push": true
+      },
+      "relationships": []
+    },
+    {
+      "id": "pharo-nexus",
+      "name": "PharoNexus",
+      "kind": "git",
+      "role": "extension",
+      "remoteUrl": "git@github.com:Evref-BL/PharoNexus.git",
+      "defaultBranch": "main",
+      "sourceRoot": "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\MetaPharoNexus",
+      "worktreesRoot": "worktrees/pharo-nexus",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/pharo-nexus.json"
+      },
+      "publication": {
+        "strategy": "direct_integration",
+        "remote": "origin",
+        "targetBranch": "main",
+        "push": true
+      },
+      "relationships": [
+        {
+          "kind": "extends",
+          "componentId": "dev-nexus"
+        },
+        {
+          "kind": "depends_on",
+          "componentId": "plexus"
+        }
+      ]
+    },
+    {
+      "id": "plexus",
+      "name": "PLexus",
+      "kind": "git",
+      "role": "dependency",
+      "remoteUrl": "git@github.com:Evref-BL/PLexus.git",
+      "defaultBranch": "main",
+      "sourceRoot": "C:\\dev\\code\\git\\PLexus",
+      "worktreesRoot": "worktrees/plexus",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/plexus.json"
+      },
+      "publication": {
+        "strategy": "direct_integration",
+        "remote": "origin",
+        "targetBranch": "main",
+        "push": true
+      },
+      "relationships": []
+    },
+    {
+      "id": "pharo-launcher-mcp",
+      "name": "pharo-launcher-mcp",
+      "kind": "git",
+      "role": "dependency",
+      "remoteUrl": "git@github.com:Evref-BL/pharo-launcher-mcp.git",
+      "defaultBranch": "main",
+      "sourceRoot": "C:\\dev\\code\\git\\MCP-PL",
+      "worktreesRoot": "worktrees/pharo-launcher-mcp",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/pharo-launcher-mcp.json"
+      },
+      "publication": {
+        "strategy": "direct_integration",
+        "remote": "origin",
+        "targetBranch": "main",
+        "push": true
+      },
+      "relationships": [
+        {
+          "kind": "related",
+          "componentId": "plexus"
+        }
+      ]
+    },
+    {
+      "id": "mcp-pharo",
+      "name": "MCP-Pharo",
+      "kind": "git",
+      "role": "dependency",
+      "remoteUrl": "https://github.com/Evref-BL/MCP.git",
+      "defaultBranch": "develop",
+      "sourceRoot": "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
+      "worktreesRoot": "worktrees/mcp-pharo",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/mcp-pharo.json"
+      },
+      "publication": {
+        "strategy": "review_handoff",
+        "remote": "origin",
+        "targetBranch": "develop",
+        "push": false
+      },
+      "relationships": [
+        {
+          "kind": "related",
+          "componentId": "pharo-nexus"
+        }
+      ]
+    }
+  ],
+  "mcp": {
+    "command": "node",
+    "args": [
+      "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus\\dist\\cli.js",
+      "mcp-stdio"
+    ],
+    "agentTargets": [
+      {
+        "agent": "codex"
+      },
+      {
+        "agent": "claude"
+      }
+    ]
+  },
+  "skills": {
+    "defaultCorePack": true,
+    "sourceControl": "support",
+    "agentTargets": [
+      {
+        "agent": "codex"
+      },
+      {
+        "agent": "claude"
+      }
+    ]
+  },
+  "automation": {
+    "enabled": true,
+    "mode": "agent_launch",
+    "selector": {
+      "statuses": [
+        "ready"
+      ],
+      "labels": [
+        "dogfood"
+      ],
+      "excludeLabels": [
+        "blocked",
+        "unsafe-live-runtime"
+      ],
+      "assignees": [],
+      "search": null,
+      "limit": 8
+    },
+    "verification": {
+      "focusedCommands": [],
+      "fullCommands": [],
+      "requirePassing": true
+    },
+    "ledger": {
+      "path": ".dev-nexus/automation/runs.json",
+      "retention": 200
+    },
+    "lock": {
+      "path": ".dev-nexus/automation/run.lock",
+      "staleAfterMs": 3600000
+    },
+    "backoff": {
+      "failureLimit": 3,
+      "baseDelayMs": 300000,
+      "maxDelayMs": 3600000
+    },
+    "schedule": {
+      "enabled": true,
+      "intervalMs": 900000
+    },
+    "setup": {
+      "dependencyLinks": []
+    },
+    "executor": {
+      "command": null,
+      "timeoutMs": null,
+      "runFullVerification": false
+    },
+    "agent": {
+      "command": null,
+      "timeoutMs": 2400000,
+      "coordinatorProfileId": "codex-5-5-xhigh",
+      "maxConcurrentSubagents": 3,
+      "profiles": [
+        {
+          "id": "codex-5-5-xhigh",
+          "executor": "codex",
+          "model": "gpt-5.5",
+          "reasoning": "xhigh",
+          "command": "C:\\Users\\gabriel.darbord\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe",
+          "args": [
+            "exec",
+            "--model",
+            "gpt-5.5",
+            "-c",
+            "model_reasoning_effort=xhigh",
+            "-c",
+            "approval_policy=never",
+            "--sandbox",
+            "danger-full-access",
+            "--cd",
+            "C:\\dev\\code\\dev-nexus-dogfood",
+            "--add-dir",
+            "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus",
+            "--add-dir",
+            "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\MetaPharoNexus",
+            "--add-dir",
+            "C:\\dev\\code\\git\\PLexus",
+            "--add-dir",
+            "C:\\dev\\code\\git\\MCP-PL",
+            "--add-dir",
+            "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
+            "--output-last-message",
+            ".dev-nexus\\automation\\last-codex-message.md",
+            "Use the DevNexus dogfood coordinator instructions in AGENTS.md. Read DEV_NEXUS_AGENT_CONTEXT_FILE, choose a safe bounded batch from eligible work items, update work items and target cycle records, and write JSON to DEV_NEXUS_AGENT_RESULT_FILE before exiting."
+          ]
+        },
+        {
+          "id": "codex-5-4-mini",
+          "executor": "codex",
+          "model": "gpt-5.4-mini",
+          "reasoning": "medium",
+          "command": "C:\\Users\\gabriel.darbord\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe",
+          "args": [
+            "exec",
+            "--model",
+            "gpt-5.4-mini",
+            "-c",
+            "approval_policy=never",
+            "--sandbox",
+            "workspace-write",
+            "--cd",
+            "C:\\dev\\code\\dev-nexus-dogfood",
+            "Read DEV_NEXUS_AGENT_CONTEXT_FILE and handle a small bounded verification or documentation work item."
+          ]
+        }
+      ],
+      "relaunch": {
+        "whileEligible": true
+      }
+    },
+    "target": {
+      "id": "dev-nexus-dogfood",
+      "objective": "Use DevNexus to drive work on itself and related components until the live plan is represented and advanced through component-owned work items.",
+      "statePath": ".dev-nexus/automation/target-state.md",
+      "cycleLedgerPath": ".dev-nexus/automation/target-cycles.json",
+      "stopWhenNoEligibleWork": true,
+      "maxCycles": 20,
+      "maxWorkItems": 60
+    },
+    "safety": {
+      "profile": "host-authorized",
+      "allowHostMutation": true,
+      "allowDependencyInstall": false,
+      "allowLiveServices": false
+    },
+    "publication": {
+      "strategy": "direct_integration",
+      "remote": "origin",
+      "targetBranch": "main",
+      "push": true
+    }
+  }
+}

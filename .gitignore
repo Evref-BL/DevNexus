@@ -1,0 +1,12 @@
+.dev-nexus/automation/agent-launches/
+.dev-nexus/automation/run.lock
+.dev-nexus/automation/runs.json
+.dev-nexus/automation/target-cycles.json
+.dev-nexus/work-items/
+.dev-nexus/skills/
+.agents/skills/
+.claude/skills/
+.codex/config.toml
+.mcp.json
+worktrees/
+components/
