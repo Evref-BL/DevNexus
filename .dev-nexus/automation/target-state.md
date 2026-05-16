@@ -10,9 +10,10 @@ Immediate direction:
   acceptance criteria, readiness labels, blockers, and safe verification notes.
 - DevNexus core result-file contract hardening and component worktree guidance
   were implemented and published as `95cec72`.
-- Next DevNexus core work should advance the remaining target-report/relaunch
-  readiness item, then continue into specialization alignment only after core
-  dogfood reliability remains green.
+- DevNexus core target-report/relaunch readiness was completed and published as
+  `1863d04`; focused target-report/CLI/MCP tests and the full check are green.
+- Next safe implementation work is the PharoNexus specialization alignment
+  item.
 - Runtime and image work stays planning-only until the isolated runner,
   disposable runtime boundary, and cleanup plan are explicit.
 
