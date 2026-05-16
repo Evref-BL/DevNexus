@@ -5,6 +5,9 @@
   "description": "Language-neutral project/work tracking and local execution core.",
   "license": "Apache-2.0",
   "type": "module",
+  "bin": {
+    "dev-nexus": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"

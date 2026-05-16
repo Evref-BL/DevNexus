@@ -1,0 +1,163 @@
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  createNexusAutomationCommandExecutor,
+  type NexusAutomationCommandRunner,
+} from "./nexusAutomationCommandExecutor.js";
+import {
+  defaultNexusAutomationConfig,
+  type NexusAutomationConfig,
+} from "./nexusAutomationConfig.js";
+import type { GitRunner } from "./gitWorktreeService.js";
+import type {
+  NexusAutomationExecutorInput,
+} from "./nexusAutomationRunOnce.js";
+
+function automationConfig(
+  overrides: Partial<NexusAutomationConfig> = {},
+): NexusAutomationConfig {
+  return {
+    ...defaultNexusAutomationConfig,
+    verification: {
+      ...defaultNexusAutomationConfig.verification,
+      focusedCommands: ["npm test"],
+      fullCommands: ["npm run check"],
+      requirePassing: true,
+    },
+    publication: {
+      ...defaultNexusAutomationConfig.publication,
+      strategy: "local_only",
+      targetBranch: "main",
+      push: false,
+    },
+    ...overrides,
+  };
+}
+
+function executorInput(config: NexusAutomationConfig): NexusAutomationExecutorInput {
+  return {
+    runId: "run-1",
+    startedAt: "2026-05-16T10:00:00.000Z",
+    projectRoot: path.resolve("project"),
+    sourceRoot: path.resolve("source"),
+    projectConfig: {
+      version: 1,
+      id: "demo-project",
+      name: "Demo Project",
+      home: null,
+      repo: {
+        kind: "git",
+        remoteUrl: null,
+        defaultBranch: "main",
+      },
+      worktreesRoot: "worktrees",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      automation: config,
+    },
+    automationConfig: config,
+    workItem: {
+      id: "local-1",
+      title: "Implement task",
+      provider: "local",
+      status: "ready",
+    },
+    worktree: {
+      sourceRoot: path.resolve("source"),
+      worktreesRoot: path.resolve("project", "worktrees"),
+      worktreePath: path.resolve("project", "worktrees", "task"),
+      branchName: "codex/demo/local-1/run-1",
+      baseRef: "main",
+      git: {
+        commands: [],
+      },
+    },
+  };
+}
+
+describe("nexus automation command executor", () => {
+  it("runs the executor command, focused and full verification, and records commits", async () => {
+    const commands: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commands.push(command);
+      expect(options.env.DEV_NEXUS_WORK_ITEM_ID).toBe("local-1");
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const gitRunner: GitRunner = (args, cwd) => {
+      expect(cwd).toBe(path.resolve("project", "worktrees", "task"));
+      return {
+        args: [...args],
+        stdout: "abc123\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const config = automationConfig();
+    const executor = createNexusAutomationCommandExecutor({
+      command: "node task.js",
+      commandRunner,
+      gitRunner,
+      runFullVerification: true,
+    });
+
+    const result = await executor(executorInput(config));
+
+    expect(commands).toEqual(["node task.js", "npm test", "npm run check"]);
+    expect(result).toMatchObject({
+      status: "completed",
+      commitIds: ["abc123"],
+      publicationDecision: {
+        type: "local_only",
+        targetBranch: "main",
+      },
+    });
+    expect(result.verification).toHaveLength(3);
+  });
+
+  it("fails without running verification when the executor command fails", async () => {
+    const commands: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commands.push(command);
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "",
+        stderr: "boom",
+        exitCode: 2,
+      };
+    };
+    const executor = createNexusAutomationCommandExecutor({
+      command: "node task.js",
+      commandRunner,
+      gitRunner: () => ({
+        args: [],
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      }),
+    });
+
+    const result = await executor(executorInput(automationConfig()));
+
+    expect(commands).toEqual(["node task.js"]);
+    expect(result.status).toBe("failed");
+    expect(result.publicationDecision).toMatchObject({
+      type: "blocked",
+    });
+    expect(result.verification).toEqual([
+      {
+        command: "node task.js",
+        status: "failed",
+        summary: "exit 2: boom",
+      },
+    ]);
+  });
+});

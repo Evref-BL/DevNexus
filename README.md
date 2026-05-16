@@ -24,3 +24,16 @@ tracker, preflights tracker and Git worktree requirements, prepares a
 branch-backed worktree, invokes an injected executor, records execution
 metadata under the worktree support directory, appends the run ledger, and
 updates the tracker with conservative status and comments.
+
+The package also ships a generic `dev-nexus` CLI for the same boundary:
+
+```bash
+dev-nexus work-item create <project-root> --title "Implement task" --status ready --label automation
+dev-nexus work-item list <project-root> --status ready
+dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
+```
+
+`automation run-once` runs the command in the prepared worktree, exposes
+`DEV_NEXUS_*` environment variables for the selected work item and worktree,
+runs configured focused verification commands, records new commits relative to
+the base ref when available, and writes the normal retained run ledger.
