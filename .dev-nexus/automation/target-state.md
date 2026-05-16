@@ -19,6 +19,8 @@ Immediate direction:
   infrastructure; PharoNexus is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
   - `dev-nexus:local-13` add the generic plugin capability/projection contract.
+  - `dev-nexus:local-14` add shared coordination status and handoff records for
+    Mac/Windows parallel work without hard locks.
   - `plexus:local-8` expose scoped PLexus project context for DevNexus plugins.
 - Dependent non-eligible plugin work:
   - `pharo-nexus:local-4` model PharoNexus as the Pharo plugin for DevNexus
@@ -26,6 +28,12 @@ Immediate direction:
     stable.
   - `pharo-launcher-mcp:local-3` confirm launcher image delete/status contract
     only if PLexus identifies a concrete launcher-side cleanup gap.
+- Dependent non-eligible shared coordination work:
+  - `dev-nexus:local-15` add shared coordination integration planning after
+    status and handoff records exist.
+- Human-in-the-loop shared coordination decision:
+  - `dev-nexus:local-16` choose the real shared tracker/provider and Tailscale
+    transport role for Mac/Windows dogfood.
 - Blocked plugin/live verification work:
   - `pharo-nexus:local-5` verify that subagents receive direct Pharo MCP access
     through PharoNexus-provided scoped PLexus setup.
@@ -35,6 +43,8 @@ Immediate direction:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
 - Human-in-the-loop blocked work:
+  - `dev-nexus:local-16` choose shared coordination provider/transport for
+    Mac/Windows dogfood after the generic API shape is ready.
   - `plexus:local-3` build the approved isolated PLexus live-smoke runner
     harness after runner inputs and cleanup policy are approved.
   - `plexus:local-2` run the approved isolated PLexus live-smoke.
@@ -60,6 +70,18 @@ Vibe backlog reconciliation:
   - `mcp-pharo:local-5` isolated local SmalltalkCI runner documentation.
 - Folded Vibe worker/provider reliability evidence into `dev-nexus:local-10`
   instead of creating new work that depends on Vibe implementation workers.
+
+Shared coordination planning:
+
+- Added `docs/shared-multi-host-coordination-prd.md` to define the feature.
+- The planned coordination API is intentionally small:
+  `coordination_status`, `coordination_handoff`, and
+  `coordination_integrate`.
+- Git worktrees and branches remain the parallelism mechanism. Coordination
+  records are shared intent and handoff facts, not hard locks.
+- Durable multi-host state should live in Git remotes and the shared work
+  tracker. Tailscale can provide private MCP transport, but should not be the
+  only source of truth.
 
 Durable completed foundation:
 

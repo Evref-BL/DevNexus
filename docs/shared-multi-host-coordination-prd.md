@@ -1,0 +1,200 @@
+# Shared Multi-Host Coordination Product Requirements Document (PRD)
+
+## Problem
+
+Mac and Windows agents can use Git worktrees and branches for parallel work,
+but they currently do not share enough intent. The painful moment is
+integration: one machine has to merge changes while its agent does not know the
+other machine's current design direction, branch state, verification evidence,
+or preferred merge order.
+
+Hard locks would reduce parallelism and work against the value of worktrees.
+The feature should preserve parallel work while making handoff and integration
+state durable, shared, and easy for agents to consume.
+
+## Goals
+
+- Make the agent-facing Application Programming Interface (API) extremely
+  small.
+- Avoid hard locks by default.
+- Let agents keep working in separate worktrees and branches.
+- Make shared work-item intent, handoffs, branch state, and merge decisions the
+  durable source of truth.
+- Automate discovery: infer host, component, work item, branch, commits,
+  changed areas, pushed state, related branches, verification, and conflicts
+  whenever possible.
+- Support Mac and Windows as peers without choosing one permanent integration
+  machine.
+- Keep transport replaceable: Git remotes and the shared work tracker are the
+  durable state; Tailscale can expose a private DevNexus coordination MCP for
+  faster direct access.
+
+## Non-Goals
+
+- No mandatory hard work locks or exclusive leases in the first version.
+- No freeform chat as the primary source of truth.
+- No automatic semantic conflict resolution.
+- No live Pharo image, PLexus, Docker, or host process work as part of this
+  generic coordination feature.
+- No shared absolute source paths, tool binary paths, runtime ports, secrets,
+  logs, or worktrees in the portable project definition.
+
+## Users
+
+- A Mac coordinator or worker agent advancing a component work item.
+- A Windows coordinator or worker agent advancing a related component work
+  item.
+- An integration agent that must merge branches from either host using the
+  current shared vision instead of stale local context.
+- A human reviewing the current multi-host state.
+
+## Dumb API
+
+The DevNexus MCP and CLI should expose three high-level operations. Required
+arguments should be minimal; the tool should infer the rest from the current
+project, worktree, Git branch, shared tracker, and target state.
+
+### `coordination_status`
+
+Read-only by default.
+
+Inputs:
+
+- Optional component or work item scope.
+
+Automation:
+
+- Fetch configured remotes when policy allows.
+- Identify current host, component, worktree, branch, base ref, and dirty state.
+- Read shared work items and recent handoffs.
+- Detect related active branches by work item, component, changed area, and
+  target cycle facts.
+- Report stale handoffs, unpushed local commits, missing upstream branches, and
+  likely integration order.
+- Return the smallest useful next action for the current agent.
+
+### `coordination_handoff`
+
+Records what the current agent wants the next agent to know.
+
+Inputs:
+
+- Optional work item.
+- Optional status: `working`, `ready`, `blocked`, or `merged`.
+- Optional note.
+
+Automation:
+
+- Infer component, work item, host id, agent id, branch, base ref, head commit,
+  changed paths, changed packages, pushed/unpushed state, and recent verification
+  evidence.
+- Push a non-protected handoff branch when project policy explicitly allows it.
+- Write a structured handoff record to the shared work tracker.
+- Attach concise branch and verification facts to the work item.
+- Suggest related work items or branches that should integrate before or after
+  this branch.
+
+### `coordination_integrate`
+
+Plans integration, and later can apply it when explicitly allowed by policy.
+
+Inputs:
+
+- Optional work item, branch, or target branch.
+
+Automation:
+
+- Fetch configured remotes.
+- Gather branches and handoffs related to the work item or target.
+- Run conflict forecasts using Git merge-base, merge-tree or an equivalent
+  temporary worktree trial merge, and range-diff where useful.
+- Read recorded decisions and verification notes before suggesting merge
+  direction.
+- Produce an integration plan with clean merges, conflicts, affected files,
+  competing decisions, suggested order, and verification commands.
+- Create an integration work item or integration branch only when configured
+  policy allows mutation.
+
+## Shared Data Model
+
+Coordination records should be tracker-backed and portable. A record should be
+small enough to fit naturally in a work-item comment or provider metadata.
+
+Fields:
+
+- Project id and component id.
+- Work item reference.
+- Host id and optional agent id.
+- Status: `working`, `ready`, `blocked`, `merged`, or `stale`.
+- Branch name, base ref, head commit, upstream, and pushed state.
+- Changed areas summarized from Git paths and known package/component roots.
+- Decisions and assumptions stated by the agent.
+- Verification commands and outcomes.
+- Related branches or work items.
+- Integration preference, when known.
+- Created and updated timestamps.
+
+Freshness is advisory. A stale record means "check before trusting" rather than
+"blocked from working."
+
+## Source Of Truth
+
+- Git remotes hold source branches and integration branches.
+- The shared work tracker holds work intent, handoffs, decisions, and
+  integration records.
+- The portable DevNexus project repo holds logical project configuration,
+  plugin declarations, shared plans, and policy defaults.
+- Host-local DevNexus overlays hold absolute paths, local command paths,
+  runtime ports, and secrets.
+- Tailscale may expose private MCP endpoints between machines, but durable
+  coordination must survive either machine being offline.
+
+## User Stories
+
+- As a Windows agent, I can run coordination status before editing and see that
+  the Mac agent has a related parser branch with a decision that should land
+  first.
+- As a Mac agent, I can run coordination handoff at the end of a turn and have
+  DevNexus record my branch, commits, changed areas, verification, and design
+  notes without hand-writing a long comment.
+- As an integration agent, I can run coordination integrate and get a merge
+  plan that includes both Mac and Windows branches, likely conflicts, intended
+  merge order, and the work-item decisions that explain why.
+- As a human, I can inspect one shared work item and understand current work
+  across both machines.
+
+## Implementation Decisions
+
+- DevNexus owns the generic coordination API.
+- Shared trackers are the preferred backing store. GitHub Issues or another
+  shared provider should be used for real multi-host operation; local JSON is
+  acceptable for dogfood only.
+- Branch naming should remain conventional rather than enforced by locks. The
+  tool should recognize host/item hints when present.
+- The first implementation should be read-mostly: status and handoff are safe
+  before integration mutation exists.
+- Integration mutation should be gated by project policy and should start with
+  integration plans before automatic merges.
+
+## Testing Decisions
+
+- Unit-test host/worktree/component inference with Windows and POSIX-style
+  paths.
+- Unit-test handoff record generation from mocked Git state and work tracker
+  state.
+- Unit-test stale record detection without treating stale state as a lock.
+- Unit-test integration planning against synthetic branches with clean merges,
+  textual conflicts, and diverging decisions.
+- Add CLI and MCP coverage for the three high-level operations.
+- Avoid live network, Tailscale, or external tracker dependencies in core tests;
+  use provider mocks.
+
+## Open Questions
+
+- Which shared tracker should be first for real Mac/Windows dogfood: GitHub
+  Issues, GitHub Projects, or a lightweight DevNexus coordination service?
+- Should handoff branch push be automatic for feature branches, or require
+  explicit project policy per component?
+- How should host identity be named when multiple agents run on one host?
+- Should integration planning create a tracker item automatically when
+  conflicts are detected, or only suggest one?

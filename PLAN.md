@@ -60,6 +60,31 @@ The intended Pharo agent setup is:
   MCP-Pharo should use the Pharo MCP directly, not edit Smalltalk source files
   from disk as a substitute for image-side work.
 
+## Shared Coordination Direction
+
+Mac and Windows agents should be able to work in parallel using Git worktrees
+and branches without hard locks. The shared source of truth should be work-item
+intent, structured handoffs, pushed branches, and explicit integration records.
+
+The agent-facing coordination API should stay deliberately small:
+
+- `coordination_status` reports current host/worktree/branch state, related
+  active work, unpushed commits, stale handoffs, and likely next action.
+- `coordination_handoff` records the current agent's branch, commits, changed
+  areas, decisions, verification, and intended merge direction with minimal
+  user-authored input.
+- `coordination_integrate` fetches related branches, forecasts conflicts,
+  reads handoff decisions, and produces an integration plan before any
+  configured mutation.
+
+The tool should infer as much as possible from Git, the DevNexus component
+graph, target cycle facts, and the shared work tracker. Tailscale may expose a
+private DevNexus coordination MCP between machines, but durable coordination
+must live in Git remotes and the shared tracker so either machine can go
+offline.
+
+See `docs/shared-multi-host-coordination-prd.md` for the feature plan.
+
 ## Dependency Direction
 
 Keep project knowledge flowing downward:
@@ -160,35 +185,39 @@ Priority candidates:
 4. Verify that a subagent in a component worktree receives direct Pharo MCP
    access through PharoNexus-provided setup before resuming MCP-Pharo source
    items.
-5. Decide MCP-Pharo publication path for `0a38755`: keep it as local review
+5. Add shared multi-host coordination status and handoff records so Mac and
+   Windows agents can publish current branch intent without hard locks.
+6. Add shared coordination integration planning so either host can merge with
+   visibility into the other host's current design direction.
+7. Decide MCP-Pharo publication path for `0a38755`: keep it as local review
    handoff, push a review branch, or publish it to `develop` after the needed
    review.
-6. Split the remaining DevNexus plan into component-owned local work items,
+8. Split the remaining DevNexus plan into component-owned local work items,
    with each item carrying readiness, blocker, acceptance, verification, and
    publication notes.
-7. Implement coordinator/subagent dispatch semantics so a coordinator can
+9. Implement coordinator/subagent dispatch semantics so a coordinator can
    launch one subagent per selected work item, obey a configured subagent cap,
    and keep work-item progress visible.
-8. Add or harden DevNexus worktree-parallel support for multi-component
+10. Add or harden DevNexus worktree-parallel support for multi-component
    targets, including component-scoped generated worktrees and clear ownership
    records.
-9. Improve target observability and final reporting so DevNexus can produce a
+11. Improve target observability and final reporting so DevNexus can produce a
    factual JSON report for target completion, active blockers, per-component
    progress, commits, verification, and publication decisions.
-10. Improve the generic MCP/CLI surface for agent use: simple project status,
+12. Improve the generic MCP/CLI surface for agent use: simple project status,
    target report, eligible work listing, work-item update/comment, cycle
    record, and agent profile inspection should be obvious and low-token.
-11. Expand work tracker support beyond the local provider when needed:
+13. Expand work tracker support beyond the local provider when needed:
    GitHub Issues, GitHub Projects, GitLab Issues, Jira, and Vibe Kanban should
    all map to neutral component work items without forcing one project equals
    one repository.
-12. Harden agent profile configuration for Codex and Claude, including model,
+14. Harden agent profile configuration for Codex and Claude, including model,
    version, reasoning or intelligence level, sandbox/safety policy, and
    per-target subagent caps.
-13. Before live PLexus, launcher, Docker, or image work, define and approve the
+15. Before live PLexus, launcher, Docker, or image work, define and approve the
    isolated runner, disposable image/runtime boundary, timeout budget, artifact
    retention, process ownership, cleanup sequence, and failure policy.
-14. Once the dogfood loop is reliable, create a fresh production-quality
+16. Once the dogfood loop is reliable, create a fresh production-quality
     DevNexus project shape from this evidence instead of carrying forward
     historical staging-project clutter.
 
