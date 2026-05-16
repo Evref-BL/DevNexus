@@ -557,6 +557,15 @@ describe("project config", () => {
                 targetAgents: ["codex"],
                 targetComponents: ["core"],
               },
+              {
+                kind: "dependency_projection",
+                id: "node-modules",
+                source: "node_modules",
+                target: "node_modules",
+                targetAgents: ["codex"],
+                targetComponents: ["core"],
+                reason: "Reuse installed package dependencies in generated workers.",
+              },
             ],
           },
           {
@@ -631,6 +640,17 @@ describe("project config", () => {
             targetAgents: ["codex"],
             targetComponents: ["core"],
           },
+          {
+            kind: "dependency_projection",
+            id: "node-modules",
+            source: "node_modules",
+            target: "node_modules",
+            required: false,
+            sourceControl: "support",
+            targetAgents: ["codex"],
+            targetComponents: ["core"],
+            reason: "Reuse installed package dependencies in generated workers.",
+          },
         ],
       },
       {
@@ -673,6 +693,76 @@ describe("project config", () => {
         ],
       },
     ]);
+  });
+
+  it("rejects invalid plugin dependency projection config", () => {
+    const configWithDependencyProjection = (
+      projection: Record<string, unknown>,
+    ) => ({
+      version: 1,
+      id: "plugin-project",
+      name: "Plugin Project",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      plugins: [
+        {
+          id: "typescript-tools",
+          capabilities: [
+            {
+              kind: "dependency_projection",
+              id: "node-modules",
+              source: "node_modules",
+              target: "node_modules",
+              ...projection,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDependencyProjection({
+          source: "",
+        }),
+      ),
+    ).toThrow(/project config\.plugins\[0\]\.capabilities\[0\]\.source/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDependencyProjection({
+          source: "C:\\dev\\node_modules",
+        }),
+      ),
+    ).toThrow(/source must be a project-relative path/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDependencyProjection({
+          source: "packages/../node_modules",
+        }),
+      ),
+    ).toThrow(/source must be a project-relative path/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDependencyProjection({
+          target: "../node_modules",
+        }),
+      ),
+    ).toThrow(/target must be a project-relative path/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDependencyProjection({
+          sourceControl: "tracked",
+        }),
+      ),
+    ).toThrow(
+      /project config\.plugins\[0\]\.capabilities\[0\]\.sourceControl/,
+    );
   });
 
   it("rejects invalid project and work tracking config", () => {
