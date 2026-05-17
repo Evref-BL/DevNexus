@@ -22,6 +22,9 @@ Immediate direction:
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
+  - `dev-nexus-pharo:local-9` bundle MCP-Pharo domain skills through
+    DevNexus-Pharo so Pharo-capable subagents receive CI reproduction, image
+    Git handoff, project load, and Pharo version compatibility guidance.
 - Runtime setup is now approved through
   `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
   Docker/Podman compatibility checks, local dependency repair, and isolated
