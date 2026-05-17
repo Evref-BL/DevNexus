@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 14,
-  "nextCommentNumber": 31,
-  "updatedAt": "2026-05-17T16:32:28.806Z",
+  "nextNumber": 22,
+  "nextCommentNumber": 37,
+  "updatedAt": "2026-05-17T20:54:24.961Z",
   "items": [
     {
       "id": "local-1",
@@ -315,6 +315,205 @@
         "provider": "local",
         "itemId": "local-13",
         "itemNumber": 13
+      }
+    },
+    {
+      "id": "local-14",
+      "title": "Slice project-scoped PLexus runtime PRD into implementation work",
+      "description": "Product Requirements Document (PRD) created at docs/plexus-project-scoped-runtime-prd.md. Goal: slice project-first runtime configuration, host-local port coordination, project-local gateway setup, clean Codex config generation, legacy gateway alias removal, diagnostics, and live-smoke coverage into implementation issues. This planning item should be handled with the to-issues workflow before implementation.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "prd",
+        "plexus-runtime",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:26:20.584Z",
+      "updatedAt": "2026-05-17T20:31:53.270Z",
+      "closedAt": "2026-05-17T20:31:53.270Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-14",
+        "itemNumber": 14
+      }
+    },
+    {
+      "id": "local-15",
+      "title": "Model project-scoped PLexus runtime policy",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nGoal:\nAdd an explicit PLexus runtime policy to project configuration so project-local lifecycle state is the default, zero-image projects remain valid, and shared gateway mode is an intentional advanced configuration instead of accidental mixed state.\n\nAcceptance criteria:\n- PLexus project configuration can express runtime scope, gateway mode, state-root behavior, and image port allocation policy without relying on legacy defaults.\n- Existing project configs load through migration/defaulting without user-visible breakage.\n- A project with no images validates as operational but idle, not removable or broken.\n- Invalid combinations, such as shared gateway mode without required endpoint details, fail with actionable diagnostics.\n- Tests cover defaults, migration from current config shape, invalid policies, and zero-image projects.\n\nVerification:\nRun the relevant plexus-core unit tests and a focused config validation check.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "project-config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:18.707Z",
+      "updatedAt": "2026-05-17T20:54:19.793Z",
+      "closedAt": "2026-05-17T20:53:53.104Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-15",
+        "itemNumber": 15
+      }
+    },
+    {
+      "id": "local-16",
+      "title": "Add host-local port claim service",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15.\n\nGoal:\nIntroduce a narrow host-local resource coordinator for TCP port claims so multiple PLexus projects and sibling workspaces can avoid collisions without creating machine-shared project state.\n\nAcceptance criteria:\n- A small claim API can claim, release, inspect, and reap stale port reservations.\n- Claim records include enough metadata to diagnose ownership: project path or id, workspace or target id, purpose, requested port or range, process id when available, and timestamp.\n- Concurrent claim attempts for the same port resolve deterministically.\n- Stale claims are detected without treating them as authoritative when the host listener state disagrees.\n- Tests cover concurrent claims, stale owner cleanup, inspection output, and release-on-success paths.\n\nVerification:\nRun focused plexus-core tests for the port claim module, including a concurrency test.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "port-coordination",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:18.803Z",
+      "updatedAt": "2026-05-17T20:54:24.961Z",
+      "closedAt": "2026-05-17T20:53:53.114Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-16",
+        "itemNumber": 16
+      }
+    },
+    {
+      "id": "local-17",
+      "title": "Use port claims for image MCP allocation",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-16.\n\nGoal:\nUpdate image Model Context Protocol (MCP) port assignment so independent PLexus projects on the same host and sibling workspaces for the same project do not collide.\n\nAcceptance criteria:\n- Dynamic image MCP port allocation consults project-local workspace state, the host-local claim service, and actual listener checks.\n- Fixed-port image configuration is honored only when the port is free or already owned by the same compatible target.\n- Fixed-port collisions fail before opening an image, with a diagnostic naming the project, image, port, and conflicting owner when known.\n- Project close and failed-open rollback release claims created during that lifecycle operation.\n- Tests cover separate state roots, sibling workspace state, occupied host ports, fixed-port conflicts, and failed-open cleanup.\n\nVerification:\nRun plexus-core lifecycle tests that open synthetic projects with overlapping port ranges.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "port-allocation",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:18.899Z",
+      "updatedAt": "2026-05-17T20:53:53.107Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-17",
+        "itemNumber": 17
+      }
+    },
+    {
+      "id": "local-18",
+      "title": "Model project-local gateway deployment",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-16.\n\nGoal:\nMake project-local gateway deployment the default PLexus behavior while preserving an explicit shared-gateway mode for advanced setups.\n\nAcceptance criteria:\n- Runtime policy records gateway mode, host, port or port range, route path, and control path.\n- Project-local gateway startup claims and validates its port before launch.\n- Shared-gateway mode never starts a second gateway process; it only registers routes with the configured external gateway.\n- PLexus status reports gateway mode, endpoint, control endpoint, owning project, and whether the process is managed by this project.\n- Tests cover project-local startup, shared-gateway route registration, occupied gateway port diagnostics, and close cleanup.\n\nVerification:\nRun focused gateway lifecycle tests and status-format tests.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "gateway",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:18.994Z",
+      "updatedAt": "2026-05-17T20:53:53.111Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-18",
+        "itemNumber": 18
+      }
+    },
+    {
+      "id": "local-19",
+      "title": "Improve PLexus runtime diagnostics",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-16, plexus:local-17, plexus:local-18.\n\nGoal:\nMake split-brain and mixed-state situations visible from PLexus status, and report fresh no-image projects as healthy idle runtime scopes.\n\nAcceptance criteria:\n- Project status reports state root, target id, workspace id, gateway endpoint, control endpoint, image MCP ports, and active port claims.\n- Diagnostics identify conflicting listeners and stale claims separately.\n- Route table state is visible enough to tell whether the gateway can route a configured image.\n- Legacy gateway or legacy MCP configuration is called out with migration guidance.\n- Zero-image projects report operational-but-idle when their runtime policy and gateway state are valid.\n\nVerification:\nRun status/diagnostics tests and capture one local status sample for a zero-image project.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "diagnostics",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:19.095Z",
+      "updatedAt": "2026-05-17T20:31:19.095Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-19",
+        "itemNumber": 19
+      }
+    },
+    {
+      "id": "local-20",
+      "title": "Gate and remove legacy gateway compatibility",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-18, dev-nexus-pharo:local-13.\n\nGoal:\nRemove the old PLexus gateway compatibility surface deliberately, after the new project-scoped gateway setup is in place and current projects have migration guidance.\n\nAcceptance criteria:\n- New generated configs no longer emit legacy pharo or combined gateway server names.\n- The compatibility phase emits warnings with exact replacement configuration names and endpoint paths.\n- The removal phase requires an explicit decision before deleting support for legacy gateway environment variables and old route paths.\n- Final removal rejects legacy config with migration guidance rather than silently falling back.\n- Tests cover warning mode, compatibility-flag behavior, and final rejection behavior.\n\nVerification:\nRun gateway config tests in warning mode and, after human approval, in removal mode.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "legacy-cleanup",
+        "gateway",
+        "hitl",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:19.289Z",
+      "updatedAt": "2026-05-17T20:31:19.289Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-20",
+        "itemNumber": 20
+      }
+    },
+    {
+      "id": "local-21",
+      "title": "Run multi-project PLexus live smoke",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-17, plexus:local-18, plexus:local-19, dev-nexus-pharo:local-13.\n\nGoal:\nProve the new project-scoped PLexus design in a real host scenario with two projects and sibling workspaces, using approved live-runtime inputs.\n\nAcceptance criteria:\n- An approved live runner opens two separate PLexus projects at the same time without gateway or image MCP port collisions.\n- The runner also opens sibling workspaces for one project and verifies that ports remain unique.\n- Route-control registration and gateway calls reach the intended Pharo image routes.\n- Status output clearly distinguishes project-local gateway ownership, shared gateway mode if used, image route table state, and port claims.\n- Cleanup removes routes, managed gateway processes, image processes, temporary images if created, and port claims.\n\nVerification:\nRun the live smoke only after the user approves the runtime targets and cleanup boundary.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-runtime",
+        "unsafe-live-runtime",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:19.385Z",
+      "updatedAt": "2026-05-17T20:31:19.385Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-21",
+        "itemNumber": 21
       }
     }
   ],
@@ -673,6 +872,83 @@
           "itemId": "local-comment-26"
         }
       }
-    ]
+    ],
+    "local-14": [
+      {
+        "id": "local-comment-31",
+        "body": "Created project-scoped PLexus runtime implementation issues from docs/plexus-project-scoped-runtime-prd.md.\n\nCreated items:\n- plexus:local-15: Model project-scoped PLexus runtime policy\n- plexus:local-16: Add host-local port claim service\n- plexus:local-17: Use port claims for image MCP allocation\n- plexus:local-18: Model project-local gateway deployment\n- plexus:local-19: Improve PLexus runtime diagnostics\n- dev-nexus-pharo:local-13: Generate clean DevNexus-Pharo Codex setup per project\n- plexus:local-20: Gate and remove legacy gateway compatibility\n- plexus:local-21: Run multi-project PLexus live smoke\n\nDependency shape:\n- plexus:local-15 is ready as the first implementation item.\n- plexus:local-16, plexus:local-17, plexus:local-18, plexus:local-19, dev-nexus-pharo:local-13, and plexus:local-20 are sequenced follow-up work.\n- plexus:local-21 stays blocked until the live-runtime smoke boundary is approved.",
+        "author": null,
+        "createdAt": "2026-05-17T20:31:19.488Z",
+        "updatedAt": "2026-05-17T20:31:19.488Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-31"
+        }
+      }
+    ],
+    "local-15": [
+      {
+        "id": "local-comment-32",
+        "body": "Started in isolated PLexus worktree /Users/gabriel/dev-nexus/dev-nexus-dogfood/worktrees/plexus/plexus-local-15-runtime-policy on branch codex/plexus/local-15-runtime-policy. Ownership: runtime policy and project configuration model in plexus-core.",
+        "author": null,
+        "createdAt": "2026-05-17T20:36:48.215Z",
+        "updatedAt": "2026-05-17T20:36:48.215Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-32"
+        }
+      },
+      {
+        "id": "local-comment-35",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: lses-MBP-4.lan\nBranch: main\nHead: 8a8b40774c7a79a6f9ca219e8ae0a6658a840434\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T20:54:19.789Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-15\",\n  \"hostId\": \"lses-MBP-4.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel/dev-nexus/sources/plexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"8a8b40774c7a79a6f9ca219e8ae0a6658a840434\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/projectConfig.ts\",\n    \"packages/plexus-core/src/projectState.ts\",\n    \"packages/plexus-core/src/projectOpen.ts\"\n  ],\n  \"decisions\": [\n    \"Published project-scoped runtime policy to PLexus main in commit 75b6bc4; integrated with port claims and pushed through 8a8b407.\"\n  ],\n  \"verificationSummary\": \"npm run typecheck --workspaces passed; npm test passed: core 93 tests, gateway 30 tests, smoke-policy 7 tests.\",\n  \"integrationPreference\": \"Already merged and pushed to origin/main.\",\n  \"note\": \"Direct integration published to Evref-BL/PLexus main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T20:54:19.793Z",
+        "updatedAt": "2026-05-17T20:54:19.793Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-35"
+        }
+      }
+    ],
+    "local-16": [
+      {
+        "id": "local-comment-33",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: lses-MBP-4.lan\nBranch: codex/plexus/local-16-port-claims\nHead: c24c739b0430e5f07cb6564f1bd940bfab332f9d\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T20:37:53.625Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-16\",\n  \"hostId\": \"lses-MBP-4.lan\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood/worktrees/plexus/plexus-local-16-port-claims\",\n  \"branch\": \"codex/plexus/local-16-port-claims\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"c24c739b0430e5f07cb6564f1bd940bfab332f9d\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/portClaims.ts\",\n    \"packages/plexus-core/src/portClaims.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Parallel worker started for standalone host-local port claim service in isolated worktree.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T20:37:53.628Z",
+        "updatedAt": "2026-05-17T20:37:53.628Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-33"
+        }
+      },
+      {
+        "id": "local-comment-34",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: lses-MBP-4.lan\nBranch: codex/plexus/local-16-port-claims\nHead: 47111386524f776ea9492c7ec13d2f914b4f2a91\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T20:51:16.777Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-16\",\n  \"hostId\": \"lses-MBP-4.lan\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood/worktrees/plexus/plexus-local-16-port-claims\",\n  \"branch\": \"codex/plexus/local-16-port-claims\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"47111386524f776ea9492c7ec13d2f914b4f2a91\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/portClaims.ts\",\n    \"packages/plexus-core/src/portClaims.test.ts\"\n  ],\n  \"decisions\": [\n    \"Added standalone filesystem-backed host-local port claim API using atomic per-port directories; lifecycle allocation wiring remains for plexus:local-17.\"\n  ],\n  \"verificationSummary\": \"npm run typecheck -w @evref-bl/plexus-core passed; npm run test -w @evref-bl/plexus-core -- portClaims.test.ts passed: 7 tests.\",\n  \"integrationPreference\": \"Merge after runtime-policy branch; files are disjoint except package export.\",\n  \"note\": \"Worker branch committed as 4711138 with coordinator cleanup fix for withPortClaim finally release.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T20:51:16.782Z",
+        "updatedAt": "2026-05-17T20:51:16.782Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-34"
+        }
+      },
+      {
+        "id": "local-comment-36",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: lses-MBP-4.lan\nBranch: main\nHead: 8a8b40774c7a79a6f9ca219e8ae0a6658a840434\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T20:54:24.960Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-16\",\n  \"hostId\": \"lses-MBP-4.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel/dev-nexus/sources/plexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"8a8b40774c7a79a6f9ca219e8ae0a6658a840434\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/portClaims.ts\",\n    \"packages/plexus-core/src/portClaims.test.ts\"\n  ],\n  \"decisions\": [\n    \"Published standalone host-local port claim service to PLexus main in commit 8a8b407; lifecycle/image allocation wiring remains for plexus:local-17.\"\n  ],\n  \"verificationSummary\": \"npm run typecheck --workspaces passed; npm test passed: core 93 tests, gateway 30 tests, smoke-policy 7 tests.\",\n  \"integrationPreference\": \"Already merged and pushed to origin/main.\",\n  \"note\": \"Direct integration published to Evref-BL/PLexus main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T20:54:24.961Z",
+        "updatedAt": "2026-05-17T20:54:24.961Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-36"
+        }
+      }
+    ],
+    "local-17": [],
+    "local-18": [],
+    "local-19": [],
+    "local-20": [],
+    "local-21": []
   }
 }

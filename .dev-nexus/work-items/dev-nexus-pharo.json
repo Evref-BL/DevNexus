@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 13,
+  "nextNumber": 14,
   "nextCommentNumber": 28,
-  "updatedAt": "2026-05-17T20:47:08.980Z",
+  "updatedAt": "2026-05-17T20:56:34.452Z",
   "items": [
     {
       "id": "local-1",
@@ -294,6 +294,32 @@
         "provider": "local",
         "itemId": "local-12",
         "itemNumber": 12
+      }
+    },
+    {
+      "id": "local-13",
+      "title": "Generate clean DevNexus-Pharo Codex setup per project",
+      "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-18.\n\nGoal:\nUpdate the DevNexus-Pharo setup path so each managed Codex project receives clean project-scoped PLexus configuration, project-local gateway settings, and the expected Pharo skills and Model Context Protocol (MCP) tools without deleting fresh zero-image PLexus projects.\n\nAcceptance criteria:\n- Generated Codex configuration preserves unrelated MCP entries while adding or updating the PLexus project, Pharo Launcher, route-control, and gateway entries needed for the project.\n- Generated project-local gateway ports are unique by policy and validated before being written.\n- Existing project images and image execution settings are preserved during config regeneration.\n- A fresh project with no images keeps its PLexus files and reports as ready for future Pharo work.\n- Tests cover config merge behavior, unique gateway port assignment, zero-image preservation, and migration from the current home-scoped DevNexus-Pharo config shape.\n\nVerification:\nRun the DevNexus-Pharo unit tests that exercise Codex/MCP config generation and extension install/update flows.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugin",
+        "mcp",
+        "plexus-runtime",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:31:19.193Z",
+      "updatedAt": "2026-05-17T20:31:19.193Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-13",
+        "itemNumber": 13
       }
     }
   ],
@@ -618,6 +644,7 @@
           "itemId": "local-comment-27"
         }
       }
-    ]
+    ],
+    "local-13": []
   }
 }

@@ -42,13 +42,26 @@ Immediate direction:
   the stdio MCP transport no longer recursively reprocesses incomplete split
   frames. Direct project-root probe of `dev-nexus.cmd mcp-stdio` returns 24
   tools with empty stderr.
-- Current ready `dogfood` work matching the automation selector after that
-  repair:
+- Project-scoped PLexus runtime work is now active from
+  `docs/plexus-project-scoped-runtime-prd.md`:
+  - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
+    It adds normalized runtime policy defaults/validation, zero-image idle
+    runtime state, external state-root policy support, and config-driven image
+    port ranges.
+  - `plexus:local-16` is complete and published through PLexus `8a8b407`.
+    It adds the standalone host-local port claim service; image lifecycle
+    wiring remains intentionally separate.
+  - `plexus:local-17` and `plexus:local-18` are now ready as the next safe
+    parallel PLexus wave.
+- Current ready `dogfood` work matching the automation selector after the MCP
+  repair and PLexus runtime wave:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
   - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
     installs so registry delay or partial installs become setup-owned
     diagnostics instead of worker surprises.
+  - `plexus:local-17` use port claims for image MCP allocation.
+  - `plexus:local-18` model project-local gateway deployment.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
