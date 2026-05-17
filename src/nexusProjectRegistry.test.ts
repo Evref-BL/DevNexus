@@ -49,6 +49,38 @@ function projectConfig(id: string, name: string) {
   };
 }
 
+const localWorkTrackingCapabilities = {
+  createItem: true,
+  listItems: true,
+  getItem: true,
+  updateItem: true,
+  comment: true,
+  labels: true,
+  assignees: true,
+  milestones: true,
+  board: false,
+  boardStatus: false,
+  draftItems: false,
+  webhooks: false,
+};
+
+const localWorkTrackingCapabilityReport = {
+  provider: "local",
+  capabilities: {
+    create: true,
+    list: true,
+    get: true,
+    update: true,
+    comment: true,
+    labels: true,
+    assignees: true,
+    milestones: true,
+    board: false,
+    boardStatus: false,
+  },
+  unsupported: ["board", "boardStatus"],
+};
+
 describe("project registry helpers", () => {
   it("normalizes project config file input to the project root", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
@@ -132,47 +164,49 @@ describe("project registry helpers", () => {
           sourceRootExists: true,
           worktreesRoot: path.join(root, "worktrees", "primary"),
           worktreesRootExists: false,
+          defaultTrackerId: "default",
+          workTrackers: [
+            {
+              id: "default",
+              name: "Default",
+              enabled: true,
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+              workTrackingCapabilities: localWorkTrackingCapabilities,
+              workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
+            },
+          ],
           workTracking: {
             provider: "local",
           },
-          workTrackingCapabilities: {
-            createItem: true,
-            listItems: true,
-            getItem: true,
-            updateItem: true,
-            comment: true,
-            labels: true,
-            assignees: true,
-            milestones: true,
-            board: false,
-            boardStatus: false,
-            draftItems: false,
-            webhooks: false,
-          },
-          workTrackingCapabilityReport: {
-            provider: "local",
-            capabilities: {
-              create: true,
-              list: true,
-              get: true,
-              update: true,
-              comment: true,
-              labels: true,
-              assignees: true,
-              milestones: true,
-              board: false,
-              boardStatus: false,
-            },
-            unsupported: ["board", "boardStatus"],
-          },
+          workTrackingCapabilities: localWorkTrackingCapabilities,
+          workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
           verification: null,
           publication: null,
           relationships: [],
         },
       ],
+      defaultTrackerId: "default",
+      workTrackers: [
+        {
+          id: "default",
+          name: "Default",
+          enabled: true,
+          roles: ["primary"],
+          workTracking: {
+            provider: "local",
+          },
+          workTrackingCapabilities: localWorkTrackingCapabilities,
+          workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
+        },
+      ],
       workTracking: {
         provider: "local",
       },
+      workTrackingCapabilities: localWorkTrackingCapabilities,
+      workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
       vibeKanbanProjectId: "vk-project",
       vibeKanbanRepoId: "vk-repo",
       projectConfigPath: path.join(root, devNexusProjectConfigFileName),

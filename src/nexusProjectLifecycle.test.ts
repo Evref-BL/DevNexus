@@ -238,6 +238,136 @@ describe("project lifecycle helpers", () => {
     ]);
   });
 
+  it("normalizes legacy and explicit component work trackers", () => {
+    const projectRoot = path.join(makeTempDir("dev-nexus-project-"), "project");
+
+    expect(
+      resolveProjectComponents(projectRoot, {
+        version: 1,
+        id: "legacy-tracked-project",
+        name: "Legacy Tracked Project",
+        home: null,
+        repo: {
+          kind: "local",
+          remoteUrl: null,
+          defaultBranch: null,
+        },
+        workTracking: {
+          provider: "local",
+          storePath: ".dev-nexus/work-items.json",
+        },
+        worktreesRoot: "worktrees",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+      })[0],
+    ).toMatchObject({
+      id: "primary",
+      defaultTrackerId: "default",
+      workTracking: {
+        provider: "local",
+        storePath: ".dev-nexus/work-items.json",
+      },
+      workTrackers: [
+        {
+          id: "default",
+          name: "Default",
+          enabled: true,
+          roles: ["primary"],
+          workTracking: {
+            provider: "local",
+            storePath: ".dev-nexus/work-items.json",
+          },
+          workTrackingCapabilityReport: {
+            provider: "local",
+          },
+        },
+      ],
+    });
+
+    expect(
+      resolveProjectComponents(projectRoot, {
+        version: 1,
+        id: "multi-tracked-project",
+        name: "Multi Tracked Project",
+        home: null,
+        repo: {
+          kind: "local",
+          remoteUrl: null,
+          defaultBranch: null,
+        },
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "local",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: null,
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local Mirror",
+                enabled: true,
+                roles: ["archive"],
+                workTracking: {
+                  provider: "local",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub Issues",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "project",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+        worktreesRoot: "worktrees",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+      })[0],
+    ).toMatchObject({
+      defaultTrackerId: "github",
+      workTracking: {
+        provider: "github",
+        repository: {
+          owner: "example",
+          name: "project",
+        },
+      },
+      workTrackingCapabilityReport: {
+        provider: "github",
+      },
+      workTrackers: [
+        {
+          id: "local",
+          workTrackingCapabilityReport: {
+            provider: "local",
+          },
+        },
+        {
+          id: "github",
+          workTrackingCapabilityReport: {
+            provider: "github",
+          },
+        },
+      ],
+    });
+  });
+
   it("loads project config only when one exists", () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     expect(loadProjectConfigIfExists(projectRoot)).toBeUndefined();
