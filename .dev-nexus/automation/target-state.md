@@ -35,13 +35,17 @@ Immediate direction:
   from work-item descriptions, record existing docs as read-only root context
   in `context.json` and `briefing.md`, and fail before worker launch if a
   referenced planning doc is missing.
+- `dev-nexus:local-57` is complete through DevNexus `1381ed6` and npm
+  `@evref-bl/dev-nexus@0.1.0-alpha.12`: provider-facing MCP schemas are
+  normalized for Codex-style tool admission, setup checks now verify expected
+  MCP server entries instead of only checking that a config file exists, and
+  the stdio MCP transport no longer recursively reprocesses incomplete split
+  frames. Direct project-root probe of `dev-nexus.cmd mcp-stdio` returns 24
+  tools with empty stderr.
 - Current ready `dogfood` work matching the automation selector after that
   repair:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
-  - `dev-nexus:local-57` add active MCP visibility diagnostics for agent
-    sessions. Current evidence: generated config and direct stdio probes work,
-    but this Codex thread still lacks visible generic DevNexus MCP namespaces.
   - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
     installs so registry delay or partial installs become setup-owned
     diagnostics instead of worker surprises.
@@ -112,8 +116,15 @@ Immediate direction:
   - `dev-nexus-pharo:local-10` is complete through DevNexus-Pharo `f49a45c`
     and npm `@evref-bl/dev-nexus-pharo@0.1.0-alpha.6` on the `dogfood` tag:
     generic tracker wrapper surfaces are now explicitly deprecated and point
-    tracker configuration/linking back to DevNexus core. The dogfood plugin
-    version pin now uses alpha.6.
+    tracker configuration/linking back to DevNexus core.
+  - `dev-nexus-pharo:local-12` is complete through DevNexus-Pharo `5786215`
+    and npm `@evref-bl/dev-nexus-pharo@0.1.0-alpha.9`: plugin MCP schemas are
+    provider-compatible, shared-root `codex init` preserves the Windows
+    `dev-nexus.cmd` command for the generic DevNexus server, and
+    DevNexus-Pharo now reuses the fixed DevNexus stdio transport. Direct
+    project-root probe of the configured `dev-nexus-pharo.cmd mcp-stdio`
+    returns 25 tools with empty stderr. The dogfood plugin version pin now
+    uses alpha.9.
   - `dev-nexus:local-55` is complete through DevNexus `dfa7099` and npm
     `@evref-bl/dev-nexus@0.1.0-alpha.8`: agent MCP refresh now has
     provider-aware targets for Codex, Claude, OpenCode, manual, and custom

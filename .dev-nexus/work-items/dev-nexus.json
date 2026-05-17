@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 59,
-  "nextCommentNumber": 99,
-  "updatedAt": "2026-05-17T19:56:57.342Z",
+  "nextCommentNumber": 100,
+  "updatedAt": "2026-05-17T20:46:56.296Z",
   "items": [
     {
       "id": "local-1",
@@ -1404,7 +1404,7 @@
       "id": "local-57",
       "title": "Add active MCP visibility diagnostics for agent sessions",
       "description": "Type: DevNexus setup/MCP diagnostics defect\nReadiness: autonomous agent-ready (AFK)\nSource: after Codex was restarted on 2026-05-17, `.codex/config.toml` and `codex mcp list` showed `dev_nexus` and `dev_nexus_pharo` enabled, and direct stdio probes proved both servers initialize and list tools. However the active Codex tool surface in this thread still exposes PLexus/Pharo namespaces but not `mcp__dev_nexus` or `mcp__dev_nexus_pharo`. Setup check only reports a generic provider-session warning, so a coordinator can believe the root is ready while silently falling back to CLI.\n\nGoal: make DevNexus onboarding/setup distinguish generated MCP config, server startability, provider config listing, and active-session tool visibility with actionable diagnostics.\n\nAcceptance criteria:\n- Setup check or a provider diagnostics command probes configured stdio/HTTP MCP servers for initialize/tools-list without requiring implementation work.\n- For Codex, diagnostics can compare generated config, `codex mcp list` or configured CLI equivalent, and a recorded active-session confirmation step without relying on the fragile plain `codex` app alias.\n- The check reports which expected namespaces/tools are configured, startable, provider-listed, and still unconfirmed in the active session.\n- Guidance tells the user or coordinator exactly whether to restart/reopen the provider session, record the session, refresh MCP config, or fix a broken command.\n- Tests cover configured-but-not-visible, command-not-startable, HTTP endpoint-unreachable, and all-good cases with mocked providers.\n\nEvidence from this run:\n- `.codex/config.toml` declares `dev_nexus`, `dev_nexus_pharo`, `plexus_project`, `pharo_launcher`, and `pharo`.\n- Exact Codex CLI path can list MCP servers, but plain `codex mcp list` hits an access-denied app alias in this shell.\n- Direct stdio probes report `dev-nexus@0.1.0` with 24 tools and `dev-nexus-pharo@0.1.0` with 25 tools.\n- Active thread tools still lack the generic DevNexus MCP namespaces.\n\nVerification:\n- Focused setup/provider diagnostics tests.\n- npm run check.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1417,8 +1417,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T19:56:36.835Z",
-      "updatedAt": "2026-05-17T19:56:36.835Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T20:46:56.296Z",
+      "closedAt": "2026-05-17T20:46:47.044Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2631,7 +2631,19 @@
         }
       }
     ],
-    "local-57": [],
+    "local-57": [
+      {
+        "id": "local-comment-99",
+        "body": "Completed through DevNexus 1381ed6 and npm @evref-bl/dev-nexus@0.1.0-alpha.12. Root cause was twofold: provider-hostile tool schemas could make Codex drop the namespace, and the stdio frame parser recursively reprocessed incomplete split frames, emitting RangeError on normal MCP clients. Added provider-compatible schema normalization, setup checks for expected MCP server entries, a split-frame transport regression test, and verified direct project-root stdio probe for dev-nexus.cmd returns 24 tools with empty stderr.",
+        "author": null,
+        "createdAt": "2026-05-17T20:46:56.296Z",
+        "updatedAt": "2026-05-17T20:46:56.296Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-99"
+        }
+      }
+    ],
     "local-58": []
   }
 }

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 12,
-  "nextCommentNumber": 27,
-  "updatedAt": "2026-05-17T19:31:54.498Z",
+  "nextNumber": 13,
+  "nextCommentNumber": 28,
+  "updatedAt": "2026-05-17T20:47:08.980Z",
   "items": [
     {
       "id": "local-1",
@@ -269,6 +269,31 @@
         "provider": "local",
         "itemId": "local-11",
         "itemNumber": 11
+      }
+    },
+    {
+      "id": "local-12",
+      "title": "Make DevNexus-Pharo MCP schemas provider-compatible",
+      "description": "Type: MCP provider compatibility defect\nReadiness: autonomous agent-ready (AFK)\nSource: Windows Codex session shows dev_nexus_pharo configured and startable, but the MCP namespace is not admitted into the active tool surface. Direct tools/list probing found nullable union schema constructs in local DevNexus-Pharo tools plus delegated DevNexus schemas.\n\nGoal: make DevNexus-Pharo provider-facing MCP tool schemas compatible with Codex/tool-provider admission while preserving runtime argument parsing.\n\nAcceptance criteria:\n- DevNexus-Pharo tools/list returns provider-compatible input schemas with no nullable type arrays, schema composition, null enum values, or implicit open objects.\n- Delegated DevNexus tools remain provider-compatible after updating the DevNexus dependency or shared compatibility helper.\n- Focused MCP tests cover schema compatibility.\n- npm run check passes.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo origin/main after verification. Publish dogfood prerelease if package behavior changes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "mcp",
+        "onboarding",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T20:17:17.233Z",
+      "updatedAt": "2026-05-17T20:47:08.980Z",
+      "closedAt": "2026-05-17T20:47:01.741Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-12",
+        "itemNumber": 12
       }
     }
   ],
@@ -578,6 +603,19 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-24"
+        }
+      }
+    ],
+    "local-12": [
+      {
+        "id": "local-comment-27",
+        "body": "Completed through DevNexus-Pharo 5786215 and npm @evref-bl/dev-nexus-pharo@0.1.0-alpha.9. Added provider-compatible MCP schema projection for local plus delegated tools, fixed shared-root Windows codex init so dev_nexus remains dev-nexus.cmd, updated to DevNexus alpha.12, and replaced the duplicated stdio parser with the fixed shared DevNexus transport. Verified npm run check, schema issue count 0 for 25 tools, and direct project-root stdio probe returns 25 tools with empty stderr.",
+        "author": null,
+        "createdAt": "2026-05-17T20:47:08.980Z",
+        "updatedAt": "2026-05-17T20:47:08.980Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-27"
         }
       }
     ]
