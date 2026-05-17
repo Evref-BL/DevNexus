@@ -1311,7 +1311,7 @@ describe("dev-nexus cli", () => {
         appServer: {
           mode: "spawn",
           commandConfigured: true,
-          argsCount: 1,
+          argsCount: 2,
           endpointScope: "loopback",
           ephemeralThreadDefault: true,
           allowNonLoopbackEndpoint: false,
