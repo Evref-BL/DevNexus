@@ -106,6 +106,44 @@ describe("nexus automation agent profile command resolution", () => {
     });
   });
 
+  it("resolves portable project paths in coordinator profile commands", () => {
+    const resolved = resolveNexusAutomationAgentCommand({
+      projectRoot: "/Users/me/dev-nexus/dogfood",
+      platform: "macos",
+      automationConfig: {
+        ...defaultNexusAutomationConfig,
+        agent: {
+          ...defaultNexusAutomationConfig.agent,
+          coordinatorProfileId: "codex-deep",
+          profiles: [
+            {
+              id: "codex-deep",
+              executor: "codex",
+              model: "gpt-5.5",
+              reasoning: "xhigh",
+              command: "codex",
+              args: [
+                "exec",
+                "--cd",
+                "projectRoot:",
+                "--add-dir",
+                "sourcesRoot:dev-nexus",
+                "--add-dir",
+                "projectParent:sources/plexus",
+                "Use DEV_NEXUS_AGENT_CONTEXT_FILE.",
+              ],
+            },
+          ],
+        },
+      },
+      commandName: "run-once",
+    });
+
+    expect(resolved.command).toBe(
+      'codex exec --cd /Users/me/dev-nexus/dogfood --add-dir /Users/me/dev-nexus/sources/dev-nexus --add-dir /Users/me/dev-nexus/sources/plexus "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
+    );
+  });
+
   it("quotes profile arguments that need shell grouping", () => {
     expect(
       shellCommandFromProfile({

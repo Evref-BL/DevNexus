@@ -1520,13 +1520,14 @@ function resolveAutomationCommandCliOptions(
   const automationConfig = config.automation;
   const configuredCommand =
     mode === "agent_launch"
-      ? automationConfig
-        ? resolveNexusAutomationAgentCommand({
-            automationConfig,
-            overrideCommand: parsed.command,
-            commandName,
-          }).command
-        : parsed.command
+        ? automationConfig
+          ? resolveNexusAutomationAgentCommand({
+              automationConfig,
+              overrideCommand: parsed.command,
+              commandName,
+              projectRoot: path.resolve(parsed.projectRoot),
+            }).command
+          : parsed.command
       : parsed.command ?? automationConfig?.executor.command;
   const configuredTimeoutMs =
     mode === "agent_launch"

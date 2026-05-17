@@ -6,6 +6,11 @@ import type {
   NexusAutomationCodexAppServerConfig,
   NexusAutomationSafetyConfig,
 } from "./nexusAutomationConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import type {
+  NexusPathHostPlatform,
+  NexusPathStyle,
+} from "./nexusPathResolver.js";
 
 export type NexusAutomationAgentCommandSource =
   | "override"
@@ -46,6 +51,17 @@ export interface ResolveNexusAutomationAgentCommandOptions {
   automationConfig: NexusAutomationConfig;
   overrideCommand?: string;
   commandName?: "run-once" | "schedule" | "coordinator-loop";
+  projectRoot?: string;
+  platform?: NexusPathHostPlatform | NexusPathStyle;
+  homePath?: string;
+  sourcesRoot?: string;
+}
+
+export interface ShellCommandFromProfileOptions {
+  projectRoot?: string;
+  platform?: NexusPathHostPlatform | NexusPathStyle;
+  homePath?: string;
+  sourcesRoot?: string;
 }
 
 export class NexusAutomationAgentProfileError extends Error {
@@ -101,7 +117,12 @@ export function resolveNexusAutomationAgentCommand(
   }
 
   return {
-    command: shellCommandFromProfile(profile),
+    command: shellCommandFromProfile(profile, {
+      projectRoot: options.projectRoot,
+      platform: options.platform,
+      homePath: options.homePath,
+      sourcesRoot: options.sourcesRoot,
+    }),
     source: "coordinator_profile",
     profile,
   };
@@ -184,9 +205,18 @@ function normalizeCodexAppServerProfilePolicy(
 
 export function shellCommandFromProfile(
   profile: NexusAutomationAgentProfileConfig,
+  options: ShellCommandFromProfileOptions = {},
 ): string {
-  const command = requiredNonEmptyString(profile.command, "profile.command");
-  return [command, ...profile.args.map(shellQuoteArgument)].join(" ");
+  const command = resolveProfileToken(
+    requiredNonEmptyString(profile.command, "profile.command"),
+    options,
+  );
+  return [
+    command,
+    ...profile.args.map((arg) =>
+      shellQuoteArgument(resolveProfileToken(arg, options)),
+    ),
+  ].join(" ");
 }
 
 export function shellQuoteArgument(value: string): string {
@@ -236,4 +266,31 @@ function requiredNonEmptyString(
   }
 
   return value.trim();
+}
+
+function resolveProfileToken(
+  value: string,
+  options: ShellCommandFromProfileOptions,
+): string {
+  const trimmed = requiredNonEmptyString(value, "profile token");
+  if (!isPortableProjectPathExpression(trimmed)) {
+    return trimmed;
+  }
+  if (!options.projectRoot) {
+    throw new NexusAutomationAgentProfileError(
+      "projectRoot is required to resolve portable automation agent profile paths",
+    );
+  }
+
+  return resolveNexusProjectPath({
+    projectRoot: options.projectRoot,
+    value: trimmed,
+    platform: options.platform,
+    homePath: options.homePath,
+    sourcesRoot: options.sourcesRoot,
+  });
+}
+
+function isPortableProjectPathExpression(value: string): boolean {
+  return /^(projectRoot|projectParent|home|sourcesRoot):/u.test(value);
 }
