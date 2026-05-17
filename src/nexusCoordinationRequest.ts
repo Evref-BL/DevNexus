@@ -10,10 +10,13 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
-  resolvePrimaryProjectComponent,
-  resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
+import {
+  resolveComponentForCurrentPath,
+  resolveComponentWorkItemRoute,
+  throwWorkItemLookupFailure,
+} from "./nexusWorkItemRouting.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -186,6 +189,7 @@ interface ResolvedCoordinationRequestContext {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
+  workItemId?: string;
   currentPath: string;
 }
 
@@ -208,7 +212,7 @@ const requestStatuses = new Set<NexusCoordinationRequestStatus>([
 export async function createNexusCoordinationRequest(
   options: NexusCoordinationRequestOptions,
 ): Promise<NexusCoordinationRequestResult> {
-  const context = resolveCoordinationRequestContext(options);
+  let context = resolveCoordinationRequestContext(options);
   const intent = parseNexusCoordinationRequestIntent(options.intent, "intent");
   const question = optionalNullableTrimmedString(options.question) ?? null;
   const note = optionalNullableTrimmedString(options.note) ?? null;
@@ -217,22 +221,39 @@ export async function createNexusCoordinationRequest(
   }
 
   const timestamp = currentTimestamp(options.now);
-  const git = getCoordinationRequestGitContext(context, options.gitRunner);
-  const explicitTarget = parseNexusCoordinationRequestTarget(
-    optionalNullableTrimmedString(options.target) ?? null,
+  let git = getCoordinationRequestGitContext(context, options.gitRunner);
+  const rawTarget = optionalNullableTrimmedString(options.target) ?? null;
+  let explicitTarget = parseNexusCoordinationRequestTarget(
+    rawTarget,
     context,
   );
-  const workItemId =
+  const rawWorkItemId =
+    context.workItemId ??
     optionalTrimmedString(options.workItemId) ??
     (explicitTarget?.kind === "work_item" ? explicitTarget.value : undefined) ??
-    inferWorkItemIdFromBranch(git.branch) ??
-    null;
-  const target =
-    explicitTarget ??
-    inferCoordinationRequestTarget({
-      workItemId,
-      branch: git.branch,
+    inferWorkItemIdFromBranch(git.branch);
+  if (rawWorkItemId && rawWorkItemId !== context.workItemId) {
+    context = resolveCoordinationRequestContext({
+      ...options,
+      workItemId: rawWorkItemId,
     });
+    git = getCoordinationRequestGitContext(context, options.gitRunner);
+    explicitTarget = parseNexusCoordinationRequestTarget(rawTarget, context);
+  }
+  const workItemId = context.workItemId ?? rawWorkItemId ?? null;
+  const target =
+    explicitTarget?.kind === "work_item" && workItemId
+      ? requestTarget({
+          kind: "work_item",
+          provider: "dev-nexus",
+          value: workItemId,
+          context,
+        })
+      : (explicitTarget ??
+        inferCoordinationRequestTarget({
+          workItemId,
+          branch: git.branch,
+        }));
   const status = coordinationRequestStatusFromResponse(options);
   const response = coordinationRequestResponse({
     status,
@@ -360,46 +381,31 @@ function resolveCoordinationRequestContext(
   );
   const projectConfig = loadProjectConfig(projectRoot);
   const currentPath = path.resolve(options.currentPath ?? process.cwd());
-  const component = resolveCoordinationRequestComponent(
-    projectRoot,
-    projectConfig,
-    options.componentId,
-    currentPath,
-  );
+  const workItemRoute = options.workItemId
+    ? resolveComponentWorkItemRoute({
+        projectRoot,
+        projectConfig,
+        componentId: options.componentId,
+        workItemId: options.workItemId,
+        currentPath,
+      })
+    : null;
+  const component =
+    workItemRoute?.component ??
+    resolveComponentForCurrentPath({
+      projectRoot,
+      projectConfig,
+      componentId: options.componentId,
+      currentPath,
+    });
 
   return {
     projectRoot,
     projectConfig,
     component,
+    ...(workItemRoute ? { workItemId: workItemRoute.itemId } : {}),
     currentPath,
   };
-}
-
-function resolveCoordinationRequestComponent(
-  projectRoot: string,
-  projectConfig: NexusProjectConfig,
-  componentId: string | undefined,
-  currentPath: string,
-): ResolvedNexusProjectComponent {
-  const components = resolveProjectComponents(projectRoot, projectConfig);
-  if (componentId) {
-    const component = components.find((candidate) => candidate.id === componentId);
-    if (!component) {
-      throw new Error(`Project component is not configured: ${componentId}`);
-    }
-
-    return component;
-  }
-
-  const inferred = components
-    .flatMap((component) => [
-      { component, root: component.sourceRoot },
-      { component, root: component.worktreesRoot },
-    ])
-    .filter((candidate) => samePathOrDescendant(currentPath, candidate.root))
-    .sort((a, b) => b.root.length - a.root.length)[0];
-
-  return inferred?.component ?? resolvePrimaryProjectComponent(projectRoot, projectConfig);
 }
 
 function getCoordinationRequestGitContext(
@@ -920,11 +926,19 @@ async function maybeGetWorkItem(
     return null;
   }
 
-  return workItemServiceForContext(context, now).getWorkItem({
-    projectRoot: context.projectRoot,
-    componentId: context.component.id,
-    id: workItemId,
-  });
+  try {
+    return await workItemServiceForContext(context, now).getWorkItem({
+      projectRoot: context.projectRoot,
+      componentId: context.component.id,
+      id: workItemId,
+    });
+  } catch (error) {
+    throwWorkItemLookupFailure({
+      component: context.component,
+      itemId: workItemId,
+      cause: error,
+    });
+  }
 }
 
 async function maybeAddRequestComment(options: {
@@ -947,12 +961,20 @@ async function maybeAddRequestComment(options: {
     return null;
   }
 
-  return workItemServiceForContext(options.context, options.now).addComment({
-    projectRoot: options.context.projectRoot,
-    componentId: options.context.component.id,
-    ref: { id: options.workItemId },
-    body: options.body,
-  });
+  try {
+    return await workItemServiceForContext(options.context, options.now).addComment({
+      projectRoot: options.context.projectRoot,
+      componentId: options.context.component.id,
+      ref: { id: options.workItemId },
+      body: options.body,
+    });
+  } catch (error) {
+    throwWorkItemLookupFailure({
+      component: options.context.component,
+      itemId: options.workItemId,
+      cause: error,
+    });
+  }
 }
 
 function workItemServiceForContext(
@@ -1082,11 +1104,6 @@ function parseAheadBehind(
 function inferWorkItemIdFromBranch(branch: string | null): string | undefined {
   const match = branch?.match(/local-\d+/u);
   return match?.[0];
-}
-
-function samePathOrDescendant(candidatePath: string, rootPath: string): boolean {
-  const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function currentTimestamp(now?: () => Date | string): string {

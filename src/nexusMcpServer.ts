@@ -66,7 +66,10 @@ import {
   recordNexusSetupStep,
   type NexusSetupRecordedStepStatus,
 } from "./nexusSetupAssistant.js";
-import { prepareNexusManualWorktree } from "./nexusManualWorktree.js";
+import {
+  prepareNexusManualWorktree,
+  resolveNexusManualWorktreeWorkItem,
+} from "./nexusManualWorktree.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -769,20 +772,41 @@ export async function callDevNexusMcpTool(
             now: context.now,
           }),
         });
-      case "worktree_prepare":
+      case "worktree_prepare": {
+        const projectRoot = projectRootFromArgs(args);
+        const componentId = optionalString(args, "componentId", "arguments");
+        const projectMeta = optionalBoolean(args, "projectMeta", "arguments");
+        const workItemId = optionalNullableString(
+          args,
+          "workItemId",
+          "arguments",
+        );
+        const workItemTitle = optionalNullableString(
+          args,
+          "workItemTitle",
+          "arguments",
+        );
+        const topic = optionalNullableString(args, "topic", "arguments");
+        const resolvedWorkItem = await resolveNexusManualWorktreeWorkItem({
+          projectRoot,
+          componentId,
+          projectMeta,
+          workItemId,
+          workItemTitle,
+          topic,
+          now: context.now,
+        });
         return toolResult({
           ok: true,
           ...prepareNexusManualWorktree({
-            projectRoot: projectRootFromArgs(args),
-            componentId: optionalString(args, "componentId", "arguments"),
-            projectMeta: optionalBoolean(args, "projectMeta", "arguments"),
-            workItemId: optionalNullableString(args, "workItemId", "arguments"),
-            workItemTitle: optionalNullableString(
-              args,
-              "workItemTitle",
-              "arguments",
-            ),
-            topic: optionalNullableString(args, "topic", "arguments"),
+            projectRoot,
+            componentId: resolvedWorkItem.componentId ?? componentId,
+            projectMeta,
+            workItemId: resolvedWorkItem.itemId ?? workItemId,
+            workItemTitle:
+              workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
+            workItemDescription: resolvedWorkItem.workItem?.description ?? null,
+            topic,
             branchName: optionalString(args, "branchName", "arguments"),
             worktreeName: optionalString(args, "worktreeName", "arguments"),
             baseRef: optionalNullableString(args, "baseRef", "arguments"),
@@ -790,6 +814,7 @@ export async function callDevNexusMcpTool(
             now: context.now,
           }),
         });
+      }
       case "coordination_status":
         return toolResult({
           ok: true,

@@ -26,6 +26,15 @@ import {
   projectPluginDependencyProjections,
   projectPluginWorkerFragments,
 } from "./nexusPluginCapabilities.js";
+import {
+  resolveComponentWorkItemRoute,
+  throwWorkItemLookupFailure,
+} from "./nexusWorkItemRouting.js";
+import {
+  createWorkItemService,
+  type ResolvedWorkItemProjectContext,
+} from "./workItemService.js";
+import type { WorkItem } from "./workTrackingTypes.js";
 
 export type NexusManualWorktreeScope = "component" | "project";
 
@@ -55,6 +64,67 @@ export interface PrepareNexusManualWorktreeResult {
   nextActions: string[];
 }
 
+export interface ResolvedNexusManualWorktreeWorkItem {
+  componentId?: string;
+  itemId?: string;
+  workItem?: WorkItem | null;
+}
+
+export async function resolveNexusManualWorktreeWorkItem(options: {
+  projectRoot: string;
+  componentId?: string;
+  projectMeta?: boolean;
+  workItemId?: string | null;
+  workItemTitle?: string | null;
+  topic?: string | null;
+  now?: () => Date | string;
+}): Promise<ResolvedNexusManualWorktreeWorkItem> {
+  if (!options.workItemId || options.projectMeta) {
+    return {};
+  }
+
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const projectConfig = loadProjectConfig(projectRoot);
+  const route = resolveComponentWorkItemRoute({
+    projectRoot,
+    projectConfig,
+    componentId: options.componentId,
+    workItemId: options.workItemId,
+  });
+  try {
+    const workItem = await createWorkItemService({
+      resolveProject: () =>
+        manualWorkItemProjectContext(projectRoot, projectConfig, route.component),
+      now: options.now,
+    }).getWorkItem({
+      projectRoot,
+      componentId: route.component.id,
+      id: route.itemId,
+    });
+    return {
+      componentId: route.component.id,
+      itemId: route.itemId,
+      workItem,
+    };
+  } catch (error) {
+    if (options.workItemTitle || options.topic) {
+      return {
+        componentId: route.component.id,
+        itemId: route.itemId,
+        workItem: null,
+      };
+    }
+
+    throwWorkItemLookupFailure({
+      component: route.component,
+      itemId: route.itemId,
+      cause: error,
+    });
+  }
+}
+
 export function prepareNexusManualWorktree(
   options: PrepareNexusManualWorktreeOptions,
 ): PrepareNexusManualWorktreeResult {
@@ -68,11 +138,31 @@ export function prepareNexusManualWorktree(
       "worktree prepare accepts either --project-meta or --component, not both",
     );
   }
+  const workItemRoute =
+    !projectMeta && options.workItemId
+      ? resolveComponentWorkItemRoute({
+          projectRoot,
+          projectConfig,
+          componentId: options.componentId,
+          workItemId: options.workItemId,
+        })
+      : null;
 
   const target = projectMeta
     ? projectWorktreeTarget(projectRoot, projectConfig)
-    : componentWorktreeTarget(projectRoot, projectConfig, options.componentId);
-  const slug = manualWorktreeSlug(options, options.now);
+    : componentWorktreeTarget(
+        projectRoot,
+        projectConfig,
+        workItemRoute?.component.id ?? options.componentId,
+      );
+  const workItemId = workItemRoute?.itemId ?? options.workItemId;
+  const slug = manualWorktreeSlug(
+    {
+      workItemId,
+      topic: options.topic,
+    },
+    options.now,
+  );
   const branchName =
     options.branchName ?? `codex/${safeDirectoryName(target.ownerId)}/${slug}`;
   const baseRef =
@@ -103,7 +193,7 @@ export function prepareNexusManualWorktree(
     branchName,
     ...(options.worktreeName ? { worktreeName: options.worktreeName } : {}),
     ...(baseRef ? { baseRef } : {}),
-    ...(options.workItemId ? { workItemId: options.workItemId } : {}),
+    ...(workItemId ? { workItemId } : {}),
     ...(options.workItemTitle ? { workItemTitle: options.workItemTitle } : {}),
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
@@ -184,6 +274,27 @@ function componentWorktreeTarget(
     worktreesRoot: component.worktreesRoot,
     defaultBaseRef:
       component.defaultBranch ?? projectConfig.repo.defaultBranch ?? null,
+  };
+}
+
+function manualWorkItemProjectContext(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  component: ResolvedNexusProjectComponent,
+): ResolvedWorkItemProjectContext {
+  if (!component.workTracking) {
+    throw new Error(`Component ${component.id} work tracking is not configured`);
+  }
+
+  return {
+    homePath: projectConfig.home ?? "",
+    projectRoot,
+    projectId: projectConfig.id,
+    projectName: projectConfig.name,
+    componentId: component.id,
+    componentName: component.name,
+    sourceRoot: component.sourceRoot,
+    workTracking: component.workTracking,
   };
 }
 

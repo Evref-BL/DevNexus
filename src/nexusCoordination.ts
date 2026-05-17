@@ -10,10 +10,13 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
-  resolvePrimaryProjectComponent,
-  resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
+import {
+  resolveComponentForCurrentPath,
+  resolveComponentWorkItemRoute,
+  throwWorkItemLookupFailure,
+} from "./nexusWorkItemRouting.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -256,6 +259,7 @@ interface ResolvedCoordinationContext {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
+  workItemId?: string;
   currentPath: string;
 }
 
@@ -271,17 +275,14 @@ export async function getNexusCoordinationStatus(
 ): Promise<NexusCoordinationStatus> {
   const context = resolveCoordinationContext(options);
   const git = getCoordinationGitStatus(context, options.gitRunner);
-  const workItem = options.workItemId
-    ? await workItemServiceForContext(context, options.now).getWorkItem({
-        projectRoot: context.projectRoot,
-        componentId: context.component.id,
-        id: options.workItemId,
-      })
+  const workItemId = context.workItemId;
+  const workItem = workItemId
+    ? await getCoordinationWorkItem(context, workItemId, options.now)
     : null;
   const now = currentTimestamp(options.now);
   const handoffs = readCoordinationHandoffs({
     context,
-    workItemId: options.workItemId,
+    workItemId,
     now,
     maxHandoffAgeMs:
       options.maxHandoffAgeMs ?? defaultCoordinationHandoffStaleAfterMs,
@@ -315,7 +316,10 @@ export async function createNexusCoordinationHandoff(
     projectRoot: context.projectRoot,
     componentId: context.component.id,
     componentName: context.component.name,
-    workItemId: requiredNonEmptyString(options.workItemId, "workItemId"),
+    workItemId: requiredNonEmptyString(
+      context.workItemId ?? options.workItemId,
+      "workItemId",
+    ),
     hostId: optionalTrimmedString(options.hostId) ?? os.hostname(),
     agentId: optionalTrimmedString(options.agentId) ?? null,
     status,
@@ -336,12 +340,21 @@ export async function createNexusCoordinationHandoff(
       optionalNullableTrimmedString(options.integrationPreference) ?? null,
     note: optionalNullableTrimmedString(options.note) ?? null,
   };
-  const comment = await workItemServiceForContext(context, options.now).addComment({
-    projectRoot: context.projectRoot,
-    componentId: context.component.id,
-    ref: { id: record.workItemId },
-    body: formatCoordinationHandoffComment(record),
-  });
+  let comment: WorkComment;
+  try {
+    comment = await workItemServiceForContext(context, options.now).addComment({
+      projectRoot: context.projectRoot,
+      componentId: context.component.id,
+      ref: { id: record.workItemId },
+      body: formatCoordinationHandoffComment(record),
+    });
+  } catch (error) {
+    throwWorkItemLookupFailure({
+      component: context.component,
+      itemId: record.workItemId,
+      cause: error,
+    });
+  }
 
   return {
     project: projectSummary(context),
@@ -361,6 +374,7 @@ export async function getNexusCoordinationIntegrationPlan(
   const maxHandoffAgeMs =
     options.maxHandoffAgeMs ?? defaultCoordinationHandoffStaleAfterMs;
   const git = getCoordinationGitStatus(context, runner);
+  const workItemId = context.workItemId;
   const targetBranch = integrationTargetBranch(context, options, git);
   const fetch = maybeFetchIntegrationTarget({
     context,
@@ -372,11 +386,11 @@ export async function getNexusCoordinationIntegrationPlan(
   const targetRef = integrationTargetRef({ fetch, git, targetBranch });
   const handoffCollection = readCoordinationHandoffs({
     context,
-    workItemId: options.workItemId,
+    workItemId,
     now,
     maxHandoffAgeMs,
   });
-  const scope: NexusCoordinationIntegrationScope = options.workItemId
+  const scope: NexusCoordinationIntegrationScope = workItemId
     ? "work_item"
     : options.targetBranch
       ? "target_branch"
@@ -482,12 +496,23 @@ function resolveCoordinationContext(
   );
   const projectConfig = loadProjectConfig(projectRoot);
   const currentPath = path.resolve(options.currentPath ?? process.cwd());
-  const component = resolveCoordinationComponent(
-    projectRoot,
-    projectConfig,
-    options.componentId,
-    currentPath,
-  );
+  const workItemRoute = options.workItemId
+    ? resolveComponentWorkItemRoute({
+        projectRoot,
+        projectConfig,
+        componentId: options.componentId,
+        workItemId: options.workItemId,
+        currentPath,
+      })
+    : null;
+  const component =
+    workItemRoute?.component ??
+    resolveComponentForCurrentPath({
+      projectRoot,
+      projectConfig,
+      componentId: options.componentId,
+      currentPath,
+    });
   if (!component.workTracking) {
     throw new Error(`Component ${component.id} work tracking is not configured`);
   }
@@ -496,35 +521,9 @@ function resolveCoordinationContext(
     projectRoot,
     projectConfig,
     component,
+    ...(workItemRoute ? { workItemId: workItemRoute.itemId } : {}),
     currentPath,
   };
-}
-
-function resolveCoordinationComponent(
-  projectRoot: string,
-  projectConfig: NexusProjectConfig,
-  componentId: string | undefined,
-  currentPath: string,
-): ResolvedNexusProjectComponent {
-  const components = resolveProjectComponents(projectRoot, projectConfig);
-  if (componentId) {
-    const component = components.find((candidate) => candidate.id === componentId);
-    if (!component) {
-      throw new Error(`Project component is not configured: ${componentId}`);
-    }
-
-    return component;
-  }
-
-  const inferred = components
-    .flatMap((component) => [
-      { component, root: component.sourceRoot },
-      { component, root: component.worktreesRoot },
-    ])
-    .filter((candidate) => samePathOrDescendant(currentPath, candidate.root))
-    .sort((a, b) => b.root.length - a.root.length)[0];
-
-  return inferred?.component ?? resolvePrimaryProjectComponent(projectRoot, projectConfig);
 }
 
 function workItemServiceForContext(
@@ -535,6 +534,26 @@ function workItemServiceForContext(
     resolveProject: () => workItemProjectContext(context),
     now,
   });
+}
+
+async function getCoordinationWorkItem(
+  context: ResolvedCoordinationContext,
+  workItemId: string,
+  now?: () => Date | string,
+): Promise<WorkItem> {
+  try {
+    return await workItemServiceForContext(context, now).getWorkItem({
+      projectRoot: context.projectRoot,
+      componentId: context.component.id,
+      id: workItemId,
+    });
+  } catch (error) {
+    throwWorkItemLookupFailure({
+      component: context.component,
+      itemId: workItemId,
+      cause: error,
+    });
+  }
 }
 
 function workItemProjectContext(
@@ -1502,11 +1521,6 @@ function componentSummary(
     worktreesRoot: component.worktreesRoot,
     workTrackingProvider: component.workTracking?.provider ?? null,
   };
-}
-
-function samePathOrDescendant(candidatePath: string, rootPath: string): boolean {
-  const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function currentTimestamp(now?: () => Date | string): string {

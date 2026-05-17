@@ -105,6 +105,7 @@ import {
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
   prepareNexusManualWorktree,
+  resolveNexusManualWorktreeWorkItem,
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
@@ -1171,38 +1172,15 @@ async function resolveWorktreePrepareWorkItem(
   itemId?: string;
   workItem?: WorkItem | null;
 }> {
-  if (!parsed.workItemId || parsed.projectMeta) {
-    return {};
-  }
-
-  const resolvedRef = resolveCliWorkItemReference(
-    parsed.projectRoot,
-    parsed.componentId,
-    parsed.workItemId,
-  );
-  try {
-    const service = workItemService(parsed.projectRoot, dependencies);
-    const workItem = await service.getWorkItem({
-      projectRoot: parsed.projectRoot,
-      componentId: resolvedRef.componentId,
-      id: resolvedRef.itemId,
-    });
-    return {
-      componentId: resolvedRef.componentId,
-      itemId: resolvedRef.itemId,
-      workItem,
-    };
-  } catch (error) {
-    if (parsed.workItemTitle || parsed.topic) {
-      return {
-        componentId: resolvedRef.componentId,
-        itemId: resolvedRef.itemId,
-        workItem: null,
-      };
-    }
-
-    throw error;
-  }
+  return resolveNexusManualWorktreeWorkItem({
+    projectRoot: parsed.projectRoot,
+    componentId: parsed.componentId,
+    projectMeta: parsed.projectMeta,
+    workItemId: parsed.workItemId,
+    workItemTitle: parsed.workItemTitle,
+    topic: parsed.topic,
+    now: dependencies.now,
+  });
 }
 
 async function handleWorkItemCommand(

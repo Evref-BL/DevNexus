@@ -10,6 +10,7 @@ import {
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
   listMcpInputSchemaProviderIssues,
+  nexusWorkerContextJsonPath,
   readNexusAutomationRunLedger,
   saveProjectConfig,
   StdioJsonRpcTransport,
@@ -282,6 +283,135 @@ describe("DevNexus MCP server", () => {
         "main",
       ],
       cwd: projectRoot,
+    });
+  });
+
+  it("prepares component worktrees from component-qualified MCP work item ids with metadata", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-worktree-");
+    const primarySourceRoot = path.join(projectRoot, "source");
+    const addonSourceRoot = path.join(projectRoot, "components", "addon");
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    fs.mkdirSync(primarySourceRoot, { recursive: true });
+    fs.mkdirSync(addonSourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            worktreesRoot: "worktrees/primary",
+            workTracking: {
+              provider: "local",
+              storePath: ".dev-nexus/work-items-primary.json",
+            },
+            relationships: [],
+          },
+          {
+            id: "addon",
+            name: "Addon",
+            kind: "git",
+            role: "addon",
+            remoteUrl: "git@example.invalid:mcp/addon.git",
+            defaultBranch: "main",
+            sourceRoot: "components/addon",
+            worktreesRoot: "worktrees/addon",
+            workTracking: {
+              provider: "local",
+              storePath: addonStorePath,
+            },
+            relationships: [
+              {
+                kind: "extends",
+                componentId: "primary",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Prepare addon worker",
+      description: "Carry this description into worker context.",
+      status: "ready",
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const gitRunner: GitRunner = (args, cwd) => {
+      const argsArray = [...args];
+      gitCalls.push({ args: argsArray, cwd });
+      if (argsArray[0] === "worktree" && argsArray[1] === "add") {
+        fs.mkdirSync(argsArray[4]!, { recursive: true });
+      }
+      if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+        return ok(argsArray, path.join(cwd ?? "", ".git", "info", "exclude"));
+      }
+      return ok(argsArray, "");
+    };
+
+    const prepared = toolJson(
+      await callDevNexusMcpTool(
+        "worktree_prepare",
+        {
+          projectRoot,
+          workItemId: "addon:local-1",
+        },
+        {
+          gitRunner,
+          now: fixedClock("2026-05-17T08:00:00.000Z"),
+        },
+      ),
+    );
+
+    expect(prepared).toMatchObject({
+      ok: true,
+      scope: "component",
+      component: {
+        id: "addon",
+      },
+      worktree: {
+        componentId: "addon",
+        branchName: "codex/addon/local-1",
+        baseRef: "main",
+        workItem: {
+          id: "local-1",
+          title: "Prepare addon worker",
+        },
+      },
+    });
+    expect(prepared.worktree.worktreePath).toBe(
+      path.join(projectRoot, "worktrees", "addon", "codex-addon-local-1"),
+    );
+    const context = JSON.parse(
+      fs.readFileSync(
+        nexusWorkerContextJsonPath(prepared.worktree.worktreePath),
+        "utf8",
+      ),
+    );
+    expect(context.worktree.workItem).toMatchObject({
+      id: "local-1",
+      title: "Prepare addon worker",
+      description: "Carry this description into worker context.",
+    });
+    expect(gitCalls[0]).toMatchObject({
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/addon/local-1",
+        path.join(projectRoot, "worktrees", "addon", "codex-addon-local-1"),
+        "main",
+      ],
+      cwd: addonSourceRoot,
     });
   });
 

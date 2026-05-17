@@ -65,6 +65,69 @@ function projectConfig(
   };
 }
 
+function multiComponentProjectConfig(options: {
+  primarySourceRoot: string;
+  primaryWorktreesRoot: string;
+  primaryStorePath: string;
+  addonSourceRoot: string;
+  addonWorktreesRoot: string;
+  addonStorePath: string;
+}): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "coordination-demo",
+    name: "Coordination Demo",
+    home: null,
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    worktreesRoot: "worktrees",
+    kanban: {
+      provider: "vibe-kanban",
+      projectId: null,
+    },
+    components: [
+      {
+        id: "primary",
+        name: "Primary",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/primary.git",
+        defaultBranch: "main",
+        sourceRoot: options.primarySourceRoot,
+        worktreesRoot: options.primaryWorktreesRoot,
+        workTracking: {
+          provider: "local",
+          storePath: options.primaryStorePath,
+        },
+        relationships: [],
+      },
+      {
+        id: "addon",
+        name: "Addon",
+        kind: "git",
+        role: "addon",
+        remoteUrl: "git@example.invalid:demo/addon.git",
+        defaultBranch: "main",
+        sourceRoot: options.addonSourceRoot,
+        worktreesRoot: options.addonWorktreesRoot,
+        workTracking: {
+          provider: "local",
+          storePath: options.addonStorePath,
+        },
+        relationships: [
+          {
+            kind: "extends",
+            componentId: "primary",
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function fakeGitRunner(
   repositoryPath: string,
   calls: Array<{ args: string[]; cwd?: string }>,
@@ -203,6 +266,186 @@ afterEach(() => {
 });
 
 describe("nexus coordination", () => {
+  it("normalizes component-qualified and provider-local ids across coordination tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const primarySourceRoot = path.join(projectRoot, "components", "primary");
+    const addonSourceRoot = path.join(projectRoot, "components", "addon");
+    const primaryWorktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const addonWorktreesRoot = path.join(projectRoot, "worktrees", "addon");
+    const addonWorktreePath = path.join(addonWorktreesRoot, "local-60");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    fs.mkdirSync(primarySourceRoot, { recursive: true });
+    fs.mkdirSync(addonSourceRoot, { recursive: true });
+    fs.mkdirSync(addonWorktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      multiComponentProjectConfig({
+        primarySourceRoot,
+        primaryWorktreesRoot,
+        primaryStorePath,
+        addonSourceRoot,
+        addonWorktreesRoot,
+        addonStorePath,
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: () => "2026-05-17T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon coordination",
+      status: "in_progress",
+    });
+    const gitRunner = fakeGitRunner(addonWorktreePath, []);
+
+    const handoff = await createNexusCoordinationHandoff({
+      projectRoot,
+      workItemId: "addon:local-1",
+      status: "ready",
+      currentPath: projectRoot,
+      gitRunner,
+      now: () => "2026-05-17T10:00:00.000Z",
+    });
+    const qualifiedStatus = await getNexusCoordinationStatus({
+      projectRoot,
+      workItemId: "addon:local-1",
+      currentPath: projectRoot,
+      gitRunner,
+      now: () => "2026-05-17T10:05:00.000Z",
+    });
+    const providerLocalStatus = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "addon",
+      workItemId: "local-1",
+      currentPath: projectRoot,
+      gitRunner,
+      now: () => "2026-05-17T10:10:00.000Z",
+    });
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      workItemId: "addon:local-1",
+      targetBranch: "main",
+      currentPath: projectRoot,
+      gitRunner,
+      now: () => "2026-05-17T10:15:00.000Z",
+    });
+
+    expect(handoff).toMatchObject({
+      component: {
+        id: "addon",
+      },
+      record: {
+        componentId: "addon",
+        workItemId: "local-1",
+      },
+      comment: {
+        id: "local-comment-1",
+      },
+    });
+    expect(qualifiedStatus).toMatchObject({
+      component: {
+        id: "addon",
+      },
+      workItem: {
+        id: "local-1",
+        title: "Addon coordination",
+      },
+      handoffs: {
+        records: [
+          {
+            workItemId: "local-1",
+            componentId: "addon",
+          },
+        ],
+      },
+    });
+    expect(providerLocalStatus.component.id).toBe("addon");
+    expect(providerLocalStatus.workItem?.title).toBe("Addon coordination");
+    expect(plan).toMatchObject({
+      component: {
+        id: "addon",
+      },
+      scope: "work_item",
+      handoffs: {
+        totalCount: 1,
+      },
+    });
+  });
+
+  it("rejects mismatched and ambiguous provider-local coordination ids with tracker diagnostics", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const primarySourceRoot = path.join(projectRoot, "components", "primary");
+    const addonSourceRoot = path.join(projectRoot, "components", "addon");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    fs.mkdirSync(primarySourceRoot, { recursive: true });
+    fs.mkdirSync(addonSourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      multiComponentProjectConfig({
+        primarySourceRoot,
+        primaryWorktreesRoot: path.join(projectRoot, "worktrees", "primary"),
+        primaryStorePath,
+        addonSourceRoot,
+        addonWorktreesRoot: path.join(projectRoot, "worktrees", "addon"),
+        addonStorePath,
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-17T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary duplicate id",
+      status: "ready",
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: () => "2026-05-17T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon duplicate id",
+      status: "ready",
+    });
+
+    await expect(
+      getNexusCoordinationStatus({
+        projectRoot,
+        componentId: "primary",
+        workItemId: "addon:local-1",
+        currentPath: projectRoot,
+        gitRunner: fakeGitRunner(projectRoot, []),
+      }),
+    ).rejects.toThrow(
+      /component "addon" conflicts with requested component "primary".*provider-local id "local-1".*requested tracker: local.*id tracker: local/u,
+    );
+    await expect(
+      getNexusCoordinationStatus({
+        projectRoot,
+        workItemId: "local-1",
+        currentPath: projectRoot,
+        gitRunner: fakeGitRunner(projectRoot, []),
+      }),
+    ).rejects.toThrow(
+      /Provider-local work item id "local-1" is ambiguous.*primary \(tracker: local\).*addon \(tracker: local\)/u,
+    );
+    await expect(
+      getNexusCoordinationStatus({
+        projectRoot,
+        componentId: "addon",
+        workItemId: "local-99",
+        currentPath: projectRoot,
+        gitRunner: fakeGitRunner(projectRoot, []),
+      }),
+    ).rejects.toThrow(
+      /requested component "addon" provider-local id "local-99" using tracker "local": Local work item not found: local-99/u,
+    );
+  });
+
   it("records structured tracker-backed handoffs and reports current git status", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const sourceRoot = path.join(projectRoot, "source");

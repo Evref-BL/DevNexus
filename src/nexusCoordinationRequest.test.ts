@@ -200,6 +200,45 @@ describe("nexus coordination requests", () => {
     );
   });
 
+  it("normalizes component-qualified request work item ids before local tracker lookup", async () => {
+    const { projectRoot, worktreePath, storePath } = await createFixture();
+
+    const result = await createNexusCoordinationRequest({
+      projectRoot,
+      workItemId: "dev-nexus:local-1",
+      intent: "feedback",
+      question: "Does the qualified id route to the component tracker?",
+      currentPath: projectRoot,
+      gitRunner: fakeGitRunner(worktreePath),
+      now: () => "2026-05-17T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      component: {
+        id: "dev-nexus",
+      },
+      workItem: {
+        id: "local-1",
+        title: "External coordination request",
+      },
+      record: {
+        componentId: "dev-nexus",
+        workItemId: "local-1",
+        target: {
+          kind: "work_item",
+          value: "local-1",
+        },
+      },
+      comment: {
+        id: "local-comment-1",
+      },
+    });
+    const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
+    expect(store.comments["local-1"]?.[0]?.body).toContain(
+      "Does the qualified id route to the component tracker?",
+    );
+  });
+
   it.each([
     ["github-issue:17", "github", "issue", "draft_comment", "read_comments"],
     ["github-pr:18", "github", "pull_request", "draft_review_request", "read_reviews"],
