@@ -3496,6 +3496,25 @@ function printProjectStatusResult(
     stdout,
     `  Work tracking: ${project.workTracking?.provider ?? "not configured"}`,
   );
+  writeLine(
+    stdout,
+    `  Default tracker: ${project.defaultTrackerId ?? "not configured"}`,
+  );
+  writeLine(stdout, `  Trackers: ${project.workTrackers.length}`);
+  for (const tracker of project.workTrackers) {
+    const state = tracker.enabled ? "enabled" : "disabled";
+    const defaultState =
+      tracker.id === project.defaultTrackerId ? " default" : "";
+    const unsupported =
+      tracker.workTrackingCapabilityReport.unsupported.length > 0
+        ? tracker.workTrackingCapabilityReport.unsupported.join(",")
+        : "none";
+    writeLine(
+      stdout,
+      `    ${tracker.id}${defaultState} [${tracker.workTracking.provider}] ` +
+        `${state} roles=${tracker.roles.join(",")} unsupported=${unsupported}`,
+    );
+  }
   writeLine(stdout, `  Components: ${project.components.length}`);
   for (const component of project.components) {
     writeLine(

@@ -291,6 +291,208 @@ describe("project config", () => {
     });
   });
 
+  it("accepts component work tracker bindings with an explicit default", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "multi-tracker-project",
+        name: "Multi Tracker Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        components: [
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/core",
+            defaultWorkTrackerId: "issues",
+            workTrackers: [
+              {
+                id: "issues",
+                name: "Issue Tracker",
+                enabled: true,
+                roles: ["primary", "planning"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "core",
+                  },
+                },
+              },
+              {
+                id: "audit",
+                enabled: false,
+                roles: ["archive"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/audit-items.json",
+                },
+              },
+            ],
+          },
+        ],
+      }).components[0],
+    ).toMatchObject({
+      defaultWorkTrackerId: "issues",
+      workTrackers: [
+        {
+          id: "issues",
+          name: "Issue Tracker",
+          enabled: true,
+          roles: ["primary", "planning"],
+          workTracking: {
+            provider: "github",
+            repository: {
+              owner: "example",
+              name: "core",
+            },
+          },
+        },
+        {
+          id: "audit",
+          name: "audit",
+          enabled: false,
+          roles: ["archive"],
+          workTracking: {
+            provider: "local",
+            storePath: ".dev-nexus/audit-items.json",
+          },
+        },
+      ],
+    });
+  });
+
+  it("rejects invalid component work tracker bindings", () => {
+    const configWithComponentTracker = (
+      componentPatch: Record<string, unknown>,
+    ) => ({
+      version: 1,
+      id: "invalid-component-tracker-project",
+      name: "Invalid Component Tracker Project",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      components: [
+        {
+          id: "core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          ...componentPatch,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          defaultWorkTrackerId: "issues",
+          workTrackers: [],
+        }),
+      ),
+    ).toThrow(/workTrackers must not be empty/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          defaultWorkTrackerId: "issues",
+          workTrackers: [
+            {
+              id: "issues",
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+            {
+              id: "issues",
+              roles: ["mirror"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/workTrackers contains duplicate id: issues/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          workTrackers: [
+            {
+              id: "issues",
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/defaultWorkTrackerId must reference/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          defaultWorkTrackerId: "missing",
+          workTrackers: [
+            {
+              id: "issues",
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/defaultWorkTrackerId references unknown tracker: missing/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          defaultWorkTrackerId: "issues",
+          workTrackers: [
+            {
+              id: "issues",
+              enabled: false,
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/workTrackers must contain at least one enabled tracker/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithComponentTracker({
+          defaultWorkTrackerId: "issues",
+          workTrackers: [
+            {
+              id: "issues",
+              roles: ["external-sync"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/roles\[0\]/);
+  });
+
   it("accepts generic automation policy with safe defaults", () => {
     expect(
       validateProjectConfig({

@@ -13,9 +13,14 @@ import {
   NexusProjectError,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
+  type ResolvedNexusProjectWorkTracker,
   samePath,
 } from "./nexusProjectLifecycle.js";
-import type { WorkTrackingConfig } from "./workTrackingTypes.js";
+import type {
+  TrackerCapabilities,
+  WorkTrackerCapabilityReport,
+  WorkTrackingConfig,
+} from "./workTrackingTypes.js";
 
 export interface NexusProjectReference {
   id: string;
@@ -35,7 +40,11 @@ export interface NexusProjectStatusBase {
   projectRoot: string;
   repo: NexusProjectConfig["repo"] | null;
   components: ResolvedNexusProjectComponent[];
+  defaultTrackerId: string | null;
+  workTrackers: ResolvedNexusProjectWorkTracker[];
   workTracking: WorkTrackingConfig | null;
+  workTrackingCapabilities: TrackerCapabilities | null;
+  workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
   vibeKanbanProjectId: string | null;
   vibeKanbanRepoId: string | null;
   projectConfigPath: string;
@@ -102,6 +111,10 @@ export function buildNexusProjectStatus(
   const resolvedProjectConfigPath = projectConfigPath(projectRoot);
   const resolvedWorktreesRoot = projectWorktreesRootPath(projectRoot, config);
   const components = config ? resolveProjectComponents(projectRoot, config) : [];
+  const primaryComponent =
+    components.find((component) => component.role === "primary") ??
+    components[0] ??
+    null;
 
   return {
     id: config?.id ?? reference.id,
@@ -109,7 +122,13 @@ export function buildNexusProjectStatus(
     projectRoot,
     repo: config?.repo ?? null,
     components,
-    workTracking: config?.workTracking ?? null,
+    defaultTrackerId: primaryComponent?.defaultTrackerId ?? null,
+    workTrackers: primaryComponent?.workTrackers ?? [],
+    workTracking: primaryComponent?.workTracking ?? config?.workTracking ?? null,
+    workTrackingCapabilities:
+      primaryComponent?.workTrackingCapabilities ?? null,
+    workTrackingCapabilityReport:
+      primaryComponent?.workTrackingCapabilityReport ?? null,
     vibeKanbanProjectId:
       config?.kanban?.projectId ?? reference.vibeKanbanProjectId ?? null,
     vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,

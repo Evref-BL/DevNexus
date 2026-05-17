@@ -68,6 +68,29 @@ export interface NexusProjectComponentRelationshipConfig {
   componentId: string;
 }
 
+export type NexusProjectWorkTrackerRole =
+  | "primary"
+  | "mirror"
+  | "coordination"
+  | "planning"
+  | "external_feedback"
+  | "migration"
+  | "archive";
+
+export interface NexusProjectWorkTrackerBindingConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  roles: NexusProjectWorkTrackerRole[];
+  workTracking: WorkTrackingConfig;
+}
+
+export interface NormalizedNexusProjectWorkTrackers {
+  defaultTrackerId: string | null;
+  defaultTracker: NexusProjectWorkTrackerBindingConfig | null;
+  trackers: NexusProjectWorkTrackerBindingConfig[];
+}
+
 export interface NexusProjectComponentConfig {
   id: string;
   name: string;
@@ -78,6 +101,8 @@ export interface NexusProjectComponentConfig {
   sourceRoot?: string;
   worktreesRoot?: string;
   workTracking?: WorkTrackingConfig;
+  defaultWorkTrackerId?: string;
+  workTrackers?: NexusProjectWorkTrackerBindingConfig[];
   verification?: Partial<NexusAutomationVerificationConfig>;
   publication?: Partial<NexusAutomationPublicationConfig>;
   relationships: NexusProjectComponentRelationshipConfig[];
@@ -914,8 +939,12 @@ function validateProjectMcpConfig(
   };
 }
 
+const legacyDefaultWorkTrackerId = "default";
+const legacyDefaultWorkTrackerName = "Default";
+
 function validateWorkTrackingProviderName(
   value: unknown,
+  pathName: string,
 ): WorkTrackingProviderName {
   if (
     value === "local" ||
@@ -928,7 +957,7 @@ function validateWorkTrackingProviderName(
   }
 
   throw new NexusConfigError(
-    "workTracking.provider must be local, vibe-kanban, github, gitlab, or jira",
+    `${pathName} must be local, vibe-kanban, github, gitlab, or jira`,
   );
 }
 
@@ -1034,6 +1063,7 @@ function validateRequiredWorkTrackingRepositoryConfig(
 
 function validateWorkTrackingBoardConfig(
   value: unknown,
+  pathName: string,
 ): WorkTrackingBoardConfig | null | undefined {
   if (value === undefined) {
     return undefined;
@@ -1043,7 +1073,6 @@ function validateWorkTrackingBoardConfig(
     return null;
   }
 
-  const pathName = "workTracking.board";
   const record = assertRecord(value, pathName);
   const id = optionalNullableString(record, "id", pathName);
   const number = optionalInteger(record, "number", pathName);
@@ -1071,19 +1100,23 @@ function validateWorkTrackingBoardConfig(
 
 function validateWorkTrackingConfig(
   value: unknown,
+  pathName = "workTracking",
 ): WorkTrackingConfig | undefined {
   if (value === undefined) {
     return undefined;
   }
 
-  const record = assertRecord(value, "workTracking");
-  const provider = validateWorkTrackingProviderName(record.provider);
-  const host = optionalNullableString(record, "host", "workTracking");
+  const record = assertRecord(value, pathName);
+  const provider = validateWorkTrackingProviderName(
+    record.provider,
+    `${pathName}.provider`,
+  );
+  const host = optionalNullableString(record, "host", pathName);
   const repository = validateWorkTrackingRepositoryConfig(
     record.repository,
-    "workTracking.repository",
+    `${pathName}.repository`,
   );
-  const board = validateWorkTrackingBoardConfig(record.board);
+  const board = validateWorkTrackingBoardConfig(record.board, `${pathName}.board`);
   const common = {
     ...(host !== undefined ? { host } : {}),
     ...(repository ? { repository } : {}),
@@ -1091,7 +1124,7 @@ function validateWorkTrackingConfig(
   };
 
   if (provider === "local") {
-    const storePath = optionalNullableString(record, "storePath", "workTracking");
+    const storePath = optionalNullableString(record, "storePath", pathName);
 
     return {
       provider,
@@ -1101,8 +1134,8 @@ function validateWorkTrackingConfig(
   }
 
   if (provider === "vibe-kanban") {
-    const projectId = optionalNullableString(record, "projectId", "workTracking");
-    const repoId = optionalNullableString(record, "repoId", "workTracking");
+    const projectId = optionalNullableString(record, "projectId", pathName);
+    const repoId = optionalNullableString(record, "repoId", pathName);
 
     return {
       provider,
@@ -1115,16 +1148,16 @@ function validateWorkTrackingConfig(
   if (provider === "github") {
     const githubRepository = validateRequiredWorkTrackingRepositoryConfig(
       record.repository,
-      "workTracking.repository",
+      `${pathName}.repository`,
     );
     if (!githubRepository.owner) {
       throw new NexusConfigError(
-        "workTracking.repository.owner must be a non-empty string",
+        `${pathName}.repository.owner must be a non-empty string`,
       );
     }
     if (!githubRepository.name) {
       throw new NexusConfigError(
-        "workTracking.repository.name must be a non-empty string",
+        `${pathName}.repository.name must be a non-empty string`,
       );
     }
 
@@ -1142,11 +1175,11 @@ function validateWorkTrackingConfig(
   if (provider === "gitlab") {
     const gitlabRepository = validateRequiredWorkTrackingRepositoryConfig(
       record.repository,
-      "workTracking.repository",
+      `${pathName}.repository`,
     );
     if (!gitlabRepository.id) {
       throw new NexusConfigError(
-        "workTracking.repository.id must be a non-empty string",
+        `${pathName}.repository.id must be a non-empty string`,
       );
     }
 
@@ -1160,12 +1193,12 @@ function validateWorkTrackingConfig(
     } satisfies GitLabWorkTrackingConfig;
   }
 
-  const issueType = optionalNullableString(record, "issueType", "workTracking");
+  const issueType = optionalNullableString(record, "issueType", pathName);
 
   return {
     provider,
     ...common,
-    projectKey: requiredString(record, "projectKey", "workTracking"),
+    projectKey: requiredString(record, "projectKey", pathName),
     ...(issueType !== undefined ? { issueType } : {}),
   } satisfies JiraWorkTrackingConfig;
 }
@@ -1209,6 +1242,188 @@ function optionalStringArray(
   }
 
   return [...value];
+}
+
+function validateWorkTrackerRole(
+  value: unknown,
+  pathName: string,
+): NexusProjectWorkTrackerRole {
+  if (
+    value === "primary" ||
+    value === "mirror" ||
+    value === "coordination" ||
+    value === "planning" ||
+    value === "external_feedback" ||
+    value === "migration" ||
+    value === "archive"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be primary, mirror, coordination, planning, external_feedback, migration, or archive`,
+  );
+}
+
+function validateWorkTrackerRoles(
+  value: unknown,
+  pathName: string,
+): NexusProjectWorkTrackerRole[] {
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(`${pathName} must not be empty`);
+  }
+
+  const roles = value.map((role, index) =>
+    validateWorkTrackerRole(role, `${pathName}[${index}]`),
+  );
+  const uniqueRoles = new Set<NexusProjectWorkTrackerRole>();
+  for (const role of roles) {
+    if (uniqueRoles.has(role)) {
+      throw new NexusConfigError(`${pathName} contains duplicate role: ${role}`);
+    }
+    uniqueRoles.add(role);
+  }
+
+  return roles;
+}
+
+function validateComponentWorkTrackerBinding(
+  value: unknown,
+  index: number,
+  componentPathName: string,
+): NexusProjectWorkTrackerBindingConfig {
+  const pathName = `${componentPathName}.workTrackers[${index}]`;
+  const record = assertRecord(value, pathName);
+  const workTracking = validateWorkTrackingConfig(
+    record.workTracking,
+    `${pathName}.workTracking`,
+  );
+  if (!workTracking) {
+    throw new NexusConfigError(`${pathName}.workTracking must be an object`);
+  }
+
+  const id = requiredString(record, "id", pathName);
+  return {
+    id,
+    name: optionalString(record, "name", pathName) ?? id,
+    enabled: optionalBoolean(record, "enabled", pathName) ?? true,
+    roles: validateWorkTrackerRoles(record.roles, `${pathName}.roles`),
+    workTracking,
+  };
+}
+
+function validateComponentWorkTrackers(
+  record: Record<string, unknown>,
+  pathName: string,
+): Pick<NexusProjectComponentConfig, "defaultWorkTrackerId" | "workTrackers"> {
+  const value = record.workTrackers;
+  if (value === undefined) {
+    if (record.defaultWorkTrackerId !== undefined) {
+      optionalString(record, "defaultWorkTrackerId", pathName);
+      throw new NexusConfigError(
+        `${pathName}.defaultWorkTrackerId requires workTrackers`,
+      );
+    }
+    return {};
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName}.workTrackers must be an array`);
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(`${pathName}.workTrackers must not be empty`);
+  }
+
+  const workTrackers = value.map((entry, index) =>
+    validateComponentWorkTrackerBinding(entry, index, pathName),
+  );
+  const trackerIds = new Set<string>();
+  for (const tracker of workTrackers) {
+    if (trackerIds.has(tracker.id)) {
+      throw new NexusConfigError(
+        `${pathName}.workTrackers contains duplicate id: ${tracker.id}`,
+      );
+    }
+    trackerIds.add(tracker.id);
+  }
+
+  const enabledTrackerIds = new Set(
+    workTrackers
+      .filter((tracker) => tracker.enabled)
+      .map((tracker) => tracker.id),
+  );
+  if (enabledTrackerIds.size === 0) {
+    throw new NexusConfigError(
+      `${pathName}.workTrackers must contain at least one enabled tracker`,
+    );
+  }
+
+  const defaultWorkTrackerId = optionalString(
+    record,
+    "defaultWorkTrackerId",
+    pathName,
+  );
+  if (!defaultWorkTrackerId) {
+    throw new NexusConfigError(
+      `${pathName}.defaultWorkTrackerId must reference a configured enabled tracker`,
+    );
+  }
+  if (!trackerIds.has(defaultWorkTrackerId)) {
+    throw new NexusConfigError(
+      `${pathName}.defaultWorkTrackerId references unknown tracker: ${defaultWorkTrackerId}`,
+    );
+  }
+  if (!enabledTrackerIds.has(defaultWorkTrackerId)) {
+    throw new NexusConfigError(
+      `${pathName}.defaultWorkTrackerId must reference an enabled tracker`,
+    );
+  }
+
+  return {
+    defaultWorkTrackerId,
+    workTrackers,
+  };
+}
+
+export function normalizeComponentWorkTrackers(
+  component: Pick<
+    NexusProjectComponentConfig,
+    "defaultWorkTrackerId" | "workTrackers" | "workTracking"
+  >,
+): NormalizedNexusProjectWorkTrackers {
+  const explicitTrackers = component.workTrackers ?? [];
+  const trackers =
+    explicitTrackers.length > 0
+      ? explicitTrackers
+      : component.workTracking
+        ? [
+            {
+              id: legacyDefaultWorkTrackerId,
+              name: legacyDefaultWorkTrackerName,
+              enabled: true,
+              roles: ["primary" as const],
+              workTracking: component.workTracking,
+            },
+          ]
+        : [];
+  const defaultTrackerId =
+    component.defaultWorkTrackerId ??
+    trackers.find((tracker) => tracker.enabled)?.id ??
+    null;
+  const defaultTracker =
+    defaultTrackerId === null
+      ? null
+      : trackers.find(
+          (tracker) => tracker.id === defaultTrackerId && tracker.enabled,
+        ) ?? null;
+
+  return {
+    defaultTrackerId: defaultTracker?.id ?? null,
+    defaultTracker,
+    trackers,
+  };
 }
 
 function validateComponentRole(
@@ -1375,6 +1590,7 @@ function validateProjectComponent(
   const sourceRoot = optionalString(record, "sourceRoot", pathName) ?? `components/${id}`;
   const worktreesRoot = optionalString(record, "worktreesRoot", pathName);
   const workTracking = validateWorkTrackingConfig(record.workTracking);
+  const workTrackerBindings = validateComponentWorkTrackers(record, pathName);
   const verification = validateComponentVerificationConfig(
     record.verification,
     `${pathName}.verification`,
@@ -1398,6 +1614,7 @@ function validateProjectComponent(
     ...(sourceRoot ? { sourceRoot } : {}),
     ...(worktreesRoot ? { worktreesRoot } : {}),
     ...(workTracking ? { workTracking } : {}),
+    ...workTrackerBindings,
     ...(verification ? { verification } : {}),
     ...(publication ? { publication } : {}),
     relationships: validateComponentRelationships(

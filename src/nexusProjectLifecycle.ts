@@ -3,10 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   loadProjectConfig,
+  normalizeComponentWorkTrackers,
   projectConfigPath,
   projectWorktreesRootPath,
   validateProjectConfig,
   type NexusProjectComponentConfig,
+  type NexusProjectWorkTrackerBindingConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -18,6 +20,16 @@ import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
 } from "./workTrackingTypes.js";
+
+export interface ResolvedNexusProjectWorkTracker {
+  id: string;
+  name: string;
+  enabled: boolean;
+  roles: NexusProjectWorkTrackerBindingConfig["roles"];
+  workTracking: NexusProjectWorkTrackerBindingConfig["workTracking"];
+  workTrackingCapabilities: TrackerCapabilities;
+  workTrackingCapabilityReport: WorkTrackerCapabilityReport;
+}
 
 export interface ProjectGitCommandResult {
   args: string[];
@@ -133,6 +145,8 @@ export interface ResolvedNexusProjectComponent {
   sourceRootExists: boolean;
   worktreesRoot: string;
   worktreesRootExists: boolean;
+  defaultTrackerId: string | null;
+  workTrackers: ResolvedNexusProjectWorkTracker[];
   workTracking: NexusProjectComponentConfig["workTracking"] | null;
   workTrackingCapabilities: TrackerCapabilities | null;
   workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
@@ -186,6 +200,12 @@ export function resolveProjectComponent(
     projectConfig,
     component,
   );
+  const normalizedWorkTrackers = normalizeComponentWorkTrackers(component);
+  const workTrackers = normalizedWorkTrackers.trackers.map((tracker) =>
+    resolveProjectWorkTracker(tracker),
+  );
+  const defaultWorkTracking =
+    normalizedWorkTrackers.defaultTracker?.workTracking ?? null;
 
   return {
     id: component.id,
@@ -198,16 +218,36 @@ export function resolveProjectComponent(
     sourceRootExists: directoryExists(sourceRoot),
     worktreesRoot,
     worktreesRootExists: directoryExists(worktreesRoot),
-    workTracking: component.workTracking ?? null,
-    workTrackingCapabilities: component.workTracking
-      ? workTrackerCapabilitiesForConfig(component.workTracking)
+    defaultTrackerId: normalizedWorkTrackers.defaultTrackerId,
+    workTrackers,
+    workTracking: defaultWorkTracking,
+    workTrackingCapabilities: defaultWorkTracking
+      ? workTrackerCapabilitiesForConfig(defaultWorkTracking)
       : null,
-    workTrackingCapabilityReport: component.workTracking
-      ? workTrackerCapabilityReportForConfig(component.workTracking)
+    workTrackingCapabilityReport: defaultWorkTracking
+      ? workTrackerCapabilityReportForConfig(defaultWorkTracking)
       : null,
     verification: component.verification ?? null,
     publication: component.publication ?? null,
     relationships: component.relationships,
+  };
+}
+
+function resolveProjectWorkTracker(
+  tracker: NexusProjectWorkTrackerBindingConfig,
+): ResolvedNexusProjectWorkTracker {
+  return {
+    id: tracker.id,
+    name: tracker.name,
+    enabled: tracker.enabled,
+    roles: tracker.roles,
+    workTracking: tracker.workTracking,
+    workTrackingCapabilities: workTrackerCapabilitiesForConfig(
+      tracker.workTracking,
+    ),
+    workTrackingCapabilityReport: workTrackerCapabilityReportForConfig(
+      tracker.workTracking,
+    ),
   };
 }
 
