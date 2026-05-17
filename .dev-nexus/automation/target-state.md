@@ -265,10 +265,10 @@ Immediate direction:
 - MCP-Pharo branch migration:
   - MCP-Pharo is now merged to `origin/main`; DevNexus component metadata and
     PLexus automatic Metacello loading must target `main`, not `develop`.
-  - MCP-Pharo was refreshed to `origin/main` commit `8ba98ed` on 2026-05-17.
+  - MCP-Pharo was refreshed to `origin/main` commit `be22607` on 2026-05-17.
     Recent pulls added repo-local Pharo skills for CI reproduction, image Git
-    handoff, project loading, and version compatibility, plus the Docker
-    smalltalkCI reproduction helper.
+    handoff, project loading, and version compatibility, the Docker
+    smalltalkCI reproduction helper, and Pharo 14 CI compatibility fixes.
 - Dependent non-eligible plugin work:
   - `pharo-launcher-mcp:local-3` confirm launcher image delete/status contract
     only if PLexus identifies a concrete launcher-side cleanup gap.
