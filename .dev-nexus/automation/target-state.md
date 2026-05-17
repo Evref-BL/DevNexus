@@ -57,6 +57,14 @@ Immediate direction:
   supplied by the caller, so Git rebase/merge continuations do not open a host
   editor during agent work. The fix does not alter global or repository Git
   config, and this root's project-local runtime install now uses alpha.14.
+- `dev-nexus:local-64` is complete through DevNexus `4ccf344` and npm
+  `@evref-bl/dev-nexus@0.1.0-alpha.15`: completed coordinator-loop finalization
+  now refreshes current eligible work after a successful coordinator returns,
+  so target cycles record zero current eligible items when selected work was
+  closed during the run. Failed, blocked, and still-eligible cycles preserve
+  their relaunch/report behavior. This root's project-local runtime install now
+  resolves alpha.15, and target-report returns `stop` for final cycle
+  `target-cycle-coordinator-loop-20260517-t230936-892-z-1-final`.
 - Project-scoped PLexus runtime work is active from
   `docs/plexus-project-scoped-runtime-prd.md`:
   - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
@@ -78,15 +86,10 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-64` fixes target-report relaunch semantics after a
-    completed coordinator-loop closes all initially eligible work. Evidence:
-    `automation eligible-work` returned zero after the six-item batch, but
-    `automation target-report` still returned `relaunch` because the latest
-    managed final cycle retained the pre-run eligible count of 6.
-  - `dev-nexus:local-61` is the next tracker-visible follow-up for actionable
-    coordination diagnostics, but it remains `todo`/dependent until explicitly
-    promoted to `ready`.
+- Current ready `dogfood` work matching the automation selector: none.
+  `dev-nexus:local-61` remains the next tracker-visible follow-up for
+  actionable coordination diagnostics, but it is still `todo`/dependent until
+  explicitly promoted to `ready`.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

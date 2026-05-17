@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 116,
-  "updatedAt": "2026-05-17T22:47:43.851Z",
+  "nextCommentNumber": 118,
+  "updatedAt": "2026-05-17T23:17:47.029Z",
   "items": [
     {
       "id": "local-1",
@@ -1580,7 +1580,7 @@
       "id": "local-64",
       "title": "Stop target-report relaunch after completed cycle closes all eligible work",
       "description": "Type: automation target-report defect. Readiness: autonomous agent-ready (AFK). Evidence: after coordinator-loop coordinator-loop-20260517-t220947-388-z-1 closed all six selected dogfood work items, eligible-work returned zero but target-report still returned relaunch because the latest completed managed cycle retained the pre-run eligible count of 6. Goal: target-report should stop when a completed coordinator-loop leaves no eligible work. Acceptance: add post-run/no-work facts or current eligible reconciliation, tests for all-closed completion returning stop, preserve relaunch for failed/blocked/still-eligible cycles. Verification: focused target-report/coordinator-loop tests and npm run check. Publication: direct DevNexus integration and dogfood prerelease if runtime needs it.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1592,8 +1592,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T22:47:43.851Z",
-      "updatedAt": "2026-05-17T22:47:43.851Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T23:17:47.029Z",
+      "closedAt": "2026-05-17T23:17:46.995Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2980,6 +2980,29 @@
         }
       }
     ],
-    "local-64": []
+    "local-64": [
+      {
+        "id": "local-comment-116",
+        "body": "Coordinator selected this as the only eligible dogfood item for run coordinator-loop-20260517-t230936-892-z-1. Implementation is local in DevNexus core; one read-only explorer subagent is mapping target-report/coordinator-loop code paths.",
+        "author": null,
+        "createdAt": "2026-05-17T23:12:01.720Z",
+        "updatedAt": "2026-05-17T23:12:01.720Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-116"
+        }
+      },
+      {
+        "id": "local-comment-117",
+        "body": "Completed in DevNexus commit 4ccf344 and published as @evref-bl/dev-nexus@0.1.0-alpha.15 on the dogfood npm tag. Focused target-report/coordinator-loop tests and npm run check passed.",
+        "author": null,
+        "createdAt": "2026-05-17T23:17:47.029Z",
+        "updatedAt": "2026-05-17T23:17:47.029Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-117"
+        }
+      }
+    ]
   }
 }
