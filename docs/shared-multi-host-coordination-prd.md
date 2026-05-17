@@ -229,6 +229,67 @@ Freshness is advisory. A stale record means "check before trusting" rather than
 - Agents may draft external requests without posting when provider mutation is
   not approved.
 
+## External Coordination Policy Notes
+
+Live external coordination should start from conservative provider policies.
+The tool can draft almost anything, but posting, assigning, reviewing, merging,
+closing, labeling, and pinging are separate capabilities.
+
+Candidate events that may need coordination:
+
+- Error triage: ask on an issue for help understanding a failure, reproduction
+  evidence, affected environment, expected behavior, and likely owner.
+- Solution agreement: propose an implementation direction on an issue and wait
+  for explicit agreement before editing high-risk behavior.
+- Option choice: present two or three concrete alternatives with tradeoffs and
+  wait for a chosen option before continuing.
+- Ownership transfer: ask whether another human or agent should own the issue,
+  component, integration branch, or review.
+- Permission request: ask for access, credentials, package publish rights,
+  repository settings, runner access, or protected-branch permissions.
+- Runtime approval: ask before live service work, Docker jobs, destructive
+  cleanup, image deletion, migrations, release publishing, or external posting.
+- Merge request or pull request review: open a proposed change, wait for
+  provider-native approval, and do not merge when approval, checks, or
+  permissions are missing.
+- Review response: ask whether requested changes are accepted, disputed,
+  deferred, or out of scope, then record the decision.
+- Continuous integration failure: ask whether to fix, retry, ignore a flaky
+  failure, or split the change when automated evidence is ambiguous.
+- Integration conflict: ask which branch, design decision, or source of truth
+  should win when branches or handoffs disagree.
+- Scope change: ask before expanding an issue beyond its original acceptance
+  criteria or moving work into a new issue.
+- API or behavior change: ask before changing public contracts, configuration
+  names, command behavior, data formats, dependency versions, or migration
+  policy.
+- Release or rollback decision: ask before tagging, publishing packages,
+  merging release branches, reverting published work, or cutting a hotfix.
+- Stale wait: ask whether to ping, keep waiting, downgrade to draft-only, or
+  mark blocked after a configured quiet period.
+- External dependency: ask upstream maintainers or third-party agents for a
+  decision when work depends on an upstream issue, pull request, or release.
+- Human escalation: ask a human to intervene when an agent is uncertain, the
+  provider state is contradictory, or the next action would cross a configured
+  safety boundary.
+
+Approval signals should be explicit and provider-native. Assignment can be a
+useful ownership signal, but it is ambiguous as an approval signal by itself.
+A safer first policy is:
+
+- An issue assignment means the assigned person or agent is the expected
+  responder or owner, not that the proposal is approved.
+- A proposal is approved by an explicit provider-native approval, an
+  `approved` label/comment recognized by policy, or a configured status
+  transition.
+- A merge request or pull request may be merged only when provider approval,
+  required checks, target branch policy, and DevNexus publication policy all
+  allow it.
+- Silence should become `waiting` and then `timed_out` or `blocked`, not
+  implicit approval.
+- DevNexus should record the exact provider object, signal, actor, timestamp,
+  and summary that justified continuing.
+
 ## Testing Decisions
 
 - Unit-test host/worktree/component inference with Windows and POSIX-style

@@ -165,6 +165,10 @@ Immediate direction:
     provider implementation.
   - `dev-nexus:local-18` tracks the human decision for which live provider
     posting actions are allowed versus draft-only.
+  - Initial live external coordination policy notes are recorded in
+    `docs/shared-multi-host-coordination-prd.md`; assignment should be treated
+    as ownership/response intent unless a project explicitly configures it as
+    an approval signal.
 - Human-in-the-loop shared coordination decision:
   - `dev-nexus:local-16` choose the real shared tracker/provider and Tailscale
     transport role for Mac/Windows dogfood.
