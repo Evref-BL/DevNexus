@@ -133,6 +133,7 @@ describe("nexus skills", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
     expect(skillIds).toEqual([
+      "use-devnexus",
       "diagnose",
       "tdd",
       "handoff",
@@ -152,6 +153,15 @@ describe("nexus skills", () => {
         skill.manifest.id,
         skill.files[nexusSkillMarkdownFileName],
       ]),
+    );
+    expect(skillMarkdown["use-devnexus"]).toContain(
+      "Product Requirements Document (PRD)",
+    );
+    expect(skillMarkdown["use-devnexus"]).toContain(
+      "Test-Driven Development (TDD)",
+    );
+    expect(skillMarkdown["use-devnexus"]).toContain(
+      "component-qualified work-item ids",
     );
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(

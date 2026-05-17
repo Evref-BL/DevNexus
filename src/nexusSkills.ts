@@ -201,6 +201,26 @@ function curatedCoreSkill(
 
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
+    "use-devnexus",
+    "use-devnexus",
+    "DevNexus-managed project workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, and advance work items across components. Use when an agent is asked to work in a DevNexus project, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
+    `
+# Use DevNexus
+
+Use this skill when working inside a DevNexus-managed project.
+
+1. Read project instructions first: agent context file when set, \`AGENTS.md\` or equivalent, durable project context, plan, and target state.
+2. Use DevNexus MCP or CLI surfaces for project status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
+3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue slicing, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
+4. Work through configured component work-item services. Prefer component-qualified work-item ids when a project has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
+5. Before editing, inspect relevant working trees and preserve unrelated changes. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations.
+6. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
+7. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, and record target-cycle or handoff facts when the project workflow provides them.
+8. Verify with focused checks first, then broader relevant checks when feasible. Publish only according to component publication policy.
+9. When running under a DevNexus-launched cycle, write the configured result file with status, summary, commits, verification, publication decision, and error or blocker details before exiting.
+`,
+  ),
+  curatedCoreSkill(
     "diagnose",
     "diagnose",
     "Systematic debugging workflow for reproducing, isolating, fixing, and verifying defects in managed projects.",

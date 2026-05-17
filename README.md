@@ -733,6 +733,7 @@ worker-local paths, such as `.agents/skills/`, from the project-managed
 index by default.
 The default core pack includes:
 
+- `use-devnexus`
 - `diagnose`
 - `tdd` for Test-Driven Development (TDD)
 - `handoff`
