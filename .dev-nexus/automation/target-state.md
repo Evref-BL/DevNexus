@@ -31,10 +31,8 @@ Immediate direction:
     DevNexus can describe the GitHub user/org namespace, repo naming,
     visibility, remote names, repo provisioning policy, and host-local auth
     profile reference for shared meta repositories.
-  - `dev-nexus:local-40` add a generic guided setup assistant service exposed
-    through CLI and MCP. This should be the product surface for onboarding
-    flows; skills/docs are supporting guidance, not the authoritative setup
-    engine.
+  - `dev-nexus:local-44` add component multi-tracker schema and compatibility
+    normalization.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -48,6 +46,20 @@ Immediate direction:
   - Until `dev-nexus:local-39` lands, the current bot-owned repo is a working
     dogfood setup, not yet the portable DevNexus project-hosting model.
 - Onboarding direction:
+  - `dev-nexus:local-40` is complete through DevNexus `4524fc6`: guided setup
+    assistant flows are exposed through CLI and MCP as `setup list`, `setup
+    plan`, `setup check`, and `setup record`. Mac setup plans now use
+    host-local placeholders instead of Windows source roots, and Mac preflight
+    correctly blocks on OS-local component path configuration. Follow-up commit
+    `dde7d8e` publishes npm `@evref-bl/dev-nexus@0.1.0-alpha.1` with the
+    `dogfood` tag for same-day Mac installation.
+  - `dev-nexus:local-53` is complete through DevNexus `e88d7aa`: portable path
+    resolution now supports `projectRoot:`, `projectParent:`, `home:`, and
+    `sourcesRoot:` bases. npm `@evref-bl/dev-nexus@0.1.0-alpha.3` is published
+    on the `dogfood` tag. This dogfood config now uses
+    `sourcesRoot:<component>` source roots; Windows keeps compatibility through
+    host-local junctions under `C:\dev\code\sources`, and the Mac setup plan
+    clones components under `$HOME/dev-nexus/sources`.
   - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
     meta-repo setup flow after the generic setup assistant and hosting config
     shape exist.
@@ -286,12 +298,17 @@ PLexus agent-facing surface direction:
   explicit opt-in setting enables it. Generated default agent config should not
   expose it.
 - Route registration, unregister, status, and stale-route cleanup are
-  internal/admin plumbing for PLexus core or operators, not a third normal
-  agent-facing surface.
+  trusted route-control plumbing for PLexus core or operators, not a third
+  normal agent-facing surface.
 - This naming/default surface direction is now implemented and published in
   PLexus `4a0b813`.
 - Scoped project/workspace/image context and route metadata are now implemented
   and published in PLexus `de0d5c6`.
+- PLexus route-control hardening is published through `71aa925`: HTTP gateway
+  service mode now separates `/mcp` agent-facing Pharo tools from
+  `/control-mcp` route registration/status/cleanup over one shared in-memory
+  route table, and PLexus core defaults route registry calls to the
+  route-control endpoint.
 
 Durable completed foundation:
 
@@ -346,6 +363,11 @@ Durable completed foundation:
   `af0b300`, covering `automation coordinator-loop`, no-work/lock/backoff wait
   decisions, target-cycle launch/finalization facts, and stdout/stderr tail
   diagnostics. Current-agent adoption remains a follow-up.
+- DevNexus guided setup assistant was published through `4524fc6`, covering
+  setup flow modeling, Mac new-machine setup plan/check/record CLI, equivalent
+  MCP tools, host-local setup progress records, README guidance, and OS-local
+  sourceRoot guards. Package `@evref-bl/dev-nexus@0.1.0-alpha.1` is published
+  on npm under the `dogfood` dist-tag through source commit `dde7d8e`.
 - DevNexus-Pharo MCP-Pharo domain skill bundling was published through
   `ec14934`, covering bundled `pharo-ci-repro`,
   `pharo-image-git-handoff`, `pharo-project-load`, and

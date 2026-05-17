@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 11,
-  "nextCommentNumber": 22,
-  "updatedAt": "2026-05-17T02:41:46.850Z",
+  "nextNumber": 14,
+  "nextCommentNumber": 28,
+  "updatedAt": "2026-05-17T14:22:37.753Z",
   "items": [
     {
       "id": "local-1",
@@ -240,6 +240,81 @@
         "provider": "local",
         "itemId": "local-10",
         "itemNumber": 10
+      }
+    },
+    {
+      "id": "local-11",
+      "title": "Split PLexus gateway HTTP into agent and route-control MCP surfaces",
+      "description": "Type: gateway HTTP surface hardening slice\nReadiness: autonomous agent-ready (AFK); no live Pharo image, launcher mutation, or Vibe workspace is required.\nSource discussion: the live gateway at http://127.0.0.1:7331/mcp was started with PLEXUS_GATEWAY_SURFACE=combined, so route-management tools appeared beside Pharo image tools in one tools/list.\n\nCurrent finding: generated workspace config already uses PLEXUS_GATEWAY_SURFACE=gateway for the agent-facing stdio facade, but HTTP service mode exposes one /mcp endpoint and defaults to the combined surface. The gateway route table is in memory, so a clean split should be one gateway process with two MCP paths sharing the same PlexusGateway instance.\n\nNaming decision: use route-control or gateway-control for the private/trusted surface rather than broad admin language. The tools control registered routes; they do not represent general product administration.\n\nGoal: make the gateway HTTP service expose /mcp as the agent-facing Pharo proxy and expose route registration/status/cleanup through a separate route-control MCP path in the same process.\n\nAcceptance criteria:\n- Default agent-facing /mcp tools/list excludes plexus_gateway_register_target, plexus_gateway_unregister_target, plexus_gateway_status, plexus_gateway_cleanup_stale_routes, and plexus_route_to_image.\n- The route-control MCP path, for example /control-mcp or /admin-mcp, exposes route registration, unregistration, status, and stale-route cleanup; raw route_to_image stays behind the existing explicit debug opt-in if retained.\n- Both MCP paths share one in-memory route table; registering through route-control immediately affects routing and status seen by the agent-facing gateway surface.\n- HTTP health output or docs make both paths discoverable for operators without implying two independent gateway processes.\n- Legacy combined surface behavior remains available only as an explicit compatibility/debug mode, not the default agent-facing service posture.\n- Tests cover tools/list and tools/call behavior for agent-facing, route-control, combined compatibility, and default HTTP service startup.\n\nVerification:\n- Run focused plexus-gateway server tests.\n- Run npm run typecheck -w @evref-bl/plexus-gateway.\n- Run broader workspace tests when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "gateway",
+        "route-control",
+        "agent-facing",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T14:11:07.848Z",
+      "updatedAt": "2026-05-17T14:22:37.753Z",
+      "closedAt": "2026-05-17T14:22:37.753Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-11",
+        "itemNumber": 11
+      }
+    },
+    {
+      "id": "local-12",
+      "title": "Point PLexus lifecycle route registry at the route-control gateway endpoint",
+      "description": "Type: PLexus core lifecycle integration slice\nReadiness: autonomous agent-ready (AFK) after the gateway exposes a route-control MCP path; no live Pharo image or launcher mutation is required.\nDepends on: the gateway route-control split.\n\nCurrent finding: HttpGatewayRouteRegistry defaults to http://127.0.0.1:<port>/mcp, and createProjectLifecycleFromEnvironment wires PLEXUS_GATEWAY_MCP_URL / PLEXUS_GATEWAY_PORT to that default. Once /mcp is agent-facing only, lifecycle route registration must call the route-control path instead.\n\nGoal: make plexus_project_open, plexus_project_close, plexus_project_status, and rescue route refresh use the private route-control gateway endpoint for route registration/status while keeping the normal gateway surface clean for agents.\n\nAcceptance criteria:\n- HttpGatewayRouteRegistry defaults to the route-control path when constructed from host/port, while explicit URL configuration still works.\n- Environment/config names clearly distinguish the route-control endpoint from the agent-facing gateway endpoint, with compatibility handling for the old PLEXUS_GATEWAY_MCP_URL path if needed.\n- Project open registers routes through route-control; project close unregisters through route-control; status queries route-control when no projectPath is supplied.\n- Unit tests prove lifecycle route calls no longer depend on route-management tools being present on the agent-facing /mcp surface.\n- Existing in-process test doubles and package boundaries remain intact; plexus-core does not gain an npm dependency on plexus-gateway.\n\nVerification:\n- Run focused plexus-core projectLifecycle and server tests.\n- Run npm run typecheck -w @evref-bl/plexus-core.\n- Run broader workspace tests when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plexus-core",
+        "gateway",
+        "route-control",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T14:11:08.061Z",
+      "updatedAt": "2026-05-17T14:22:37.645Z",
+      "closedAt": "2026-05-17T14:22:37.645Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-12",
+        "itemNumber": 12
+      }
+    },
+    {
+      "id": "local-13",
+      "title": "Document clean PLexus MCP surfaces and route-control terminology",
+      "description": "Type: docs/config migration slice\nReadiness: autonomous agent-ready (AFK); no live runtime is required.\nDepends on: gateway route-control split and lifecycle endpoint wiring decisions.\n\nCurrent finding: PLexus docs already say gateway should be the agent-facing Pharo proxy, but several places still use internal/admin wording for route-management tools and examples do not clearly explain the one-process/two-endpoint route-control shape.\n\nGoal: align docs and generated examples around clean MCP surfaces: plexus_project for lifecycle, pharo-launcher for scoped image lifecycle, gateway for Pharo code tools with imageId, and route-control/gateway-control only for trusted PLexus route management.\n\nAcceptance criteria:\n- README and docs/package-boundaries.md describe the route-control surface as private/trusted route management, not a normal agent-facing MCP server.\n- docs/architecture.md, docs/development.md, docs/project-model.md, docs/vibe-kanban-setup.md, and docs/kanban-agent-pharo-access.md consistently show gateway as Pharo proxy only and explain that route-control shares the same gateway process/state.\n- Examples avoid recommending PLEXUS_GATEWAY_SURFACE=combined for normal use and mark combined as legacy/debug compatibility.\n- Generated config examples preserve the agent-facing gateway entry and show any lifecycle route-control URL/env separately when needed.\n- Terminology is consistent enough that future issues can say route-control without reopening the admin naming question.\n\nVerification:\n- Run documentation grep/checks for stale combined/admin guidance where practical.\n- Run focused workspace MCP config tests if examples or generated config helpers change.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "docs",
+        "gateway",
+        "route-control",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T14:11:08.211Z",
+      "updatedAt": "2026-05-17T14:22:37.694Z",
+      "closedAt": "2026-05-17T14:22:37.694Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-13",
+        "itemNumber": 13
       }
     }
   ],
@@ -490,6 +565,78 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-12"
+        }
+      }
+    ],
+    "local-11": [
+      {
+        "id": "local-comment-22",
+        "body": "Starting implementation in PLexus component worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\plexus\\local-11-route-control-surfaces on branch codex/plexus-route-control-surfaces. Scope: route-control gateway split, lifecycle endpoint update, and docs alignment via parallel subagents with disjoint write areas.",
+        "author": null,
+        "createdAt": "2026-05-17T14:14:34.510Z",
+        "updatedAt": "2026-05-17T14:14:34.510Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-22"
+        }
+      },
+      {
+        "id": "local-comment-27",
+        "body": "Completed and published in PLexus commit 71aa925fef51ca83397df4b8c2d56dbe281c91db.\n\nImplemented one gateway HTTP process with separate MCP paths: /mcp is agent-facing gateway/Pharo tools, /control-mcp is route-control for route registration/status/cleanup. The same PlexusGateway instance backs both paths, so the in-memory route table is shared. Default environment-created gateway surface is now gateway; combined remains explicit legacy/debug compatibility.\n\nVerification passed:\n- npm test -w @evref-bl/plexus-gateway -- src/server.test.ts\n- npm run typecheck -w @evref-bl/plexus-gateway\n- npm run typecheck --workspaces\n- npm test --workspaces\n- npm run build\n- npm run test:smoke-policy",
+        "author": null,
+        "createdAt": "2026-05-17T14:22:37.075Z",
+        "updatedAt": "2026-05-17T14:22:37.075Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-27"
+        }
+      }
+    ],
+    "local-12": [
+      {
+        "id": "local-comment-23",
+        "body": "Starting dependent lifecycle endpoint wiring in the same PLexus worktree/branch as plexus:local-11. This is safe to advance because local-11's implementation direction is the same-process /mcp plus route-control split.",
+        "author": null,
+        "createdAt": "2026-05-17T14:14:50.895Z",
+        "updatedAt": "2026-05-17T14:14:50.895Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-23"
+        }
+      },
+      {
+        "id": "local-comment-25",
+        "body": "Completed and published in PLexus commit 71aa925fef51ca83397df4b8c2d56dbe281c91db.\n\nHttpGatewayRouteRegistry now defaults host/port route registry calls to /control-mcp while preserving explicit PLEXUS_GATEWAY_MCP_URL compatibility. Added PLEXUS_GATEWAY_CONTROL_MCP_URL and PLEXUS_GATEWAY_CONTROL_MCP_PATH support, with legacy PLEXUS_GATEWAY_MCP_PATH fallback.\n\nVerification passed:\n- npm test -w @evref-bl/plexus-core -- src/projectLifecycle.test.ts\n- npm run typecheck -w @evref-bl/plexus-core\n- npm run typecheck --workspaces\n- npm test --workspaces\n- npm run build\n- npm run test:smoke-policy",
+        "author": null,
+        "createdAt": "2026-05-17T14:22:36.852Z",
+        "updatedAt": "2026-05-17T14:22:36.852Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-25"
+        }
+      }
+    ],
+    "local-13": [
+      {
+        "id": "local-comment-24",
+        "body": "Starting docs/terminology alignment in the same PLexus worktree/branch as plexus:local-11. Documentation writes are isolated to README/docs while source implementation proceeds in gateway/core files.",
+        "author": null,
+        "createdAt": "2026-05-17T14:14:50.920Z",
+        "updatedAt": "2026-05-17T14:14:50.920Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-24"
+        }
+      },
+      {
+        "id": "local-comment-26",
+        "body": "Completed and published in PLexus commit 71aa925fef51ca83397df4b8c2d56dbe281c91db.\n\nDocs now use route-control/gateway-control terminology for trusted route registration/status/cleanup, document the clean surfaces (plexus_project, pharo-launcher, gateway, route-control), and explain one HTTP gateway process with /mcp plus /control-mcp over the same in-memory route table. PLEXUS_GATEWAY_SURFACE=combined is documented as legacy/debug compatibility.\n\nVerification passed:\n- rg check for admin/combined/route-control wording across README.md and docs\n- git diff --check\n- npm run build\n- npm test --workspaces\n- npm run test:smoke-policy",
+        "author": null,
+        "createdAt": "2026-05-17T14:22:36.936Z",
+        "updatedAt": "2026-05-17T14:22:36.936Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-26"
         }
       }
     ]

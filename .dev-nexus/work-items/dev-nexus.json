@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 43,
-  "nextCommentNumber": 73,
-  "updatedAt": "2026-05-17T13:54:58.317Z",
+  "nextNumber": 54,
+  "nextCommentNumber": 84,
+  "updatedAt": "2026-05-17T15:02:02.879Z",
   "items": [
     {
       "id": "local-1",
@@ -961,7 +961,7 @@
       "id": "local-40",
       "title": "Add DevNexus guided setup assistant service",
       "description": "Type: DevNexus onboarding infrastructure slice\nReadiness: autonomous agent-ready (AFK)\nSource discussion: users need hand-holding for DevNexus setup, especially bot/machine-user setup, meta-project hosting, auth profile setup, and bringing an existing project onto a new machine. A skill alone is insufficient because onboarding needs checks, generated commands, stateful progress, and safe automation.\n\nGoal: add a generic DevNexus setup assistant service that can present guided setup flows, run safe preflight checks, generate exact user steps, and record progress without making setup depend on chat memory.\n\nFeature choice:\n- Implement this as DevNexus core setup/onboarding service exposed through CLI and MCP.\n- Use skills/docs as projected guidance and explanatory material, not as the authoritative setup engine.\n\nAcceptance criteria:\n- DevNexus has a generic setup flow model with steps, prerequisites, manual actions, safe automated actions, verification checks, generated commands, and next-action summaries.\n- CLI exposes a low-token flow surface, for example `setup list`, `setup plan <flow>`, `setup check <flow>`, and `setup record <flow-step>`, with JSON output for agents.\n- MCP exposes equivalent setup-assistant tools for agent use without requiring a separate plugin.\n- Setup steps can explicitly mark manual actions, such as creating a GitHub account, browser/device auth, or accepting an invite, versus automatable actions like generating SSH config or validating remotes.\n- Flow progress can be persisted in DevNexus project state or a host-local setup state file according to whether the fact is portable or machine-specific.\n- The service can run in noninteractive mode and produce exact instructions instead of blocking on prompts.\n- Tests cover flow modeling, check execution, manual-step rendering, persistence boundaries, and JSON/CLI output.\n\nBoundaries:\n- Do not store tokens, private keys, browser auth state, or absolute host-secret paths in shared project state.\n- Do not hard-code GitHub-only behavior into the generic setup engine.\n- Do not make DevNexus choose implementation work; this is project setup infrastructure.\n\nVerification:\n- Focused setup service/model tests.\n- Focused CLI/MCP tests for setup flow output.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -974,8 +974,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:53:04.741Z",
-      "updatedAt": "2026-05-17T13:53:04.741Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T14:44:48.926Z",
+      "closedAt": "2026-05-17T14:44:48.926Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1027,13 +1027,300 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T13:54:23.339Z",
+      "updatedAt": "2026-05-17T15:02:02.879Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-42",
         "itemNumber": 42
+      }
+    },
+    {
+      "id": "local-43",
+      "title": "Slice component multi-tracker work tracking PRD into implementation items",
+      "description": "Type: planning / issue-slicing follow-up\nReadiness: human-in-the-loop or planning-agent ready; not implementation-ready until sliced.\nSource artifact: `docs/component-multi-tracker-prd.md`.\n\nGoal: turn the Component Multi-Tracker Work Tracking Product Requirements Document (PRD) into bounded DevNexus-owned implementation work items.\n\nAcceptance criteria:\n- Use the `to-issues` workflow to slice the PRD into independently verifiable DevNexus component work items.\n- Preserve the PRD direction: additive multi-tracker schema, default tracker compatibility, tracker registry, link records, dry-run sync planning, one-way sync, coordination role support, and provider-policy guardrails.\n- Each created work item states readiness, dependencies, acceptance criteria, verification, and publication notes.\n- Implementation-ready items stay scoped to DevNexus core unless a provider/plugin component explicitly owns a slice.\n- Live external provider writes remain blocked unless a sliced item records explicit provider policy and credential approval.\n\nBoundaries:\n- Do not enable live external sync while slicing.\n- Do not create Vibe workspaces, sessions, executions, or implementation workers.\n- Do not treat mirrored external tracker items as canonical until the default tracker policy is implemented.\n\nVerification:\n- Static review that created items cover the PRD phases and keep dependencies ordered.\n\nPublication notes:\n- Dogfood project-state change only unless the issue slicing produces source changes later.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "planning",
+        "work-tracking",
+        "multi-tracker",
+        "prd",
+        "to-issues",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:57:51.328Z",
+      "updatedAt": "2026-05-17T13:59:51.938Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-43",
+        "itemNumber": 43
+      }
+    },
+    {
+      "id": "local-44",
+      "title": "Add component multi-tracker schema and compatibility normalization",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: `docs/component-multi-tracker-prd.md`.\nParent planning item: `dev-nexus:local-43`.\n\nGoal: add the additive component tracker-binding configuration model while preserving existing single `workTracking` behavior.\n\nUser stories covered:\n- As a project maintainer, I can keep existing single-tracker components working unchanged.\n- As a project maintainer, I can declare multiple named trackers and choose one default tracker.\n\nAcceptance criteria:\n- Component configuration accepts named work tracker bindings with stable id, display name, enabled flag, roles, and provider config.\n- Existing `components[].workTracking` remains accepted and normalizes into one default tracker binding.\n- Existing project-level legacy `workTracking` compatibility still normalizes onto the generated primary component.\n- Config validation rejects duplicate tracker ids, missing default tracker ids, invalid roles, and unusable empty tracker lists.\n- Project/component status reports default tracker id plus the normalized tracker list and capability summaries.\n- Current single-tracker fixtures/tests continue to pass without project config changes.\n\nBoundaries:\n- Do not change work-item operation routing in this slice beyond reading the normalized default tracker.\n- Do not add sync execution or external writes.\n\nVerification:\n- Focused project config/lifecycle/status tests for legacy single-tracker and new multi-tracker configs.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "work-tracking",
+        "multi-tracker",
+        "schema",
+        "compatibility",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:50.130Z",
+      "updatedAt": "2026-05-17T13:59:50.130Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-44",
+        "itemNumber": 44
+      }
+    },
+    {
+      "id": "local-45",
+      "title": "Add tracker registry and explicit tracker selection for work-item operations",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after `dev-nexus:local-44` lands.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: route DevNexus work-item operations through a component tracker registry so commands and MCP tools can target either the default tracker or an explicitly named tracker.\n\nUser stories covered:\n- As a worker, I can update the canonical/default tracker without specifying extra options.\n- As a maintainer, I can inspect or operate on a non-default tracker explicitly.\n\nAcceptance criteria:\n- A component tracker registry resolves `{ componentId, trackerId }` into the correct work-tracking provider config.\n- Existing work-item CLI and MCP operations continue to use the component default tracker when no tracker id is provided.\n- Work-item CLI and MCP operations accept an explicit tracker id for create, list, get, update, comment, and set-status where provider capabilities allow it.\n- Error messages distinguish unknown component, unknown tracker id, disabled tracker, unsupported provider, and provider capability gaps.\n- Work-item responses include enough tracker/provider reference metadata for agents to avoid ambiguity.\n- Tests cover omitted tracker id, explicit tracker id, component-qualified id, tracker-qualified id where supported, and externalRef routing.\n\nDependencies:\n- Depends on `dev-nexus:local-44` for normalized tracker bindings.\n\nBoundaries:\n- Do not aggregate or deduplicate linked items in this slice.\n- Do not add sync planning or sync execution.\n\nVerification:\n- Focused work-item service, CLI, and MCP tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "cli",
+        "mcp",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:50.492Z",
+      "updatedAt": "2026-05-17T13:59:50.492Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-45",
+        "itemNumber": 45
+      }
+    },
+    {
+      "id": "local-46",
+      "title": "Add neutral work-item tracker link records",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add a neutral link model so DevNexus can represent one logical work item across local, GitHub, GitLab, Jira, or other tracker references.\n\nUser stories covered:\n- As a migration owner, I can link an existing GitHub issue to a local work item before enabling sync.\n- As a coordinator, I can see all provider references for one logical item.\n\nAcceptance criteria:\n- DevNexus persists work-item link records keyed by project id, component id, neutral logical item id, and tracker references.\n- Link references capture tracker id, provider, host, repository/project identity, item id, item number or key, node id, and web URL when available.\n- CLI and MCP surfaces can link, show, and unlink tracker references for a logical work item.\n- Link writes are idempotent and can update observed metadata without duplicating references.\n- Unlink records enough audit metadata to explain what was removed.\n- Tests cover link creation, duplicate/idempotent updates, invalid tracker refs, unlink, and show operations.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n\nBoundaries:\n- Do not auto-link likely matches without explicit policy.\n- Do not sync fields or comments in this slice.\n\nVerification:\n- Focused link-store/model tests plus CLI/MCP tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "links",
+        "identity",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:50.676Z",
+      "updatedAt": "2026-05-17T13:59:50.676Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-46",
+        "itemNumber": 46
+      }
+    },
+    {
+      "id": "local-47",
+      "title": "Add dry-run work-item sync planner",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker link records land.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: build a mutation-free sync planner that shows which selected source items would create, update, skip, or conflict with target tracker items.\n\nUser stories covered:\n- As a maintainer, I can dry-run sync and review planned changes before DevNexus writes to an external provider.\n- As a coordinator, I can see missing capabilities or credentials before attempting sync.\n\nAcceptance criteria:\n- Sync policy config can name source tracker, target tracker, direction, filters, field set, comment policy, status mapping, conflict policy, and write policy.\n- A dry-run planner reads source and target trackers through provider capabilities and existing link records.\n- Planner output includes creates, updates, skipped items, conflicting fields, missing provider capabilities, missing credentials, and policy blocks.\n- Planner detects linked versus unlinked target items without creating provider objects.\n- Planner treats provider capability gaps as planned skips or blockers, not silent partial success.\n- CLI and MCP expose a dry-run sync plan with concise JSON suitable for agents.\n\nDependencies:\n- Depends on `dev-nexus:local-44`, `dev-nexus:local-45`, and `dev-nexus:local-46`.\n\nBoundaries:\n- Dry-run only: no provider mutation, no link creation, and no external comments.\n- Two-way sync remains out of scope.\n\nVerification:\n- Focused sync-policy validation and dry-run planner tests with mocked providers.\n- Cases: create, update, skip, missing capability, missing credential, stale link, and conflict.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "sync",
+        "planner",
+        "dry-run",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:50.856Z",
+      "updatedAt": "2026-05-17T13:59:50.856Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-47",
+        "itemNumber": 47
+      }
+    },
+    {
+      "id": "local-48",
+      "title": "Execute one-way local-to-GitHub work-item sync with mocked providers",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dry-run sync planning lands; live external writes remain policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add idempotent one-way sync execution for the first narrow provider path: local primary tracker to GitHub mirror or coordination tracker, covered by mocked provider tests.\n\nUser stories covered:\n- As a project maintainer, I can mirror selected local items to GitHub without duplicating issues on rerun.\n- As a worker, canonical local status can be reflected into an approved GitHub mirror when policy allows.\n\nAcceptance criteria:\n- Sync execution consumes a prior plan or rebuilds an equivalent plan immediately before mutation.\n- Execution can create missing target GitHub issues when policy and provider capabilities allow it.\n- Execution can update only configured fields owned by the source policy.\n- Created or updated target items are linked to the logical work item immediately and idempotently.\n- DevNexus-generated comments include stable markers or fingerprints to prevent duplicate/echo comments.\n- Execution records a sync run summary with created, updated, skipped, conflicted, and blocked counts plus provider links.\n- Live external writes require explicit provider write policy and configured auth identity; default tests use mocked providers only.\n\nDependencies:\n- Depends on `dev-nexus:local-47`.\n- Composes with `dev-nexus:local-38` publication identity guardrails and `dev-nexus:local-39` meta-project hosting config before live dogfood writes.\n\nBoundaries:\n- Do not implement unrestricted two-way sync.\n- Do not propagate deletes.\n- Do not enable live GitHub sync in the dogfood project without explicit policy approval.\n\nVerification:\n- Mocked GitHub/local provider execution tests for idempotent create, update, link, comment marker, skipped capability, and blocked policy cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "sync",
+        "github",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:51.018Z",
+      "updatedAt": "2026-05-17T13:59:51.018Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-48",
+        "itemNumber": 48
+      }
+    },
+    {
+      "id": "local-49",
+      "title": "Expose multi-tracker state in agent status and automation context",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker bindings and link records are available.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: update low-token status, eligible-work, and agent-launch context so agents understand component tracker bindings, defaults, roles, and linked eligible work without reading raw project config.\n\nUser stories covered:\n- As a coordinator, I can list eligible work without seeing duplicate copies from multiple trackers.\n- As a Mac or Windows agent, I can see whether coordination is local, shared, mirrored, or blocked by policy.\n\nAcceptance criteria:\n- Project status, automation status, eligible-work summaries, and agent launch context report tracker ids, providers, roles, enabled/default state, and capability summaries per component.\n- Eligible work remains selected from the default tracker unless config explicitly says otherwise.\n- Linked provider copies are grouped under one logical work item when link records are available.\n- Run and target-cycle facts include selected tracker id and logical item id when available.\n- Status output includes sync warnings such as stale mirrors or missing coordination tracker capability without blocking unrelated local work.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-46`.\n\nBoundaries:\n- Do not change coordinator work selection semantics beyond reporting and deduping linked views.\n- Do not execute sync.\n\nVerification:\n- Focused automation status, eligible-work, target-cycle, and agent launch context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "automation",
+        "agent-context",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:51.260Z",
+      "updatedAt": "2026-05-17T13:59:51.260Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-49",
+        "itemNumber": 49
+      }
+    },
+    {
+      "id": "local-50",
+      "title": "Allow coordination tools to target tracker roles",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands; live external posting remains policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: let coordination status, handoff, integrate, and request flows use configured tracker roles such as coordination or external_feedback instead of assuming the component default tracker is the only backing store.\n\nUser stories covered:\n- As a Mac agent, I can read shared handoff state from a GitHub-backed coordination tracker while work selection remains local.\n- As an external reviewer, I can respond in a provider-native thread while DevNexus records the neutral effect locally.\n\nAcceptance criteria:\n- Coordination configuration can select a tracker by id or role for handoffs and external request records.\n- Work selection and canonical item updates still use the component default tracker unless policy says otherwise.\n- Handoff records include selected work item, logical item id, tracker references, branch facts, and provider target refs.\n- Integration planning can read handoffs from a coordination tracker and work details from the primary/default tracker.\n- Provider capability gaps for reading/writing comments are reported clearly.\n- Live external posting stays disabled unless coordination provider policy allows it.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n- Complements `dev-nexus:local-16` and `dev-nexus:local-18` for shared provider and external posting policy decisions.\n\nBoundaries:\n- Do not infer approval or merge permission from mirrored coordination records.\n- Do not create Vibe workspaces, sessions, executions, or implementation workers.\n\nVerification:\n- Focused coordination status/handoff/integrate/request tests with local and mocked external coordination trackers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "coordination",
+        "multi-host",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:51.423Z",
+      "updatedAt": "2026-05-17T13:59:51.423Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-50",
+        "itemNumber": 50
+      }
+    },
+    {
+      "id": "local-51",
+      "title": "Document multi-tracker configuration and migration guidance",
+      "description": "Type: documentation and migration slice\nReadiness: autonomous agent-ready (AFK) after the core multi-tracker shape stabilizes.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: document how users configure multiple component trackers, preserve default tracker compatibility, link existing external items, dry-run sync, and migrate safely from local to shared providers.\n\nUser stories covered:\n- As a maintainer, I can migrate a component from local work items to GitHub or Jira without losing history.\n- As a project maintainer, I can choose which items are mirrored externally and which remain local.\n\nAcceptance criteria:\n- README or docs explain tracker bindings, default tracker behavior, roles, link records, sync policy, dry-run planning, and one-way sync limitations.\n- Documentation includes examples for local primary plus GitHub mirror/coordination tracker.\n- Migration guidance covers linking existing external issues before enabling sync.\n- Safety notes cover dry-run-first behavior, no delete propagation, no two-way sync by default, and provider identity guardrails.\n- Agent-facing guidance explains how coordinators should treat canonical versus mirrored work items.\n\nDependencies:\n- Depends on the implemented shape from `dev-nexus:local-44` through the relevant sync/coordination slices.\n\nBoundaries:\n- Do not document unsupported two-way sync or live external writes as available.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if docs are covered by repository checks.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "docs",
+        "migration",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:51.589Z",
+      "updatedAt": "2026-05-17T13:59:51.589Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-51",
+        "itemNumber": 51
+      }
+    },
+    {
+      "id": "local-52",
+      "title": "Choose first live multi-tracker dogfood sync policy",
+      "description": "Type: human-in-the-loop (HITL) policy decision slice\nReadiness: blocked on provider/write policy and dogfood target choice.\nSource PRD: `docs/component-multi-tracker-prd.md` open questions.\n\nGoal: decide the first live dogfood sync policy before enabling real external provider mutation for multi-tracker sync.\n\nDecision points:\n- Should the first live target be GitHub Issues only, or GitHub Issues plus GitHub Project v2 board status?\n- Should the dogfood project keep local as primary until bot identity and meta-project hosting guardrails are complete?\n- Which item subset should sync first: `dogfood` ready items, coordination-only handoffs, or a smaller manual allowlist?\n- Which comments should mirror externally: all DevNexus progress comments, only handoffs, only high-signal status transitions, or none initially?\n- Which host-local auth profile or bot identity is allowed to create/update external issues?\n- What quiet-period and no-repeat-ping rules apply to external waiting states?\n\nAcceptance criteria:\n- Record the chosen provider, repository/project target, auth profile, allowed operations, synced fields, comment policy, status mapping, and initial item filter.\n- Confirm whether live writes are allowed or whether the first rollout remains draft-only.\n- Update project config or target-state only after the policy is explicit.\n- Leave implementation slices blocked from live external mutation until this decision is recorded.\n\nDependencies:\n- Related to `dev-nexus:local-16`, `dev-nexus:local-18`, `dev-nexus:local-38`, and `dev-nexus:local-39`.\n\nBoundaries:\n- Do not perform live external provider writes as part of the decision.\n- Do not store secrets in shared project state.\n\nVerification:\n- Static policy/config review.\n- After approval, one harmless dry-run and then one explicitly approved provider smoke against the chosen test target.\n\nPublication notes:\n- Dogfood project-state/policy change only unless implementation changes are required later.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "work-tracking",
+        "multi-tracker",
+        "sync",
+        "github",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:59:51.755Z",
+      "updatedAt": "2026-05-17T13:59:51.755Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-52",
+        "itemNumber": 52
+      }
+    },
+    {
+      "id": "local-53",
+      "title": "Add portable project path resolution",
+      "description": "Type: DevNexus project config/path portability slice\nReadiness: autonomous agent-ready (AFK)\nSource finding: Mac setup exposed that dev-nexus.project.json currently stores Windows absolute component sourceRoot paths. A shared DevNexus meta project should be portable across Windows, macOS, and Linux without rewriting shared config for each host.\n\nGoal: add a generic portable path model and resolver so shared project config can use one OS-neutral path style while DevNexus code and agent surfaces resolve it to host-local filesystem paths.\n\nDesign direction:\n- Shared config should prefer portable path expressions, not raw OS absolute paths, for component sourceRoot, worktreesRoot, MCP/generated config paths, runtime state roots, and setup paths.\n- Use POSIX-style separators in shared config and resolve them through a central DevNexus path resolver on each host.\n- Support stable bases such as projectRoot, projectParent, home, and a configured sourcesRoot/workspacesRoot where appropriate.\n- Keep legacy absolute string paths accepted for compatibility, but status/setup checks should flag them as non-portable when they block another OS.\n- Host-local overrides may still exist for exceptional layouts, but normal Mac/Windows sharing should work from the same shared path expressions.\n\nAcceptance criteria:\n- DevNexus has a typed path expression/resolution service with Windows, macOS, and Linux tests.\n- Project config validation accepts portable path expressions or normalized portable strings for component source roots while preserving legacy absolute string compatibility.\n- Project/component status, setup plan/check, worktree setup, automation context, MCP config refresh, and verification command cwd resolution use the central resolver instead of ad hoc path.resolve calls where project-config paths are involved.\n- Setup assistant recommends portable shared paths for new projects and reports legacy absolute paths as portability warnings or blockers with migration guidance.\n- Existing projects with absolute paths continue to work on the original host.\n- Tests cover Windows and POSIX conversion, project-relative paths, home/source base paths, legacy absolute paths, and serialized JSON stability.\n\nBoundaries:\n- Do not store machine-specific secrets, SSH keys, tokens, or browser auth state in shared config.\n- Do not hard-code this dogfood project's Windows or Mac layout into DevNexus core.\n- Do not require all existing users to migrate before legacy configs continue working.\n\nVerification:\n- Focused path resolver and project config tests.\n- Focused setup assistant/status/context tests proving a shared portable config resolves correctly on Windows and macOS fixtures.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.\n- This should unblock the full new-machine setup flow tracked by dev-nexus:local-42.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "project-config",
+        "paths",
+        "multi-host",
+        "onboarding",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T14:44:48.955Z",
+      "updatedAt": "2026-05-17T15:01:41.562Z",
+      "closedAt": "2026-05-17T15:01:41.562Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-53",
+        "itemNumber": 53
       }
     }
   ],
@@ -1903,8 +2190,144 @@
         }
       }
     ],
-    "local-40": [],
+    "local-40": [
+      {
+        "id": "local-comment-74",
+        "body": "Coordinator starting same-day Mac setup pass. Scope: implement the smallest useful DevNexus setup assistant foundation with CLI/MCP-ready service shape and a concrete new-machine/Mac onboarding flow where possible. Preserve existing dogfood planning changes and avoid live runtime work.",
+        "author": null,
+        "createdAt": "2026-05-17T14:04:10.439Z",
+        "updatedAt": "2026-05-17T14:04:10.439Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-74"
+        }
+      },
+      {
+        "id": "local-comment-75",
+        "body": "Published DevNexus 4524fc6. Adds guided setup assistant service with setup list/plan/check/record through CLI and MCP, records host-local setup state under .dev-nexus/host-setup, documents guided setup, and guards Mac plans/checks from accepting Windows-local sourceRoot paths. Verification: npm run check passed (45 files, 287 tests). Mac preflight now correctly reports current Windows component source roots as host-local blockers for a Mac joining this shared project.",
+        "author": null,
+        "createdAt": "2026-05-17T14:25:00.699Z",
+        "updatedAt": "2026-05-17T14:25:00.699Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-75"
+        }
+      },
+      {
+        "id": "local-comment-77",
+        "body": "Published follow-up DevNexus commit dde7d8e and npm @evref-bl/dev-nexus@0.1.0-alpha.1 with dist-tag dogfood, so a Mac can install the setup assistant through npm install -g @evref-bl/dev-nexus@dogfood. npm latest remains 0.1.0-alpha.0.",
+        "author": null,
+        "createdAt": "2026-05-17T14:29:12.900Z",
+        "updatedAt": "2026-05-17T14:29:12.900Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-77"
+        }
+      }
+    ],
     "local-41": [],
-    "local-42": []
+    "local-42": [
+      {
+        "id": "local-comment-76",
+        "body": "Partially unblocked by DevNexus 4524fc6: the generic setup assistant now includes a join-existing-project plan/check/record flow and Mac path guard. Keep this item todo/dependent because the full new-machine flow still needs first-class hosting/auth-profile configuration and publication guardrails from dev-nexus:local-39 and dev-nexus:local-38, plus host-local sourceRoot override persistence.",
+        "author": null,
+        "createdAt": "2026-05-17T14:26:27.286Z",
+        "updatedAt": "2026-05-17T14:26:27.286Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-76"
+        }
+      },
+      {
+        "id": "local-comment-78",
+        "body": "User feedback during Mac bootstrap: the new-machine setup flow must explicitly explain where to clone the dogfood meta repo and that this fresh directory becomes the DevNexus project root. Applying this as an immediate setup-assistant clarity fix.",
+        "author": null,
+        "createdAt": "2026-05-17T14:39:47.797Z",
+        "updatedAt": "2026-05-17T14:39:47.797Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-78"
+        }
+      },
+      {
+        "id": "local-comment-79",
+        "body": "Design dependency added: dev-nexus:local-53 will make shared dev-nexus.project.json portable across OSes through a central path resolver and OS-neutral path expressions. The full new-machine setup flow should build on that rather than relying primarily on ad hoc host-local sourceRoot overrides.",
+        "author": null,
+        "createdAt": "2026-05-17T14:45:01.726Z",
+        "updatedAt": "2026-05-17T14:45:01.726Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-79"
+        }
+      },
+      {
+        "id": "local-comment-82",
+        "body": "Portable path dependency dev-nexus:local-53 is complete and published in @evref-bl/dev-nexus@0.1.0-alpha.3. Mac setup plan now clones the meta project into C:\\Users\\gabriel.darbord/dev-nexus/dev-nexus-dogfood and component sources into C:\\Users\\gabriel.darbord/dev-nexus/sources/<component>. Remaining scope for this item should focus on running the new-machine flow on the Mac and addressing host-local automation profile paths if Mac-side automation launch is required.",
+        "author": null,
+        "createdAt": "2026-05-17T15:01:52.380Z",
+        "updatedAt": "2026-05-17T15:01:52.380Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-82"
+        }
+      },
+      {
+        "id": "local-comment-83",
+        "body": "Correction for previous comment: the Mac setup plan renders literal shell paths `$HOME/dev-nexus/dev-nexus-dogfood` and `$HOME/dev-nexus/sources/<component>` on macOS. The Windows-looking path came from PowerShell expanding `$HOME` while composing the comment, not from the setup plan output.",
+        "author": null,
+        "createdAt": "2026-05-17T15:02:02.879Z",
+        "updatedAt": "2026-05-17T15:02:02.879Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-83"
+        }
+      }
+    ],
+    "local-43": [
+      {
+        "id": "local-comment-73",
+        "body": "Sliced docs/component-multi-tracker-prd.md into DevNexus implementation and decision items:\n\n- dev-nexus:local-44 multi-tracker schema and compatibility normalization (ready)\n- dev-nexus:local-45 tracker registry and explicit tracker selection\n- dev-nexus:local-46 neutral tracker link records\n- dev-nexus:local-47 dry-run sync planner\n- dev-nexus:local-48 one-way local-to-GitHub sync execution with mocked providers\n- dev-nexus:local-49 agent status and automation context updates\n- dev-nexus:local-50 coordination tools target tracker roles\n- dev-nexus:local-51 documentation and migration guidance\n- dev-nexus:local-52 first live dogfood sync policy decision (blocked/HITL)\n\nLive external provider writes remain gated by policy and credentials; implementation slices should use mocked providers until the policy item is resolved.",
+        "author": null,
+        "createdAt": "2026-05-17T13:59:51.938Z",
+        "updatedAt": "2026-05-17T13:59:51.938Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-73"
+        }
+      }
+    ],
+    "local-44": [],
+    "local-45": [],
+    "local-46": [],
+    "local-47": [],
+    "local-48": [],
+    "local-49": [],
+    "local-50": [],
+    "local-51": [],
+    "local-52": [],
+    "local-53": [
+      {
+        "id": "local-comment-80",
+        "body": "Starting ASAP Mac onboarding unblock. Scope: central portable path resolver and first integration points needed by project status/setup assistant, plus published dogfood CLI if verification passes. Keep legacy absolute paths compatible.",
+        "author": null,
+        "createdAt": "2026-05-17T14:46:32.314Z",
+        "updatedAt": "2026-05-17T14:46:32.314Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-80"
+        }
+      },
+      {
+        "id": "local-comment-81",
+        "body": "Implemented and published in DevNexus commit e88d7aa. Added central portable path resolver with sourcesRoot/projectRoot/projectParent/home bases, wired project status and setup plan/check through it, preserved legacy absolute path compatibility, and published @evref-bl/dev-nexus@0.1.0-alpha.3 under the dogfood dist-tag. Dogfood config now uses sourcesRoot:<component> component roots; Windows has local junctions under C:\\dev\\code\\sources to preserve current checkouts. Verification passed: npm run check (46 files, 294 tests).",
+        "author": null,
+        "createdAt": "2026-05-17T15:01:41.395Z",
+        "updatedAt": "2026-05-17T15:01:41.395Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-81"
+        }
+      }
+    ]
   }
 }

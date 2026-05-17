@@ -17,7 +17,7 @@
       "role": "primary",
       "remoteUrl": "git@github.com:Evref-BL/DevNexus.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus",
+      "sourceRoot": "sourcesRoot:dev-nexus",
       "worktreesRoot": "worktrees/dev-nexus",
       "workTracking": {
         "provider": "local",
@@ -47,7 +47,7 @@
       "role": "extension",
       "remoteUrl": "git@github.com:Evref-BL/DevNexus-Pharo.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus-Pharo",
+      "sourceRoot": "sourcesRoot:dev-nexus-pharo",
       "worktreesRoot": "worktrees/dev-nexus-pharo",
       "workTracking": {
         "provider": "local",
@@ -77,7 +77,7 @@
       "role": "dependency",
       "remoteUrl": "git@github.com:Evref-BL/PLexus.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\git\\PLexus",
+      "sourceRoot": "sourcesRoot:plexus",
       "worktreesRoot": "worktrees/plexus",
       "workTracking": {
         "provider": "local",
@@ -98,7 +98,7 @@
       "role": "dependency",
       "remoteUrl": "git@github.com:Evref-BL/pharo-launcher-mcp.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\git\\pharo-launcher-mcp",
+      "sourceRoot": "sourcesRoot:pharo-launcher-mcp",
       "worktreesRoot": "worktrees/pharo-launcher-mcp",
       "workTracking": {
         "provider": "local",
@@ -124,7 +124,7 @@
       "role": "dependency",
       "remoteUrl": "https://github.com/Evref-BL/MCP.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
+      "sourceRoot": "sourcesRoot:mcp-pharo",
       "worktreesRoot": "worktrees/mcp-pharo",
       "workTracking": {
         "provider": "local",
@@ -145,9 +145,8 @@
     }
   ],
   "mcp": {
-    "command": "C:\\Users\\gabriel.darbord\\AppData\\Local\\OpenAI\\Codex\\bin\\node.exe",
+    "command": "dev-nexus",
     "args": [
-      "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus\\dist\\cli.js",
       "mcp-stdio"
     ],
     "defaultToolsApprovalMode": "approve",
