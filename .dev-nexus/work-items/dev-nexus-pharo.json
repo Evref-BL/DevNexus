@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 12,
-  "nextCommentNumber": 25,
-  "updatedAt": "2026-05-17T18:50:12.238Z",
+  "nextCommentNumber": 27,
+  "updatedAt": "2026-05-17T19:31:54.498Z",
   "items": [
     {
       "id": "local-1",
@@ -225,7 +225,7 @@
       "id": "local-10",
       "title": "Deprecate generic tracker wrappers from DevNexus-Pharo",
       "description": "Type: specialization cleanup slice\nReadiness: autonomous agent-ready (AFK); no live Pharo image, PLexus route, Docker run, or external provider posting required.\nSource finding: DevNexus-Pharo README advertised provider-neutral tracker configuration even though generic work tracking belongs to DevNexus core. The command is not only stale documentation: DevNexus-Pharo still exposes dev-nexus-pharo project configure-tracker in CLI usage, project_configure_tracker through MCP, and tests/service wrappers that delegate into DevNexus core.\n\nGoal: make DevNexus-Pharo clearly a Pharo specialization/plugin layer, while generic project tracker configuration and sync surfaces live in DevNexus core.\n\nAcceptance criteria:\n- DevNexus-Pharo CLI and MCP docs identify generic tracker commands as legacy compatibility wrappers or remove them after a migration path is chosen.\n- New docs and examples use dev-nexus project tracker configure for provider-neutral work tracking.\n- DevNexus-Pharo-owned code no longer presents generic tracker configuration as first-class Pharo plugin behavior; any remaining wrapper delegates to DevNexus core and emits/decribes deprecation consistently.\n- Focused CLI/MCP/project-service tests cover the chosen compatibility/deprecation behavior.\n- README and help text stay aligned with the architectural boundary: DevNexus owns generic work tracking, DevNexus-Pharo owns Pharo plugin/setup behavior.\n\nVerification:\n- Run focused DevNexus-Pharo CLI/MCP/project-service tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -237,8 +237,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T16:14:39.404Z",
-      "updatedAt": "2026-05-17T16:14:39.404Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:31:54.498Z",
+      "closedAt": "2026-05-17T19:15:34.619Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -500,7 +500,30 @@
         }
       }
     ],
-    "local-10": [],
+    "local-10": [
+      {
+        "id": "local-comment-25",
+        "body": "Completed and published. DevNexus-Pharo commit f49a45c deprecates generic tracker wrappers consistently across CLI usage, MCP tool descriptions/results, project-service results, docs, and focused tests. Compatibility wrappers are retained but now report deprecation metadata and direct users to DevNexus core tracker commands. Verification: npm test -- src/cli.test.ts src/mcpServer.test.ts src/projectService.test.ts passed in the worktree; npm run check passed in the worktree and source checkout. Published @evref-bl/dev-nexus-pharo@0.1.0-alpha.6 on the dogfood npm tag and pushed origin/main.",
+        "author": null,
+        "createdAt": "2026-05-17T19:15:34.417Z",
+        "updatedAt": "2026-05-17T19:15:34.417Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-25"
+        }
+      },
+      {
+        "id": "local-comment-26",
+        "body": "Completed and published through DevNexus-Pharo source commit f49a45c, released as @evref-bl/dev-nexus-pharo@0.1.0-alpha.6 on the dogfood npm tag. Worker commit 214cc99 deprecated generic tracker wrapper surfaces and points generic tracker configuration/linking back to DevNexus core while retaining compatibility wrappers. Verification passed with focused CLI/MCP/project-service tests and npm run check.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:54.342Z",
+        "updatedAt": "2026-05-17T19:31:54.342Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-26"
+        }
+      }
+    ],
     "local-11": [
       {
         "id": "local-comment-20",

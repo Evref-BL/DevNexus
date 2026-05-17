@@ -17,22 +17,26 @@ Immediate direction:
   tools `eligible_work` and `agent_profiles`.
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
-- Current ready `dogfood` work matching the automation selector after parallel
-  wave `parallel-dev-nexus-wave-20260517-1115`:
+- Parallel DevNexus wave `parallel-dev-nexus-wave-20260517-1854` completed
+  and published through DevNexus `dfa7099`, released as
+  `@evref-bl/dev-nexus@0.1.0-alpha.8` on the `dogfood` npm tag:
+  - `dev-nexus:local-38` added publication identity and remote/account
+    guardrails.
+  - `dev-nexus:local-39` added first-class meta-project hosting
+    configuration.
+  - `dev-nexus:local-44` added component multi-tracker schema and compatibility
+    normalization.
+  - `dev-nexus:local-55` added extensible agent-provider MCP target support,
+    including OpenCode/manual/custom configuration paths and Windows
+    `dev-nexus.cmd` MCP refresh behavior.
+- Current ready `dogfood` work matching the automation selector after that
+  wave:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
-  - `dev-nexus:local-38` add publication identity and remote guardrails so
-    DevNexus can prevent GitHub account/remote mix-ups before automated pushes
-    or provider writes.
-  - `dev-nexus:local-39` add first-class meta-project hosting configuration so
-    DevNexus can describe the GitHub user/org namespace, repo naming,
-    visibility, remote names, repo provisioning policy, and host-local auth
-    profile reference for shared meta repositories.
-  - `dev-nexus:local-44` add component multi-tracker schema and compatibility
-    normalization.
-  - `dev-nexus:local-55` add extensible agent-provider MCP target support so
-    DevNexus can support providers such as OpenCode without Codex-specific
-    assumptions.
+  - `dev-nexus:local-56` expose referenced planning docs in worker context.
+    This tracks the PRD projection gap found when the `local-44` worker prompt
+    referenced `docs/component-multi-tracker-prd.md` as if it existed inside
+    the prepared component worktree.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -40,11 +44,11 @@ Immediate direction:
     as `Gabot-Darbot` for bot API work.
   - The dogfood meta repo uses `origin` for personal SSH access and `bot` for
     `git@github.com-gabot:Gabot-Darbot/dev-nexus-dogfood.git`.
-  - Until `dev-nexus:local-38` lands, agents must not infer the right account
-    from the active browser or default `gh`; automation should use explicit
-    remotes/wrappers.
-  - Until `dev-nexus:local-39` lands, the current bot-owned repo is a working
-    dogfood setup, not yet the portable DevNexus project-hosting model.
+  - `dev-nexus:local-38` and `dev-nexus:local-39` are now published through
+    DevNexus `dfa7099`. Agents should still use explicit configured
+    remotes/wrappers, but DevNexus now has modeled publication identity,
+    remote guardrail, auth-profile, and meta-project hosting configuration
+    surfaces instead of relying on implicit shell/browser state.
 - Onboarding direction:
   - `dev-nexus:local-40` is complete through DevNexus `4524fc6`: guided setup
     assistant flows are exposed through CLI and MCP as `setup list`, `setup
@@ -97,9 +101,16 @@ Immediate direction:
     entry exists, but this Windows Codex session still lacks a visible
     `mcp__dev_nexus` namespace, so generic DevNexus operations continue through
     the CLI until that provider-session issue is isolated.
-  - `dev-nexus:local-55` tracks the next provider-inclusion slice: extensible
-    agent MCP target adapters, including OpenCode or a documented custom
-    provider/manual-config path once provider docs confirm the config model.
+  - `dev-nexus-pharo:local-10` is complete through DevNexus-Pharo `f49a45c`
+    and npm `@evref-bl/dev-nexus-pharo@0.1.0-alpha.6` on the `dogfood` tag:
+    generic tracker wrapper surfaces are now explicitly deprecated and point
+    tracker configuration/linking back to DevNexus core. The dogfood plugin
+    version pin now uses alpha.6.
+  - `dev-nexus:local-55` is complete through DevNexus `dfa7099` and npm
+    `@evref-bl/dev-nexus@0.1.0-alpha.8`: agent MCP refresh now has
+    provider-aware targets for Codex, Claude, OpenCode, manual, and custom
+    providers, plus explicit unsupported-capability gaps and Windows
+    `dev-nexus.cmd` command projection.
   - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
     meta-repo setup flow after the generic setup assistant and hosting config
     shape exist.

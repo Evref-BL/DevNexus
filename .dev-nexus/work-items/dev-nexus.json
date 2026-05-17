@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 56,
-  "nextCommentNumber": 92,
-  "updatedAt": "2026-05-17T17:33:07.152Z",
+  "nextNumber": 57,
+  "nextCommentNumber": 97,
+  "updatedAt": "2026-05-17T19:31:54.859Z",
   "items": [
     {
       "id": "local-1",
@@ -910,7 +910,7 @@
       "id": "local-38",
       "title": "Add publication identity and remote guardrails",
       "description": "Type: Git publication/account safety implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource discussion: the dogfood meta repository is owned by the dedicated machine user Gabot-Darbot while the human account Gabriel-Darbord remains the normal personal CLI/Git identity. Local setup uses plain gh for Gabriel-Darbord, gh-gabot with GH_CONFIG_DIR for Gabot-Darbot, origin for personal SSH access, and bot for the bot SSH host alias.\n\nGoal: make DevNexus prevent GitHub account and remote mix-ups by modeling publication identity and validating remotes/accounts before push or provider writes.\n\nAcceptance criteria:\n- Project/component publication policy can declare the intended actor for automated publication or provider writes, such as a named machine user, GitHub App, or human account.\n- Publication policy can declare the expected Git remote name, expected remote URL or SSH host alias, and optional command environment such as GH_CONFIG_DIR without storing secrets.\n- DevNexus preflight/status surfaces report the effective Git remote, upstream branch, push URL, expected actor, and observed actor when it can be checked safely.\n- Automation/worker launch context tells agents which remote/account is intended for human work versus bot automation.\n- Before any DevNexus-owned push or live provider mutation, DevNexus can block with an actionable error when the configured remote or actor does not match policy.\n- Documentation covers the recommended GitHub machine-user setup: SSH host alias for Git, isolated gh config for API calls, personal origin plus bot remote when both accounts need access, and no secrets in shared meta repos.\n- Tests mock git and gh/app-token checks; no live GitHub credentials are required.\n\nBoundaries:\n- Do not hard-code Gabot-Darbot or Gabriel-Darbord into DevNexus core; use them only as examples in dogfood-local docs/fixtures if needed.\n- Keep GitHub-specific details behind provider/adaptor policy so GitLab/Jira can reuse the generic actor concept later.\n- Do not make DevNexus choose work or merge policy; this only guards configured publication/provider actions.\n\nVerification:\n- Focused publication/account-policy tests.\n- Focused agent launch/context tests proving the intended actor/remote is surfaced.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -922,8 +922,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:36:16.678Z",
-      "updatedAt": "2026-05-17T13:47:22.062Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:31:53.041Z",
+      "closedAt": "2026-05-17T19:31:53.041Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -935,7 +935,7 @@
       "id": "local-39",
       "title": "Add meta-project hosting configuration",
       "description": "Type: meta-project hosting configuration slice\nReadiness: autonomous agent-ready (AFK) for config/schema/docs and mocked GitHub provider behavior; human-in-the-loop (HITL) for any live org/account/repository provisioning.\nSource discussion: DevNexus meta projects should be pushable/shareable through a configured GitHub owner/namespace, such as a dedicated bot account repository or a private organization. The hosting namespace, repository naming policy, visibility, default branch, and automation actor should be DevNexus-managed project configuration rather than ad hoc local Git setup.\n\nGoal: add first-class DevNexus configuration for where shared meta-project repositories live and how they are provisioned, without storing secrets in shared project state.\n\nAcceptance criteria:\n- DevNexus project config can describe a meta-project hosting target: provider, owner/namespace, repository naming convention, visibility, default branch, remote names, and whether DevNexus may create the remote repository automatically.\n- The hosting target can represent either a user-owned machine-account namespace such as `Gabot-Darbot` or a private organization namespace, without changing the rest of the project model.\n- Config separates portable hosting intent from host-local authentication material. Shared config may reference a named auth profile, but tokens, app keys, SSH private keys, and absolute credential paths stay in host-local config/overrides.\n- DevNexus can generate or validate the expected meta repo remote URLs for human and automation remotes, such as personal `origin` plus bot `bot`, without requiring agents to choose manually.\n- DevNexus can preflight whether the remote repo exists and whether the configured actor appears to have the required read/write/admin capability; live creation remains policy-gated.\n- Documentation explains recommended setups: dedicated machine-user account repo, private organization repo, and later GitHub App installation, including tradeoffs for multi-host dogfood.\n- Mocked provider tests cover repo-name derivation, remote generation, missing repo, permission mismatch, and host-local auth profile lookup failure.\n\nBoundaries:\n- Do not hard-code Gabot-Darbot, Gabriel-Darbord, or one GitHub organization into DevNexus core; use examples only in docs/fixtures.\n- Do not require a real GitHub token or live repo creation in normal tests.\n- Keep provider-specific GitHub details behind a hosting/provider adapter so GitLab can be added later.\n- Do not conflate source component publication with meta-project hosting; source repos may remain in an upstream organization while meta repos live in a DevNexus-owned namespace.\n\nRelationship:\n- Complements `dev-nexus:local-38`, which guards the actor/remote used for publication and provider writes. This item owns where meta repositories are configured/provisioned.\n\nVerification:\n- Focused project config/schema tests.\n- Focused hosting/remote-generation tests with mocked provider responses.\n- Focused docs/example validation if available.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -948,8 +948,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:46:52.140Z",
-      "updatedAt": "2026-05-17T13:54:58.317Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:31:53.493Z",
+      "closedAt": "2026-05-17T19:31:53.493Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1066,7 +1066,7 @@
       "id": "local-44",
       "title": "Add component multi-tracker schema and compatibility normalization",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: `docs/component-multi-tracker-prd.md`.\nParent planning item: `dev-nexus:local-43`.\n\nGoal: add the additive component tracker-binding configuration model while preserving existing single `workTracking` behavior.\n\nUser stories covered:\n- As a project maintainer, I can keep existing single-tracker components working unchanged.\n- As a project maintainer, I can declare multiple named trackers and choose one default tracker.\n\nAcceptance criteria:\n- Component configuration accepts named work tracker bindings with stable id, display name, enabled flag, roles, and provider config.\n- Existing `components[].workTracking` remains accepted and normalizes into one default tracker binding.\n- Existing project-level legacy `workTracking` compatibility still normalizes onto the generated primary component.\n- Config validation rejects duplicate tracker ids, missing default tracker ids, invalid roles, and unusable empty tracker lists.\n- Project/component status reports default tracker id plus the normalized tracker list and capability summaries.\n- Current single-tracker fixtures/tests continue to pass without project config changes.\n\nBoundaries:\n- Do not change work-item operation routing in this slice beyond reading the normalized default tracker.\n- Do not add sync execution or external writes.\n\nVerification:\n- Focused project config/lifecycle/status tests for legacy single-tracker and new multi-tracker configs.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1079,8 +1079,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.130Z",
-      "updatedAt": "2026-05-17T13:59:50.130Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:31:53.830Z",
+      "closedAt": "2026-05-17T19:31:53.830Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1353,7 +1353,7 @@
       "id": "local-55",
       "title": "Add extensible agent-provider MCP target support",
       "description": "Type: agent-provider MCP projection slice\nReadiness: autonomous agent-ready (AFK) with current provider docs; no live credentials required.\nSource finding: Mac onboarding exposed that DevNexus setup guidance must not assume Codex Desktop. Users may prefer OpenCode or another MCP-capable agent provider with a different project/session and config model.\n\nGoal: make DevNexus agent-provider setup extensible beyond the current Codex/Claude concrete projection writers, starting with OpenCode if its documented MCP config model is stable enough.\n\nAcceptance criteria:\n- Agent MCP target configuration distinguishes provider identity, config path, config format/schema, project/session activation notes, and approval/tool-trust semantics where supported.\n- `project mcp refresh` reports unsupported provider/config combinations as explicit capability gaps instead of Codex-specific assumptions or generic crashes.\n- OpenCode support is implemented when official docs confirm the config shape; otherwise a documented custom-provider/manual-config path exists.\n- Setup plan/check output remains provider-neutral and lists configured target agents plus exact generated or manual config files.\n- Tests cover Codex, Claude, OpenCode or custom provider fixtures, unsupported provider warnings, and project/session setup-record readiness.\n\nBoundaries:\n- Do not edit provider global state, app databases, credentials, or private auth material.\n- Do not assume every provider uses Codex TOML or Claude-style JSON.\n- Keep DevNexus generic; provider-specific behavior belongs in target adapters.\n\nVerification:\n- Focused agent MCP config and setup assistant tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1366,13 +1366,38 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T17:07:57.932Z",
-      "updatedAt": "2026-05-17T17:09:14.469Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:31:54.160Z",
+      "closedAt": "2026-05-17T19:31:54.160Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-55",
         "itemNumber": 55
+      }
+    },
+    {
+      "id": "local-56",
+      "title": "Expose referenced planning docs in worker context",
+      "description": "Type: worker-context setup defect\nReadiness: autonomous agent-ready (AFK)\nSource: during the 2026-05-17 parallel dogfood wave, the local-44 worker prompt referenced `docs/component-multi-tracker-prd.md` inside the prepared component worktree, but DevNexus worktree preparation only projected core context files and did not make referenced root docs available in the worktree. The worker had to report an input gap and continue from acceptance criteria until the coordinator sent the root PRD path manually.\n\nGoal: make prepared worker contexts expose or resolve work-item referenced planning documents so agents do not receive nonexistent doc paths.\n\nAcceptance criteria:\n- Worktree preparation detects root-relative doc references from work-item descriptions and/or selected project docs and records them in `.dev-nexus/context/context.json` plus `briefing.md` as read-only inputs with absolute paths.\n- Coordinator/worker briefing avoids implying that root docs exist inside the component worktree unless they are explicitly projected there.\n- If a referenced planning file is missing, setup reports a clear capability/input gap before launch.\n- Tests cover a work item referencing `docs/component-multi-tracker-prd.md` and prove the worker context includes the correct read-only root path.\n\nBoundaries:\n- Do not copy arbitrary project docs into source worktrees by default if read-only absolute references are enough.\n- Preserve component worktree ownership: root docs are context, not worker write scope.\n\nVerification:\n- Focused worker context/worktree prepare tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "worker-context",
+        "docs",
+        "setup",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T19:08:17.175Z",
+      "updatedAt": "2026-05-17T19:31:54.859Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-56",
+        "itemNumber": 56
       }
     }
   ],
@@ -2239,6 +2264,17 @@
           "provider": "local",
           "itemId": "local-comment-71"
         }
+      },
+      {
+        "id": "local-comment-92",
+        "body": "Completed and published through DevNexus source commit dfa7099, released as @evref-bl/dev-nexus@0.1.0-alpha.8 on the dogfood npm tag. Worker commit 173e054 added publication identity and remote/account guardrails with mocked GitHub actor and remote checks. Verification passed in the worker, integration worktree, and source checkout with npm run check.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:52.869Z",
+        "updatedAt": "2026-05-17T19:31:52.869Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-92"
+        }
       }
     ],
     "local-39": [
@@ -2251,6 +2287,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-72"
+        }
+      },
+      {
+        "id": "local-comment-93",
+        "body": "Completed and published through DevNexus source commit dfa7099, released as @evref-bl/dev-nexus@0.1.0-alpha.8 on the dogfood npm tag. Worker commit 56d19dc added meta-project hosting configuration, remote URL generation, host-local auth profile references, and mocked setup/preflight behavior. Live repo creation remains policy-gated follow-up behavior.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:53.219Z",
+        "updatedAt": "2026-05-17T19:31:53.219Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-93"
         }
       }
     ],
@@ -2426,7 +2473,19 @@
         }
       }
     ],
-    "local-44": [],
+    "local-44": [
+      {
+        "id": "local-comment-94",
+        "body": "Completed and published through DevNexus source commit dfa7099, released as @evref-bl/dev-nexus@0.1.0-alpha.8 on the dogfood npm tag. Worker commit 7fbd1bd added component workTrackers/defaultWorkTrackerId schema, legacy workTracking normalization, and status reporting for tracker capabilities. The missing PRD projection observed during this item is tracked separately as dev-nexus:local-56.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:53.657Z",
+        "updatedAt": "2026-05-17T19:31:53.657Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-94"
+        }
+      }
+    ],
     "local-45": [],
     "local-46": [],
     "local-47": [],
@@ -2472,6 +2531,31 @@
         }
       }
     ],
-    "local-55": []
+    "local-55": [
+      {
+        "id": "local-comment-95",
+        "body": "Completed and published through DevNexus source commit dfa7099, released as @evref-bl/dev-nexus@0.1.0-alpha.8 on the dogfood npm tag. Worker commit 5e54d3f added provider-aware MCP targets for Codex, Claude, OpenCode, manual, and custom providers, unsupported-capability gaps, and Windows dev-nexus.cmd refresh behavior. Verification passed with focused tests, npm run check, and build.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:53.992Z",
+        "updatedAt": "2026-05-17T19:31:53.992Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-95"
+        }
+      }
+    ],
+    "local-56": [
+      {
+        "id": "local-comment-96",
+        "body": "Promoted after the local-44 worker reported that docs/component-multi-tracker-prd.md was referenced as if it existed inside the prepared component worktree. The coordinator supplied the root PRD manually for this run; future worktree preparation should expose referenced planning docs as read-only root paths or report missing inputs before launch.",
+        "author": null,
+        "createdAt": "2026-05-17T19:31:54.676Z",
+        "updatedAt": "2026-05-17T19:31:54.676Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-96"
+        }
+      }
+    ]
   }
 }
