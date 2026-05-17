@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 12,
-  "nextCommentNumber": 21,
-  "updatedAt": "2026-05-17T17:41:32.728Z",
+  "nextCommentNumber": 24,
+  "updatedAt": "2026-05-17T18:21:36.151Z",
   "items": [
     {
       "id": "local-1",
@@ -250,7 +250,7 @@
       "id": "local-11",
       "title": "Materialize DevNexus-Pharo root plugin setup for shared projects",
       "description": "Type: Mac onboarding/plugin projection follow-up\\nReadiness: autonomous agent-ready for static config/projection work; live runtime reachability remains gated by approved runner policy.\\nSource: Mac onboarding report on 2026-05-17 found that the dogfood root only projected generic DevNexus MCP and lacked DevNexus-Pharo/PLexus MCP entries plus Pharo skills. DevNexus core now warns on missing plugin projections in setup check, but the plugin still needs to own materializing its root/worker setup.\\n\\nGoal: provide a DevNexus-Pharo setup/projection path that can be invoked from a shared DevNexus project root to materialize Pharo plugin skills and provider MCP entries without requiring a sibling source checkout or manual global skill installation.\\n\\nAcceptance criteria:\\n- A Mac/Windows shared DevNexus project can run a documented DevNexus-Pharo setup command or hook from the meta root after installing npm packages.\\n- The command materializes DevNexus-Pharo and MCP-Pharo domain skills under .dev-nexus/skills and projects them into configured agent skill directories such as .agents/skills for Codex.\\n- The command updates configured provider MCP files with DevNexus-Pharo/PLexus/Pharo plugin servers where root access is intended, or emits explicit worker-only guidance when root access is not configured.\\n- It does not start live images or PLexus services unless an approved runtime profile is selected.\\n- dev-nexus setup check . join-existing-project no longer leaves unexplained plugin skill/MCP warnings after the static setup portion completes.\\n\\nVerification:\\n- Static fixture project tests for skill and MCP projection on macOS/Windows paths.\\n- Optional temp project smoke using the published npm package, without live image startup.\\n\\nPublication notes:\\n- Direct integration to DevNexus-Pharo origin/main and publish a dogfood npm prerelease if package behavior changes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -262,8 +262,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T17:32:40.114Z",
-      "updatedAt": "2026-05-17T17:41:32.728Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T18:21:36.151Z",
+      "closedAt": "2026-05-17T18:02:47.949Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -511,6 +511,39 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-20"
+        }
+      },
+      {
+        "id": "local-comment-21",
+        "body": "Implemented shared-root DevNexus-Pharo setup in commit ceaa017 and published @evref-bl/dev-nexus-pharo@0.1.0-alpha.1 with npm dist-tag dogfood.\n\nWhat changed:\n- upgraded to @evref-bl/dev-nexus@0.1.0-alpha.7 so generic shared project configs without legacy kanban validate;\n- project skills refresh now materializes DevNexus-Pharo plugin-declared skills, including MCP-Pharo skills, into .dev-nexus/skills and configured agent skill dirs;\n- Codex init now detects shared DevNexus roots with the DevNexus-Pharo plugin and writes dev_nexus, dev_nexus_pharo, plexus_project, pharo_launcher, and pharo entries while removing old managed plexus/vibe_kanban entries;\n- no live images, PLexus services, Docker, or Pharo Launcher processes are started by static setup.\n\nVerification:\n- npm run check in the DevNexus-Pharo worktree: 20 files / 184 tests passed.\n- npm run check in the source checkout after fast-forward: 20 files / 184 tests passed.\n- temp shared-project smoke: skills refresh installed 21/21 expected skills and codex init produced the five shared-root MCP entries.",
+        "author": null,
+        "createdAt": "2026-05-17T18:02:47.748Z",
+        "updatedAt": "2026-05-17T18:02:47.748Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-21"
+        }
+      },
+      {
+        "id": "local-comment-22",
+        "body": "Follow-up before root rollout: commit 594f403 corrects shared-root MCP config so `plexus_project` and `pharo_launcher` use the PLexus core CLI (`plexus`) instead of inheriting the legacy gateway command (`plexus-gateway`). Published `@evref-bl/dev-nexus-pharo@0.1.0-alpha.2` with the `dogfood` tag.\n\nVerification: `npm run check` passed in the worktree and source checkout (20 files / 184 tests), and `npm pack --dry-run` passed for alpha.2.",
+        "author": null,
+        "createdAt": "2026-05-17T18:11:50.061Z",
+        "updatedAt": "2026-05-17T18:11:50.061Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-22"
+        }
+      },
+      {
+        "id": "local-comment-23",
+        "body": "Final static setup hardening: commit a8056da is published and `@evref-bl/dev-nexus-pharo@0.1.0-alpha.4` is now on the `dogfood` dist-tag.\n\nAdditional fixes beyond the original alpha.1 slice:\n- `plexus_project` and `pharo_launcher` use the PLexus core CLI, not the gateway binary.\n- shared-root Codex config prefers project-local runtime binaries under `.dev-nexus/runtime/npm-tools/node_modules/.bin`.\n- Windows generation selects `.cmd` shims when no explicit platform is passed.\n\nRoot smoke: installed the package-local runtime tools, refreshed project skills to 21/21 installed, and regenerated `.codex/config.toml` with `dev_nexus`, `dev_nexus_pharo`, `plexus_project`, `pharo_launcher`, and `pharo` using project-local Windows shims. `dev-nexus-pharo codex doctor` passed. DevNexus setup check now only warns that this already-running provider session has not been restarted/recorded with the refreshed MCP tools visible.",
+        "author": null,
+        "createdAt": "2026-05-17T18:21:36.151Z",
+        "updatedAt": "2026-05-17T18:21:36.151Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-23"
         }
       }
     ]
