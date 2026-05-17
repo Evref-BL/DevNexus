@@ -59,3 +59,16 @@ DevNexus dogfood work on 2026-05-17.
 - `pharo-launcher-mcp` live smoke passed with this profile state root. It copied
   the launcher image/changes into the disposable profile and passed health,
   version, and validate-installation checks.
+- `plexus:local-3` hardened the PLexus smoke runner to require
+  `--approvalProfile`, `--launcherProfileRoot`, `--artifactRoot`,
+  `--stateRoot`, `--runId`, `--workspaceId`, `--targetId`, and timeout budget
+  inputs before live execution. The harness was published as PLexus `5953274`.
+- `pharo-launcher-mcp:local-4` fixed isolated launcher profile configuration,
+  copied-image metadata repair, and Windows detached launch logging. The fix
+  was published as pharo-launcher-mcp `24f6d84`.
+- The approved PLexus live smoke passed as
+  `dogfood-overnight-local-3-20260517-0428`: copied `MCP12-2` to an owned
+  disposable image, opened the project, routed `find-packages`, closed the
+  project, unregistered the route, stopped the process, and deleted the copied
+  image. Artifact evidence is retained under
+  `C:\dev\code\dev-nexus-dogfood\.dev-nexus\runtime\artifacts\overnight-live-20260517\dogfood-overnight-local-3-20260517-0428`.

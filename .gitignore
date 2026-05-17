@@ -1,6 +1,7 @@
 .dev-nexus/automation/agent-launches/
 .dev-nexus/automation/host-runs/
 .dev-nexus/automation/last-codex-message.md
+.dev-nexus/automation/last-agent-result.json
 .dev-nexus/automation/run.lock
 .dev-nexus/automation/runs.json
 .dev-nexus/automation/target-cycles.json

@@ -22,6 +22,9 @@ Immediate direction:
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
+  - `dev-nexus:local-26` project MCP approval defaults into generated agent
+    configs so refreshed Codex MCP entries keep the current trusted server
+    approval settings.
   - `dev-nexus-pharo:local-9` bundle MCP-Pharo domain skills through
     DevNexus-Pharo so Pharo-capable subagents receive CI reproduction, image
     Git handoff, project load, and Pharo version compatibility guidance.
@@ -41,7 +44,13 @@ Immediate direction:
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
 - `pharo-launcher-mcp` live-smoke passed using the approved profile state root
-  and produced no source checkout changes.
+  and produced no source checkout changes. A later launcher-owned fix for
+  isolated profile configuration, copied-image metadata repair, and Windows
+  detached launch logging was completed and published as `24f6d84`.
+- PLexus approved live smoke `dogfood-overnight-local-3-20260517-0428`
+  passed open/route/close through the isolated runner after the launcher fix.
+  Artifacts are retained under
+  `.dev-nexus/runtime/artifacts/overnight-live-20260517/dogfood-overnight-local-3-20260517-0428`.
 - Scoped npm dogfood prereleases were published on 2026-05-17 so other
   machines can install without sibling checkout assumptions:
   - `@evref-bl/dev-nexus@0.1.0-alpha.0` published with `dogfood` tag and
@@ -136,15 +145,9 @@ Immediate direction:
 - Later or dependent non-eligible work:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
-- Previously human-in-the-loop blocked work now ready for isolated runtime setup:
-  - `plexus:local-3` build and harden the isolated PLexus live-smoke runner
-    harness using the approved `overnight-live-20260517` profile.
-
 - Human-in-the-loop blocked work:
   - `dev-nexus:local-16` choose shared coordination provider/transport for
     Mac/Windows dogfood after the generic API shape is ready.
-  - `plexus:local-2` run the approved isolated PLexus live-smoke after
-    `plexus:local-3` confirms the harness is runnable.
   - `dev-nexus-pharo:local-5` verify DevNexus-Pharo-provided Pharo MCP access in
     subagent worktrees after the runner passes.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the approved
@@ -263,8 +266,14 @@ Durable completed foundation:
 - DevNexus-Pharo adapter alignment was completed and published as `c6629df`.
 - PLexus isolated live-smoke runner boundary was documented and published as
   `916e1d5`.
+- PLexus approved isolated live-smoke runner harness was completed and
+  published as `5953274`; `plexus:local-3` and the approved live-smoke
+  execution item `plexus:local-2` are complete.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as
   `1f3070b`.
+- pharo-launcher-mcp isolated profile image-copy configuration was completed
+  and published as `24f6d84`, including profile-root launcher CLI config,
+  copied-image metadata repair, and detached launch log redirection.
 - MCP-Pharo static/live verification boundary was merged through `origin/main`;
   automatic loads and DevNexus component defaults now target `main`.
 - MCP-Pharo `mcp-pharo:local-5` was completed by upstream work now refreshed
