@@ -37,9 +37,16 @@ Immediate direction:
   coordinator should use parallel subagents for independent selected items when
   useful, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS=8` and disjoint
   component/worktree write scopes.
-- The cron prompt now invokes DevNexus through the working Winget Node path
-  instead of the fragile `node` alias that previously resolved to an
-  inaccessible Codex app package runtime in the scheduler shell.
+- The cron prompt now invokes DevNexus through the user-local Codex Node path
+  instead of a fragile `node` alias or scheduler-sensitive package-manager
+  runtime.
+- Previous scheduler blocker: on 2026-05-17T07:32:51Z, the configured
+  Winget-managed `node.exe` returned access denied before DevNexus
+  `automation run-once` could load. No coordinator launch or implementation
+  work was attempted during that blocked overnight run.
+- Current automation state: the Codex automation is active again and now invokes
+  DevNexus through
+  `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\node.exe`.
 - Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
@@ -299,7 +306,7 @@ Durable completed foundation:
   with `default_tools_approval_mode = "approve"` for trusted DevNexus-Pharo and
   PLexus MCP servers. `dev-nexus:local-26` is complete; future MCP refreshes
   preserve approval defaults through DevNexus source commit `baa238a`.
-- The dogfood DevNexus MCP projection now uses the working Winget Node
+- The dogfood DevNexus MCP projection now uses the user-local Codex Node
   executable path and declares `defaultToolsApprovalMode: "approve"` in
   `dev-nexus.project.json`; refreshed `.codex/config.toml` contains
   `default_tools_approval_mode = "approve"`.

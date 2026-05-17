@@ -170,9 +170,10 @@ follow-ups remain blocked until an isolated runner is approved.
 - Agent launch mode can use a configured coordinator profile. The current
   Codex profile uses the user-local Codex binary because the Windows app alias
   is not executable from this shell.
-- The cron scheduler command and dogfood MCP projection should use the working
-  Winget Node executable path directly instead of a plain `node` alias when the
-  scheduler shell resolves that alias to an inaccessible app package runtime.
+- The cron scheduler command and dogfood MCP projection should use the
+  user-local Codex Node executable directly. A plain `node` alias can resolve
+  to an inaccessible app package runtime, and the previous Winget-managed Node
+  path returned access denied from the scheduler shell.
 - Target reports now expose relaunch decisions from durable target/run facts.
 
 ## Next Target Direction
