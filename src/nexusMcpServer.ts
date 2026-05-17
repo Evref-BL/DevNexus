@@ -42,6 +42,12 @@ import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  adoptNexusAutomationCurrentAgent,
+  adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
+  recordNexusAutomationCurrentAgentAdoptionResult,
+  type NexusAutomationCurrentAgentAdoptionResultInput,
+} from "./nexusAutomationCurrentAgentAdoption.js";
+import {
   createNexusCoordinationHandoff,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
@@ -225,6 +231,89 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "current_agent_adopt",
+    description: "Create or reuse DevNexus agent-launch context for the current coordinator without spawning nested model execution.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        runId: { type: "string" },
+        owner: { type: ["string", "null"] },
+        coordinatorLoop: { type: "boolean" },
+        runIdPrefix: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "current_agent_record",
+    description: "Record the current coordinator's adopted DevNexus run result and release its adoption lock.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        runId: { type: "string" },
+        result: {
+          type: "object",
+          properties: {
+            status: {
+              type: "string",
+              enum: ["completed", "blocked", "failed", "skipped"],
+            },
+            summary: { type: "string" },
+            commitIds: { type: "array", items: { type: "string" } },
+            verification: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  command: { type: "string" },
+                  status: {
+                    type: "string",
+                    enum: ["passed", "failed", "not_run"],
+                  },
+                  summary: { type: ["string", "null"] },
+                },
+                required: ["command"],
+                additionalProperties: false,
+              },
+            },
+            publicationDecision: {
+              type: "object",
+              properties: {
+                type: {
+                  type: "string",
+                  enum: [
+                    "not_decided",
+                    "local_only",
+                    "direct_integration",
+                    "review_handoff",
+                    "blocked",
+                  ],
+                },
+                targetBranch: { type: ["string", "null"] },
+                remote: { type: ["string", "null"] },
+                prUrl: { type: ["string", "null"] },
+                reason: { type: ["string", "null"] },
+              },
+              required: ["type"],
+              additionalProperties: false,
+            },
+            error: { type: ["string", "null"] },
+          },
+          required: ["status", "summary"],
+          additionalProperties: false,
+        },
+      },
+      required: ["runId", "result"],
       additionalProperties: false,
     },
   },
@@ -473,6 +562,35 @@ export async function callDevNexusMcpTool(
           report: buildNexusAutomationTargetReport({
             projectRoot: projectRootFromArgs(args),
             now: context.now?.(),
+          }),
+        });
+      case "current_agent_adopt": {
+        const coordinatorLoop =
+          optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
+        const adoptOptions = {
+          projectRoot: projectRootFromArgs(args),
+          runId: optionalString(args, "runId", "arguments"),
+          owner: optionalNullableString(args, "owner", "arguments"),
+          now: context.now,
+        };
+        return toolResult({
+          ok: true,
+          ...(coordinatorLoop
+            ? await adoptNexusAutomationCurrentAgentFromCoordinatorLoop({
+                ...adoptOptions,
+                runIdPrefix: optionalString(args, "runIdPrefix", "arguments"),
+              })
+            : await adoptNexusAutomationCurrentAgent(adoptOptions)),
+        });
+      }
+      case "current_agent_record":
+        return toolResult({
+          ok: true,
+          ...recordNexusAutomationCurrentAgentAdoptionResult({
+            projectRoot: projectRootFromArgs(args),
+            runId: requiredString(args, "runId", "arguments"),
+            result: currentAgentResultFromArgs(args),
+            now: context.now,
           }),
         });
       case "coordination_status":
@@ -743,6 +861,119 @@ function appendTargetCycleFromArgs(
     projectId: projectConfig.id,
     record: ledger.cycles.at(-1)!,
     ledger,
+  };
+}
+
+function currentAgentResultFromArgs(
+  args: Record<string, unknown>,
+): NexusAutomationCurrentAgentAdoptionResultInput {
+  const result = asRecord(args.result, "arguments.result");
+  return {
+    status: parseCurrentAgentResultStatus(
+      requiredString(result, "status", "arguments.result"),
+      "arguments.result.status",
+    ),
+    summary: requiredString(result, "summary", "arguments.result"),
+    ...(hasOwn(result, "commitIds")
+      ? {
+          commitIds:
+            optionalStringArray(result, "commitIds", "arguments.result") ?? [],
+        }
+      : {}),
+    ...(hasOwn(result, "verification")
+      ? {
+          verification:
+            currentAgentVerificationFromArgs(
+              result,
+              "verification",
+              "arguments.result",
+            ) ?? [],
+        }
+      : {}),
+    ...(hasOwn(result, "publicationDecision")
+      ? {
+          publicationDecision: currentAgentPublicationDecisionFromArgs(
+            asRecord(
+              result.publicationDecision,
+              "arguments.result.publicationDecision",
+            ),
+          ),
+        }
+      : {}),
+    ...(hasOwn(result, "error")
+      ? { error: optionalNullableString(result, "error", "arguments.result") ?? null }
+      : {}),
+  };
+}
+
+function currentAgentVerificationFromArgs(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["verification"]> | undefined {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${pathName}.${key} must be an array`);
+  }
+
+  return value.map((item, index) => {
+    const itemPath = `${pathName}.${key}[${index}]`;
+    const verification = asRecord(item, itemPath);
+    return {
+      command: requiredString(verification, "command", itemPath),
+      ...(hasOwn(verification, "status")
+        ? {
+            status: parseVerificationStatus(
+              requiredString(verification, "status", itemPath),
+              `${itemPath}.status`,
+            ),
+          }
+        : {}),
+      ...(hasOwn(verification, "summary")
+        ? {
+            summary:
+              optionalNullableString(verification, "summary", itemPath) ?? null,
+          }
+        : {}),
+    };
+  });
+}
+
+function currentAgentPublicationDecisionFromArgs(
+  record: Record<string, unknown>,
+): NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["publicationDecision"]> {
+  return {
+    type: parsePublicationDecisionType(
+      requiredString(record, "type", "arguments.result.publicationDecision"),
+      "arguments.result.publicationDecision.type",
+    ),
+    targetBranch:
+      optionalNullableString(
+        record,
+        "targetBranch",
+        "arguments.result.publicationDecision",
+      ) ?? null,
+    remote:
+      optionalNullableString(
+        record,
+        "remote",
+        "arguments.result.publicationDecision",
+      ) ?? null,
+    prUrl:
+      optionalNullableString(
+        record,
+        "prUrl",
+        "arguments.result.publicationDecision",
+      ) ?? null,
+    reason:
+      optionalNullableString(
+        record,
+        "reason",
+        "arguments.result.publicationDecision",
+      ) ?? null,
   };
 }
 
@@ -1315,6 +1546,54 @@ function parseTargetCycleStatus(
   }
 
   throw new Error(`${pathName} must be a valid target cycle status`);
+}
+
+function parseCurrentAgentResultStatus(
+  value: string,
+  pathName: string,
+): NexusAutomationCurrentAgentAdoptionResultInput["status"] {
+  if (
+    value === "completed" ||
+    value === "blocked" ||
+    value === "failed" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid current-agent result status`);
+}
+
+function parseVerificationStatus(
+  value: string,
+  pathName: string,
+): NonNullable<
+  NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["verification"]>[number]["status"]
+> {
+  if (value === "passed" || value === "failed" || value === "not_run") {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid verification status`);
+}
+
+function parsePublicationDecisionType(
+  value: string,
+  pathName: string,
+): NonNullable<
+  NexusAutomationCurrentAgentAdoptionResultInput["publicationDecision"]
+>["type"] {
+  if (
+    value === "not_decided" ||
+    value === "local_only" ||
+    value === "direct_integration" ||
+    value === "review_handoff" ||
+    value === "blocked"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid publication decision type`);
 }
 
 function optionalNullableNonNegativeInteger(

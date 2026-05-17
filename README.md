@@ -428,6 +428,16 @@ statuses, and publication decision types. The same required and optional field
 lists are exposed in `DEV_NEXUS_AGENT_RESULT_REQUIRED_FIELDS` and
 `DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS`.
 
+Current-agent adoption uses the same context and result-file contract without
+starting a child coordinator process. `automation current-agent adopt` creates
+or reuses the launch context, keeps the DevNexus run lock for the already
+running coordinator, and returns the `DEV_NEXUS_*` environment values that a
+launched process would have received. The current coordinator then records the
+terminal result with `automation current-agent record` or the MCP
+`current_agent_record` tool. Adoption result statuses are `completed`,
+`blocked`, `failed`, and `skipped`; verification records, commit ids, and
+publication decisions are recorded into the same automation run ledger.
+
 ```json
 {
   "status": "completed",
@@ -574,6 +584,9 @@ dev-nexus automation target-report <project-root> --json
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 dev-nexus automation coordinator-loop <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
+dev-nexus automation current-agent adopt <project-root> --run-id current-1 --json
+dev-nexus automation current-agent record <project-root> --run-id current-1 --status completed --summary "Coordinator completed."
+dev-nexus automation coordinator-loop <project-root> --adopt-current --run-id-prefix heartbeat --json
 ```
 
 For `automation target-cycle record`, `--work-item-status`,
@@ -624,7 +637,17 @@ inputs that would be invisible to the configured agent-launch loop.
 environment variables for project context and writes the retained run ledger.
 In agent-launch mode, no work item is selected and no generated worktree is
 prepared by DevNexus; the target command launches an agent with enough context
-to make its own work-selection and supervision decisions.
+to make its own work-selection and supervision decisions. Use this when
+DevNexus should start a coordinator process.
+
+`automation current-agent adopt` is the no-spawn counterpart for an
+already-running coordinator, such as a Codex heartbeat or a restricted host
+process. It returns `shouldProceed`, the context file, result file, result
+contract, and environment map. If `shouldProceed` is false, the current agent
+must not continue the automation run. If it is true, the agent may proceed
+under the returned `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS` cap and must call
+`automation current-agent record` or `current_agent_record` before yielding the
+run.
 
 `automation schedule` repeatedly checks the same read-only status boundary and
 dispatches `automation run-once` only when the project is ready. It honors
@@ -636,9 +659,12 @@ smokes and supervised runners.
 It records target-cycle decisions for no-work, lock, backoff, blocked, launch,
 completion, and failure outcomes, and launches a coordinator only when the
 project is ready. External schedulers can wake this command while DevNexus
-keeps the durable wait/skip/launch policy in project state. Current-agent
-adoption remains a follow-up; this mode launches the configured coordinator
-command rather than adopting an already-running agent.
+keeps the durable wait/skip/launch policy in project state. With
+`--adopt-current`, the same coordinator-loop gate records the wait/skip/block
+or dispatched target-cycle facts and returns current-agent adoption context
+instead of launching the configured coordinator command. This is the scheduler
+safe path for hosts that can wake DevNexus but must avoid nested model
+execution.
 
 ## Curated Skills
 

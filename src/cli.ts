@@ -34,6 +34,15 @@ import {
   type RunNexusAutomationCoordinatorLoopResult,
 } from "./nexusAutomationCoordinatorLoop.js";
 import {
+  adoptNexusAutomationCurrentAgent,
+  adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
+  recordNexusAutomationCurrentAgentAdoptionResult,
+  type AdoptNexusAutomationCurrentAgentFromCoordinatorLoopResult,
+  type AdoptNexusAutomationCurrentAgentResult,
+  type NexusAutomationCurrentAgentAdoptionResultInput,
+  type NexusAutomationCurrentAgentAdoptionResultStatus,
+} from "./nexusAutomationCurrentAgentAdoption.js";
+import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
@@ -362,6 +371,22 @@ interface ParsedAutomationCoordinatorLoopCommand {
   runIdPrefix?: string;
   timeoutMs?: number;
   runFullVerification?: boolean;
+  adoptCurrent?: boolean;
+  runId?: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationCurrentAgentAdoptCommand {
+  projectRoot: string;
+  runId?: string;
+  owner?: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationCurrentAgentRecordCommand {
+  projectRoot: string;
+  runId: string;
+  result: NexusAutomationCurrentAgentAdoptionResultInput;
   json?: boolean;
 }
 
@@ -396,6 +421,8 @@ export function usage(): string {
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
     "  dev-nexus automation coordinator-loop <project-root> [--command <command>] [options]",
+    "  dev-nexus automation current-agent adopt <project-root> [options]",
+    "  dev-nexus automation current-agent record <project-root> --run-id <id> --status <status> --summary <text> [options]",
     "",
     "Options for home init:",
     "  --projects-root <path>",
@@ -574,12 +601,35 @@ export function usage(): string {
     "",
     "Options for automation coordinator-loop:",
     "  --command <command>        coordinator command; overrides automation.agent.command or coordinator profile command",
+    "  --adopt-current            return current-agent adoption context instead of launching a command",
+    "  --run-id <id>              run id to use with --adopt-current",
     "  --owner <name>",
     "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
     "  --max-ticks <count>        stop after this many loop decisions",
     "  --max-runs <count>         stop after this many coordinator launches",
     "  --run-id-prefix <prefix>",
     "  --timeout-ms <ms>          applies to the coordinator command",
+    "  --json",
+    "",
+    "Options for automation current-agent adopt:",
+    "  --run-id <id>",
+    "  --owner <name>",
+    "  --json",
+    "",
+    "Options for automation current-agent record:",
+    "  --run-id <id>",
+    "  --status <completed|blocked|failed|skipped>",
+    "  --summary <text>",
+    "  --commit <id>              repeatable",
+    "  --verification-command <command>  repeatable",
+    "  --verification-status <passed|failed|not_run>",
+    "  --verification-summary <text>",
+    "  --publication-type <not_decided|local_only|direct_integration|review_handoff|blocked>",
+    "  --publication-remote <name>",
+    "  --publication-target-branch <branch>",
+    "  --publication-pr-url <url>",
+    "  --publication-reason <text>",
+    "  --error <text>",
     "  --json",
   ].join("\n");
 }
@@ -1029,6 +1079,10 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "current-agent") {
+    return handleAutomationCurrentAgentCommand(argv, dependencies);
+  }
+
   if (argv[1] === "schedule") {
     const parsed = parseAutomationScheduleCommand(argv);
     const commandOptions = resolveAutomationCommandCliOptions(
@@ -1074,6 +1128,27 @@ async function handleAutomationCommand(
   if (argv[1] === "coordinator-loop") {
     const parsed = parseAutomationCoordinatorLoopCommand(argv);
     const stdout = dependencies.stdout ?? process.stdout;
+    if (parsed.adoptCurrent) {
+      if (parsed.command) {
+        throw new Error(
+          "automation coordinator-loop --adopt-current does not accept --command",
+        );
+      }
+      const result = await adoptNexusAutomationCurrentAgentFromCoordinatorLoop({
+        projectRoot: parsed.projectRoot,
+        owner: parsed.owner,
+        runId: parsed.runId,
+        intervalMs: parsed.intervalMs,
+        runIdPrefix: parsed.runIdPrefix,
+        now: dependencies.now,
+      });
+      printAutomationCurrentAgentCoordinatorLoopAdoptionResult(
+        result,
+        parsed,
+        stdout,
+      );
+      return 0;
+    }
     const result = await runNexusAutomationCoordinatorLoop({
       projectRoot: parsed.projectRoot,
       owner: parsed.owner,
@@ -1093,7 +1168,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, schedule, or coordinator-loop",
+      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
     );
   }
 
@@ -1204,6 +1279,39 @@ async function handleAutomationTargetCycleCommand(
   }
 
   throw new Error("automation target-cycle requires list or record");
+}
+
+async function handleAutomationCurrentAgentCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  const stdout = dependencies.stdout ?? process.stdout;
+  if (command === "adopt") {
+    const parsed = parseAutomationCurrentAgentAdoptCommand(argv);
+    const result = await adoptNexusAutomationCurrentAgent({
+      projectRoot: parsed.projectRoot,
+      runId: parsed.runId,
+      owner: parsed.owner,
+      now: dependencies.now,
+    });
+    printAutomationCurrentAgentAdoptionResult(result, parsed, stdout);
+    return 0;
+  }
+
+  if (command === "record") {
+    const parsed = parseAutomationCurrentAgentRecordCommand(argv);
+    const result = recordNexusAutomationCurrentAgentAdoptionResult({
+      projectRoot: parsed.projectRoot,
+      runId: parsed.runId,
+      result: parsed.result,
+      now: dependencies.now,
+    });
+    printAutomationCurrentAgentRecordResult(result, parsed, stdout);
+    return 0;
+  }
+
+  throw new Error("automation current-agent requires adopt or record");
 }
 
 function resolveAutomationCommandCliOptions(
@@ -2508,6 +2616,12 @@ function parseAutomationCoordinatorLoopCommand(
       case "--command":
         parsed.command = next();
         break;
+      case "--adopt-current":
+        parsed.adoptCurrent = true;
+        break;
+      case "--run-id":
+        parsed.runId = next();
+        break;
       case "--owner":
         parsed.owner = next();
         break;
@@ -2535,6 +2649,198 @@ function parseAutomationCoordinatorLoopCommand(
   }
 
   return parsed as ParsedAutomationCoordinatorLoopCommand;
+}
+
+function parseAutomationCurrentAgentAdoptCommand(
+  argv: string[],
+): ParsedAutomationCurrentAgentAdoptCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation current-agent adopt requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationCurrentAgentAdoptCommand> = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--run-id":
+        parsed.runId = next();
+        break;
+      case "--owner":
+        parsed.owner = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation current-agent adopt option: ${arg}`);
+    }
+  }
+
+  return parsed as ParsedAutomationCurrentAgentAdoptCommand;
+}
+
+function parseAutomationCurrentAgentRecordCommand(
+  argv: string[],
+): ParsedAutomationCurrentAgentRecordCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation current-agent record requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationCurrentAgentRecordCommand> & {
+    commitIds: string[];
+    verification: NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["verification"]>;
+    publicationDecision?: NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["publicationDecision"]>;
+    status?: NexusAutomationCurrentAgentAdoptionResultStatus;
+    summary?: string;
+    error?: string | null;
+  } = {
+    projectRoot,
+    commitIds: [],
+    verification: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+    const lastVerification = () => {
+      const item = parsed.verification.at(-1);
+      if (!item) {
+        throw new Error(`${arg} requires a preceding --verification-command`);
+      }
+
+      return item;
+    };
+
+    switch (arg) {
+      case "--run-id":
+        parsed.runId = next();
+        break;
+      case "--status":
+        parsed.status = parseCurrentAgentResultStatus(next(), arg);
+        break;
+      case "--summary":
+        parsed.summary = next();
+        break;
+      case "--commit":
+        parsed.commitIds.push(next());
+        break;
+      case "--verification-command":
+        parsed.verification.push({ command: next() });
+        break;
+      case "--verification-status":
+        lastVerification().status = parseVerificationStatus(next(), arg);
+        break;
+      case "--verification-summary":
+        lastVerification().summary = next();
+        break;
+      case "--publication-type":
+        parsed.publicationDecision = {
+          ...(parsed.publicationDecision ?? {
+            targetBranch: null,
+            remote: null,
+            prUrl: null,
+            reason: null,
+          }),
+          type: parsePublicationDecisionType(next(), arg),
+        };
+        break;
+      case "--publication-remote":
+        parsed.publicationDecision = {
+          ...(parsed.publicationDecision ?? {
+            type: "not_decided",
+            targetBranch: null,
+            prUrl: null,
+            reason: null,
+          }),
+          remote: next(),
+        };
+        break;
+      case "--publication-target-branch":
+        parsed.publicationDecision = {
+          ...(parsed.publicationDecision ?? {
+            type: "not_decided",
+            remote: null,
+            prUrl: null,
+            reason: null,
+          }),
+          targetBranch: next(),
+        };
+        break;
+      case "--publication-pr-url":
+        parsed.publicationDecision = {
+          ...(parsed.publicationDecision ?? {
+            type: "not_decided",
+            targetBranch: null,
+            remote: null,
+            reason: null,
+          }),
+          prUrl: next(),
+        };
+        break;
+      case "--publication-reason":
+        parsed.publicationDecision = {
+          ...(parsed.publicationDecision ?? {
+            type: "not_decided",
+            targetBranch: null,
+            remote: null,
+            prUrl: null,
+          }),
+          reason: next(),
+        };
+        break;
+      case "--error":
+        parsed.error = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation current-agent record option: ${arg}`);
+    }
+  }
+
+  if (!parsed.runId) {
+    throw new Error("automation current-agent record requires --run-id");
+  }
+  if (!parsed.status) {
+    throw new Error("automation current-agent record requires --status");
+  }
+  if (!parsed.summary) {
+    throw new Error("automation current-agent record requires --summary");
+  }
+
+  return {
+    projectRoot,
+    runId: parsed.runId,
+    json: parsed.json,
+    result: {
+      status: parsed.status,
+      summary: parsed.summary,
+      ...(parsed.commitIds.length ? { commitIds: parsed.commitIds } : {}),
+      ...(parsed.verification.length ? { verification: parsed.verification } : {}),
+      ...(parsed.publicationDecision
+        ? { publicationDecision: parsed.publicationDecision }
+        : {}),
+      ...(parsed.error !== undefined ? { error: parsed.error } : {}),
+    },
+  };
 }
 
 function printHomeInitResult(
@@ -3027,6 +3333,78 @@ function printAutomationCoordinatorLoopResult(
   }
 }
 
+function printAutomationCurrentAgentCoordinatorLoopAdoptionResult(
+  result: AdoptNexusAutomationCurrentAgentFromCoordinatorLoopResult,
+  parsed: ParsedAutomationCoordinatorLoopCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus current-agent coordinator-loop adoption checked.");
+  writeLine(stdout, `  Decision: ${result.decision.type}`);
+  writeLine(stdout, `  Action: ${result.action}`);
+  writeLine(stdout, `  Proceed: ${result.shouldProceed ? "yes" : "no"}`);
+  if (result.adoption) {
+    writeLine(stdout, `  Run: ${result.adoption.runId}`);
+    if (result.adoption.contextFile) {
+      writeLine(stdout, `  Context: ${result.adoption.contextFile}`);
+    }
+    if (result.adoption.resultFile) {
+      writeLine(stdout, `  Result file: ${result.adoption.resultFile}`);
+    }
+  }
+  if (result.targetCycle) {
+    writeLine(stdout, `  Target cycle: ${result.targetCycle.id} ${result.targetCycle.status}`);
+  }
+}
+
+function printAutomationCurrentAgentAdoptionResult(
+  result: AdoptNexusAutomationCurrentAgentResult,
+  parsed: ParsedAutomationCurrentAgentAdoptCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus current-agent adoption ${result.status}.`);
+  writeLine(stdout, `  Run: ${result.runId}`);
+  writeLine(stdout, `  Proceed: ${result.shouldProceed ? "yes" : "no"}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  if (result.contextFile) {
+    writeLine(stdout, `  Context: ${result.contextFile}`);
+  }
+  if (result.resultFile) {
+    writeLine(stdout, `  Result file: ${result.resultFile}`);
+  }
+}
+
+function printAutomationCurrentAgentRecordResult(
+  result: ReturnType<typeof recordNexusAutomationCurrentAgentAdoptionResult>,
+  parsed: ParsedAutomationCurrentAgentRecordCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus current-agent adoption recorded ${result.status}.`);
+  writeLine(stdout, `  Run: ${result.runId}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  writeLine(stdout, `  Result file: ${result.resultFile}`);
+  if (result.targetCycle) {
+    writeLine(stdout, `  Target cycle: ${result.targetCycle.id} ${result.targetCycle.status}`);
+  }
+}
+
 function printAutomationRunOnceResult(
   result: RunNexusAutomationOnceResult,
   parsed: ParsedAutomationRunOnceCommand,
@@ -3350,6 +3728,54 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   }
 
   throw new Error(`${optionName} must be a valid work status`);
+}
+
+function parseCurrentAgentResultStatus(
+  value: string,
+  optionName: string,
+): NexusAutomationCurrentAgentAdoptionResultStatus {
+  if (
+    value === "completed" ||
+    value === "blocked" ||
+    value === "failed" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid current-agent result status`);
+}
+
+function parseVerificationStatus(
+  value: string,
+  optionName: string,
+): NonNullable<
+  NonNullable<NexusAutomationCurrentAgentAdoptionResultInput["verification"]>[number]["status"]
+> {
+  if (value === "passed" || value === "failed" || value === "not_run") {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid verification status`);
+}
+
+function parsePublicationDecisionType(
+  value: string,
+  optionName: string,
+): NonNullable<
+  NexusAutomationCurrentAgentAdoptionResultInput["publicationDecision"]
+>["type"] {
+  if (
+    value === "not_decided" ||
+    value === "local_only" ||
+    value === "direct_integration" ||
+    value === "review_handoff" ||
+    value === "blocked"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid publication decision type`);
 }
 
 function parseTargetCycleStatus(

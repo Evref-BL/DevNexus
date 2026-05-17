@@ -8,6 +8,7 @@ import {
   defaultNexusAutomationConfig,
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
+  readNexusAutomationRunLedger,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
@@ -159,6 +160,8 @@ describe("DevNexus MCP server", () => {
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
+      "current_agent_adopt",
+      "current_agent_record",
       "coordination_status",
       "coordination_handoff",
       "coordination_integrate",
@@ -169,6 +172,94 @@ describe("DevNexus MCP server", () => {
       "work_item_comment",
       "work_item_set_status",
     ]);
+  });
+
+  it("adopts and records current-agent runs through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        agent: {
+          ...projectConfig().automation!.agent,
+          maxConcurrentSubagents: 2,
+        },
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "MCP adoptable task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const adopted = toolJson(
+      await callDevNexusMcpTool(
+        "current_agent_adopt",
+        {
+          projectRoot,
+          runId: "mcp-current-1",
+          owner: "mcp-host",
+        },
+        { now: fixedClock("2026-05-17T10:00:00.000Z") },
+      ),
+    );
+
+    expect(adopted).toMatchObject({
+      ok: true,
+      status: "started",
+      shouldProceed: true,
+      environment: {
+        DEV_NEXUS_CURRENT_AGENT_ADOPTION: "true",
+        DEV_NEXUS_RUN_ID: "mcp-current-1",
+        DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS: "2",
+      },
+      result: {
+        statuses: ["completed", "failed", "blocked", "skipped"],
+      },
+    });
+
+    const recorded = toolJson(
+      await callDevNexusMcpTool(
+        "current_agent_record",
+        {
+          projectRoot,
+          runId: "mcp-current-1",
+          result: {
+            status: "completed",
+            summary: "MCP current agent completed",
+            commitIds: ["abc123"],
+            verification: [
+              {
+                command: "npm test",
+                status: "passed",
+                summary: "focused tests passed",
+              },
+            ],
+          },
+        },
+        { now: fixedClock("2026-05-17T10:10:00.000Z") },
+      ),
+    );
+
+    expect(recorded).toMatchObject({
+      ok: true,
+      status: "completed",
+      result: {
+        commitIds: ["abc123"],
+      },
+    });
+    expect(
+      readNexusAutomationRunLedger(projectRoot, config.automation!).runs.at(-1),
+    ).toMatchObject({
+      id: "mcp-current-1",
+      status: "completed",
+      commitIds: ["abc123"],
+    });
   });
 
   it("reports generic plugin capabilities through the agent profile surface", async () => {
