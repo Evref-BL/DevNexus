@@ -17,16 +17,31 @@ Immediate direction:
   tools `eligible_work` and `agent_profiles`.
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
-- Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-29` add the current-agent coordinator adoption contract so
-    restricted hosts can let an already-running coordinator adopt DevNexus run
-    context, result contract, target-cycle facts, and subagent cap policy.
-  - `dev-nexus:local-17` add draft-only/mocked `coordination_request` support
-    without live external provider posting.
-  - `dev-nexus:local-24` support declared related-component dependency
-    projections for worker worktrees.
-  - `dev-nexus:local-31` add a Codex app-server JSON-RPC capability adapter.
-  - `dev-nexus:local-32` add Codex app-server agent profile schema support.
+- Current ready `dogfood` work matching the automation selector after parallel
+  wave `parallel-dev-nexus-wave-20260517-1115`:
+  - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
+    unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
+  - `dev-nexus:local-37` provide JavaScript/TypeScript toolchain support for
+    generated worker worktrees so subagents can run focused npm checks without
+    ad hoc installs.
+- The five-agent DevNexus wave completed and was published through DevNexus
+  `d0db6af`:
+  - `dev-nexus:local-17` added draft-only/mocked `coordination_request`
+    support through CLI and MCP, without live external provider posting.
+  - `dev-nexus:local-24` added related-component dependency projections for
+    worker worktrees.
+  - `dev-nexus:local-29` added the current-agent coordinator adoption contract
+    for already-running coordinators.
+  - `dev-nexus:local-31` added the Codex app-server JSON-RPC capability
+    adapter foundation.
+  - `dev-nexus:local-32` added Codex app-server agent profile schema support.
+  Integration verification passed with `npm run check`: 44 test files and 279
+  tests.
+- Worker-local JavaScript/TypeScript verification remains a follow-up
+  infrastructure concern tracked by `dev-nexus:local-37`: generated Git
+  worktrees without local `node_modules` cannot run `npm run build` or focused
+  Vitest directly unless DevNexus projects dependency/toolchain support into
+  the worker context.
 - Runtime setup is now approved through
   `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
   Docker/Podman compatibility checks, local dependency repair, and isolated
@@ -48,9 +63,10 @@ Immediate direction:
 - Codex app-server provider planning is captured in
   `docs/codex-app-server-provider-prd.md`. The follow-up tracker item
   `dev-nexus:local-30` is `todo`/HITL and has been sliced into implementation
-  items. Ready foundation work is `dev-nexus:local-31` and
-  `dev-nexus:local-32`; dependent follow-ups `dev-nexus:local-33` through
-  `dev-nexus:local-36` remain `todo` until their prerequisites land.
+  items. Foundation work `dev-nexus:local-31` and `dev-nexus:local-32` is
+  complete; `dev-nexus:local-33` is now ready. Dependent follow-ups
+  `dev-nexus:local-34` through `dev-nexus:local-36` remain `todo` until the
+  app-server launch path lands.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.
