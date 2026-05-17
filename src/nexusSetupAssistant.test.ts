@@ -114,6 +114,8 @@ describe("nexus setup assistant", () => {
       (step) => step.id === "refresh-agent-mcp-and-skills",
     )!;
     expect(refreshStep.commands).toContain("dev-nexus project mcp refresh .");
+    expect(refreshStep.checks).toContain("test -f .codex/config.toml");
+    expect(refreshStep.checks.join("\n")).not.toContain(".codex\\config.toml");
     const agentStep = plan.steps.find(
       (step) => step.id === "open-agent-project-session",
     )!;
@@ -297,6 +299,131 @@ describe("nexus setup assistant", () => {
       }),
     );
     expect(check.status).toBe("warning");
+  });
+
+  it("warns when plugin-projected skills and MCP servers are not materialized", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-plugin-projection-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      skills: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "dev-nexus-pharo",
+          enabled: true,
+          name: "DevNexus-Pharo",
+          version: "0.1.0-alpha.0",
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "skill-pharo-ci-repro",
+              skillId: "pharo-ci-repro",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-plexus",
+              serverName: "plexus",
+            },
+          ],
+        },
+      ],
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
+      recursive: true,
+    });
+    recordNexusSetupStep({
+      projectRoot,
+      flowId: "join-existing-project",
+      stepId: "open-agent-project-session",
+      status: "completed",
+      note: "DevNexus MCP visible in fresh agent session.",
+      now: () => "2026-05-17T16:00:00.000Z",
+    });
+
+    const warningCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(warningCheck.status).toBe("warning");
+    expect(warningCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-managed",
+        status: "warning",
+        summary: expect.stringContaining("not materialized"),
+      }),
+    );
+    expect(warningCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-codex",
+        status: "warning",
+        summary: expect.stringContaining("missing from the codex skill directory"),
+      }),
+    );
+    expect(warningCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-mcp-plexus-codex",
+        status: "warning",
+        summary: expect.stringContaining("not configured for codex"),
+      }),
+    );
+
+    fs.mkdirSync(
+      path.join(projectRoot, ".dev-nexus", "skills", "pharo-ci-repro"),
+      { recursive: true },
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, ".dev-nexus", "skills", "pharo-ci-repro", "SKILL.md"),
+      "# Pharo CI Repro\n",
+    );
+    fs.mkdirSync(path.join(projectRoot, ".agents", "skills", "pharo-ci-repro"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(projectRoot, ".agents", "skills", "pharo-ci-repro", "SKILL.md"),
+      "# Pharo CI Repro\n",
+    );
+    fs.appendFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "\n[mcp_servers.plexus]\ncommand = \"plexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+
+    const passedCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(passedCheck.status).toBe("passed");
+    expect(passedCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-managed",
+        status: "passed",
+      }),
+    );
+    expect(passedCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-codex",
+        status: "passed",
+      }),
+    );
+    expect(passedCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-dev-nexus-pharo-mcp-plexus-codex",
+        status: "passed",
+      }),
+    );
   });
 
   it("checks safe local Mac setup facts without contacting GitHub", () => {

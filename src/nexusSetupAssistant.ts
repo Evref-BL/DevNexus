@@ -3,6 +3,16 @@ import path from "node:path";
 import process from "node:process";
 import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
 import { analyzeNexusProjectPath } from "./nexusPathResolver.js";
+import type {
+  NexusPluginMcpServerCapability,
+  NexusPluginProjectedSkillCapability,
+  NexusProjectPluginConfig,
+} from "./nexusPluginCapabilities.js";
+import {
+  nexusSkillMarkdownFileName,
+  nexusSkillSupportDirectoryName,
+  nexusSkillsDirectoryName,
+} from "./nexusSkills.js";
 
 export type NexusSetupFlowId =
   | "github-meta-project"
@@ -221,6 +231,10 @@ export function buildNexusSetupCheck(options: {
         "Run dev-nexus project mcp refresh . after installing DevNexus.",
       missingStatus: "warning",
     }));
+  }
+
+  if (projectConfig) {
+    checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
   }
 
   if (flow.id === "join-existing-project" && agentMcpTargets.length > 0) {
@@ -536,9 +550,11 @@ function joinExistingProjectSteps(options: {
       ],
       manualInstructions: [
         "Run from the meta-project root after installing DevNexus and configuring local paths.",
+        "Plugin-projected skills and plugin MCP servers may require plugin-specific setup commands; setup check reports those gaps explicitly.",
       ],
       checks: [
-        ...agentMcpConfigCheckCommands(options.projectConfig),
+        ...agentMcpConfigCheckCommands(options.projectConfig, options.platform),
+        ...pluginProjectionCheckCommands(options.projectConfig, options.platform),
         `${devNexusCommand} automation eligible-work . --json`,
       ],
     },
@@ -665,10 +681,331 @@ function setupAgentMcpTargets(
   }));
 }
 
-function agentMcpConfigCheckCommands(projectConfig: NexusProjectConfig): string[] {
+function agentMcpConfigCheckCommands(
+  projectConfig: NexusProjectConfig,
+  platform: NexusSetupPlatform,
+): string[] {
   return setupAgentMcpTargets(projectConfig).map(
-    (target) => `test -f ${shellPathPlaceholder(target.configPath)}`,
+    (target) =>
+      `test -f ${shellPathPlaceholder(setupCommandPath(target.configPath, platform))}`,
   );
+}
+
+function pluginProjectionCheckCommands(
+  projectConfig: NexusProjectConfig,
+  platform: NexusSetupPlatform,
+): string[] {
+  const commands: string[] = [];
+  const skillTargets = setupAgentSkillTargets(projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectConfig);
+
+  for (const { capability } of pluginProjectedSkillCapabilities(projectConfig)) {
+    commands.push(
+      `test -f ${shellPathPlaceholder(setupCommandJoin(platform,
+        nexusSkillSupportDirectoryName,
+        nexusSkillsDirectoryName,
+        capability.skillId,
+        nexusSkillMarkdownFileName,
+      ))}`,
+    );
+    for (const target of skillTargetsForCapability(capability, skillTargets)) {
+      commands.push(
+        `test -f ${shellPathPlaceholder(setupCommandJoin(platform,
+          target.directory,
+          capability.skillId,
+          nexusSkillMarkdownFileName,
+        ))}`,
+      );
+    }
+  }
+
+  for (const { capability } of pluginMcpServerCapabilities(projectConfig)) {
+    for (const target of mcpTargets) {
+      const marker =
+        target.agent === "codex"
+          ? `[mcp_servers.${capability.serverName}]`
+          : `"${capability.serverName}"`;
+      const configPath = setupCommandPath(target.configPath, platform);
+      commands.push(
+        `test -f ${shellPathPlaceholder(configPath)} && grep -Fq ${shellStringLiteral(marker)} ${shellPathPlaceholder(configPath)}`,
+      );
+    }
+  }
+
+  return commands;
+}
+
+function pluginProjectionChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  return [
+    ...pluginProjectedSkillChecks(projectRoot, projectConfig),
+    ...pluginMcpServerChecks(projectRoot, projectConfig),
+  ];
+}
+
+function pluginProjectedSkillChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  const checks: NexusSetupCheckResult[] = [];
+  const skillTargets = setupAgentSkillTargets(projectConfig);
+
+  for (const { plugin, capability } of pluginProjectedSkillCapabilities(projectConfig)) {
+    const pluginLabel = setupPluginLabel(plugin);
+    const skillId = capability.skillId;
+    checks.push(pathCheck({
+      id: `plugin-${setupCheckIdPart(plugin.id)}-skill-${setupCheckIdPart(skillId)}-managed`,
+      title: `${pluginLabel} skill ${skillId}`,
+      pathName: path.join(
+        projectRoot,
+        nexusSkillSupportDirectoryName,
+        nexusSkillsDirectoryName,
+        skillId,
+        nexusSkillMarkdownFileName,
+      ),
+      passedSummary: `Plugin-projected skill is materialized in ${nexusSkillSupportDirectoryName}/${nexusSkillsDirectoryName}: ${skillId}.`,
+      blockedSummary: `Plugin ${pluginLabel} declares projected skill ${skillId}, but it is not materialized in ${nexusSkillSupportDirectoryName}/${nexusSkillsDirectoryName}.`,
+      nextAction:
+        `Run the plugin skill refresh/setup command or update the project skill bundle before assigning ${pluginLabel} worker tasks.`,
+      missingStatus: "warning",
+    }));
+
+    for (const target of skillTargetsForCapability(capability, skillTargets)) {
+      checks.push(pathCheck({
+        id: `plugin-${setupCheckIdPart(plugin.id)}-skill-${setupCheckIdPart(skillId)}-${setupCheckIdPart(target.agent)}`,
+        title: `${target.agent} skill ${skillId}`,
+        pathName: path.join(
+          projectRoot,
+          target.directory,
+          skillId,
+          nexusSkillMarkdownFileName,
+        ),
+        passedSummary: `Plugin-projected skill ${skillId} is available to ${target.agent}.`,
+        blockedSummary: `Plugin-projected skill ${skillId} is missing from the ${target.agent} skill directory.`,
+        nextAction:
+          `Refresh ${target.agent} skill projection after the project-managed ${skillId} skill is materialized.`,
+        missingStatus: "warning",
+      }));
+    }
+  }
+
+  return checks;
+}
+
+function pluginMcpServerChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  const checks: NexusSetupCheckResult[] = [];
+  const mcpTargets = setupAgentMcpTargets(projectConfig);
+
+  for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
+    for (const target of mcpTargets) {
+      checks.push(pluginMcpServerCheck({
+        projectRoot,
+        plugin,
+        capability,
+        agent: target.agent,
+        configPath: target.configPath,
+      }));
+    }
+  }
+
+  return checks;
+}
+
+function pluginMcpServerCheck(options: {
+  projectRoot: string;
+  plugin: NexusProjectPluginConfig;
+  capability: NexusPluginMcpServerCapability;
+  agent: string;
+  configPath: string;
+}): NexusSetupCheckResult {
+  const configPath = path.join(options.projectRoot, options.configPath);
+  const pluginLabel = setupPluginLabel(options.plugin);
+  const serverName = options.capability.serverName;
+  const checkBase = {
+    id: `plugin-${setupCheckIdPart(options.plugin.id)}-mcp-${setupCheckIdPart(serverName)}-${setupCheckIdPart(options.agent)}`,
+    title: `${options.agent} MCP server ${serverName}`,
+  };
+
+  if (!fs.existsSync(configPath)) {
+    return {
+      ...checkBase,
+      status: "warning",
+      summary:
+        `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.agent} MCP config is missing.`,
+      nextAction:
+        `Project ${options.agent} MCP config, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
+    };
+  }
+
+  const configured = mcpServerConfigured({
+    agent: options.agent,
+    configPath,
+    serverName,
+  });
+  if (configured === true) {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary: `Plugin MCP server ${serverName} is configured for ${options.agent}.`,
+      nextAction: null,
+    };
+  }
+
+  return {
+    ...checkBase,
+    status: "warning",
+    summary:
+      configured === false
+        ? `Plugin ${pluginLabel} declares MCP server ${serverName}, but it is not configured for ${options.agent}.`
+        : `Plugin ${pluginLabel} declares MCP server ${serverName}, but DevNexus cannot inspect ${options.agent} MCP config format yet.`,
+    nextAction:
+      configured === false
+        ? `Run the plugin-specific MCP setup or refresh step so ${options.agent} can access ${serverName}.`
+        : `Verify ${serverName} manually in ${options.configPath} or add a DevNexus MCP config adapter for ${options.agent}.`,
+  };
+}
+
+function setupAgentSkillTargets(
+  projectConfig: NexusProjectConfig | null,
+): { agent: string; directory: string }[] {
+  if (projectConfig?.skills?.agentTargets === undefined) {
+    return [];
+  }
+
+  return projectConfig.skills.agentTargets
+    .filter((target) => target.enabled !== false)
+    .map((target) => ({
+      agent: target.agent,
+      directory: target.directory ?? defaultSetupAgentSkillDirectory(target.agent),
+    }));
+}
+
+function defaultSetupAgentSkillDirectory(agent: string): string {
+  if (agent === "codex") {
+    return path.join(".agents", "skills");
+  }
+  if (agent === "claude") {
+    return path.join(".claude", "skills");
+  }
+  return path.join(`.${safeAgentConfigDirectoryName(agent)}`, "skills");
+}
+
+function skillTargetsForCapability(
+  capability: NexusPluginProjectedSkillCapability,
+  skillTargets: readonly { agent: string; directory: string }[],
+): { agent: string; directory: string }[] {
+  if (!capability.targetAgents || capability.targetAgents.length === 0) {
+    return [...skillTargets];
+  }
+
+  const targetAgents = new Set(capability.targetAgents);
+  return skillTargets.filter((target) => targetAgents.has(target.agent));
+}
+
+function pluginProjectedSkillCapabilities(
+  projectConfig: NexusProjectConfig,
+): Array<{
+  plugin: NexusProjectPluginConfig;
+  capability: NexusPluginProjectedSkillCapability;
+}> {
+  return enabledPluginConfigs(projectConfig).flatMap((plugin) =>
+    plugin.capabilities
+      .filter((capability): capability is NexusPluginProjectedSkillCapability =>
+        capability.kind === "projected_skill")
+      .map((capability) => ({ plugin, capability })),
+  );
+}
+
+function pluginMcpServerCapabilities(
+  projectConfig: NexusProjectConfig,
+): Array<{
+  plugin: NexusProjectPluginConfig;
+  capability: NexusPluginMcpServerCapability;
+}> {
+  return enabledPluginConfigs(projectConfig).flatMap((plugin) =>
+    plugin.capabilities
+      .filter((capability): capability is NexusPluginMcpServerCapability =>
+        capability.kind === "mcp_server")
+      .map((capability) => ({ plugin, capability })),
+  );
+}
+
+function enabledPluginConfigs(
+  projectConfig: NexusProjectConfig,
+): NexusProjectPluginConfig[] {
+  return (projectConfig.plugins ?? []).filter((plugin) => plugin.enabled !== false);
+}
+
+function mcpServerConfigured(options: {
+  agent: string;
+  configPath: string;
+  serverName: string;
+}): boolean | null {
+  if (options.agent === "codex") {
+    return codexMcpServerConfigured(
+      fs.readFileSync(options.configPath, "utf8"),
+      options.serverName,
+    );
+  }
+
+  if (options.agent === "claude") {
+    return claudeMcpServerConfigured(options.configPath, options.serverName);
+  }
+
+  return null;
+}
+
+function codexMcpServerConfigured(content: string, serverName: string): boolean {
+  for (const line of content.replace(/\r\n/gu, "\n").split("\n")) {
+    const tableName = tomlTableName(line);
+    if (
+      tableName === `mcp_servers.${serverName}` ||
+      tableName?.startsWith(`mcp_servers.${serverName}.`) === true
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function claudeMcpServerConfigured(configPath: string, serverName: string): boolean {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return false;
+    }
+    const mcpServers = (parsed as { mcpServers?: unknown }).mcpServers;
+    return (
+      !!mcpServers &&
+      typeof mcpServers === "object" &&
+      !Array.isArray(mcpServers) &&
+      Object.prototype.hasOwnProperty.call(mcpServers, serverName)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function tomlTableName(line: string): string | null {
+  const match = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/u);
+  return match?.[1]?.trim() ?? null;
+}
+
+function setupPluginLabel(plugin: NexusProjectPluginConfig): string {
+  return plugin.name ?? plugin.id;
+}
+
+function setupCheckIdPart(value: string): string {
+  const safe = value
+    .replace(/[^A-Za-z0-9_-]/gu, "-")
+    .replace(/-+/gu, "-")
+    .replace(/^-|-$/gu, "");
+  return safe.length > 0 ? safe : "item";
 }
 
 function defaultSetupAgentMcpConfigPath(agent: string): string {
@@ -787,6 +1124,23 @@ function platformCommands(
 
 function shellPathPlaceholder(value: string): string {
   return value.includes(" ") ? `"${value}"` : value;
+}
+
+function setupCommandJoin(
+  platform: NexusSetupPlatform,
+  ...segments: string[]
+): string {
+  return setupCommandPath(segments.join("/"), platform);
+}
+
+function setupCommandPath(value: string, platform: NexusSetupPlatform): string {
+  return platform === "windows"
+    ? value.replace(/[\\/]/gu, "\\")
+    : value.replace(/[\\/]/gu, "/");
+}
+
+function shellStringLiteral(value: string): string {
+  return `'${value.replace(/'/gu, "'\\''")}'`;
 }
 
 function planProjectRootPath(

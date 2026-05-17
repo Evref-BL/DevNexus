@@ -95,6 +95,13 @@ roots from another machine, the Mac plan uses host-local placeholders and the
 check reports the component path configuration as blocked instead of treating
 the other machine's path as valid.
 
+Setup checks also inspect enabled plugin capability declarations. If a plugin
+declares projected skills or MCP servers, `setup check` reports whether the
+project-managed skill files, agent-local skill projections, and agent MCP
+server entries are present. DevNexus core only reports these generic capability
+gaps; plugin packages still own the provider-specific commands that materialize
+or start their runtime surfaces.
+
 The cloned meta repository directory is the DevNexus project root. Keep it
 separate from component source checkouts; component repositories are cloned or
 verified by the setup flow in a later step.
