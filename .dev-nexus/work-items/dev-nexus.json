@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 40,
-  "nextCommentNumber": 72,
-  "updatedAt": "2026-05-17T13:47:22.062Z",
+  "nextNumber": 43,
+  "nextCommentNumber": 73,
+  "updatedAt": "2026-05-17T13:54:58.317Z",
   "items": [
     {
       "id": "local-1",
@@ -948,13 +948,92 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:46:52.140Z",
-      "updatedAt": "2026-05-17T13:46:52.140Z",
+      "updatedAt": "2026-05-17T13:54:58.317Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-39",
         "itemNumber": 39
+      }
+    },
+    {
+      "id": "local-40",
+      "title": "Add DevNexus guided setup assistant service",
+      "description": "Type: DevNexus onboarding infrastructure slice\nReadiness: autonomous agent-ready (AFK)\nSource discussion: users need hand-holding for DevNexus setup, especially bot/machine-user setup, meta-project hosting, auth profile setup, and bringing an existing project onto a new machine. A skill alone is insufficient because onboarding needs checks, generated commands, stateful progress, and safe automation.\n\nGoal: add a generic DevNexus setup assistant service that can present guided setup flows, run safe preflight checks, generate exact user steps, and record progress without making setup depend on chat memory.\n\nFeature choice:\n- Implement this as DevNexus core setup/onboarding service exposed through CLI and MCP.\n- Use skills/docs as projected guidance and explanatory material, not as the authoritative setup engine.\n\nAcceptance criteria:\n- DevNexus has a generic setup flow model with steps, prerequisites, manual actions, safe automated actions, verification checks, generated commands, and next-action summaries.\n- CLI exposes a low-token flow surface, for example `setup list`, `setup plan <flow>`, `setup check <flow>`, and `setup record <flow-step>`, with JSON output for agents.\n- MCP exposes equivalent setup-assistant tools for agent use without requiring a separate plugin.\n- Setup steps can explicitly mark manual actions, such as creating a GitHub account, browser/device auth, or accepting an invite, versus automatable actions like generating SSH config or validating remotes.\n- Flow progress can be persisted in DevNexus project state or a host-local setup state file according to whether the fact is portable or machine-specific.\n- The service can run in noninteractive mode and produce exact instructions instead of blocking on prompts.\n- Tests cover flow modeling, check execution, manual-step rendering, persistence boundaries, and JSON/CLI output.\n\nBoundaries:\n- Do not store tokens, private keys, browser auth state, or absolute host-secret paths in shared project state.\n- Do not hard-code GitHub-only behavior into the generic setup engine.\n- Do not make DevNexus choose implementation work; this is project setup infrastructure.\n\nVerification:\n- Focused setup service/model tests.\n- Focused CLI/MCP tests for setup flow output.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "setup",
+        "mcp",
+        "cli",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:53:04.741Z",
+      "updatedAt": "2026-05-17T13:53:04.741Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-40",
+        "itemNumber": 40
+      }
+    },
+    {
+      "id": "local-41",
+      "title": "Add GitHub bot and meta-repo onboarding flow",
+      "description": "Type: GitHub/meta-project onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting config shape are available.\nSource discussion: DevNexus should hand-hold users through creating or choosing a bot/machine-user account, deciding whether meta projects live under the bot account or an organization, configuring SSH/GitHub CLI auth profiles, and creating/pushing the shared DevNexus meta repo.\n\nGoal: add a DevNexus setup flow for initial project creation with GitHub-backed meta-project hosting and a dedicated automation actor.\n\nAcceptance criteria:\n- Setup flow can recommend and customize names for a bot account and optional org/namespace, such as `<user>-bot` and `<user>-dev-nexus`, while allowing custom names like `Gabot-Darbot`.\n- The flow explains what must be manual, such as creating a GitHub account, verifying email, completing browser/device auth, and creating an organization if GitHub API permissions cannot do it.\n- The flow can generate exact commands for SSH key creation, SSH host alias config, isolated `gh` config via `GH_CONFIG_DIR`, and Git remotes without exposing private material.\n- The flow can verify plain user auth, bot auth, SSH host aliases, repo existence, collaborator access, and intended remotes.\n- The flow can create or propose creating the private meta repo when policy and credentials allow; otherwise it emits precise manual steps and resumes from verification checks.\n- The flow configures DevNexus project hosting metadata and publication guardrails so future agents know which actor/remote is intended.\n- The flow produces a final setup report suitable for handoff to another machine or agent.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration.\n- Complements `dev-nexus:local-38` for actor/remote guardrails.\n\nBoundaries:\n- Do not automate GitHub account creation; GitHub account creation remains a manual step.\n- Do not store secrets in the shared meta repo.\n- Do not force an organization; support bot-owned repos and org-owned repos.\n\nVerification:\n- Mocked GitHub/gh/SSH checks for happy path and missing-permission paths.\n- Static docs/example checks.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "onboarding",
+        "github",
+        "meta-project",
+        "auth-profiles",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:53:46.258Z",
+      "updatedAt": "2026-05-17T13:53:46.258Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-41",
+        "itemNumber": 41
+      }
+    },
+    {
+      "id": "local-42",
+      "title": "Add new-machine setup flow for existing DevNexus projects",
+      "description": "Type: existing-project/new-machine onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting/auth-profile config shape are available.\nSource discussion: users should be able to bring a shared DevNexus project onto another machine, such as Mac plus Windows, without re-discovering bot account setup, remotes, component roots, MCP refresh, skills projection, and local toolchain dependencies by hand.\n\nGoal: add a DevNexus setup flow for joining an existing shared DevNexus meta project on a new machine.\n\nAcceptance criteria:\n- Flow starts from a meta repo URL or known hosting config and guides clone/fetch of the DevNexus meta project into a local root.\n- Flow identifies portable project state versus host-local state and prompts/generates missing host-local overrides for source roots, worktree roots, auth profiles, MCP config, skills projection, runtime/state roots, and toolchain paths.\n- Flow verifies personal and bot/API auth profiles according to project policy, including plain user `gh`, bot wrapper or app profile, SSH host aliases, and remote access.\n- Flow verifies component source checkouts: clone if absent when policy allows, fetch/pull if present, preserve dirty local changes, and report conflicts instead of overwriting.\n- Flow refreshes or proposes refreshing MCP/projected skill configuration for the local agent target and reports approval/default-tool settings needed for automation.\n- Flow runs safe preflight checks for required runtimes/toolchains and reports actionable blockers, without running live PLexus/Pharo/Docker work unless an approved runtime profile exists.\n- Flow produces a machine-local setup report that another agent can read before continuing work.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration and auth profile references.\n- Depends on `dev-nexus:local-38` for actor/remote guardrails when publishing from the new machine.\n\nBoundaries:\n- Do not overwrite existing dirty component source roots or host-local config.\n- Do not copy secrets into shared project state.\n- Do not launch live runtime services/images during baseline onboarding.\n\nVerification:\n- Mocked filesystem/Git/gh checks for fresh-machine and existing-dirty-machine cases.\n- Fixture project with host-local overrides and component source roots.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "onboarding",
+        "multi-host",
+        "auth-profiles",
+        "mcp",
+        "toolchain",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:54:23.339Z",
+      "updatedAt": "2026-05-17T13:54:23.339Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-42",
+        "itemNumber": 42
       }
     }
   ],
@@ -1811,6 +1890,21 @@
         }
       }
     ],
-    "local-39": []
+    "local-39": [
+      {
+        "id": "local-comment-72",
+        "body": "Onboarding follow-up split: `dev-nexus:local-40` owns the generic setup assistant service/CLI/MCP foundation. `dev-nexus:local-41` owns the initial GitHub bot + meta-repo setup flow. `dev-nexus:local-42` owns joining an existing shared DevNexus project on a new machine. This hosting-config item should expose enough project/auth-profile metadata for those flows to generate remotes and checks without storing secrets.",
+        "author": null,
+        "createdAt": "2026-05-17T13:54:58.317Z",
+        "updatedAt": "2026-05-17T13:54:58.317Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-72"
+        }
+      }
+    ],
+    "local-40": [],
+    "local-41": [],
+    "local-42": []
   }
 }

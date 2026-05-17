@@ -31,6 +31,10 @@ Immediate direction:
     DevNexus can describe the GitHub user/org namespace, repo naming,
     visibility, remote names, repo provisioning policy, and host-local auth
     profile reference for shared meta repositories.
+  - `dev-nexus:local-40` add a generic guided setup assistant service exposed
+    through CLI and MCP. This should be the product surface for onboarding
+    flows; skills/docs are supporting guidance, not the authoritative setup
+    engine.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -43,6 +47,13 @@ Immediate direction:
     remotes/wrappers.
   - Until `dev-nexus:local-39` lands, the current bot-owned repo is a working
     dogfood setup, not yet the portable DevNexus project-hosting model.
+- Onboarding direction:
+  - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
+    meta-repo setup flow after the generic setup assistant and hosting config
+    shape exist.
+  - `dev-nexus:local-42` will add the new-machine setup flow for joining an
+    existing shared DevNexus project, including host-local auth, source roots,
+    MCP refresh, skills projection, and toolchain preflight.
 - The five-agent DevNexus wave completed and was published through DevNexus
   `d0db6af`:
   - `dev-nexus:local-17` added draft-only/mocked `coordination_request`
