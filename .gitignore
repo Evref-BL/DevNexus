@@ -4,6 +4,7 @@
 .dev-nexus/automation/run.lock
 .dev-nexus/automation/runs.json
 .dev-nexus/automation/target-cycles.json
+.dev-nexus/runtime/
 .dev-nexus/work-items/
 .dev-nexus/skills/
 .agents/skills/

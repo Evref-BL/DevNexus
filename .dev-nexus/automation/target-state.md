@@ -22,6 +22,17 @@ Immediate direction:
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
+- Runtime setup is now approved through
+  `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
+  Docker/Podman compatibility checks, local dependency repair, and isolated
+  PLexus/pharo-launcher-mcp/Pharo smoke work may proceed inside that profile.
+  Live external provider posting remains blocked unless a work item records
+  explicit provider-policy approval.
+- Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
+  `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
+  project and package identity consistently.
+- `pharo-launcher-mcp` live-smoke passed using the approved profile state root
+  and produced no source checkout changes.
 - Scoped npm dogfood prereleases were published on 2026-05-17 so other
   machines can install without sibling checkout assumptions:
   - `@evref-bl/dev-nexus@0.1.0-alpha.0` published with `dogfood` tag and
@@ -115,16 +126,19 @@ Immediate direction:
 - Later or dependent non-eligible work:
   - `pharo-launcher-mcp:local-2` launcher cleanup/status hook follow-up only
     after the approved runner harness identifies a concrete hook need.
+- Previously human-in-the-loop blocked work now ready for isolated runtime setup:
+  - `plexus:local-3` build and harden the isolated PLexus live-smoke runner
+    harness using the approved `overnight-live-20260517` profile.
+
 - Human-in-the-loop blocked work:
   - `dev-nexus:local-16` choose shared coordination provider/transport for
     Mac/Windows dogfood after the generic API shape is ready.
-  - `plexus:local-3` build the approved isolated PLexus live-smoke runner
-    harness after runner inputs and cleanup policy are approved.
-  - `plexus:local-2` run the approved isolated PLexus live-smoke.
+  - `plexus:local-2` run the approved isolated PLexus live-smoke after
+    `plexus:local-3` confirms the harness is runnable.
   - `dev-nexus-pharo:local-5` verify DevNexus-Pharo-provided Pharo MCP access in
-    subagent worktrees.
+    subagent worktrees after the runner passes.
   - `mcp-pharo:local-2` run MCP-Pharo verification through the approved
-    isolated runner.
+    isolated runner after the runner passes.
 
 Vibe backlog reconciliation:
 
@@ -250,9 +264,10 @@ Durable completed foundation:
 
 Active boundaries:
 
-- Do not run live Pharo images, PLexus open/close, Docker launches, destructive
-  Git cleanup, package installs, or privileged host mutation without an
-  explicit isolated runner and cleanup plan.
+- Live Pharo images, PLexus open/close, Docker launches, and package installs
+  are allowed only inside the approved
+  `overnight-live-20260517` disposable runner profile or a newer recorded
+  profile. Destructive Git cleanup and unrelated host mutation remain blocked.
 - Do not create Vibe workspaces, sessions, executions, or workers for
   implementation.
 - Preserve unrelated changes in component working trees.

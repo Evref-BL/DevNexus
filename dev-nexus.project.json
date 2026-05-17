@@ -102,7 +102,7 @@
       "role": "dependency",
       "remoteUrl": "git@github.com:Evref-BL/pharo-launcher-mcp.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\git\\MCP-PL",
+      "sourceRoot": "C:\\dev\\code\\git\\pharo-launcher-mcp",
       "worktreesRoot": "worktrees/pharo-launcher-mcp",
       "workTracking": {
         "provider": "local",
@@ -220,7 +220,7 @@
         },
         {
           "kind": "mcp_server",
-          "id": "mcp-plexus",
+          "id": "plexus-mcp",
           "serverName": "plexus",
           "description": "Scoped PLexus project and lifecycle surface; live open/close remains policy-gated.",
           "tools": [
@@ -426,7 +426,7 @@
             "--add-dir",
             "C:\\dev\\code\\git\\PLexus",
             "--add-dir",
-            "C:\\dev\\code\\git\\MCP-PL",
+            "C:\\dev\\code\\git\\pharo-launcher-mcp",
             "--add-dir",
             "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
             "--output-last-message",
@@ -470,8 +470,8 @@
     "safety": {
       "profile": "host-authorized",
       "allowHostMutation": true,
-      "allowDependencyInstall": false,
-      "allowLiveServices": false
+      "allowDependencyInstall": true,
+      "allowLiveServices": true
     },
     "publication": {
       "strategy": "direct_integration",
