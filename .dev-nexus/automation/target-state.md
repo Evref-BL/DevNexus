@@ -81,6 +81,14 @@ Immediate direction:
     server entries are missing. The dogfood project config now also declares
     the DevNexus-Pharo MCP-Pharo domain skills. `dev-nexus-pharo:local-11`
     tracks plugin-owned materialization of root Pharo skills and MCP config.
+  - Mac local remediation proved the desired root tool shape: generic
+    `dev_nexus`, `dev_nexus_pharo`, `plexus_project`, `pharo_launcher`, and
+    live gateway-backed `pharo` MCP servers; project-local runtime packages
+    under `.dev-nexus/runtime/npm-tools`; and 20 project-local Codex skills.
+    The remaining upstream blocker is that published DevNexus-Pharo
+    `project skills refresh` fails on this generic dogfood config with
+    `kanban must be an object`, so `dev-nexus-pharo:local-11` must automate
+    the Mac-proven setup without relying on that manual repair.
   - `dev-nexus:local-55` tracks the next provider-inclusion slice: extensible
     agent MCP target adapters, including OpenCode or a documented custom
     provider/manual-config path once provider docs confirm the config model.

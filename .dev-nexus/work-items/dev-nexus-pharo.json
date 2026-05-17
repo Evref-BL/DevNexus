@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 12,
-  "nextCommentNumber": 20,
-  "updatedAt": "2026-05-17T17:32:56.648Z",
+  "nextCommentNumber": 21,
+  "updatedAt": "2026-05-17T17:41:32.728Z",
   "items": [
     {
       "id": "local-1",
@@ -262,7 +262,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T17:32:40.114Z",
-      "updatedAt": "2026-05-17T17:32:56.648Z",
+      "updatedAt": "2026-05-17T17:41:32.728Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -501,6 +501,18 @@
       }
     ],
     "local-10": [],
-    "local-11": []
+    "local-11": [
+      {
+        "id": "local-comment-20",
+        "body": "Mac remediation evidence to preserve: a working dogfood root config declares five Codex MCP servers: dev_nexus via host-installed dogfood DevNexus CLI, dev_nexus_pharo via project-local stdio package install, plexus_project via project-local PLexus lifecycle/status stdio, pharo_launcher via project-local pharo-launcher-mcp stdio, and pharo via PLexus gateway HTTP at 127.0.0.1:7331/mcp. Project-local runtime packages live under ignored .dev-nexus/runtime/npm-tools with binaries dev-nexus, dev-nexus-pharo, pharo-launcher-mcp, and plexus. Skills were materialized to .dev-nexus/skills and .agents/skills with 20 Codex-visible skills, including the four MCP-Pharo domain skills. Caveats: currently running Codex sessions still need reload; DevNexus-Pharo HTTP MCP on 7330 is not running and stdio was used instead; pharo depends on an existing PLexus gateway listener; published dev-nexus-pharo project skills refresh currently fails against the generic dogfood config with 'kanban must be an object', so the upstream setup flow must fix this instead of relying on manual materialization.",
+        "author": null,
+        "createdAt": "2026-05-17T17:41:32.728Z",
+        "updatedAt": "2026-05-17T17:41:32.728Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-20"
+        }
+      }
+    ]
   }
 }
