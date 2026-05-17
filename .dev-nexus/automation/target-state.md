@@ -86,10 +86,10 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector: none.
-  `dev-nexus:local-61` remains the next tracker-visible follow-up for
-  actionable coordination diagnostics, but it is still `todo`/dependent until
-  explicitly promoted to `ready`.
+- Current ready `dogfood` work matching the automation selector:
+  - `dev-nexus:local-61` coordination integration tracker diagnostics. The
+    heartbeat reflection promoted it to `ready` after the local-provider
+    transactional/concurrency fixes landed in the six-item wave.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

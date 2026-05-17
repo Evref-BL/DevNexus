@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 118,
-  "updatedAt": "2026-05-17T23:17:47.029Z",
+  "nextCommentNumber": 119,
+  "updatedAt": "2026-05-17T23:22:40.563Z",
   "items": [
     {
       "id": "local-1",
@@ -1508,7 +1508,7 @@
       "id": "local-61",
       "title": "Report coordination integration tracker parse failures actionably",
       "description": "Type: coordination diagnostics defect\nReadiness: autonomous agent-ready (AFK), after or alongside the local-provider concurrency fix\nSource: During the 2026-05-17 PLexus integration, coordination integrate failed with a raw JSON.parse message after the local tracker store was corrupted. The command did not identify the store path, affected component, failing provider operation, or a safe recovery path.\n\nGoal:\nMake coordination integrate and related coordination readers degrade cleanly when tracker stores or handoff comments are malformed.\n\nAcceptance criteria:\n- coordination integrate reports component id, tracker id/provider, store path when local, and the failing read/parse stage for malformed tracker state.\n- The command returns structured JSON with ok: false and actionable diagnostics instead of crashing with an uncaught parser message.\n- Malformed handoff comments are skipped or reported individually without hiding valid handoffs from other work items.\n- Tests cover malformed local stores, malformed handoff comment JSON blocks, and valid handoffs coexisting with bad records.\n\nVerification:\nRun focused coordination integrate diagnostics tests and npm run check.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1522,7 +1522,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T21:01:06.401Z",
-      "updatedAt": "2026-05-17T21:01:06.401Z",
+      "updatedAt": "2026-05-17T23:22:40.563Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2942,7 +2942,19 @@
         }
       }
     ],
-    "local-61": [],
+    "local-61": [
+      {
+        "id": "local-comment-118",
+        "body": "Heartbeat reflection promoted this item to ready. Evidence: local-provider transactional/concurrency fixes from dev-nexus:local-59 are now complete and published in the six-item wave through DevNexus f6e98bc, while this item records a separate observed coordination_integrate diagnostics gap from the same incident. Safe next action is focused DevNexus diagnostics work with tests; no live runtime or external provider access required.",
+        "author": null,
+        "createdAt": "2026-05-17T23:22:40.563Z",
+        "updatedAt": "2026-05-17T23:22:40.563Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-118"
+        }
+      }
+    ],
     "local-62": [
       {
         "id": "local-comment-101",
