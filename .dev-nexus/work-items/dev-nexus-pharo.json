@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 10,
+  "nextNumber": 11,
   "nextCommentNumber": 20,
-  "updatedAt": "2026-05-17T10:06:12.505Z",
+  "updatedAt": "2026-05-17T16:14:39.404Z",
   "items": [
     {
       "id": "local-1",
@@ -219,6 +219,31 @@
         "provider": "local",
         "itemId": "local-9",
         "itemNumber": 9
+      }
+    },
+    {
+      "id": "local-10",
+      "title": "Deprecate generic tracker wrappers from DevNexus-Pharo",
+      "description": "Type: specialization cleanup slice\nReadiness: autonomous agent-ready (AFK); no live Pharo image, PLexus route, Docker run, or external provider posting required.\nSource finding: DevNexus-Pharo README advertised provider-neutral tracker configuration even though generic work tracking belongs to DevNexus core. The command is not only stale documentation: DevNexus-Pharo still exposes dev-nexus-pharo project configure-tracker in CLI usage, project_configure_tracker through MCP, and tests/service wrappers that delegate into DevNexus core.\n\nGoal: make DevNexus-Pharo clearly a Pharo specialization/plugin layer, while generic project tracker configuration and sync surfaces live in DevNexus core.\n\nAcceptance criteria:\n- DevNexus-Pharo CLI and MCP docs identify generic tracker commands as legacy compatibility wrappers or remove them after a migration path is chosen.\n- New docs and examples use dev-nexus project tracker configure for provider-neutral work tracking.\n- DevNexus-Pharo-owned code no longer presents generic tracker configuration as first-class Pharo plugin behavior; any remaining wrapper delegates to DevNexus core and emits/decribes deprecation consistently.\n- Focused CLI/MCP/project-service tests cover the chosen compatibility/deprecation behavior.\n- README and help text stay aligned with the architectural boundary: DevNexus owns generic work tracking, DevNexus-Pharo owns Pharo plugin/setup behavior.\n\nVerification:\n- Run focused DevNexus-Pharo CLI/MCP/project-service tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "specialization",
+        "work-tracking",
+        "cleanup",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T16:14:39.404Z",
+      "updatedAt": "2026-05-17T16:14:39.404Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-10",
+        "itemNumber": 10
       }
     }
   ],
@@ -449,6 +474,7 @@
           "itemId": "local-comment-19"
         }
       }
-    ]
+    ],
+    "local-10": []
   }
 }
