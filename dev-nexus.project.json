@@ -250,6 +250,42 @@
           ]
         },
         {
+          "kind": "projected_skill",
+          "id": "skill-pharo-ci-repro",
+          "skillId": "pharo-ci-repro",
+          "description": "Project MCP-Pharo Pharo CI reproduction guidance, including local smalltalkCI log capture.",
+          "targetAgents": [
+            "codex"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-pharo-image-git-handoff",
+          "skillId": "pharo-image-git-handoff",
+          "description": "Project MCP-Pharo image-to-Tonel Git handoff guidance for Pharo-capable workers.",
+          "targetAgents": [
+            "codex"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-pharo-project-load",
+          "skillId": "pharo-project-load",
+          "description": "Project MCP-Pharo project loading and Metacello diagnostic guidance.",
+          "targetAgents": [
+            "codex"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-pharo-version-compat",
+          "skillId": "pharo-version-compat",
+          "description": "Project MCP-Pharo PharoCompatibility and version compatibility guidance.",
+          "targetAgents": [
+            "codex"
+          ]
+        },
+        {
           "kind": "mcp_server",
           "id": "plexus-mcp",
           "serverName": "plexus",

@@ -74,6 +74,13 @@ Immediate direction:
     `@evref-bl/dev-nexus@0.1.0-alpha.6` is published on the `dogfood` tag.
     The wording is provider-neutral; Codex Desktop is only one provider
     example.
+  - Mac plugin-projection follow-up is published through DevNexus `6dd5cc8`
+    and npm `@evref-bl/dev-nexus@0.1.0-alpha.7`: setup checks now inspect
+    enabled plugin `projected_skill` and `mcp_server` capabilities and warn
+    when project-managed skills, agent-local skill projections, or agent MCP
+    server entries are missing. The dogfood project config now also declares
+    the DevNexus-Pharo MCP-Pharo domain skills. `dev-nexus-pharo:local-11`
+    tracks plugin-owned materialization of root Pharo skills and MCP config.
   - `dev-nexus:local-55` tracks the next provider-inclusion slice: extensible
     agent MCP target adapters, including OpenCode or a documented custom
     provider/manual-config path once provider docs confirm the config model.

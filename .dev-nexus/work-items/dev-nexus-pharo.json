@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 11,
+  "nextNumber": 12,
   "nextCommentNumber": 20,
-  "updatedAt": "2026-05-17T16:14:39.404Z",
+  "updatedAt": "2026-05-17T17:32:56.648Z",
   "items": [
     {
       "id": "local-1",
@@ -245,6 +245,31 @@
         "itemId": "local-10",
         "itemNumber": 10
       }
+    },
+    {
+      "id": "local-11",
+      "title": "Materialize DevNexus-Pharo root plugin setup for shared projects",
+      "description": "Type: Mac onboarding/plugin projection follow-up\\nReadiness: autonomous agent-ready for static config/projection work; live runtime reachability remains gated by approved runner policy.\\nSource: Mac onboarding report on 2026-05-17 found that the dogfood root only projected generic DevNexus MCP and lacked DevNexus-Pharo/PLexus MCP entries plus Pharo skills. DevNexus core now warns on missing plugin projections in setup check, but the plugin still needs to own materializing its root/worker setup.\\n\\nGoal: provide a DevNexus-Pharo setup/projection path that can be invoked from a shared DevNexus project root to materialize Pharo plugin skills and provider MCP entries without requiring a sibling source checkout or manual global skill installation.\\n\\nAcceptance criteria:\\n- A Mac/Windows shared DevNexus project can run a documented DevNexus-Pharo setup command or hook from the meta root after installing npm packages.\\n- The command materializes DevNexus-Pharo and MCP-Pharo domain skills under .dev-nexus/skills and projects them into configured agent skill directories such as .agents/skills for Codex.\\n- The command updates configured provider MCP files with DevNexus-Pharo/PLexus/Pharo plugin servers where root access is intended, or emits explicit worker-only guidance when root access is not configured.\\n- It does not start live images or PLexus services unless an approved runtime profile is selected.\\n- dev-nexus setup check . join-existing-project no longer leaves unexplained plugin skill/MCP warnings after the static setup portion completes.\\n\\nVerification:\\n- Static fixture project tests for skill and MCP projection on macOS/Windows paths.\\n- Optional temp project smoke using the published npm package, without live image startup.\\n\\nPublication notes:\\n- Direct integration to DevNexus-Pharo origin/main and publish a dogfood npm prerelease if package behavior changes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "skills",
+        "mcp",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T17:32:40.114Z",
+      "updatedAt": "2026-05-17T17:32:56.648Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-11",
+        "itemNumber": 11
+      }
     }
   ],
   "comments": {
@@ -475,6 +500,7 @@
         }
       }
     ],
-    "local-10": []
+    "local-10": [],
+    "local-11": []
   }
 }

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 56,
-  "nextCommentNumber": 91,
-  "updatedAt": "2026-05-17T17:09:14.470Z",
+  "nextCommentNumber": 92,
+  "updatedAt": "2026-05-17T17:33:07.152Z",
   "items": [
     {
       "id": "local-1",
@@ -1027,7 +1027,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T17:08:17.945Z",
+      "updatedAt": "2026-05-17T17:33:07.152Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2399,6 +2399,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-90"
+        }
+      },
+      {
+        "id": "local-comment-91",
+        "body": "Implemented in branch codex/dev-nexus/local-42: setup check now compares enabled plugin projected_skill and mcp_server capabilities against project-managed skills, agent skill projections, and agent MCP config entries. Verification passed with npm run check.",
+        "author": null,
+        "createdAt": "2026-05-17T17:29:32.019Z",
+        "updatedAt": "2026-05-17T17:29:32.019Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-91"
         }
       }
     ],
