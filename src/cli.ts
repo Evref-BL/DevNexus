@@ -537,7 +537,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for project mcp refresh:",
-    "  --agent <codex|claude>    repeatable; defaults to project mcp.agentTargets or codex",
+    "  --agent <agent>           repeatable; defaults to project mcp.agentTargets or codex",
     "  --json",
     "",
     "Options for project tracker configure:",
@@ -3542,8 +3542,21 @@ function printProjectMcpRefreshResult(
   for (const target of result.agentTargets) {
     writeLine(
       stdout,
-      `    ${target.agent}: ${target.configPath} (${target.serverName})`,
+      `    ${target.agent}/${target.provider}: ${target.configPath} (${target.serverName}, ${target.configStatus}, ${target.configFormat}/${target.configSchema})`,
     );
+    if (target.commandResolution.strategy !== "unchanged") {
+      writeLine(stdout, `      Command: ${target.commandResolution.summary}`);
+    }
+    for (const note of target.activationNotes) {
+      writeLine(stdout, `      Session: ${note}`);
+    }
+    writeLine(stdout, `      Trust: ${target.trustSemantics.summary}`);
+    for (const gap of target.capabilityGaps) {
+      writeLine(stdout, `      Gap: ${gap.severity} ${gap.summary}`);
+    }
+  }
+  if (result.capabilityGaps.length > 0) {
+    writeLine(stdout, `  Capability gaps: ${result.capabilityGaps.length}`);
   }
   if (result.gitExcludeEntries.length > 0) {
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);

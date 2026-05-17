@@ -297,11 +297,15 @@ function mcpAgentTargetConfigPath(target: NexusProjectAgentMcpTarget): string {
   if (target.configPath) {
     return target.configPath;
   }
-  if (target.agent === "codex") {
+  const provider = target.provider ?? target.agent;
+  if (provider === "codex") {
     return path.join(".codex", "config.toml");
   }
-  if (target.agent === "claude") {
+  if (provider === "claude") {
     return ".mcp.json";
+  }
+  if (provider === "opencode") {
+    return "opencode.json";
   }
 
   return path.join(`.${target.agent}`, "mcp.json");

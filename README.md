@@ -50,7 +50,7 @@ dev-nexus project import <source-root> --home <home-path> --name <name>
 dev-nexus project list --home <home-path>
 dev-nexus project status <project-id-or-root> --home <home-path>
 dev-nexus project status <project-root>
-dev-nexus project mcp refresh <project-root> --agent codex --agent claude
+dev-nexus project mcp refresh <project-root> --agent codex --agent claude --agent opencode
 dev-nexus project tracker configure <project> --home <home-path> --provider local
 dev-nexus project tracker link <project> --home <home-path> --tracker-project-id <id>
 dev-nexus setup list
@@ -347,17 +347,28 @@ or through project configuration:
   "mcp": {
     "agentTargets": [
       { "agent": "codex" },
-      { "agent": "claude", "sourceControl": "source" }
+      { "agent": "claude", "sourceControl": "source" },
+      { "agent": "opencode" },
+      {
+        "agent": "custom-agent",
+        "provider": "custom",
+        "configPath": "docs/custom-agent-mcp.md",
+        "configFormat": "manual",
+        "configSchema": "custom.manual"
+      }
     ]
   }
 }
 ```
 
-The Codex target writes or updates `.codex/config.toml` with a
-`dev_nexus` stdio server. The Claude target writes or updates project
-`.mcp.json`. Generated support config is excluded from Git by default;
-set `sourceControl` to `source` when the project should commit the agent MCP
-configuration.
+Provider adapters own config shape and launch semantics. Codex writes
+`.codex/config.toml`, Claude writes `.mcp.json`, and OpenCode writes project
+`opencode.json` using an `mcp` local server entry. Unknown providers are reported
+as manual capability gaps with the server name, command, args, config path,
+activation notes, and trust semantics needed for hand configuration.
+
+Generated support config is excluded from Git by default; set `sourceControl`
+to `source` when the project should commit the agent MCP configuration.
 
 ## Plugin Capabilities
 

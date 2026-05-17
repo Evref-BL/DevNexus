@@ -128,15 +128,23 @@ export interface NexusProjectKanbanConfig {
 
 export type NexusProjectExtensionsConfig = Record<string, Record<string, unknown>>;
 
+export type NexusProjectAgentMcpConfigFormat = "toml" | "json" | "manual";
+
 export interface NexusProjectAgentMcpTarget {
   agent: string;
+  provider?: string;
   enabled?: boolean;
   configPath?: string;
+  configFormat?: NexusProjectAgentMcpConfigFormat;
+  configSchema?: string;
   sourceControl?: NexusSkillSourceControl;
   serverName?: string;
   command?: string;
   args?: string[];
   defaultToolsApprovalMode?: string;
+  activationNotes?: string[];
+  trustSemantics?: string;
+  manualInstructions?: string[];
 }
 
 export interface NexusProjectMcpConfig {
@@ -876,6 +884,7 @@ function validateProjectMcpAgentTarget(
   const pathName = `project config.mcp.agentTargets[${index}]`;
   const record = assertRecord(value, pathName);
   const enabled = optionalBoolean(record, "enabled", pathName);
+  const provider = optionalString(record, "provider", pathName);
   const sourceControl = validateSkillSourceControl(
     record.sourceControl,
     `${pathName}.sourceControl`,
@@ -889,17 +898,54 @@ function validateProjectMcpAgentTarget(
     "defaultToolsApprovalMode",
     pathName,
   );
+  const configFormat = validateAgentMcpConfigFormat(
+    record.configFormat,
+    `${pathName}.configFormat`,
+  );
+  const configSchema = optionalString(record, "configSchema", pathName);
+  const activationNotes = optionalStringArray(
+    record,
+    "activationNotes",
+    pathName,
+  );
+  const trustSemantics = optionalString(record, "trustSemantics", pathName);
+  const manualInstructions = optionalStringArray(
+    record,
+    "manualInstructions",
+    pathName,
+  );
 
   return {
     agent: requiredString(record, "agent", pathName),
+    ...(provider !== undefined ? { provider } : {}),
     ...(enabled !== undefined ? { enabled } : {}),
     ...(configPath !== undefined ? { configPath } : {}),
+    ...(configFormat !== undefined ? { configFormat } : {}),
+    ...(configSchema !== undefined ? { configSchema } : {}),
     ...(sourceControl !== undefined ? { sourceControl } : {}),
     ...(serverName !== undefined ? { serverName } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
+    ...(activationNotes !== undefined ? { activationNotes } : {}),
+    ...(trustSemantics !== undefined ? { trustSemantics } : {}),
+    ...(manualInstructions !== undefined ? { manualInstructions } : {}),
   };
+}
+
+function validateAgentMcpConfigFormat(
+  value: unknown,
+  pathName: string,
+): NexusProjectAgentMcpConfigFormat | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "toml" || value === "json" || value === "manual") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be toml, json, or manual`);
 }
 
 function validateProjectMcpConfig(

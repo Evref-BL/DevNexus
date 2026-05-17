@@ -351,6 +351,82 @@ describe("nexus setup assistant", () => {
     expect(check.status).toBe("warning");
   });
 
+  it("lists OpenCode and manual provider MCP targets in setup guidance and checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-provider-targets-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [
+          { agent: "opencode" },
+          {
+            agent: "custom-agent",
+            provider: "custom",
+            configPath: "docs/custom-agent-mcp.md",
+            configFormat: "manual",
+            configSchema: "custom.manual",
+          },
+        ],
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const agentStep = plan.steps.find(
+      (step) => step.id === "open-agent-project-session",
+    )!;
+
+    expect(refreshStep.checks).toContain("test -f opencode.json");
+    expect(refreshStep.checks).toContain("test -f docs/custom-agent-mcp.md");
+    expect(refreshStep.manualInstructions.join("\n")).toContain(
+      "opencode/opencode materialized opencode.json json/opencode.mcp.local",
+    );
+    expect(agentStep.manualInstructions.join("\n")).toContain(
+      "custom-agent/custom manual docs/custom-agent-mcp.md manual/custom.manual",
+    );
+
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.writeFileSync(
+      path.join(projectRoot, "opencode.json"),
+      `${JSON.stringify({
+        mcp: {
+          dev_nexus: {
+            type: "local",
+            command: ["dev-nexus", "mcp-stdio"],
+          },
+        },
+      }, null, 2)}\n`,
+    );
+    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
+      recursive: true,
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-opencode",
+        status: "passed",
+        summary: expect.stringContaining("opencode.json"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-gap-custom-agent-manual-provider-config-required",
+        status: "warning",
+        summary: expect.stringContaining("manual MCP config is required"),
+      }),
+    );
+  });
+
   it("warns when plugin-projected skills and MCP servers are not materialized", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-plugin-projection-");
     writeProject(projectRoot, {
