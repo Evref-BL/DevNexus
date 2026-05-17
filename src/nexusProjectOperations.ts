@@ -181,10 +181,14 @@ export function buildProjectConfig(
       },
     ],
     worktreesRoot: nexusProjectWorktreesDirectoryName,
-    kanban: {
-      provider: "vibe-kanban",
-      projectId: vibeKanbanProjectId,
-    },
+    ...(vibeKanbanProjectId
+      ? {
+          kanban: {
+            provider: "vibe-kanban" as const,
+            projectId: vibeKanbanProjectId,
+          },
+        }
+      : {}),
     ...(extensions ? { extensions } : {}),
   };
 }
@@ -432,7 +436,7 @@ export function importNexusProjectInRegistry(
       );
   if (existingProjectConfig && vibeKanbanProjectId) {
     projectConfig.kanban = {
-      ...projectConfig.kanban,
+      provider: "vibe-kanban",
       projectId: vibeKanbanProjectId,
     };
   }
@@ -457,7 +461,7 @@ export function importNexusProjectInRegistry(
     options.registry,
     projectRoot,
     projectConfig,
-    { vibeKanbanProjectId: projectConfig.kanban.projectId },
+    { vibeKanbanProjectId: projectConfig.kanban?.projectId ?? null },
   );
 
   return {
@@ -493,8 +497,9 @@ export function configureNexusProjectTrackerInRegistry(
     );
   }
   const workTracking = buildConfiguredWorkTracking(options);
+  const { kanban: _kanban, ...projectConfigWithoutLegacyKanban } = projectConfig;
   const updatedProjectConfig: NexusProjectConfig = {
-    ...projectConfig,
+    ...projectConfigWithoutLegacyKanban,
     workTracking,
     components: projectConfig.components.map((component) =>
       component.role === "primary"
@@ -544,7 +549,7 @@ export function linkNexusProjectTrackerInRegistry(
   const updatedProjectConfig: NexusProjectConfig = {
     ...projectConfig,
     kanban: {
-      ...projectConfig.kanban,
+      provider: "vibe-kanban",
       projectId: vibeKanbanProjectId,
     },
   };

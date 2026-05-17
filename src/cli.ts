@@ -1129,11 +1129,16 @@ async function handleWorkItemCommand(
 
   if (command === "get") {
     const parsed = parseWorkItemGetCommand(argv);
+    const reference = resolveCliWorkItemReference(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.itemId,
+    );
     const item = await workItemService(parsed.projectRoot, dependencies)
       .getWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
-        componentId: parsed.componentId,
-        id: parsed.itemId,
+        componentId: reference.componentId,
+        id: reference.itemId,
       });
     printWorkItemGetResult(item, parsed, dependencies.stdout ?? process.stdout);
     return 0;
@@ -1141,11 +1146,16 @@ async function handleWorkItemCommand(
 
   if (command === "update") {
     const parsed = parseWorkItemUpdateCommand(argv);
+    const reference = resolveCliWorkItemReference(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.itemId,
+    );
     const item = await workItemService(parsed.projectRoot, dependencies)
       .updateWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
-        componentId: parsed.componentId,
-        ref: { id: parsed.itemId },
+        componentId: reference.componentId,
+        ref: { id: reference.itemId },
         patch: parsed.patch,
       });
     printWorkItemUpdateResult(item, parsed, dependencies.stdout ?? process.stdout);
@@ -1154,11 +1164,16 @@ async function handleWorkItemCommand(
 
   if (command === "comment") {
     const parsed = parseWorkItemCommentCommand(argv);
+    const reference = resolveCliWorkItemReference(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.itemId,
+    );
     const comment = await workItemService(parsed.projectRoot, dependencies)
       .addComment({
         projectRoot: path.resolve(parsed.projectRoot),
-        componentId: parsed.componentId,
-        ref: { id: parsed.itemId },
+        componentId: reference.componentId,
+        ref: { id: reference.itemId },
         body: parsed.body,
       });
     printWorkItemCommentResult(
@@ -1609,6 +1624,57 @@ function resolveDirectProject(
     sourceRoot: component.sourceRoot,
     workTracking: component.workTracking,
   };
+}
+
+function resolveCliWorkItemReference(
+  projectRoot: string,
+  componentId: string | undefined,
+  itemId: string,
+): { componentId?: string; itemId: string } {
+  const qualified = componentQualifiedWorkItemId(projectRoot, itemId);
+  if (!qualified) {
+    return {
+      ...(componentId ? { componentId } : {}),
+      itemId,
+    };
+  }
+
+  if (componentId && componentId !== qualified.componentId) {
+    throw new Error(
+      `Work item id component "${qualified.componentId}" conflicts with --component "${componentId}"`,
+    );
+  }
+
+  return qualified;
+}
+
+function componentQualifiedWorkItemId(
+  projectRoot: string,
+  itemId: string,
+): { componentId: string; itemId: string } | null {
+  const split = itemId.match(/^([A-Za-z0-9][A-Za-z0-9_.-]*):(.+)$/);
+  if (!split) {
+    return null;
+  }
+
+  const componentId = split[1]!;
+  const qualifiedItemId = split[2]!.trim();
+  if (!qualifiedItemId) {
+    return null;
+  }
+
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const componentIds = new Set(
+    resolveProjectComponents(
+      resolvedProjectRoot,
+      loadProjectConfig(resolvedProjectRoot),
+    ).map((component) => component.id),
+  );
+  if (!componentIds.has(componentId)) {
+    return null;
+  }
+
+  return { componentId, itemId: qualifiedItemId };
 }
 
 function parseHomeInitCommand(argv: string[]): ParsedHomeInitCommand {

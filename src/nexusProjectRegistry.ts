@@ -111,7 +111,7 @@ export function buildNexusProjectStatus(
     components,
     workTracking: config?.workTracking ?? null,
     vibeKanbanProjectId:
-      config?.kanban.projectId ?? reference.vibeKanbanProjectId ?? null,
+      config?.kanban?.projectId ?? reference.vibeKanbanProjectId ?? null,
     vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
     projectConfigPath: resolvedProjectConfigPath,
     projectConfigExists: Boolean(config),
@@ -134,7 +134,7 @@ export function buildNexusProjectStatusForPath(
     id: config.id,
     name: config.name,
     projectRoot,
-    ...(config.kanban.projectId
+    ...(config.kanban?.projectId
       ? { vibeKanbanProjectId: config.kanban.projectId }
       : {}),
   }, { projectConfig: config });
@@ -153,7 +153,7 @@ export function upsertNexusProjectReference(
     existingIndex >= 0 ? registry.projects[existingIndex] : undefined;
   const resolvedVibeKanbanProjectId =
     options.vibeKanbanProjectId ??
-    projectConfig.kanban.projectId ??
+    projectConfig.kanban?.projectId ??
     existing?.vibeKanbanProjectId ??
     null;
   const resolvedVibeKanbanRepoId =

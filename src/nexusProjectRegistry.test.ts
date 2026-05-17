@@ -182,6 +182,31 @@ describe("project registry helpers", () => {
     });
   });
 
+  it("resolves portable component source roots from the sibling sources root", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(root, { recursive: true });
+    saveProjectConfig(root, {
+      ...projectConfig("config-id", "Config Project"),
+      components: [
+        {
+          id: "dev-nexus",
+          name: "DevNexus",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:example/dev-nexus.git",
+          defaultBranch: "main",
+          sourceRoot: "sourcesRoot:dev-nexus",
+          relationships: [],
+        },
+      ],
+    });
+
+    expect(buildNexusProjectStatusForPath(root).components[0]).toMatchObject({
+      id: "dev-nexus",
+      sourceRoot: path.join(path.dirname(root), "sources", "dev-nexus"),
+    });
+  });
+
   it("reports missing path status with a generic initialization error", () => {
     const root = makeTempDir("dev-nexus-missing-project-");
 

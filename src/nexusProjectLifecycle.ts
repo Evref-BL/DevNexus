@@ -13,6 +13,7 @@ import {
   workTrackerCapabilityReportForConfig,
   workTrackerCapabilitiesForConfig,
 } from "./workTrackingProviderService.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
@@ -223,9 +224,10 @@ function resolveComponentWorktreesRoot(
 }
 
 function resolveProjectPath(projectRoot: string, value: string): string {
-  return path.isAbsolute(value)
-    ? path.resolve(value)
-    : path.resolve(projectRoot, value);
+  return resolveNexusProjectPath({
+    projectRoot: path.resolve(projectRoot),
+    value,
+  });
 }
 
 function directoryExists(directoryPath: string): boolean {

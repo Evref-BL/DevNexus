@@ -603,7 +603,9 @@ describe("dev-nexus cli", () => {
     const createOutput = captureOutput();
     const addonListOutput = captureOutput();
     const primaryListOutput = captureOutput();
+    const getOutput = captureOutput();
     const updateOutput = captureOutput();
+    const commentOutput = captureOutput();
 
     await main(
       [
@@ -633,19 +635,37 @@ describe("dev-nexus cli", () => {
       stdout: primaryListOutput.writer,
     });
     await main(
+      ["work-item", "get", projectRoot, "addon:local-1", "--json"],
+      {
+        stdout: getOutput.writer,
+      },
+    );
+    await main(
       [
         "work-item",
         "update",
         projectRoot,
-        "local-1",
-        "--component",
-        "addon",
+        "addon:local-1",
         "--status",
         "done",
         "--json",
       ],
       {
         stdout: updateOutput.writer,
+      },
+    );
+    await main(
+      [
+        "work-item",
+        "comment",
+        projectRoot,
+        "addon:local-1",
+        "--body",
+        "Component-qualified reference worked.",
+        "--json",
+      ],
+      {
+        stdout: commentOutput.writer,
       },
     );
 
@@ -661,9 +681,16 @@ describe("dev-nexus cli", () => {
       },
     ]);
     expect(JSON.parse(primaryListOutput.output()).workItems).toEqual([]);
+    expect(JSON.parse(getOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Addon task",
+    });
     expect(JSON.parse(updateOutput.output()).workItem).toMatchObject({
       id: "local-1",
       status: "done",
+    });
+    expect(JSON.parse(commentOutput.output()).comment).toMatchObject({
+      body: "Component-qualified reference worked.",
     });
   });
 

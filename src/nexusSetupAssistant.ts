@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
+import { analyzeNexusProjectPath } from "./nexusPathResolver.js";
 
 export type NexusSetupFlowId =
   | "github-meta-project"
@@ -228,7 +229,13 @@ export function buildNexusSetupCheck(options: {
         continue;
       }
 
-      if (isPathIncompatibleWithPlatform(component.sourceRoot, platform)) {
+      const sourceRootAnalysis = analyzeNexusProjectPath({
+        projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
+        value: component.sourceRoot,
+        platform,
+      });
+
+      if (!sourceRootAnalysis.compatible) {
         checks.push({
           id: `component-${component.id}-source-root`,
           title: `${component.name} source root`,
@@ -243,12 +250,12 @@ export function buildNexusSetupCheck(options: {
       checks.push(pathCheck({
         id: `component-${component.id}-source-root`,
         title: `${component.name} source root`,
-        pathName: path.resolve(projectRoot, component.sourceRoot),
-        passedSummary: `Component source root exists: ${component.sourceRoot}`,
-        blockedSummary: `Component source root is missing: ${component.sourceRoot}`,
+        pathName: sourceRootAnalysis.path,
+        passedSummary: `Component source root exists: ${sourceRootAnalysis.path}`,
+        blockedSummary: `Component source root is missing: ${sourceRootAnalysis.path}`,
         nextAction: component.remoteUrl
-          ? `Clone or fetch ${component.remoteUrl} into ${component.sourceRoot}.`
-          : `Create or configure ${component.sourceRoot}.`,
+          ? `Clone or fetch ${component.remoteUrl} into ${sourceRootAnalysis.path}.`
+          : `Create or configure ${sourceRootAnalysis.path}.`,
         missingStatus: "blocked",
       }));
     }
@@ -475,12 +482,20 @@ function joinExistingProjectSteps(options: {
       kind: "manual",
       scope: "host-local",
       summary: "Clone or point host-local component source roots at the paths configured for this machine.",
-      commands: componentCloneCommands(options.projectConfig, options.platform),
+      commands: componentCloneCommands(
+        options.projectConfig,
+        options.platform,
+        options.projectRoot,
+      ),
       manualInstructions: [
         "Preserve any existing dirty source checkout; fetch first and stop on conflicts.",
         "Host-local paths may differ between Mac and Windows and should not contain secrets.",
       ],
-      checks: componentSourceChecks(options.projectConfig, options.platform),
+      checks: componentSourceChecks(
+        options.projectConfig,
+        options.platform,
+        options.projectRoot,
+      ),
     },
     {
       id: "refresh-agent-mcp-and-skills",
@@ -657,15 +672,32 @@ function planProjectRootPath(
   return `$HOME/dev-nexus/${projectConfig.id}`;
 }
 
+function componentResolutionProjectRoot(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  platform: NexusSetupPlatform,
+): string {
+  return isPathIncompatibleWithPlatform(projectRoot, platform)
+    ? planProjectRootPath(projectRoot, projectConfig, platform)
+    : projectRoot;
+}
+
 function componentPlanSourceRoot(
   component: NexusProjectConfig["components"][number],
   platform: NexusSetupPlatform,
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
 ): string | null {
   if (!component.sourceRoot) {
     return null;
   }
-  if (!isPathIncompatibleWithPlatform(component.sourceRoot, platform)) {
-    return component.sourceRoot;
+  const analysis = analyzeNexusProjectPath({
+    projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
+    value: component.sourceRoot,
+    platform,
+  });
+  if (analysis.compatible) {
+    return analysis.path;
   }
 
   if (platform === "windows") {
@@ -712,9 +744,15 @@ function isPosixAbsolutePath(value: string): boolean {
 function componentCloneCommands(
   projectConfig: NexusProjectConfig,
   platform: NexusSetupPlatform,
+  projectRoot: string,
 ): string[] {
   return projectConfig.components.flatMap((component) => {
-    const sourceRoot = componentPlanSourceRoot(component, platform);
+    const sourceRoot = componentPlanSourceRoot(
+      component,
+      platform,
+      projectRoot,
+      projectConfig,
+    );
     if (!sourceRoot || !component.remoteUrl) {
       return [];
     }
@@ -728,9 +766,12 @@ function componentCloneCommands(
 function componentSourceChecks(
   projectConfig: NexusProjectConfig,
   platform: NexusSetupPlatform,
+  projectRoot: string,
 ): string[] {
   return projectConfig.components
-    .map((component) => componentPlanSourceRoot(component, platform))
+    .map((component) =>
+      componentPlanSourceRoot(component, platform, projectRoot, projectConfig),
+    )
     .filter((sourceRoot): sourceRoot is string => Boolean(sourceRoot))
     .map((sourceRoot) => `test -d ${shellPathPlaceholder(sourceRoot)}`);
 }

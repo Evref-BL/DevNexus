@@ -170,6 +170,54 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("uses portable component source roots in Mac setup commands", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-portable-paths-");
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "dev-nexus",
+          name: "DevNexus",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "sourcesRoot:dev-nexus",
+          relationships: [],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const prepareStep = plan.steps.find(
+      (step) => step.id === "prepare-component-checkouts",
+    )!;
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(prepareStep.commands.join("\n")).toContain("sources/dev-nexus");
+    expect(prepareStep.commands.join("\n")).not.toContain("sourcesRoot:");
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        status: "blocked",
+        summary: expect.stringContaining("sources"),
+      }),
+    );
+    expect(check.checks).not.toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        summary: expect.stringContaining("another OS"),
+      }),
+    );
+  });
+
   it("checks safe local Mac setup facts without contacting GitHub", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-check-");
     writeProject(projectRoot);

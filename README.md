@@ -93,6 +93,17 @@ The cloned meta repository directory is the DevNexus project root. Keep it
 separate from component source checkouts; component repositories are cloned or
 verified by the setup flow in a later step.
 
+Shared project configs should prefer portable component paths over machine
+absolute paths. `sourceRoot` and `worktreesRoot` accept ordinary project-root
+relative paths plus explicit bases such as `projectRoot:components/core`,
+`projectParent:sources/core`, `sourcesRoot:core`, and `home:dev-nexus/core`.
+`sourcesRoot:` defaults to a sibling `sources` directory beside the meta
+project root, so a meta checkout at `$HOME/dev-nexus/example-suite` resolves
+`sourcesRoot:core` to `$HOME/dev-nexus/sources/core` on Mac or Linux and the
+equivalent user directory on Windows. Legacy absolute paths still work on the
+matching OS, but setup checks report foreign absolute paths as blocked for a
+new machine.
+
 ## Project Template Shape
 
 The generic project scaffold separates project-owned support state from
@@ -428,11 +439,7 @@ Example:
       ]
     }
   ],
-  "worktreesRoot": "worktrees",
-  "kanban": {
-    "provider": "vibe-kanban",
-    "projectId": null
-  }
+  "worktreesRoot": "worktrees"
 }
 ```
 

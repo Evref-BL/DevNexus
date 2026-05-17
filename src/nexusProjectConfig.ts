@@ -36,6 +36,7 @@ import {
   type NexusAutomationPublicationConfig,
   type NexusAutomationVerificationConfig,
 } from "./nexusAutomationConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -124,7 +125,7 @@ export interface NexusProjectConfig {
   repo: NexusProjectRepoConfig;
   components: NexusProjectComponentConfig[];
   worktreesRoot: string;
-  kanban: NexusProjectKanbanConfig;
+  kanban?: NexusProjectKanbanConfig;
   workTracking?: WorkTrackingConfig;
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
@@ -153,7 +154,10 @@ export function projectConfigPath(projectRootPath: string): string {
 }
 
 function resolveFromProject(projectRootPath: string, value: string): string {
-  return path.resolve(projectRootPath, value);
+  return resolveNexusProjectPath({
+    projectRoot: path.resolve(projectRootPath),
+    value,
+  });
 }
 
 export function projectWorktreesRootPath(
@@ -359,7 +363,13 @@ export function resolveNexusAgentConfig(
   });
 }
 
-function validateKanbanConfig(value: unknown): NexusProjectKanbanConfig {
+function validateKanbanConfig(
+  value: unknown,
+): NexusProjectKanbanConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
   const record = assertRecord(value, "kanban");
   if (record.provider !== "vibe-kanban") {
     throw new NexusConfigError("kanban.provider must be vibe-kanban");
@@ -1494,6 +1504,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const mcp = validateProjectMcpConfig(record.mcp);
   const automation = validateNexusAutomationConfig(record.automation);
   const repo = validateRepoConfig(record.repo);
+  const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
     optionalString(record, "worktreesRoot", "project config") ??
     nexusProjectWorktreesDirectoryName;
@@ -1504,7 +1515,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     home: nullableString(record, "home", "project config"),
     repo,
     worktreesRoot,
-    kanban: validateKanbanConfig(record.kanban),
+    ...(kanban ? { kanban } : {}),
     ...(workTracking ? { workTracking } : {}),
   };
   const components = validateProjectComponentsConfig(record.components, common);
