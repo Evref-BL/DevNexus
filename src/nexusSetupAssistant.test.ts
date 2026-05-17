@@ -92,6 +92,7 @@ describe("nexus setup assistant", () => {
       "configure-meta-remotes",
       "prepare-component-checkouts",
       "refresh-agent-mcp-and-skills",
+      "open-codex-desktop-project",
       "run-final-preflight",
     ]);
     expect(plan.steps.find((step) => step.id === "configure-automation-auth-profile"))
@@ -108,6 +109,20 @@ describe("nexus setup assistant", () => {
     );
     expect(cloneStep.manualInstructions).toContain(
       "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
+    );
+    const codexStep = plan.steps.find(
+      (step) => step.id === "open-codex-desktop-project",
+    )!;
+    expect(codexStep).toMatchObject({
+      kind: "manual",
+      scope: "host-local",
+    });
+    expect(codexStep.summary).toContain("does not mutate Codex app state");
+    expect(codexStep.manualInstructions.join("\n")).toContain(
+      "create or open a project rooted at $HOME/dev-nexus/mac-demo",
+    );
+    expect(codexStep.manualInstructions.join("\n")).toContain(
+      "Do not edit Codex global state or app databases directly",
     );
     expect(JSON.stringify(plan)).not.toContain("gho_");
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");

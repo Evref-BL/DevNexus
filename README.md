@@ -84,10 +84,14 @@ dev-nexus setup check . join-existing-project --platform macos
 
 The plan covers prerequisite installs, human GitHub authentication, isolated
 automation authentication, meta-project remotes, component checkouts, MCP
-refresh, skill projection, and final preflight. When shared project metadata
-contains OS-local source roots from another machine, the Mac plan uses
-host-local placeholders and the check reports the component path configuration
-as blocked instead of treating the other machine's path as valid.
+refresh, skill projection, opening the Codex Desktop project, and final
+preflight. DevNexus writes repo-local Codex MCP configuration such as
+`.codex/config.toml`, but it does not edit Codex Desktop's private project
+registry. After the MCP refresh step, open or create the Codex Desktop project
+manually with the cloned meta repository as the project root. When shared
+project metadata contains OS-local source roots from another machine, the Mac
+plan uses host-local placeholders and the check reports the component path
+configuration as blocked instead of treating the other machine's path as valid.
 
 The cloned meta repository directory is the DevNexus project root. Keep it
 separate from component source checkouts; component repositories are cloned or

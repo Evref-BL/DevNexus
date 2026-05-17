@@ -513,6 +513,24 @@ function joinExistingProjectSteps(options: {
       checks: ["test -f .codex/config.toml", `${devNexusCommand} automation eligible-work . --json`],
     },
     {
+      id: "open-codex-desktop-project",
+      title: "Open Codex Desktop project",
+      kind: "manual",
+      scope: "host-local",
+      summary:
+        "Open or create the Codex Desktop project for this meta-project root; DevNexus projects repo-local Codex config but does not mutate Codex app state.",
+      commands: [],
+      manualInstructions: [
+        `In Codex Desktop, create or open a project rooted at ${projectRootForPlatform}.`,
+        "Confirm the project is using the generated .codex/config.toml from the meta-project root.",
+        "Reload or restart Codex if the DevNexus MCP tools are not visible after opening the project.",
+        "Do not edit Codex global state or app databases directly; treat project registration as a manual app action until a supported API exists.",
+      ],
+      checks: [
+        "Open Codex Desktop on the meta-project root and confirm DevNexus MCP tools are visible.",
+      ],
+    },
+    {
       id: "run-final-preflight",
       title: "Run final setup preflight",
       kind: "verification",
