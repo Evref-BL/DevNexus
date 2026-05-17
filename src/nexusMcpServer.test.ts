@@ -162,6 +162,7 @@ describe("DevNexus MCP server", () => {
       "coordination_status",
       "coordination_handoff",
       "coordination_integrate",
+      "coordination_request",
       "work_item_create",
       "work_item_list",
       "work_item_get",
@@ -306,6 +307,70 @@ describe("DevNexus MCP server", () => {
             },
           ],
         },
+      },
+    });
+  });
+
+  it("records coordination requests through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-17");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate external review",
+      status: "in_progress",
+    });
+
+    const request = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_request",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          intent: "approval",
+          question: "Approve the mocked external request slice?",
+          target: "github-issue:22",
+          responseStatus: "approved",
+          responseSummary: "Approved by reviewer comment.",
+          responder: "reviewer-a",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-17T10:00:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+
+    expect(request).toMatchObject({
+      ok: true,
+      record: {
+        intent: "approval",
+        status: "approved",
+        target: {
+          kind: "github_issue",
+          provider: "github",
+          value: "22",
+        },
+        provider: {
+          provider: "github",
+          surface: "issue",
+          mode: "draft",
+          posted: false,
+          credentialsUsed: false,
+        },
+        response: {
+          status: "approved",
+          summary: "Approved by reviewer comment.",
+        },
+      },
+      comment: {
+        id: "local-comment-1",
       },
     });
   });

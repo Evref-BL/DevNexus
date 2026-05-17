@@ -48,6 +48,11 @@ import {
   parseNexusCoordinationHandoffStatus,
 } from "./nexusCoordination.js";
 import {
+  createNexusCoordinationRequest,
+  parseNexusCoordinationRequestIntent,
+  parseNexusCoordinationRequestStatus,
+} from "./nexusCoordinationRequest.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
@@ -287,6 +292,46 @@ const tools: McpTool[] = [
         fetch: { type: "boolean" },
         currentPath: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "coordination_request",
+    description: "Draft a provider-neutral external coordination request and summarize mocked provider responses without live provider posting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        workItemId: { type: "string" },
+        intent: {
+          type: "string",
+          enum: ["approval", "feedback", "choice", "review"],
+        },
+        question: { type: ["string", "null"] },
+        note: { type: ["string", "null"] },
+        target: { type: ["string", "null"] },
+        hostId: { type: "string" },
+        agentId: { type: "string" },
+        responseStatus: {
+          type: "string",
+          enum: [
+            "waiting",
+            "answered",
+            "approved",
+            "changes_requested",
+            "timed_out",
+            "blocked",
+          ],
+        },
+        responseSummary: { type: ["string", "null"] },
+        responder: { type: ["string", "null"] },
+        requestedChanges: { type: "array", items: { type: "string" } },
+        currentPath: { type: "string" },
+      },
+      required: ["intent"],
       additionalProperties: false,
     },
   },
@@ -541,6 +586,44 @@ export async function callDevNexusMcpTool(
             gitRunner: context.gitRunner,
             now: context.now,
           }),
+        });
+      case "coordination_request":
+        return toolResult({
+          ok: true,
+          ...(await createNexusCoordinationRequest({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            workItemId: optionalString(args, "workItemId", "arguments"),
+            intent: parseNexusCoordinationRequestIntent(
+              requiredString(args, "intent", "arguments"),
+              "arguments.intent",
+            ),
+            question: optionalNullableString(args, "question", "arguments"),
+            note: optionalNullableString(args, "note", "arguments"),
+            target: optionalNullableString(args, "target", "arguments"),
+            hostId: optionalString(args, "hostId", "arguments"),
+            agentId: optionalString(args, "agentId", "arguments"),
+            responseStatus: hasOwn(args, "responseStatus")
+              ? parseNexusCoordinationRequestStatus(
+                  requiredString(args, "responseStatus", "arguments"),
+                  "arguments.responseStatus",
+                )
+              : undefined,
+            responseSummary: optionalNullableString(
+              args,
+              "responseSummary",
+              "arguments",
+            ),
+            responder: optionalNullableString(args, "responder", "arguments"),
+            requestedChanges:
+              optionalStringArray(args, "requestedChanges", "arguments") ?? [],
+            currentPath:
+              optionalString(args, "currentPath", "arguments") ??
+              context.currentPath ??
+              process.cwd(),
+            gitRunner: context.gitRunner,
+            now: context.now,
+          })),
         });
       case "work_item_create":
         return toolResult({
