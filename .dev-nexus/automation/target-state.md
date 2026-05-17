@@ -43,6 +43,11 @@ Immediate direction:
   `dev-nexus automation coordinator-loop . --max-ticks 1 --max-runs 1 --json`
   and let DevNexus decide no-work, backoff, active-lock, wait, launch,
   completion, blocked, and failed outcomes.
+- Codex app-server provider planning is captured in
+  `docs/codex-app-server-provider-prd.md`. The follow-up tracker item
+  `dev-nexus:local-30` is `todo`/HITL and intentionally not ready for
+  automation until the Product Requirements Document (PRD) is accepted and
+  sliced into implementation items.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.
