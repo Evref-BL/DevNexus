@@ -46,11 +46,19 @@ Immediate direction:
 - `pharo-launcher-mcp` live-smoke passed using the approved profile state root
   and produced no source checkout changes. A later launcher-owned fix for
   isolated profile configuration, copied-image metadata repair, and Windows
-  detached launch logging was completed and published as `24f6d84`.
+  detached launch logging was completed and published as `24f6d84`, then
+  released to npm as `@evref-bl/pharo-launcher-mcp@0.1.2` from source commit
+  `c137fe9`.
 - PLexus approved live smoke `dogfood-overnight-local-3-20260517-0428`
   passed open/route/close through the isolated runner after the launcher fix.
   Artifacts are retained under
   `.dev-nexus/runtime/artifacts/overnight-live-20260517/dogfood-overnight-local-3-20260517-0428`.
+- PLexus now consumes `@evref-bl/pharo-launcher-mcp@^0.1.2` through normal npm
+  dependency resolution in source commit `7d34f86`. The approved smoke was
+  rerun without a local launcher checkout override as
+  `dogfood-overnight-local-3-npm-20260517-0442` and passed copy/open/route/close
+  cleanup through the published package. Artifacts are retained under
+  `.dev-nexus/runtime/artifacts/overnight-live-20260517/dogfood-overnight-local-3-npm-20260517-0442`.
 - Scoped npm dogfood prereleases were published on 2026-05-17 so other
   machines can install without sibling checkout assumptions:
   - `@evref-bl/dev-nexus@0.1.0-alpha.0` published with `dogfood` tag and
@@ -268,12 +276,15 @@ Durable completed foundation:
   `916e1d5`.
 - PLexus approved isolated live-smoke runner harness was completed and
   published as `5953274`; `plexus:local-3` and the approved live-smoke
-  execution item `plexus:local-2` are complete.
+  execution item `plexus:local-2` are complete. PLexus source commit `7d34f86`
+  updates the launcher package dependency to the published fixed
+  `@evref-bl/pharo-launcher-mcp@0.1.2`.
 - pharo-launcher-mcp cleanup hook boundary was documented and published as
   `1f3070b`.
 - pharo-launcher-mcp isolated profile image-copy configuration was completed
   and published as `24f6d84`, including profile-root launcher CLI config,
-  copied-image metadata repair, and detached launch log redirection.
+  copied-image metadata repair, and detached launch log redirection. Patch
+  release `0.1.2` was published to npm from `c137fe9`.
 - MCP-Pharo static/live verification boundary was merged through `origin/main`;
   automatic loads and DevNexus component defaults now target `main`.
 - MCP-Pharo `mcp-pharo:local-5` was completed by upstream work now refreshed

@@ -65,10 +65,17 @@ DevNexus dogfood work on 2026-05-17.
   inputs before live execution. The harness was published as PLexus `5953274`.
 - `pharo-launcher-mcp:local-4` fixed isolated launcher profile configuration,
   copied-image metadata repair, and Windows detached launch logging. The fix
-  was published as pharo-launcher-mcp `24f6d84`.
+  was published as pharo-launcher-mcp `24f6d84`, then released to npm as
+  `@evref-bl/pharo-launcher-mcp@0.1.2` from `c137fe9`.
 - The approved PLexus live smoke passed as
   `dogfood-overnight-local-3-20260517-0428`: copied `MCP12-2` to an owned
   disposable image, opened the project, routed `find-packages`, closed the
   project, unregistered the route, stopped the process, and deleted the copied
   image. Artifact evidence is retained under
   `C:\dev\code\dev-nexus-dogfood\.dev-nexus\runtime\artifacts\overnight-live-20260517\dogfood-overnight-local-3-20260517-0428`.
+- PLexus source `7d34f86` now pins `@evref-bl/pharo-launcher-mcp@^0.1.2`.
+  The same approved live smoke passed without a local launcher checkout
+  override as `dogfood-overnight-local-3-npm-20260517-0442`, proving the normal
+  npm package path can copy, open, route, close, unregister, stop, and delete
+  the disposable image. Artifact evidence is retained under
+  `C:\dev\code\dev-nexus-dogfood\.dev-nexus\runtime\artifacts\overnight-live-20260517\dogfood-overnight-local-3-npm-20260517-0442`.
