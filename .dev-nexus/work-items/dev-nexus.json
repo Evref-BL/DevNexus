@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 64,
+  "nextNumber": 65,
   "nextCommentNumber": 116,
-  "updatedAt": "2026-05-17T22:41:34.311Z",
+  "updatedAt": "2026-05-17T22:47:43.851Z",
   "items": [
     {
       "id": "local-1",
@@ -1575,6 +1575,31 @@
         "itemId": "local-63",
         "itemNumber": 63
       }
+    },
+    {
+      "id": "local-64",
+      "title": "Stop target-report relaunch after completed cycle closes all eligible work",
+      "description": "Type: automation target-report defect. Readiness: autonomous agent-ready (AFK). Evidence: after coordinator-loop coordinator-loop-20260517-t220947-388-z-1 closed all six selected dogfood work items, eligible-work returned zero but target-report still returned relaunch because the latest completed managed cycle retained the pre-run eligible count of 6. Goal: target-report should stop when a completed coordinator-loop leaves no eligible work. Acceptance: add post-run/no-work facts or current eligible reconciliation, tests for all-closed completion returning stop, preserve relaunch for failed/blocked/still-eligible cycles. Verification: focused target-report/coordinator-loop tests and npm run check. Publication: direct DevNexus integration and dogfood prerelease if runtime needs it.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "target-report",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T22:47:43.851Z",
+      "updatedAt": "2026-05-17T22:47:43.851Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-64",
+        "itemNumber": 64
+      }
     }
   ],
   "comments": {
@@ -2954,6 +2979,7 @@
           "itemId": "local-comment-103"
         }
       }
-    ]
+    ],
+    "local-64": []
   }
 }

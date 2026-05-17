@@ -78,10 +78,15 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector: none after
-  this batch. `dev-nexus:local-61` is the next tracker-visible follow-up for
-  actionable coordination diagnostics, but it remains `todo`/dependent until
-  explicitly promoted to `ready`.
+- Current ready `dogfood` work matching the automation selector:
+  - `dev-nexus:local-64` fixes target-report relaunch semantics after a
+    completed coordinator-loop closes all initially eligible work. Evidence:
+    `automation eligible-work` returned zero after the six-item batch, but
+    `automation target-report` still returned `relaunch` because the latest
+    managed final cycle retained the pre-run eligible count of 6.
+  - `dev-nexus:local-61` is the next tracker-visible follow-up for actionable
+    coordination diagnostics, but it remains `todo`/dependent until explicitly
+    promoted to `ready`.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
