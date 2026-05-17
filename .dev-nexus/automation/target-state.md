@@ -39,6 +39,12 @@ Immediate direction:
   repair:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
+  - `dev-nexus:local-57` add active MCP visibility diagnostics for agent
+    sessions. Current evidence: generated config and direct stdio probes work,
+    but this Codex thread still lacks visible generic DevNexus MCP namespaces.
+  - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
+    installs so registry delay or partial installs become setup-owned
+    diagnostics instead of worker surprises.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

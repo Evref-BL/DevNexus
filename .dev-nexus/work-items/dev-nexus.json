@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 57,
+  "nextNumber": 59,
   "nextCommentNumber": 99,
-  "updatedAt": "2026-05-17T19:50:13.412Z",
+  "updatedAt": "2026-05-17T19:56:57.342Z",
   "items": [
     {
       "id": "local-1",
@@ -1399,6 +1399,58 @@
         "itemId": "local-56",
         "itemNumber": 56
       }
+    },
+    {
+      "id": "local-57",
+      "title": "Add active MCP visibility diagnostics for agent sessions",
+      "description": "Type: DevNexus setup/MCP diagnostics defect\nReadiness: autonomous agent-ready (AFK)\nSource: after Codex was restarted on 2026-05-17, `.codex/config.toml` and `codex mcp list` showed `dev_nexus` and `dev_nexus_pharo` enabled, and direct stdio probes proved both servers initialize and list tools. However the active Codex tool surface in this thread still exposes PLexus/Pharo namespaces but not `mcp__dev_nexus` or `mcp__dev_nexus_pharo`. Setup check only reports a generic provider-session warning, so a coordinator can believe the root is ready while silently falling back to CLI.\n\nGoal: make DevNexus onboarding/setup distinguish generated MCP config, server startability, provider config listing, and active-session tool visibility with actionable diagnostics.\n\nAcceptance criteria:\n- Setup check or a provider diagnostics command probes configured stdio/HTTP MCP servers for initialize/tools-list without requiring implementation work.\n- For Codex, diagnostics can compare generated config, `codex mcp list` or configured CLI equivalent, and a recorded active-session confirmation step without relying on the fragile plain `codex` app alias.\n- The check reports which expected namespaces/tools are configured, startable, provider-listed, and still unconfirmed in the active session.\n- Guidance tells the user or coordinator exactly whether to restart/reopen the provider session, record the session, refresh MCP config, or fix a broken command.\n- Tests cover configured-but-not-visible, command-not-startable, HTTP endpoint-unreachable, and all-good cases with mocked providers.\n\nEvidence from this run:\n- `.codex/config.toml` declares `dev_nexus`, `dev_nexus_pharo`, `plexus_project`, `pharo_launcher`, and `pharo`.\n- Exact Codex CLI path can list MCP servers, but plain `codex mcp list` hits an access-denied app alias in this shell.\n- Direct stdio probes report `dev-nexus@0.1.0` with 24 tools and `dev-nexus-pharo@0.1.0` with 25 tools.\n- Active thread tools still lack the generic DevNexus MCP namespaces.\n\nVerification:\n- Focused setup/provider diagnostics tests.\n- npm run check.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "mcp",
+        "onboarding",
+        "diagnostics",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T19:56:36.835Z",
+      "updatedAt": "2026-05-17T19:56:36.835Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-57",
+        "itemNumber": 57
+      }
+    },
+    {
+      "id": "local-58",
+      "title": "Harden npm dogfood package propagation and runtime installs",
+      "description": "Type: setup/package-install reliability defect\nReadiness: autonomous agent-ready (AFK)\nSource: several dogfood setup and worker runs have depended on freshly published npm dogfood prereleases. Registry propagation or transient fetch failures caused confusing manual recovery: DevNexus-Pharo name-based install initially saw a missing packument after publish, a PLexus worker failed to fetch `@evref-bl/pharo-launcher-mcp` and left partial `node_modules`, and DevNexus alpha.9 install had to be retried after the dogfood tag became visible.\n\nGoal: make DevNexus-owned setup/runtime package installation resilient and explicit so workers do not discover npm propagation or partial-install failures mid-task.\n\nAcceptance criteria:\n- DevNexus setup/runtime package installation and publish-smoke guidance use bounded retry/backoff for npm packument/dist-tag visibility after a publish.\n- Runtime package install preflight detects partial or stale `node_modules` state and either repairs it through an approved setup command or reports a clear blocker before launching workers.\n- Worker context explains that package installation/fetch is setup-owned; workers should not run ad hoc npm install/npx fetches when dependencies are unavailable.\n- Failure summaries distinguish registry propagation delay, network failure, missing package/version, and damaged local install state.\n- Tests mock delayed npm visibility and partial runtime install directories without live registry access.\n\nVerification:\n- Focused setup/runtime package tests.\n- npm run check.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "npm",
+        "packaging",
+        "setup",
+        "diagnostics",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T19:56:57.342Z",
+      "updatedAt": "2026-05-17T19:56:57.342Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-58",
+        "itemNumber": 58
+      }
     }
   ],
   "comments": {
@@ -2578,6 +2630,8 @@
           "itemId": "local-comment-98"
         }
       }
-    ]
+    ],
+    "local-57": [],
+    "local-58": []
   }
 }
