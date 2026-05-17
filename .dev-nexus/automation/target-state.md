@@ -18,6 +18,9 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
+  - `dev-nexus:local-27` add a DevNexus-managed conditional coordinator loop
+    so DevNexus, not a raw Codex cron timer, owns perpetual work conditions,
+    locking, backoff, run/adopt decisions, and target-cycle facts.
   - `dev-nexus:local-17` add draft-only/mocked `coordination_request` support
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
@@ -31,9 +34,16 @@ Immediate direction:
   PLexus/pharo-launcher-mcp/Pharo smoke work may proceed inside that profile.
   Live external provider posting remains blocked unless a work item records
   explicit provider-policy approval.
-- The Codex cron automation is a thin scheduler for
-  `dev-nexus automation run-once`; DevNexus owns coordinator launch context,
-  result files, target-cycle facts, and the subagent cap. The launched
+- The standalone Codex cron automation `devnexus-dogfood-overnight` is paused.
+  It can load `dev-nexus automation run-once`, but its scheduler shell runs in
+  a restricted workspace-write/no-network sandbox, so a nested `codex.exe`
+  coordinator can fail before selecting work. This is now tracked by
+  `dev-nexus:local-27`.
+- The active continuation automation is the thread heartbeat
+  `devnexus-dogfood-heartbeat`. Treat it as a temporary wake-up bridge, not
+  the desired perpetual-work architecture. It continues this full-access thread
+  as the coordinator, using DevNexus as infrastructure for eligible work,
+  target-cycle facts, work-item updates, and subagent cap policy. The
   coordinator should use parallel subagents for independent selected items when
   useful, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS=8` and disjoint
   component/worktree write scopes.
@@ -44,9 +54,12 @@ Immediate direction:
   Winget-managed `node.exe` returned access denied before DevNexus
   `automation run-once` could load. No coordinator launch or implementation
   work was attempted during that blocked overnight run.
-- Current automation state: the Codex automation is active again and now invokes
-  DevNexus through
-  `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\node.exe`.
+- Current automation state: the paused cron invokes DevNexus through
+  `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\node.exe`, but it
+  should not be resumed for nested coordinator launch until `dev-nexus:local-27`
+  lands or Codex cron permissions can allow child model/network execution.
+  Even then, the preferred model is for any host scheduler to wake DevNexus,
+  while DevNexus decides whether a coordinator run should actually start.
 - Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
@@ -267,6 +280,10 @@ Durable completed foundation:
   covering `defaultToolsApprovalMode` in project MCP config, Codex
   `default_tools_approval_mode` generation, and preservation of existing
   trusted-server approval settings during `project mcp refresh`.
+- DevNexus MCP component-qualified work-item routing was published through
+  `7aa035d`, covering `component-id:local-id` references for MCP
+  get/update/comment/set-status calls so component-local trackers are selected
+  before legacy root tracker fallbacks.
 - PLexus scoped plugin context was published through `de0d5c6`, covering
   project/workspace/target/image ownership context, scoped lifecycle
   affordance descriptions, cleanup metadata, and gateway `imageId` route

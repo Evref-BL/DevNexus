@@ -133,8 +133,8 @@ Configured components:
 
 Current component publication state:
 
-- DevNexus is clean and pushed to `origin/main` through `3891e3e` (`Handle
-  legacy project configs in template layout`).
+- DevNexus is clean and pushed to `origin/main` through `7aa035d` (`Route MCP
+  work item refs by component prefix`).
 - DevNexus-Pharo is clean and pushed to `origin/main` through `8024fa2`; the
   GitHub repository has been renamed to `Evref-BL/DevNexus-Pharo`.
 - PLexus is clean and pushed to `origin/main` through `a616dd4` (`Merge PLexus
@@ -174,6 +174,14 @@ follow-ups remain blocked until an isolated runner is approved.
   user-local Codex Node executable directly. A plain `node` alias can resolve
   to an inaccessible app package runtime, and the previous Winget-managed Node
   path returned access denied from the scheduler shell.
+- Codex standalone cron shells can be more restricted than the interactive
+  coordinator thread. DevNexus should support a current-agent coordinator
+  adoption flow so an already-running agent can use DevNexus launch context,
+  target-cycle facts, result contracts, and subagent cap policy without
+  spawning a nested model process.
+- DevNexus MCP work-item tools support component-qualified ids such as
+  `dev-nexus:local-27`, selecting the component work tracker before provider
+  lookup so agents do not need CLI fallbacks for component-local work items.
 - Target reports now expose relaunch decisions from durable target/run facts.
 
 ## Next Target Direction

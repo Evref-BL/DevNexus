@@ -50,3 +50,11 @@ older control-project handoff.
 - The cron automation and dogfood MCP projection use the user-local Codex Node
   executable directly. The previous Winget-managed Node path was executable
   interactively but returned access denied from the scheduler shell.
+- The standalone cron is currently paused because Codex cron shell commands run
+  with restricted workspace/no-network permissions; nested `codex.exe`
+  coordinator launch can fail there. Use the active thread heartbeat until
+  DevNexus supports current-agent coordinator adoption or cron permissions
+  support child model execution.
+- DevNexus source commit `7aa035d` fixes MCP work-item tools so
+  component-qualified ids such as `dev-nexus:local-27` route to the component
+  work tracker before provider selection.
