@@ -57,7 +57,7 @@ Immediate direction:
   supplied by the caller, so Git rebase/merge continuations do not open a host
   editor during agent work. The fix does not alter global or repository Git
   config, and this root's project-local runtime install now uses alpha.14.
-- Project-scoped PLexus runtime work is now active from
+- Project-scoped PLexus runtime work is active from
   `docs/plexus-project-scoped-runtime-prd.md`:
   - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
     It adds normalized runtime policy defaults/validation, zero-image idle
@@ -66,31 +66,22 @@ Immediate direction:
   - `plexus:local-16` is complete and published through PLexus `8a8b407`.
     It adds the standalone host-local port claim service; image lifecycle
     wiring remains intentionally separate.
-  - `plexus:local-17` and `plexus:local-18` are now ready as the next safe
-    parallel PLexus wave.
-- DevNexus tooling defects found while running the PLexus parallel wave are
-  now tracked:
-  - `dev-nexus:local-59` covers local work-item store concurrency/data
-    integrity after parallel local-provider writes corrupted a JSON store.
-  - `dev-nexus:local-60` covers inconsistent component-qualified work-item id
-    handling in coordination/worktree commands.
-  - `dev-nexus:local-61` covers actionable coordination diagnostics when a
-    tracker store or handoff comment cannot be parsed.
-  - `dev-nexus:local-58` now also carries the PLexus worktree dependency
-    projection evidence where workers lacked `tsc`/`vitest` until setup ran
-    `npm ci`.
-- Current ready `dogfood` work matching the automation selector after the MCP,
-  Codex launcher, noninteractive Git, and PLexus runtime repairs:
-  - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
-    unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
-  - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
-    installs so registry delay or partial installs become setup-owned
-    diagnostics instead of worker surprises.
-  - `dev-nexus:local-59` make local work-item store writes concurrency-safe.
-  - `dev-nexus:local-60` normalize component-qualified ids in coordination and
-    worktree tools.
-  - `plexus:local-17` use port claims for image MCP allocation.
-  - `plexus:local-18` model project-local gateway deployment.
+  - `plexus:local-17` and `plexus:local-18` are complete and published
+    through PLexus `b220adf`. The integration first incorporated the upstream
+    runtime foundation commits `75b6bc4` and `8a8b407`, then added image MCP
+    port-claim allocation and project-local gateway deployment.
+- The six-item parallel dogfood wave selected by
+  `coordinator-loop-20260517-t220947-388-z-1` is complete:
+  - `dev-nexus:local-33`, `dev-nexus:local-58`, `dev-nexus:local-59`, and
+    `dev-nexus:local-60` are published through DevNexus `f6e98bc`.
+  - `plexus:local-17` and `plexus:local-18` are published through PLexus
+    `b220adf`.
+  - DevNexus focused integrated tests plus `npm run check` passed; PLexus
+    focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
+- Current ready `dogfood` work matching the automation selector: none after
+  this batch. `dev-nexus:local-61` is the next tracker-visible follow-up for
+  actionable coordination diagnostics, but it remains `todo`/dependent until
+  explicitly promoted to `ready`.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -218,9 +209,9 @@ Immediate direction:
   `docs/codex-app-server-provider-prd.md`. The follow-up tracker item
   `dev-nexus:local-30` is `todo`/HITL and has been sliced into implementation
   items. Foundation work `dev-nexus:local-31` and `dev-nexus:local-32` is
-  complete; `dev-nexus:local-33` is now ready. Dependent follow-ups
-  `dev-nexus:local-34` through `dev-nexus:local-36` remain `todo` until the
-  app-server launch path lands.
+  complete, and `dev-nexus:local-33` landed the app-server launch provider in
+  DevNexus `f6e98bc`. Dependent follow-ups `dev-nexus:local-34` through
+  `dev-nexus:local-36` remain `todo` until explicitly promoted.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 37,
-  "updatedAt": "2026-05-17T20:54:24.961Z",
+  "nextCommentNumber": 43,
+  "updatedAt": "2026-05-17T22:41:35.218Z",
   "items": [
     {
       "id": "local-1",
@@ -395,7 +395,7 @@
       "id": "local-17",
       "title": "Use port claims for image MCP allocation",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-16.\n\nGoal:\nUpdate image Model Context Protocol (MCP) port assignment so independent PLexus projects on the same host and sibling workspaces for the same project do not collide.\n\nAcceptance criteria:\n- Dynamic image MCP port allocation consults project-local workspace state, the host-local claim service, and actual listener checks.\n- Fixed-port image configuration is honored only when the port is free or already owned by the same compatible target.\n- Fixed-port collisions fail before opening an image, with a diagnostic naming the project, image, port, and conflicting owner when known.\n- Project close and failed-open rollback release claims created during that lifecycle operation.\n- Tests cover separate state roots, sibling workspace state, occupied host ports, fixed-port conflicts, and failed-open cleanup.\n\nVerification:\nRun plexus-core lifecycle tests that open synthetic projects with overlapping port ranges.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -407,8 +407,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:18.899Z",
-      "updatedAt": "2026-05-17T20:53:53.107Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:34.787Z",
+      "closedAt": "2026-05-17T22:41:34.502Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -420,7 +420,7 @@
       "id": "local-18",
       "title": "Model project-local gateway deployment",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-16.\n\nGoal:\nMake project-local gateway deployment the default PLexus behavior while preserving an explicit shared-gateway mode for advanced setups.\n\nAcceptance criteria:\n- Runtime policy records gateway mode, host, port or port range, route path, and control path.\n- Project-local gateway startup claims and validates its port before launch.\n- Shared-gateway mode never starts a second gateway process; it only registers routes with the configured external gateway.\n- PLexus status reports gateway mode, endpoint, control endpoint, owning project, and whether the process is managed by this project.\n- Tests cover project-local startup, shared-gateway route registration, occupied gateway port diagnostics, and close cleanup.\n\nVerification:\nRun focused gateway lifecycle tests and status-format tests.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -432,8 +432,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:18.994Z",
-      "updatedAt": "2026-05-17T20:53:53.111Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:35.218Z",
+      "closedAt": "2026-05-17T22:41:35.002Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -945,8 +945,76 @@
         }
       }
     ],
-    "local-17": [],
-    "local-18": [],
+    "local-17": [
+      {
+        "id": "local-comment-37",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: image MCP port claims.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:46.518Z",
+        "updatedAt": "2026-05-17T22:13:46.518Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-37"
+        }
+      },
+      {
+        "id": "local-comment-39",
+        "body": "Worker completed implementation on branch codex/plexus/local-17-port-claims-20260517-220947 at commit 6d801f495be596990e70d06fae83203a038dc9b4. Focused projectOpen/projectClose tests, workspace typecheck, npm test, and npm run build passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; awaiting PLexus batch integration.",
+        "author": null,
+        "createdAt": "2026-05-17T22:27:42.760Z",
+        "updatedAt": "2026-05-17T22:27:42.760Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-39"
+        }
+      },
+      {
+        "id": "local-comment-41",
+        "body": "Completed and published in PLexus main at b220adf. Integrated worker commit 6d801f4 as 22be709, then merged with upstream runtime foundation; focused lifecycle/config tests, typecheck, npm test, and npm run build passed.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:34.787Z",
+        "updatedAt": "2026-05-17T22:41:34.787Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-41"
+        }
+      }
+    ],
+    "local-18": [
+      {
+        "id": "local-comment-38",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: project-local gateway deployment.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:46.901Z",
+        "updatedAt": "2026-05-17T22:13:46.901Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-38"
+        }
+      },
+      {
+        "id": "local-comment-40",
+        "body": "Worker completed implementation on branch codex/plexus/local-18-gateway-deployment-20260517-220947 at commit 3beced281ff66c1380b8fc545d296a8d84af7053. Focused gateway/config lifecycle tests, workspace typecheck, npm test, and npm run build passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; awaiting PLexus batch integration.",
+        "author": null,
+        "createdAt": "2026-05-17T22:29:28.859Z",
+        "updatedAt": "2026-05-17T22:29:28.859Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-40"
+        }
+      },
+      {
+        "id": "local-comment-42",
+        "body": "Completed and published in PLexus main at b220adf. Integrated worker commit 3beced2 as 8d8eb9, then merged with upstream runtime foundation; focused lifecycle/config tests, typecheck, npm test, and npm run build passed.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:35.218Z",
+        "updatedAt": "2026-05-17T22:41:35.218Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-42"
+        }
+      }
+    ],
     "local-19": [],
     "local-20": [],
     "local-21": []

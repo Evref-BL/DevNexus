@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 64,
-  "nextCommentNumber": 104,
-  "updatedAt": "2026-05-17T21:25:23.247Z",
+  "nextCommentNumber": 116,
+  "updatedAt": "2026-05-17T22:41:34.311Z",
   "items": [
     {
       "id": "local-1",
@@ -784,7 +784,7 @@
       "id": "local-33",
       "title": "Launch ephemeral Codex app-server worker threads",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after the JSON-RPC adapter and app-server profile schema are in place.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: let DevNexus launch a Codex app-server-backed worker thread or turn through the selected app-server profile, using ephemeral threads by default.\n\nUser stories covered:\n- As a coordinator, I can request a temporary Codex worker for a selected work item and receive thread/turn identity plus run metadata.\n- As a coordinator, I can start or fork a Codex thread with the intended cwd, model, reasoning, permissions, and project context.\n\nAcceptance criteria:\n- DevNexus can start or fork a Codex app-server thread from a configured profile and start a turn with coordinator-provided input.\n- Ephemeral threads are used by default when the profile requests them, with an explicit durable opt-in for visible/persisted Codex chats.\n- Launch input includes the DevNexus context/result contract paths and respects selected cwd, model, reasoning, approval policy, sandbox or permission profile, and MCP approval defaults where the protocol supports them.\n- The provider returns thread id, turn id, ephemeral status, cwd, model, and failure summaries to the caller.\n- Focused tests use the mocked app-server adapter and do not require live Codex.\n\nBlockers and sequencing:\n- Depends on the Codex app-server JSON-RPC capability adapter.\n- Depends on Codex app-server agent profile schema.\n\nBoundaries:\n- DevNexus still does not choose implementation work or supervise workers; the coordinator decides when to use the provider.\n- Do not implement MCP tool relay in this slice except as required to preserve normal thread startup configuration.\n\nVerification:\n- Run focused launch-provider tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -797,8 +797,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T10:38:29.034Z",
-      "updatedAt": "2026-05-17T11:28:57.904Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:19.020Z",
+      "closedAt": "2026-05-17T22:41:13.652Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1430,7 +1430,7 @@
       "id": "local-58",
       "title": "Harden npm dogfood package propagation and runtime installs",
       "description": "Type: setup/package-install reliability defect\nReadiness: autonomous agent-ready (AFK)\nSource: several dogfood setup and worker runs have depended on freshly published npm dogfood prereleases. Registry propagation or transient fetch failures caused confusing manual recovery: DevNexus-Pharo name-based install initially saw a missing packument after publish, a PLexus worker failed to fetch `@evref-bl/pharo-launcher-mcp` and left partial `node_modules`, and DevNexus alpha.9 install had to be retried after the dogfood tag became visible.\n\nGoal: make DevNexus-owned setup/runtime package installation resilient and explicit so workers do not discover npm propagation or partial-install failures mid-task.\n\nAcceptance criteria:\n- DevNexus setup/runtime package installation and publish-smoke guidance use bounded retry/backoff for npm packument/dist-tag visibility after a publish.\n- Runtime package install preflight detects partial or stale `node_modules` state and either repairs it through an approved setup command or reports a clear blocker before launching workers.\n- Worker context explains that package installation/fetch is setup-owned; workers should not run ad hoc npm install/npx fetches when dependencies are unavailable.\n- Failure summaries distinguish registry propagation delay, network failure, missing package/version, and damaged local install state.\n- Tests mock delayed npm visibility and partial runtime install directories without live registry access.\n\nVerification:\n- Focused setup/runtime package tests.\n- npm run check.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1443,8 +1443,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T19:56:57.342Z",
-      "updatedAt": "2026-05-17T21:01:06.504Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:33.519Z",
+      "closedAt": "2026-05-17T22:41:33.352Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1456,7 +1456,7 @@
       "id": "local-59",
       "title": "Make local work-item store writes concurrency-safe",
       "description": "Type: local work-tracker data-integrity defect\nReadiness: autonomous agent-ready (AFK)\nSource: During the 2026-05-17 PLexus parallel worktree wave, parallel DevNexus local-provider mutations corrupted .dev-nexus/work-items/plexus.json. Two coordination/comment writes reused comment ids and the file ended with a duplicated JSON tail after the closing brace. Subsequent work-item updates and coordination integrate failed with: Unexpected non-whitespace character after JSON at position 72490. The coordinator repaired the file manually by removing only the duplicate suffix.\n\nGoal:\nMake local work-item stores safe under concurrent create, update, comment, and coordination handoff operations.\n\nAcceptance criteria:\n- Every local-provider mutation uses a per-store transactional write path: acquire lock or equivalent serialization, read fresh state, allocate ids under that lock, write to a temporary file, and atomically replace the store.\n- Concurrent comments or updates against the same store produce distinct ids and preserve all records.\n- DevNexus never appends or partially rewrites a store that fails JSON parsing.\n- Parse failures include the store path, operation, and recovery guidance, without losing the original error detail.\n- Tests simulate concurrent create/comment/update/handoff operations against the same local store and assert valid JSON plus preserved records.\n\nVerification:\nRun focused local work-tracker provider tests, coordination handoff tests that use the local provider, and npm run check.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1469,8 +1469,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T21:01:06.198Z",
-      "updatedAt": "2026-05-17T21:01:06.198Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:33.935Z",
+      "closedAt": "2026-05-17T22:41:33.768Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1482,7 +1482,7 @@
       "id": "local-60",
       "title": "Normalize component-qualified ids in coordination and worktree tools",
       "description": "Type: component work-item routing defect\nReadiness: autonomous agent-ready (AFK)\nSource: During the 2026-05-17 PLexus parallel wave, coordination handoff failed for component-qualified ids such as plexus:local-15 even when --component plexus was provided: Local work item not found. The same command succeeded only after switching to provider-local id local-15. DevNexus worktree prepare also accepted the component-qualified work item but produced worker context with a null work-item title.\n\nGoal:\nMake all DevNexus coordination and worktree tools route component-qualified work item ids consistently with work-item get/update/comment.\n\nAcceptance criteria:\n- coordination status, handoff, integrate, and request accept component-qualified ids with or without an explicit --component when the component can be resolved safely.\n- worktree prepare resolves component-qualified work items to the owning component and includes the work-item title in generated context/briefing metadata.\n- Error messages name the requested component, provider-local id, and configured tracker when lookup fails.\n- Tests cover local provider items, component-qualified ids, provider-local ids with --component, and ambiguous/mismatched component errors.\n\nVerification:\nRun focused coordination CLI/MCP tests, worktree prepare tests, and npm run check.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1495,8 +1495,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T21:01:06.299Z",
-      "updatedAt": "2026-05-17T21:01:06.299Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T22:41:34.311Z",
+      "closedAt": "2026-05-17T22:41:34.103Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2411,6 +2411,39 @@
           "provider": "local",
           "itemId": "local-comment-70"
         }
+      },
+      {
+        "id": "local-comment-104",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: Codex app-server worker launch.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:45.066Z",
+        "updatedAt": "2026-05-17T22:13:45.066Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-104"
+        }
+      },
+      {
+        "id": "local-comment-109",
+        "body": "Worker completed implementation on branch codex/dev-nexus/local-33-app-server-20260517-220947 at commit 4491ed3. Focused app-server launch tests, build, and final npm run check passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; awaiting batch integration.",
+        "author": null,
+        "createdAt": "2026-05-17T22:23:25.917Z",
+        "updatedAt": "2026-05-17T22:23:25.917Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-109"
+        }
+      },
+      {
+        "id": "local-comment-112",
+        "body": "Completed and published in DevNexus main at f6e98bc. Integrated worker commit 4491ed3 as d160f1a with npm run check passing after the combined batch.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:19.020Z",
+        "updatedAt": "2026-05-17T22:41:19.020Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-112"
+        }
       }
     ],
     "local-34": [],
@@ -2779,10 +2812,111 @@
           "provider": "local",
           "itemId": "local-comment-100"
         }
+      },
+      {
+        "id": "local-comment-105",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: npm dogfood runtime install hardening.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:45.452Z",
+        "updatedAt": "2026-05-17T22:13:45.452Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-105"
+        }
+      },
+      {
+        "id": "local-comment-110",
+        "body": "Worker completed implementation on branch codex/dev-nexus/local-58-npm-runtime-20260517-220947 at commit fff6c44. Focused npm/runtime/setup tests and npm run check passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; integration must resolve expected overlap with dev-nexus:local-33 in nexusAutomationAgentLaunch.ts and index.ts.",
+        "author": null,
+        "createdAt": "2026-05-17T22:23:50.352Z",
+        "updatedAt": "2026-05-17T22:23:50.352Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-110"
+        }
+      },
+      {
+        "id": "local-comment-113",
+        "body": "Completed and published in DevNexus main at f6e98bc. Integrated worker commit fff6c44 as f6e98bc with focused runtime/setup tests and npm run check passing in the combined batch.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:33.519Z",
+        "updatedAt": "2026-05-17T22:41:33.519Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-113"
+        }
       }
     ],
-    "local-59": [],
-    "local-60": [],
+    "local-59": [
+      {
+        "id": "local-comment-106",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: local work-item store concurrency.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:45.836Z",
+        "updatedAt": "2026-05-17T22:13:45.836Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-106"
+        }
+      },
+      {
+        "id": "local-comment-108",
+        "body": "Worker completed implementation on branch codex/dev-nexus/local-59-local-store-20260517-220947 at commit 5afcf26806f7f262a42187bc854c28c71f0dc88d. Focused local-provider/coordination tests and npm run check passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; awaiting batch integration.",
+        "author": null,
+        "createdAt": "2026-05-17T22:20:29.366Z",
+        "updatedAt": "2026-05-17T22:20:29.366Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-108"
+        }
+      },
+      {
+        "id": "local-comment-114",
+        "body": "Completed and published in DevNexus main at f6e98bc. Integrated worker commit 5afcf26 as 32d894a with focused local-provider tests and npm run check passing in the combined batch.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:33.935Z",
+        "updatedAt": "2026-05-17T22:41:33.935Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-114"
+        }
+      }
+    ],
+    "local-60": [
+      {
+        "id": "local-comment-107",
+        "body": "Selected by DevNexus coordinator run coordinator-loop-20260517-t220947-388-z-1 as part of the six-item parallel dogfood batch. Work runs in an isolated component worktree; coordinator serializes tracker writes and handles integration/publication. Scope: component-qualified id normalization.",
+        "author": null,
+        "createdAt": "2026-05-17T22:13:46.170Z",
+        "updatedAt": "2026-05-17T22:13:46.170Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-107"
+        }
+      },
+      {
+        "id": "local-comment-111",
+        "body": "Worker completed implementation on branch codex/dev-nexus/local-60-qualified-ids-20260517-220947 at commit bc5760cd3df861bef7adb60ff5f1e05720073500. Focused coordination/request/MCP/CLI tests and npm run check passed in the worker worktree. Coordinator review found a clean worktree and no diff whitespace issues; integration must resolve expected overlap with dev-nexus:local-59 in nexusCoordination.ts/test and with other DevNexus branches in index.ts.",
+        "author": null,
+        "createdAt": "2026-05-17T22:26:03.699Z",
+        "updatedAt": "2026-05-17T22:26:03.699Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-111"
+        }
+      },
+      {
+        "id": "local-comment-115",
+        "body": "Completed and published in DevNexus main at f6e98bc. Integrated worker commit bc5760c as ca0c126 with focused routing/coordination tests and npm run check passing in the combined batch.",
+        "author": null,
+        "createdAt": "2026-05-17T22:41:34.311Z",
+        "updatedAt": "2026-05-17T22:41:34.311Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-115"
+        }
+      }
+    ],
     "local-61": [],
     "local-62": [
       {
