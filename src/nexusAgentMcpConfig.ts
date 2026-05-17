@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import type {
   NexusProjectAgentMcpTarget,
+  NexusProjectAgentMcpConfigFormat,
   NexusProjectMcpConfig,
 } from "./nexusProjectConfig.js";
 import type { NexusSkillSourceControl } from "./nexusSkills.js";
@@ -15,26 +17,85 @@ export interface MaterializeNexusProjectAgentMcpConfigOptions {
   mcpConfig?: NexusProjectMcpConfig;
   agentTargets?: NexusProjectAgentMcpTarget[];
   excludeFromGit?: boolean;
+  platform?: NodeJS.Platform;
+}
+
+export type NexusAgentMcpConfigSchema = string;
+
+export type NexusAgentMcpConfigStatus =
+  | "materialized"
+  | "manual"
+  | "unsupported";
+
+export type NexusAgentMcpCapabilityGapSeverity = "warning" | "blocked";
+
+export interface NexusAgentMcpCapabilityGap {
+  id: string;
+  severity: NexusAgentMcpCapabilityGapSeverity;
+  summary: string;
+  nextAction: string;
+}
+
+export interface NexusAgentMcpTrustSemantics {
+  mode:
+    | "provider_default"
+    | "codex_default_tools_approval_mode"
+    | "opencode_permission_config"
+    | "manual";
+  summary: string;
+  settingPath: string | null;
+}
+
+export interface NexusAgentMcpCommandResolution {
+  originalCommand: string;
+  command: string;
+  strategy: "unchanged" | "windows_cmd_shim";
+  summary: string;
 }
 
 export interface MaterializedNexusAgentMcpTarget {
   agent: string;
+  provider: string;
   serverName: string;
   command: string;
   args: string[];
   defaultToolsApprovalMode?: string;
   sourceControl: NexusSkillSourceControl;
   configPath: string;
-  configFormat: "toml" | "json";
+  configPathRelative: string;
+  configFormat: NexusProjectAgentMcpConfigFormat;
+  configSchema: NexusAgentMcpConfigSchema;
+  configStatus: NexusAgentMcpConfigStatus;
+  activationNotes: string[];
+  trustSemantics: NexusAgentMcpTrustSemantics;
+  manualInstructions: string[];
+  capabilityGaps: NexusAgentMcpCapabilityGap[];
+  commandResolution: NexusAgentMcpCommandResolution;
 }
 
 export interface MaterializeNexusProjectAgentMcpConfigResult {
   agentTargets: MaterializedNexusAgentMcpTarget[];
+  capabilityGaps: Array<NexusAgentMcpCapabilityGap & {
+    agent: string;
+    provider: string;
+  }>;
   gitExcludePath: string | null;
   gitExcludeEntries: string[];
 }
 
 interface ResolvedNexusAgentMcpTarget extends MaterializedNexusAgentMcpTarget {}
+
+interface NexusAgentMcpProviderAdapter {
+  provider: string;
+  configFormat: NexusProjectAgentMcpConfigFormat;
+  configSchema: NexusAgentMcpConfigSchema;
+  defaultConfigPath: string;
+  activationNotes: string[];
+  trustSemantics: (
+    target: NexusProjectAgentMcpTarget,
+  ) => NexusAgentMcpTrustSemantics;
+  writer: ((target: ResolvedNexusAgentMcpTarget) => void) | null;
+}
 
 export class NexusAgentMcpConfigError extends Error {
   constructor(message: string) {
@@ -46,6 +107,7 @@ export class NexusAgentMcpConfigError extends Error {
 export function emptyNexusProjectAgentMcpConfigResult(): MaterializeNexusProjectAgentMcpConfigResult {
   return {
     agentTargets: [],
+    capabilityGaps: [],
     gitExcludePath: null,
     gitExcludeEntries: [],
   };
@@ -61,15 +123,17 @@ export function materializeNexusProjectAgentMcpConfig(
   const projectRoot = path.resolve(options.projectRoot);
   const targets = resolveAgentMcpTargets(projectRoot, options);
   for (const target of targets) {
-    if (target.configFormat === "toml") {
-      writeCodexMcpConfig(target);
-    } else {
-      writeClaudeMcpConfig(target);
+    if (target.configStatus === "materialized") {
+      writeNexusAgentMcpConfig(target);
     }
   }
 
   const supportEntries = targets
-    .filter((target) => target.sourceControl === "support")
+    .filter(
+      (target) =>
+        target.sourceControl === "support" &&
+        target.configStatus === "materialized",
+    )
     .map((target) => gitExcludeEntryForPath(projectRoot, target.configPath));
   const gitExclude =
     options.excludeFromGit === false
@@ -78,14 +142,25 @@ export function materializeNexusProjectAgentMcpConfig(
 
   return {
     agentTargets: targets,
+    capabilityGaps: targetCapabilityGaps(targets),
     gitExcludePath: gitExclude.gitExcludePath,
     gitExcludeEntries: gitExclude.gitExcludeEntries,
   };
 }
 
+export function resolveNexusProjectAgentMcpTargets(
+  options: Omit<MaterializeNexusProjectAgentMcpConfigOptions, "excludeFromGit">,
+): MaterializedNexusAgentMcpTarget[] {
+  if (options.mcpConfig?.enabled === false) {
+    return [];
+  }
+
+  return resolveAgentMcpTargets(path.resolve(options.projectRoot), options);
+}
+
 function resolveAgentMcpTargets(
   projectRoot: string,
-  options: MaterializeNexusProjectAgentMcpConfigOptions,
+  options: Omit<MaterializeNexusProjectAgentMcpConfigOptions, "excludeFromGit">,
 ): ResolvedNexusAgentMcpTarget[] {
   const configuredTargets =
     options.agentTargets ?? options.mcpConfig?.agentTargets ?? [{ agent: "codex" }];
@@ -93,11 +168,12 @@ function resolveAgentMcpTargets(
   return configuredTargets
     .filter((target) => target.enabled !== false)
     .map((target) => {
+      const provider = normalizeAgentProvider(target);
+      const adapter = providerAdapterForTarget(target, provider);
       const serverName =
         target.serverName ??
         options.mcpConfig?.serverName ??
         defaultNexusMcpServerName;
-      assertTomlBareKey(serverName, `mcp agent target ${target.agent}.serverName`);
       const command =
         target.command ?? options.mcpConfig?.command ?? defaultNexusMcpCommand;
       const args = [
@@ -108,54 +184,344 @@ function resolveAgentMcpTargets(
         options.mcpConfig?.defaultToolsApprovalMode;
       const sourceControl =
         target.sourceControl ?? options.mcpConfig?.sourceControl ?? "support";
-      const configFormat = configFormatForAgent(target.agent);
-      const configPath = path.join(
-        projectRoot,
-        assertProjectRelativeFilePath(
-          target.configPath ?? defaultConfigPathForAgent(target.agent),
-          `mcp agent target ${target.agent}.configPath`,
-        ),
+      const configFormat = target.configFormat ?? adapter.configFormat;
+      const configSchema =
+        (target.configSchema as NexusAgentMcpConfigSchema | undefined) ??
+        adapter.configSchema;
+      const configPathRelative = assertProjectRelativeFilePath(
+        target.configPath ?? adapter.defaultConfigPath,
+        `mcp agent target ${target.agent}.configPath`,
       );
+      if (configSchema === "codex.mcp_servers") {
+        assertTomlBareKey(serverName, `mcp agent target ${target.agent}.serverName`);
+      }
+      const configPath = path.join(projectRoot, configPathRelative);
+      const configCapability = configCapabilityForTarget({
+        target,
+        provider,
+        adapter,
+        configFormat,
+        configSchema,
+      });
+      const commandResolution = resolveMcpCommandForTarget({
+        command,
+        platform: options.platform ?? process.platform,
+      });
+      const capabilityGaps = [
+        ...configCapability.capabilityGaps,
+        ...commandResolution.capabilityGaps,
+      ];
+      const activationNotes = [
+        ...adapter.activationNotes,
+        ...(target.activationNotes ?? []),
+      ];
+      const manualInstructions = [
+        ...manualInstructionsForTarget({
+          target,
+          provider,
+          serverName,
+          command: commandResolution.command,
+          args,
+          configPath: configPathRelative,
+          configStatus: configCapability.configStatus,
+        }),
+        ...(target.manualInstructions ?? []),
+      ];
 
       return {
         agent: target.agent,
+        provider,
         serverName,
-        command,
+        command: commandResolution.command,
         args,
         ...(defaultToolsApprovalMode !== undefined
           ? { defaultToolsApprovalMode }
           : {}),
         sourceControl,
         configPath,
+        configPathRelative,
         configFormat,
+        configSchema,
+        configStatus: configCapability.configStatus,
+        activationNotes,
+        trustSemantics:
+          target.trustSemantics !== undefined
+            ? {
+                mode: "manual",
+                summary: target.trustSemantics,
+                settingPath: null,
+              }
+            : adapter.trustSemantics({
+                ...target,
+                ...(defaultToolsApprovalMode !== undefined
+                  ? { defaultToolsApprovalMode }
+                  : {}),
+              }),
+        manualInstructions,
+        capabilityGaps,
+        commandResolution: {
+          originalCommand: commandResolution.originalCommand,
+          command: commandResolution.command,
+          strategy: commandResolution.strategy,
+          summary: commandResolution.summary,
+        },
       };
     });
 }
 
-function configFormatForAgent(agent: string): "toml" | "json" {
-  if (agent === "codex") {
-    return "toml";
-  }
-  if (agent === "claude") {
-    return "json";
+const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
+  codex: {
+    provider: "codex",
+    configFormat: "toml",
+    configSchema: "codex.mcp_servers",
+    defaultConfigPath: path.join(".codex", "config.toml"),
+    activationNotes: [
+      "Open or restart the Codex project/session rooted at the DevNexus project root after refreshing MCP config.",
+    ],
+    trustSemantics: (target) => ({
+      mode: "codex_default_tools_approval_mode",
+      summary: target.defaultToolsApprovalMode
+        ? `Codex default MCP tool approval mode is projected as ${target.defaultToolsApprovalMode}.`
+        : "Codex MCP tool approval follows the provider default unless defaultToolsApprovalMode is configured.",
+      settingPath: "mcp_servers.<server>.default_tools_approval_mode",
+    }),
+    writer: writeCodexMcpConfig,
+  },
+  claude: {
+    provider: "claude",
+    configFormat: "json",
+    configSchema: "claude.mcpServers",
+    defaultConfigPath: ".mcp.json",
+    activationNotes: [
+      "Open or restart the Claude project/session rooted at the DevNexus project root after refreshing MCP config.",
+    ],
+    trustSemantics: () => ({
+      mode: "provider_default",
+      summary:
+        "DevNexus projects the MCP server only; Claude tool approval and trust prompts remain provider-managed.",
+      settingPath: null,
+    }),
+    writer: writeClaudeMcpConfig,
+  },
+  opencode: {
+    provider: "opencode",
+    configFormat: "json",
+    configSchema: "opencode.mcp.local",
+    defaultConfigPath: "opencode.json",
+    activationNotes: [
+      "Start OpenCode from the DevNexus project root so it loads the project opencode.json.",
+    ],
+    trustSemantics: () => ({
+      mode: "opencode_permission_config",
+      summary:
+        "OpenCode manages tool trust through its permission config; DevNexus leaves permission policy unchanged.",
+      settingPath: "permission",
+    }),
+    writer: writeOpenCodeMcpConfig,
+  },
+};
+
+function normalizeAgentProvider(target: NexusProjectAgentMcpTarget): string {
+  return (target.provider ?? target.agent).trim().toLowerCase();
+}
+
+function providerAdapterForTarget(
+  target: NexusProjectAgentMcpTarget,
+  provider: string,
+): NexusAgentMcpProviderAdapter {
+  const adapter = providerAdapters[provider];
+  if (adapter) {
+    return adapter;
   }
 
-  throw new NexusAgentMcpConfigError(
-    `Agent MCP target is not supported: ${agent}`,
+  return {
+    provider,
+    configFormat: target.configFormat ?? "manual",
+    configSchema: target.configSchema ?? "manual",
+    defaultConfigPath:
+      target.configPath ?? path.join(`.${safeAgentConfigDirectoryName(target.agent)}`, "mcp.md"),
+    activationNotes: [
+      "Open or restart the configured agent provider project/session rooted at the DevNexus project root after applying MCP config.",
+    ],
+    trustSemantics: () => ({
+      mode: "manual",
+      summary:
+        "DevNexus has no provider adapter for this target; tool trust and approval semantics must be configured manually for the provider.",
+      settingPath: null,
+    }),
+    writer: null,
+  };
+}
+
+function configCapabilityForTarget(options: {
+  target: NexusProjectAgentMcpTarget;
+  provider: string;
+  adapter: NexusAgentMcpProviderAdapter;
+  configFormat: NexusProjectAgentMcpConfigFormat;
+  configSchema: NexusAgentMcpConfigSchema;
+}): {
+  configStatus: NexusAgentMcpConfigStatus;
+  capabilityGaps: NexusAgentMcpCapabilityGap[];
+} {
+  const expectedFormat = options.adapter.configFormat;
+  const expectedSchema = options.adapter.configSchema;
+  const explicitFormat = options.target.configFormat !== undefined;
+  const explicitSchema = options.target.configSchema !== undefined;
+
+  if (!options.adapter.writer) {
+    if (options.configFormat === "manual" || !explicitFormat) {
+      return {
+        configStatus: "manual",
+        capabilityGaps: [
+          {
+            id: "manual-provider-config-required",
+            severity: "warning",
+            summary:
+              `Agent provider ${options.provider} is not supported by a DevNexus MCP writer; manual MCP config is required.`,
+            nextAction:
+              "Use the reported command, args, server name, config path, activation notes, and trust semantics to configure the provider manually.",
+          },
+        ],
+      };
+    }
+
+    return {
+      configStatus: "unsupported",
+      capabilityGaps: [
+        {
+          id: "unsupported-provider-config",
+          severity: "blocked",
+          summary:
+            `Agent provider ${options.provider} does not have a DevNexus writer for ${options.configFormat}/${options.configSchema}.`,
+          nextAction:
+            "Change the target to configFormat manual or add a DevNexus MCP config adapter for this provider schema.",
+        },
+      ],
+    };
+  }
+
+  if (
+    (explicitFormat && options.configFormat !== expectedFormat) ||
+    (explicitSchema && options.configSchema !== expectedSchema)
+  ) {
+    return {
+      configStatus: "unsupported",
+      capabilityGaps: [
+        {
+          id: "unsupported-provider-config",
+          severity: "blocked",
+          summary:
+            `Agent provider ${options.provider} supports ${expectedFormat}/${expectedSchema}, not ${options.configFormat}/${options.configSchema}.`,
+          nextAction:
+            "Remove the configFormat/configSchema override or add a provider adapter for the requested config shape.",
+        },
+      ],
+    };
+  }
+
+  return {
+    configStatus: "materialized",
+    capabilityGaps: [],
+  };
+}
+
+function manualInstructionsForTarget(options: {
+  target: NexusProjectAgentMcpTarget;
+  provider: string;
+  serverName: string;
+  command: string;
+  args: string[];
+  configPath: string;
+  configStatus: NexusAgentMcpConfigStatus;
+}): string[] {
+  if (options.configStatus === "materialized") {
+    return [];
+  }
+
+  return [
+    `Add MCP server ${options.serverName} to ${options.configPath} for provider ${options.provider}.`,
+    `Use command ${JSON.stringify(options.command)} with args ${JSON.stringify(options.args)}.`,
+    "Do not place credentials, tokens, private keys, or provider app database state in the generated project config.",
+  ];
+}
+
+function resolveMcpCommandForTarget(options: {
+  command: string;
+  platform: NodeJS.Platform;
+}): NexusAgentMcpCommandResolution & {
+  capabilityGaps: NexusAgentMcpCapabilityGap[];
+} {
+  if (options.platform !== "win32") {
+    return {
+      originalCommand: options.command,
+      command: options.command,
+      strategy: "unchanged",
+      summary: "Command left unchanged for this platform.",
+      capabilityGaps: [],
+    };
+  }
+
+  if (isPowerShellScriptPath(options.command)) {
+    return {
+      originalCommand: options.command,
+      command: options.command,
+      strategy: "unchanged",
+      summary:
+        "Command left unchanged because it already names a PowerShell script.",
+      capabilityGaps: [
+        {
+          id: "windows-powershell-shim-command",
+          severity: "warning",
+          summary:
+            `Windows MCP target command ${options.command} names a PowerShell script, which some agent providers cannot execute as an MCP child process.`,
+          nextAction:
+            "Use the corresponding .cmd npm shim or an executable node command for this provider target.",
+        },
+      ],
+    };
+  }
+
+  if (!commandNeedsWindowsCmdShim(options.command)) {
+    return {
+      originalCommand: options.command,
+      command: options.command,
+      strategy: "unchanged",
+      summary: "Windows command already has an executable suffix or path form.",
+      capabilityGaps: [],
+    };
+  }
+
+  return {
+    originalCommand: options.command,
+    command: `${options.command}.cmd`,
+    strategy: "windows_cmd_shim",
+    summary:
+      `Windows MCP target command ${options.command} was written as ${options.command}.cmd so providers do not resolve the PowerShell shim first.`,
+    capabilityGaps: [],
+  };
+}
+
+function targetCapabilityGaps(
+  targets: readonly ResolvedNexusAgentMcpTarget[],
+): Array<NexusAgentMcpCapabilityGap & { agent: string; provider: string }> {
+  return targets.flatMap((target) =>
+    target.capabilityGaps.map((gap) => ({
+      ...gap,
+      agent: target.agent,
+      provider: target.provider,
+    })),
   );
 }
 
-function defaultConfigPathForAgent(agent: string): string {
-  if (agent === "codex") {
-    return path.join(".codex", "config.toml");
-  }
-  if (agent === "claude") {
-    return ".mcp.json";
+function writeNexusAgentMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  const adapter = providerAdapters[target.provider];
+  if (!adapter?.writer) {
+    throw new NexusAgentMcpConfigError(
+      `Agent MCP target cannot be materialized without a provider writer: ${target.provider}`,
+    );
   }
 
-  throw new NexusAgentMcpConfigError(
-    `Agent MCP target is not supported: ${agent}`,
-  );
+  adapter.writer(target);
 }
 
 function assertProjectRelativeFilePath(filePath: string, pathName: string): string {
@@ -174,12 +540,30 @@ function assertProjectRelativeFilePath(filePath: string, pathName: string): stri
   return filePath;
 }
 
+function safeAgentConfigDirectoryName(agent: string): string {
+  const safe = agent.replace(/[^A-Za-z0-9_-]/gu, "-").replace(/-+/gu, "-");
+  return safe.length > 0 ? safe : "agent";
+}
+
 function assertTomlBareKey(value: string, pathName: string): void {
   if (!/^[A-Za-z0-9_-]+$/u.test(value)) {
     throw new NexusAgentMcpConfigError(
       `${pathName} must contain only letters, digits, underscores, and hyphens`,
     );
   }
+}
+
+function commandNeedsWindowsCmdShim(command: string): boolean {
+  return (
+    command === defaultNexusMcpCommand &&
+    !command.includes("/") &&
+    !command.includes("\\") &&
+    path.extname(command) === ""
+  );
+}
+
+function isPowerShellScriptPath(command: string): boolean {
+  return path.extname(command).toLowerCase() === ".ps1";
 }
 
 function writeCodexMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
@@ -344,6 +728,40 @@ function writeClaudeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   fs.writeFileSync(
     target.configPath,
     `${JSON.stringify({ ...existing, mcpServers }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function writeOpenCodeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  const existing = readJsonObject(target.configPath);
+  const existingMcp = existing.mcp;
+  if (
+    existingMcp !== undefined &&
+    (!existingMcp || typeof existingMcp !== "object" || Array.isArray(existingMcp))
+  ) {
+    throw new NexusAgentMcpConfigError(
+      `OpenCode MCP config mcp must be an object: ${target.configPath}`,
+    );
+  }
+
+  const mcp = {
+    ...((existingMcp as Record<string, unknown> | undefined) ?? {}),
+    [target.serverName]: {
+      type: "local",
+      command: [target.command, ...target.args],
+      enabled: true,
+    },
+  };
+  const next = {
+    $schema: "https://opencode.ai/config.json",
+    ...existing,
+    mcp,
+  };
+
+  fs.mkdirSync(path.dirname(target.configPath), { recursive: true });
+  fs.writeFileSync(
+    target.configPath,
+    `${JSON.stringify(next, null, 2)}\n`,
     "utf8",
   );
 }

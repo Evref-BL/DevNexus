@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import {
+  resolveNexusProjectAgentMcpTargets,
+  type MaterializedNexusAgentMcpTarget,
+} from "./nexusAgentMcpConfig.js";
 import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
 import { analyzeNexusProjectPath } from "./nexusPathResolver.js";
 import type {
@@ -219,18 +223,21 @@ export function buildNexusSetupCheck(options: {
     missingStatus: "blocked",
   }));
 
-  const agentMcpTargets = setupAgentMcpTargets(projectConfig);
+  const agentMcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
   for (const target of agentMcpTargets) {
     checks.push(pathCheck({
       id: `agent-mcp-config-${target.agent}`,
       title: `${target.agent} MCP config`,
-      pathName: path.join(projectRoot, target.configPath),
-      passedSummary: `${target.agent} MCP config exists for this project root.`,
-      blockedSummary: `${target.agent} MCP config has not been projected for this machine.`,
+      pathName: target.configPath,
+      passedSummary:
+        `${target.provider} MCP config exists for this project root: ${target.configPathRelative}.`,
+      blockedSummary:
+        `${target.provider} MCP config has not been projected or manually configured for this machine: ${target.configPathRelative}.`,
       nextAction:
         "Run dev-nexus project mcp refresh . after installing DevNexus.",
       missingStatus: "warning",
     }));
+    checks.push(...agentMcpCapabilityGapChecks(target));
   }
 
   if (projectConfig) {
@@ -403,6 +410,10 @@ function joinExistingProjectSteps(options: {
     options.projectConfig,
     options.platform,
   );
+  const agentMcpTargets = setupAgentMcpTargets(
+    options.projectRoot,
+    options.projectConfig,
+  );
   return [
     {
       id: "install-prerequisites",
@@ -550,11 +561,20 @@ function joinExistingProjectSteps(options: {
       ],
       manualInstructions: [
         "Run from the meta-project root after installing DevNexus and configuring local paths.",
+        `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
         "Plugin-projected skills and plugin MCP servers may require plugin-specific setup commands; setup check reports those gaps explicitly.",
       ],
       checks: [
-        ...agentMcpConfigCheckCommands(options.projectConfig, options.platform),
-        ...pluginProjectionCheckCommands(options.projectConfig, options.platform),
+        ...agentMcpConfigCheckCommands(
+          options.projectConfig,
+          options.projectRoot,
+          options.platform,
+        ),
+        ...pluginProjectionCheckCommands(
+          options.projectConfig,
+          options.projectRoot,
+          options.platform,
+        ),
         `${devNexusCommand} automation eligible-work . --json`,
       ],
     },
@@ -570,6 +590,7 @@ function joinExistingProjectSteps(options: {
       ],
       manualInstructions: [
         `In the configured agent application or CLI provider, create, open, or select a project/session rooted at ${projectRootForPlatform}.`,
+        `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
         "Confirm the provider is using the generated MCP config from the meta-project root.",
         "For Codex Desktop, this means opening or creating a Codex project at the meta-project root; other providers may use a different project/session model.",
         "Reload, restart, or start a fresh provider session if the DevNexus MCP tools are not visible after the MCP refresh.",
@@ -665,39 +686,38 @@ function githubMetaProjectSteps(options: {
 }
 
 function setupAgentMcpTargets(
+  projectRoot: string,
   projectConfig: NexusProjectConfig | null,
-): { agent: string; configPath: string }[] {
+): MaterializedNexusAgentMcpTarget[] {
   if (projectConfig?.mcp?.enabled === false) {
     return [];
   }
 
-  const targets =
-    projectConfig?.mcp?.agentTargets?.filter((target) => target.enabled !== false) ??
-    [{ agent: "codex" }];
-
-  return targets.map((target) => ({
-    agent: target.agent,
-    configPath: target.configPath ?? defaultSetupAgentMcpConfigPath(target.agent),
-  }));
+  return resolveNexusProjectAgentMcpTargets({
+    projectRoot,
+    mcpConfig: projectConfig?.mcp,
+  });
 }
 
 function agentMcpConfigCheckCommands(
   projectConfig: NexusProjectConfig,
+  projectRoot: string,
   platform: NexusSetupPlatform,
 ): string[] {
-  return setupAgentMcpTargets(projectConfig).map(
+  return setupAgentMcpTargets(projectRoot, projectConfig).map(
     (target) =>
-      `test -f ${shellPathPlaceholder(setupCommandPath(target.configPath, platform))}`,
+      `test -f ${shellPathPlaceholder(setupCommandPath(target.configPathRelative, platform))}`,
   );
 }
 
 function pluginProjectionCheckCommands(
   projectConfig: NexusProjectConfig,
+  projectRoot: string,
   platform: NexusSetupPlatform,
 ): string[] {
   const commands: string[] = [];
   const skillTargets = setupAgentSkillTargets(projectConfig);
-  const mcpTargets = setupAgentMcpTargets(projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
 
   for (const { capability } of pluginProjectedSkillCapabilities(projectConfig)) {
     commands.push(
@@ -722,10 +742,10 @@ function pluginProjectionCheckCommands(
   for (const { capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargets) {
       const marker =
-        target.agent === "codex"
+        target.configSchema === "codex.mcp_servers"
           ? `[mcp_servers.${capability.serverName}]`
           : `"${capability.serverName}"`;
-      const configPath = setupCommandPath(target.configPath, platform);
+      const configPath = setupCommandPath(target.configPathRelative, platform);
       commands.push(
         `test -f ${shellPathPlaceholder(configPath)} && grep -Fq ${shellStringLiteral(marker)} ${shellPathPlaceholder(configPath)}`,
       );
@@ -799,7 +819,7 @@ function pluginMcpServerChecks(
   projectConfig: NexusProjectConfig,
 ): NexusSetupCheckResult[] {
   const checks: NexusSetupCheckResult[] = [];
-  const mcpTargets = setupAgentMcpTargets(projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargets) {
@@ -808,7 +828,10 @@ function pluginMcpServerChecks(
         plugin,
         capability,
         agent: target.agent,
+        provider: target.provider,
         configPath: target.configPath,
+        configPathRelative: target.configPathRelative,
+        configSchema: target.configSchema,
       }));
     }
   }
@@ -821,9 +844,12 @@ function pluginMcpServerCheck(options: {
   plugin: NexusProjectPluginConfig;
   capability: NexusPluginMcpServerCapability;
   agent: string;
+  provider: string;
   configPath: string;
+  configPathRelative: string;
+  configSchema: string;
 }): NexusSetupCheckResult {
-  const configPath = path.join(options.projectRoot, options.configPath);
+  const configPath = options.configPath;
   const pluginLabel = setupPluginLabel(options.plugin);
   const serverName = options.capability.serverName;
   const checkBase = {
@@ -836,22 +862,23 @@ function pluginMcpServerCheck(options: {
       ...checkBase,
       status: "warning",
       summary:
-        `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.agent} MCP config is missing.`,
+        `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.provider} MCP config is missing.`,
       nextAction:
-        `Project ${options.agent} MCP config, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
+        `Project ${options.provider} MCP config at ${options.configPathRelative}, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
     };
   }
 
   const configured = mcpServerConfigured({
-    agent: options.agent,
+    provider: options.provider,
     configPath,
+    configSchema: options.configSchema,
     serverName,
   });
   if (configured === true) {
     return {
       ...checkBase,
       status: "passed",
-      summary: `Plugin MCP server ${serverName} is configured for ${options.agent}.`,
+      summary: `Plugin MCP server ${serverName} is configured for ${options.provider}.`,
       nextAction: null,
     };
   }
@@ -861,12 +888,12 @@ function pluginMcpServerCheck(options: {
     status: "warning",
     summary:
       configured === false
-        ? `Plugin ${pluginLabel} declares MCP server ${serverName}, but it is not configured for ${options.agent}.`
-        : `Plugin ${pluginLabel} declares MCP server ${serverName}, but DevNexus cannot inspect ${options.agent} MCP config format yet.`,
+        ? `Plugin ${pluginLabel} declares MCP server ${serverName}, but it is not configured for ${options.provider}.`
+        : `Plugin ${pluginLabel} declares MCP server ${serverName}, but DevNexus cannot inspect ${options.provider} MCP config schema ${options.configSchema} yet.`,
     nextAction:
       configured === false
-        ? `Run the plugin-specific MCP setup or refresh step so ${options.agent} can access ${serverName}.`
-        : `Verify ${serverName} manually in ${options.configPath} or add a DevNexus MCP config adapter for ${options.agent}.`,
+        ? `Run the plugin-specific MCP setup or refresh step so ${options.provider} can access ${serverName}.`
+        : `Verify ${serverName} manually in ${options.configPathRelative} or add a DevNexus MCP config adapter for ${options.provider}.`,
   };
 }
 
@@ -941,20 +968,51 @@ function enabledPluginConfigs(
   return (projectConfig.plugins ?? []).filter((plugin) => plugin.enabled !== false);
 }
 
+function agentMcpCapabilityGapChecks(
+  target: MaterializedNexusAgentMcpTarget,
+): NexusSetupCheckResult[] {
+  return target.capabilityGaps
+    .filter((gap) => !gap.id.startsWith("windows-"))
+    .map((gap) => ({
+      id: `agent-mcp-gap-${setupCheckIdPart(target.agent)}-${setupCheckIdPart(gap.id)}`,
+      title: `${target.agent} MCP capability gap`,
+      status: gap.severity === "blocked" ? "blocked" : "warning",
+      summary: gap.summary,
+      nextAction: gap.nextAction,
+    }));
+}
+
+function agentMcpTargetSummary(target: MaterializedNexusAgentMcpTarget): string {
+  return `${target.agent}/${target.provider} ${target.configStatus} ${target.configPathRelative} ${target.configFormat}/${target.configSchema}`;
+}
+
 function mcpServerConfigured(options: {
-  agent: string;
+  provider: string;
   configPath: string;
+  configSchema: string;
   serverName: string;
 }): boolean | null {
-  if (options.agent === "codex") {
+  if (options.configSchema === "codex.mcp_servers") {
     return codexMcpServerConfigured(
       fs.readFileSync(options.configPath, "utf8"),
       options.serverName,
     );
   }
 
-  if (options.agent === "claude") {
-    return claudeMcpServerConfigured(options.configPath, options.serverName);
+  if (options.configSchema === "claude.mcpServers") {
+    return jsonObjectMcpServerConfigured(
+      options.configPath,
+      "mcpServers",
+      options.serverName,
+    );
+  }
+
+  if (options.configSchema === "opencode.mcp.local") {
+    return jsonObjectMcpServerConfigured(
+      options.configPath,
+      "mcp",
+      options.serverName,
+    );
   }
 
   return null;
@@ -973,13 +1031,17 @@ function codexMcpServerConfigured(content: string, serverName: string): boolean 
   return false;
 }
 
-function claudeMcpServerConfigured(configPath: string, serverName: string): boolean {
+function jsonObjectMcpServerConfigured(
+  configPath: string,
+  containerKey: "mcp" | "mcpServers",
+  serverName: string,
+): boolean {
   try {
     const parsed = JSON.parse(fs.readFileSync(configPath, "utf8")) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return false;
     }
-    const mcpServers = (parsed as { mcpServers?: unknown }).mcpServers;
+    const mcpServers = (parsed as Record<string, unknown>)[containerKey];
     return (
       !!mcpServers &&
       typeof mcpServers === "object" &&
@@ -1006,16 +1068,6 @@ function setupCheckIdPart(value: string): string {
     .replace(/-+/gu, "-")
     .replace(/^-|-$/gu, "");
   return safe.length > 0 ? safe : "item";
-}
-
-function defaultSetupAgentMcpConfigPath(agent: string): string {
-  if (agent === "codex") {
-    return path.join(".codex", "config.toml");
-  }
-  if (agent === "claude") {
-    return ".mcp.json";
-  }
-  return path.join(`.${safeAgentConfigDirectoryName(agent)}`, "mcp.json");
 }
 
 function safeAgentConfigDirectoryName(agent: string): string {

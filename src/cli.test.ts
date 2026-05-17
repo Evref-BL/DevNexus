@@ -1589,6 +1589,8 @@ describe("dev-nexus cli", () => {
         "codex",
         "--agent",
         "claude",
+        "--agent",
+        "opencode",
         "--json",
       ],
       {
@@ -1608,8 +1610,15 @@ describe("dev-nexus cli", () => {
           agent: "claude",
           serverName: "dev_nexus",
         },
+        {
+          agent: "opencode",
+          serverName: "dev_nexus",
+          configSchema: "opencode.mcp.local",
+        },
       ],
     });
+    const expectedCommand =
+      process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus";
     expect(
       fs.readFileSync(path.join(projectRoot, ".codex", "config.toml"), "utf8"),
     ).toContain("[mcp_servers.dev_nexus]");
@@ -1617,8 +1626,16 @@ describe("dev-nexus cli", () => {
       JSON.parse(fs.readFileSync(path.join(projectRoot, ".mcp.json"), "utf8"))
         .mcpServers.dev_nexus,
     ).toEqual({
-      command: "dev-nexus",
+      command: expectedCommand,
       args: ["mcp-stdio"],
+    });
+    expect(
+      JSON.parse(fs.readFileSync(path.join(projectRoot, "opencode.json"), "utf8"))
+        .mcp.dev_nexus,
+    ).toEqual({
+      type: "local",
+      command: [expectedCommand, "mcp-stdio"],
+      enabled: true,
     });
   });
 
