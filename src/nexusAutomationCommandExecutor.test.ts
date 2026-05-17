@@ -88,6 +88,9 @@ describe("nexus automation command executor", () => {
     const commandRunner: NexusAutomationCommandRunner = (command, options) => {
       commands.push(command);
       expect(options.env.DEV_NEXUS_WORK_ITEM_ID).toBe("local-1");
+      expect(options.env.GIT_EDITOR).toBe("true");
+      expect(options.env.GIT_SEQUENCE_EDITOR).toBe("true");
+      expect(options.env.GIT_MERGE_AUTOEDIT).toBe("no");
       return {
         command,
         cwd: options.cwd,
@@ -110,6 +113,7 @@ describe("nexus automation command executor", () => {
       command: "node task.js",
       commandRunner,
       gitRunner,
+      env: {},
       runFullVerification: true,
     });
 
@@ -164,6 +168,40 @@ describe("nexus automation command executor", () => {
         summary: "exit 2: boom",
       },
     ]);
+  });
+
+  it("preserves explicit Git prompt environment values for executor commands", async () => {
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      expect(options.env.GIT_EDITOR).toBe("custom-editor");
+      expect(options.env.GIT_SEQUENCE_EDITOR).toBe("custom-sequence-editor");
+      expect(options.env.GIT_MERGE_AUTOEDIT).toBe("yes");
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "ok",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const executor = createNexusAutomationCommandExecutor({
+      command: "node task.js",
+      commandRunner,
+      gitRunner: () => ({
+        args: [],
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      }),
+      env: {
+        GIT_EDITOR: "custom-editor",
+        GIT_SEQUENCE_EDITOR: "custom-sequence-editor",
+        GIT_MERGE_AUTOEDIT: "yes",
+      },
+    });
+
+    const result = await executor(executorInput(automationConfig()));
+
+    expect(result.status).toBe("completed");
   });
 
   it("keeps stdout and stderr tails in failed command summaries", async () => {

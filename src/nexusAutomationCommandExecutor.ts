@@ -19,6 +19,7 @@ import type {
   WorktreeVerificationInput,
   WorktreeVerificationStatus,
 } from "./worktreeExecutionMetadata.js";
+import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
 
 export interface NexusAutomationCommandRunOptions {
   cwd: string;
@@ -214,6 +215,7 @@ function executorEnvironment(
 ): NodeJS.ProcessEnv {
   return {
     ...baseEnv,
+    ...nonInteractiveGitEnvironment(baseEnv),
     DEV_NEXUS_RUN_ID: input.runId,
     DEV_NEXUS_STARTED_AT: input.startedAt,
     DEV_NEXUS_PROJECT_ROOT: input.projectRoot,

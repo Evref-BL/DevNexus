@@ -590,6 +590,118 @@ describe("nexus automation agent launch", () => {
     });
   });
 
+  it("adds noninteractive Git defaults to launched agent environments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs noninteractive Git",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-git-env-defaults",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        env: {},
+        commandRunner: (command, options) => {
+          expect(options.env.GIT_EDITOR).toBe("true");
+          expect(options.env.GIT_SEQUENCE_EDITOR).toBe("true");
+          expect(options.env.GIT_MERGE_AUTOEDIT).toBe("no");
+          fs.writeFileSync(
+            options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+            `${JSON.stringify({
+              status: "completed",
+              summary: "Git prompt defaults were present",
+            })}\n`,
+            "utf8",
+          );
+
+          return {
+            command,
+            cwd: options.cwd,
+            stdout: "launched",
+            stderr: "",
+            exitCode: 0,
+          };
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      summary: "Git prompt defaults were present",
+    });
+  });
+
+  it("preserves explicit Git prompt environment values for launched agents", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs custom Git env",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-git-env-custom",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        env: {
+          GIT_EDITOR: "custom-editor",
+          GIT_SEQUENCE_EDITOR: "custom-sequence-editor",
+          GIT_MERGE_AUTOEDIT: "yes",
+        },
+        commandRunner: (command, options) => {
+          expect(options.env.GIT_EDITOR).toBe("custom-editor");
+          expect(options.env.GIT_SEQUENCE_EDITOR).toBe("custom-sequence-editor");
+          expect(options.env.GIT_MERGE_AUTOEDIT).toBe("yes");
+          fs.writeFileSync(
+            options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+            `${JSON.stringify({
+              status: "completed",
+              summary: "Git prompt env was preserved",
+            })}\n`,
+            "utf8",
+          );
+
+          return {
+            command,
+            cwd: options.cwd,
+            stdout: "launched",
+            stderr: "",
+            exitCode: 0,
+          };
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      summary: "Git prompt env was preserved",
+    });
+  });
+
   it("blocks incomplete coordinator profile policy before launching", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

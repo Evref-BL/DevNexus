@@ -19,6 +19,7 @@ import {
   type NexusAutomationCommandRunner,
   type NexusAutomationCommandRunResult,
 } from "./nexusAutomationCommandExecutor.js";
+import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
   normalizeNexusAutomationAgentPolicy,
@@ -985,10 +986,14 @@ function agentLaunchEnvironment(
   input: NexusAutomationAgentLaunchInput,
 ): NodeJS.ProcessEnv {
   const publication = input.automationConfig.publication;
-  return {
+  const explicitEnv = {
     ...baseEnv,
     ...publicationCommandEnvironment(publication),
     ...publicationEnvironmentVariables(publication),
+  };
+  return {
+    ...explicitEnv,
+    ...nonInteractiveGitEnvironment(explicitEnv),
     DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
     DEV_NEXUS_RUN_ID: input.runId,
     DEV_NEXUS_STARTED_AT: input.startedAt,
