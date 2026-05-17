@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 62,
-  "nextCommentNumber": 101,
-  "updatedAt": "2026-05-17T21:01:06.504Z",
+  "nextNumber": 63,
+  "nextCommentNumber": 102,
+  "updatedAt": "2026-05-17T21:08:32.421Z",
   "items": [
     {
       "id": "local-1",
@@ -1530,6 +1530,27 @@
         "itemId": "local-61",
         "itemNumber": 61
       }
+    },
+    {
+      "id": "local-62",
+      "title": "Resolve Windows Codex coordinator command without host-specific shared config",
+      "description": "Type: automation infrastructure repair\nReadiness: autonomous agent-ready (AFK)\nSource: heartbeat coordinator-loop target cycle target-cycle-coordinator-loop-20260517-t205231-721-z-1 failed before work selection because the configured Codex coordinator profile used bare `codex`, which Windows resolved to the WindowsApps alias and failed with `Acc?s refus?`; the user-local Codex Desktop binary runs correctly.\n\nGoal: make shared DevNexus Codex coordinator profiles portable while avoiding Windows App Execution Alias failures.\n\nAcceptance criteria:\n- Shared project profiles can keep `command: codex` without encoding one machine's absolute path.\n- On Windows, DevNexus resolves a Codex executor profile's bare `codex` command to the user-local Codex Desktop CLI when it exists, or uses an explicit host-local override when configured.\n- The generated shell command quotes resolved command paths safely.\n- Tests cover Windows local Codex command resolution and command-path quoting without requiring a real Codex install.\n- The dogfood project runtime package is refreshed so `automation coordinator-loop` no longer fails with `Acc?s refus?` before coordinator selection.\n\nVerification:\n- Run focused agent profile command-resolution tests.\n- Run `npm run check` in DevNexus when feasible.\n- Smoke the dogfood coordinator launch path with a harmless command/profile check or a bounded coordinator-loop dry path that does not start unrelated implementation.\n\nPublication notes:\n- Publish DevNexus to origin/main and npm dogfood tag if verification passes, then refresh `.dev-nexus/runtime/npm-tools` in the dogfood root.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T21:00:57.634Z",
+      "updatedAt": "2026-05-17T21:08:32.420Z",
+      "closedAt": "2026-05-17T21:08:32.420Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-62",
+        "itemNumber": 62
+      }
     }
   ],
   "comments": {
@@ -2738,6 +2759,19 @@
     ],
     "local-59": [],
     "local-60": [],
-    "local-61": []
+    "local-61": [],
+    "local-62": [
+      {
+        "id": "local-comment-101",
+        "body": "Completed and published.\n\nRoot cause:\n- On Windows, bare `codex` resolved to the WindowsApps alias `C:\\Program Files\\WindowsApps\\OpenAI.Codex_...\\app\\resources\\codex.exe`.\n- That alias fails from this host shell with `Acc?s refus?`.\n- The user-local Codex Desktop binary `C:\\Users\\gabriel.darbord\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe` runs successfully.\n\nFix:\n- DevNexus now keeps shared profiles portable with `command: codex`.\n- When resolving a Codex executor profile on Windows, DevNexus uses the user-local Codex Desktop CLI if present, or `DEV_NEXUS_CODEX_COMMAND` when explicitly set.\n- Resolved command paths are shell-quoted, so paths with spaces are safe.\n- The CLI test no longer assumes a host-invariant executable string.\n\nPublished source/package:\n- DevNexus commit `8358ad8` pushed to `origin/main`.\n- Published `@evref-bl/dev-nexus@0.1.0-alpha.13` on npm with the `dogfood` tag.\n- Refreshed this dogfood root's local runtime install so `.dev-nexus/runtime/npm-tools/node_modules/dev-nexus` is alpha.13.\n\nVerification:\n- Focused: `npm test -- src/nexusAutomationAgentProfile.test.ts` passed.\n- Full: `npm run check` passed in the implementation worktree and again in the publish checkout: 48 test files, 327 tests.\n- Runtime smoke: installed package resolves the dogfood coordinator profile to `C:\\Users\\gabriel.darbord\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe`, and the command runner executes that binary with `--version` successfully.",
+        "author": null,
+        "createdAt": "2026-05-17T21:08:32.204Z",
+        "updatedAt": "2026-05-17T21:08:32.204Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-101"
+        }
+      }
+    ]
   }
 }

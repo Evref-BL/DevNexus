@@ -42,6 +42,14 @@ Immediate direction:
   the stdio MCP transport no longer recursively reprocesses incomplete split
   frames. Direct project-root probe of `dev-nexus.cmd mcp-stdio` returns 24
   tools with empty stderr.
+- `dev-nexus:local-62` is complete through DevNexus `8358ad8` and npm
+  `@evref-bl/dev-nexus@0.1.0-alpha.13`: Windows Codex executor profiles keep
+  shared `command: codex` config portable, but resolve to the user-local Codex
+  Desktop CLI when present instead of the WindowsApps alias that fails with
+  `Acc?s refus?`. Resolved command paths are shell-quoted, this root's
+  project-local runtime install now uses alpha.13 directly, and the coordinator
+  profile resolves to
+  `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\codex.exe`.
 - Project-scoped PLexus runtime work is now active from
   `docs/plexus-project-scoped-runtime-prd.md`:
   - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
