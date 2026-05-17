@@ -756,6 +756,57 @@ describe("nexus automation agent launch", () => {
     });
   });
 
+  it("keeps stdout and stderr tails when an agent command fails", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs coordinator diagnostics",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-failed-command",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner: (command, options) => ({
+          command,
+          cwd: options.cwd,
+          stdout: "stdout first\nstdout tail\n",
+          stderr: "stderr first\nstderr tail\n",
+          exitCode: 2,
+        }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary:
+        "Agent command failed: exit 2: stderr tail: stderr tail; stdout tail: stdout tail",
+      launch: {
+        error: "exit 2: stderr tail: stderr tail; stdout tail: stdout tail",
+        verification: [
+          {
+            command: "codex run",
+            status: "failed",
+            summary:
+              "exit 2: stderr tail: stderr tail; stdout tail: stdout tail",
+          },
+        ],
+      },
+    });
+  });
+
   it("fails malformed agent result files before recording completion", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

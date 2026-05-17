@@ -29,6 +29,11 @@ import {
   type RunNexusAutomationSchedulerResult,
 } from "./nexusAutomationScheduler.js";
 import {
+  runNexusAutomationCoordinatorLoop,
+  type NexusAutomationCoordinatorLoopTick,
+  type RunNexusAutomationCoordinatorLoopResult,
+} from "./nexusAutomationCoordinatorLoop.js";
+import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
@@ -347,6 +352,19 @@ interface ParsedAutomationScheduleCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationCoordinatorLoopCommand {
+  projectRoot: string;
+  command?: string;
+  owner?: string;
+  intervalMs?: number;
+  maxTicks?: number;
+  maxRuns?: number;
+  runIdPrefix?: string;
+  timeoutMs?: number;
+  runFullVerification?: boolean;
+  json?: boolean;
+}
+
 export function usage(): string {
   return [
     "Usage:",
@@ -377,6 +395,7 @@ export function usage(): string {
     "  dev-nexus automation target-report <project-root> [options]",
     "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
     "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
+    "  dev-nexus automation coordinator-loop <project-root> [--command <command>] [options]",
     "",
     "Options for home init:",
     "  --projects-root <path>",
@@ -551,6 +570,16 @@ export function usage(): string {
     "  --run-id-prefix <prefix>",
     "  --full                     also run configured full verification commands",
     "  --timeout-ms <ms>          applies to each command",
+    "  --json",
+    "",
+    "Options for automation coordinator-loop:",
+    "  --command <command>        coordinator command; overrides automation.agent.command or coordinator profile command",
+    "  --owner <name>",
+    "  --interval-ms <ms>         overrides project automation.schedule.intervalMs",
+    "  --max-ticks <count>        stop after this many loop decisions",
+    "  --max-runs <count>         stop after this many coordinator launches",
+    "  --run-id-prefix <prefix>",
+    "  --timeout-ms <ms>          applies to the coordinator command",
     "  --json",
   ].join("\n");
 }
@@ -1042,9 +1071,29 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "coordinator-loop") {
+    const parsed = parseAutomationCoordinatorLoopCommand(argv);
+    const stdout = dependencies.stdout ?? process.stdout;
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot: parsed.projectRoot,
+      owner: parsed.owner,
+      intervalMs: parsed.intervalMs,
+      maxTicks: parsed.maxTicks,
+      maxRuns: parsed.maxRuns,
+      runIdPrefix: parsed.runIdPrefix,
+      now: dependencies.now,
+      onTick: parsed.json
+        ? undefined
+        : (tick) => printAutomationCoordinatorLoopTick(tick, stdout),
+      launcher: createAutomationCoordinatorLoopCliLauncher(parsed, dependencies),
+    });
+    printAutomationCoordinatorLoopResult(result, parsed, stdout);
+    return 0;
+  }
+
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, or schedule",
+      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, schedule, or coordinator-loop",
     );
   }
 
@@ -1158,8 +1207,11 @@ async function handleAutomationTargetCycleCommand(
 }
 
 function resolveAutomationCommandCliOptions(
-  commandName: "run-once" | "schedule",
-  parsed: ParsedAutomationRunOnceCommand | ParsedAutomationScheduleCommand,
+  commandName: "run-once" | "schedule" | "coordinator-loop",
+  parsed:
+    | ParsedAutomationRunOnceCommand
+    | ParsedAutomationScheduleCommand
+    | ParsedAutomationCoordinatorLoopCommand,
 ): {
   mode: "run_once" | "agent_launch";
   command: string;
@@ -1202,6 +1254,37 @@ function resolveAutomationCommandCliOptions(
     ...(parsed.timeoutMs ?? configuredTimeoutMs
       ? { timeoutMs: parsed.timeoutMs ?? configuredTimeoutMs ?? undefined }
       : {}),
+  };
+}
+
+function createAutomationCoordinatorLoopCliLauncher(
+  parsed: ParsedAutomationCoordinatorLoopCommand,
+  dependencies: DevNexusCliDependencies,
+) {
+  let launcher: ReturnType<typeof createNexusAutomationAgentCommandLauncher> | null =
+    null;
+
+  return (
+    input: Parameters<ReturnType<typeof createNexusAutomationAgentCommandLauncher>>[0],
+  ) => {
+    if (!launcher) {
+      const commandOptions = resolveAutomationCommandCliOptions(
+        "coordinator-loop",
+        parsed,
+      );
+      if (commandOptions.mode !== "agent_launch") {
+        throw new Error(
+          "automation coordinator-loop requires project config automation.mode agent_launch",
+        );
+      }
+      launcher = createNexusAutomationAgentCommandLauncher({
+        command: commandOptions.command,
+        commandRunner: dependencies.commandRunner,
+        timeoutMs: commandOptions.timeoutMs,
+      });
+    }
+
+    return launcher(input);
   };
 }
 
@@ -2401,6 +2484,59 @@ function parseAutomationScheduleCommand(
   return parsed as ParsedAutomationScheduleCommand;
 }
 
+function parseAutomationCoordinatorLoopCommand(
+  argv: string[],
+): ParsedAutomationCoordinatorLoopCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation coordinator-loop requires a project root");
+  }
+
+  const parsed: Partial<ParsedAutomationCoordinatorLoopCommand> = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--command":
+        parsed.command = next();
+        break;
+      case "--owner":
+        parsed.owner = next();
+        break;
+      case "--interval-ms":
+        parsed.intervalMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--max-ticks":
+        parsed.maxTicks = parsePositiveInteger(next(), arg);
+        break;
+      case "--max-runs":
+        parsed.maxRuns = parsePositiveInteger(next(), arg);
+        break;
+      case "--run-id-prefix":
+        parsed.runIdPrefix = next();
+        break;
+      case "--timeout-ms":
+        parsed.timeoutMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation coordinator-loop option: ${arg}`);
+    }
+  }
+
+  return parsed as ParsedAutomationCoordinatorLoopCommand;
+}
+
 function printHomeInitResult(
   result: {
     homePath: string;
@@ -2730,6 +2866,18 @@ function printAutomationScheduleTick(
   );
 }
 
+function printAutomationCoordinatorLoopTick(
+  tick: NexusAutomationCoordinatorLoopTick,
+  stdout: TextWriter,
+): void {
+  const runStatus = tick.run ? ` run=${tick.run.status}` : "";
+  const wait = tick.waitMs === null ? "" : ` waitMs=${tick.waitMs}`;
+  writeLine(
+    stdout,
+    `DevNexus coordinator loop tick ${tick.index}: ${tick.status.status} decision=${tick.decision.type} action=${tick.action}${runStatus}${wait}`,
+  );
+}
+
 function printAutomationEnqueueResult(
   result: EnqueueNexusAutomationWorkItemResult,
   parsed: ParsedAutomationEnqueueCommand,
@@ -2852,6 +3000,29 @@ function printAutomationScheduleResult(
   const lastTick = result.ticks.at(-1);
   if (lastTick) {
     writeLine(stdout, `  Last status: ${lastTick.status.status}`);
+    writeLine(stdout, `  Last action: ${lastTick.action}`);
+  }
+}
+
+function printAutomationCoordinatorLoopResult(
+  result: RunNexusAutomationCoordinatorLoopResult,
+  parsed: ParsedAutomationCoordinatorLoopCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordinator loop stopped.");
+  writeLine(stdout, `  Reason: ${result.stoppedReason}`);
+  writeLine(stdout, `  Ticks: ${result.ticks.length}`);
+  writeLine(stdout, `  Runs: ${result.runs.length}`);
+  const lastTick = result.ticks.at(-1);
+  if (lastTick) {
+    writeLine(stdout, `  Last status: ${lastTick.status.status}`);
+    writeLine(stdout, `  Last decision: ${lastTick.decision.type}`);
     writeLine(stdout, `  Last action: ${lastTick.action}`);
   }
 }

@@ -89,6 +89,13 @@ export interface AppendNexusAutomationTargetCycleRecordOptions {
   now?: Date | string;
 }
 
+export interface RecordNexusAutomationTargetCycleRecordOptions {
+  projectRoot: string;
+  config: NexusAutomationConfig;
+  record: NexusAutomationTargetCycleRecordInput;
+  now?: Date | string;
+}
+
 export interface NexusAutomationTargetCycleSummary {
   ledgerPath: string;
   cycleCount: number;
@@ -170,6 +177,33 @@ export function appendNexusAutomationTargetCycleRecord(
   const cycles = [...existing.cycles, record].slice(
     -options.config.ledger.retention,
   );
+  const ledger: NexusAutomationTargetCycleLedger = {
+    version: 1,
+    cycles,
+    updatedAt: recordedAt,
+  };
+  writeNexusAutomationTargetCycleLedger(
+    options.projectRoot,
+    options.config,
+    ledger,
+  );
+
+  return ledger;
+}
+
+export function recordNexusAutomationTargetCycleRecord(
+  options: RecordNexusAutomationTargetCycleRecordOptions,
+): NexusAutomationTargetCycleLedger {
+  const recordedAt = isoString(options.now ?? new Date());
+  const record = normalizeTargetCycleRecordInput(options.record, recordedAt);
+  const existing = readNexusAutomationTargetCycleLedger(
+    options.projectRoot,
+    options.config,
+  );
+  const cycles = [
+    ...existing.cycles.filter((cycle) => cycle.id !== record.id),
+    record,
+  ].slice(-options.config.ledger.retention);
   const ledger: NexusAutomationTargetCycleLedger = {
     version: 1,
     cycles,

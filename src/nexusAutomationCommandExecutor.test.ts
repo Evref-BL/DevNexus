@@ -166,6 +166,36 @@ describe("nexus automation command executor", () => {
     ]);
   });
 
+  it("keeps stdout and stderr tails in failed command summaries", async () => {
+    const executor = createNexusAutomationCommandExecutor({
+      command: "node noisy-task.js",
+      commandRunner: (command, options) => ({
+        command,
+        cwd: options.cwd,
+        stdout: "stdout first\nstdout tail\n",
+        stderr: "stderr first\nstderr tail\n",
+        exitCode: 2,
+      }),
+      gitRunner: () => ({
+        args: [],
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      }),
+    });
+
+    const result = await executor(executorInput(automationConfig()));
+
+    expect(result.verification?.[0]).toMatchObject({
+      command: "node noisy-task.js",
+      status: "failed",
+      summary: "exit 2: stderr tail: stderr tail; stdout tail: stdout tail",
+    });
+    expect(result.error).toBe(
+      "exit 2: stderr tail: stderr tail; stdout tail: stdout tail",
+    );
+  });
+
   it("runs verbose default commands without overflowing the child output buffer", () => {
     const script = [
       "process.stdout.write('first line\\n');",

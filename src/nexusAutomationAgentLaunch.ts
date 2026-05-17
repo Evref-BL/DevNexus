@@ -15,6 +15,7 @@ import {
 } from "./nexusAutomation.js";
 import {
   defaultNexusAutomationCommandRunner,
+  summarizeNexusAutomationCommandRunResult,
   type NexusAutomationCommandRunner,
   type NexusAutomationCommandRunResult,
 } from "./nexusAutomationCommandExecutor.js";
@@ -1163,13 +1164,7 @@ function commandSucceeded(result: NexusAutomationCommandRunResult): boolean {
 }
 
 function commandSummary(result: NexusAutomationCommandRunResult): string {
-  if (result.error) {
-    return result.error;
-  }
-
-  const exit = result.exitCode === null ? "no exit code" : `exit ${result.exitCode}`;
-  const output = firstNonEmptyLine(result.stderr) ?? firstNonEmptyLine(result.stdout);
-  return output ? `${exit}: ${truncate(output, 180)}` : exit;
+  return summarizeNexusAutomationCommandRunResult(result);
 }
 
 function defaultAgentSummary(status: NexusAutomationAgentLaunchStatus): string {
@@ -1286,17 +1281,6 @@ function currentIso(now?: () => Date | string): string {
   }
 
   return date.toISOString();
-}
-
-function firstNonEmptyLine(value: string): string | undefined {
-  return value
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .find(Boolean);
-}
-
-function truncate(value: string, length: number): string {
-  return value.length <= length ? value : `${value.slice(0, length - 3)}...`;
 }
 
 function normalizeStringArray(value: unknown, name: string): string[] {

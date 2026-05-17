@@ -8,6 +8,7 @@ import {
   defaultNexusAutomationConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
+  readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
@@ -257,6 +258,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation target-report");
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
+    expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
   it("initializes a home and manages projects through the CLI", async () => {
@@ -2053,6 +2055,119 @@ describe("dev-nexus cli", () => {
     ).toMatchObject({
       id: "local-1",
       status: "done",
+    });
+  });
+
+  it("runs a managed coordinator loop through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          ...config.automation!.agent,
+          command: "codex run",
+          timeoutMs: 2468,
+          relaunch: {
+            whileEligible: true,
+          },
+        },
+        target: {
+          ...config.automation!.target,
+          id: "dogfood",
+          objective: "Launch coordinators while work remains eligible.",
+        },
+      },
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinator-loop task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+    const commandRuns: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commandRuns.push(command);
+      expect(options.cwd).toBe(projectRoot);
+      expect(options.timeoutMs).toBe(2468);
+      expect(options.env.DEV_NEXUS_AUTOMATION_MODE).toBe("agent_launch");
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator loop completed",
+          commitIds: ["abc123"],
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "coordinator done",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(
+      [
+        "automation",
+        "coordinator-loop",
+        projectRoot,
+        "--max-runs",
+        "1",
+        "--run-id-prefix",
+        "cli-loop",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        commandRunner,
+        now: fixedClock("2026-05-17T10:00:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      stoppedReason: "max_runs",
+      ticks: [
+        {
+          action: "launched",
+          decision: {
+            type: "launch",
+          },
+          run: {
+            status: "completed",
+            summary: "Coordinator loop completed",
+          },
+          targetCycle: {
+            id: "target-cycle-cli-loop-20260517-t100000-000-z-1",
+            runId: "cli-loop-20260517-t100000-000-z-1",
+            status: "completed",
+            eligibleWorkItemCount: 1,
+          },
+        },
+      ],
+    });
+    expect(commandRuns).toEqual(["codex run"]);
+    expect(
+      readNexusAutomationTargetCycleLedger(
+        projectRoot,
+        projectConfig().automation!,
+      ).cycles.at(-1),
+    ).toMatchObject({
+      id: "target-cycle-cli-loop-20260517-t100000-000-z-1",
+      status: "completed",
+      runId: "cli-loop-20260517-t100000-000-z-1",
     });
   });
 });

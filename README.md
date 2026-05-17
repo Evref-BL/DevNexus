@@ -573,6 +573,7 @@ dev-nexus automation target-cycle list <project-root>
 dev-nexus automation target-report <project-root> --json
 dev-nexus automation run-once <project-root> --command "codex exec <prompt-or-script>"
 dev-nexus automation schedule <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
+dev-nexus automation coordinator-loop <project-root> --command "codex exec <prompt-or-script>" --max-runs 1
 ```
 
 For `automation target-cycle record`, `--work-item-status`,
@@ -593,9 +594,10 @@ Projects can also store the shell command under `automation.agent.command` for
 agent-launch mode or `automation.executor.command` for the older generated
 worktree executor mode. For agent-launch mode, projects may instead set
 `automation.agent.coordinatorProfileId` to a profile with `command` and
-`args`. `automation run-once` and `automation schedule` may omit `--command`
-when the relevant command source is configured. Command-line options still
-override the configured command and timeout.
+`args`. `automation run-once`, `automation schedule`, and
+`automation coordinator-loop` may omit `--command` when the relevant command
+source is configured. Command-line options still override the configured
+command and timeout.
 
 Profile selection is infrastructure policy, not work supervision. A
 coordinator may use `automation.agent.profiles` and
@@ -629,6 +631,14 @@ dispatches `automation run-once` only when the project is ready. It honors
 project `automation.schedule.intervalMs`, waits until active locks or retry
 backoff expire, and supports `--max-ticks` or `--max-runs` for bounded local
 smokes and supervised runners.
+
+`automation coordinator-loop` is the DevNexus-owned agent-launch service mode.
+It records target-cycle decisions for no-work, lock, backoff, blocked, launch,
+completion, and failure outcomes, and launches a coordinator only when the
+project is ready. External schedulers can wake this command while DevNexus
+keeps the durable wait/skip/launch policy in project state. Current-agent
+adoption remains a follow-up; this mode launches the configured coordinator
+command rather than adopting an already-running agent.
 
 ## Curated Skills
 

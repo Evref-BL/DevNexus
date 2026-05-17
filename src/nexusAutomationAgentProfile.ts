@@ -41,7 +41,7 @@ export interface NexusAutomationAgentPolicy {
 export interface ResolveNexusAutomationAgentCommandOptions {
   automationConfig: NexusAutomationConfig;
   overrideCommand?: string;
-  commandName?: "run-once" | "schedule";
+  commandName?: "run-once" | "schedule" | "coordinator-loop";
 }
 
 export class NexusAutomationAgentProfileError extends Error {

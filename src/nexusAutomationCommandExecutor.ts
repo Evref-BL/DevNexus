@@ -160,6 +160,18 @@ export function defaultNexusAutomationCommandRunner(
   }
 }
 
+export function summarizeNexusAutomationCommandRunResult(
+  result: NexusAutomationCommandRunResult,
+): string {
+  if (result.error) {
+    return result.error;
+  }
+
+  const exit = result.exitCode === null ? "no exit code" : `exit ${result.exitCode}`;
+  const output = commandOutputDiagnostic(result);
+  return output ? `${exit}: ${truncate(output, 240)}` : exit;
+}
+
 function createCommandCaptureFiles(): {
   stdoutPath: string;
   stderrPath: string;
@@ -240,13 +252,7 @@ function commandSucceeded(result: NexusAutomationCommandRunResult): boolean {
 }
 
 function commandSummary(result: NexusAutomationCommandRunResult): string {
-  if (result.error) {
-    return result.error;
-  }
-
-  const exit = result.exitCode === null ? "no exit code" : `exit ${result.exitCode}`;
-  const output = firstNonEmptyLine(result.stderr) ?? firstNonEmptyLine(result.stdout);
-  return output ? `${exit}: ${truncate(output, 180)}` : exit;
+  return summarizeNexusAutomationCommandRunResult(result);
 }
 
 function executorSummary(
@@ -352,11 +358,24 @@ function readOutputPreview(filePath: string): string {
   }
 }
 
-function firstNonEmptyLine(value: string): string | undefined {
+function commandOutputDiagnostic(
+  result: NexusAutomationCommandRunResult,
+): string | null {
+  const stderrTail = lastNonEmptyLine(result.stderr);
+  const stdoutTail = lastNonEmptyLine(result.stdout);
+  if (stderrTail && stdoutTail) {
+    return `stderr tail: ${stderrTail}; stdout tail: ${stdoutTail}`;
+  }
+
+  return stderrTail ?? stdoutTail ?? null;
+}
+
+function lastNonEmptyLine(value: string): string | undefined {
   return value
     .split(/\r?\n/u)
     .map((line) => line.trim())
-    .find(Boolean);
+    .filter(Boolean)
+    .at(-1);
 }
 
 function truncate(value: string, length: number): string {

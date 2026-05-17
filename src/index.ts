@@ -6,6 +6,7 @@ export * from "./nexusAutomationAgentProfile.js";
 export * from "./nexusAutomationAgentSurface.js";
 export * from "./nexusAutomationCommandExecutor.js";
 export * from "./nexusAutomationConfig.js";
+export * from "./nexusAutomationCoordinatorLoop.js";
 export * from "./nexusAutomationEnqueue.js";
 export * from "./nexusAutomationRunOnce.js";
 export * from "./nexusAutomationScheduler.js";
