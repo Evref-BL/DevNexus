@@ -100,6 +100,10 @@ import {
 } from "./nexusAgentMcpConfig.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
+  prepareNexusManualWorktree,
+  type PrepareNexusManualWorktreeResult,
+} from "./nexusManualWorktree.js";
+import {
   createDefaultNexusHomeConfigBase,
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
@@ -412,6 +416,19 @@ interface ParsedCoordinationRequestCommand {
   json?: boolean;
 }
 
+interface ParsedWorktreePrepareCommand {
+  projectRoot: string;
+  componentId?: string;
+  projectMeta?: boolean;
+  branchName?: string;
+  worktreeName?: string;
+  baseRef?: string | null;
+  topic?: string | null;
+  workItemId?: string | null;
+  workItemTitle?: string | null;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -476,6 +493,7 @@ export function usage(): string {
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
     "  dev-nexus coordination request <project-root> --intent <intent> (--question <text>|--note <text>) [options]",
+    "  dev-nexus worktree prepare <project-root> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
@@ -586,6 +604,18 @@ export function usage(): string {
     "  --responder <id>",
     "  --requested-change <text>  repeatable",
     "  --worktree <path>         git worktree or source checkout used for context",
+    "  --json",
+    "",
+    "Options for worktree prepare:",
+    "  --component <id>          prepare a component-scoped worktree; defaults to the primary component",
+    "  --project-meta            prepare a project/meta worktree rooted at the DevNexus project checkout",
+    "  --work-item <id>          owning work item id used for branch naming and metadata",
+    "  --work-item-title <text>",
+    "  --topic <text>            human-readable topic used when --work-item is omitted",
+    "  --branch <name>           branch to create; defaults to codex/<scope>/<work-item-or-topic>",
+    "  --worktree-name <name>    directory name under the configured worktrees root",
+    "  --base-ref <ref>          defaults to the component or project default branch",
+    "  --no-base-ref             create the branch from the source checkout HEAD",
     "  --json",
     "",
     "Options for work-item create:",
@@ -748,6 +778,9 @@ export async function main(
   if (argv[0] === "coordination") {
     return handleCoordinationCommand(argv, dependencies);
   }
+  if (argv[0] === "worktree") {
+    return handleWorktreeCommand(argv, dependencies);
+  }
   if (argv[0] === "work-item") {
     return handleWorkItemCommand(argv, dependencies);
   }
@@ -760,7 +793,7 @@ export async function main(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, coordination, work-item, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, coordination, worktree, work-item, automation, mcp-stdio, or --help",
   );
 }
 
@@ -1087,6 +1120,37 @@ async function handleCoordinationCommand(
   }
 
   throw new Error("coordination requires status, handoff, integrate, or request");
+}
+
+async function handleWorktreeCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "prepare") {
+    const parsed = parseWorktreePrepareCommand(argv);
+    const result = prepareNexusManualWorktree({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectMeta: parsed.projectMeta,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      baseRef: parsed.baseRef,
+      topic: parsed.topic,
+      workItemId: parsed.workItemId,
+      workItemTitle: parsed.workItemTitle,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printWorktreePrepareResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("worktree requires prepare");
 }
 
 async function handleWorkItemCommand(
@@ -2377,6 +2441,65 @@ function parseCoordinationRequestCommand(
   return parsed as ParsedCoordinationRequestCommand;
 }
 
+function parseWorktreePrepareCommand(
+  argv: string[],
+): ParsedWorktreePrepareCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("worktree prepare requires a project root");
+  }
+
+  const parsed: ParsedWorktreePrepareCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--project-meta":
+        parsed.projectMeta = true;
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--work-item-title":
+        parsed.workItemTitle = next();
+        break;
+      case "--topic":
+        parsed.topic = next();
+        break;
+      case "--branch":
+        parsed.branchName = next();
+        break;
+      case "--worktree-name":
+        parsed.worktreeName = next();
+        break;
+      case "--base-ref":
+        parsed.baseRef = next();
+        break;
+      case "--no-base-ref":
+        parsed.baseRef = null;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown worktree prepare option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
@@ -3630,6 +3753,32 @@ function printCoordinationRequestResult(
   writeLine(stdout, `  Posted: ${String(result.record.provider.posted)}`);
   if (result.comment) {
     writeLine(stdout, `  Comment: ${result.comment.id}`);
+  }
+}
+
+function printWorktreePrepareResult(
+  result: PrepareNexusManualWorktreeResult,
+  parsed: ParsedWorktreePrepareCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus worktree prepared.");
+  writeLine(stdout, `  Scope: ${result.scope}`);
+  if (result.component) {
+    writeLine(stdout, `  Component: ${result.component.id}`);
+  }
+  writeLine(stdout, `  Worktree: ${result.worktree.worktreePath}`);
+  writeLine(stdout, `  Branch: ${result.worktree.branchName}`);
+  if (result.worktree.baseRef) {
+    writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
+  }
+  for (const action of result.nextActions) {
+    writeLine(stdout, `  Next: ${action}`);
   }
 }
 

@@ -65,6 +65,7 @@ import {
   recordNexusSetupStep,
   type NexusSetupRecordedStepStatus,
 } from "./nexusSetupAssistant.js";
+import { prepareNexusManualWorktree } from "./nexusManualWorktree.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -388,6 +389,27 @@ const tools: McpTool[] = [
         },
       },
       required: ["runId", "result"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "worktree_prepare",
+    description: "Prepare an isolated Git worktree and branch for manual parallel agent work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        projectMeta: { type: "boolean" },
+        workItemId: { type: ["string", "null"] },
+        workItemTitle: { type: ["string", "null"] },
+        topic: { type: ["string", "null"] },
+        branchName: { type: "string" },
+        worktreeName: { type: "string" },
+        baseRef: { type: ["string", "null"] },
+      },
       additionalProperties: false,
     },
   },
@@ -742,6 +764,27 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             runId: requiredString(args, "runId", "arguments"),
             result: currentAgentResultFromArgs(args),
+            now: context.now,
+          }),
+        });
+      case "worktree_prepare":
+        return toolResult({
+          ok: true,
+          ...prepareNexusManualWorktree({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            projectMeta: optionalBoolean(args, "projectMeta", "arguments"),
+            workItemId: optionalNullableString(args, "workItemId", "arguments"),
+            workItemTitle: optionalNullableString(
+              args,
+              "workItemTitle",
+              "arguments",
+            ),
+            topic: optionalNullableString(args, "topic", "arguments"),
+            branchName: optionalString(args, "branchName", "arguments"),
+            worktreeName: optionalString(args, "worktreeName", "arguments"),
+            baseRef: optionalNullableString(args, "baseRef", "arguments"),
+            gitRunner: context.gitRunner,
             now: context.now,
           }),
         });

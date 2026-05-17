@@ -256,6 +256,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
+    expect(output.output()).toContain("dev-nexus worktree prepare");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
@@ -263,6 +264,160 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("prepares manual component and project-meta worktrees through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-worktree-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const sourceDependency = path.join(sourceRoot, "node_modules");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(sourceDependency, { recursive: true });
+    fs.writeFileSync(path.join(sourceDependency, "tool.txt"), "ready\n", "utf8");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        plugins: [
+          {
+            id: "typescript",
+            enabled: true,
+            name: "TypeScript Tooling",
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "node-modules",
+                source: "node_modules",
+                target: "node_modules",
+                required: true,
+                reason: "Resolve local npm binaries from prepared JS/TS worktrees.",
+                targetComponents: ["primary"],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const output = captureOutput();
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    await main(
+      [
+        "worktree",
+        "prepare",
+        projectRoot,
+        "--component",
+        "primary",
+        "--work-item",
+        "local-42",
+        "--topic",
+        "Parallel chat isolation",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner: fakeGitRunner(gitCalls),
+        now: fixedClock("2026-05-17T08:00:00.000Z"),
+      },
+    );
+
+    const componentPayload = JSON.parse(output.output());
+    expect(componentPayload).toMatchObject({
+      ok: true,
+      scope: "component",
+      component: {
+        id: "primary",
+      },
+      worktree: {
+        componentId: "primary",
+        branchName: "codex/primary/local-42",
+        baseRef: "main",
+        workItem: {
+          id: "local-42",
+        },
+      },
+      setup: {
+        dependencyProjections: [
+          {
+            id: "node-modules",
+            status: "linked",
+            sourceMetadata: {
+              pluginId: "typescript",
+            },
+          },
+        ],
+      },
+    });
+    expect(componentPayload.worktree.worktreePath).toBe(
+      path.join(projectRoot, "worktrees", "primary", "codex-primary-local-42"),
+    );
+    expect(
+      fs.existsSync(
+        path.join(componentPayload.worktree.worktreePath, "node_modules", "tool.txt"),
+      ),
+    ).toBe(true);
+    let worktreeAddCalls = gitCalls.filter(
+      (call) => call.args[0] === "worktree" && call.args[1] === "add",
+    );
+    expect(worktreeAddCalls[0]).toMatchObject({
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/primary/local-42",
+        path.join(projectRoot, "worktrees", "primary", "codex-primary-local-42"),
+        "main",
+      ],
+      cwd: sourceRoot,
+    });
+
+    const metaOutput = captureOutput();
+    await main(
+      [
+        "worktree",
+        "prepare",
+        projectRoot,
+        "--project-meta",
+        "--topic",
+        "Project state cleanup",
+        "--worktree-name",
+        "project-state-cleanup",
+        "--json",
+      ],
+      {
+        stdout: metaOutput.writer,
+        gitRunner: fakeGitRunner(gitCalls),
+        now: fixedClock("2026-05-17T08:00:00.000Z"),
+      },
+    );
+
+    const metaPayload = JSON.parse(metaOutput.output());
+    expect(metaPayload).toMatchObject({
+      ok: true,
+      scope: "project",
+      component: null,
+      worktree: {
+        componentId: "demo-project",
+        branchName: "codex/demo-project/project-state-cleanup",
+        baseRef: "main",
+        workItem: null,
+      },
+    });
+    expect(metaPayload.worktree.worktreePath).toBe(
+      path.join(projectRoot, "worktrees", "demo-project", "project-state-cleanup"),
+    );
+    worktreeAddCalls = gitCalls.filter(
+      (call) => call.args[0] === "worktree" && call.args[1] === "add",
+    );
+    expect(worktreeAddCalls[1]).toMatchObject({
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/demo-project/project-state-cleanup",
+        path.join(projectRoot, "worktrees", "demo-project", "project-state-cleanup"),
+        "main",
+      ],
+      cwd: projectRoot,
+    });
   });
 
   it("prints a Mac new-machine setup plan through the CLI", async () => {

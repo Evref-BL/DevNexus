@@ -23,6 +23,7 @@ export * from "./nexusWorkerContextBundle.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusMcpServer.js";
+export * from "./nexusManualWorktree.js";
 export * from "./nexusPathResolver.js";
 export * from "./nexusPluginCapabilities.js";
 export * from "./nexusProjectScaffold.js";

@@ -166,6 +166,7 @@ describe("DevNexus MCP server", () => {
       "target_report",
       "current_agent_adopt",
       "current_agent_record",
+      "worktree_prepare",
       "coordination_status",
       "coordination_handoff",
       "coordination_integrate",
@@ -177,6 +178,65 @@ describe("DevNexus MCP server", () => {
       "work_item_comment",
       "work_item_set_status",
     ]);
+  });
+
+  it("prepares project-meta worktrees through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-worktree-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const gitRunner: GitRunner = (args, cwd) => {
+      const argsArray = [...args];
+      gitCalls.push({ args: argsArray, cwd });
+      if (argsArray[0] === "worktree" && argsArray[1] === "add") {
+        fs.mkdirSync(argsArray[4]!, { recursive: true });
+      }
+      if (argsArray[0] === "rev-parse" && argsArray[1] === "--git-path") {
+        return ok(argsArray, path.join(cwd ?? "", ".git", "info", "exclude"));
+      }
+      return ok(argsArray, "");
+    };
+
+    const prepared = toolJson(
+      await callDevNexusMcpTool(
+        "worktree_prepare",
+        {
+          projectRoot,
+          projectMeta: true,
+          topic: "parallel chat",
+          worktreeName: "parallel-chat",
+        },
+        {
+          gitRunner,
+          now: fixedClock("2026-05-17T08:00:00.000Z"),
+        },
+      ),
+    );
+
+    expect(prepared).toMatchObject({
+      ok: true,
+      scope: "project",
+      component: null,
+      worktree: {
+        componentId: "mcp-demo",
+        branchName: "codex/mcp-demo/parallel-chat",
+        baseRef: "main",
+      },
+    });
+    expect(prepared.worktree.worktreePath).toBe(
+      path.join(projectRoot, "worktrees", "mcp-demo", "parallel-chat"),
+    );
+    expect(gitCalls[0]).toMatchObject({
+      args: [
+        "worktree",
+        "add",
+        "-b",
+        "codex/mcp-demo/parallel-chat",
+        path.join(projectRoot, "worktrees", "mcp-demo", "parallel-chat"),
+        "main",
+      ],
+      cwd: projectRoot,
+    });
   });
 
   it("builds guided setup plans through MCP tools", async () => {

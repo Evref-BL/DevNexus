@@ -203,7 +203,7 @@ export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "use-devnexus",
     "use-devnexus",
-    "DevNexus-managed project workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, and advance work items across components. Use when an agent is asked to work in a DevNexus project, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
+    "DevNexus-managed project workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus project, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
     `
 # Use DevNexus
 
@@ -213,11 +213,15 @@ Use this skill when working inside a DevNexus-managed project.
 2. Use DevNexus MCP or CLI surfaces for project status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
 3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue slicing, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
 4. Work through configured component work-item services. Prefer component-qualified work-item ids when a project has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
-5. Before editing, inspect relevant working trees and preserve unrelated changes. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations.
-6. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
-7. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, and record target-cycle or handoff facts when the project workflow provides them.
-8. Verify with focused checks first, then broader relevant checks when feasible. Publish only according to component publication policy.
-9. When running under a DevNexus-launched cycle, write the configured result file with status, summary, commits, verification, publication decision, and error or blocker details before exiting.
+5. Before editing, inspect relevant working trees and preserve unrelated changes. Treat a shared checkout as read-mostly context unless the task is clearly read-only or already owns that checkout.
+6. For mutating parallel work, prepare an isolated Git worktree before editing. Use component-scoped worktrees for component source changes, and use a project/meta worktree for DevNexus project files such as \`AGENTS.md\`, \`PLAN.md\`, \`CONTEXT.md\`, \`.dev-nexus/**\`, projected skills, target state, or dogfood docs. Prefer DevNexus worktree tools such as \`worktree_prepare\` or \`dev-nexus worktree prepare\` over hand-rolled \`git worktree\` commands.
+7. Let configured setup make prepared worktrees usable. For example, JavaScript/TypeScript projects should expose reusable dependencies through a plugin \`dependency_projection\` such as \`node_modules\` -> \`node_modules\`, instead of teaching every agent to repair missing dependencies manually.
+8. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
+9. Run source and Git commands from the assigned worktree. Stage only files owned by that worktree and avoid committing unrelated project-state or tracker files from another chat.
+10. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, record target-cycle facts, and use coordination handoffs for \`working\`, \`ready\`, \`blocked\`, or \`merged\` worktree branches.
+11. Before integrating parallel chat branches, use DevNexus coordination status or integration planning to check related branches, stale handoffs, unpushed commits, conflicts, and verification order.
+12. Verify with focused checks first, then broader relevant checks when feasible. Publish only according to component publication policy.
+13. When running under a DevNexus-launched cycle, write the configured result file with status, summary, commits, verification, publication decision, and error or blocker details before exiting.
 `,
   ),
   curatedCoreSkill(

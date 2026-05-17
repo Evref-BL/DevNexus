@@ -163,6 +163,9 @@ describe("nexus skills", () => {
     expect(skillMarkdown["use-devnexus"]).toContain(
       "component-qualified work-item ids",
     );
+    expect(skillMarkdown["use-devnexus"]).toContain("worktree_prepare");
+    expect(skillMarkdown["use-devnexus"]).toContain("project/meta worktree");
+    expect(skillMarkdown["use-devnexus"]).toContain("dependency_projection");
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",

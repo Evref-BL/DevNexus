@@ -196,9 +196,42 @@ component work-item service and read Git state, but they do not choose or
 supervise implementation work.
 
 ```bash
+dev-nexus worktree prepare <project-root> --component dev-nexus --work-item local-1
+dev-nexus worktree prepare <project-root> --project-meta --topic "project state"
 dev-nexus coordination status <project-root> --work-item local-1 --worktree <path>
 dev-nexus coordination handoff <project-root> local-1 --status ready --worktree <path>
 dev-nexus coordination integrate <project-root> --work-item local-1 --target-branch main --worktree <path>
+```
+
+`worktree prepare` creates a chat-owned branch and isolated Git worktree under
+the owning component's worktree root. `--project-meta` uses the DevNexus project
+checkout itself as the source repository and stores project-state worktrees
+under the project worktrees root, which keeps concurrent edits to files such as
+`.dev-nexus/**`, `PLAN.md`, projected skills, and target state out of the shared
+checkout. Prepared worktrees also run the project's declared worktree setup:
+`automation.setup.dependencyLinks`, enabled plugin `dependency_projection`
+capabilities, worker skill projections, and worker context materialization.
+For JavaScript/TypeScript projects, a tooling plugin should provide the
+`node_modules` projection instead of baking package-manager behavior into the
+generic worktree command.
+
+```json
+{
+  "id": "typescript",
+  "enabled": true,
+  "name": "TypeScript Tooling",
+  "capabilities": [
+    {
+      "kind": "dependency_projection",
+      "id": "node-modules",
+      "source": "node_modules",
+      "target": "node_modules",
+      "required": false,
+      "sourceControl": "support",
+      "reason": "Resolve local npm binaries from prepared JS/TS worktrees."
+    }
+  ]
+}
 ```
 
 `coordination integrate` builds a read-only plan from related handoff branches,
