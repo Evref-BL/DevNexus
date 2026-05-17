@@ -52,9 +52,13 @@ older control-project handoff.
   interactively but returned access denied from the scheduler shell.
 - The standalone cron is currently paused because Codex cron shell commands run
   with restricted workspace/no-network permissions; nested `codex.exe`
-  coordinator launch can fail there. Use the active thread heartbeat until
-  DevNexus supports current-agent coordinator adoption or cron permissions
-  support child model execution.
+  coordinator launch can fail there. DevNexus source commit `af0b300` adds the
+  managed `automation coordinator-loop`; the active heartbeat should use that
+  loop as a temporary wake-up bridge. Current-agent adoption for already-running
+  coordinators is tracked separately by `dev-nexus:local-29`.
 - DevNexus source commit `7aa035d` fixes MCP work-item tools so
   component-qualified ids such as `dev-nexus:local-27` route to the component
   work tracker before provider selection.
+- DevNexus-Pharo source commit `ec14934` bundles MCP-Pharo domain skills for
+  Pharo-capable subagents: `pharo-ci-repro`, `pharo-image-git-handoff`,
+  `pharo-project-load`, and `pharo-version-compat`.

@@ -133,10 +133,11 @@ Configured components:
 
 Current component publication state:
 
-- DevNexus is clean and pushed to `origin/main` through `7aa035d` (`Route MCP
-  work item refs by component prefix`).
-- DevNexus-Pharo is clean and pushed to `origin/main` through `8024fa2`; the
-  GitHub repository has been renamed to `Evref-BL/DevNexus-Pharo`.
+- DevNexus is clean and pushed to `origin/main` through `af0b300` (`Add
+  managed coordinator loop`).
+- DevNexus-Pharo is clean and pushed to `origin/main` through `ec14934`
+  (`Bundle MCP-Pharo domain skills`); the GitHub repository has been renamed to
+  `Evref-BL/DevNexus-Pharo`.
 - PLexus is clean and pushed to `origin/main` through `a616dd4` (`Merge PLexus
   portability coverage`).
 - pharo-launcher-mcp is clean and pushed to `origin/main` through `8a8b5eb`
@@ -179,9 +180,16 @@ follow-ups remain blocked until an isolated runner is approved.
   adoption flow so an already-running agent can use DevNexus launch context,
   target-cycle facts, result contracts, and subagent cap policy without
   spawning a nested model process.
+- DevNexus now has a managed `automation coordinator-loop` foundation. Host
+  schedulers should wake that loop rather than deciding work directly. The
+  separate current-agent adoption contract remains tracked by
+  `dev-nexus:local-29`.
 - DevNexus MCP work-item tools support component-qualified ids such as
   `dev-nexus:local-27`, selecting the component work tracker before provider
   lookup so agents do not need CLI fallbacks for component-local work items.
+- DevNexus-Pharo now bundles MCP-Pharo domain skills for Pharo-capable
+  subagents, with provenance back to MCP-Pharo and plugin projected-skill
+  capabilities for worker context.
 - Target reports now expose relaunch decisions from durable target/run facts.
 
 ## Next Target Direction

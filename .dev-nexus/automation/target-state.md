@@ -18,16 +18,13 @@ Immediate direction:
 - New plugin-composition plan work is tracked. DevNexus remains the generic
   infrastructure; DevNexus-Pharo is a DevNexus plugin, not an alternate runner.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-27` add a DevNexus-managed conditional coordinator loop
-    so DevNexus, not a raw Codex cron timer, owns perpetual work conditions,
-    locking, backoff, run/adopt decisions, and target-cycle facts.
+  - `dev-nexus:local-29` add the current-agent coordinator adoption contract so
+    restricted hosts can let an already-running coordinator adopt DevNexus run
+    context, result contract, target-cycle facts, and subagent cap policy.
   - `dev-nexus:local-17` add draft-only/mocked `coordination_request` support
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
-  - `dev-nexus-pharo:local-9` bundle MCP-Pharo domain skills through
-    DevNexus-Pharo so Pharo-capable subagents receive CI reproduction, image
-    Git handoff, project load, and Pharo version compatibility guidance.
 - Runtime setup is now approved through
   `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
   Docker/Podman compatibility checks, local dependency repair, and isolated
@@ -37,16 +34,15 @@ Immediate direction:
 - The standalone Codex cron automation `devnexus-dogfood-overnight` is paused.
   It can load `dev-nexus automation run-once`, but its scheduler shell runs in
   a restricted workspace-write/no-network sandbox, so a nested `codex.exe`
-  coordinator can fail before selecting work. This is now tracked by
-  `dev-nexus:local-27`.
+  coordinator can fail before selecting work. The DevNexus-owned loop
+  foundation is complete through `dev-nexus:local-27`; restricted current-agent
+  adoption remains tracked by `dev-nexus:local-29`.
 - The active continuation automation is the thread heartbeat
   `devnexus-dogfood-heartbeat`. Treat it as a temporary wake-up bridge, not
-  the desired perpetual-work architecture. It continues this full-access thread
-  as the coordinator, using DevNexus as infrastructure for eligible work,
-  target-cycle facts, work-item updates, and subagent cap policy. The
-  coordinator should use parallel subagents for independent selected items when
-  useful, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS=8` and disjoint
-  component/worktree write scopes.
+  the desired perpetual-work architecture. It should invoke
+  `dev-nexus automation coordinator-loop . --max-ticks 1 --max-runs 1 --json`
+  and let DevNexus decide no-work, backoff, active-lock, wait, launch,
+  completion, blocked, and failed outcomes.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.
@@ -56,10 +52,11 @@ Immediate direction:
   work was attempted during that blocked overnight run.
 - Current automation state: the paused cron invokes DevNexus through
   `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\node.exe`, but it
-  should not be resumed for nested coordinator launch until `dev-nexus:local-27`
-  lands or Codex cron permissions can allow child model/network execution.
-  Even then, the preferred model is for any host scheduler to wake DevNexus,
-  while DevNexus decides whether a coordinator run should actually start.
+  should not be resumed as a direct nested coordinator launcher. If a host
+  scheduler is used, it should wake DevNexus `automation coordinator-loop`
+  instead, so DevNexus decides whether a coordinator run should actually start.
+  `dev-nexus:local-27` is now complete through DevNexus `af0b300`; current-agent
+  adoption remains tracked separately by `dev-nexus:local-29`.
 - Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
@@ -284,6 +281,14 @@ Durable completed foundation:
   `7aa035d`, covering `component-id:local-id` references for MCP
   get/update/comment/set-status calls so component-local trackers are selected
   before legacy root tracker fallbacks.
+- DevNexus managed coordinator-loop foundation was published through
+  `af0b300`, covering `automation coordinator-loop`, no-work/lock/backoff wait
+  decisions, target-cycle launch/finalization facts, and stdout/stderr tail
+  diagnostics. Current-agent adoption remains a follow-up.
+- DevNexus-Pharo MCP-Pharo domain skill bundling was published through
+  `ec14934`, covering bundled `pharo-ci-repro`,
+  `pharo-image-git-handoff`, `pharo-project-load`, and
+  `pharo-version-compat` skills plus plugin projected-skill capabilities.
 - PLexus scoped plugin context was published through `de0d5c6`, covering
   project/workspace/target/image ownership context, scoped lifecycle
   affordance descriptions, cleanup metadata, and gateway `imageId` route
