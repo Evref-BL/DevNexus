@@ -1,5 +1,6 @@
 import path from "node:path";
 import process from "node:process";
+import type { Readable, Writable } from "node:stream";
 import {
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
@@ -1505,7 +1506,12 @@ function jsonRpcError(
   };
 }
 
-class StdioJsonRpcTransport {
+export interface StdioJsonRpcTransportStreams {
+  stdin: Readable;
+  stdout: Writable;
+}
+
+export class StdioJsonRpcTransport {
   private buffer = Buffer.alloc(0);
   private processing = false;
 
@@ -1513,12 +1519,19 @@ class StdioJsonRpcTransport {
     private readonly onMessage: (
       message: JsonRpcRequest,
     ) => Promise<unknown | undefined>,
+    private readonly streams: StdioJsonRpcTransportStreams = {
+      stdin: process.stdin,
+      stdout: process.stdout,
+    },
   ) {}
 
   start(): Promise<void> {
     return new Promise((resolve) => {
-      process.stdin.on("data", (chunk: Buffer) => {
-        this.buffer = Buffer.concat([this.buffer, chunk]);
+      this.streams.stdin.on("data", (chunk: Buffer | string) => {
+        const bufferChunk = Buffer.isBuffer(chunk)
+          ? chunk
+          : Buffer.from(chunk, "utf8");
+        this.buffer = Buffer.concat([this.buffer, bufferChunk]);
         void this.processBuffer().catch((error: unknown) => {
           this.send(
             jsonRpcError(
@@ -1529,7 +1542,7 @@ class StdioJsonRpcTransport {
           );
         });
       });
-      process.stdin.once("end", resolve);
+      this.streams.stdin.once("end", resolve);
     });
   }
 
@@ -1569,9 +1582,6 @@ class StdioJsonRpcTransport {
       }
     } finally {
       this.processing = false;
-      if (this.headerEndIndex()) {
-        void this.processBuffer();
-      }
     }
   }
 
@@ -1587,7 +1597,7 @@ class StdioJsonRpcTransport {
 
   private send(message: unknown): void {
     const body = JSON.stringify(message);
-    process.stdout.write(
+    this.streams.stdout.write(
       `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`,
     );
   }

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   callDevNexusMcpTool,
@@ -11,6 +12,7 @@ import {
   listMcpInputSchemaProviderIssues,
   readNexusAutomationRunLedger,
   saveProjectConfig,
+  StdioJsonRpcTransport,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
@@ -26,6 +28,38 @@ function makeTempDir(prefix: string): string {
 
 function fixedClock(timestamp: string): () => string {
   return () => timestamp;
+}
+
+function jsonRpcFrame(message: unknown): Buffer {
+  const body = JSON.stringify(message);
+  return Buffer.from(
+    `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`,
+    "utf8",
+  );
+}
+
+function parseJsonRpcFrame(frame: Buffer): unknown {
+  const headerEnd = frame.indexOf("\r\n\r\n");
+  expect(headerEnd).toBeGreaterThanOrEqual(0);
+  const header = frame.slice(0, headerEnd).toString("utf8");
+  const lengthMatch = /^Content-Length:\s*(\d+)\s*$/imu.exec(header);
+  expect(lengthMatch).not.toBeNull();
+  const bodyStart = headerEnd + 4;
+  return JSON.parse(
+    frame.slice(bodyStart, bodyStart + Number(lengthMatch![1])).toString("utf8"),
+  );
+}
+
+async function nextChunk(stream: PassThrough): Promise<Buffer> {
+  return new Promise((resolve) => {
+    stream.once("data", (chunk: Buffer | string) => {
+      resolve(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, "utf8"));
+    });
+  });
+}
+
+async function waitForMicrotask(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjectConfig {
@@ -1234,5 +1268,39 @@ describe("DevNexus MCP server", () => {
         isError: true,
       },
     });
+  });
+
+  it("waits for a split stdio frame body without recursively reprocessing the header", async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const transport = new StdioJsonRpcTransport(
+      async (message) => ({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: { method: message.method },
+      }),
+      { stdin, stdout },
+    );
+    const started = transport.start();
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+    });
+
+    stdin.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n`);
+    await waitForMicrotask();
+    expect(stdout.read()).toBeNull();
+
+    const response = nextChunk(stdout);
+    stdin.write(body);
+
+    expect(parseJsonRpcFrame(await response)).toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      result: { method: "tools/list" },
+    });
+    stdin.end();
+    await started;
   });
 });
