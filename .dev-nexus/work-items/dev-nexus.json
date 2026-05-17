@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 55,
-  "nextCommentNumber": 86,
-  "updatedAt": "2026-05-17T16:06:58.143Z",
+  "nextCommentNumber": 88,
+  "updatedAt": "2026-05-17T16:55:41.547Z",
   "items": [
     {
       "id": "local-1",
@@ -1013,7 +1013,7 @@
       "id": "local-42",
       "title": "Add new-machine setup flow for existing DevNexus projects",
       "description": "Type: existing-project/new-machine onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting/auth-profile config shape are available.\nSource discussion: users should be able to bring a shared DevNexus project onto another machine, such as Mac plus Windows, without re-discovering bot account setup, remotes, component roots, MCP refresh, skills projection, and local toolchain dependencies by hand.\n\nGoal: add a DevNexus setup flow for joining an existing shared DevNexus meta project on a new machine.\n\nAcceptance criteria:\n- Flow starts from a meta repo URL or known hosting config and guides clone/fetch of the DevNexus meta project into a local root.\n- Flow identifies portable project state versus host-local state and prompts/generates missing host-local overrides for source roots, worktree roots, auth profiles, MCP config, skills projection, runtime/state roots, and toolchain paths.\n- Flow verifies personal and bot/API auth profiles according to project policy, including plain user `gh`, bot wrapper or app profile, SSH host aliases, and remote access.\n- Flow verifies component source checkouts: clone if absent when policy allows, fetch/pull if present, preserve dirty local changes, and report conflicts instead of overwriting.\n- Flow refreshes or proposes refreshing MCP/projected skill configuration for the local agent target and reports approval/default-tool settings needed for automation.\n- Flow runs safe preflight checks for required runtimes/toolchains and reports actionable blockers, without running live PLexus/Pharo/Docker work unless an approved runtime profile exists.\n- Flow produces a machine-local setup report that another agent can read before continuing work.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration and auth profile references.\n- Depends on `dev-nexus:local-38` for actor/remote guardrails when publishing from the new machine.\n\nBoundaries:\n- Do not overwrite existing dirty component source roots or host-local config.\n- Do not copy secrets into shared project state.\n- Do not launch live runtime services/images during baseline onboarding.\n\nVerification:\n- Mocked filesystem/Git/gh checks for fresh-machine and existing-dirty-machine cases.\n- Fixture project with host-local overrides and component source roots.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -1027,7 +1027,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T15:02:02.879Z",
+      "updatedAt": "2026-05-17T16:55:41.547Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2318,6 +2318,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-83"
+        }
+      },
+      {
+        "id": "local-comment-86",
+        "body": "Mac onboarding follow-up: added an explicit manual Codex Desktop project step to the join-existing-project setup plan. DevNexus now states it projects repo-local .codex/config.toml but does not mutate Codex app state, and tells users to open/create the Codex Desktop project rooted at the meta repo. Published DevNexus commit edf8434 after build and focused tests.",
+        "author": null,
+        "createdAt": "2026-05-17T16:55:40.716Z",
+        "updatedAt": "2026-05-17T16:55:40.716Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-86"
+        }
+      },
+      {
+        "id": "local-comment-87",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-42-codex-desktop-project-step\nHead: edf8434ef9f75121160e334e737194a85231e9f9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T16:55:41.530Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-42\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-desktop-project-step\",\n  \"branch\": \"codex/dev-nexus/local-42-codex-desktop-project-step\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"edf8434ef9f75121160e334e737194a85231e9f9\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"README.md\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm run build passed; vitest run src/nexusSetupAssistant.test.ts passed; npm test -- --exclude src/processSupervisor.test.ts passed\",\n  \"integrationPreference\": null,\n  \"note\": \"Merged and pushed edf8434 to origin/main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T16:55:41.547Z",
+        "updatedAt": "2026-05-17T16:55:41.547Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-87"
         }
       }
     ],
