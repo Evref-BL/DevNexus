@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 57,
-  "nextCommentNumber": 97,
-  "updatedAt": "2026-05-17T19:31:54.859Z",
+  "nextCommentNumber": 99,
+  "updatedAt": "2026-05-17T19:50:13.412Z",
   "items": [
     {
       "id": "local-1",
@@ -1379,7 +1379,7 @@
       "id": "local-56",
       "title": "Expose referenced planning docs in worker context",
       "description": "Type: worker-context setup defect\nReadiness: autonomous agent-ready (AFK)\nSource: during the 2026-05-17 parallel dogfood wave, the local-44 worker prompt referenced `docs/component-multi-tracker-prd.md` inside the prepared component worktree, but DevNexus worktree preparation only projected core context files and did not make referenced root docs available in the worktree. The worker had to report an input gap and continue from acceptance criteria until the coordinator sent the root PRD path manually.\n\nGoal: make prepared worker contexts expose or resolve work-item referenced planning documents so agents do not receive nonexistent doc paths.\n\nAcceptance criteria:\n- Worktree preparation detects root-relative doc references from work-item descriptions and/or selected project docs and records them in `.dev-nexus/context/context.json` plus `briefing.md` as read-only inputs with absolute paths.\n- Coordinator/worker briefing avoids implying that root docs exist inside the component worktree unless they are explicitly projected there.\n- If a referenced planning file is missing, setup reports a clear capability/input gap before launch.\n- Tests cover a work item referencing `docs/component-multi-tracker-prd.md` and prove the worker context includes the correct read-only root path.\n\nBoundaries:\n- Do not copy arbitrary project docs into source worktrees by default if read-only absolute references are enough.\n- Preserve component worktree ownership: root docs are context, not worker write scope.\n\nVerification:\n- Focused worker context/worktree prepare tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1391,8 +1391,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T19:08:17.175Z",
-      "updatedAt": "2026-05-17T19:31:54.859Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T19:50:13.412Z",
+      "closedAt": "2026-05-17T19:50:13.412Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2554,6 +2554,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-96"
+        }
+      },
+      {
+        "id": "local-comment-97",
+        "body": "Starting implementation in an isolated DevNexus component worktree. Scope: expose referenced root planning docs in generated worker context/briefing and add focused tests for the local-44 PRD path case.",
+        "author": null,
+        "createdAt": "2026-05-17T19:37:56.838Z",
+        "updatedAt": "2026-05-17T19:37:56.838Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-97"
+        }
+      },
+      {
+        "id": "local-comment-98",
+        "body": "Completed and published through DevNexus source commit 42cf6c5, released as @evref-bl/dev-nexus@0.1.0-alpha.9 on the dogfood npm tag. Worker context bundles now extract root-relative planning docs from work-item descriptions, record existing docs as read-only project context in context.json and briefing.md, and fail before worker launch when a referenced doc is missing. Automation run-once passes full work-item descriptions into generated context, and manual worktree prepare now best-effort resolves the configured work item for title/description context while preserving topic/title fallback behavior. Verification passed with focused context/run-once/CLI tests and npm run check in both worker and source checkouts.",
+        "author": null,
+        "createdAt": "2026-05-17T19:50:13.247Z",
+        "updatedAt": "2026-05-17T19:50:13.247Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-98"
         }
       }
     ]

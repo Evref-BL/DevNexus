@@ -29,14 +29,16 @@ Immediate direction:
   - `dev-nexus:local-55` added extensible agent-provider MCP target support,
     including OpenCode/manual/custom configuration paths and Windows
     `dev-nexus.cmd` MCP refresh behavior.
+- `dev-nexus:local-56` is complete through DevNexus `42cf6c5` and npm
+  `@evref-bl/dev-nexus@0.1.0-alpha.9`: generated worker contexts now extract
+  root-relative planning docs such as `docs/component-multi-tracker-prd.md`
+  from work-item descriptions, record existing docs as read-only root context
+  in `context.json` and `briefing.md`, and fail before worker launch if a
+  referenced planning doc is missing.
 - Current ready `dogfood` work matching the automation selector after that
-  wave:
+  repair:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
-  - `dev-nexus:local-56` expose referenced planning docs in worker context.
-    This tracks the PRD projection gap found when the `local-44` worker prompt
-    referenced `docs/component-multi-tracker-prd.md` as if it existed inside
-    the prepared component worktree.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
