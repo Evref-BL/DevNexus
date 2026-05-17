@@ -14,6 +14,7 @@ import {
   type MaterializeNexusWorkerContextBundleResult,
   type NexusWorkerContextDependencyProjection,
   type NexusWorkerContextDependencyProjectionSourceControl,
+  type NexusWorkerContextDependencyProjectionSourceComponent,
   type NexusWorkerContextDependencyProjectionSourceMetadata,
   type NexusWorkerContextDependencyProjectionStatus,
   type NexusWorkerContextAgentSkillProjection,
@@ -56,6 +57,7 @@ export interface NexusAutomationWorktreeSetupLinkResult {
 
 export interface NexusAutomationPluginDependencyProjection {
   id: string;
+  sourceComponent?: NexusWorkerContextDependencyProjectionSourceComponent;
   source: string;
   target: string;
   required: boolean;
@@ -135,6 +137,7 @@ export class NexusAutomationWorktreeSetupError extends Error {
 
 export function preflightNexusAutomationWorktreeSetup(options: {
   sourceRoot: string;
+  worktreesRoot?: string;
   automationConfig: NexusAutomationConfig;
   pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
 }): NexusAutomationWorktreeSetupPreflightCheck[] {
@@ -183,6 +186,7 @@ export function preflightNexusAutomationWorktreeSetup(options: {
     preflightPluginDependencyProjection({
       projection,
       sourceRoot,
+      worktreesRoot: options.worktreesRoot,
     }),
   );
 
@@ -219,6 +223,7 @@ export function materializeNexusAutomationWorktreeSetup(
     materializePluginDependencyProjection({
       projection,
       sourceRoot,
+      worktreesRoot: options.worktreesRoot,
       worktreePath,
       gitRunner,
       platform,
@@ -737,6 +742,7 @@ function isNexusSkillManifest(value: unknown): value is NexusSkillManifest {
 function preflightPluginDependencyProjection(options: {
   projection: NexusAutomationPluginDependencyProjection;
   sourceRoot: string;
+  worktreesRoot?: string;
 }): NexusAutomationWorktreeSetupPreflightCheck {
   const name = `pluginDependencyProjection:${requiredNonEmptyString(
     options.projection.id,
@@ -744,26 +750,44 @@ function preflightPluginDependencyProjection(options: {
   )}`;
 
   try {
-    const sourcePath = resolveInsideRoot(
+    const projection = normalizePluginDependencyProjection(options.projection);
+    const projectionSourceRoot = pluginDependencyProjectionSourceRoot(
       options.sourceRoot,
-      options.projection.source,
+      projection,
+    );
+    preflightPluginDependencyProjectionTarget({
+      projection,
+      sourceRoot: options.sourceRoot,
+      worktreesRoot: options.worktreesRoot,
+    });
+
+    if (
+      projection.sourceComponent &&
+      !fs.existsSync(projection.sourceComponent.sourceRoot)
+    ) {
+      if (projection.required) {
+        return {
+          name,
+          status: "failed",
+          message: `Required plugin dependency projection source component ${projection.sourceComponent.id} source root does not exist: ${projection.sourceComponent.sourceRoot}`,
+        };
+      }
+
+      return {
+        name,
+        status: "passed",
+        message: `Optional plugin dependency projection source component ${projection.sourceComponent.id} source root is absent and will be skipped: ${projection.sourceComponent.sourceRoot}`,
+      };
+    }
+
+    const sourcePath = resolveInsideOrAtRoot(
+      projectionSourceRoot,
+      projection.source,
       "plugin dependency projection source",
-    );
-    resolveInsideRoot(
-      options.sourceRoot,
-      options.projection.target,
-      "plugin dependency projection target",
-    );
-    normalizeDependencyProjectionSourceControl(
-      options.projection.sourceControl,
-      "plugin dependency projection sourceControl",
-    );
-    normalizePluginDependencyProjectionSourceMetadata(
-      options.projection.sourceMetadata,
     );
 
     if (!fs.existsSync(sourcePath)) {
-      if (options.projection.required) {
+      if (projection.required) {
         return {
           name,
           status: "failed",
@@ -781,7 +805,7 @@ function preflightPluginDependencyProjection(options: {
     return {
       name,
       status: "passed",
-      message: `Plugin dependency projection ${options.projection.source} -> ${options.projection.target} is safe to materialize`,
+      message: `Plugin dependency projection ${projection.source} -> ${projection.target} is safe to materialize`,
     };
   } catch (error) {
     return {
@@ -795,20 +819,45 @@ function preflightPluginDependencyProjection(options: {
 function materializePluginDependencyProjection(options: {
   projection: NexusAutomationPluginDependencyProjection;
   sourceRoot: string;
+  worktreesRoot?: string;
   worktreePath: string;
   gitRunner: GitRunner;
   platform: NodeJS.Platform;
 }): NexusAutomationWorktreeDependencyProjectionResult {
   const projection = normalizePluginDependencyProjection(options.projection);
-  const sourcePath = resolveInsideRoot(
+  const projectionSourceRoot = pluginDependencyProjectionSourceRoot(
     options.sourceRoot,
+    projection,
+  );
+  const targetPath = resolvePluginDependencyProjectionTargetPath({
+    projection,
+    worktreePath: options.worktreePath,
+    worktreesRoot: options.worktreesRoot,
+  });
+
+  if (
+    projection.sourceComponent &&
+    !fs.existsSync(projection.sourceComponent.sourceRoot)
+  ) {
+    if (projection.required) {
+      throw new NexusAutomationWorktreeSetupError(
+        `Required plugin dependency projection source component ${projection.sourceComponent.id} source root does not exist: ${projection.sourceComponent.sourceRoot}`,
+      );
+    }
+
+    return dependencyProjectionResult({
+      projection,
+      sourcePath: projection.sourceComponent.sourceRoot,
+      targetPath,
+      status: "skipped",
+      message: `Optional plugin dependency projection source component ${projection.sourceComponent.id} source root is absent: ${projection.sourceComponent.sourceRoot}`,
+    });
+  }
+
+  const sourcePath = resolveInsideOrAtRoot(
+    projectionSourceRoot,
     projection.source,
     "plugin dependency projection source",
-  );
-  const targetPath = resolveInsideRoot(
-    options.worktreePath,
-    projection.target,
-    "plugin dependency projection target",
   );
 
   if (!fs.existsSync(sourcePath)) {
@@ -829,7 +878,10 @@ function materializePluginDependencyProjection(options: {
 
   const sourceStats = fs.statSync(sourcePath);
   if (fs.existsSync(targetPath)) {
-    if (projection.sourceControl === "support") {
+    if (
+      projection.sourceControl === "support" &&
+      pathIsInsideRoot(options.worktreePath, targetPath)
+    ) {
       addGitInfoExclude({
         worktreePath: options.worktreePath,
         targetPath,
@@ -853,7 +905,10 @@ function materializePluginDependencyProjection(options: {
     targetPath,
     symlinkType(sourceStats, options.platform),
   );
-  if (projection.sourceControl === "support") {
+  if (
+    projection.sourceControl === "support" &&
+    pathIsInsideRoot(options.worktreePath, targetPath)
+  ) {
     addGitInfoExclude({
       worktreePath: options.worktreePath,
       targetPath,
@@ -897,6 +952,13 @@ function normalizePluginDependencyProjection(
     sourceMetadata: normalizePluginDependencyProjectionSourceMetadata(
       projection.sourceMetadata,
     ),
+    ...(projection.sourceComponent
+      ? {
+          sourceComponent: normalizePluginDependencyProjectionSourceComponent(
+            projection.sourceComponent,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -936,6 +998,23 @@ function normalizePluginDependencyProjectionSourceMetadata(
   };
 }
 
+function normalizePluginDependencyProjectionSourceComponent(
+  sourceComponent: NexusWorkerContextDependencyProjectionSourceComponent,
+): NexusWorkerContextDependencyProjectionSourceComponent {
+  return {
+    id: requiredNonEmptyString(
+      sourceComponent.id,
+      "plugin dependency projection sourceComponent.id",
+    ),
+    sourceRoot: path.resolve(
+      requiredNonEmptyString(
+        sourceComponent.sourceRoot,
+        "plugin dependency projection sourceComponent.sourceRoot",
+      ),
+    ),
+  };
+}
+
 function dependencyProjectionResult(options: {
   projection: NexusAutomationPluginDependencyProjection;
   sourcePath: string;
@@ -955,7 +1034,88 @@ function dependencyProjectionResult(options: {
     status: options.status,
     message: options.message,
     sourceMetadata: options.projection.sourceMetadata,
+    ...(options.projection.sourceComponent
+      ? { sourceComponent: options.projection.sourceComponent }
+      : {}),
   };
+}
+
+function pluginDependencyProjectionSourceRoot(
+  defaultSourceRoot: string,
+  projection: NexusAutomationPluginDependencyProjection,
+): string {
+  return projection.sourceComponent?.sourceRoot ?? defaultSourceRoot;
+}
+
+function preflightPluginDependencyProjectionTarget(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourceRoot: string;
+  worktreesRoot?: string;
+}): void {
+  const syntheticWorktreesRoot = path.resolve(
+    options.worktreesRoot ?? options.sourceRoot,
+  );
+  resolvePluginDependencyProjectionTargetPath({
+    projection: options.projection,
+    worktreePath: path.join(syntheticWorktreesRoot, "__nexus_worker__"),
+    worktreesRoot: options.worktreesRoot,
+  });
+}
+
+function resolvePluginDependencyProjectionTargetPath(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  worktreePath: string;
+  worktreesRoot?: string;
+}): string {
+  const target = requiredNonEmptyString(
+    options.projection.target,
+    "plugin dependency projection target",
+  );
+  if (path.isAbsolute(target)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `plugin dependency projection target must be relative: ${target}`,
+    );
+  }
+
+  const worktreePath = path.resolve(options.worktreePath);
+  const targetPath = path.resolve(worktreePath, target);
+  const relativeToWorktree = path.relative(worktreePath, targetPath);
+  if (
+    relativeToWorktree &&
+    !relativeToWorktree.startsWith("..") &&
+    !path.isAbsolute(relativeToWorktree)
+  ) {
+    return targetPath;
+  }
+  if (!relativeToWorktree) {
+    throw new NexusAutomationWorktreeSetupError(
+      `plugin dependency projection target must resolve inside ${worktreePath}: ${target}`,
+    );
+  }
+  if (!options.projection.sourceComponent) {
+    throw new NexusAutomationWorktreeSetupError(
+      `plugin dependency projection target outside the worker worktree requires sourceComponent: ${target}`,
+    );
+  }
+  if (!options.worktreesRoot) {
+    throw new NexusAutomationWorktreeSetupError(
+      `plugin dependency projection target outside the worker worktree requires worktreesRoot: ${target}`,
+    );
+  }
+
+  const worktreesRoot = path.resolve(options.worktreesRoot);
+  const relativeToWorktreesRoot = path.relative(worktreesRoot, targetPath);
+  if (
+    !relativeToWorktreesRoot ||
+    relativeToWorktreesRoot.startsWith("..") ||
+    path.isAbsolute(relativeToWorktreesRoot)
+  ) {
+    throw new NexusAutomationWorktreeSetupError(
+      `plugin dependency projection target must resolve inside worktreesRoot when outside the worker worktree: ${target}`,
+    );
+  }
+
+  return targetPath;
 }
 
 function materializeDependencyLink(options: {
@@ -1124,6 +1284,31 @@ function resolveInsideRoot(root: string, value: string, name: string): string {
   }
 
   return resolved;
+}
+
+function resolveInsideOrAtRoot(root: string, value: string, name: string): string {
+  const trimmed = requiredNonEmptyString(value, name);
+  if (path.isAbsolute(trimmed)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `${name} must be relative: ${trimmed}`,
+    );
+  }
+
+  const rootPath = path.resolve(root);
+  const resolved = path.resolve(rootPath, trimmed);
+  const relative = path.relative(rootPath, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new NexusAutomationWorktreeSetupError(
+      `${name} must resolve inside ${rootPath}: ${trimmed}`,
+    );
+  }
+
+  return resolved;
+}
+
+function pathIsInsideRoot(root: string, value: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(value));
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 function assertWorktreePathInsideRoot(

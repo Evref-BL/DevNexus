@@ -244,6 +244,33 @@ function requiredProjectRelativePath(
   return value;
 }
 
+function requiredDependencyProjectionTargetPath(
+  record: Record<string, unknown>,
+  pathName: string,
+  allowsOutsideWorker: boolean,
+): string {
+  const value = requiredString(record, "target", pathName).trim();
+  if (
+    /^[A-Za-z]:/u.test(value) ||
+    value.startsWith("/") ||
+    value.startsWith("\\")
+  ) {
+    throw new NexusConfigError(
+      `${pathName}.target must be a relative path`,
+    );
+  }
+  if (
+    !allowsOutsideWorker &&
+    value.split(/[\\/]/u).some((part) => part === "..")
+  ) {
+    throw new NexusConfigError(
+      `${pathName}.target must be a project-relative path unless sourceComponentId is declared`,
+    );
+  }
+
+  return value;
+}
+
 function nullableString(
   record: Record<string, unknown>,
   key: string,
@@ -665,6 +692,11 @@ function validatePluginCapabilityRecord(
       record.sourceControl,
       `${pathName}.sourceControl`,
     );
+    const sourceComponentId = optionalString(
+      record,
+      "sourceComponentId",
+      pathName,
+    );
     const targetAgents = optionalStringArray(record, "targetAgents", pathName);
     const targetComponents = optionalStringArray(
       record,
@@ -677,8 +709,13 @@ function validatePluginCapabilityRecord(
       kind,
       id,
       ...(description !== undefined ? { description } : {}),
+      ...(sourceComponentId !== undefined ? { sourceComponentId } : {}),
       source: requiredProjectRelativePath(record, "source", pathName),
-      target: requiredProjectRelativePath(record, "target", pathName),
+      target: requiredDependencyProjectionTargetPath(
+        record,
+        pathName,
+        sourceComponentId !== undefined,
+      ),
       required: optionalBoolean(record, "required", pathName) ?? false,
       sourceControl: sourceControl ?? "support",
       ...(targetAgents !== undefined ? { targetAgents } : {}),
@@ -1424,6 +1461,26 @@ function validateProjectComponentsConfig(
   return components;
 }
 
+function validatePluginDependencyProjectionSourceComponents(
+  plugins: NexusProjectPluginsConfig | undefined,
+  components: NexusProjectComponentConfig[],
+): void {
+  const componentIds = new Set(components.map((component) => component.id));
+  for (const plugin of plugins ?? []) {
+    for (const capability of plugin.capabilities) {
+      if (
+        capability.kind === "dependency_projection" &&
+        capability.sourceComponentId &&
+        !componentIds.has(capability.sourceComponentId)
+      ) {
+        throw new NexusConfigError(
+          `project config.plugins.${plugin.id}.${capability.id} sourceComponentId references unknown component: ${capability.sourceComponentId}`,
+        );
+      }
+    }
+  }
+}
+
 export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const record = assertRecord(value, "project config");
   if (record.version !== 1) {
@@ -1450,10 +1507,12 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     kanban: validateKanbanConfig(record.kanban),
     ...(workTracking ? { workTracking } : {}),
   };
+  const components = validateProjectComponentsConfig(record.components, common);
+  validatePluginDependencyProjectionSourceComponents(plugins, components);
 
   return {
     ...common,
-    components: validateProjectComponentsConfig(record.components, common),
+    components,
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
     ...(mcp ? { mcp } : {}),

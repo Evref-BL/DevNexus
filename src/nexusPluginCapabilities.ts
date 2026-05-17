@@ -83,6 +83,7 @@ export interface NexusPluginAgentAffordanceCapability
 export interface NexusPluginDependencyProjectionCapability
   extends NexusPluginCapabilityBase {
   kind: "dependency_projection";
+  sourceComponentId?: string;
   source: string;
   target: string;
   required?: boolean;
@@ -170,6 +171,7 @@ export type NexusPluginCapabilityProjectionRecord =
       kind: "dependency_projection";
       id: string;
       description: string | null;
+      sourceComponentId?: string;
       source: string;
       target: string;
       required: boolean;
@@ -238,6 +240,7 @@ export interface NexusPluginDependencyProjection {
   kind: "dependency_projection";
   id: string;
   description: string | null;
+  sourceComponentId?: string;
   source: string;
   target: string;
   required: boolean;
@@ -372,6 +375,9 @@ function projectCapabilityRecord(
       kind: capability.kind,
       id: capability.id,
       description: capability.description ?? null,
+      ...(capability.sourceComponentId
+        ? { sourceComponentId: capability.sourceComponentId }
+        : {}),
       source: capability.source,
       target: capability.target,
       required: capability.required ?? false,
@@ -411,6 +417,9 @@ function projectDependencyProjection(
     kind: capability.kind,
     id: capability.id,
     description: capability.description ?? null,
+    ...(capability.sourceComponentId
+      ? { sourceComponentId: capability.sourceComponentId }
+      : {}),
     source: capability.source,
     target: capability.target,
     required: capability.required ?? false,

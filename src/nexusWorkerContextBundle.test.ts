@@ -316,6 +316,73 @@ describe("nexus worker context bundle", () => {
     );
   });
 
+  it("records related component dependency projection sources in context and briefing surfaces", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "DevNexus-Pharo");
+    const relatedSourceRoot = path.join(projectRoot, "components", "DevNexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus-pharo");
+    const worktreePath = path.join(worktreesRoot, "local-24");
+    const targetDependency = path.join(worktreesRoot, "DevNexus");
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus-pharo",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-24-related-dependency-projections",
+      baseRef: "origin/main",
+      workItem: {
+        id: "local-24",
+        title: "Support related component dependency projections",
+      },
+      dependencyProjections: [
+        {
+          id: "dev-nexus-sibling",
+          source: ".",
+          target: "../DevNexus",
+          sourcePath: relatedSourceRoot,
+          targetPath: targetDependency,
+          required: true,
+          sourceControl: "support",
+          reason: "Pharo baselines resolve the sibling DevNexus checkout.",
+          status: "linked",
+          message: `Linked plugin dependency projection ${relatedSourceRoot} -> ${targetDependency}`,
+          sourceMetadata: {
+            pluginId: "pharo-tools",
+            pluginName: "Pharo Tools",
+            version: "0.1.0",
+            capabilityId: "dev-nexus-sibling",
+          },
+          sourceComponent: {
+            id: "dev-nexus",
+            sourceRoot: relatedSourceRoot,
+          },
+        },
+      ],
+    });
+
+    const contextJson = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(worktreePath), "utf8"),
+    );
+    expect(contextJson.dependencySupport.pluginDependencyProjections[0])
+      .toMatchObject({
+        id: "dev-nexus-sibling",
+        source: ".",
+        target: "../DevNexus",
+        sourceComponent: {
+          id: "dev-nexus",
+          sourceRoot: relatedSourceRoot,
+        },
+      });
+    expect(result.briefingMarkdown).toContain(
+      "- linked dev-nexus-sibling: ../DevNexus",
+    );
+    expect(result.briefingMarkdown).toContain(
+      `Source component: dev-nexus (${relatedSourceRoot})`,
+    );
+  });
+
   it("renders generic plugin fragments into worker context and briefing surfaces", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "core");

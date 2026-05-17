@@ -86,6 +86,11 @@ export interface NexusWorkerContextDependencyProjectionSourceMetadata {
   capabilityId: string;
 }
 
+export interface NexusWorkerContextDependencyProjectionSourceComponent {
+  id: string;
+  sourceRoot: string;
+}
+
 export interface NexusWorkerContextDependencyProjection {
   id: string;
   source: string;
@@ -98,6 +103,7 @@ export interface NexusWorkerContextDependencyProjection {
   status: NexusWorkerContextDependencyProjectionStatus;
   message: string;
   sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata;
+  sourceComponent?: NexusWorkerContextDependencyProjectionSourceComponent;
 }
 
 export interface NexusWorkerContextDependencySupport {
@@ -506,6 +512,13 @@ function normalizeWorkerDependencyProjection(
     sourceMetadata: normalizeDependencyProjectionSourceMetadata(
       projection.sourceMetadata,
     ),
+    ...(projection.sourceComponent
+      ? {
+          sourceComponent: normalizeDependencyProjectionSourceComponent(
+            projection.sourceComponent,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -558,6 +571,21 @@ function normalizeDependencyProjectionSourceMetadata(
   };
 }
 
+function normalizeDependencyProjectionSourceComponent(
+  sourceComponent: NexusWorkerContextDependencyProjectionSourceComponent,
+): NexusWorkerContextDependencyProjectionSourceComponent {
+  return {
+    id: requiredNonEmptyString(
+      sourceComponent.id,
+      "dependencyProjections.sourceComponent.id",
+    ),
+    sourceRoot: normalizedAbsolutePath(
+      sourceComponent.sourceRoot,
+      "dependencyProjections.sourceComponent.sourceRoot",
+    ),
+  };
+}
+
 function renderDependencyProjectionLines(
   dependencySupport: NexusWorkerContextDependencySupport,
 ): string[] {
@@ -568,6 +596,11 @@ function renderDependencyProjectionLines(
   return dependencySupport.pluginDependencyProjections.flatMap((projection) => [
     `- ${projection.status} ${projection.id}: ${projection.target}`,
     `  Source: ${projection.sourceMetadata.pluginId}:${projection.sourceMetadata.capabilityId}`,
+    ...(projection.sourceComponent
+      ? [
+          `  Source component: ${projection.sourceComponent.id} (${projection.sourceComponent.sourceRoot})`,
+        ]
+      : []),
     ...(projection.reason ? [`  Reason: ${projection.reason}`] : []),
   ]);
 }

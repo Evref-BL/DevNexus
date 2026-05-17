@@ -82,6 +82,31 @@ function jsToolchainProjection(
   };
 }
 
+function relatedDevNexusProjection(
+  sourceRoot: string,
+  overrides: Partial<NexusAutomationPluginDependencyProjection> = {},
+): NexusAutomationPluginDependencyProjection {
+  return {
+    id: "dev-nexus-sibling",
+    sourceComponent: {
+      id: "dev-nexus",
+      sourceRoot,
+    },
+    source: ".",
+    target: "../DevNexus",
+    required: true,
+    sourceControl: "support",
+    reason: "Pharo baselines resolve the sibling DevNexus checkout.",
+    sourceMetadata: {
+      pluginId: "pharo-tools",
+      pluginName: "Pharo Tools",
+      version: "0.1.0",
+      capabilityId: "dev-nexus-sibling",
+    },
+    ...overrides,
+  };
+}
+
 function resolveLocalBinFromWorktree(
   worktreePath: string,
   command: string,
@@ -281,6 +306,145 @@ describe("nexus automation worktree setup", () => {
     expect(
       fs.readFileSync(path.join(worktreePath, ".git", "info", "exclude"), "utf8"),
     ).toBe(".dev-cache/\nnode_modules/\n");
+  });
+
+  it("materializes related component projections at sibling support paths", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "components", "DevNexus-Pharo");
+    const relatedSourceRoot = path.join(projectRoot, "components", "DevNexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus-pharo");
+    const worktreePath = path.join(worktreesRoot, "local-24");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(relatedSourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    fs.writeFileSync(
+      path.join(relatedSourceRoot, "BaselineOfDevNexus.st"),
+      "baseline\n",
+      "utf8",
+    );
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    expect(
+      preflightNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreesRoot,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [
+          relatedDevNexusProjection(relatedSourceRoot),
+        ],
+      }),
+    ).toEqual([
+      {
+        name: "pluginDependencyProjection:dev-nexus-sibling",
+        status: "passed",
+        message: "Plugin dependency projection . -> ../DevNexus is safe to materialize",
+      },
+    ]);
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      pluginDependencyProjections: [relatedDevNexusProjection(relatedSourceRoot)],
+      gitRunner: fakeGitRunner(gitCalls),
+    });
+
+    const targetPath = path.join(worktreesRoot, "DevNexus");
+    expect(result.dependencyProjections).toMatchObject([
+      {
+        id: "dev-nexus-sibling",
+        source: ".",
+        target: "../DevNexus",
+        sourcePath: relatedSourceRoot,
+        targetPath,
+        required: true,
+        sourceControl: "support",
+        status: "linked",
+        sourceComponent: {
+          id: "dev-nexus",
+          sourceRoot: relatedSourceRoot,
+        },
+      },
+    ]);
+    expect(
+      fs.readFileSync(
+        path.join(worktreePath, "..", "DevNexus", "BaselineOfDevNexus.st"),
+        "utf8",
+      ),
+    ).toBe("baseline\n");
+    expect(fs.existsSync(path.join(worktreePath, ".git", "info", "exclude")))
+      .toBe(false);
+    expect(gitCalls).toEqual([]);
+  });
+
+  it("rejects undeclared outside plugin projection targets in preflight", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreesRoot = makeTempDir("dev-nexus-setup-worktrees-");
+    fs.mkdirSync(path.join(sourceRoot, "DevNexus"), { recursive: true });
+
+    expect(
+      preflightNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreesRoot,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [
+          jsToolchainProjection({
+            id: "undeclared-sibling",
+            source: "DevNexus",
+            target: "../DevNexus",
+            required: true,
+          }),
+        ],
+      }),
+    ).toEqual([
+      {
+        name: "pluginDependencyProjection:undeclared-sibling",
+        status: "failed",
+        message: "plugin dependency projection target outside the worker worktree requires sourceComponent: ../DevNexus",
+      },
+    ]);
+  });
+
+  it("rejects missing required related component sources in preflight", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreesRoot = makeTempDir("dev-nexus-setup-worktrees-");
+    const missingSourceRoot = path.join(sourceRoot, "..", "missing-DevNexus");
+
+    expect(
+      preflightNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreesRoot,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [
+          relatedDevNexusProjection(missingSourceRoot),
+        ],
+      }),
+    ).toEqual([
+      {
+        name: "pluginDependencyProjection:dev-nexus-sibling",
+        status: "failed",
+        message: `Required plugin dependency projection source component dev-nexus source root does not exist: ${path.resolve(
+          missingSourceRoot,
+        )}`,
+      },
+    ]);
   });
 
   it("skips optional missing plugin projections and records them in worker context", () => {

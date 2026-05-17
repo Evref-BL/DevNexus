@@ -767,6 +767,95 @@ describe("project config", () => {
     );
   });
 
+  it("accepts dependency projections sourced from configured related components", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "pharo-project",
+        name: "Pharo Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        components: [
+          {
+            id: "dev-nexus-pharo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/DevNexus-Pharo",
+          },
+          {
+            id: "dev-nexus",
+            kind: "git",
+            role: "dependency",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/DevNexus",
+          },
+        ],
+        plugins: [
+          {
+            id: "pharo-tools",
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "dev-nexus-sibling",
+                sourceComponentId: "dev-nexus",
+                source: ".",
+                target: "../DevNexus",
+                required: true,
+              },
+            ],
+          },
+        ],
+      }).plugins?.[0]?.capabilities[0],
+    ).toMatchObject({
+      kind: "dependency_projection",
+      id: "dev-nexus-sibling",
+      sourceComponentId: "dev-nexus",
+      source: ".",
+      target: "../DevNexus",
+      required: true,
+    });
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "pharo-project",
+        name: "Pharo Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        components: [
+          {
+            id: "dev-nexus-pharo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+          },
+        ],
+        plugins: [
+          {
+            id: "pharo-tools",
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "dev-nexus-sibling",
+                sourceComponentId: "dev-nexus",
+                source: ".",
+                target: "../DevNexus",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/sourceComponentId references unknown component: dev-nexus/);
+  });
+
   it("rejects invalid project and work tracking config", () => {
     expect(() =>
       validateProjectConfig({
