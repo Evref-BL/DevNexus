@@ -271,6 +271,10 @@ Durable completed foundation:
   through commit `8ba98ed`, which includes repo-local Pharo CI reproduction,
   image Git handoff, project loading, version compatibility skills, Docker
   smalltalkCI helper scripts, and log-reading references.
+- Local Codex/automation MCP config now uses the `dev_nexus_pharo` server name
+  with `default_tools_approval_mode = "approve"` for trusted DevNexus-Pharo and
+  PLexus MCP servers. `dev-nexus:local-26` tracks the source-side generator fix
+  so future MCP refreshes keep approval defaults and current server names.
 
 Active boundaries:
 

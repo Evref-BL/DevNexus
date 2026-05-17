@@ -21,7 +21,7 @@
       "role": "primary",
       "remoteUrl": "git@github.com:Evref-BL/DevNexus.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus",
+      "sourceRoot": "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus",
       "worktreesRoot": "worktrees/dev-nexus",
       "workTracking": {
         "provider": "local",
@@ -51,7 +51,7 @@
       "role": "extension",
       "remoteUrl": "git@github.com:Evref-BL/DevNexus-Pharo.git",
       "defaultBranch": "main",
-      "sourceRoot": "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\MetaPharoNexus",
+      "sourceRoot": "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus-Pharo",
       "worktreesRoot": "worktrees/dev-nexus-pharo",
       "workTracking": {
         "provider": "local",
@@ -151,7 +151,7 @@
   "mcp": {
     "command": "node",
     "args": [
-      "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus\\dist\\cli.js",
+      "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus\\dist\\cli.js",
       "mcp-stdio"
     ],
     "agentTargets": [
@@ -420,9 +420,9 @@
             "--cd",
             "C:\\dev\\code\\dev-nexus-dogfood",
             "--add-dir",
-            "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\DevNexus",
+            "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus",
             "--add-dir",
-            "C:\\dev\\code\\pharo-nexus\\PharoNexus-Control\\worktrees\\MetaPharoNexus",
+            "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus-Pharo",
             "--add-dir",
             "C:\\dev\\code\\git\\PLexus",
             "--add-dir",

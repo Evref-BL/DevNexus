@@ -21,7 +21,7 @@ DevNexus dogfood work on 2026-05-17.
 - PLexus source: `C:\dev\code\git\PLexus`
 - pharo-launcher-mcp source: `C:\dev\code\git\pharo-launcher-mcp`
 - DevNexus-Pharo source:
-  `C:\dev\code\pharo-nexus\PharoNexus-Control\worktrees\MetaPharoNexus`
+  `C:\dev\code\dev-nexus-control\worktrees\DevNexus-Pharo`
 - MCP-Pharo source:
   `C:\Users\gabriel.darbord\Documents\Pharo\images\MCP12-2\pharo-local\iceberg\Evref-BL\MCP`
 - PLexus state root:
