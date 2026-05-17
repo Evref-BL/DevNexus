@@ -25,6 +25,8 @@ Immediate direction:
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
+  - `dev-nexus:local-31` add a Codex app-server JSON-RPC capability adapter.
+  - `dev-nexus:local-32` add Codex app-server agent profile schema support.
 - Runtime setup is now approved through
   `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
   Docker/Podman compatibility checks, local dependency repair, and isolated
@@ -45,9 +47,10 @@ Immediate direction:
   completion, blocked, and failed outcomes.
 - Codex app-server provider planning is captured in
   `docs/codex-app-server-provider-prd.md`. The follow-up tracker item
-  `dev-nexus:local-30` is `todo`/HITL and intentionally not ready for
-  automation until the Product Requirements Document (PRD) is accepted and
-  sliced into implementation items.
+  `dev-nexus:local-30` is `todo`/HITL and has been sliced into implementation
+  items. Ready foundation work is `dev-nexus:local-31` and
+  `dev-nexus:local-32`; dependent follow-ups `dev-nexus:local-33` through
+  `dev-nexus:local-36` remain `todo` until their prerequisites land.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.
