@@ -75,6 +75,14 @@ import {
   type NexusCoordinationStatus,
 } from "./nexusCoordination.js";
 import {
+  createNexusCoordinationRequest,
+  parseNexusCoordinationRequestIntent,
+  parseNexusCoordinationRequestStatus,
+  type NexusCoordinationRequestIntent,
+  type NexusCoordinationRequestResult,
+  type NexusCoordinationRequestStatus,
+} from "./nexusCoordinationRequest.js";
+import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
@@ -347,6 +355,24 @@ interface ParsedCoordinationIntegrateCommand {
   json?: boolean;
 }
 
+interface ParsedCoordinationRequestCommand {
+  projectRoot: string;
+  componentId?: string;
+  workItemId?: string;
+  intent: NexusCoordinationRequestIntent;
+  question?: string | null;
+  note?: string | null;
+  target?: string | null;
+  hostId?: string;
+  agentId?: string;
+  responseStatus?: NexusCoordinationRequestStatus;
+  responseSummary?: string | null;
+  responder?: string | null;
+  requestedChanges: string[];
+  currentPath?: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -406,6 +432,7 @@ export function usage(): string {
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
+    "  dev-nexus coordination request <project-root> --intent <intent> (--question <text>|--note <text>) [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
@@ -494,6 +521,22 @@ export function usage(): string {
     "  --target-branch <branch>  defaults to component or automation publication target",
     "  --fetch                   fetch configured remote when automation safety allows host mutation",
     "  --worktree <path>         git worktree or source checkout used for planning",
+    "  --json",
+    "",
+    "Options for coordination request:",
+    "  --component <id>          defaults to component inferred from --worktree or current directory",
+    "  --work-item <id>",
+    "  --intent <approval|feedback|choice|review>",
+    "  --question <text>",
+    "  --note <text>",
+    "  --target <target>         examples: github-issue:1, github-pr:2, gitlab-issue:3, gitlab-mr:4, jira:KEY-5",
+    "  --host <id>",
+    "  --agent <id>",
+    "  --response-status <waiting|answered|approved|changes_requested|timed_out|blocked>",
+    "  --response-summary <text>",
+    "  --responder <id>",
+    "  --requested-change <text>  repeatable",
+    "  --worktree <path>         git worktree or source checkout used for context",
     "  --json",
     "",
     "Options for work-item create:",
@@ -912,7 +955,35 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status, handoff, or integrate");
+  if (command === "request") {
+    const parsed = parseCoordinationRequestCommand(argv);
+    const result = await createNexusCoordinationRequest({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      intent: parsed.intent,
+      question: parsed.question,
+      note: parsed.note,
+      target: parsed.target,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      responseStatus: parsed.responseStatus,
+      responseSummary: parsed.responseSummary,
+      responder: parsed.responder,
+      requestedChanges: parsed.requestedChanges,
+      currentPath: parsed.currentPath ?? process.cwd(),
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationRequestResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("coordination requires status, handoff, integrate, or request");
 }
 
 async function handleWorkItemCommand(
@@ -1932,6 +2003,87 @@ function parseCoordinationIntegrateCommand(
   }
 
   return parsed;
+}
+
+function parseCoordinationRequestCommand(
+  argv: string[],
+): ParsedCoordinationRequestCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination request requires a project root");
+  }
+
+  const parsed: Partial<ParsedCoordinationRequestCommand> = {
+    projectRoot,
+    requestedChanges: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--intent":
+        parsed.intent = parseNexusCoordinationRequestIntent(next(), arg);
+        break;
+      case "--question":
+        parsed.question = next();
+        break;
+      case "--note":
+        parsed.note = next();
+        break;
+      case "--target":
+        parsed.target = next();
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--response-status":
+        parsed.responseStatus = parseNexusCoordinationRequestStatus(next(), arg);
+        break;
+      case "--response-summary":
+        parsed.responseSummary = next();
+        break;
+      case "--responder":
+        parsed.responder = next();
+        break;
+      case "--requested-change":
+        parsed.requestedChanges?.push(next());
+        break;
+      case "--worktree":
+        parsed.currentPath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination request option: ${arg}`);
+    }
+  }
+
+  if (!parsed.intent) {
+    throw new Error("coordination request requires --intent");
+  }
+  if (!parsed.question && !parsed.note) {
+    throw new Error("coordination request requires --question or --note");
+  }
+
+  return parsed as ParsedCoordinationRequestCommand;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -3076,6 +3228,36 @@ function printCoordinationIntegrationPlan(
     }
   }
   writeLine(stdout, `  Next action: ${plan.nextAction}`);
+}
+
+function printCoordinationRequestResult(
+  result: NexusCoordinationRequestResult,
+  parsed: ParsedCoordinationRequestCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination request recorded.");
+  writeLine(stdout, `  Project: ${result.project.id}`);
+  writeLine(stdout, `  Component: ${result.component.id}`);
+  if (result.record.workItemId) {
+    writeLine(stdout, `  Work item: ${result.record.workItemId}`);
+  }
+  writeLine(stdout, `  Intent: ${result.record.intent}`);
+  writeLine(stdout, `  Status: ${result.record.status}`);
+  writeLine(stdout, `  Target: ${result.record.target.label}`);
+  writeLine(
+    stdout,
+    `  Provider: ${result.record.provider.provider} ${result.record.provider.surface} draft`,
+  );
+  writeLine(stdout, `  Posted: ${String(result.record.provider.posted)}`);
+  if (result.comment) {
+    writeLine(stdout, `  Comment: ${result.comment.id}`);
+  }
 }
 
 function printWorkItemCreateResult(

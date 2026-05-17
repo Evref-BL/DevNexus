@@ -254,6 +254,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus coordination status");
+    expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
@@ -843,6 +844,82 @@ describe("dev-nexus cli", () => {
             },
           ],
         },
+      },
+    });
+  });
+
+  it("records coordination requests through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-17");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Ask for external coordination",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner = fakeCoordinationIntegrationGitRunner(worktreePath);
+
+    await main(
+      [
+        "coordination",
+        "request",
+        projectRoot,
+        "--work-item",
+        "local-1",
+        "--intent",
+        "choice",
+        "--question",
+        "Which provider target shape should this slice use?",
+        "--target",
+        "gitlab-mr:7",
+        "--response-status",
+        "approved",
+        "--response-summary",
+        "Use the neutral target record with provider-specific mock flow.",
+        "--responder",
+        "reviewer-a",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-17T10:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      record: {
+        intent: "choice",
+        status: "approved",
+        workItemId: "local-1",
+        target: {
+          kind: "gitlab_merge_request",
+          provider: "gitlab",
+          value: "7",
+        },
+        provider: {
+          provider: "gitlab",
+          surface: "merge_request",
+          mode: "draft",
+          posted: false,
+          credentialsUsed: false,
+        },
+        response: {
+          status: "approved",
+          responder: "reviewer-a",
+        },
+      },
+      comment: {
+        id: "local-comment-1",
       },
     });
   });
