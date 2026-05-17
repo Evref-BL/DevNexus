@@ -493,6 +493,102 @@ describe("project config", () => {
     ).toThrow(/roles\[0\]/);
   });
 
+  it("accepts meta-project hosting config with portable auth profile references", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "hosted-project",
+        name: "Hosted Project",
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            nameTemplate: "{projectId}-meta",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          authProfile: "human-github",
+          remotes: [
+            {
+              name: "origin",
+              role: "human",
+              protocol: "ssh",
+            },
+            {
+              name: "bot",
+              role: "automation",
+              protocol: "ssh",
+              authProfile: "bot-github",
+              sshHost: "github.com-example-bot",
+            },
+          ],
+          provisioning: {
+            allowCreate: false,
+          },
+        },
+      }).hosting,
+    ).toEqual({
+      provider: "github",
+      namespace: "ExampleOrg",
+      repository: {
+        nameTemplate: "{projectId}-meta",
+        visibility: "private",
+        defaultBranch: "main",
+      },
+      authProfile: "human-github",
+      remotes: [
+        {
+          name: "origin",
+          role: "human",
+          protocol: "ssh",
+        },
+        {
+          name: "bot",
+          role: "automation",
+          protocol: "ssh",
+          authProfile: "bot-github",
+          sshHost: "github.com-example-bot",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+      },
+    });
+
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "hosted-default-project",
+        name: "Hosted Default Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "machine-user",
+        },
+      }).hosting,
+    ).toEqual({
+      provider: "github",
+      namespace: "machine-user",
+      repository: {
+        visibility: "private",
+        defaultBranch: "main",
+      },
+      remotes: [
+        {
+          name: "origin",
+          role: "human",
+          protocol: "ssh",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+      },
+    });
+  });
+
   it("accepts generic automation policy with safe defaults", () => {
     expect(
       validateProjectConfig({
@@ -1297,6 +1393,66 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/workTracking\.repository\.name/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-provider",
+        name: "Invalid Hosting Provider",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "gitlab",
+          namespace: "example",
+        },
+      }),
+    ).toThrow(/project config\.hosting\.provider/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-remote",
+        name: "Invalid Hosting Remote",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          remotes: [
+            {
+              name: "origin",
+            },
+            {
+              name: "origin",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/duplicate name: origin/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-name-policy",
+        name: "Invalid Hosting Name Policy",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          repository: {
+            name: "fixed",
+            nameTemplate: "{projectId}",
+          },
+        },
+      }),
+    ).toThrow(/either name or nameTemplate/);
 
     expect(() =>
       validateProjectConfig({

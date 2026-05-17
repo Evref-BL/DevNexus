@@ -7,6 +7,11 @@ import {
   validateNexusAgentConfig,
   type NexusAgentConfig,
 } from "./nexusProjectConfig.js";
+import type {
+  NexusHostingAuthProfileConfig,
+  NexusHostingAuthProfileKind,
+  NexusProjectHostingProviderName,
+} from "./nexusProjectHosting.js";
 import type { NexusProjectReference } from "./nexusProjectRegistry.js";
 
 export const devNexusHomeConfigFileName = "dev-nexus.home.json";
@@ -22,6 +27,7 @@ export interface NexusHomeConfigBase {
   version: 1;
   paths: NexusHomePathsConfig;
   agent?: NexusAgentConfig;
+  authProfiles?: NexusHostingAuthProfileConfig[];
   projects: NexusProjectReference[];
 }
 
@@ -29,6 +35,7 @@ export interface CreateDefaultNexusHomeConfigBaseOptions {
   projectsRoot?: string;
   workspacesRoot?: string;
   agent?: NexusAgentConfig;
+  authProfiles?: NexusHostingAuthProfileConfig[];
 }
 
 export interface DefaultNexusHomePathOptions {
@@ -85,6 +92,82 @@ function optionalString(
   }
 
   return value;
+}
+
+function validateHostingProviderName(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingProviderName {
+  if (value === "github") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be github`);
+}
+
+function validateHostingAuthProfileKind(
+  value: unknown,
+  pathName: string,
+): NexusHostingAuthProfileKind | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "human" || value === "automation" || value === "app") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be human, automation, or app`);
+}
+
+function validateHostingAuthProfile(
+  value: unknown,
+  index: number,
+): NexusHostingAuthProfileConfig {
+  const pathName = `authProfiles[${index}]`;
+  const record = assertRecord(value, pathName);
+  const kind = validateHostingAuthProfileKind(record.kind, `${pathName}.kind`);
+  const account = optionalString(record, "account", pathName);
+  const host = optionalString(record, "host", pathName);
+  const sshHost = optionalString(record, "sshHost", pathName);
+  const githubCliConfigDir = optionalString(
+    record,
+    "githubCliConfigDir",
+    pathName,
+  );
+  const command = optionalString(record, "command", pathName);
+
+  return {
+    id: requiredString(record, "id", pathName),
+    provider: validateHostingProviderName(record.provider, `${pathName}.provider`),
+    ...(kind !== undefined ? { kind } : {}),
+    ...(account !== undefined ? { account } : {}),
+    ...(host !== undefined ? { host } : {}),
+    ...(sshHost !== undefined ? { sshHost } : {}),
+    ...(githubCliConfigDir !== undefined ? { githubCliConfigDir } : {}),
+    ...(command !== undefined ? { command } : {}),
+  };
+}
+
+function validateHostingAuthProfiles(
+  value: unknown,
+): NexusHostingAuthProfileConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("authProfiles must be an array");
+  }
+
+  const authProfiles = value.map(validateHostingAuthProfile);
+  const ids = new Set<string>();
+  for (const profile of authProfiles) {
+    if (ids.has(profile.id)) {
+      throw new NexusConfigError(`Auth profile id is duplicated: ${profile.id}`);
+    }
+    ids.add(profile.id);
+  }
+
+  return authProfiles;
 }
 
 function validateNexusProjectReference(
@@ -184,6 +267,9 @@ export function createDefaultNexusHomeConfigBase(
   if (options.agent) {
     config.agent = validateNexusAgentConfig(options.agent, "agent");
   }
+  if (options.authProfiles) {
+    config.authProfiles = validateHostingAuthProfiles(options.authProfiles);
+  }
 
   return validateNexusHomeConfigBase(config, resolvedHomePath);
 }
@@ -199,6 +285,7 @@ export function validateNexusHomeConfigBase(
 
   const paths = assertRecord(record.paths, "paths");
   const agent = validateNexusAgentConfig(record.agent, "agent");
+  const authProfiles = validateHostingAuthProfiles(record.authProfiles);
   const config: NexusHomeConfigBase = {
     version: 1,
     paths: {
@@ -210,6 +297,9 @@ export function validateNexusHomeConfigBase(
 
   if (agent) {
     config.agent = agent;
+  }
+  if (authProfiles) {
+    config.authProfiles = authProfiles;
   }
 
   return config;

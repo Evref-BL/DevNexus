@@ -37,6 +37,13 @@ import {
   type NexusAutomationVerificationConfig,
 } from "./nexusAutomationConfig.js";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import type {
+  NexusProjectHostingConfig,
+  NexusProjectHostingProviderName,
+  NexusProjectHostingRemoteProtocol,
+  NexusProjectHostingRemoteRole,
+  NexusProjectHostingRepositoryVisibility,
+} from "./nexusProjectHosting.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -157,6 +164,7 @@ export interface NexusProjectConfig {
   mcp?: NexusProjectMcpConfig;
   skills?: NexusProjectSkillsConfig;
   plugins?: NexusProjectPluginsConfig;
+  hosting?: NexusProjectHostingConfig;
   automation?: NexusAutomationConfig;
 }
 
@@ -942,6 +950,187 @@ function validateProjectMcpConfig(
 const legacyDefaultWorkTrackerId = "default";
 const legacyDefaultWorkTrackerName = "Default";
 
+function validateProjectHostingProviderName(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingProviderName {
+  if (value === "github") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be github`);
+}
+
+function validateProjectHostingRepositoryVisibility(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingRepositoryVisibility {
+  if (value === undefined) {
+    return "private";
+  }
+  if (value === "public" || value === "private" || value === "internal") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be public, private, or internal`);
+}
+
+function validateProjectHostingRemoteProtocol(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingRemoteProtocol {
+  if (value === undefined) {
+    return "ssh";
+  }
+  if (value === "ssh" || value === "https") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be ssh or https`);
+}
+
+function validateProjectHostingRemoteRole(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingRemoteRole {
+  if (value === undefined) {
+    return "other";
+  }
+  if (value === "human" || value === "automation" || value === "other") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be human, automation, or other`);
+}
+
+function validateProjectHostingRepositoryConfig(
+  value: unknown,
+): NexusProjectHostingConfig["repository"] {
+  const pathName = "project config.hosting.repository";
+  const record =
+    value === undefined ? {} : assertRecord(value, pathName);
+  const name = optionalString(record, "name", pathName);
+  const nameTemplate = optionalString(record, "nameTemplate", pathName);
+  if (name !== undefined && nameTemplate !== undefined) {
+    throw new NexusConfigError(
+      `${pathName} must define either name or nameTemplate, not both`,
+    );
+  }
+
+  return {
+    ...(name !== undefined ? { name } : {}),
+    ...(nameTemplate !== undefined ? { nameTemplate } : {}),
+    visibility: validateProjectHostingRepositoryVisibility(
+      record.visibility,
+      `${pathName}.visibility`,
+    ),
+    defaultBranch:
+      optionalString(record, "defaultBranch", pathName) ?? "main",
+  };
+}
+
+function validateProjectHostingRemoteConfig(
+  value: unknown,
+  index: number,
+): NexusProjectHostingConfig["remotes"][number] {
+  const pathName = `project config.hosting.remotes[${index}]`;
+  const record = assertRecord(value, pathName);
+  const protocol = validateProjectHostingRemoteProtocol(
+    record.protocol,
+    `${pathName}.protocol`,
+  );
+  const authProfile = optionalString(record, "authProfile", pathName);
+  const host = optionalString(record, "host", pathName);
+  const sshHost = optionalString(record, "sshHost", pathName);
+  if (protocol === "https" && sshHost !== undefined) {
+    throw new NexusConfigError(
+      `${pathName}.sshHost is only valid for ssh remotes`,
+    );
+  }
+
+  return {
+    name: requiredString(record, "name", pathName),
+    role: validateProjectHostingRemoteRole(record.role, `${pathName}.role`),
+    protocol,
+    ...(authProfile !== undefined ? { authProfile } : {}),
+    ...(host !== undefined ? { host } : {}),
+    ...(sshHost !== undefined ? { sshHost } : {}),
+  };
+}
+
+function validateProjectHostingRemotes(
+  value: unknown,
+): NexusProjectHostingConfig["remotes"] {
+  if (value === undefined) {
+    return [
+      {
+        name: "origin",
+        role: "human",
+        protocol: "ssh",
+      },
+    ];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.hosting.remotes must be an array");
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(
+      "project config.hosting.remotes must not be empty",
+    );
+  }
+
+  const remotes = value.map((remote, index) =>
+    validateProjectHostingRemoteConfig(remote, index),
+  );
+  const names = new Set<string>();
+  for (const remote of remotes) {
+    if (names.has(remote.name)) {
+      throw new NexusConfigError(
+        `project config.hosting.remotes contains duplicate name: ${remote.name}`,
+      );
+    }
+    names.add(remote.name);
+  }
+
+  return remotes;
+}
+
+function validateProjectHostingProvisioningConfig(
+  value: unknown,
+): NexusProjectHostingConfig["provisioning"] {
+  const pathName = "project config.hosting.provisioning";
+  const record =
+    value === undefined ? {} : assertRecord(value, pathName);
+
+  return {
+    allowCreate: optionalBoolean(record, "allowCreate", pathName) ?? false,
+  };
+}
+
+function validateProjectHostingConfig(
+  value: unknown,
+): NexusProjectHostingConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const pathName = "project config.hosting";
+  const record = assertRecord(value, pathName);
+  const authProfile = optionalString(record, "authProfile", pathName);
+
+  return {
+    provider: validateProjectHostingProviderName(
+      record.provider,
+      `${pathName}.provider`,
+    ),
+    namespace: requiredString(record, "namespace", pathName),
+    repository: validateProjectHostingRepositoryConfig(record.repository),
+    ...(authProfile !== undefined ? { authProfile } : {}),
+    remotes: validateProjectHostingRemotes(record.remotes),
+    provisioning: validateProjectHostingProvisioningConfig(record.provisioning),
+  };
+}
+
 function validateWorkTrackingProviderName(
   value: unknown,
   pathName: string,
@@ -1719,6 +1908,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const skills = validateProjectSkillsConfig(record.skills);
   const plugins = validateProjectPluginsConfig(record.plugins);
   const mcp = validateProjectMcpConfig(record.mcp);
+  const hosting = validateProjectHostingConfig(record.hosting);
   const automation = validateNexusAutomationConfig(record.automation);
   const repo = validateRepoConfig(record.repo);
   const kanban = validateKanbanConfig(record.kanban);
@@ -1746,6 +1936,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(mcp ? { mcp } : {}),
     ...(skills ? { skills } : {}),
     ...(plugins ? { plugins } : {}),
+    ...(hosting ? { hosting } : {}),
     ...(automation ? { automation } : {}),
   };
 }
