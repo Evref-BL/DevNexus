@@ -317,6 +317,13 @@ PLexus agent-facing surface direction:
   `/control-mcp` route registration/status/cleanup over one shared in-memory
   route table, and PLexus core defaults route registry calls to the
   route-control endpoint.
+- Mac PLexus follow-up commits are pulled into the Windows checkout through
+  `c24c739`: `44fd737` maps legacy `PLEXUS_GATEWAY_MCP_URL` `/mcp` values to
+  `/control-mcp`, `6a36cf2` preserves per-image runtime state, records actual
+  image listener pids, and adds scoped stop behavior, and `c24c739` aligns
+  Windows/POSIX path-style test expectations. `plexus:local-6` remains open
+  because `pharo_launcher_image_create` is still documented but not exposed by
+  the scoped launcher server.
 
 Durable completed foundation:
 

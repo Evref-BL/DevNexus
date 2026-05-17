@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 14,
-  "nextCommentNumber": 28,
-  "updatedAt": "2026-05-17T14:22:37.753Z",
+  "nextCommentNumber": 31,
+  "updatedAt": "2026-05-17T16:32:28.806Z",
   "items": [
     {
       "id": "local-1",
@@ -138,7 +138,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-16T14:42:17.401Z",
-      "updatedAt": "2026-05-16T14:42:17.401Z",
+      "updatedAt": "2026-05-17T16:32:28.806Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -162,7 +162,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-16T14:42:17.547Z",
-      "updatedAt": "2026-05-16T16:29:32.154Z",
+      "updatedAt": "2026-05-17T16:32:28.773Z",
       "closedAt": "2026-05-16T16:29:32.012Z",
       "webUrl": null,
       "externalRef": {
@@ -283,7 +283,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T14:11:08.061Z",
-      "updatedAt": "2026-05-17T14:22:37.645Z",
+      "updatedAt": "2026-05-17T16:32:28.794Z",
       "closedAt": "2026-05-17T14:22:37.645Z",
       "webUrl": null,
       "externalRef": {
@@ -471,7 +471,19 @@
       }
     ],
     "local-5": [],
-    "local-6": [],
+    "local-6": [
+      {
+        "id": "local-comment-30",
+        "body": "Mac/PLexus progress pulled on Windows: commit 6a36cf2 (Fix scoped image lifecycle state) fixes scoped image runtime state preservation, records the actual image process pid instead of the launcher wrapper pid, and makes pharo_launcher_image_stop stop one scoped image through PLexus close policy. User-reported live P14 verification recorded pid 30385 as the actual listener on 7102; scoped stop removed P14 processes/listeners and left the gateway route registry empty. Remaining local-6 gap: pharo_launcher_image_create is still documented but the scoped server still exposes list/info/start/stop only, so the create/docs part of the contract is not closed yet.",
+        "author": null,
+        "createdAt": "2026-05-17T16:32:28.806Z",
+        "updatedAt": "2026-05-17T16:32:28.806Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-30"
+        }
+      }
+    ],
     "local-7": [
       {
         "id": "local-comment-4",
@@ -493,6 +505,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-6"
+        }
+      },
+      {
+        "id": "local-comment-28",
+        "body": "Mac/PLexus follow-up pulled on Windows: commit c24c739 (Align path-style test expectations) updates path-style expectations in projectStartupScript, projectState, and workspaceMcpConfig tests to match intended Windows/POSIX behavior. User-reported verification: npm run build and full npm test passed.",
+        "author": null,
+        "createdAt": "2026-05-17T16:32:28.773Z",
+        "updatedAt": "2026-05-17T16:32:28.773Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-28"
         }
       }
     ],
@@ -613,6 +636,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-25"
+        }
+      },
+      {
+        "id": "local-comment-29",
+        "body": "Mac/PLexus follow-up pulled on Windows: commit 44fd737 (Route legacy gateway URL to control MCP) extends the route-control endpoint migration so legacy PLEXUS_GATEWAY_MCP_URL values ending in /mcp route lifecycle control calls to /control-mcp. User-reported verification: npm run test -w @evref-bl/plexus-core -- projectOpen.test.ts projectClose.test.ts projectLifecycle.test.ts passed; npm run build passed; full npm test passed.",
+        "author": null,
+        "createdAt": "2026-05-17T16:32:28.794Z",
+        "updatedAt": "2026-05-17T16:32:28.794Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-29"
         }
       }
     ],
