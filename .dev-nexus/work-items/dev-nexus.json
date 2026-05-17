@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 59,
-  "nextCommentNumber": 100,
-  "updatedAt": "2026-05-17T20:46:56.296Z",
+  "nextNumber": 62,
+  "nextCommentNumber": 101,
+  "updatedAt": "2026-05-17T21:01:06.504Z",
   "items": [
     {
       "id": "local-1",
@@ -1443,13 +1443,92 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T19:56:57.342Z",
-      "updatedAt": "2026-05-17T19:56:57.342Z",
+      "updatedAt": "2026-05-17T21:01:06.504Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-58",
         "itemNumber": 58
+      }
+    },
+    {
+      "id": "local-59",
+      "title": "Make local work-item store writes concurrency-safe",
+      "description": "Type: local work-tracker data-integrity defect\nReadiness: autonomous agent-ready (AFK)\nSource: During the 2026-05-17 PLexus parallel worktree wave, parallel DevNexus local-provider mutations corrupted .dev-nexus/work-items/plexus.json. Two coordination/comment writes reused comment ids and the file ended with a duplicated JSON tail after the closing brace. Subsequent work-item updates and coordination integrate failed with: Unexpected non-whitespace character after JSON at position 72490. The coordinator repaired the file manually by removing only the duplicate suffix.\n\nGoal:\nMake local work-item stores safe under concurrent create, update, comment, and coordination handoff operations.\n\nAcceptance criteria:\n- Every local-provider mutation uses a per-store transactional write path: acquire lock or equivalent serialization, read fresh state, allocate ids under that lock, write to a temporary file, and atomically replace the store.\n- Concurrent comments or updates against the same store produce distinct ids and preserve all records.\n- DevNexus never appends or partially rewrites a store that fails JSON parsing.\n- Parse failures include the store path, operation, and recovery guidance, without losing the original error detail.\n- Tests simulate concurrent create/comment/update/handoff operations against the same local store and assert valid JSON plus preserved records.\n\nVerification:\nRun focused local work-tracker provider tests, coordination handoff tests that use the local provider, and npm run check.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "work-tracking",
+        "local-provider",
+        "data-integrity",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T21:01:06.198Z",
+      "updatedAt": "2026-05-17T21:01:06.198Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-59",
+        "itemNumber": 59
+      }
+    },
+    {
+      "id": "local-60",
+      "title": "Normalize component-qualified ids in coordination and worktree tools",
+      "description": "Type: component work-item routing defect\nReadiness: autonomous agent-ready (AFK)\nSource: During the 2026-05-17 PLexus parallel wave, coordination handoff failed for component-qualified ids such as plexus:local-15 even when --component plexus was provided: Local work item not found. The same command succeeded only after switching to provider-local id local-15. DevNexus worktree prepare also accepted the component-qualified work item but produced worker context with a null work-item title.\n\nGoal:\nMake all DevNexus coordination and worktree tools route component-qualified work item ids consistently with work-item get/update/comment.\n\nAcceptance criteria:\n- coordination status, handoff, integrate, and request accept component-qualified ids with or without an explicit --component when the component can be resolved safely.\n- worktree prepare resolves component-qualified work items to the owning component and includes the work-item title in generated context/briefing metadata.\n- Error messages name the requested component, provider-local id, and configured tracker when lookup fails.\n- Tests cover local provider items, component-qualified ids, provider-local ids with --component, and ambiguous/mismatched component errors.\n\nVerification:\nRun focused coordination CLI/MCP tests, worktree prepare tests, and npm run check.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "work-items",
+        "work-item-routing",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T21:01:06.299Z",
+      "updatedAt": "2026-05-17T21:01:06.299Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-60",
+        "itemNumber": 60
+      }
+    },
+    {
+      "id": "local-61",
+      "title": "Report coordination integration tracker parse failures actionably",
+      "description": "Type: coordination diagnostics defect\nReadiness: autonomous agent-ready (AFK), after or alongside the local-provider concurrency fix\nSource: During the 2026-05-17 PLexus integration, coordination integrate failed with a raw JSON.parse message after the local tracker store was corrupted. The command did not identify the store path, affected component, failing provider operation, or a safe recovery path.\n\nGoal:\nMake coordination integrate and related coordination readers degrade cleanly when tracker stores or handoff comments are malformed.\n\nAcceptance criteria:\n- coordination integrate reports component id, tracker id/provider, store path when local, and the failing read/parse stage for malformed tracker state.\n- The command returns structured JSON with ok: false and actionable diagnostics instead of crashing with an uncaught parser message.\n- Malformed handoff comments are skipped or reported individually without hiding valid handoffs from other work items.\n- Tests cover malformed local stores, malformed handoff comment JSON blocks, and valid handoffs coexisting with bad records.\n\nVerification:\nRun focused coordination integrate diagnostics tests and npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "diagnostics",
+        "local-provider",
+        "bug",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T21:01:06.401Z",
+      "updatedAt": "2026-05-17T21:01:06.401Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-61",
+        "itemNumber": 61
       }
     }
   ],
@@ -2644,6 +2723,21 @@
         }
       }
     ],
-    "local-58": []
+    "local-58": [
+      {
+        "id": "local-comment-100",
+        "body": "Additional evidence from the 2026-05-17 PLexus parallel worktree wave: DevNexus dependency projection reported optional node_modules support as skipped because /Users/gabriel/dev-nexus/sources/plexus/node_modules was absent. Both worker branches initially could not run tsc or vitest; the coordinator had to run npm ci in each prepared worktree and again in the shared checkout before verification. This should become setup-owned preflight/repair or an explicit blocker before workers start.",
+        "author": null,
+        "createdAt": "2026-05-17T21:01:06.504Z",
+        "updatedAt": "2026-05-17T21:01:06.504Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-100"
+        }
+      }
+    ],
+    "local-59": [],
+    "local-60": [],
+    "local-61": []
   }
 }

@@ -53,6 +53,17 @@ Immediate direction:
     wiring remains intentionally separate.
   - `plexus:local-17` and `plexus:local-18` are now ready as the next safe
     parallel PLexus wave.
+- DevNexus tooling defects found while running the PLexus parallel wave are
+  now tracked:
+  - `dev-nexus:local-59` covers local work-item store concurrency/data
+    integrity after parallel local-provider writes corrupted a JSON store.
+  - `dev-nexus:local-60` covers inconsistent component-qualified work-item id
+    handling in coordination/worktree commands.
+  - `dev-nexus:local-61` covers actionable coordination diagnostics when a
+    tracker store or handoff comment cannot be parsed.
+  - `dev-nexus:local-58` now also carries the PLexus worktree dependency
+    projection evidence where workers lacked `tsc`/`vitest` until setup ran
+    `npm ci`.
 - Current ready `dogfood` work matching the automation selector after the MCP
   repair and PLexus runtime wave:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
@@ -60,6 +71,9 @@ Immediate direction:
   - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
     installs so registry delay or partial installs become setup-owned
     diagnostics instead of worker surprises.
+  - `dev-nexus:local-59` make local work-item store writes concurrency-safe.
+  - `dev-nexus:local-60` normalize component-qualified ids in coordination and
+    worktree tools.
   - `plexus:local-17` use port claims for image MCP allocation.
   - `plexus:local-18` model project-local gateway deployment.
 - GitHub identity dogfood state:
