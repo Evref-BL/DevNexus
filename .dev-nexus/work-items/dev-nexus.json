@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 63,
-  "nextCommentNumber": 103,
-  "updatedAt": "2026-05-17T21:14:51.404Z",
+  "nextNumber": 64,
+  "nextCommentNumber": 104,
+  "updatedAt": "2026-05-17T21:25:23.247Z",
   "items": [
     {
       "id": "local-1",
@@ -1551,6 +1551,30 @@
         "itemId": "local-62",
         "itemNumber": 62
       }
+    },
+    {
+      "id": "local-63",
+      "title": "Make DevNexus-launched Git commands noninteractive",
+      "description": "Type: automation ergonomics defect\nReadiness: autonomous agent-ready (AFK)\nSource: During a dogfood meta-repo rebase on 2026-05-17, `git rebase --continue` opened VS Code on `.git/COMMIT_EDITMSG` because the host global Git `core.editor` is VS Code with `--wait`. Agents should not rely on the human to close editors or complete interactive Git prompts.\n\nGoal: make DevNexus-launched commands noninteractive for Git editor prompts by default.\n\nAcceptance criteria:\n- Agent launch environments set `GIT_EDITOR=true`, `GIT_SEQUENCE_EDITOR=true`, and `GIT_MERGE_AUTOEDIT=no` unless the caller already supplied explicit values.\n- Command-executor environments use the same noninteractive Git defaults.\n- Tests prove existing caller-provided values are preserved and defaults are added when absent.\n- The change does not alter the user's global or repository Git configuration.\n\nVerification:\n- Focused automation environment tests.\n- `npm run check`.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes; publish dogfood prerelease if needed by automation runtime.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "git",
+        "automation",
+        "bug"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T21:18:35.789Z",
+      "updatedAt": "2026-05-17T21:25:23.247Z",
+      "closedAt": "2026-05-17T21:25:23.247Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-63",
+        "itemNumber": 63
+      }
     }
   ],
   "comments": {
@@ -2781,6 +2805,19 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-102"
+        }
+      }
+    ],
+    "local-63": [
+      {
+        "id": "local-comment-103",
+        "body": "Implemented in DevNexus source commit 797be36 and published as @evref-bl/dev-nexus@0.1.0-alpha.14 on the dogfood npm dist-tag.\n\nVerification:\n- npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCommandExecutor.test.ts: passed (13 tests)\n- npm run check: passed (48 files, 330 tests)\n\nNotes:\n- Agent launch and command executor environments now default GIT_EDITOR=true, GIT_SEQUENCE_EDITOR=true, and GIT_MERGE_AUTOEDIT=no.\n- Explicit caller-provided Git prompt environment values are preserved.\n- No global or repository Git config is modified.\n- Project-local runtime package is updated to alpha.14.",
+        "author": null,
+        "createdAt": "2026-05-17T21:25:23.053Z",
+        "updatedAt": "2026-05-17T21:25:23.053Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-103"
         }
       }
     ]

@@ -50,6 +50,13 @@ Immediate direction:
   project-local runtime install now uses alpha.13 directly, and the coordinator
   profile resolves to
   `C:\Users\gabriel.darbord\AppData\Local\OpenAI\Codex\bin\codex.exe`.
+- `dev-nexus:local-63` is complete through DevNexus `797be36` and npm
+  `@evref-bl/dev-nexus@0.1.0-alpha.14`: DevNexus-launched coordinator and
+  command-executor environments now default to `GIT_EDITOR=true`,
+  `GIT_SEQUENCE_EDITOR=true`, and `GIT_MERGE_AUTOEDIT=no` unless explicitly
+  supplied by the caller, so Git rebase/merge continuations do not open a host
+  editor during agent work. The fix does not alter global or repository Git
+  config, and this root's project-local runtime install now uses alpha.14.
 - Project-scoped PLexus runtime work is now active from
   `docs/plexus-project-scoped-runtime-prd.md`:
   - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
@@ -72,8 +79,8 @@ Immediate direction:
   - `dev-nexus:local-58` now also carries the PLexus worktree dependency
     projection evidence where workers lacked `tsc`/`vitest` until setup ran
     `npm ci`.
-- Current ready `dogfood` work matching the automation selector after the MCP
-  repair and PLexus runtime wave:
+- Current ready `dogfood` work matching the automation selector after the MCP,
+  Codex launcher, noninteractive Git, and PLexus runtime repairs:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
   - `dev-nexus:local-58` harden npm dogfood package propagation and runtime
