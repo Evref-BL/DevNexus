@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 55,
-  "nextCommentNumber": 88,
-  "updatedAt": "2026-05-17T16:55:41.547Z",
+  "nextCommentNumber": 89,
+  "updatedAt": "2026-05-17T16:58:00.884Z",
   "items": [
     {
       "id": "local-1",
@@ -1027,7 +1027,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T16:55:41.547Z",
+      "updatedAt": "2026-05-17T16:58:00.884Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2340,6 +2340,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-87"
+        }
+      },
+      {
+        "id": "local-comment-88",
+        "body": "Publication follow-up: bumped and published @evref-bl/dev-nexus@0.1.0-alpha.5 with npm dist-tag dogfood. DevNexus source origin/main is now 9e4e868, so Mac hosts can update with npm install -g @evref-bl/dev-nexus@dogfood and see the explicit Codex Desktop project step.",
+        "author": null,
+        "createdAt": "2026-05-17T16:58:00.884Z",
+        "updatedAt": "2026-05-17T16:58:00.884Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-88"
         }
       }
     ],
