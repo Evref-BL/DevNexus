@@ -94,6 +94,7 @@ describe("nexus automation agent profile command resolution", () => {
         },
       },
       commandName: "schedule",
+      platform: "linux",
     });
 
     expect(resolved).toMatchObject({
@@ -144,6 +145,39 @@ describe("nexus automation agent profile command resolution", () => {
     );
   });
 
+  it("resolves bare Codex profile commands to the local Windows Desktop CLI", () => {
+    const homePath = "C:\\Users\\example";
+    const codexPath =
+      "C:\\Users\\example\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe";
+    const resolved = resolveNexusAutomationAgentCommand({
+      projectRoot: "C:\\dev\\dogfood",
+      platform: "windows",
+      homePath,
+      automationConfig: {
+        ...defaultNexusAutomationConfig,
+        agent: {
+          ...defaultNexusAutomationConfig.agent,
+          coordinatorProfileId: "codex-deep",
+          profiles: [
+            {
+              id: "codex-deep",
+              executor: "codex",
+              model: "gpt-5.5",
+              reasoning: "xhigh",
+              command: "codex",
+              args: ["exec"],
+            },
+          ],
+        },
+      },
+      commandName: "coordinator-loop",
+    });
+
+    expect(resolved.command).toBe(
+      `"${codexPath.replace(/(["\\])/gu, "\\$1")}" exec`,
+    );
+  });
+
   it("quotes profile arguments that need shell grouping", () => {
     expect(
       shellCommandFromProfile({
@@ -155,6 +189,19 @@ describe("nexus automation agent profile command resolution", () => {
         args: ["--model", "Claude Sonnet", "say \"hi\""],
       }),
     ).toBe('claude --model "Claude Sonnet" "say \\"hi\\""');
+  });
+
+  it("quotes resolved profile command paths that need shell grouping", () => {
+    expect(
+      shellCommandFromProfile({
+        id: "codex-local",
+        executor: "codex",
+        model: "gpt-5.5",
+        reasoning: "xhigh",
+        command: "C:\\Program Files\\OpenAI\\Codex\\codex.exe",
+        args: ["exec"],
+      }),
+    ).toBe('"C:\\\\Program Files\\\\OpenAI\\\\Codex\\\\codex.exe" exec');
   });
 
   it("blocks unresolved coordinator profile commands", () => {

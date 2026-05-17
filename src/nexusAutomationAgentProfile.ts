@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type {
   NexusAutomationAgentProfileExecutorMode,
   NexusAutomationAgentProfileIntendedUse,
@@ -6,7 +9,10 @@ import type {
   NexusAutomationCodexAppServerConfig,
   NexusAutomationSafetyConfig,
 } from "./nexusAutomationConfig.js";
-import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import {
+  normalizeNexusPathPlatform,
+  resolveNexusProjectPath,
+} from "./nexusPathResolver.js";
 import type {
   NexusPathHostPlatform,
   NexusPathStyle,
@@ -207,12 +213,9 @@ export function shellCommandFromProfile(
   profile: NexusAutomationAgentProfileConfig,
   options: ShellCommandFromProfileOptions = {},
 ): string {
-  const command = resolveProfileToken(
-    requiredNonEmptyString(profile.command, "profile.command"),
-    options,
-  );
+  const command = resolveProfileCommand(profile, options);
   return [
-    command,
+    shellQuoteArgument(command),
     ...profile.args.map((arg) =>
       shellQuoteArgument(resolveProfileToken(arg, options)),
     ),
@@ -293,4 +296,52 @@ function resolveProfileToken(
 
 function isPortableProjectPathExpression(value: string): boolean {
   return /^(projectRoot|projectParent|home|sourcesRoot):/u.test(value);
+}
+
+function resolveProfileCommand(
+  profile: NexusAutomationAgentProfileConfig,
+  options: ShellCommandFromProfileOptions,
+): string {
+  const command = requiredNonEmptyString(profile.command, "profile.command");
+  if (
+    requiredNonEmptyString(profile.executor, "profile.executor") === "codex" &&
+    command === "codex"
+  ) {
+    return resolveLocalCodexCommand(command, options);
+  }
+
+  return resolveProfileToken(command, options);
+}
+
+function resolveLocalCodexCommand(
+  fallback: string,
+  options: ShellCommandFromProfileOptions,
+): string {
+  const platform = normalizeNexusPathPlatform(options.platform);
+  if (platform !== "windows") {
+    return fallback;
+  }
+
+  const explicit = process.env.DEV_NEXUS_CODEX_COMMAND?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const localAppData = options.homePath
+    ? path.win32.join(options.homePath, "AppData", "Local")
+    : process.env.LOCALAPPDATA ??
+      path.win32.join(os.homedir(), "AppData", "Local");
+  const candidate = path.win32.join(
+    localAppData,
+    "OpenAI",
+    "Codex",
+    "bin",
+    "codex.exe",
+  );
+
+  if (options.homePath) {
+    return candidate;
+  }
+
+  return fs.existsSync(candidate) ? candidate : fallback;
 }

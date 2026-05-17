@@ -2358,9 +2358,10 @@ describe("dev-nexus cli", () => {
       status: "completed",
       summary: "Coordinator profile launched",
     });
-    expect(commandRuns).toEqual([
-      'codex exec --model gpt-5.5 --reasoning-effort xhigh "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
-    ]);
+    expect(commandRuns).toHaveLength(1);
+    expect(commandRuns[0]).toMatch(
+      /(?:^codex|codex\.exe") exec --model gpt-5\.5 --reasoning-effort xhigh "Use DEV_NEXUS_AGENT_CONTEXT_FILE\."$/u,
+    );
   });
 
   it("adopts and records current-agent automation through the CLI", async () => {
