@@ -152,7 +152,7 @@ export function buildNexusSetupPlan(options: {
     nextActions:
       flow.id === "join-existing-project"
         ? [
-            "Install prerequisites, then clone or update the shared DevNexus meta repository.",
+            "Install prerequisites, then choose a fresh DevNexus project root and clone or update the shared meta repository there.",
             "Configure human and automation GitHub auth profiles before allowing pushes.",
             "Run setup check again and address blocked component source roots or MCP projection gaps.",
           ]
@@ -387,13 +387,18 @@ function joinExistingProjectSteps(options: {
       title: "Clone or update the shared meta repository",
       kind: "manual",
       scope: "host-local",
-      summary: "Bring the shared DevNexus meta project onto this machine without changing component source repos.",
+      summary:
+        `Create or reuse the DevNexus project root at ${projectRootForPlatform}; this directory is the shared meta project checkout, not a component source checkout.`,
       commands: [
+        makeDirectoryCommand(path.dirname(projectRootForPlatform), options.platform),
         `git clone ${humanRemote} ${shellPathPlaceholder(projectRootForPlatform)}`,
         `cd ${shellPathPlaceholder(projectRootForPlatform)}`,
         "git pull --ff-only",
       ],
       manualInstructions: [
+        `Use ${projectRootForPlatform} as the fresh DevNexus project directory on this machine unless you intentionally chose another empty location.`,
+        "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
+        "Do not clone the meta project inside a component source checkout; component sources are prepared in a later step.",
         "Use your human account for the normal origin remote when the repo is private and you are a collaborator.",
         "If this directory already exists, inspect dirty state before pulling.",
       ],
@@ -646,7 +651,7 @@ function planProjectRootPath(
   }
 
   if (platform === "windows") {
-    return `%USERPROFILE%\\dev-nexus\\${projectConfig.id}`;
+    return `$env:USERPROFILE\\dev-nexus\\${projectConfig.id}`;
   }
 
   return `$HOME/dev-nexus/${projectConfig.id}`;
@@ -664,10 +669,21 @@ function componentPlanSourceRoot(
   }
 
   if (platform === "windows") {
-    return `%USERPROFILE%\\dev-nexus\\sources\\${component.id}`;
+    return `$env:USERPROFILE\\dev-nexus\\sources\\${component.id}`;
   }
 
   return `$HOME/dev-nexus/sources/${component.id}`;
+}
+
+function makeDirectoryCommand(
+  directoryPath: string,
+  platform: NexusSetupPlatform,
+): string {
+  if (platform === "windows") {
+    return `New-Item -ItemType Directory -Force -Path ${shellPathPlaceholder(directoryPath)}`;
+  }
+
+  return `mkdir -p ${shellPathPlaceholder(directoryPath)}`;
 }
 
 function isPathIncompatibleWithPlatform(

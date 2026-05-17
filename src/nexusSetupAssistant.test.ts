@@ -99,9 +99,19 @@ describe("nexus setup assistant", () => {
         kind: "manual",
         scope: "host-local",
       });
+    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-meta-repo")!;
+    expect(cloneStep.summary).toContain("DevNexus project root");
+    expect(cloneStep.summary).toContain("not a component source checkout");
+    expect(cloneStep.commands).toContain("mkdir -p $HOME/dev-nexus");
+    expect(cloneStep.commands).toContain(
+      "git clone git@github.com:Gabot-Darbot/mac-demo.git $HOME/dev-nexus/mac-demo",
+    );
+    expect(cloneStep.manualInstructions).toContain(
+      "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
+    );
     expect(JSON.stringify(plan)).not.toContain("gho_");
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
-    expect(plan.nextActions[0]).toContain("Install prerequisites");
+    expect(plan.nextActions[0]).toContain("fresh DevNexus project root");
   });
 
   it("resolves automatic platform selection to the current host", () => {

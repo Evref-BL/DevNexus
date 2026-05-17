@@ -75,8 +75,11 @@ configuration with machine-local secrets or paths.
 For a Mac joining an existing project:
 
 ```bash
-dev-nexus setup plan <project-root> join-existing-project --platform macos
-dev-nexus setup check <project-root> join-existing-project --platform macos
+mkdir -p "$HOME/dev-nexus"
+git clone <meta-repo-url> "$HOME/dev-nexus/<project-id>"
+cd "$HOME/dev-nexus/<project-id>"
+dev-nexus setup plan . join-existing-project --platform macos
+dev-nexus setup check . join-existing-project --platform macos
 ```
 
 The plan covers prerequisite installs, human GitHub authentication, isolated
@@ -85,6 +88,10 @@ refresh, skill projection, and final preflight. When shared project metadata
 contains OS-local source roots from another machine, the Mac plan uses
 host-local placeholders and the check reports the component path configuration
 as blocked instead of treating the other machine's path as valid.
+
+The cloned meta repository directory is the DevNexus project root. Keep it
+separate from component source checkouts; component repositories are cloned or
+verified by the setup flow in a later step.
 
 ## Project Template Shape
 
