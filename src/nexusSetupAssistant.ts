@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
+import { expectedNexusProjectHostingRemotes } from "./nexusProjectHosting.js";
 import { analyzeNexusProjectPath } from "./nexusPathResolver.js";
 import type {
   NexusPluginMcpServerCapability,
@@ -389,14 +390,75 @@ function projectSummary(
   };
 }
 
+interface MetaProjectRemotePlan {
+  humanRemote: string;
+  botRemote: string;
+  automationAuthProfileDirectory: string;
+  automationSshHost: string;
+}
+
+function metaProjectRemotePlan(
+  projectConfig: NexusProjectConfig,
+): MetaProjectRemotePlan {
+  if (projectConfig.hosting) {
+    const remotes = expectedNexusProjectHostingRemotes({
+      project: projectConfig,
+      hosting: projectConfig.hosting,
+    });
+    const humanRemote =
+      remotes.find((remote) => remote.role === "human") ??
+      remotes.find((remote) => remote.name === "origin") ??
+      remotes[0]!;
+    const botRemote =
+      remotes.find((remote) => remote.role === "automation") ??
+      remotes.find((remote) => remote.name === "bot") ??
+      humanRemote;
+
+    return {
+      humanRemote: humanRemote.url,
+      botRemote: botRemote.url,
+      automationAuthProfileDirectory: authProfileConfigDirectory(
+        botRemote.authProfile,
+      ),
+      automationSshHost:
+        sshHostFromGitRemote(botRemote.url) ?? "<automation-ssh-host>",
+    };
+  }
+
+  const metaRemote = projectConfig.repo.remoteUrl ?? "<meta-repo-url>";
+  const botRemote = metaRemote;
+  return {
+    humanRemote: humanRemoteFromAutomationRemote(metaRemote),
+    botRemote,
+    automationAuthProfileDirectory: authProfileConfigDirectory(null),
+    automationSshHost: sshHostFromGitRemote(botRemote) ?? "<automation-ssh-host>",
+  };
+}
+
+function authProfileConfigDirectory(authProfile: string | null): string {
+  const safeProfile = (authProfile ?? "automation-github")
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+  return `gh-${safeProfile || "automation-github"}`;
+}
+
+function sshHostFromGitRemote(remoteUrl: string): string | null {
+  const match = /^git@([^:]+):/u.exec(remoteUrl);
+  return match?.[1] ?? null;
+}
+
 function joinExistingProjectSteps(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   platform: NexusSetupPlatform;
 }): NexusSetupStep[] {
-  const metaRemote = options.projectConfig.repo.remoteUrl ?? "<meta-repo-url>";
-  const humanRemote = humanRemoteFromAutomationRemote(metaRemote);
-  const botRemote = metaRemote;
+  const {
+    humanRemote,
+    botRemote,
+    automationAuthProfileDirectory,
+    automationSshHost,
+  } = metaProjectRemotePlan(options.projectConfig);
   const devNexusCommand = "dev-nexus";
   const projectRootForPlatform = planProjectRootPath(
     options.projectRoot,
@@ -476,19 +538,19 @@ function joinExistingProjectSteps(options: {
       summary: "Create or verify the isolated GitHub CLI and SSH profile used by the bot or app actor.",
       commands: platformCommands(options.platform, {
         macos: [
-          "mkdir -p \"$HOME/.config/gh-gabot\" \"$HOME/.ssh\"",
-          "GH_CONFIG_DIR=\"$HOME/.config/gh-gabot\" gh auth login --hostname github.com --git-protocol ssh --web",
-          "ssh -T git@github.com-gabot",
+          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
+          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
         windows: [
-          "New-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.config\\gh-gabot\"",
-          "$env:GH_CONFIG_DIR=\"$env:USERPROFILE\\.config\\gh-gabot\"; gh auth login --hostname github.com --git-protocol ssh --web",
-          "ssh -T git@github.com-gabot",
+          `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"`,
+          `$env:GH_CONFIG_DIR="$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"; gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
         linux: [
-          "mkdir -p \"$HOME/.config/gh-gabot\" \"$HOME/.ssh\"",
-          "GH_CONFIG_DIR=\"$HOME/.config/gh-gabot\" gh auth login --hostname github.com --git-protocol ssh --web",
-          "ssh -T git@github.com-gabot",
+          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
+          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
       }),
       manualInstructions: [
@@ -496,7 +558,7 @@ function joinExistingProjectSteps(options: {
         "If using an SSH host alias, configure it in ~/.ssh/config before validating the bot remote.",
       ],
       checks: [
-        "GH_CONFIG_DIR=\"$HOME/.config/gh-gabot\" gh auth status --hostname github.com",
+        `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth status --hostname github.com`,
         `git ls-remote ${botRemote} HEAD`,
       ],
     },
@@ -606,7 +668,11 @@ function githubMetaProjectSteps(options: {
   projectConfig: NexusProjectConfig;
   platform: NexusSetupPlatform;
 }): NexusSetupStep[] {
-  const metaRemote = options.projectConfig.repo.remoteUrl ?? "<meta-repo-url>";
+  const {
+    botRemote,
+    automationAuthProfileDirectory,
+    automationSshHost,
+  } = metaProjectRemotePlan(options.projectConfig);
   return [
     {
       id: "choose-hosting-namespace",
@@ -629,16 +695,19 @@ function githubMetaProjectSteps(options: {
       summary: "Configure SSH and GitHub CLI auth for the selected automation actor.",
       commands: platformCommands(options.platform, {
         macos: [
-          "mkdir -p \"$HOME/.config/gh-gabot\" \"$HOME/.ssh\"",
-          "GH_CONFIG_DIR=\"$HOME/.config/gh-gabot\" gh auth login --hostname github.com --git-protocol ssh --web",
+          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
+          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
         windows: [
-          "New-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.config\\gh-gabot\"",
-          "$env:GH_CONFIG_DIR=\"$env:USERPROFILE\\.config\\gh-gabot\"; gh auth login --hostname github.com --git-protocol ssh --web",
+          `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"`,
+          `$env:GH_CONFIG_DIR="$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"; gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
         linux: [
-          "mkdir -p \"$HOME/.config/gh-gabot\" \"$HOME/.ssh\"",
-          "GH_CONFIG_DIR=\"$HOME/.config/gh-gabot\" gh auth login --hostname github.com --git-protocol ssh --web",
+          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
+          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+          `ssh -T git@${automationSshHost}`,
         ],
       }),
       manualInstructions: [
@@ -653,13 +722,13 @@ function githubMetaProjectSteps(options: {
       scope: "host-local",
       summary: "Create or connect the shared private meta repository according to project policy.",
       commands: [
-        `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${metaRemote} || git remote add bot ${metaRemote}`,
+        `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
         "git push bot main",
       ],
       manualInstructions: [
         "Only create or push the remote when project policy allows the configured automation actor to do so.",
       ],
-      checks: [`git ls-remote ${metaRemote} HEAD`],
+      checks: [`git ls-remote ${botRemote} HEAD`],
     },
   ];
 }
@@ -1103,8 +1172,9 @@ function summarizeCheckStatus(checks: NexusSetupCheckResult[]): NexusSetupCheckS
 }
 
 function humanRemoteFromAutomationRemote(remote: string): string {
-  if (remote.startsWith("git@github.com-gabot:")) {
-    return remote.replace("git@github.com-gabot:", "git@github.com:");
+  const sshRemote = /^git@([^:]+):(.+)$/u.exec(remote);
+  if (sshRemote?.[1]?.startsWith("github.com-")) {
+    return `git@github.com:${sshRemote[2]}`;
   }
   return remote;
 }

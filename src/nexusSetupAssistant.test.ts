@@ -153,6 +153,56 @@ describe("nexus setup assistant", () => {
     expect(plan.platform).not.toBe("auto");
   });
 
+  it("uses configured meta-project hosting remotes in setup guidance", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-hosting-remotes-");
+    writeProject(projectRoot, {
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          nameTemplate: "{projectId}",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "bot",
+            role: "automation",
+            protocol: "ssh",
+            authProfile: "bot-github",
+            sshHost: "github.com-example-bot",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-meta-repo")!;
+    const remotesStep = plan.steps.find((step) => step.id === "configure-meta-remotes")!;
+
+    expect(cloneStep.commands).toContain(
+      "git clone git@github.com:ExampleOrg/mac-demo.git $HOME/dev-nexus/mac-demo",
+    );
+    expect(remotesStep.commands).toContain(
+      "git remote set-url origin git@github.com:ExampleOrg/mac-demo.git",
+    );
+    expect(remotesStep.commands).toContain(
+      "git remote get-url bot >/dev/null 2>&1 && git remote set-url bot git@github.com-example-bot:ExampleOrg/mac-demo.git || git remote add bot git@github.com-example-bot:ExampleOrg/mac-demo.git",
+    );
+  });
+
   it("keeps OS-local Windows component paths out of Mac setup commands", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-mac-paths-");
     writeProject(projectRoot, {

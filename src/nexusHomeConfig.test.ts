@@ -91,6 +91,71 @@ describe("home config primitives", () => {
     });
   });
 
+  it("validates host-local hosting auth profiles without storing shared secrets", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
+
+    expect(
+      createDefaultNexusHomeConfigBase(homePath, {
+        authProfiles: [
+          {
+            id: "human-github",
+            provider: "github",
+            kind: "human",
+            account: "alice",
+            host: "github.com",
+          },
+          {
+            id: "bot-github",
+            provider: "github",
+            kind: "automation",
+            account: "example-bot",
+            sshHost: "github.com-example-bot",
+            githubCliConfigDir: path.join(homePath, "gh-example-bot"),
+            command: "gh-example-bot",
+          },
+        ],
+      }).authProfiles,
+    ).toEqual([
+      {
+        id: "human-github",
+        provider: "github",
+        kind: "human",
+        account: "alice",
+        host: "github.com",
+      },
+      {
+        id: "bot-github",
+        provider: "github",
+        kind: "automation",
+        account: "example-bot",
+        sshHost: "github.com-example-bot",
+        githubCliConfigDir: path.join(homePath, "gh-example-bot"),
+        command: "gh-example-bot",
+      },
+    ]);
+
+    expect(() =>
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        authProfiles: [
+          {
+            id: "bot-github",
+            provider: "github",
+          },
+          {
+            id: "bot-github",
+            provider: "github",
+          },
+        ],
+        projects: [],
+      }),
+    ).toThrow(/Auth profile id is duplicated/);
+  });
+
   it("validates project registry entries and rejects duplicate ids", () => {
     const config = createDefaultNexusHomeConfigBase(makeTempDir("dev-nexus-home-"));
     config.projects = [

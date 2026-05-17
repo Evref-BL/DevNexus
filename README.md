@@ -117,6 +117,87 @@ equivalent user directory on Windows. Legacy absolute paths still work on the
 matching OS, but setup checks report foreign absolute paths as blocked for a
 new machine.
 
+## Meta-Project Hosting
+
+`dev-nexus.project.json` can describe where the shared DevNexus meta-project
+repository should live without storing credentials in the shared checkout. The
+top-level `hosting` record is portable intent: provider, namespace, repository
+name policy, visibility, default branch, expected remotes, and whether
+DevNexus may create a missing remote repository when a separately approved live
+provisioning policy allows it.
+
+Example shared config:
+
+```json
+{
+  "hosting": {
+    "provider": "github",
+    "namespace": "example-devnexus",
+    "repository": {
+      "nameTemplate": "{projectId}",
+      "visibility": "private",
+      "defaultBranch": "main"
+    },
+    "authProfile": "human-github",
+    "remotes": [
+      {
+        "name": "origin",
+        "role": "human",
+        "protocol": "ssh"
+      },
+      {
+        "name": "bot",
+        "role": "automation",
+        "protocol": "ssh",
+        "authProfile": "bot-github"
+      }
+    ],
+    "provisioning": {
+      "allowCreate": false
+    }
+  }
+}
+```
+
+Host-local auth profile records belong in the user's DevNexus home config or a
+host override, not in the shared project. They can name local SSH aliases,
+GitHub CLI config directories, or wrapper commands, but tokens, app keys, SSH
+private keys, and absolute credential paths should remain local to that host.
+
+Example host-local auth profile shape:
+
+```json
+{
+  "authProfiles": [
+    {
+      "id": "bot-github",
+      "provider": "github",
+      "kind": "automation",
+      "account": "example-bot",
+      "sshHost": "github.com-example-bot",
+      "githubCliConfigDir": "/home/alice/.config/gh-example-bot"
+    }
+  ]
+}
+```
+
+Recommended setups:
+
+- Dedicated machine-user repository: simple for dogfood automation and works
+  well with separate `origin` and `bot` remotes, but the machine user must be
+  managed like a real account.
+- Private organization repository: better for teams and ownership transfer;
+  grant the human users and automation account only the repository permissions
+  they need.
+- GitHub App installation: preferable later for scoped automation, rotation,
+  and auditability, but it needs an installation flow and host-local app
+  credential handling before live provisioning is enabled.
+
+Hosting preflight should use a provider adapter. Normal tests use mocked
+GitHub responses for repository existence, visibility/default-branch mismatch,
+actor permissions, and missing host-local auth profiles. Live repository
+creation remains policy-gated and is not part of the default check path.
+
 ## Project Template Shape
 
 The generic project scaffold separates project-owned support state from
@@ -131,6 +212,7 @@ terms used by the code:
 | Target state | `automation.target.statePath`, defaulting to `.dev-nexus/automation/target-state.md` | User-authored target memory, not overwritten by refresh |
 | Skills | `.dev-nexus/skills/`, optional `.agents/skills/` or `.claude/skills/` projections | Generated from curated or extension skill definitions |
 | Plugin capabilities | `dev-nexus.project.json` `plugins` records | User-authored additive capability metadata projected into agent context |
+| Meta-project hosting | `dev-nexus.project.json` `hosting` record plus host-local auth profiles | Shared repository intent without shared credentials |
 | Agent MCP projection | `.codex/config.toml`, `.mcp.json`, or configured agent target paths | Generated from `mcp.agentTargets` |
 
 Component worktree roots are component-scoped even when a project has one
