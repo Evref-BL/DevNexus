@@ -6,8 +6,10 @@ import { main } from "./cli.js";
 import {
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
+  loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
+  readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
   type GitCommandResult,
@@ -2018,6 +2020,115 @@ describe("dev-nexus cli", () => {
     expect(commandRuns).toEqual([
       'codex exec --model gpt-5.5 --reasoning-effort xhigh "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
     ]);
+  });
+
+  it("adopts and records current-agent automation through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          ...config.automation!.agent,
+          maxConcurrentSubagents: 2,
+        },
+      },
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Current-agent CLI task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const adoptOutput = captureOutput();
+    const recordOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "current-agent",
+        "adopt",
+        projectRoot,
+        "--run-id",
+        "current-cli-1",
+        "--owner",
+        "heartbeat",
+        "--json",
+      ],
+      {
+        stdout: adoptOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+
+    const adoption = JSON.parse(adoptOutput.output());
+    expect(adoption).toMatchObject({
+      ok: true,
+      status: "started",
+      shouldProceed: true,
+      environment: {
+        DEV_NEXUS_CURRENT_AGENT_ADOPTION: "true",
+        DEV_NEXUS_RUN_ID: "current-cli-1",
+        DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS: "2",
+      },
+      result: {
+        statuses: ["completed", "failed", "blocked", "skipped"],
+      },
+    });
+
+    await main(
+      [
+        "automation",
+        "current-agent",
+        "record",
+        projectRoot,
+        "--run-id",
+        "current-cli-1",
+        "--status",
+        "skipped",
+        "--summary",
+        "Current coordinator skipped after review",
+        "--verification-command",
+        "npm test",
+        "--verification-status",
+        "not_run",
+        "--verification-summary",
+        "not needed",
+        "--json",
+      ],
+      {
+        stdout: recordOutput.writer,
+        now: fixedClock("2026-05-16T10:05:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(recordOutput.output())).toMatchObject({
+      ok: true,
+      status: "skipped",
+      summary: "Current coordinator skipped after review",
+      resultFile: adoption.resultFile,
+    });
+    expect(
+      readNexusAutomationRunLedger(
+        projectRoot,
+        loadProjectConfig(projectRoot).automation!,
+      ).runs.at(-1),
+    ).toMatchObject({
+      id: "current-cli-1",
+      status: "skipped",
+      verification: [
+        {
+          command: "npm test",
+          status: "not_run",
+        },
+      ],
+    });
   });
 
   it("schedules bounded automation through the command executor", async () => {
