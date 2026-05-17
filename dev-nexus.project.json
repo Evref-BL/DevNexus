@@ -431,7 +431,7 @@
             "C:\\Users\\gabriel.darbord\\Documents\\Pharo\\images\\MCP12-2\\pharo-local\\iceberg\\Evref-BL\\MCP",
             "--output-last-message",
             ".dev-nexus\\automation\\last-codex-message.md",
-            "Use the DevNexus dogfood coordinator instructions in AGENTS.md. Read DEV_NEXUS_AGENT_CONTEXT_FILE, choose a safe bounded batch from eligible work items, update work items and target cycle records, and write JSON to DEV_NEXUS_AGENT_RESULT_FILE before exiting."
+            "Use the DevNexus dogfood coordinator instructions in AGENTS.md. Read DEV_NEXUS_AGENT_CONTEXT_FILE, inspect DevNexus eligible work and agent profiles, choose the largest safe bounded batch from eligible work items, and use parallel subagents for independent items when useful, respecting DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS and disjoint component/worktree write scopes. Update work items and target cycle records, supervise subagent results, verify and publish according to component policy, and write JSON to DEV_NEXUS_AGENT_RESULT_FILE before exiting."
           ]
         },
         {

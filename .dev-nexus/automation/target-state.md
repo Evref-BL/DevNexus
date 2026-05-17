@@ -31,6 +31,12 @@ Immediate direction:
   PLexus/pharo-launcher-mcp/Pharo smoke work may proceed inside that profile.
   Live external provider posting remains blocked unless a work item records
   explicit provider-policy approval.
+- The Codex cron automation is a thin scheduler for
+  `dev-nexus automation run-once`; DevNexus owns coordinator launch context,
+  result files, target-cycle facts, and the subagent cap. The launched
+  coordinator should use parallel subagents for independent selected items when
+  useful, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS=8` and disjoint
+  component/worktree write scopes.
 - Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
