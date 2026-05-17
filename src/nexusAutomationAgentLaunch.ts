@@ -166,6 +166,24 @@ export interface NexusAutomationAgentLaunchResult {
   verification?: WorktreeVerificationInput[];
   publicationDecision?: WorktreePublicationDecisionInput;
   error?: string | null;
+  codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata;
+}
+
+export interface NexusAutomationCodexAppServerLaunchMetadata {
+  provider: "codex-app-server";
+  status: "started" | "failed";
+  action: "thread_start" | "thread_fork";
+  runId: string;
+  profileId: string;
+  threadId: string | null;
+  turnId: string | null;
+  sourceThreadId: string | null;
+  sourceTurnId: string | null;
+  ephemeral: boolean;
+  cwd: string;
+  model: string | null;
+  reasoning: string | null;
+  failureSummary: string | null;
 }
 
 export type NexusAutomationAgentLauncher = (
@@ -770,13 +788,26 @@ function preflightNexusAutomationAgentPolicy(
       `Coordinator profile ${coordinatorProfile.id} intendedUse allows coordinator launch`,
       `automation.agent.profiles.${coordinatorProfile.id}.intendedUse must be coordinator or any for coordinator launch`,
     ),
-    check(
-      `agentProfile:${coordinatorProfile.id}:command`,
-      coordinatorProfile.command !== null,
-      `Coordinator profile ${coordinatorProfile.id} command is configured`,
-      `automation.agent.profiles.${coordinatorProfile.id}.command must be configured for coordinator launch`,
-    ),
   );
+  if (coordinatorProfile.executorMode === "app_server") {
+    checks.push(
+      check(
+        `agentProfile:${coordinatorProfile.id}:appServer`,
+        coordinatorProfile.appServer !== undefined,
+        `Coordinator profile ${coordinatorProfile.id} app-server policy is configured`,
+        `automation.agent.profiles.${coordinatorProfile.id}.appServer must be configured for app-server launch`,
+      ),
+    );
+  } else {
+    checks.push(
+      check(
+        `agentProfile:${coordinatorProfile.id}:command`,
+        coordinatorProfile.command !== null,
+        `Coordinator profile ${coordinatorProfile.id} command is configured`,
+        `automation.agent.profiles.${coordinatorProfile.id}.command must be configured for coordinator launch`,
+      ),
+    );
+  }
 
   return checks;
 }
