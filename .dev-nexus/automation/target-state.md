@@ -27,6 +27,10 @@ Immediate direction:
   - `dev-nexus:local-38` add publication identity and remote guardrails so
     DevNexus can prevent GitHub account/remote mix-ups before automated pushes
     or provider writes.
+  - `dev-nexus:local-39` add first-class meta-project hosting configuration so
+    DevNexus can describe the GitHub user/org namespace, repo naming,
+    visibility, remote names, repo provisioning policy, and host-local auth
+    profile reference for shared meta repositories.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -37,6 +41,8 @@ Immediate direction:
   - Until `dev-nexus:local-38` lands, agents must not infer the right account
     from the active browser or default `gh`; automation should use explicit
     remotes/wrappers.
+  - Until `dev-nexus:local-39` lands, the current bot-owned repo is a working
+    dogfood setup, not yet the portable DevNexus project-hosting model.
 - The five-agent DevNexus wave completed and was published through DevNexus
   `d0db6af`:
   - `dev-nexus:local-17` added draft-only/mocked `coordination_request`

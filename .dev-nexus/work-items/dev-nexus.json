@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 39,
-  "nextCommentNumber": 71,
-  "updatedAt": "2026-05-17T13:36:16.678Z",
+  "nextNumber": 40,
+  "nextCommentNumber": 72,
+  "updatedAt": "2026-05-17T13:47:22.062Z",
   "items": [
     {
       "id": "local-1",
@@ -922,13 +922,39 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:36:16.678Z",
-      "updatedAt": "2026-05-17T13:36:16.678Z",
+      "updatedAt": "2026-05-17T13:47:22.062Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-38",
         "itemNumber": 38
+      }
+    },
+    {
+      "id": "local-39",
+      "title": "Add meta-project hosting configuration",
+      "description": "Type: meta-project hosting configuration slice\nReadiness: autonomous agent-ready (AFK) for config/schema/docs and mocked GitHub provider behavior; human-in-the-loop (HITL) for any live org/account/repository provisioning.\nSource discussion: DevNexus meta projects should be pushable/shareable through a configured GitHub owner/namespace, such as a dedicated bot account repository or a private organization. The hosting namespace, repository naming policy, visibility, default branch, and automation actor should be DevNexus-managed project configuration rather than ad hoc local Git setup.\n\nGoal: add first-class DevNexus configuration for where shared meta-project repositories live and how they are provisioned, without storing secrets in shared project state.\n\nAcceptance criteria:\n- DevNexus project config can describe a meta-project hosting target: provider, owner/namespace, repository naming convention, visibility, default branch, remote names, and whether DevNexus may create the remote repository automatically.\n- The hosting target can represent either a user-owned machine-account namespace such as `Gabot-Darbot` or a private organization namespace, without changing the rest of the project model.\n- Config separates portable hosting intent from host-local authentication material. Shared config may reference a named auth profile, but tokens, app keys, SSH private keys, and absolute credential paths stay in host-local config/overrides.\n- DevNexus can generate or validate the expected meta repo remote URLs for human and automation remotes, such as personal `origin` plus bot `bot`, without requiring agents to choose manually.\n- DevNexus can preflight whether the remote repo exists and whether the configured actor appears to have the required read/write/admin capability; live creation remains policy-gated.\n- Documentation explains recommended setups: dedicated machine-user account repo, private organization repo, and later GitHub App installation, including tradeoffs for multi-host dogfood.\n- Mocked provider tests cover repo-name derivation, remote generation, missing repo, permission mismatch, and host-local auth profile lookup failure.\n\nBoundaries:\n- Do not hard-code Gabot-Darbot, Gabriel-Darbord, or one GitHub organization into DevNexus core; use examples only in docs/fixtures.\n- Do not require a real GitHub token or live repo creation in normal tests.\n- Keep provider-specific GitHub details behind a hosting/provider adapter so GitLab can be added later.\n- Do not conflate source component publication with meta-project hosting; source repos may remain in an upstream organization while meta repos live in a DevNexus-owned namespace.\n\nRelationship:\n- Complements `dev-nexus:local-38`, which guards the actor/remote used for publication and provider writes. This item owns where meta repositories are configured/provisioned.\n\nVerification:\n- Focused project config/schema tests.\n- Focused hosting/remote-generation tests with mocked provider responses.\n- Focused docs/example validation if available.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "meta-project",
+        "github",
+        "auth-profiles",
+        "project-config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:46:52.140Z",
+      "updatedAt": "2026-05-17T13:46:52.140Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-39",
+        "itemNumber": 39
       }
     }
   ],
@@ -1772,6 +1798,19 @@
     "local-35": [],
     "local-36": [],
     "local-37": [],
-    "local-38": []
+    "local-38": [
+      {
+        "id": "local-comment-71",
+        "body": "Related planning update: `dev-nexus:local-39` now owns first-class meta-project hosting configuration: provider, owner/namespace, repo naming, visibility, remote generation, and host-local auth profile references. Keep this item focused on publication/provider-write guardrails: expected actor, expected remote, observed account checks, and blocking mismatches before mutation.",
+        "author": null,
+        "createdAt": "2026-05-17T13:47:22.062Z",
+        "updatedAt": "2026-05-17T13:47:22.062Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-71"
+        }
+      }
+    ],
+    "local-39": []
   }
 }
