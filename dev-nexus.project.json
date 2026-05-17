@@ -4,8 +4,8 @@
   "name": "DevNexus Dogfood",
   "home": null,
   "repo": {
-    "kind": "local",
-    "remoteUrl": null,
+    "kind": "git",
+    "remoteUrl": "git@github.com-gabot:Gabot-Darbot/dev-nexus-dogfood.git",
     "defaultBranch": "main"
   },
   "worktreesRoot": "worktrees",
@@ -476,7 +476,7 @@
     },
     "publication": {
       "strategy": "direct_integration",
-      "remote": "origin",
+      "remote": "bot",
       "targetBranch": "main",
       "push": true
     }

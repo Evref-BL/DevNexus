@@ -24,6 +24,19 @@ Immediate direction:
   - `dev-nexus:local-37` provide JavaScript/TypeScript toolchain support for
     generated worker worktrees so subagents can run focused npm checks without
     ad hoc installs.
+  - `dev-nexus:local-38` add publication identity and remote guardrails so
+    DevNexus can prevent GitHub account/remote mix-ups before automated pushes
+    or provider writes.
+- GitHub identity dogfood state:
+  - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
+  - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
+    `GH_CONFIG_DIR=C:\Users\gabriel.darbord\.config\gh-gabot` and authenticates
+    as `Gabot-Darbot` for bot API work.
+  - The dogfood meta repo uses `origin` for personal SSH access and `bot` for
+    `git@github.com-gabot:Gabot-Darbot/dev-nexus-dogfood.git`.
+  - Until `dev-nexus:local-38` lands, agents must not infer the right account
+    from the active browser or default `gh`; automation should use explicit
+    remotes/wrappers.
 - The five-agent DevNexus wave completed and was published through DevNexus
   `d0db6af`:
   - `dev-nexus:local-17` added draft-only/mocked `coordination_request`
