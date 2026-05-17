@@ -83,6 +83,18 @@ import {
   type NexusCoordinationRequestStatus,
 } from "./nexusCoordinationRequest.js";
 import {
+  buildNexusSetupCheck,
+  buildNexusSetupPlan,
+  listNexusSetupFlows,
+  recordNexusSetupStep,
+  type NexusSetupCheck,
+  type NexusSetupFlowSummary,
+  type NexusSetupPlan,
+  type NexusSetupPlatform,
+  type NexusSetupRecordedStepStatus,
+  type RecordNexusSetupStepResult,
+} from "./nexusSetupAssistant.js";
+import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
@@ -210,6 +222,33 @@ interface ParsedProjectTrackerLinkCommand {
   homePath?: string;
   project: string;
   trackerProjectId: string;
+  json?: boolean;
+}
+
+interface ParsedSetupListCommand {
+  json?: boolean;
+}
+
+interface ParsedSetupPlanCommand {
+  projectRoot: string;
+  flowId: string;
+  platform?: NexusSetupPlatform;
+  json?: boolean;
+}
+
+interface ParsedSetupCheckCommand {
+  projectRoot: string;
+  flowId: string;
+  platform?: NexusSetupPlatform;
+  json?: boolean;
+}
+
+interface ParsedSetupRecordCommand {
+  projectRoot: string;
+  flowId: string;
+  stepId: string;
+  status: NexusSetupRecordedStepStatus;
+  note?: string | null;
   json?: boolean;
 }
 
@@ -429,6 +468,10 @@ export function usage(): string {
     "  dev-nexus project mcp refresh <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
+    "  dev-nexus setup list [options]",
+    "  dev-nexus setup plan <project-root> <flow-id> [options]",
+    "  dev-nexus setup check <project-root> <flow-id> [options]",
+    "  dev-nexus setup record <project-root> <flow-id> <step-id> --status <status> [options]",
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
@@ -494,6 +537,12 @@ export function usage(): string {
     "Options for project tracker link:",
     "  --home <path>",
     "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for setup:",
+    "  --platform <auto|macos|windows|linux>",
+    "  --status <pending|completed|blocked|skipped>",
+    "  --note <text>",
     "  --json",
     "",
     "Options for coordination status:",
@@ -693,6 +742,9 @@ export async function main(
   if (argv[0] === "project") {
     return handleProjectCommand(argv, dependencies);
   }
+  if (argv[0] === "setup") {
+    return handleSetupCommand(argv, dependencies);
+  }
   if (argv[0] === "coordination") {
     return handleCoordinationCommand(argv, dependencies);
   }
@@ -708,7 +760,7 @@ export async function main(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, coordination, work-item, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, coordination, work-item, automation, mcp-stdio, or --help",
   );
 }
 
@@ -884,6 +936,57 @@ async function handleProjectTrackerCommand(
   }
 
   throw new Error("project tracker requires configure or link");
+}
+
+async function handleSetupCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  const stdout = dependencies.stdout ?? process.stdout;
+  if (command === "list") {
+    const parsed = parseSetupListCommand(argv);
+    printSetupFlowListResult(listNexusSetupFlows(), parsed, stdout);
+    return 0;
+  }
+
+  if (command === "plan") {
+    const parsed = parseSetupPlanCommand(argv);
+    const plan = buildNexusSetupPlan({
+      projectRoot: parsed.projectRoot,
+      flowId: parsed.flowId,
+      platform: parsed.platform,
+    });
+    printSetupPlanResult(plan, parsed, stdout);
+    return 0;
+  }
+
+  if (command === "check") {
+    const parsed = parseSetupCheckCommand(argv);
+    const check = buildNexusSetupCheck({
+      projectRoot: parsed.projectRoot,
+      flowId: parsed.flowId,
+      platform: parsed.platform,
+    });
+    printSetupCheckResult(check, parsed, stdout);
+    return 0;
+  }
+
+  if (command === "record") {
+    const parsed = parseSetupRecordCommand(argv);
+    const result = recordNexusSetupStep({
+      projectRoot: parsed.projectRoot,
+      flowId: parsed.flowId,
+      stepId: parsed.stepId,
+      status: parsed.status,
+      note: parsed.note,
+      now: dependencies.now,
+    });
+    printSetupRecordResult(result, parsed, stdout);
+    return 0;
+  }
+
+  throw new Error("setup requires list, plan, check, or record");
 }
 
 async function handleCoordinationCommand(
@@ -1841,6 +1944,127 @@ function parseProjectTrackerLinkCommand(
   }
 
   return parsed as ParsedProjectTrackerLinkCommand;
+}
+
+function parseSetupListCommand(argv: string[]): ParsedSetupListCommand {
+  const rest = argv.slice(2);
+  const parsed: ParsedSetupListCommand = {};
+  for (const arg of rest) {
+    if (arg === "--json") {
+      parsed.json = true;
+      continue;
+    }
+    throw new Error(`Unknown setup list option: ${arg}`);
+  }
+
+  return parsed;
+}
+
+function parseSetupPlanCommand(argv: string[]): ParsedSetupPlanCommand {
+  const [, , projectRoot, flowId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("setup plan requires a project root");
+  }
+  if (!flowId || flowId.startsWith("--")) {
+    throw new Error("setup plan requires a flow id");
+  }
+
+  const parsed: ParsedSetupPlanCommand = { projectRoot, flowId };
+  parseSetupPlanOrCheckOptions(rest, parsed, "setup plan");
+  return parsed;
+}
+
+function parseSetupCheckCommand(argv: string[]): ParsedSetupCheckCommand {
+  const [, , projectRoot, flowId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("setup check requires a project root");
+  }
+  if (!flowId || flowId.startsWith("--")) {
+    throw new Error("setup check requires a flow id");
+  }
+
+  const parsed: ParsedSetupCheckCommand = { projectRoot, flowId };
+  parseSetupPlanOrCheckOptions(rest, parsed, "setup check");
+  return parsed;
+}
+
+function parseSetupPlanOrCheckOptions(
+  rest: string[],
+  parsed: ParsedSetupPlanCommand | ParsedSetupCheckCommand,
+  commandName: string,
+): void {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--platform":
+        parsed.platform = parseSetupPlatform(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown ${commandName} option: ${arg}`);
+    }
+  }
+}
+
+function parseSetupRecordCommand(argv: string[]): ParsedSetupRecordCommand {
+  const [, , projectRoot, flowId, stepId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("setup record requires a project root");
+  }
+  if (!flowId || flowId.startsWith("--")) {
+    throw new Error("setup record requires a flow id");
+  }
+  if (!stepId || stepId.startsWith("--")) {
+    throw new Error("setup record requires a step id");
+  }
+
+  const parsed: Partial<ParsedSetupRecordCommand> = {
+    projectRoot,
+    flowId,
+    stepId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--status":
+        parsed.status = parseSetupRecordedStepStatus(next(), arg);
+        break;
+      case "--note":
+        parsed.note = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown setup record option: ${arg}`);
+    }
+  }
+
+  if (!parsed.status) {
+    throw new Error("setup record requires --status");
+  }
+
+  return parsed as ParsedSetupRecordCommand;
 }
 
 function parseCoordinationStatusCommand(
@@ -3149,6 +3373,88 @@ function printProjectTrackerLinkResult(
   writeLine(stdout, `  Tracker project: ${result.vibeKanbanProjectId}`);
 }
 
+function printSetupFlowListResult(
+  flows: NexusSetupFlowSummary[],
+  parsed: ParsedSetupListCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, flows };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus setup flows: ${flows.length}`);
+  for (const flow of flows) {
+    writeLine(stdout, `  ${flow.id}: ${flow.title}`);
+  }
+}
+
+function printSetupPlanResult(
+  plan: NexusSetupPlan,
+  parsed: ParsedSetupPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus setup plan: ${plan.flow.id}.`);
+  if (plan.project) {
+    writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  }
+  writeLine(stdout, `  Platform: ${plan.platform}`);
+  writeLine(stdout, `  Steps: ${plan.steps.length}`);
+  for (const step of plan.steps) {
+    writeLine(stdout, `    ${step.id} [${step.kind}/${step.scope}] ${step.title}`);
+  }
+  if (plan.nextActions.length > 0) {
+    writeLine(stdout, `  Next action: ${plan.nextActions[0]}`);
+  }
+}
+
+function printSetupCheckResult(
+  check: NexusSetupCheck,
+  parsed: ParsedSetupCheckCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, check };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus setup check: ${check.status}.`);
+  writeLine(stdout, `  Flow: ${check.flow.id}`);
+  writeLine(stdout, `  Project root: ${check.projectRoot}`);
+  for (const result of check.checks) {
+    writeLine(stdout, `    ${result.id}: ${result.status} - ${result.summary}`);
+  }
+  if (check.nextActions.length > 0) {
+    writeLine(stdout, `  Next action: ${check.nextActions[0]}`);
+  }
+}
+
+function printSetupRecordResult(
+  result: RecordNexusSetupStepResult,
+  parsed: ParsedSetupRecordCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus setup step recorded.");
+  writeLine(stdout, `  Flow: ${parsed.flowId}`);
+  writeLine(stdout, `  Step: ${parsed.stepId}`);
+  writeLine(stdout, `  Status: ${parsed.status}`);
+  writeLine(stdout, `  State: ${result.statePath}`);
+}
+
 function printCoordinationStatusResult(
   status: NexusCoordinationStatus,
   parsed: ParsedCoordinationStatusCommand,
@@ -4076,6 +4382,38 @@ function parseTrackerProvider(
   }
 
   throw new Error(`${optionName} must be local, github, gitlab, or jira`);
+}
+
+function parseSetupPlatform(
+  value: string,
+  optionName: string,
+): NexusSetupPlatform {
+  if (
+    value === "auto" ||
+    value === "macos" ||
+    value === "windows" ||
+    value === "linux"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be auto, macos, windows, or linux`);
+}
+
+function parseSetupRecordedStepStatus(
+  value: string,
+  optionName: string,
+): NexusSetupRecordedStepStatus {
+  if (
+    value === "pending" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be pending, completed, blocked, or skipped`);
 }
 
 function parsePositiveInteger(value: string, optionName: string): number {

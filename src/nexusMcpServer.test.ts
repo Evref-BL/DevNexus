@@ -157,6 +157,10 @@ describe("DevNexus MCP server", () => {
       "automation_status",
       "eligible_work",
       "agent_profiles",
+      "setup_flow_list",
+      "setup_plan",
+      "setup_check",
+      "setup_record",
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
@@ -173,6 +177,52 @@ describe("DevNexus MCP server", () => {
       "work_item_comment",
       "work_item_set_status",
     ]);
+  });
+
+  it("builds guided setup plans through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-setup-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        id: "mac-demo",
+        name: "Mac Demo",
+        repo: {
+          kind: "git",
+          remoteUrl: "git@github.com-gabot:Gabot-Darbot/mac-demo.git",
+          defaultBranch: "main",
+        },
+      }),
+    );
+
+    const listed = toolJson(await callDevNexusMcpTool("setup_flow_list", {}));
+    const planned = toolJson(
+      await callDevNexusMcpTool("setup_plan", {
+        projectRoot,
+        flowId: "join-existing-project",
+        platform: "macos",
+      }),
+    );
+
+    expect(listed.flows).toContainEqual(
+      expect.objectContaining({
+        id: "join-existing-project",
+      }),
+    );
+    expect(planned).toMatchObject({
+      ok: true,
+      plan: {
+        flow: {
+          id: "join-existing-project",
+        },
+        project: {
+          id: "mac-demo",
+        },
+      },
+    });
+    expect(planned.plan.steps.map((step: { id: string }) => step.id)).toContain(
+      "configure-automation-auth-profile",
+    );
   });
 
   it("adopts and records current-agent runs through MCP tools", async () => {

@@ -39,6 +39,7 @@ export * from "./nexusProjectHomeService.js";
 export * from "./nexusProjectLifecycle.js";
 export * from "./nexusProjectOperations.js";
 export * from "./nexusProjectRegistry.js";
+export * from "./nexusSetupAssistant.js";
 export * from "./nexusSkills.js";
 export * from "./workTrackingLocalProvider.js";
 export * from "./workTrackingProviderService.js";

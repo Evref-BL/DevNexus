@@ -59,6 +59,13 @@ import {
   parseNexusCoordinationRequestStatus,
 } from "./nexusCoordinationRequest.js";
 import {
+  buildNexusSetupCheck,
+  buildNexusSetupPlan,
+  listNexusSetupFlows,
+  recordNexusSetupStep,
+  type NexusSetupRecordedStepStatus,
+} from "./nexusSetupAssistant.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
@@ -148,6 +155,68 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setup_flow_list",
+    description: "List guided DevNexus setup flows for project onboarding and new-machine setup.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setup_plan",
+    description: "Build a guided setup plan for a DevNexus project without reading secrets or mutating host state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        flowId: { type: "string" },
+        platform: {
+          type: "string",
+          enum: ["auto", "macos", "windows", "linux"],
+        },
+      },
+      required: ["projectRoot", "flowId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setup_check",
+    description: "Check safe local setup facts for a DevNexus project without contacting external providers.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        flowId: { type: "string" },
+        platform: {
+          type: "string",
+          enum: ["auto", "macos", "windows", "linux"],
+        },
+      },
+      required: ["projectRoot", "flowId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setup_record",
+    description: "Record host-local progress for a DevNexus guided setup flow.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        flowId: { type: "string" },
+        stepId: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["pending", "completed", "blocked", "skipped"],
+        },
+        note: { type: ["string", "null"] },
+      },
+      required: ["projectRoot", "flowId", "stepId", "status"],
       additionalProperties: false,
     },
   },
@@ -590,6 +659,44 @@ export async function callDevNexusMcpTool(
         return toolResult({
           ok: true,
           ...getNexusAutomationAgentProfileSummary(projectRootFromArgs(args)),
+        });
+      case "setup_flow_list":
+        return toolResult({
+          ok: true,
+          flows: listNexusSetupFlows(),
+        });
+      case "setup_plan":
+        return toolResult({
+          ok: true,
+          plan: buildNexusSetupPlan({
+            projectRoot: projectRootFromArgs(args),
+            flowId: requiredString(args, "flowId", "arguments"),
+            platform: optionalString(args, "platform", "arguments"),
+          }),
+        });
+      case "setup_check":
+        return toolResult({
+          ok: true,
+          check: buildNexusSetupCheck({
+            projectRoot: projectRootFromArgs(args),
+            flowId: requiredString(args, "flowId", "arguments"),
+            platform: optionalString(args, "platform", "arguments"),
+          }),
+        });
+      case "setup_record":
+        return toolResult({
+          ok: true,
+          ...recordNexusSetupStep({
+            projectRoot: projectRootFromArgs(args),
+            flowId: requiredString(args, "flowId", "arguments"),
+            stepId: requiredString(args, "stepId", "arguments"),
+            status: parseNexusSetupRecordedStepStatus(
+              requiredString(args, "status", "arguments"),
+              "arguments.status",
+            ),
+            note: optionalNullableString(args, "note", "arguments"),
+            now: context.now,
+          }),
         });
       case "target_cycle_list":
         return toolResult({
@@ -1577,6 +1684,22 @@ function parseWorkStatus(value: string, pathName: string): WorkStatus {
   }
 
   return value as WorkStatus;
+}
+
+function parseNexusSetupRecordedStepStatus(
+  value: string,
+  pathName: string,
+): NexusSetupRecordedStepStatus {
+  if (
+    value === "pending" ||
+    value === "completed" ||
+    value === "blocked" ||
+    value === "skipped"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be pending, completed, blocked, or skipped`);
 }
 
 function optionalWorkStatus(

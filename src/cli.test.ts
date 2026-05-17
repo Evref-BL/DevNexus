@@ -253,6 +253,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
+    expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus work-item create");
@@ -262,6 +263,70 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("prints a Mac new-machine setup plan through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-setup-");
+    fs.writeFileSync(
+      path.join(projectRoot, "dev-nexus.project.json"),
+      `${JSON.stringify(
+        projectConfig({
+          id: "mac-demo",
+          name: "Mac Demo",
+          repo: {
+            kind: "git",
+            remoteUrl: "git@github.com-gabot:Gabot-Darbot/mac-demo.git",
+            defaultBranch: "main",
+          },
+          components: [
+            {
+              id: "dev-nexus",
+              name: "DevNexus",
+              kind: "git",
+              role: "primary",
+              remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+              defaultBranch: "main",
+              sourceRoot: "components/DevNexus",
+              relationships: [],
+            },
+          ],
+        }),
+        null,
+        2,
+      )}\n`,
+    );
+    const output = captureOutput();
+
+    await main(
+      [
+        "setup",
+        "plan",
+        projectRoot,
+        "join-existing-project",
+        "--platform",
+        "macos",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    const parsed = JSON.parse(output.output());
+    expect(parsed).toMatchObject({
+      ok: true,
+      plan: {
+        flow: {
+          id: "join-existing-project",
+        },
+        project: {
+          id: "mac-demo",
+        },
+      },
+    });
+    expect(parsed.plan.steps.map((step: { id: string }) => step.id)).toContain(
+      "configure-automation-auth-profile",
+    );
   });
 
   it("initializes a home and manages projects through the CLI", async () => {

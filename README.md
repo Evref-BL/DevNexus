@@ -53,6 +53,9 @@ dev-nexus project status <project-root>
 dev-nexus project mcp refresh <project-root> --agent codex --agent claude
 dev-nexus project tracker configure <project> --home <home-path> --provider local
 dev-nexus project tracker link <project> --home <home-path> --tracker-project-id <id>
+dev-nexus setup list
+dev-nexus setup plan <project-root> join-existing-project --platform macos
+dev-nexus setup check <project-root> join-existing-project --platform macos
 dev-nexus mcp-stdio
 ```
 
@@ -60,6 +63,28 @@ Commands that need a registry use `--home`; when it is omitted they fall back
 to `DEV_NEXUS_HOME` and then the default user home path. `project status` can
 also inspect an initialized project root directly without a home registry,
 which is useful for local smoke checks and generated worktrees.
+
+## Guided Setup
+
+DevNexus includes a guided setup assistant for first-machine setup and for
+joining an existing shared DevNexus meta project on another host. The setup
+assistant reads `dev-nexus.project.json`, produces host-local steps, and records
+progress under `.dev-nexus/host-setup/` instead of mutating shared project
+configuration with machine-local secrets or paths.
+
+For a Mac joining an existing project:
+
+```bash
+dev-nexus setup plan <project-root> join-existing-project --platform macos
+dev-nexus setup check <project-root> join-existing-project --platform macos
+```
+
+The plan covers prerequisite installs, human GitHub authentication, isolated
+automation authentication, meta-project remotes, component checkouts, MCP
+refresh, skill projection, and final preflight. When shared project metadata
+contains OS-local source roots from another machine, the Mac plan uses
+host-local placeholders and the check reports the component path configuration
+as blocked instead of treating the other machine's path as valid.
 
 ## Project Template Shape
 
@@ -116,12 +141,19 @@ project_status
 automation_status
 eligible_work
 agent_profiles
+setup_flow_list
+setup_plan
+setup_check
+setup_record
 target_cycle_list
 target_cycle_record
 target_report
+current_agent_adopt
+current_agent_record
 coordination_status
 coordination_handoff
 coordination_integrate
+coordination_request
 work_item_create
 work_item_list
 work_item_get
