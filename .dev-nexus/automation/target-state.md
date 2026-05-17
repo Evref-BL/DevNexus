@@ -60,6 +60,10 @@ Immediate direction:
     `sourcesRoot:<component>` source roots; Windows keeps compatibility through
     host-local junctions under `C:\dev\code\sources`, and the Mac setup plan
     clones components under `$HOME/dev-nexus/sources`.
+  - Remaining Mac automation portability blocker is tracked as
+    `dev-nexus:local-54`: shared automation agent profiles still need
+    host-local executable/path resolution before Mac-side DevNexus-managed
+    coordinator launch is clean.
   - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
     meta-repo setup flow after the generic setup assistant and hosting config
     shape exist.
