@@ -452,6 +452,153 @@ describe("nexus automation run once", () => {
     expect(excludeEntries).toContain("node_modules/");
   });
 
+  it("materializes related component plugin projections before executor work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-run-once-project-");
+    const pharoSourceRoot = path.join(projectRoot, "components", "DevNexus-Pharo");
+    const relatedSourceRoot = path.join(projectRoot, "components", "DevNexus");
+    fs.mkdirSync(pharoSourceRoot, { recursive: true });
+    fs.mkdirSync(relatedSourceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(relatedSourceRoot, "BaselineOfDevNexus.st"),
+      "baseline\n",
+      "utf8",
+    );
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "dev-nexus-pharo",
+            name: "DevNexus Pharo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/DevNexus-Pharo",
+            workTracking: {
+              provider: "local",
+            },
+            relationships: [],
+          },
+          {
+            id: "dev-nexus",
+            name: "DevNexus",
+            kind: "git",
+            role: "dependency",
+            remoteUrl: null,
+            defaultBranch: "main",
+            sourceRoot: "components/DevNexus",
+            relationships: [],
+          },
+        ],
+        plugins: [
+          {
+            id: "pharo-tools",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "dev-nexus-sibling",
+                sourceComponentId: "dev-nexus",
+                source: ".",
+                target: "../DevNexus",
+                required: true,
+                reason: "Pharo baselines resolve the sibling DevNexus checkout.",
+                targetComponents: ["dev-nexus-pharo"],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Run with related component plugin dependencies",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = await runNexusAutomationOnce({
+      projectRoot,
+      runId: "run-related-plugin-deps",
+      worktreeName: "local-24",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+        "2026-05-16T10:02:00.000Z",
+        "2026-05-16T10:03:00.000Z",
+      ),
+      gitRunner: fakeGitRunner(gitCalls),
+      executor: ({ setup, worktree }) => {
+        expect(setup.dependencyProjections).toMatchObject([
+          {
+            id: "dev-nexus-sibling",
+            source: ".",
+            target: "../DevNexus",
+            sourcePath: relatedSourceRoot,
+            targetPath: path.join(
+              projectRoot,
+              "worktrees",
+              "dev-nexus-pharo",
+              "DevNexus",
+            ),
+            status: "linked",
+            sourceComponent: {
+              id: "dev-nexus",
+              sourceRoot: relatedSourceRoot,
+            },
+          },
+        ]);
+        expect(
+          fs.readFileSync(
+            path.join(
+              worktree.worktreePath,
+              "..",
+              "DevNexus",
+              "BaselineOfDevNexus.st",
+            ),
+            "utf8",
+          ),
+        ).toBe("baseline\n");
+
+        return {
+          status: "completed",
+          summary: "Related component dependency linked",
+        };
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    const contextJson = JSON.parse(
+      fs.readFileSync(result.setup!.context!.contextJsonPath, "utf8"),
+    );
+    expect(contextJson.dependencySupport.pluginDependencyProjections[0])
+      .toMatchObject({
+        id: "dev-nexus-sibling",
+        sourceComponent: {
+          id: "dev-nexus",
+          sourceRoot: relatedSourceRoot,
+        },
+      });
+    expect(result.setup!.context!.briefingMarkdown).toContain(
+      `Source component: dev-nexus (${relatedSourceRoot})`,
+    );
+    const excludeEntries = fs
+      .readFileSync(
+        path.join(result.worktree!.worktreePath, ".git", "info", "exclude"),
+        "utf8",
+      )
+      .trim()
+      .split(/\r?\n/u);
+    expect(excludeEntries).toContain(".dev-nexus/context/");
+    expect(excludeEntries).not.toContain("../DevNexus/");
+  });
+
   it("blocks before worktree preparation when a required plugin dependency projection is missing", async () => {
     const projectRoot = makeTempDir("dev-nexus-run-once-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

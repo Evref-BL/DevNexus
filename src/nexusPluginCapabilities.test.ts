@@ -50,6 +50,53 @@ describe("nexus plugin capability projections", () => {
       },
     ]);
   });
+
+  it("includes related component sources in dependency projection summaries", () => {
+    expect(
+      projectPluginCapabilityProjections({
+        plugins: [
+          {
+            id: "pharo-tools",
+            name: "Pharo Tools",
+            enabled: true,
+            capabilities: [
+              {
+                kind: "dependency_projection",
+                id: "dev-nexus-sibling",
+                sourceComponentId: "dev-nexus",
+                source: ".",
+                target: "../DevNexus",
+                required: true,
+                reason: "Pharo baselines resolve the sibling DevNexus checkout.",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        pluginId: "pharo-tools",
+        pluginName: "Pharo Tools",
+        version: null,
+        capabilityCount: 1,
+        capabilities: [
+          {
+            kind: "dependency_projection",
+            id: "dev-nexus-sibling",
+            description: null,
+            sourceComponentId: "dev-nexus",
+            source: ".",
+            target: "../DevNexus",
+            required: true,
+            sourceControl: "support",
+            targetAgents: [],
+            targetComponents: [],
+            reason: "Pharo baselines resolve the sibling DevNexus checkout.",
+          },
+        ],
+      },
+    ]);
+  });
 });
 
 describe("nexus plugin dependency projections", () => {
@@ -103,6 +150,15 @@ describe("nexus plugin dependency projections", () => {
                 },
                 {
                   kind: "dependency_projection",
+                  id: "dev-nexus-sibling",
+                  sourceComponentId: "dev-nexus",
+                  source: ".",
+                  target: "../DevNexus",
+                  required: true,
+                  targetComponents: ["core"],
+                },
+                {
+                  kind: "dependency_projection",
                   id: "other-agent",
                   source: "other",
                   target: "other",
@@ -138,6 +194,25 @@ describe("nexus plugin dependency projections", () => {
           pluginName: "Alpha Tools",
           version: "1.2.3",
           capabilityId: "cache",
+        },
+      },
+      {
+        kind: "dependency_projection",
+        id: "dev-nexus-sibling",
+        description: null,
+        sourceComponentId: "dev-nexus",
+        source: ".",
+        target: "../DevNexus",
+        required: true,
+        sourceControl: "support",
+        targetAgents: [],
+        targetComponents: ["core"],
+        reason: null,
+        pluginSource: {
+          pluginId: "alpha-tools",
+          pluginName: "Alpha Tools",
+          version: "1.2.3",
+          capabilityId: "dev-nexus-sibling",
         },
       },
       {

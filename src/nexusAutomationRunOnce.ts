@@ -35,6 +35,7 @@ import {
 } from "./nexusPluginCapabilities.js";
 import {
   resolvePrimaryProjectComponent,
+  resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
@@ -295,6 +296,7 @@ export async function runNexusAutomationOnce(
     }
 
     pluginDependencyProjections = automationPluginDependencyProjections(
+      projectRoot,
       projectConfig,
       primaryComponent.id,
     );
@@ -642,6 +644,7 @@ export function preflightNexusAutomationRunOnce(options: {
     ),
     ...preflightNexusAutomationWorktreeSetup({
       sourceRoot: options.sourceRoot,
+      worktreesRoot: options.component.worktreesRoot,
       automationConfig: options.automationConfig,
       pluginDependencyProjections: options.pluginDependencyProjections,
     }),
@@ -649,25 +652,52 @@ export function preflightNexusAutomationRunOnce(options: {
 }
 
 function automationPluginDependencyProjections(
+  projectRoot: string,
   projectConfig: NexusProjectConfig,
   componentId: string,
 ): NexusAutomationPluginDependencyProjection[] {
+  const componentsById = new Map(
+    resolveProjectComponents(projectRoot, projectConfig).map((component) => [
+      component.id,
+      component,
+    ]),
+  );
+
   return projectPluginDependencyProjections(projectConfig, {
     componentId,
-  }).map((projection) => ({
-    id: projection.id,
-    source: projection.source,
-    target: projection.target,
-    required: projection.required,
-    sourceControl: projection.sourceControl,
-    reason: projection.reason,
-    sourceMetadata: {
-      pluginId: projection.pluginSource.pluginId,
-      pluginName: projection.pluginSource.pluginName,
-      version: projection.pluginSource.version,
-      capabilityId: projection.pluginSource.capabilityId,
-    },
-  }));
+  }).map((projection) => {
+    const sourceComponent = projection.sourceComponentId
+      ? componentsById.get(projection.sourceComponentId)
+      : null;
+    if (projection.sourceComponentId && !sourceComponent) {
+      throw new NexusAutomationRunOnceError(
+        `Plugin dependency projection ${projection.id} sourceComponentId references unknown component: ${projection.sourceComponentId}`,
+      );
+    }
+
+    return {
+      id: projection.id,
+      ...(sourceComponent
+        ? {
+            sourceComponent: {
+              id: sourceComponent.id,
+              sourceRoot: sourceComponent.sourceRoot,
+            },
+          }
+        : {}),
+      source: projection.source,
+      target: projection.target,
+      required: projection.required,
+      sourceControl: projection.sourceControl,
+      reason: projection.reason,
+      sourceMetadata: {
+        pluginId: projection.pluginSource.pluginId,
+        pluginName: projection.pluginSource.pluginName,
+        version: projection.pluginSource.version,
+        capabilityId: projection.pluginSource.capabilityId,
+      },
+    };
+  });
 }
 
 export function generateNexusAutomationRunId(
