@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 55,
-  "nextCommentNumber": 89,
-  "updatedAt": "2026-05-17T16:58:00.884Z",
+  "nextNumber": 56,
+  "nextCommentNumber": 91,
+  "updatedAt": "2026-05-17T17:09:14.470Z",
   "items": [
     {
       "id": "local-1",
@@ -1027,7 +1027,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T16:58:00.884Z",
+      "updatedAt": "2026-05-17T17:08:17.945Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1347,6 +1347,32 @@
         "provider": "local",
         "itemId": "local-54",
         "itemNumber": 54
+      }
+    },
+    {
+      "id": "local-55",
+      "title": "Add extensible agent-provider MCP target support",
+      "description": "Type: agent-provider MCP projection slice\nReadiness: autonomous agent-ready (AFK) with current provider docs; no live credentials required.\nSource finding: Mac onboarding exposed that DevNexus setup guidance must not assume Codex Desktop. Users may prefer OpenCode or another MCP-capable agent provider with a different project/session and config model.\n\nGoal: make DevNexus agent-provider setup extensible beyond the current Codex/Claude concrete projection writers, starting with OpenCode if its documented MCP config model is stable enough.\n\nAcceptance criteria:\n- Agent MCP target configuration distinguishes provider identity, config path, config format/schema, project/session activation notes, and approval/tool-trust semantics where supported.\n- `project mcp refresh` reports unsupported provider/config combinations as explicit capability gaps instead of Codex-specific assumptions or generic crashes.\n- OpenCode support is implemented when official docs confirm the config shape; otherwise a documented custom-provider/manual-config path exists.\n- Setup plan/check output remains provider-neutral and lists configured target agents plus exact generated or manual config files.\n- Tests cover Codex, Claude, OpenCode or custom provider fixtures, unsupported provider warnings, and project/session setup-record readiness.\n\nBoundaries:\n- Do not edit provider global state, app databases, credentials, or private auth material.\n- Do not assume every provider uses Codex TOML or Claude-style JSON.\n- Keep DevNexus generic; provider-specific behavior belongs in target adapters.\n\nVerification:\n- Focused agent MCP config and setup assistant tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "agent-providers",
+        "mcp",
+        "opencode",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T17:07:57.932Z",
+      "updatedAt": "2026-05-17T17:09:14.469Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-55",
+        "itemNumber": 55
       }
     }
   ],
@@ -2352,6 +2378,28 @@
           "provider": "local",
           "itemId": "local-comment-88"
         }
+      },
+      {
+        "id": "local-comment-89",
+        "body": "Mac report follow-up: setup/preflight is technically good, but the report exposed a readiness gap. DevNexus now separates projected MCP config from actual provider-session readiness: setup check warns until the host records open-agent-project-session after confirming DevNexus MCP tools are visible in the configured provider. The wording is provider-neutral, with Codex Desktop only as an example. Published DevNexus source cbdddb7 and npm @evref-bl/dev-nexus@0.1.0-alpha.6 through source 8c51077.",
+        "author": null,
+        "createdAt": "2026-05-17T17:08:08.784Z",
+        "updatedAt": "2026-05-17T17:08:08.784Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-89"
+        }
+      },
+      {
+        "id": "local-comment-90",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-42-setup-check-codex-loaded\nHead: cbdddb7b80d2974b4ab98b73df12825538f89524\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-17T17:08:17.930Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-42\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\setup-check-codex-loaded\",\n  \"branch\": \"codex/dev-nexus/local-42-setup-check-codex-loaded\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"cbdddb7b80d2974b4ab98b73df12825538f89524\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"README.md\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm run build passed; vitest run src/nexusSetupAssistant.test.ts passed; npm test -- --exclude src/processSupervisor.test.ts passed\",\n  \"integrationPreference\": null,\n  \"note\": \"Merged provider-neutral setup readiness and published @evref-bl/dev-nexus@0.1.0-alpha.6. Created dev-nexus:local-55 for full OpenCode/custom provider adapter support.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-17T17:08:17.945Z",
+        "updatedAt": "2026-05-17T17:08:17.945Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-90"
+        }
       }
     ],
     "local-43": [
@@ -2412,6 +2460,7 @@
           "itemId": "local-comment-84"
         }
       }
-    ]
+    ],
+    "local-55": []
   }
 }

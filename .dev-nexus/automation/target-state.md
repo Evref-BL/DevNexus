@@ -30,6 +30,9 @@ Immediate direction:
     profile reference for shared meta repositories.
   - `dev-nexus:local-44` add component multi-tracker schema and compatibility
     normalization.
+  - `dev-nexus:local-55` add extensible agent-provider MCP target support so
+    DevNexus can support providers such as OpenCode without Codex-specific
+    assumptions.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -63,6 +66,17 @@ Immediate direction:
     `@evref-bl/dev-nexus@0.1.0-alpha.4` is published on the `dogfood` tag.
     The same profile resolves to Windows paths on Windows and
     `$HOME/dev-nexus/...` paths on Mac.
+  - `dev-nexus:local-42` Mac follow-ups are published through DevNexus
+    `8c51077`: setup guidance now separates projected MCP config from
+    provider-session readiness. Setup checks warn until the host records
+    `open-agent-project-session` after confirming DevNexus MCP tools are
+    visible in the configured provider. npm
+    `@evref-bl/dev-nexus@0.1.0-alpha.6` is published on the `dogfood` tag.
+    The wording is provider-neutral; Codex Desktop is only one provider
+    example.
+  - `dev-nexus:local-55` tracks the next provider-inclusion slice: extensible
+    agent MCP target adapters, including OpenCode or a documented custom
+    provider/manual-config path once provider docs confirm the config model.
   - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
     meta-repo setup flow after the generic setup assistant and hosting config
     shape exist.
