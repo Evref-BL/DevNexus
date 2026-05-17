@@ -112,6 +112,7 @@ describe("project config", () => {
         serverName: "dev_nexus",
         command: "dev-nexus",
         args: ["mcp-stdio"],
+        defaultToolsApprovalMode: "approve",
         agentTargets: [
           {
             agent: "codex",
@@ -121,6 +122,7 @@ describe("project config", () => {
             agent: "claude",
             configPath: ".mcp.json",
             sourceControl: "source" as const,
+            defaultToolsApprovalMode: "approve",
           },
         ],
       },

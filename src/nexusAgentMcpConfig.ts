@@ -22,6 +22,7 @@ export interface MaterializedNexusAgentMcpTarget {
   serverName: string;
   command: string;
   args: string[];
+  defaultToolsApprovalMode?: string;
   sourceControl: NexusSkillSourceControl;
   configPath: string;
   configFormat: "toml" | "json";
@@ -102,6 +103,9 @@ function resolveAgentMcpTargets(
       const args = [
         ...(target.args ?? options.mcpConfig?.args ?? defaultNexusMcpArgs),
       ];
+      const defaultToolsApprovalMode =
+        target.defaultToolsApprovalMode ??
+        options.mcpConfig?.defaultToolsApprovalMode;
       const sourceControl =
         target.sourceControl ?? options.mcpConfig?.sourceControl ?? "support";
       const configFormat = configFormatForAgent(target.agent);
@@ -118,6 +122,9 @@ function resolveAgentMcpTargets(
         serverName,
         command,
         args,
+        ...(defaultToolsApprovalMode !== undefined
+          ? { defaultToolsApprovalMode }
+          : {}),
         sourceControl,
         configPath,
         configFormat,
@@ -179,7 +186,16 @@ function writeCodexMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   const existing = fs.existsSync(target.configPath)
     ? fs.readFileSync(target.configPath, "utf8")
     : "";
-  const nextContent = upsertCodexMcpServerBlock(existing, target);
+  const nextContent = upsertCodexMcpServerBlock(existing, {
+    ...target,
+    defaultToolsApprovalMode:
+      target.defaultToolsApprovalMode ??
+      codexMcpServerStringSetting(
+        existing,
+        target.serverName,
+        "default_tools_approval_mode",
+      ),
+  });
 
   fs.mkdirSync(path.dirname(target.configPath), { recursive: true });
   fs.writeFileSync(target.configPath, nextContent, "utf8");
@@ -187,19 +203,64 @@ function writeCodexMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
 
 function upsertCodexMcpServerBlock(
   existing: string,
-  target: Pick<ResolvedNexusAgentMcpTarget, "serverName" | "command" | "args">,
+  target: Pick<
+    ResolvedNexusAgentMcpTarget,
+    "serverName" | "command" | "args" | "defaultToolsApprovalMode"
+  >,
 ): string {
   const retainedLines = removeTomlServerTable(existing, target.serverName);
   const retained = trimTrailingBlankLines(retainedLines).join("\n");
-  const serverBlock = [
+  const serverBlockLines = [
     `[mcp_servers.${target.serverName}]`,
     `command = ${tomlString(target.command)}`,
     `args = ${tomlStringArray(target.args)}`,
-  ].join("\n");
+  ];
+  if (target.defaultToolsApprovalMode) {
+    serverBlockLines.push(
+      `default_tools_approval_mode = ${tomlString(target.defaultToolsApprovalMode)}`,
+    );
+  }
+  const serverBlock = serverBlockLines.join("\n");
 
   return retained.length > 0
     ? `${retained}\n\n${serverBlock}\n`
     : `${serverBlock}\n`;
+}
+
+function codexMcpServerStringSetting(
+  existing: string,
+  serverName: string,
+  settingName: string,
+): string | undefined {
+  const lines = existing.replace(/\r\n/gu, "\n").split("\n");
+  let insideServer = false;
+  const settingPattern = new RegExp(
+    `^\\s*${escapeRegExp(settingName)}\\s*=\\s*(\"(?:[^\"\\\\]|\\\\.)*\")\\s*(?:#.*)?$`,
+    "u",
+  );
+
+  for (const line of lines) {
+    const tableName = tomlTableName(line);
+    if (tableName) {
+      insideServer = tableName === `mcp_servers.${serverName}`;
+      continue;
+    }
+
+    if (!insideServer) {
+      continue;
+    }
+
+    const match = line.match(settingPattern);
+    if (match) {
+      try {
+        return JSON.parse(match[1]) as string;
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 function removeTomlServerTable(existing: string, serverName: string): string[] {
@@ -251,6 +312,10 @@ function tomlString(value: string): string {
 
 function tomlStringArray(values: readonly string[]): string {
   return `[${values.map((value) => tomlString(value)).join(", ")}]`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function writeClaudeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {

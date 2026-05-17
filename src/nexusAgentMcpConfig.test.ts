@@ -43,6 +43,7 @@ describe("nexus agent MCP config", () => {
         "[mcp_servers.dev_nexus]",
         'command = "old-dev-nexus"',
         "args = []",
+        'default_tools_approval_mode = "approve"',
         "",
         "[tools]",
         "web_search = true",
@@ -71,8 +72,30 @@ describe("nexus agent MCP config", () => {
     expect(refreshed).toContain("[mcp_servers.dev_nexus]");
     expect(refreshed).toContain('command = "dev-nexus"');
     expect(refreshed).toContain('args = ["mcp-stdio"]');
+    expect(refreshed).toContain('default_tools_approval_mode = "approve"');
     expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
       .toContain(".codex/config.toml");
+  });
+
+  it("writes configured Codex MCP approval defaults", () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const codexConfigPath = path.join(projectRoot, ".codex", "config.toml");
+
+    const result = materializeNexusProjectAgentMcpConfig({
+      projectRoot,
+      mcpConfig: {
+        defaultToolsApprovalMode: "approve",
+      },
+    });
+    const refreshed = fs.readFileSync(codexConfigPath, "utf8");
+
+    expect(result.agentTargets).toMatchObject([
+      {
+        agent: "codex",
+        defaultToolsApprovalMode: "approve",
+      },
+    ]);
+    expect(refreshed).toContain('default_tools_approval_mode = "approve"');
   });
 
   it("materializes Claude MCP config while preserving unrelated servers", () => {

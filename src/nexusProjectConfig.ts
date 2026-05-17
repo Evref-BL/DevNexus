@@ -103,6 +103,7 @@ export interface NexusProjectAgentMcpTarget {
   serverName?: string;
   command?: string;
   args?: string[];
+  defaultToolsApprovalMode?: string;
 }
 
 export interface NexusProjectMcpConfig {
@@ -111,6 +112,7 @@ export interface NexusProjectMcpConfig {
   serverName?: string;
   command?: string;
   args?: string[];
+  defaultToolsApprovalMode?: string;
   agentTargets?: NexusProjectAgentMcpTarget[];
 }
 
@@ -802,6 +804,11 @@ function validateProjectMcpAgentTarget(
   const serverName = optionalString(record, "serverName", pathName);
   const command = optionalString(record, "command", pathName);
   const args = optionalStringArray(record, "args", pathName);
+  const defaultToolsApprovalMode = optionalString(
+    record,
+    "defaultToolsApprovalMode",
+    pathName,
+  );
 
   return {
     agent: requiredString(record, "agent", pathName),
@@ -811,6 +818,7 @@ function validateProjectMcpAgentTarget(
     ...(serverName !== undefined ? { serverName } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
+    ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
   };
 }
 
@@ -830,6 +838,11 @@ function validateProjectMcpConfig(
   const serverName = optionalString(record, "serverName", "project config.mcp");
   const command = optionalString(record, "command", "project config.mcp");
   const args = optionalStringArray(record, "args", "project config.mcp");
+  const defaultToolsApprovalMode = optionalString(
+    record,
+    "defaultToolsApprovalMode",
+    "project config.mcp",
+  );
   const agentTargets = record.agentTargets;
   if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
     throw new NexusConfigError(
@@ -843,6 +856,7 @@ function validateProjectMcpConfig(
     ...(serverName !== undefined ? { serverName } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
+    ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
     ...(agentTargets
       ? {
           agentTargets: agentTargets.map((target, index) =>
