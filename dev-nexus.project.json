@@ -149,11 +149,12 @@
     }
   ],
   "mcp": {
-    "command": "node",
+    "command": "C:\\Users\\gabriel.darbord\\AppData\\Local\\Microsoft\\WinGet\\Packages\\OpenJS.NodeJS.LTS_Microsoft.Winget.Source_8wekyb3d8bbwe\\node-v24.15.0-win-x64\\node.exe",
     "args": [
       "C:\\dev\\code\\dev-nexus-control\\worktrees\\DevNexus\\dist\\cli.js",
       "mcp-stdio"
     ],
+    "defaultToolsApprovalMode": "approve",
     "agentTargets": [
       {
         "agent": "codex"

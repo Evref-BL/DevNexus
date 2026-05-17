@@ -47,3 +47,6 @@ older control-project handoff.
   the target loop.
 - The coordinator profile uses the user-local Codex CLI binary because the
   Windows app package alias is not executable from this shell.
+- The cron automation and dogfood MCP projection use the Winget Node executable
+  path directly because plain `node` can resolve to an inaccessible Codex app
+  package runtime inside scheduler shells.

@@ -22,9 +22,6 @@ Immediate direction:
     without live external provider posting.
   - `dev-nexus:local-24` support declared related-component dependency
     projections for worker worktrees.
-  - `dev-nexus:local-26` project MCP approval defaults into generated agent
-    configs so refreshed Codex MCP entries keep the current trusted server
-    approval settings.
   - `dev-nexus-pharo:local-9` bundle MCP-Pharo domain skills through
     DevNexus-Pharo so Pharo-capable subagents receive CI reproduction, image
     Git handoff, project load, and Pharo version compatibility guidance.
@@ -40,6 +37,9 @@ Immediate direction:
   coordinator should use parallel subagents for independent selected items when
   useful, respecting `DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS=8` and disjoint
   component/worktree write scopes.
+- The cron prompt now invokes DevNexus through the working Winget Node path
+  instead of the fragile `node` alias that previously resolved to an
+  inaccessible Codex app package runtime in the scheduler shell.
 - Local launcher cleanup: the pharo-launcher-mcp checkout now lives at
   `C:\dev\code\git\pharo-launcher-mcp`; active source/config now uses that
   project and package identity consistently.
@@ -256,6 +256,10 @@ Durable completed foundation:
   `6c0501c`, covering generic `dependency_projection` plugin capabilities,
   generated worktree materialization, Git exclusion, worker context reporting,
   JS/TS binary-resolution fixtures, and run-once preflight/setup wiring.
+- DevNexus MCP approval-default projection was published through `baa238a`,
+  covering `defaultToolsApprovalMode` in project MCP config, Codex
+  `default_tools_approval_mode` generation, and preservation of existing
+  trusted-server approval settings during `project mcp refresh`.
 - PLexus scoped plugin context was published through `de0d5c6`, covering
   project/workspace/target/image ownership context, scoped lifecycle
   affordance descriptions, cleanup metadata, and gateway `imageId` route
@@ -293,8 +297,12 @@ Durable completed foundation:
   smalltalkCI helper scripts, and log-reading references.
 - Local Codex/automation MCP config now uses the `dev_nexus_pharo` server name
   with `default_tools_approval_mode = "approve"` for trusted DevNexus-Pharo and
-  PLexus MCP servers. `dev-nexus:local-26` tracks the source-side generator fix
-  so future MCP refreshes keep approval defaults and current server names.
+  PLexus MCP servers. `dev-nexus:local-26` is complete; future MCP refreshes
+  preserve approval defaults through DevNexus source commit `baa238a`.
+- The dogfood DevNexus MCP projection now uses the working Winget Node
+  executable path and declares `defaultToolsApprovalMode: "approve"` in
+  `dev-nexus.project.json`; refreshed `.codex/config.toml` contains
+  `default_tools_approval_mode = "approve"`.
 
 Active boundaries:
 
