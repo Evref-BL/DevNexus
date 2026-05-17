@@ -1,0 +1,19 @@
+{
+  "name": "DevNexus Dogfood",
+  "kanban": {
+    "provider": "vibe-kanban",
+    "projectId": "dev-nexus-dogfood"
+  },
+  "images": [],
+  "imageExecution": {
+    "mode": "disabled",
+    "requireDisposableImage": true,
+    "requireCleanupPlan": true,
+    "docker": {
+      "image": null,
+      "network": "none",
+      "autoRemove": true,
+      "mountProjectReadOnly": true
+    }
+  }
+}
