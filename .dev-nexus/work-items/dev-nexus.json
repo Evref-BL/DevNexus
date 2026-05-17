@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 55,
-  "nextCommentNumber": 84,
-  "updatedAt": "2026-05-17T15:06:37.659Z",
+  "nextCommentNumber": 85,
+  "updatedAt": "2026-05-17T15:17:19.424Z",
   "items": [
     {
       "id": "local-1",
@@ -1327,7 +1327,7 @@
       "id": "local-54",
       "title": "Move automation agent profiles to portable host-local config",
       "description": "Type: DevNexus automation/profile portability slice\nReadiness: autonomous agent-ready (AFK)\nSource finding: portable component source roots now unblock Mac setup, but this dogfood dev-nexus.project.json still stores Windows-specific Codex executable paths and --add-dir paths inside automation.agent.profiles. A Mac can run setup and component work manually, but DevNexus-managed automation launch from shared config remains host-specific.\n\nGoal: separate portable automation profile intent from host-local executable/path material so the same shared meta project can launch coordinators on Windows or macOS without rewriting dev-nexus.project.json.\n\nAcceptance criteria:\n- Automation agent profiles can reference a host-local profile id or resolve command/path expressions through the central path resolver.\n- Shared config no longer needs raw Windows Codex executable paths or component absolute --add-dir values.\n- Host-local profile configuration stores executable paths, app-server endpoints, and OS-specific args outside shared project state.\n- Agent launch context reports which host-local profile was selected and blocks clearly if it is missing.\n- Existing Windows dogfood launch profile remains compatible through migration or host-local override.\n- Tests cover Windows and macOS fixture profile resolution, missing profile blockers, and serialized shared config stability.\n\nBoundaries:\n- Do not store tokens, private keys, or browser auth state in shared config.\n- Do not make DevNexus choose work; this only prepares the launcher infrastructure.\n\nVerification:\n- Focused automation agent profile/launch tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1340,8 +1340,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T15:06:37.659Z",
-      "updatedAt": "2026-05-17T15:06:37.659Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T15:17:19.424Z",
+      "closedAt": "2026-05-17T15:17:19.424Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2355,6 +2355,18 @@
         }
       }
     ],
-    "local-54": []
+    "local-54": [
+      {
+        "id": "local-comment-84",
+        "body": "Implemented and published in DevNexus commit c83ab0f. Automation agent profile command resolution now resolves portable project path expressions in command/profile args when CLI automation launch passes the project root. The dogfood shared profile now uses generic command 'codex' plus projectRoot:/sourcesRoot: args instead of Windows executable and absolute --add-dir values. Verification passed: npm run check (46 files, 295 tests). Published @evref-bl/dev-nexus@0.1.0-alpha.4 on npm dogfood tag.",
+        "author": null,
+        "createdAt": "2026-05-17T15:17:19.222Z",
+        "updatedAt": "2026-05-17T15:17:19.222Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-84"
+        }
+      }
+    ]
   }
 }
