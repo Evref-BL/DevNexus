@@ -5,6 +5,8 @@
 .dev-nexus/automation/run.lock
 .dev-nexus/automation/runs.json
 .dev-nexus/automation/target-cycles.json
+.dev-nexus/handoff-assets/
+.dev-nexus/host-setup/
 .dev-nexus/runtime/
 .dev-nexus/skills/
 .agents/skills/
