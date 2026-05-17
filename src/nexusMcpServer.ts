@@ -567,44 +567,52 @@ export async function callDevNexusMcpTool(
             limit: optionalPositiveInteger(args, "limit", "arguments"),
           }),
         });
-      case "work_item_get":
+      case "work_item_get": {
+        const { selector, ref } = workItemSelectorRefFromArgs(args);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).getWorkItem({
-            ...projectSelectorFromArgs(args),
-            ...workItemRefFromArgs(args),
+            ...selector,
+            ...ref,
           }),
         });
-      case "work_item_update":
+      }
+      case "work_item_update": {
+        const { selector, ref } = workItemSelectorRefFromArgs(args);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).updateWorkItem({
-            ...projectSelectorFromArgs(args),
-            ref: workItemRefFromArgs(args),
+            ...selector,
+            ref,
             patch: workItemPatchFromArgs(args),
           }),
         });
-      case "work_item_comment":
+      }
+      case "work_item_comment": {
+        const { selector, ref } = workItemSelectorRefFromArgs(args);
         return toolResult({
           ok: true,
           comment: await workItemServiceFromArgs(args, context).addComment({
-            ...projectSelectorFromArgs(args),
-            ref: workItemRefFromArgs(args),
+            ...selector,
+            ref,
             body: requiredString(args, "body", "arguments"),
           }),
         });
-      case "work_item_set_status":
+      }
+      case "work_item_set_status": {
+        const { selector, ref } = workItemSelectorRefFromArgs(args);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).setStatus({
-            ...projectSelectorFromArgs(args),
-            ref: workItemRefFromArgs(args),
+            ...selector,
+            ref,
             status: parseWorkStatus(
               requiredString(args, "status", "arguments"),
               "arguments.status",
             ),
           }),
         });
+      }
       default:
         return toolResult(
           {
@@ -848,6 +856,67 @@ function projectSelectorFromArgs(args: Record<string, unknown>): WorkItemProject
     ...(projectRoot ? { projectRoot } : {}),
     ...(componentId ? { componentId } : {}),
   };
+}
+
+function workItemSelectorRefFromArgs(args: Record<string, unknown>): {
+  selector: WorkItemProjectSelector;
+  ref: WorkItemRef;
+} {
+  const selector = projectSelectorFromArgs(args);
+  const ref = workItemRefFromArgs(args);
+  const qualified = qualifiedWorkItemId(args, ref.id);
+  if (!qualified) {
+    return { selector, ref };
+  }
+
+  if (selector.componentId && selector.componentId !== qualified.componentId) {
+    throw new Error(
+      `Work item id component "${qualified.componentId}" conflicts with componentId "${selector.componentId}"`,
+    );
+  }
+
+  return {
+    selector: {
+      ...selector,
+      componentId: qualified.componentId,
+    },
+    ref: {
+      ...ref,
+      id: qualified.id,
+    },
+  };
+}
+
+function qualifiedWorkItemId(
+  args: Record<string, unknown>,
+  id: string | undefined,
+): { componentId: string; id: string } | null {
+  if (!id) {
+    return null;
+  }
+
+  const split = id.match(/^([A-Za-z0-9][A-Za-z0-9_.-]*):(.+)$/);
+  if (!split) {
+    return null;
+  }
+
+  const componentId = split[1]!;
+  const itemId = split[2]!.trim();
+  if (!itemId) {
+    return null;
+  }
+
+  const projectRoot = projectRootFromArgs(args);
+  const componentIds = new Set(
+    resolveProjectComponents(projectRoot, loadProjectConfig(projectRoot)).map(
+      (component) => component.id,
+    ),
+  );
+  if (!componentIds.has(componentId)) {
+    return null;
+  }
+
+  return { componentId, id: itemId };
 }
 
 function workItemRefFromArgs(args: Record<string, unknown>): WorkItemRef {

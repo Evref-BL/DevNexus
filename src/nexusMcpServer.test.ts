@@ -792,10 +792,52 @@ describe("DevNexus MCP server", () => {
         projectRoot,
       }),
     );
+    const qualifiedGet = toolJson(
+      await callDevNexusMcpTool("work_item_get", {
+        projectRoot,
+        id: "addon:local-1",
+      }),
+    );
+    const qualifiedUpdate = toolJson(
+      await callDevNexusMcpTool("work_item_update", {
+        projectRoot,
+        id: "addon:local-1",
+        title: "Updated addon MCP task",
+      }),
+    );
+    const qualifiedComment = toolJson(
+      await callDevNexusMcpTool("work_item_comment", {
+        projectRoot,
+        id: "addon:local-1",
+        body: "Component-qualified reference worked.",
+      }),
+    );
+    const qualifiedStatus = toolJson(
+      await callDevNexusMcpTool("work_item_set_status", {
+        projectRoot,
+        id: "addon:local-1",
+        status: "done",
+      }),
+    );
 
     expect(created.workItem).toMatchObject({
       id: "local-1",
       title: "Addon MCP task",
+    });
+    expect(qualifiedGet.workItem).toMatchObject({
+      id: "local-1",
+      title: "Addon MCP task",
+    });
+    expect(qualifiedUpdate.workItem).toMatchObject({
+      id: "local-1",
+      title: "Updated addon MCP task",
+    });
+    expect(qualifiedComment.comment).toMatchObject({
+      body: "Component-qualified reference worked.",
+    });
+    expect(qualifiedStatus.workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
     });
     expect(addonList.workItems).toMatchObject([
       {
