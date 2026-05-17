@@ -132,6 +132,23 @@ function writeText(filePath: string, text: string): void {
   fs.writeFileSync(filePath, text, "utf8");
 }
 
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function holdStoreLock(storePath: string): () => void {
+  const lockPath = `${storePath}.lock`;
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  const handle = fs.openSync(lockPath, "wx");
+  try {
+    fs.writeFileSync(handle, "external test lock\n", "utf8");
+  } finally {
+    fs.closeSync(handle);
+  }
+
+  return () => fs.rmSync(lockPath, { force: true });
+}
+
 function commitAll(repositoryPath: string, message: string): string {
   runGit(repositoryPath, ["add", "."]);
   runGit(repositoryPath, ["commit", "-m", message]);
@@ -329,6 +346,84 @@ describe("nexus coordination", () => {
       "Handoff for local-1 from 2026-05-16T10:00:00.000Z is stale.",
     );
     expect(status.blocking).toBe(false);
+  });
+
+  it("serializes concurrent local-provider coordination handoffs", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-59");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig(sourceRoot, "worktrees/dev-nexus", storePath));
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath },
+      now: () => "2026-05-16T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Concurrent handoffs",
+      status: "in_progress",
+    });
+
+    const absoluteStorePath = path.join(projectRoot, storePath);
+    const releaseLock = holdStoreLock(absoluteStorePath);
+    const statuses = ["working", "ready", "blocked", "merged"] as const;
+    let completed = false;
+    const handoffs = Promise.all(
+      statuses.map((status, index) =>
+        createNexusCoordinationHandoff({
+          projectRoot,
+          componentId: "dev-nexus",
+          workItemId: "local-1",
+          status,
+          hostId: `host-${index}`,
+          agentId: "codex",
+          changedAreas: [`src/area-${index}.ts`],
+          decisions: [`Decision ${index}`],
+          currentPath: worktreePath,
+          gitRunner: fakeGitRunner(worktreePath, []),
+          now: () => `2026-05-16T10:0${index}:00.000Z`,
+        }),
+      ),
+    ).then((result) => {
+      completed = true;
+      return result;
+    });
+
+    try {
+      await sleep(25);
+      expect(completed).toBe(false);
+    } finally {
+      releaseLock();
+    }
+
+    const results = await handoffs;
+    const commentIds = results.map((result) => result.comment.id);
+    expect(new Set(commentIds).size).toBe(4);
+
+    const rawStore = fs.readFileSync(absoluteStorePath, "utf8");
+    expect(() => JSON.parse(rawStore)).not.toThrow();
+    const store = loadLocalWorkTrackingStore(absoluteStorePath);
+    const comments = store.comments["local-1"] ?? [];
+    expect(comments).toHaveLength(4);
+    expect(new Set(comments.map((comment) => comment.id)).size).toBe(4);
+    expect(comments.every((comment) =>
+      comment.body.includes(coordinationHandoffCommentMarker),
+    )).toBe(true);
+
+    const coordinationStatus = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-1",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(coordinationStatus.handoffs.records).toHaveLength(4);
+    expect(coordinationStatus.handoffs.records.map((record) => record.status))
+      .toEqual(expect.arrayContaining([...statuses]));
   });
 
   it("plans a clean handoff branch merge without mutating the source checkout", async () => {

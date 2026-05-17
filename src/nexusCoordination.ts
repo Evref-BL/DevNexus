@@ -1316,7 +1316,11 @@ function readCoordinationHandoffs(options: {
     options.context.projectRoot,
     workTracking,
   );
-  const store = loadLocalWorkTrackingStore(storePath);
+  const store = loadLocalWorkTrackingStore(
+    storePath,
+    undefined,
+    "readCoordinationHandoffs",
+  );
   const comments = options.workItemId
     ? (store.comments[options.workItemId] ?? []).map((comment) => ({
         workItemId: options.workItemId!,

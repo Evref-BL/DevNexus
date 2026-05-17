@@ -20,6 +20,8 @@ import type {
 export const localWorkTrackingDirectoryName = ".dev-nexus";
 export const localWorkTrackingStoreFileName = "work-items.json";
 export const localWorkTrackingStoreVersion = 1;
+const localWorkTrackingStoreLockTimeoutMs = 30_000;
+const localWorkTrackingStoreLockRetryMs = 10;
 
 const workStatuses = new Set<WorkStatus>([
   "todo",
@@ -47,9 +49,12 @@ export interface LocalWorkTrackerProviderOptions {
 }
 
 export class LocalWorkTrackerProviderError extends Error {
-  constructor(message: string) {
+  constructor(message: string, options: { cause?: unknown } = {}) {
     super(message);
     this.name = "LocalWorkTrackerProviderError";
+    if (options.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
   }
 }
 
@@ -136,8 +141,7 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
     context: NexusProjectContext,
   ): Promise<TrackerProjectRef> {
     const projectRoot = this.resolveProjectRoot(context.projectRoot);
-    const store = this.loadStore(projectRoot);
-    this.saveStore(projectRoot, store);
+    await this.mutateStore(projectRoot, "ensureProject", () => undefined);
 
     return {
       provider: "local",
@@ -153,38 +157,38 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
 
   async createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
     const projectRoot = this.resolveProjectRoot(input.projectRoot);
-    const store = this.loadStore(projectRoot);
-    const number = store.nextNumber;
-    const id = `local-${number}`;
-    const timestamp = this.now();
-    const status = input.status ?? "todo";
-    assertWorkStatus(status);
+    return this.mutateStore(projectRoot, "createWorkItem", (store) => {
+      const number = store.nextNumber;
+      const id = `local-${number}`;
+      const timestamp = this.now();
+      const status = input.status ?? "todo";
+      assertWorkStatus(status);
 
-    const item: WorkItem = {
-      id,
-      title: requiredNonEmptyString(input.title, "title"),
-      description: input.description ?? null,
-      status,
-      provider: "local",
-      labels: normalizeStringArray(input.labels, "labels"),
-      assignees: normalizeStringArray(input.assignees, "assignees"),
-      milestone: optionalNullableString(input.milestone, "milestone") ?? null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      closedAt: isClosedStatus(status) ? timestamp : null,
-      webUrl: null,
-      externalRef: {
+      const item: WorkItem = {
+        id,
+        title: requiredNonEmptyString(input.title, "title"),
+        description: input.description ?? null,
+        status,
         provider: "local",
-        itemId: id,
-        itemNumber: number,
-      },
-    };
+        labels: normalizeStringArray(input.labels, "labels"),
+        assignees: normalizeStringArray(input.assignees, "assignees"),
+        milestone: optionalNullableString(input.milestone, "milestone") ?? null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        closedAt: isClosedStatus(status) ? timestamp : null,
+        webUrl: null,
+        externalRef: {
+          provider: "local",
+          itemId: id,
+          itemNumber: number,
+        },
+      };
 
-    store.items.push(item);
-    store.comments[item.id] = [];
-    store.nextNumber += 1;
-    this.saveStore(projectRoot, store);
-    return item;
+      store.items.push(item);
+      store.comments[item.id] = [];
+      store.nextNumber += 1;
+      return item;
+    });
   }
 
   async listWorkItems(query: WorkItemQuery = {}): Promise<WorkItem[]> {
@@ -204,7 +208,7 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
     const search = query.search?.trim().toLowerCase();
     const limit = normalizeLimit(query.limit);
 
-    let items = this.loadStore(projectRoot).items.filter((item) => {
+    let items = this.loadStore(projectRoot, "listWorkItems").items.filter((item) => {
       if (statuses && !statuses.has(item.status)) {
         return false;
       }
@@ -229,72 +233,72 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
   }
 
   async getWorkItem(ref: WorkItemRef): Promise<WorkItem> {
-    const store = this.loadStore(this.resolveProjectRoot());
+    const store = this.loadStore(this.resolveProjectRoot(), "getWorkItem");
     return findWorkItem(store, ref);
   }
 
   async updateWorkItem(ref: WorkItemRef, patch: WorkItemPatch): Promise<WorkItem> {
     const projectRoot = this.resolveProjectRoot();
-    const store = this.loadStore(projectRoot);
-    const item = findWorkItem(store, ref);
-    const timestamp = this.now();
+    return this.mutateStore(projectRoot, "updateWorkItem", (store) => {
+      const item = findWorkItem(store, ref);
+      const timestamp = this.now();
 
-    const updated: WorkItem = {
-      ...item,
-      updatedAt: timestamp,
-    };
+      const updated: WorkItem = {
+        ...item,
+        updatedAt: timestamp,
+      };
 
-    if (patch.title !== undefined) {
-      updated.title = requiredNonEmptyString(patch.title, "title");
-    }
-    if (patch.description !== undefined) {
-      updated.description = patch.description;
-    }
-    if (patch.status !== undefined) {
-      assertWorkStatus(patch.status);
-      updated.status = patch.status;
-      updated.closedAt = isClosedStatus(patch.status)
-        ? item.closedAt ?? timestamp
-        : null;
-    }
-    if (patch.labels !== undefined) {
-      updated.labels = normalizeStringArray(patch.labels, "labels");
-    }
-    if (patch.assignees !== undefined) {
-      updated.assignees = normalizeStringArray(patch.assignees, "assignees");
-    }
-    if (patch.milestone !== undefined) {
-      updated.milestone = optionalNullableString(patch.milestone, "milestone");
-    }
+      if (patch.title !== undefined) {
+        updated.title = requiredNonEmptyString(patch.title, "title");
+      }
+      if (patch.description !== undefined) {
+        updated.description = patch.description;
+      }
+      if (patch.status !== undefined) {
+        assertWorkStatus(patch.status);
+        updated.status = patch.status;
+        updated.closedAt = isClosedStatus(patch.status)
+          ? item.closedAt ?? timestamp
+          : null;
+      }
+      if (patch.labels !== undefined) {
+        updated.labels = normalizeStringArray(patch.labels, "labels");
+      }
+      if (patch.assignees !== undefined) {
+        updated.assignees = normalizeStringArray(patch.assignees, "assignees");
+      }
+      if (patch.milestone !== undefined) {
+        updated.milestone = optionalNullableString(patch.milestone, "milestone");
+      }
 
-    store.items[store.items.indexOf(item)] = updated;
-    this.saveStore(projectRoot, store);
-    return updated;
+      store.items[store.items.indexOf(item)] = updated;
+      return updated;
+    });
   }
 
   async addComment(ref: WorkItemRef, body: string): Promise<WorkComment> {
     const projectRoot = this.resolveProjectRoot();
-    const store = this.loadStore(projectRoot);
-    const item = findWorkItem(store, ref);
-    const timestamp = this.now();
-    const id = `local-comment-${store.nextCommentNumber}`;
-    const comment: WorkComment = {
-      id,
-      body: requiredNonEmptyString(body, "body"),
-      author: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      externalRef: {
-        provider: "local",
-        itemId: id,
-      },
-    };
+    return this.mutateStore(projectRoot, "addComment", (store) => {
+      const item = findWorkItem(store, ref);
+      const timestamp = this.now();
+      const id = `local-comment-${store.nextCommentNumber}`;
+      const comment: WorkComment = {
+        id,
+        body: requiredNonEmptyString(body, "body"),
+        author: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        externalRef: {
+          provider: "local",
+          itemId: id,
+        },
+      };
 
-    store.nextCommentNumber += 1;
-    store.comments[item.id] = [...(store.comments[item.id] ?? []), comment];
-    item.updatedAt = timestamp;
-    this.saveStore(projectRoot, store);
-    return comment;
+      store.nextCommentNumber += 1;
+      store.comments[item.id] = [...(store.comments[item.id] ?? []), comment];
+      item.updatedAt = timestamp;
+      return comment;
+    });
   }
 
   async setStatus(ref: WorkItemRef, status: WorkStatus): Promise<WorkItem> {
@@ -312,15 +316,37 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
     );
   }
 
-  private loadStore(projectRoot: string): LocalWorkTrackingStore {
-    return loadLocalWorkTrackingStore(this.storePathFor(projectRoot), this.now());
+  private loadStore(
+    projectRoot: string,
+    operation: string,
+  ): LocalWorkTrackingStore {
+    return loadLocalWorkTrackingStore(
+      this.storePathFor(projectRoot),
+      this.now(),
+      operation,
+    );
   }
 
-  private saveStore(projectRoot: string, store: LocalWorkTrackingStore): void {
-    saveLocalWorkTrackingStore(this.storePathFor(projectRoot), {
-      ...store,
-      updatedAt: this.now(),
-    });
+  private async mutateStore<T>(
+    projectRoot: string,
+    operation: string,
+    mutate: (store: LocalWorkTrackingStore) => T,
+  ): Promise<T> {
+    return mutateLocalWorkTrackingStore(
+      this.storePathFor(projectRoot),
+      operation,
+      this.now(),
+      (store) => {
+        const result = mutate(store);
+        return {
+          store: {
+            ...store,
+            updatedAt: this.now(),
+          },
+          result,
+        };
+      },
+    );
   }
 
   private now(): string {
@@ -332,25 +358,170 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
 export function loadLocalWorkTrackingStore(
   storePath: string,
   timestamp: string = new Date().toISOString(),
+  operation = "loadLocalWorkTrackingStore",
 ): LocalWorkTrackingStore {
   if (!fs.existsSync(storePath)) {
     return emptyStore(timestamp);
   }
 
-  const raw = JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, ""));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, ""));
+  } catch (error) {
+    throw localStoreParseError(storePath, operation, error);
+  }
   return validateStore(raw);
 }
 
 export function saveLocalWorkTrackingStore(
   storePath: string,
   store: LocalWorkTrackingStore,
+  operation = "saveLocalWorkTrackingStore",
 ): void {
+  const normalized = validateStore(store);
+  const temporaryPath = temporaryStorePath(storePath);
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  fs.writeFileSync(
-    storePath,
-    `${JSON.stringify(validateStore(store), null, 2)}\n`,
-    "utf8",
+  try {
+    writeTextFileSync(temporaryPath, `${JSON.stringify(normalized, null, 2)}\n`);
+    fs.renameSync(temporaryPath, storePath);
+  } catch (error) {
+    fs.rmSync(temporaryPath, { force: true });
+    throw localStoreWriteError(storePath, operation, error);
+  }
+}
+
+async function mutateLocalWorkTrackingStore<T>(
+  storePath: string,
+  operation: string,
+  timestamp: string,
+  mutate: (
+    store: LocalWorkTrackingStore,
+  ) => { store: LocalWorkTrackingStore; result: T },
+): Promise<T> {
+  const release = await acquireLocalWorkTrackingStoreLock(storePath, operation);
+  try {
+    const store = loadLocalWorkTrackingStore(storePath, timestamp, operation);
+    const mutation = mutate(store);
+    saveLocalWorkTrackingStore(storePath, mutation.store, operation);
+    return mutation.result;
+  } finally {
+    release();
+  }
+}
+
+async function acquireLocalWorkTrackingStoreLock(
+  storePath: string,
+  operation: string,
+): Promise<() => void> {
+  const lockPath = localWorkTrackingStoreLockPath(storePath);
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  const startedAt = Date.now();
+  while (true) {
+    if (tryWriteStoreLock(lockPath, storePath, operation)) {
+      return () => {
+        fs.rmSync(lockPath, { force: true });
+      };
+    }
+
+    if (Date.now() - startedAt >= localWorkTrackingStoreLockTimeoutMs) {
+      throw new LocalWorkTrackerProviderError(
+        `Failed to acquire local work item store lock at ${path.resolve(lockPath)} for ${path.resolve(storePath)} during ${operation}. Recovery: confirm no DevNexus process is writing this store, remove the stale lock file if it is safe, and retry.`,
+      );
+    }
+
+    await delay(localWorkTrackingStoreLockRetryMs);
+  }
+}
+
+function tryWriteStoreLock(
+  lockPath: string,
+  storePath: string,
+  operation: string,
+): boolean {
+  try {
+    const handle = fs.openSync(lockPath, "wx");
+    try {
+      fs.writeFileSync(
+        handle,
+        `${JSON.stringify(
+          {
+            pid: process.pid,
+            operation,
+            storePath: path.resolve(storePath),
+            acquiredAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+    } finally {
+      fs.closeSync(handle);
+    }
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+function localWorkTrackingStoreLockPath(storePath: string): string {
+  return `${storePath}.lock`;
+}
+
+function temporaryStorePath(storePath: string): string {
+  const directory = path.dirname(storePath);
+  const basename = path.basename(storePath);
+  const nonce = `${process.pid}-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2)}`;
+  return path.join(directory, `.${basename}.${nonce}.tmp`);
+}
+
+function writeTextFileSync(filePath: string, content: string): void {
+  const handle = fs.openSync(filePath, "w");
+  try {
+    fs.writeFileSync(handle, content, "utf8");
+    fs.fsyncSync(handle);
+  } finally {
+    fs.closeSync(handle);
+  }
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function localStoreParseError(
+  storePath: string,
+  operation: string,
+  error: unknown,
+): LocalWorkTrackerProviderError {
+  return new LocalWorkTrackerProviderError(
+    `Failed to parse local work item store at ${path.resolve(storePath)} during ${operation}. DevNexus did not write changes to this store. Recovery: repair the JSON store or restore it from backup before retrying. Original error: ${errorDetail(error)}`,
+    { cause: error },
   );
+}
+
+function localStoreWriteError(
+  storePath: string,
+  operation: string,
+  error: unknown,
+): LocalWorkTrackerProviderError {
+  return new LocalWorkTrackerProviderError(
+    `Failed to write local work item store at ${path.resolve(storePath)} during ${operation}. Recovery: verify filesystem permissions and free space, then retry. Original error: ${errorDetail(error)}`,
+    { cause: error },
+  );
+}
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error
+    ? `${error.name}: ${error.message}`
+    : String(error);
 }
 
 function emptyStore(timestamp: string): LocalWorkTrackingStore {

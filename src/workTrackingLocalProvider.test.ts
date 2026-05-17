@@ -23,6 +23,23 @@ function fixedClock(...timestamps: string[]): () => string {
   return () => timestamps[Math.min(index++, timestamps.length - 1)] ?? timestamps[0]!;
 }
 
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function holdStoreLock(storePath: string): () => void {
+  const lockPath = `${storePath}.lock`;
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  const handle = fs.openSync(lockPath, "wx");
+  try {
+    fs.writeFileSync(handle, "external test lock\n", "utf8");
+  } finally {
+    fs.closeSync(handle);
+  }
+
+  return () => fs.rmSync(lockPath, { force: true });
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -226,5 +243,102 @@ describe("local work tracker provider", () => {
     await expect(provider.createWorkItem({ title: "   " })).rejects.toThrow(
       /title must be a non-empty string/,
     );
+  });
+
+  it("serializes concurrent create, comment, and update mutations against one store", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const provider = createLocalWorkTrackerProvider({ projectRoot });
+    const seedItems = [];
+    for (let index = 0; index < 4; index += 1) {
+      seedItems.push(await provider.createWorkItem({ title: `Seed ${index}` }));
+    }
+
+    const storePath = defaultLocalWorkTrackingStorePath(projectRoot);
+    const releaseLock = holdStoreLock(storePath);
+    let completed = false;
+    const mutations = Promise.all([
+      ...Array.from({ length: 4 }, (_, index) =>
+        createLocalWorkTrackerProvider({ projectRoot }).createWorkItem({
+          title: `Created ${index}`,
+          labels: [`created-${index}`],
+        }),
+      ),
+      ...seedItems.map((item, index) =>
+        createLocalWorkTrackerProvider({ projectRoot }).addComment(
+          { id: item.id },
+          `Comment ${index}`,
+        ),
+      ),
+      ...seedItems.map((item, index) =>
+        createLocalWorkTrackerProvider({ projectRoot }).updateWorkItem(
+          { id: item.id },
+          { labels: [`updated-${index}`] },
+        ),
+      ),
+    ]).then((result) => {
+      completed = true;
+      return result;
+    });
+
+    try {
+      await sleep(25);
+      expect(completed).toBe(false);
+    } finally {
+      releaseLock();
+    }
+
+    const results = await mutations;
+    const created = results.slice(0, 4).map((item) => item.id);
+    expect(new Set(created).size).toBe(4);
+
+    const rawStore = fs.readFileSync(storePath, "utf8");
+    expect(() => JSON.parse(rawStore)).not.toThrow();
+    const store = loadLocalWorkTrackingStore(storePath);
+    expect(store.items).toHaveLength(8);
+    expect(store.nextNumber).toBe(9);
+    expect(store.nextCommentNumber).toBe(5);
+    expect(new Set(store.items.map((item) => item.id)).size).toBe(8);
+
+    for (const [index, item] of seedItems.entries()) {
+      expect(store.comments[item.id]).toHaveLength(1);
+      expect(store.comments[item.id]?.[0]?.id).toMatch(/^local-comment-\d+$/u);
+      expect(store.comments[item.id]?.[0]?.body).toBe(`Comment ${index}`);
+      expect(store.items.find((candidate) => candidate.id === item.id)).toMatchObject({
+        id: item.id,
+        labels: [`updated-${index}`],
+      });
+    }
+  });
+
+  it("keeps a corrupted store unchanged and reports parse recovery context", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const provider = createLocalWorkTrackerProvider({ projectRoot });
+    const storePath = defaultLocalWorkTrackingStorePath(projectRoot);
+    const corruptedStore = `${JSON.stringify({
+      version: localWorkTrackingStoreVersion,
+      nextNumber: 1,
+      nextCommentNumber: 1,
+      updatedAt: "2026-05-15T09:00:00.000Z",
+      items: [],
+      comments: {},
+    })}\n{\"duplicated\":\"tail\"}\n`;
+    fs.mkdirSync(path.dirname(storePath), { recursive: true });
+    fs.writeFileSync(storePath, corruptedStore, "utf8");
+
+    let caught: unknown;
+    try {
+      await provider.createWorkItem({ title: "Should not overwrite" });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message).toContain(path.resolve(storePath));
+    expect(message).toContain("createWorkItem");
+    expect(message).toContain("Recovery:");
+    expect(message).toContain("Original error:");
+    expect((caught as { cause?: unknown }).cause).toBeInstanceOf(SyntaxError);
+    expect(fs.readFileSync(storePath, "utf8")).toBe(corruptedStore);
   });
 });
