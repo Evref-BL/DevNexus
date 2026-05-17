@@ -71,6 +71,7 @@ import {
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
 } from "./workItemService.js";
+import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import type { GitRunner } from "./gitWorktreeService.js";
 import type {
   WorkItemPatch,
@@ -645,7 +646,7 @@ const tools: McpTool[] = [
 ];
 
 export function listDevNexusMcpTools(): McpTool[] {
-  return tools;
+  return providerCompatibleMcpTools(tools);
 }
 
 export async function callDevNexusMcpTool(

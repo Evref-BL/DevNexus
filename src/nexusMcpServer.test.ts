@@ -8,6 +8,7 @@ import {
   defaultNexusAutomationConfig,
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
+  listMcpInputSchemaProviderIssues,
   readNexusAutomationRunLedger,
   saveProjectConfig,
   type GitCommandResult,
@@ -178,6 +179,17 @@ describe("DevNexus MCP server", () => {
       "work_item_comment",
       "work_item_set_status",
     ]);
+  });
+
+  it("lists provider-compatible tool input schemas", () => {
+    const issues = listDevNexusMcpTools().flatMap((tool) =>
+      listMcpInputSchemaProviderIssues(tool.inputSchema).map((issue) => ({
+        tool: tool.name,
+        ...issue,
+      })),
+    );
+
+    expect(issues).toEqual([]);
   });
 
   it("prepares project-meta worktrees through MCP tools", async () => {

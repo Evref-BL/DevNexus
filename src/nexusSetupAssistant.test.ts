@@ -348,7 +348,52 @@ describe("nexus setup assistant", () => {
         status: "passed",
       }),
     );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "warning",
+        summary: expect.stringContaining("missing from .codex"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-claude-dev_nexus",
+        status: "warning",
+        summary: expect.stringContaining("missing from .mcp.json"),
+      }),
+    );
     expect(check.status).toBe("warning");
+  });
+
+  it("passes the agent MCP server check when the expected server is configured", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-server-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
+      recursive: true,
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "passed",
+      }),
+    );
   });
 
   it("lists OpenCode and manual provider MCP targets in setup guidance and checks", () => {
@@ -557,7 +602,10 @@ describe("nexus setup assistant", () => {
     writeProject(projectRoot);
     fs.mkdirSync(path.join(projectRoot, ".git"));
     fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), "");
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
 
     const check = buildNexusSetupCheck({
       projectRoot,
@@ -585,7 +633,10 @@ describe("nexus setup assistant", () => {
     writeProject(projectRoot);
     fs.mkdirSync(path.join(projectRoot, ".git"));
     fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), "");
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
     fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
       recursive: true,
     });

@@ -238,6 +238,7 @@ export function buildNexusSetupCheck(options: {
         "Run dev-nexus project mcp refresh . after installing DevNexus.",
       missingStatus: "warning",
     }));
+    checks.push(agentMcpServerConfiguredCheck(target));
     checks.push(...agentMcpCapabilityGapChecks(target));
   }
 
@@ -963,6 +964,55 @@ function pluginMcpServerCheck(options: {
       configured === false
         ? `Run the plugin-specific MCP setup or refresh step so ${options.provider} can access ${serverName}.`
         : `Verify ${serverName} manually in ${options.configPathRelative} or add a DevNexus MCP config adapter for ${options.provider}.`,
+  };
+}
+
+function agentMcpServerConfiguredCheck(
+  target: MaterializedNexusAgentMcpTarget,
+): NexusSetupCheckResult {
+  const checkBase = {
+    id: `agent-mcp-server-${setupCheckIdPart(target.agent)}-${setupCheckIdPart(target.serverName)}`,
+    title: `${target.agent} MCP server ${target.serverName}`,
+  };
+
+  if (!fs.existsSync(target.configPath)) {
+    return {
+      ...checkBase,
+      status: "warning",
+      summary:
+        `${target.provider} MCP config is missing, so DevNexus cannot confirm ${target.serverName} is configured.`,
+      nextAction:
+        `Run dev-nexus project mcp refresh . to project ${target.serverName} into ${target.configPathRelative}.`,
+    };
+  }
+
+  const configured = mcpServerConfigured({
+    provider: target.provider,
+    configPath: target.configPath,
+    configSchema: target.configSchema,
+    serverName: target.serverName,
+  });
+  if (configured === true) {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary:
+        `DevNexus MCP server ${target.serverName} is configured for ${target.provider}.`,
+      nextAction: null,
+    };
+  }
+
+  return {
+    ...checkBase,
+    status: "warning",
+    summary:
+      configured === false
+        ? `DevNexus expected MCP server ${target.serverName}, but it is missing from ${target.configPathRelative}.`
+        : `DevNexus cannot inspect ${target.provider} MCP config schema ${target.configSchema} for server ${target.serverName}.`,
+    nextAction:
+      configured === false
+        ? `Run dev-nexus project mcp refresh . and confirm ${target.serverName} appears in ${target.configPathRelative}.`
+        : `Confirm ${target.serverName} manually in ${target.configPathRelative}, or add a DevNexus adapter for ${target.provider}.`,
   };
 }
 
