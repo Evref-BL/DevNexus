@@ -169,6 +169,9 @@ Immediate direction:
     `docs/shared-multi-host-coordination-prd.md`; assignment should be treated
     as ownership/response intent unless a project explicitly configures it as
     an approval signal.
+  - Default policy direction: external provider events should update neutral
+    DevNexus state-machine records; GitHub labels or Projects status/category
+    moves are preferred for issue-level approval over assignment.
 - Human-in-the-loop shared coordination decision:
   - `dev-nexus:local-16` choose the real shared tracker/provider and Tailscale
     transport role for Mac/Windows dogfood.

@@ -290,6 +290,48 @@ A safer first policy is:
 - DevNexus should record the exact provider object, signal, actor, timestamp,
   and summary that justified continuing.
 
+Default policy direction after the first dogfood review:
+
+- The coordinator may make ordinary coordination decisions and adjust local
+  DevNexus state when provider policy allows the underlying action. We will
+  judge and refine those defaults from dogfood evidence rather than requiring a
+  human choice for every event class.
+- External provider events should translate into neutral DevNexus state-machine
+  events. Typical effects are work-item status changes, labels, target-cycle
+  facts, notes, continuation decisions, or publication gates.
+- Provider assignment is an ownership or expected-responder signal. Approval
+  should come from an explicit state transition, such as a GitHub issue label,
+  GitHub Projects status/category move, GitLab label/status, Jira transition,
+  or provider-native review approval.
+- Project configuration should map provider-specific state transitions onto
+  neutral DevNexus signals such as `waiting`, `answered`, `approved`,
+  `changes_requested`, `timed_out`, `blocked`, and `ready_to_continue`.
+- The first GitHub policy should prefer labels or GitHub Projects categories
+  for issue-level approval, and pull-request review approval plus required
+  checks for merge approval.
+
+Default state-machine effects:
+
+- Drafted request: record a DevNexus note, but do not change work status unless
+  the coordinator chooses to pause.
+- Posted request: move the affected work item to `waiting` or add an equivalent
+  waiting label/status, record the provider object, and let the coordinator
+  choose unrelated eligible work.
+- Answer received: append the answer summary and mark the work item
+  `ready_to_continue` when the response resolves the question.
+- Approved state transition: mark the gated action as allowed, continue or move
+  the work item back to `ready`, and record the approving actor and provider
+  signal.
+- Changes requested or rejected: move the work item to a revision-oriented state
+  or leave it in progress with a clear requested-changes note.
+- Ambiguous answer: keep the item waiting, ask a narrower follow-up if policy
+  allows pings, or mark blocked when no safe interpretation exists.
+- Timed-out wait: record `timed_out`, optionally post one configured follow-up,
+  then mark blocked or downgrade to draft-only behavior.
+- Pull request or merge request approved: unlock publication only when provider
+  approval, required checks, branch protection, and DevNexus publication policy
+  all agree.
+
 ## Testing Decisions
 
 - Unit-test host/worktree/component inference with Windows and POSIX-style
