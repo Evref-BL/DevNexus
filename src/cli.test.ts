@@ -1176,6 +1176,77 @@ describe("dev-nexus cli", () => {
     expect(payload.projectConfig).toBeUndefined();
   });
 
+  it("summarizes codex app-server profiles without local command or endpoint values", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+          agent: {
+            ...projectConfig().automation!.agent,
+            profiles: [
+              {
+                id: "codex-app-server",
+                executor: "codex",
+                executorMode: "app_server",
+                intendedUse: "subagent",
+                model: "gpt-5.5",
+                reasoning: "high",
+                command: null,
+                args: [],
+                appServer: {
+                  mode: "spawn",
+                  command: "C:\\Users\\example\\Codex\\codex-app-server.exe",
+                  args: ["--profile", "dogfood"],
+                  endpoint: "http://127.0.0.1:17655",
+                  ephemeralThreadDefault: true,
+                  localPolicy: {
+                    hostLocalSafetyHints: [
+                      "requires_local_codex_account",
+                      "spawns_local_process",
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+    const output = captureOutput();
+
+    await main(["automation", "agent-profiles", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const rawOutput = output.output();
+    const payload = JSON.parse(rawOutput);
+    expect(payload.profiles).toEqual([
+      expect.objectContaining({
+        id: "codex-app-server",
+        executor: "codex",
+        executorMode: "app_server",
+        appServer: {
+          mode: "spawn",
+          commandConfigured: true,
+          argsCount: 1,
+          endpointScope: "loopback",
+          ephemeralThreadDefault: true,
+          allowNonLoopbackEndpoint: false,
+          hostLocalSafetyHints: [
+            "requires_local_codex_account",
+            "spawns_local_process",
+          ],
+        },
+      }),
+    ]);
+    expect(rawOutput).not.toContain("C:\\Users\\example");
+    expect(rawOutput).not.toContain("127.0.0.1:17655");
+  });
+
   it("refreshes project agent MCP config through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

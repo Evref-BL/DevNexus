@@ -262,4 +262,51 @@ describe("nexus automation agent profile command resolution", () => {
       ],
     });
   });
+
+  it("normalizes codex app-server policy as host-local profile policy", () => {
+    const policy = normalizeNexusAutomationAgentPolicy({
+      ...defaultNexusAutomationConfig,
+      agent: {
+        ...defaultNexusAutomationConfig.agent,
+        profiles: [
+          {
+            id: "codex-app-server",
+            executor: "codex",
+            executorMode: "app_server",
+            model: "gpt-5.5",
+            reasoning: "high",
+            intendedUse: "subagent",
+            command: null,
+            args: [],
+            appServer: {
+              mode: "connect",
+              command: null,
+              args: [],
+              endpoint: "http://127.0.0.1:17655",
+              ephemeralThreadDefault: false,
+              localPolicy: {
+                allowNonLoopbackEndpoint: false,
+                hostLocalSafetyHints: ["connects_to_local_service"],
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(policy.profiles[0]).toMatchObject({
+      id: "codex-app-server",
+      executor: "codex",
+      executorMode: "app_server",
+      appServer: {
+        mode: "connect",
+        endpoint: "http://127.0.0.1:17655",
+        ephemeralThreadDefault: false,
+        localPolicy: {
+          allowNonLoopbackEndpoint: false,
+          hostLocalSafetyHints: ["connects_to_local_service"],
+        },
+      },
+    });
+  });
 });

@@ -229,6 +229,65 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("reports codex app-server profiles through MCP without host-local values", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          agent: {
+            ...projectConfig().automation!.agent,
+            profiles: [
+              {
+                id: "codex-app-server",
+                executor: "codex",
+                executorMode: "app_server",
+                intendedUse: "subagent",
+                model: null,
+                reasoning: null,
+                command: null,
+                args: [],
+                appServer: {
+                  mode: "connect",
+                  command: null,
+                  args: [],
+                  endpoint: "http://127.0.0.1:17655",
+                  ephemeralThreadDefault: false,
+                  localPolicy: {
+                    hostLocalSafetyHints: ["connects_to_local_service"],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const response = await callDevNexusMcpTool("agent_profiles", { projectRoot });
+    const rawOutput = response.content[0]!.text;
+    const result = toolJson(response);
+
+    expect(result.profiles).toEqual([
+      expect.objectContaining({
+        id: "codex-app-server",
+        executorMode: "app_server",
+        appServer: {
+          mode: "connect",
+          commandConfigured: false,
+          argsCount: 0,
+          endpointScope: "loopback",
+          ephemeralThreadDefault: false,
+          allowNonLoopbackEndpoint: false,
+          hostLocalSafetyHints: ["connects_to_local_service"],
+        },
+      }),
+    ]);
+    expect(rawOutput).not.toContain("127.0.0.1:17655");
+  });
+
   it("records and reports coordination handoffs through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");

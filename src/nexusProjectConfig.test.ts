@@ -516,6 +516,198 @@ describe("project config", () => {
     });
   });
 
+  it("accepts codex app-server profiles without changing codex exec or Claude profiles", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "app-server-agent-profile-project",
+        name: "App Server Agent Profile Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          mode: "agent_launch",
+          agent: {
+            coordinatorProfileId: "codex-exec",
+            profiles: [
+              {
+                id: "codex-exec",
+                executor: "codex",
+                model: "gpt-5.5",
+                reasoning: "xhigh",
+                command: "codex",
+                args: ["exec"],
+              },
+              {
+                id: "claude-worker",
+                executor: "claude",
+                model: "claude-sonnet",
+                reasoning: null,
+                command: null,
+                args: [],
+              },
+              {
+                id: "codex-app-server",
+                executor: "codex",
+                executorMode: "app_server",
+                intendedUse: "subagent",
+                model: "gpt-5.5",
+                reasoning: "high",
+                command: null,
+                args: [],
+                appServer: {
+                  mode: "spawn",
+                  command: "C:\\Users\\example\\Codex\\codex-app-server.exe",
+                  args: ["--profile", "dogfood"],
+                  endpoint: "http://127.0.0.1:17655",
+                  ephemeralThreadDefault: true,
+                  localPolicy: {
+                    hostLocalSafetyHints: [
+                      "requires_local_codex_account",
+                      "spawns_local_process",
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }).automation?.agent.profiles,
+    ).toEqual([
+      {
+        id: "codex-exec",
+        executor: "codex",
+        model: "gpt-5.5",
+        version: null,
+        variant: null,
+        reasoning: "xhigh",
+        intelligence: null,
+        intendedUse: "any",
+        safety: null,
+        command: "codex",
+        args: ["exec"],
+      },
+      {
+        id: "claude-worker",
+        executor: "claude",
+        model: "claude-sonnet",
+        version: null,
+        variant: null,
+        reasoning: null,
+        intelligence: null,
+        intendedUse: "any",
+        safety: null,
+        command: null,
+        args: [],
+      },
+      {
+        id: "codex-app-server",
+        executor: "codex",
+        executorMode: "app_server",
+        model: "gpt-5.5",
+        version: null,
+        variant: null,
+        reasoning: "high",
+        intelligence: null,
+        intendedUse: "subagent",
+        safety: null,
+        command: null,
+        args: [],
+        appServer: {
+          mode: "spawn",
+          command: "C:\\Users\\example\\Codex\\codex-app-server.exe",
+          args: ["--profile", "dogfood"],
+          endpoint: "http://127.0.0.1:17655",
+          ephemeralThreadDefault: true,
+          localPolicy: {
+            allowNonLoopbackEndpoint: false,
+            hostLocalSafetyHints: [
+              "requires_local_codex_account",
+              "spawns_local_process",
+            ],
+          },
+        },
+      },
+    ]);
+  });
+
+  it("rejects unsafe codex app-server profile combinations", () => {
+    const configWithProfile = (profile: Record<string, unknown>) => ({
+      version: 1,
+      id: "invalid-app-server-agent-profile",
+      name: "Invalid App Server Agent Profile",
+      kanban: {
+        provider: "vibe-kanban",
+        projectId: null,
+      },
+      automation: {
+        agent: {
+          profiles: [profile],
+        },
+      },
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithProfile({
+          id: "spawn-missing-command",
+          executor: "codex",
+          executorMode: "app_server",
+          appServer: {
+            mode: "spawn",
+            endpoint: "http://127.0.0.1:17655",
+          },
+        }),
+      ),
+    ).toThrow(/appServer\.command must be configured when appServer\.mode is spawn/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithProfile({
+          id: "non-loopback-without-policy",
+          executor: "codex",
+          executorMode: "app_server",
+          appServer: {
+            mode: "connect",
+            endpoint: "http://192.168.1.10:17655",
+          },
+        }),
+      ),
+    ).toThrow(/non-loopback.*localPolicy\.allowNonLoopbackEndpoint/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithProfile({
+          id: "claude-app-server",
+          executor: "claude",
+          executorMode: "app_server",
+          appServer: {
+            mode: "connect",
+            endpoint: "http://127.0.0.1:17655",
+          },
+        }),
+      ),
+    ).toThrow(/executorMode app_server requires executor codex/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithProfile({
+          id: "bad-hint",
+          executor: "codex",
+          executorMode: "app_server",
+          appServer: {
+            mode: "connect",
+            endpoint: "http://127.0.0.1:17655",
+            localPolicy: {
+              hostLocalSafetyHints: ["store-token-in-config"],
+            },
+          },
+        }),
+      ),
+    ).toThrow(/hostLocalSafetyHints\[0\]/);
+  });
+
   it("accepts multiple additive plugin capability records", () => {
     expect(
       validateProjectConfig({
