@@ -13,6 +13,13 @@ export type NexusAutomationAgentProfileIntendedUse =
   | "any"
   | "coordinator"
   | "subagent";
+export type NexusAutomationAgentProfileExecutorMode = "exec" | "app_server";
+export type NexusAutomationCodexAppServerMode = "connect" | "spawn";
+export type NexusAutomationCodexAppServerSafetyHint =
+  | "connects_to_local_service"
+  | "requires_local_codex_account"
+  | "spawns_local_process"
+  | "uses_host_local_endpoint";
 
 export interface NexusAutomationSelectorConfig {
   statuses: WorkStatus[];
@@ -73,6 +80,7 @@ export interface NexusAutomationAgentRelaunchConfig {
 export interface NexusAutomationAgentProfileConfig {
   id: string;
   executor: string;
+  executorMode?: NexusAutomationAgentProfileExecutorMode;
   model: string | null;
   version?: string | null;
   variant?: string | null;
@@ -82,6 +90,21 @@ export interface NexusAutomationAgentProfileConfig {
   safety?: NexusAutomationSafetyConfig | null;
   command: string | null;
   args: string[];
+  appServer?: NexusAutomationCodexAppServerConfig;
+}
+
+export interface NexusAutomationCodexAppServerLocalPolicy {
+  allowNonLoopbackEndpoint: boolean;
+  hostLocalSafetyHints: NexusAutomationCodexAppServerSafetyHint[];
+}
+
+export interface NexusAutomationCodexAppServerConfig {
+  mode: NexusAutomationCodexAppServerMode;
+  command: string | null;
+  args: string[];
+  endpoint: string;
+  ephemeralThreadDefault: boolean;
+  localPolicy: NexusAutomationCodexAppServerLocalPolicy;
 }
 
 export interface NexusAutomationAgentConfig {
@@ -517,10 +540,27 @@ function validateAgentProfileConfig(
   pathName: string,
 ): NexusAutomationAgentProfileConfig {
   const record = assertRecord(value, pathName);
+  const id = requiredNonEmptyString(record.id, `${pathName}.id`);
+  const executor = requiredNonEmptyString(record.executor, `${pathName}.executor`);
+  const executorMode = validateAgentProfileExecutorMode(
+    record.executorMode,
+    `${pathName}.executorMode`,
+  );
+  const appServer = validateCodexAppServerConfig(
+    record.appServer,
+    `${pathName}.appServer`,
+  );
+  const resolvedExecutorMode = validateAgentProfileExecutorModeCombination({
+    executor,
+    executorMode,
+    appServer,
+    pathName,
+  });
 
   return {
-    id: requiredNonEmptyString(record.id, `${pathName}.id`),
-    executor: requiredNonEmptyString(record.executor, `${pathName}.executor`),
+    id,
+    executor,
+    ...(resolvedExecutorMode ? { executorMode: resolvedExecutorMode } : {}),
     model: optionalNullableString(record.model, `${pathName}.model`) ?? null,
     version:
       optionalNullableString(record.version, `${pathName}.version`) ?? null,
@@ -541,7 +581,258 @@ function validateAgentProfileConfig(
     ),
     command: optionalNullableString(record.command, `${pathName}.command`) ?? null,
     args: optionalStringArray(record.args, `${pathName}.args`) ?? [],
+    ...(appServer ? { appServer } : {}),
   };
+}
+
+function validateAgentProfileExecutorMode(
+  value: unknown,
+  pathName: string,
+): NexusAutomationAgentProfileExecutorMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "exec" || value === "app_server") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(`${pathName} must be exec or app_server`);
+}
+
+function validateAgentProfileExecutorModeCombination(options: {
+  executor: string;
+  executorMode: NexusAutomationAgentProfileExecutorMode | undefined;
+  appServer: NexusAutomationCodexAppServerConfig | undefined;
+  pathName: string;
+}): NexusAutomationAgentProfileExecutorMode | undefined {
+  const resolvedMode =
+    options.executorMode ?? (options.appServer ? "app_server" : undefined);
+  if (!resolvedMode) {
+    return undefined;
+  }
+  if (options.executor.toLowerCase() !== "codex") {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.executorMode app_server requires executor codex`,
+    );
+  }
+  if (resolvedMode === "exec" && options.appServer) {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.appServer requires executorMode app_server`,
+    );
+  }
+  if (resolvedMode === "app_server" && !options.appServer) {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.appServer must be configured when executorMode is app_server`,
+    );
+  }
+
+  return resolvedMode;
+}
+
+function validateCodexAppServerConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationCodexAppServerConfig | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const mode = validateCodexAppServerMode(record.mode, `${pathName}.mode`);
+  const command = optionalNullableString(record.command, `${pathName}.command`) ??
+    null;
+  const args = optionalStringArray(record.args, `${pathName}.args`) ?? [];
+  const endpoint = requiredCodexAppServerEndpoint(
+    record.endpoint,
+    `${pathName}.endpoint`,
+  );
+  const ephemeralThreadDefault = optionalBoolean(
+    record,
+    "ephemeralThreadDefault",
+    pathName,
+  ) ?? true;
+  const localPolicy = validateCodexAppServerLocalPolicy(
+    record.localPolicy,
+    `${pathName}.localPolicy`,
+  );
+
+  validateCodexAppServerModeCombination({
+    mode,
+    command,
+    args,
+    pathName,
+  });
+  validateCodexAppServerEndpointPolicy({
+    endpoint,
+    localPolicy,
+    pathName,
+  });
+
+  return {
+    mode,
+    command,
+    args,
+    endpoint,
+    ephemeralThreadDefault,
+    localPolicy,
+  };
+}
+
+function validateCodexAppServerMode(
+  value: unknown,
+  pathName: string,
+): NexusAutomationCodexAppServerMode {
+  if (value === "connect" || value === "spawn") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(`${pathName} must be connect or spawn`);
+}
+
+function validateCodexAppServerLocalPolicy(
+  value: unknown,
+  pathName: string,
+): NexusAutomationCodexAppServerLocalPolicy {
+  if (value === undefined || value === null) {
+    return {
+      allowNonLoopbackEndpoint: false,
+      hostLocalSafetyHints: [],
+    };
+  }
+
+  const record = assertRecord(value, pathName);
+  return {
+    allowNonLoopbackEndpoint:
+      optionalBoolean(record, "allowNonLoopbackEndpoint", pathName) ?? false,
+    hostLocalSafetyHints: optionalArrayField(
+      record,
+      "hostLocalSafetyHints",
+      pathName,
+      validateCodexAppServerSafetyHint,
+    ).hostLocalSafetyHints ?? [],
+  };
+}
+
+function validateCodexAppServerSafetyHint(
+  value: unknown,
+  pathName: string,
+): NexusAutomationCodexAppServerSafetyHint {
+  if (
+    value === "connects_to_local_service" ||
+    value === "requires_local_codex_account" ||
+    value === "spawns_local_process" ||
+    value === "uses_host_local_endpoint"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be connects_to_local_service, requires_local_codex_account, spawns_local_process, or uses_host_local_endpoint`,
+  );
+}
+
+function validateCodexAppServerModeCombination(options: {
+  mode: NexusAutomationCodexAppServerMode;
+  command: string | null;
+  args: string[];
+  pathName: string;
+}): void {
+  if (options.mode === "spawn" && !options.command) {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.command must be configured when appServer.mode is spawn`,
+    );
+  }
+  if (options.mode === "connect" && options.command) {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.command must be omitted when appServer.mode is connect`,
+    );
+  }
+  if (options.mode === "connect" && options.args.length > 0) {
+    throw new NexusAutomationConfigError(
+      `${options.pathName}.args must be omitted when appServer.mode is connect`,
+    );
+  }
+}
+
+function requiredCodexAppServerEndpoint(
+  value: unknown,
+  pathName: string,
+): string {
+  const endpoint = requiredNonEmptyString(value, pathName);
+  const url = parseCodexAppServerEndpoint(endpoint, pathName);
+  if (url.username || url.password || url.search || url.hash) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must not include credentials, query, or fragment values`,
+    );
+  }
+
+  return endpoint;
+}
+
+function validateCodexAppServerEndpointPolicy(options: {
+  endpoint: string;
+  localPolicy: NexusAutomationCodexAppServerLocalPolicy;
+  pathName: string;
+}): void {
+  if (isLoopbackCodexAppServerEndpoint(options.endpoint, options.pathName)) {
+    return;
+  }
+  if (options.localPolicy.allowNonLoopbackEndpoint) {
+    return;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${options.pathName}.endpoint uses a non-loopback host; set ${options.pathName}.localPolicy.allowNonLoopbackEndpoint to true only for explicit host-local policy`,
+  );
+}
+
+export function codexAppServerEndpointScope(
+  endpoint: string,
+): "loopback" | "non_loopback" {
+  return isLoopbackCodexAppServerEndpoint(
+    endpoint,
+    "appServer.endpoint",
+  ) ? "loopback" : "non_loopback";
+}
+
+function isLoopbackCodexAppServerEndpoint(
+  endpoint: string,
+  pathName: string,
+): boolean {
+  const url = parseCodexAppServerEndpoint(endpoint, pathName);
+  const hostname = url.hostname.toLowerCase().replace(/^\[(.*)\]$/u, "$1");
+  return (
+    hostname === "localhost" ||
+    hostname === "::1" ||
+    /^127(?:\.|$)/u.test(hostname)
+  );
+}
+
+function parseCodexAppServerEndpoint(endpoint: string, pathName: string): URL {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be an http, https, ws, or wss URL`,
+    );
+  }
+
+  if (
+    url.protocol !== "http:" &&
+    url.protocol !== "https:" &&
+    url.protocol !== "ws:" &&
+    url.protocol !== "wss:"
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be an http, https, ws, or wss URL`,
+    );
+  }
+  if (!url.hostname) {
+    throw new NexusAutomationConfigError(`${pathName} must include a host`);
+  }
+
+  return url;
 }
 
 function validateAgentProfileIntendedUse(

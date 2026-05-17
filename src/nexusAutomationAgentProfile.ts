@@ -1,7 +1,9 @@
 import type {
+  NexusAutomationAgentProfileExecutorMode,
   NexusAutomationAgentProfileIntendedUse,
   NexusAutomationAgentProfileConfig,
   NexusAutomationConfig,
+  NexusAutomationCodexAppServerConfig,
   NexusAutomationSafetyConfig,
 } from "./nexusAutomationConfig.js";
 
@@ -19,6 +21,7 @@ export interface ResolvedNexusAutomationAgentCommand {
 export interface NexusAutomationAgentProfilePolicy {
   id: string;
   executor: string;
+  executorMode?: NexusAutomationAgentProfileExecutorMode;
   model: string | null;
   version: string | null;
   variant: string | null;
@@ -28,6 +31,7 @@ export interface NexusAutomationAgentProfilePolicy {
   safety: NexusAutomationSafetyConfig;
   command: string | null;
   args: string[];
+  appServer?: NexusAutomationCodexAppServerConfig;
 }
 
 export interface NexusAutomationAgentPolicy {
@@ -133,6 +137,7 @@ function normalizeNexusAutomationAgentProfilePolicy(
   return {
     id: requiredNonEmptyString(profile.id, "profile.id"),
     executor: requiredNonEmptyString(profile.executor, "profile.executor"),
+    ...(profile.executorMode ? { executorMode: profile.executorMode } : {}),
     model: optionalNullableString(profile.model, "profile.model") ?? null,
     version: optionalNullableString(profile.version, "profile.version") ?? null,
     variant: optionalNullableString(profile.variant, "profile.variant") ?? null,
@@ -147,6 +152,33 @@ function normalizeNexusAutomationAgentProfilePolicy(
     args: profile.args.map((arg) =>
       requiredNonEmptyString(arg, "profile.args[]"),
     ),
+    ...(profile.appServer
+      ? { appServer: normalizeCodexAppServerProfilePolicy(profile.appServer) }
+      : {}),
+  };
+}
+
+function normalizeCodexAppServerProfilePolicy(
+  appServer: NexusAutomationCodexAppServerConfig,
+): NexusAutomationCodexAppServerConfig {
+  return {
+    mode: appServer.mode,
+    command:
+      optionalNullableString(appServer.command, "profile.appServer.command") ??
+      null,
+    args: appServer.args.map((arg) =>
+      requiredNonEmptyString(arg, "profile.appServer.args[]"),
+    ),
+    endpoint: requiredNonEmptyString(
+      appServer.endpoint,
+      "profile.appServer.endpoint",
+    ),
+    ephemeralThreadDefault: appServer.ephemeralThreadDefault,
+    localPolicy: {
+      allowNonLoopbackEndpoint:
+        appServer.localPolicy.allowNonLoopbackEndpoint,
+      hostLocalSafetyHints: [...appServer.localPolicy.hostLocalSafetyHints],
+    },
   };
 }
 

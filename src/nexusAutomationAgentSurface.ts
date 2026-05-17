@@ -1,5 +1,10 @@
 import path from "node:path";
-import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import {
+  codexAppServerEndpointScope,
+  type NexusAutomationAgentProfileExecutorMode,
+  type NexusAutomationCodexAppServerSafetyHint,
+  type NexusAutomationConfig,
+} from "./nexusAutomationConfig.js";
 import { normalizeNexusAutomationAgentPolicy } from "./nexusAutomationAgentProfile.js";
 import {
   getNexusAutomationStatus,
@@ -51,6 +56,7 @@ export interface NexusAutomationEligibleWorkSummary {
 export interface NexusAutomationAgentProfilePolicySummary {
   id: string;
   executor: string;
+  executorMode: NexusAutomationAgentProfileExecutorMode | null;
   model: string | null;
   version: string | null;
   variant: string | null;
@@ -60,6 +66,17 @@ export interface NexusAutomationAgentProfilePolicySummary {
   safety: NexusAutomationConfig["safety"];
   commandConfigured: boolean;
   argsCount: number;
+  appServer: NexusAutomationCodexAppServerPolicySummary | null;
+}
+
+export interface NexusAutomationCodexAppServerPolicySummary {
+  mode: "connect" | "spawn";
+  commandConfigured: boolean;
+  argsCount: number;
+  endpointScope: "loopback" | "non_loopback";
+  ephemeralThreadDefault: boolean;
+  allowNonLoopbackEndpoint: boolean;
+  hostLocalSafetyHints: NexusAutomationCodexAppServerSafetyHint[];
 }
 
 export interface NexusAutomationAgentProfileSummary {
@@ -149,6 +166,7 @@ export function getNexusAutomationAgentProfileSummary(
       agentPolicy?.profiles.map((profile) => ({
         id: profile.id,
         executor: profile.executor,
+        executorMode: summarizeExecutorMode(profile),
         model: profile.model,
         version: profile.version,
         variant: profile.variant,
@@ -158,9 +176,35 @@ export function getNexusAutomationAgentProfileSummary(
         safety: profile.safety,
         commandConfigured: profile.command !== null,
         argsCount: profile.args.length,
+        appServer: profile.appServer
+          ? {
+              mode: profile.appServer.mode,
+              commandConfigured: profile.appServer.command !== null,
+              argsCount: profile.appServer.args.length,
+              endpointScope: codexAppServerEndpointScope(
+                profile.appServer.endpoint,
+              ),
+              ephemeralThreadDefault: profile.appServer.ephemeralThreadDefault,
+              allowNonLoopbackEndpoint:
+                profile.appServer.localPolicy.allowNonLoopbackEndpoint,
+              hostLocalSafetyHints: [
+                ...profile.appServer.localPolicy.hostLocalSafetyHints,
+              ],
+            }
+          : null,
       })) ?? [],
     pluginCapabilities: projectPluginCapabilityProjections(projectConfig),
   };
+}
+
+function summarizeExecutorMode(profile: {
+  executor: string;
+  executorMode?: NexusAutomationAgentProfileExecutorMode;
+}): NexusAutomationAgentProfileExecutorMode | null {
+  if (profile.executorMode) {
+    return profile.executorMode;
+  }
+  return profile.executor.toLowerCase() === "codex" ? "exec" : null;
 }
 
 function summarizeEligibleWorkItem(
