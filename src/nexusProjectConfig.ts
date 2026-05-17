@@ -31,6 +31,7 @@ import {
   type NexusProjectPluginsConfig,
 } from "./nexusPluginCapabilities.js";
 import {
+  validatePartialNexusAutomationPublicationConfig,
   validateNexusAutomationConfig,
   type NexusAutomationConfig,
   type NexusAutomationPublicationConfig,
@@ -1744,27 +1745,6 @@ function validateComponentVerificationConfig(
   };
 }
 
-function validatePublicationStrategy(
-  value: unknown,
-  pathName: string,
-): NexusAutomationPublicationConfig["strategy"] | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (
-    value === "local_only" ||
-    value === "direct_integration" ||
-    value === "review_handoff"
-  ) {
-    return value;
-  }
-
-  throw new NexusConfigError(
-    `${pathName} must be local_only, direct_integration, or review_handoff`,
-  );
-}
-
 function validateComponentPublicationConfig(
   value: unknown,
   pathName: string,
@@ -1773,18 +1753,7 @@ function validateComponentPublicationConfig(
     return undefined;
   }
 
-  const record = assertRecord(value, pathName);
-  const strategy = validatePublicationStrategy(record.strategy, `${pathName}.strategy`);
-  const remote = optionalNullableString(record, "remote", pathName);
-  const targetBranch = optionalNullableString(record, "targetBranch", pathName);
-  const push = optionalBoolean(record, "push", pathName);
-
-  return {
-    ...(strategy !== undefined ? { strategy } : {}),
-    ...(remote !== undefined ? { remote } : {}),
-    ...(targetBranch !== undefined ? { targetBranch } : {}),
-    ...(push !== undefined ? { push } : {}),
-  };
+  return validatePartialNexusAutomationPublicationConfig(value, pathName);
 }
 
 function validateRepoConfig(value: unknown): NexusProjectRepoConfig {

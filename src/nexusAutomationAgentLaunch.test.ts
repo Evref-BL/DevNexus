@@ -12,8 +12,11 @@ import {
   readNexusAutomationRunLedger,
   runNexusAutomationAgentLaunchOnce,
   saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
   type NexusAutomationCommandRunner,
   type NexusProjectConfig,
+  type NexusPublicationActorRunner,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -77,6 +80,51 @@ afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+function publicationGitRunner(repositoryPath: string): GitRunner {
+  return (args, cwd) => {
+    const key = args.join(" ");
+    if (key === "rev-parse --show-toplevel") {
+      return gitResult(args, repositoryPath, cwd);
+    }
+    if (key === "symbolic-ref --short HEAD") {
+      return gitResult(args, "feature/local-38\n", cwd);
+    }
+    if (key === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return gitResult(args, "bot/main\n", cwd);
+    }
+    if (key === "remote get-url bot") {
+      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    }
+    if (key === "remote get-url --push bot") {
+      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    }
+
+    return {
+      args: [...args],
+      stdout: "",
+      stderr: `unexpected git command ${key} from ${cwd ?? ""}`,
+      exitCode: 1,
+    };
+  };
+}
+
+function actorRunnerWithHandle(handle: string): NexusPublicationActorRunner {
+  return () => ({ status: 0, stdout: `${handle}\n`, stderr: "" });
+}
+
+function gitResult(
+  args: readonly string[],
+  stdout: string,
+  _cwd: string | undefined,
+): GitCommandResult {
+  return {
+    args: [...args],
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}
 
 describe("nexus automation agent launch", () => {
   it("launches a configured agent with context without selecting or mutating work", async () => {
@@ -175,6 +223,31 @@ describe("nexus automation agent launch", () => {
             maxCycles: 8,
             maxWorkItems: 25,
           },
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "direct_integration",
+            remote: "bot",
+            remoteUrl: "git@github.com-bot:example/project.git",
+            sshHostAlias: "github.com-bot",
+            targetBranch: "main",
+            push: true,
+            actor: {
+              kind: "machine_user",
+              provider: "github",
+              handle: "example-bot",
+              id: null,
+            },
+            manualRemote: "origin",
+            manualActor: {
+              kind: "human",
+              provider: "github",
+              handle: "example-human",
+              id: null,
+            },
+            commandEnvironment: {
+              GH_CONFIG_DIR: "home:.config/gh-example-bot",
+            },
+          },
         },
       }),
     );
@@ -213,6 +286,18 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS).toBe(
         "commitIds,verification,publicationDecision,error",
       );
+      expect(options.env.GH_CONFIG_DIR).toBe("home:.config/gh-example-bot");
+      expect(options.env.DEV_NEXUS_PUBLICATION_REMOTE).toBe("bot");
+      expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_KIND).toBe("machine_user");
+      expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_PROVIDER).toBe("github");
+      expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_HANDLE).toBe("example-bot");
+      expect(options.env.DEV_NEXUS_PUBLICATION_MANUAL_REMOTE).toBe("origin");
+      expect(options.env.DEV_NEXUS_PUBLICATION_MANUAL_ACTOR_HANDLE).toBe(
+        "example-human",
+      );
+      expect(options.env.DEV_NEXUS_PUBLICATION_COMMAND_ENV_KEYS).toBe(
+        "GH_CONFIG_DIR",
+      );
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
       );
@@ -223,6 +308,25 @@ describe("nexus automation agent launch", () => {
           mode: "agent_launch",
           eligibleWorkItemCount: 1,
         },
+        components: [
+          {
+            id: "primary",
+            publication: {
+              remote: "bot",
+              actor: {
+                kind: "machine_user",
+                provider: "github",
+                handle: "example-bot",
+              },
+              manualRemote: "origin",
+              manualActor: {
+                kind: "human",
+                provider: "github",
+                handle: "example-human",
+              },
+            },
+          },
+        ],
         target: {
           id: "dogfood",
           objective: "Use DevNexus to work on itself until no eligible issue remains.",
@@ -356,6 +460,20 @@ describe("nexus automation agent launch", () => {
             title: "Let an agent choose",
           },
         ],
+        publication: {
+          remote: "bot",
+          actor: {
+            kind: "machine_user",
+            provider: "github",
+            handle: "example-bot",
+          },
+          manualRemote: "origin",
+          manualActor: {
+            kind: "human",
+            provider: "github",
+            handle: "example-human",
+          },
+        },
       });
       fs.writeFileSync(
         options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
@@ -392,6 +510,8 @@ describe("nexus automation agent launch", () => {
     const result = await runNexusAutomationAgentLaunchOnce({
       projectRoot,
       runId: "agent-run-1",
+      gitRunner: publicationGitRunner(path.join(projectRoot, "source")),
+      publicationActorRunner: actorRunnerWithHandle("example-bot"),
       now: fixedClock(
         "2026-05-16T10:00:00.000Z",
         "2026-05-16T10:01:00.000Z",

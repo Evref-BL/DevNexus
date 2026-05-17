@@ -2556,7 +2556,11 @@ describe("dev-nexus cli", () => {
       ],
     });
     expect(commandRuns).toEqual(["node scheduled-task.js", "npm test"]);
-    expect(gitCalls[0]).toMatchObject({
+    expect(
+      gitCalls.find(
+        (call) => call.args[0] === "worktree" && call.args[1] === "add",
+      ),
+    ).toMatchObject({
       args: [
         "worktree",
           "add",

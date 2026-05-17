@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import type { NexusSkillSourceControl } from "./nexusSkills.js";
 import type {
   WorkStatus,
@@ -141,6 +142,7 @@ export interface NexusWorkerContextBundle {
   dependencySupport: NexusWorkerContextDependencySupport;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
+  publication: NexusAutomationPublicationConfig | null;
   projectContext: NexusWorkerProjectContextReferences;
   pluginFragments: NexusPluginWorkerFragmentsProjection;
   boundaries: NexusWorkerContextBoundaries;
@@ -161,6 +163,7 @@ export interface NexusWorkerContextBundleOptions {
   skills?: NexusWorkerContextSkills;
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
+  publication?: NexusAutomationPublicationConfig | null;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -245,6 +248,7 @@ export function buildNexusWorkerContextBundle(
   const pluginFragments = normalizeWorkerPluginFragments(
     options.pluginFragments,
   );
+  const publication = options.publication ?? null;
   const worktree = {
     componentId,
     sourceRoot,
@@ -271,6 +275,7 @@ export function buildNexusWorkerContextBundle(
     dependencySupport,
     ownership: worktree,
     worktree,
+    publication,
     projectContext,
     pluginFragments,
     boundaries: {
@@ -328,6 +333,8 @@ export function renderNexusWorkerBriefing(
     "",
     "Dependency support:",
     ...renderDependencyProjectionLines(context.dependencySupport),
+    "",
+    ...renderPublicationPolicyLines(context.publication),
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
@@ -603,6 +610,40 @@ function renderDependencyProjectionLines(
       : []),
     ...(projection.reason ? [`  Reason: ${projection.reason}`] : []),
   ]);
+}
+
+function renderPublicationPolicyLines(
+  publication: NexusAutomationPublicationConfig | null,
+): string[] {
+  if (!publication) {
+    return ["Publication policy:", "- automation remote: none"];
+  }
+
+  const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
+    .sort()
+    .join(", ");
+
+  return [
+    "Publication policy:",
+    `- automation remote: ${publication.remote ?? "none"}`,
+    `- automation actor: ${publicationActorLabel(publication.actor)}`,
+    `- manual remote: ${publication.manualRemote ?? "none"}`,
+    `- manual actor: ${publicationActorLabel(publication.manualActor)}`,
+    `- command environment keys: ${commandEnvironmentKeys || "none"}`,
+  ];
+}
+
+function publicationActorLabel(
+  actor: NexusAutomationPublicationConfig["actor"],
+): string {
+  if (!actor) {
+    return "none";
+  }
+  return [
+    actor.kind,
+    actor.provider ?? "unknown-provider",
+    actor.handle ?? actor.id ?? "unknown-actor",
+  ].join(":");
 }
 
 function normalizeWorkerContextWorkItem(

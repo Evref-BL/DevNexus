@@ -24,10 +24,19 @@ import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
+import type { GitRunner } from "./gitWorktreeService.js";
 import {
   projectPluginCapabilityProjections,
   type NexusPluginCapabilityProjection,
 } from "./nexusPluginCapabilities.js";
+import {
+  getNexusPublicationStatuses,
+  publicationCommandEnvironment,
+  publicationEnvironmentVariables,
+  publicationPreflightChecks,
+  resolveNexusPublicationPolicy,
+  type NexusPublicationActorRunner,
+} from "./nexusPublicationPolicy.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -83,6 +92,7 @@ export interface NexusAutomationAgentLaunchComponentContext {
     provider: string | null;
     configured: boolean;
   };
+  publication: NexusAutomationConfig["publication"];
   relationships: ResolvedNexusProjectComponent["relationships"];
 }
 
@@ -178,6 +188,8 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  gitRunner?: GitRunner;
+  publicationActorRunner?: NexusPublicationActorRunner;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
 }
@@ -384,11 +396,22 @@ export async function runNexusAutomationAgentLaunchOnce(
       });
     }
 
-    preflight = preflightNexusAutomationAgentLaunch({
+    const publication = getNexusPublicationStatuses({
+      projectRoot,
+      projectConfig,
+      components,
+      action: "status",
+      gitRunner: options.gitRunner,
+      actorRunner: options.publicationActorRunner,
+    });
+    preflight = [
+      ...preflightNexusAutomationAgentLaunch({
       components,
       componentProviders,
       automationConfig,
-    });
+      }),
+      ...publicationPreflightChecks(publication),
+    ];
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
       const summary = failedChecks.map((check) => check.message).join("; ");
@@ -860,7 +883,9 @@ function buildAgentLaunchContext(
       name: input.projectConfig.name,
       componentCount: input.components.length,
     },
-    components: input.components.map(componentContext),
+    components: input.components.map((component) =>
+      componentContext(component, input.projectConfig),
+    ),
     automation: {
       mode: "agent_launch",
       selectorQuery: input.selectorQuery,
@@ -882,6 +907,7 @@ function buildAgentLaunchContext(
 
 function componentContext(
   component: ResolvedNexusProjectComponent,
+  projectConfig: NexusProjectConfig,
 ): NexusAutomationAgentLaunchComponentContext {
   return {
     id: component.id,
@@ -898,6 +924,7 @@ function componentContext(
       provider: component.workTracking?.provider ?? null,
       configured: Boolean(component.workTracking),
     },
+    publication: resolveNexusPublicationPolicy(projectConfig, component),
     relationships: component.relationships,
   };
 }
@@ -957,8 +984,11 @@ function agentLaunchEnvironment(
   baseEnv: NodeJS.ProcessEnv,
   input: NexusAutomationAgentLaunchInput,
 ): NodeJS.ProcessEnv {
+  const publication = input.automationConfig.publication;
   return {
     ...baseEnv,
+    ...publicationCommandEnvironment(publication),
+    ...publicationEnvironmentVariables(publication),
     DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
     DEV_NEXUS_RUN_ID: input.runId,
     DEV_NEXUS_STARTED_AT: input.startedAt,

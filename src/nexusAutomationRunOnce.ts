@@ -34,6 +34,13 @@ import {
   projectPluginWorkerFragments,
 } from "./nexusPluginCapabilities.js";
 import {
+  getNexusPublicationStatus,
+  publicationPolicyRequiresGuard,
+  publicationPreflightChecks,
+  resolveNexusPublicationPolicy,
+  type NexusPublicationActorRunner,
+} from "./nexusPublicationPolicy.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -123,6 +130,7 @@ export interface RunNexusAutomationOnceOptions {
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
+  publicationActorRunner?: NexusPublicationActorRunner;
   now?: () => Date | string;
   executor: NexusAutomationExecutor;
 }
@@ -315,6 +323,8 @@ export async function runNexusAutomationOnce(
       automationConfig,
       provider,
       pluginDependencyProjections,
+      gitRunner: options.gitRunner,
+      publicationActorRunner: options.publicationActorRunner,
     });
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
@@ -441,6 +451,10 @@ export async function runNexusAutomationOnce(
         pluginFragments: projectPluginWorkerFragments(projectConfig, {
           componentId: primaryComponent.id,
         }),
+        publication: resolveNexusPublicationPolicy(
+          projectConfig,
+          primaryComponent,
+        ),
       },
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });
@@ -596,8 +610,31 @@ export function preflightNexusAutomationRunOnce(options: {
   automationConfig: NexusAutomationConfig;
   provider: WorkTrackerProvider;
   pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
+  gitRunner?: GitRunner;
+  publicationActorRunner?: NexusPublicationActorRunner;
 }): NexusAutomationPreflightCheck[] {
   const worktreesRoot = options.component.worktreesRoot;
+  const publicationPolicy = resolveNexusPublicationPolicy(
+    options.projectConfig,
+    options.component,
+  );
+  const publicationAction =
+    options.provider.provider === "local" ? "status" : "provider_write";
+  const publicationChecks = publicationPolicyRequiresGuard(
+    publicationPolicy,
+    publicationAction,
+  )
+    ? publicationPreflightChecks([
+        getNexusPublicationStatus({
+          projectRoot: options.projectRoot,
+          projectConfig: options.projectConfig,
+          component: options.component,
+          action: publicationAction,
+          gitRunner: options.gitRunner,
+          actorRunner: options.publicationActorRunner,
+        }),
+      ])
+    : [];
 
   return [
     check(
@@ -648,6 +685,7 @@ export function preflightNexusAutomationRunOnce(options: {
       automationConfig: options.automationConfig,
       pluginDependencyProjections: options.pluginDependencyProjections,
     }),
+    ...publicationChecks,
   ];
 }
 

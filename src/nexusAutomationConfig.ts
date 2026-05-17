@@ -9,6 +9,11 @@ export type NexusAutomationPublicationStrategy =
   | "local_only"
   | "direct_integration"
   | "review_handoff";
+export type NexusPublicationActorKind =
+  | "human"
+  | "machine_user"
+  | "app"
+  | "service_account";
 export type NexusAutomationAgentProfileIntendedUse =
   | "any"
   | "coordinator"
@@ -133,11 +138,25 @@ export interface NexusAutomationSafetyConfig {
   allowLiveServices: boolean;
 }
 
+export interface NexusPublicationActorConfig {
+  kind: NexusPublicationActorKind;
+  provider: string | null;
+  handle: string | null;
+  id: string | null;
+}
+
 export interface NexusAutomationPublicationConfig {
   strategy: NexusAutomationPublicationStrategy;
   remote: string | null;
   targetBranch: string | null;
   push: boolean;
+  remoteUrl: string | null;
+  pushUrl: string | null;
+  sshHostAlias: string | null;
+  actor: NexusPublicationActorConfig | null;
+  manualRemote: string | null;
+  manualActor: NexusPublicationActorConfig | null;
+  commandEnvironment: Record<string, string>;
 }
 
 export interface NexusAutomationConfig {
@@ -228,6 +247,13 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     remote: "origin",
     targetBranch: null,
     push: false,
+    remoteUrl: null,
+    pushUrl: null,
+    sshHostAlias: null,
+    actor: null,
+    manualRemote: null,
+    manualActor: null,
+    commandEnvironment: {},
   },
 };
 
@@ -263,7 +289,10 @@ export function validateNexusAutomationConfig(
   const agent = validateAgentConfig(record.agent);
   const target = validateTargetConfig(record.target);
   const safety = validateSafetyConfig(record.safety);
-  const publication = validatePublicationConfig(record.publication);
+  const publication = validatePartialNexusAutomationPublicationConfig(
+    record.publication,
+    "project config.automation.publication",
+  );
 
   return {
     enabled: enabled ?? defaultNexusAutomationConfig.enabled,
@@ -319,6 +348,10 @@ export function validateNexusAutomationConfig(
     publication: {
       ...defaultNexusAutomationConfig.publication,
       ...publication,
+      commandEnvironment: {
+        ...defaultNexusAutomationConfig.publication.commandEnvironment,
+        ...publication.commandEnvironment,
+      },
     },
   };
 }
@@ -953,20 +986,27 @@ function validateSafetyConfigAt(
   };
 }
 
-function validatePublicationConfig(
+export function validatePartialNexusAutomationPublicationConfig(
   value: unknown,
+  pathName = "project config.automation.publication",
 ): Partial<NexusAutomationPublicationConfig> {
   if (value === undefined) {
     return {};
   }
 
-  const pathName = "project config.automation.publication";
   const record = assertRecord(value, pathName);
   return {
     ...optionalPublicationStrategyField(record, "strategy", pathName),
     ...optionalNullableStringField(record, "remote", pathName),
     ...optionalNullableStringField(record, "targetBranch", pathName),
     ...optionalBooleanField(record, "push", pathName),
+    ...optionalNullableStringField(record, "remoteUrl", pathName),
+    ...optionalNullableStringField(record, "pushUrl", pathName),
+    ...optionalNullableStringField(record, "sshHostAlias", pathName),
+    ...optionalPublicationActorField(record, "actor", pathName),
+    ...optionalNullableStringField(record, "manualRemote", pathName),
+    ...optionalPublicationActorField(record, "manualActor", pathName),
+    ...optionalCommandEnvironmentField(record, "commandEnvironment", pathName),
   };
 }
 
@@ -1151,6 +1191,90 @@ function optionalStringArray(
 
   return value.map((item, index) =>
     requiredNonEmptyString(item, `${pathName}[${index}]`),
+  );
+}
+
+function optionalCommandEnvironmentField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, Record<string, string>>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  const environment = assertRecord(value, `${pathName}.${key}`);
+  const normalized: Record<string, string> = {};
+  for (const [envKey, envValue] of Object.entries(environment)) {
+    const envPath = `${pathName}.${key}.${envKey}`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(envKey)) {
+      throw new NexusAutomationConfigError(
+        `${envPath} must be a valid environment variable name`,
+      );
+    }
+    if (secretLikeEnvironmentKey(envKey)) {
+      throw new NexusAutomationConfigError(
+        `${envPath} must not store secrets in shared publication policy; use a host-local auth profile reference instead`,
+      );
+    }
+    normalized[envKey] = requiredNonEmptyString(envValue, envPath);
+  }
+
+  return { [key]: normalized } as Record<Key, Record<string, string>>;
+}
+
+function secretLikeEnvironmentKey(key: string): boolean {
+  return /(?:TOKEN|SECRET|PASSWORD|PASS|PRIVATE_KEY|ACCESS_KEY|CREDENTIAL)/iu.test(
+    key,
+  );
+}
+
+function optionalPublicationActorField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusPublicationActorConfig | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<Key, null>;
+  }
+
+  return {
+    [key]: validatePublicationActorConfig(value, `${pathName}.${key}`),
+  } as Record<Key, NexusPublicationActorConfig>;
+}
+
+function validatePublicationActorConfig(
+  value: unknown,
+  pathName: string,
+): NexusPublicationActorConfig {
+  const record = assertRecord(value, pathName);
+  return {
+    kind: validatePublicationActorKind(record.kind, `${pathName}.kind`),
+    provider: optionalNullableString(record.provider, `${pathName}.provider`) ?? null,
+    handle: optionalNullableString(record.handle, `${pathName}.handle`) ?? null,
+    id: optionalNullableString(record.id, `${pathName}.id`) ?? null,
+  };
+}
+
+function validatePublicationActorKind(
+  value: unknown,
+  pathName: string,
+): NexusPublicationActorKind {
+  if (
+    value === "human" ||
+    value === "machine_user" ||
+    value === "app" ||
+    value === "service_account"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be human, machine_user, app, or service_account`,
   );
 }
 

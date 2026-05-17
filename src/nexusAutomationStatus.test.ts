@@ -8,7 +8,10 @@ import {
   getNexusAutomationStatus,
   nexusAutomationLockPath,
   saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
   type NexusProjectConfig,
+  type NexusPublicationActorRunner,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -405,4 +408,122 @@ describe("nexus automation status", () => {
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
+
+  it("blocks readiness when publication actor guardrails do not match", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "direct_integration",
+            remote: "bot",
+            remoteUrl: "git@github.com-bot:example/project.git",
+            sshHostAlias: "github.com-bot",
+            targetBranch: "main",
+            push: true,
+            actor: {
+              kind: "machine_user",
+              provider: "github",
+              handle: "example-bot",
+              id: null,
+            },
+            commandEnvironment: {
+              GH_CONFIG_DIR: "home:.config/gh-example-bot",
+            },
+          },
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Blocked publication task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      gitRunner: publicationGitRunner(sourceRoot),
+      publicationActorRunner: actorRunnerWithHandle("example-human"),
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      candidateCount: null,
+      selectedWorkItem: null,
+      publication: [
+        {
+          componentId: "primary",
+          blocking: true,
+          actor: {
+            status: "mismatched",
+            observed: {
+              handle: "example-human",
+            },
+          },
+        },
+      ],
+    });
+    expect(result.preflight).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:actor",
+        status: "failed",
+      }),
+    );
+  });
 });
+
+function publicationGitRunner(repositoryPath: string): GitRunner {
+  return (args, cwd) => {
+    const key = args.join(" ");
+    if (key === "rev-parse --show-toplevel") {
+      return gitResult(args, repositoryPath, cwd);
+    }
+    if (key === "symbolic-ref --short HEAD") {
+      return gitResult(args, "feature/local-38\n", cwd);
+    }
+    if (key === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return gitResult(args, "bot/main\n", cwd);
+    }
+    if (key === "remote get-url bot") {
+      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    }
+    if (key === "remote get-url --push bot") {
+      return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    }
+
+    return {
+      args: [...args],
+      stdout: "",
+      stderr: `unexpected git command ${key} from ${cwd ?? ""}`,
+      exitCode: 1,
+    };
+  };
+}
+
+function actorRunnerWithHandle(handle: string): NexusPublicationActorRunner {
+  return () => ({ status: 0, stdout: `${handle}\n`, stderr: "" });
+}
+
+function gitResult(
+  args: readonly string[],
+  stdout: string,
+  _cwd: string | undefined,
+): GitCommandResult {
+  return {
+    args: [...args],
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}
