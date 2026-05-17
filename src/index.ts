@@ -27,6 +27,7 @@ export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusMcpServer.js";
 export * from "./nexusMcpSchemaCompatibility.js";
 export * from "./nexusManualWorktree.js";
+export * from "./nexusNpmRuntime.js";
 export * from "./nexusPathResolver.js";
 export * from "./nexusPluginCapabilities.js";
 export * from "./nexusProjectHosting.js";

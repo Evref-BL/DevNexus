@@ -102,6 +102,13 @@ server entries are present. DevNexus core only reports these generic capability
 gaps; plugin packages still own the provider-specific commands that materialize
 or start their runtime surfaces.
 
+When setup depends on freshly published dogfood npm packages, setup should
+wait for packument and dist-tag visibility with bounded retry/backoff before
+installing or launching workers. DevNexus reports npm registry propagation
+delay, network failure, missing package versions, and damaged local
+`node_modules` state as distinct setup outcomes so workers do not discover
+package fetch failures mid-task.
+
 The cloned meta repository directory is the DevNexus project root. Keep it
 separate from component source checkouts; component repositories are cloned or
 verified by the setup flow in a later step.

@@ -761,6 +761,69 @@ describe("nexus automation agent launch", () => {
     );
   });
 
+  it("blocks before launching when project-local runtime npm packages are damaged and repair is not approved", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          safety: {
+            ...projectConfig().automation!.safety,
+            allowDependencyInstall: false,
+          },
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs runtime tools",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const runtimeRoot = path.join(projectRoot, ".dev-nexus", "runtime", "npm-tools");
+    fs.mkdirSync(path.join(runtimeRoot, "node_modules"), { recursive: true });
+    fs.writeFileSync(
+      path.join(runtimeRoot, "package.json"),
+      `${JSON.stringify({
+        dependencies: {
+          "@evref-bl/dev-nexus-pharo": "0.1.0-alpha.9",
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-runtime-npm-preflight",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: expect.stringContaining("Damaged local npm runtime install state"),
+      contextFile: null,
+      resultFile: null,
+      launch: null,
+    });
+    expect(result.preflight).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "npmRuntimeInstall:npm-tools",
+          status: "failed",
+          message: expect.stringContaining("missing installed package"),
+        }),
+      ]),
+    );
+  });
+
   it("launches with component-scoped work items across multiple components", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

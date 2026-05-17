@@ -431,6 +431,9 @@ describe("nexus worker context bundle", () => {
     expect(result.briefingMarkdown).toContain(
       "Source: typescript-dev-nexus:node-modules",
     );
+    expect(result.briefingMarkdown).toContain(
+      "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
+    );
   });
 
   it("records related component dependency projection sources in context and briefing surfaces", () => {

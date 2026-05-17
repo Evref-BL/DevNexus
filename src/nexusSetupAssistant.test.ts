@@ -95,6 +95,10 @@ describe("nexus setup assistant", () => {
       "open-agent-project-session",
       "run-final-preflight",
     ]);
+    const installStep = plan.steps.find((step) => step.id === "install-prerequisites")!;
+    expect(installStep.manualInstructions.join("\n")).toContain(
+      "For freshly published dogfood packages, setup should wait for npm packument and dist-tag visibility with bounded retry/backoff before installing.",
+    );
     expect(plan.steps.find((step) => step.id === "configure-automation-auth-profile"))
       .toMatchObject({
         kind: "manual",

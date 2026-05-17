@@ -500,6 +500,8 @@ function joinExistingProjectSteps(options: {
       }),
       manualInstructions: [
         "Use the package manager you trust on this host; the commands are examples.",
+        "For freshly published dogfood packages, setup should wait for npm packument and dist-tag visibility with bounded retry/backoff before installing.",
+        "Classify npm fetch failures before assigning worker tasks: E404 immediately after publish is registry propagation delay, network and timeout errors are network failures, absent versions are missing-version blockers, and damaged node_modules belongs to setup repair.",
         "Do not continue to auth or remotes until git, gh, node, npm, and dev-nexus are available.",
       ],
       checks: ["git --version", "gh --version", "node --version", `${devNexusCommand} --help`],

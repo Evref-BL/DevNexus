@@ -43,6 +43,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  preflightNexusNpmRuntimeInstall,
+  type NexusNpmRuntimeCommandRunner,
+} from "./nexusNpmRuntime.js";
+import {
   readNexusAutomationTargetContext,
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
@@ -209,6 +213,7 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
   publicationActorRunner?: NexusPublicationActorRunner;
+  runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
 }
@@ -425,9 +430,11 @@ export async function runNexusAutomationAgentLaunchOnce(
     });
     preflight = [
       ...preflightNexusAutomationAgentLaunch({
-      components,
-      componentProviders,
-      automationConfig,
+        projectRoot,
+        components,
+        componentProviders,
+        automationConfig,
+        runtimePackageCommandRunner: options.runtimePackageCommandRunner,
       }),
       ...publicationPreflightChecks(publication),
     ];
@@ -712,12 +719,23 @@ export function createNexusAutomationAgentCommandLauncher(
 }
 
 export function preflightNexusAutomationAgentLaunch(options: {
+  projectRoot?: string;
   components: ResolvedNexusProjectComponent[];
   componentProviders: NexusAutomationAgentLaunchComponentProvider[];
   automationConfig: NexusAutomationConfig;
+  runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
 }): NexusAutomationPreflightCheck[] {
   return [
     ...preflightNexusAutomationAgentPolicy(options.automationConfig),
+    ...(options.projectRoot
+      ? preflightNexusNpmRuntimeInstall({
+          projectRoot: options.projectRoot,
+          allowRepair: options.automationConfig.safety.allowDependencyInstall,
+          ...(options.runtimePackageCommandRunner
+            ? { commandRunner: options.runtimePackageCommandRunner }
+            : {}),
+        })
+      : []),
     check(
       "workTracking",
       options.componentProviders.length > 0,
