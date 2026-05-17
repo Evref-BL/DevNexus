@@ -39,6 +39,11 @@ Plugins should compose inside one DevNexus project. For example, a project may
 load a Pharo plugin and a TypeScript plugin at the same time, with each plugin
 contributing only the tools and setup policy needed for its domain.
 
+DevNexus-TypeScript is the TypeScript/JavaScript plugin for DevNexus. It should
+keep language-specific worktree setup outside DevNexus core while projecting
+reusable dependency support such as `node_modules` links and worker guidance for
+running package scripts without ad hoc installs.
+
 DevNexus-Pharo is the Pharo plugin for DevNexus. It should supply Pharo-specific
 agent setup rather than act as an alternate project runner. In particular,
 DevNexus-Pharo should prepare scoped PLexus project context for subagents, project
@@ -127,6 +132,7 @@ Configured components:
 
 - `dev-nexus`: generic core and primary component.
 - `dev-nexus-pharo`: Pharo plugin for DevNexus.
+- `dev-nexus-typescript`: TypeScript/JavaScript plugin for DevNexus.
 - `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
@@ -138,6 +144,8 @@ Current component publication state:
 - DevNexus-Pharo is clean and pushed to `origin/main` through `ec14934`
   (`Bundle MCP-Pharo domain skills`); the GitHub repository has been renamed to
   `Evref-BL/DevNexus-Pharo`.
+- DevNexus-TypeScript is clean and pushed to `origin/main` through `bf19839`
+  (`Initial DevNexus TypeScript plugin`).
 - PLexus is clean and pushed to `origin/main` through `a616dd4` (`Merge PLexus
   portability coverage`).
 - pharo-launcher-mcp is clean and pushed to `origin/main` through `8a8b5eb`

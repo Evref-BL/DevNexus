@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 55,
-  "nextCommentNumber": 85,
-  "updatedAt": "2026-05-17T15:17:19.424Z",
+  "nextCommentNumber": 86,
+  "updatedAt": "2026-05-17T16:06:58.143Z",
   "items": [
     {
       "id": "local-1",
@@ -885,7 +885,7 @@
       "id": "local-37",
       "title": "Provide JS/TS toolchain support for generated worker worktrees",
       "description": "Type: worker setup/toolchain follow-up\nReadiness: autonomous agent-ready (AFK)\nSource finding: the five-agent DevNexus wave on 2026-05-17 showed generated Git worktrees often lack local node_modules. Workers A and E could implement changes but could not run npm run build or focused Vitest inside their assigned worktrees because tsc/vitest were not resolvable.\n\nGoal: make JavaScript/TypeScript DevNexus worker worktrees able to run configured project checks without ad hoc installs or unsafe registry fetches.\n\nAcceptance criteria:\n- DevNexus worker setup can project or reference a configured JS/TS toolchain/dependency context for generated worktrees.\n- The approach does not copy large node_modules blindly into every worktree unless explicitly configured.\n- Worker context explains how npm scripts and focused tests should be run in generated worktrees.\n- Preflight reports a clear blocker when the required dependency context is missing.\n- Static tests cover a generated worktree using dependency/toolchain support to resolve tsc/vitest from an approved source.\n\nBoundaries:\n- Do not require live network or npm registry access in normal tests.\n- Do not hide arbitrary outside-source path access behind the toolchain feature.\n- Keep this generic enough for future language plugins, but implement the JS/TS case first.\n\nVerification:\n- Focused worker setup/context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -897,8 +897,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T11:28:58.068Z",
-      "updatedAt": "2026-05-17T11:28:58.068Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-17T16:06:58.143Z",
+      "closedAt": "2026-05-17T16:06:58.143Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2189,7 +2189,19 @@
     "local-34": [],
     "local-35": [],
     "local-36": [],
-    "local-37": [],
+    "local-37": [
+      {
+        "id": "local-comment-85",
+        "body": "Completed by splitting TypeScript/JavaScript worktree setup into a standalone DevNexus plugin component. DevNexus core already provides generic plugin dependency projection; Evref-BL/DevNexus-TypeScript commit bf19839 declares the TypeScript/JavaScript dependency projection and worker guidance; this dogfood project now includes dev-nexus-typescript as a component and enables the plugin capability for JS/TS components. Verification for the plugin repo passed: npm run check and npm pack --dry-run.",
+        "author": null,
+        "createdAt": "2026-05-17T16:06:52.681Z",
+        "updatedAt": "2026-05-17T16:06:52.681Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-85"
+        }
+      }
+    ],
     "local-38": [
       {
         "id": "local-comment-71",

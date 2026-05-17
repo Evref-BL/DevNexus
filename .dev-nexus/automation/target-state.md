@@ -21,9 +21,6 @@ Immediate direction:
   wave `parallel-dev-nexus-wave-20260517-1115`:
   - `dev-nexus:local-33` launch ephemeral Codex app-server worker threads,
     unblocked by completed `dev-nexus:local-31` and `dev-nexus:local-32`.
-  - `dev-nexus:local-37` provide JavaScript/TypeScript toolchain support for
-    generated worker worktrees so subagents can run focused npm checks without
-    ad hoc installs.
   - `dev-nexus:local-38` add publication identity and remote guardrails so
     DevNexus can prevent GitHub account/remote mix-ups before automated pushes
     or provider writes.
@@ -85,11 +82,11 @@ Immediate direction:
   - `dev-nexus:local-32` added Codex app-server agent profile schema support.
   Integration verification passed with `npm run check`: 44 test files and 279
   tests.
-- Worker-local JavaScript/TypeScript verification remains a follow-up
-  infrastructure concern tracked by `dev-nexus:local-37`: generated Git
-  worktrees without local `node_modules` cannot run `npm run build` or focused
-  Vitest directly unless DevNexus projects dependency/toolchain support into
-  the worker context.
+- Worker-local JavaScript/TypeScript verification is now handled as a plugin
+  concern. DevNexus core supplies generic dependency projections, and the
+  standalone `dev-nexus-typescript` component supplies TypeScript/JavaScript
+  plugin capabilities that project existing `node_modules` support and worker
+  guidance into generated worktrees.
 - Runtime setup is now approved through
   `.dev-nexus/automation/runtime-profile-overnight-live-20260517.md`.
   Docker/Podman compatibility checks, local dependency repair, and isolated
@@ -193,6 +190,11 @@ Immediate direction:
     records the resulting support in setup/context surfaces. JavaScript/
     TypeScript is covered by fixtures; Java can reuse the same hook later for
     JDK/Maven/Gradle hints.
+  - `dev-nexus:local-37` is complete through the standalone
+    DevNexus-TypeScript plugin repo at `bf19839` plus this dogfood project
+    wiring. The project now treats TypeScript/JavaScript package dependency
+    setup as plugin-provided infrastructure rather than hard-coding it into
+    DevNexus core.
   - `dev-nexus-pharo:local-4` is complete and published through DevNexus-Pharo
     `75a038c`. DevNexus-Pharo now declares a DevNexus plugin config with Pharo
     skills, scoped PLexus and direct Pharo MCP capabilities, setup obligations,

@@ -15,6 +15,7 @@ older control-project handoff.
 
 - `dev-nexus`: generic core and primary component.
 - `dev-nexus-pharo`: Pharo plugin for DevNexus.
+- `dev-nexus-typescript`: TypeScript/JavaScript plugin for DevNexus.
 - `plexus`: runtime gateway dependency for the Pharo plugin.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
 - `mcp-pharo`: in-image MCP dependency.
@@ -25,7 +26,7 @@ older control-project handoff.
   historical context.
 - DevNexus plugins are additive project capabilities, not alternate project
   runners. A project can load multiple plugins, such as DevNexus-Pharo for Pharo
-  work and a future TypeScript plugin for TypeScript work.
+  work and DevNexus-TypeScript for TypeScript/JavaScript work.
 - DevNexus-Pharo is responsible for Pharo agent setup: scoped PLexus project
   context, safe launcher affordances, gateway routing, and direct Pharo MCP
   access for subagents.
@@ -62,3 +63,6 @@ older control-project handoff.
 - DevNexus-Pharo source commit `ec14934` bundles MCP-Pharo domain skills for
   Pharo-capable subagents: `pharo-ci-repro`, `pharo-image-git-handoff`,
   `pharo-project-load`, and `pharo-version-compat`.
+- DevNexus-TypeScript source commit `bf19839` creates the standalone
+  TypeScript/JavaScript plugin repo and declares dependency projection plus
+  worker guidance for reusable package dependencies in generated worktrees.

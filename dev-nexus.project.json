@@ -71,6 +71,41 @@
       ]
     },
     {
+      "id": "dev-nexus-typescript",
+      "name": "DevNexus-TypeScript",
+      "kind": "git",
+      "role": "extension",
+      "remoteUrl": "git@github.com:Evref-BL/DevNexus-TypeScript.git",
+      "defaultBranch": "main",
+      "sourceRoot": "sourcesRoot:dev-nexus-typescript",
+      "worktreesRoot": "worktrees/dev-nexus-typescript",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/dev-nexus-typescript.json"
+      },
+      "verification": {
+        "focusedCommands": [
+          "npm run check"
+        ],
+        "fullCommands": [
+          "npm run check"
+        ],
+        "requirePassing": true
+      },
+      "publication": {
+        "strategy": "direct_integration",
+        "remote": "origin",
+        "targetBranch": "main",
+        "push": true
+      },
+      "relationships": [
+        {
+          "kind": "extends",
+          "componentId": "dev-nexus"
+        }
+      ]
+    },
+    {
       "id": "plexus",
       "name": "PLexus",
       "kind": "git",
@@ -341,6 +376,67 @@
           ]
         }
       ]
+    },
+    {
+      "id": "dev-nexus-typescript",
+      "name": "DevNexus TypeScript",
+      "version": "0.1.0-alpha.0",
+      "enabled": true,
+      "capabilities": [
+        {
+          "kind": "dependency_projection",
+          "id": "node-modules",
+          "description": "Project existing package dependencies into TypeScript and JavaScript worktrees.",
+          "source": "node_modules",
+          "target": "node_modules",
+          "required": false,
+          "sourceControl": "support",
+          "targetComponents": [
+            "dev-nexus",
+            "dev-nexus-pharo",
+            "dev-nexus-typescript",
+            "plexus",
+            "pharo-launcher-mcp"
+          ],
+          "reason": "Resolve local package binaries such as tsc and test runners from prepared worktrees."
+        },
+        {
+          "kind": "worker_context_fragment",
+          "id": "context-typescript-toolchain-boundary",
+          "title": "TypeScript Toolchain Boundary",
+          "body": "DevNexus TypeScript composes with DevNexus and does not choose or supervise implementation work. It contributes TypeScript and JavaScript setup policy through DevNexus plugin capabilities. Use projected dependencies when available, and report missing dependency context as a setup blocker instead of silently fetching packages.",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ],
+          "targetComponents": [
+            "dev-nexus",
+            "dev-nexus-pharo",
+            "dev-nexus-typescript",
+            "plexus",
+            "pharo-launcher-mcp"
+          ],
+          "provenance": "DevNexus TypeScript plugin"
+        },
+        {
+          "kind": "worker_briefing_fragment",
+          "id": "briefing-typescript-worktree-setup",
+          "title": "TypeScript Worktree Setup",
+          "body": "Run source and Git commands from the assigned worktree. Prefer existing package scripts such as test, check, typecheck, lint, or build. Do not run npm, pnpm, yarn, or bun install commands unless the project policy or user explicitly allows dependency installation. If package binaries are unavailable, report the setup blocker instead of using npx package fetches as a substitute.",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ],
+          "targetComponents": [
+            "dev-nexus",
+            "dev-nexus-pharo",
+            "dev-nexus-typescript",
+            "plexus",
+            "pharo-launcher-mcp"
+          ],
+          "provenance": "DevNexus TypeScript plugin"
+        }
+      ]
     }
   ],
   "automation": {
@@ -419,6 +515,8 @@
               "sourcesRoot:dev-nexus",
               "--add-dir",
               "sourcesRoot:dev-nexus-pharo",
+              "--add-dir",
+              "sourcesRoot:dev-nexus-typescript",
               "--add-dir",
               "sourcesRoot:plexus",
               "--add-dir",
