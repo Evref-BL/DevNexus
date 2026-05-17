@@ -8,6 +8,7 @@ import {
 import type {
   NexusAutomationConfig,
   NexusAutomationDependencyLinkConfig,
+  NexusAutomationPublicationConfig,
 } from "./nexusAutomationConfig.js";
 import {
   materializeNexusWorkerContextBundle,
@@ -114,6 +115,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   ownership: NexusWorkerContextBundleWorktree;
   targetStatePath?: string | null;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
+  publication?: NexusAutomationPublicationConfig | null;
 }
 
 export interface NexusAutomationWorktreeSetupOptions {
@@ -327,6 +329,8 @@ function materializeWorkerContext(options: {
     ),
     dependencyProjections: options.dependencyProjections,
     pluginFragments: options.context.pluginFragments,
+    publication:
+      options.context.publication ?? options.automationConfig.publication,
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,

@@ -18,6 +18,7 @@ import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
+import type { GitRunner } from "./gitWorktreeService.js";
 import {
   generateNexusAutomationAgentRunId,
   preflightNexusAutomationAgentLaunch,
@@ -49,6 +50,14 @@ import {
   buildNexusAutomationTargetReport,
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
+import {
+  getNexusPublicationStatuses,
+  publicationCommandEnvironment,
+  publicationEnvironmentVariables,
+  publicationPreflightChecks,
+  resolveNexusPublicationPolicy,
+  type NexusPublicationActorRunner,
+} from "./nexusPublicationPolicy.js";
 import {
   projectPluginCapabilityProjections,
   type NexusPluginCapabilityProjection,
@@ -179,6 +188,8 @@ export interface AdoptNexusAutomationCurrentAgentOptions {
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  gitRunner?: GitRunner;
+  publicationActorRunner?: NexusPublicationActorRunner;
   now?: () => Date | string;
   env?: NodeJS.ProcessEnv;
   targetCycleId?: string | null;
@@ -496,11 +507,22 @@ export async function adoptNexusAutomationCurrentAgent(
       });
     }
 
-    preflight = preflightNexusAutomationAgentLaunch({
+    const publication = getNexusPublicationStatuses({
+      projectRoot,
+      projectConfig,
+      components,
+      action: "status",
+      gitRunner: options.gitRunner,
+      actorRunner: options.publicationActorRunner,
+    });
+    preflight = [
+      ...preflightNexusAutomationAgentLaunch({
       components,
       componentProviders,
       automationConfig,
-    });
+      }),
+      ...publicationPreflightChecks(publication),
+    ];
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
       const summary = failedChecks.map((check) => check.message).join("; ");
@@ -696,6 +718,8 @@ export async function adoptNexusAutomationCurrentAgentFromCoordinatorLoop(
     provider: options.provider,
     providerFactory: options.providerFactory,
     providerOptions: options.providerOptions,
+    gitRunner: options.gitRunner,
+    publicationActorRunner: options.publicationActorRunner,
     now: options.now,
   });
   const targetReport = buildNexusAutomationTargetReport({
@@ -1121,7 +1145,9 @@ function buildCurrentAgentAdoptionContext(input: {
       name: input.projectConfig.name,
       componentCount: input.components.length,
     },
-    components: input.components.map(componentContext),
+    components: input.components.map((component) =>
+      componentContext(component, input.projectConfig),
+    ),
     automation: {
       mode: "agent_launch",
       selectorQuery: input.selectorQuery,
@@ -1149,6 +1175,7 @@ function buildCurrentAgentAdoptionContext(input: {
 
 function componentContext(
   component: ResolvedNexusProjectComponent,
+  projectConfig: NexusProjectConfig,
 ): NexusAutomationAgentLaunchComponentContext {
   return {
     id: component.id,
@@ -1165,6 +1192,7 @@ function componentContext(
       provider: component.workTracking?.provider ?? null,
       configured: Boolean(component.workTracking),
     },
+    publication: resolveNexusPublicationPolicy(projectConfig, component),
     relationships: component.relationships,
   };
 }
@@ -1252,8 +1280,11 @@ function currentAgentAdoptionEnvironment(
     projectRoot: input.projectRoot,
     config: input.automationConfig,
   });
+  const publication = input.automationConfig.publication;
   return {
     ...baseEnv,
+    ...publicationCommandEnvironment(publication),
+    ...publicationEnvironmentVariables(publication),
     DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
     DEV_NEXUS_CURRENT_AGENT_ADOPTION: "true",
     DEV_NEXUS_CURRENT_AGENT_ADOPTION_FILE: input.metadataFile,

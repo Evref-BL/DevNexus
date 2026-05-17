@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { GitRunner } from "./gitWorktreeService.js";
 import {
   runNexusAutomationAgentLaunchOnce,
   type NexusAutomationAgentLauncher,
@@ -75,6 +76,7 @@ export interface RunNexusAutomationCoordinatorLoopOptions {
   owner?: string | null;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  gitRunner?: GitRunner;
   now?: () => Date | string;
   sleep?: (ms: number) => Promise<void>;
   onTick?: (tick: NexusAutomationCoordinatorLoopTick) => void | Promise<void>;
@@ -125,6 +127,7 @@ export async function runNexusAutomationCoordinatorLoop(
       projectRoot,
       providerFactory: options.providerFactory,
       providerOptions: options.providerOptions,
+      gitRunner: options.gitRunner,
       now: options.now,
     });
     const targetReport = buildNexusAutomationTargetReport({
@@ -304,6 +307,7 @@ export async function runNexusAutomationCoordinatorLoop(
         projectRoot,
         providerFactory: options.providerFactory,
         providerOptions: options.providerOptions,
+        gitRunner: options.gitRunner,
         owner: options.owner ?? "coordinator-loop",
         now: options.now,
         runId,

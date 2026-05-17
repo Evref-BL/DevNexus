@@ -99,6 +99,7 @@ export async function runNexusAutomationScheduler(
       provider: options.provider,
       providerFactory: options.providerFactory,
       providerOptions: options.providerOptions,
+      gitRunner: options.gitRunner,
       now: options.now,
     });
     const intervalMs = intervalOverride ?? status.automationConfig?.schedule.intervalMs;
@@ -143,6 +144,7 @@ export async function runNexusAutomationScheduler(
           provider: options.provider,
           providerFactory: options.providerFactory,
           providerOptions: options.providerOptions,
+          gitRunner: options.gitRunner,
           now: options.now,
           owner: options.owner ?? "scheduler",
           runId,

@@ -46,6 +46,10 @@ import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import type {
+  NexusPublicationActorStatus,
+  NexusPublicationStatus,
+} from "./nexusPublicationPolicy.js";
 import {
   getNexusAutomationAgentProfileSummary,
   getNexusAutomationEligibleWorkSummary,
@@ -1259,6 +1263,7 @@ async function handleAutomationCommand(
     const parsed = parseAutomationStatusCommand(argv);
     const result = await getNexusAutomationStatus({
       projectRoot: parsed.projectRoot,
+      gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
     printAutomationStatusResult(
@@ -1393,6 +1398,7 @@ async function handleAutomationCommand(
         runId: parsed.runId,
         intervalMs: parsed.intervalMs,
         runIdPrefix: parsed.runIdPrefix,
+        gitRunner: dependencies.gitRunner,
         now: dependencies.now,
       });
       printAutomationCurrentAgentCoordinatorLoopAdoptionResult(
@@ -1409,6 +1415,7 @@ async function handleAutomationCommand(
       maxTicks: parsed.maxTicks,
       maxRuns: parsed.maxRuns,
       runIdPrefix: parsed.runIdPrefix,
+      gitRunner: dependencies.gitRunner,
       now: dependencies.now,
       onTick: parsed.json
         ? undefined
@@ -1432,6 +1439,7 @@ async function handleAutomationCommand(
       projectRoot: parsed.projectRoot,
       runId: parsed.runId,
       owner: parsed.owner,
+      gitRunner: dependencies.gitRunner,
       now: dependencies.now,
       launcher: createNexusAutomationAgentCommandLauncher({
         command: commandOptions.command,
@@ -1546,6 +1554,7 @@ async function handleAutomationCurrentAgentCommand(
       projectRoot: parsed.projectRoot,
       runId: parsed.runId,
       owner: parsed.owner,
+      gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
     printAutomationCurrentAgentAdoptionResult(result, parsed, stdout);
@@ -4202,6 +4211,12 @@ function printAutomationStatusResult(
       `  Max concurrent subagents: ${result.agent.maxConcurrentSubagents}`,
     );
   }
+  if (result.publication.length > 0) {
+    writeLine(stdout, `  Publication policies: ${result.publication.length}`);
+    for (const publication of result.publication) {
+      writeLine(stdout, `    ${formatPublicationStatus(publication)}`);
+    }
+  }
   if (result.selectedWorkItem) {
     writeLine(
       stdout,
@@ -4236,6 +4251,37 @@ function printAutomationStatusResult(
       );
     }
   }
+}
+
+function formatPublicationStatus(publication: NexusPublicationStatus): string {
+  const actor = formatPublicationActor(publication.actor);
+  const upstream = publication.git.upstream ?? "none";
+  const pushUrl = publication.git.pushUrl ?? "unknown";
+  const checkStatus = publication.blocking ? "blocked" : "ok";
+
+  return [
+    `${publication.componentId}:`,
+    `remote=${publication.git.remoteName ?? "none"}`,
+    `upstream=${upstream}`,
+    `pushUrl=${pushUrl}`,
+    `actor=${actor}`,
+    `checks=${checkStatus}`,
+  ].join(" ");
+}
+
+function formatPublicationActor(actor: NexusPublicationActorStatus): string {
+  const expected = actor.expected
+    ? [
+        actor.expected.kind,
+        actor.expected.provider ?? "unknown-provider",
+        actor.expected.handle ?? actor.expected.id ?? "unknown-actor",
+      ].join(":")
+    : "none";
+  const observed = actor.observed
+    ? `${actor.observed.provider}:${actor.observed.handle}`
+    : actor.status;
+
+  return `${expected}->${observed}`;
 }
 
 function printAutomationEligibleWorkResult(

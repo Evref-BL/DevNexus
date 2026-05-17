@@ -197,7 +197,11 @@ describe("nexus automation scheduler", () => {
         },
       ],
     });
-    expect(gitCalls[0]).toMatchObject({
+    expect(
+      gitCalls.find(
+        (call) => call.args[0] === "worktree" && call.args[1] === "add",
+      ),
+    ).toMatchObject({
       args: [
         "worktree",
           "add",

@@ -546,6 +546,50 @@ publication decisions are recorded into the same automation run ledger.
 }
 ```
 
+Publication policy can declare both the automated publication identity and the
+human/manual identity that should remain separate from it:
+
+```json
+{
+  "automation": {
+    "publication": {
+      "strategy": "direct_integration",
+      "remote": "bot",
+      "remoteUrl": "git@github.com-bot:example/project.git",
+      "sshHostAlias": "github.com-bot",
+      "targetBranch": "main",
+      "push": true,
+      "actor": {
+        "kind": "machine_user",
+        "provider": "github",
+        "handle": "example-bot"
+      },
+      "manualRemote": "origin",
+      "manualActor": {
+        "kind": "human",
+        "provider": "github",
+        "handle": "example-human"
+      },
+      "commandEnvironment": {
+        "GH_CONFIG_DIR": "home:.config/gh-example-bot"
+      }
+    }
+  }
+}
+```
+
+Recommended GitHub setup is to keep the normal `origin` remote authenticated as
+the human operator, add a separate automation remote such as `bot`, and point
+that remote at an SSH host alias configured for a machine user or GitHub App
+key. Keep GitHub CLI auth state isolated with a non-secret environment pointer
+such as `GH_CONFIG_DIR`; do not store tokens, private keys, passwords, or
+credentials in shared DevNexus config. `automation status` and preflight report
+the effective Git remote, upstream branch, push URL, expected actor, and
+observed GitHub actor when the configured auth profile can be checked. Before a
+DevNexus-owned push or live provider mutation, mismatched configured remotes,
+SSH aliases, push URLs, or actors become blocking preflight failures with the
+observed value in the message.
+
 The agent context includes `components` and `componentEligibleWorkItems`.
 DevNexus groups eligible work items by component and does not collapse that
 grouping into a decision. The launched agent can then decide which component
@@ -718,7 +762,9 @@ configured component services.
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an
 agent under the user-configured launch policy before any worktree or tracker
-mutation happens.
+mutation happens. The same status payload includes publication policy status
+for each component, including the effective remote, upstream, push URL, and
+safe actor observation when configured.
 
 `automation enqueue` creates a work item that matches the configured automation
 launch filter. It derives the default status, labels, and assignees from

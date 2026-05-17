@@ -409,8 +409,98 @@ describe("project config", () => {
         remote: "origin",
         targetBranch: "main",
         push: true,
+        remoteUrl: null,
+        pushUrl: null,
+        sshHostAlias: null,
+        actor: null,
+        manualRemote: null,
+        manualActor: null,
+        commandEnvironment: {},
       },
     });
+  });
+
+  it("accepts publication identity and remote guardrails", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "publication-project",
+        name: "Publication Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "direct_integration",
+            remote: "bot",
+            remoteUrl: "git@github.com-bot:example/project.git",
+            sshHostAlias: "github.com-bot",
+            targetBranch: "main",
+            push: true,
+            actor: {
+              kind: "machine_user",
+              provider: "github",
+              handle: "example-bot",
+            },
+            manualRemote: "origin",
+            manualActor: {
+              kind: "human",
+              provider: "github",
+              handle: "example-human",
+            },
+            commandEnvironment: {
+              GH_CONFIG_DIR: "home:.config/gh-example-bot",
+            },
+          },
+        },
+      }).automation?.publication,
+    ).toEqual({
+      strategy: "direct_integration",
+      remote: "bot",
+      remoteUrl: "git@github.com-bot:example/project.git",
+      pushUrl: null,
+      sshHostAlias: "github.com-bot",
+      targetBranch: "main",
+      push: true,
+      actor: {
+        kind: "machine_user",
+        provider: "github",
+        handle: "example-bot",
+        id: null,
+      },
+      manualRemote: "origin",
+      manualActor: {
+        kind: "human",
+        provider: "github",
+        handle: "example-human",
+        id: null,
+      },
+      commandEnvironment: {
+        GH_CONFIG_DIR: "home:.config/gh-example-bot",
+      },
+    });
+  });
+
+  it("rejects secret-like publication command environment keys", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "publication-project",
+        name: "Publication Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            commandEnvironment: {
+              GITHUB_TOKEN: "token",
+            },
+          },
+        },
+      }),
+    ).toThrow(/must not store secrets/);
   });
 
   it("accepts agent launch automation mode", () => {

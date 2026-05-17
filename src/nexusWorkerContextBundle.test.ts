@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  defaultNexusAutomationConfig,
   materializeNexusWorkerContextBundle,
   nexusWorkerBriefingPath,
   nexusWorkerContextJsonPath,
@@ -47,6 +48,26 @@ describe("nexus worker context bundle", () => {
       branchName: "codex/local-19-worker-context",
       baseRef: "origin/main",
       workItem,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        remote: "bot",
+        actor: {
+          kind: "machine_user",
+          provider: "github",
+          handle: "example-bot",
+          id: null,
+        },
+        manualRemote: "origin",
+        manualActor: {
+          kind: "human",
+          provider: "github",
+          handle: "example-human",
+          id: null,
+        },
+        commandEnvironment: {
+          GH_CONFIG_DIR: "home:.config/gh-example-bot",
+        },
+      },
     });
 
     const contextJsonPath = nexusWorkerContextJsonPath(worktreePath);
@@ -77,6 +98,23 @@ describe("nexus worker context bundle", () => {
           status: "ready",
           provider: "local",
           labels: ["dogfood"],
+        },
+      },
+      publication: {
+        remote: "bot",
+        actor: {
+          kind: "machine_user",
+          provider: "github",
+          handle: "example-bot",
+        },
+        manualRemote: "origin",
+        manualActor: {
+          kind: "human",
+          provider: "github",
+          handle: "example-human",
+        },
+        commandEnvironment: {
+          GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
       projectContext: {
@@ -131,6 +169,13 @@ describe("nexus worker context bundle", () => {
       "Treat project context files as read-only unless the coordinator explicitly assigns project-state ownership.",
     );
     expect(briefing).toContain(`- AGENTS.md: ${path.join(projectRoot, "AGENTS.md")}`);
+    expect(briefing).toContain("- automation remote: bot");
+    expect(briefing).toContain(
+      "- automation actor: machine_user:github:example-bot",
+    );
+    expect(briefing).toContain("- manual remote: origin");
+    expect(briefing).toContain("- manual actor: human:github:example-human");
+    expect(briefing).toContain("- command environment keys: GH_CONFIG_DIR");
   });
 
   it("uses an explicit target state path when one is supplied", () => {

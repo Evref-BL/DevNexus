@@ -47,6 +47,13 @@ import {
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
+import type { GitRunner } from "./gitWorktreeService.js";
+import {
+  getNexusPublicationStatuses,
+  publicationPreflightChecks,
+  type NexusPublicationActorRunner,
+  type NexusPublicationStatus,
+} from "./nexusPublicationPolicy.js";
 import type {
   WorkItem,
   WorkItemQuery,
@@ -82,6 +89,8 @@ export interface GetNexusAutomationStatusOptions {
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  gitRunner?: GitRunner;
+  publicationActorRunner?: NexusPublicationActorRunner;
   now?: () => Date | string;
 }
 
@@ -100,6 +109,7 @@ export interface NexusAutomationStatus {
   target: NexusAutomationTargetContext | null;
   targetCycles: NexusAutomationTargetCycleSummary | null;
   agent: NexusAutomationAgentPolicy | null;
+  publication: NexusPublicationStatus[];
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkItems: WorkItem[] | null;
@@ -243,11 +253,22 @@ export async function getNexusAutomationStatus(
         selectedWorkItem: null,
       });
     }
-    const preflight = preflightNexusAutomationAgentLaunch({
+    const publication = getNexusPublicationStatuses({
+      projectRoot,
+      projectConfig,
       components,
-      componentProviders,
-      automationConfig,
+      action: "status",
+      gitRunner: options.gitRunner,
+      actorRunner: options.publicationActorRunner,
     });
+    const preflight = [
+      ...preflightNexusAutomationAgentLaunch({
+        components,
+        componentProviders,
+        automationConfig,
+      }),
+      ...publicationPreflightChecks(publication),
+    ];
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
       return statusResult({
@@ -266,6 +287,7 @@ export async function getNexusAutomationStatus(
         candidateCount: null,
         eligibleWorkItems: null,
         selectedWorkItem: null,
+        publication,
       });
     }
 
@@ -303,6 +325,7 @@ export async function getNexusAutomationStatus(
       eligibleWorkItems,
       componentEligibleWorkItems,
       selectedWorkItem: null,
+      publication,
     });
   }
 
@@ -341,6 +364,14 @@ export async function getNexusAutomationStatus(
     component: primaryComponent,
   });
 
+  const publication = getNexusPublicationStatuses({
+    projectRoot,
+    projectConfig,
+    components,
+    action: "status",
+    gitRunner: options.gitRunner,
+    actorRunner: options.publicationActorRunner,
+  });
   const preflight = preflightNexusAutomationRunOnce({
     projectRoot,
     sourceRoot,
@@ -348,6 +379,8 @@ export async function getNexusAutomationStatus(
     component: primaryComponent,
     automationConfig,
     provider,
+    gitRunner: options.gitRunner,
+    publicationActorRunner: options.publicationActorRunner,
   });
   const failedChecks = preflight.filter((check) => check.status === "failed");
   if (failedChecks.length > 0) {
@@ -367,6 +400,7 @@ export async function getNexusAutomationStatus(
       candidateCount: null,
       eligibleWorkItems: null,
       selectedWorkItem: null,
+      publication,
     });
   }
 
@@ -398,6 +432,7 @@ export async function getNexusAutomationStatus(
     candidateCount: candidates.length,
     eligibleWorkItems: null,
     selectedWorkItem,
+    publication,
   });
 }
 
@@ -575,6 +610,7 @@ type AutomationStatusInput = Omit<
   | "agent"
   | "componentEligibleWorkItems"
   | "components"
+  | "publication"
   | "target"
   | "targetCycles"
 > &
@@ -584,6 +620,7 @@ type AutomationStatusInput = Omit<
       | "agent"
       | "componentEligibleWorkItems"
       | "components"
+      | "publication"
       | "target"
       | "targetCycles"
     >
@@ -617,6 +654,7 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     target,
     targetCycles,
     agent,
+    publication: result.publication ?? [],
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
   };
