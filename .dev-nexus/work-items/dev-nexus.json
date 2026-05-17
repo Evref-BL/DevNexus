@@ -1,0 +1,1777 @@
+{
+  "version": 1,
+  "nextNumber": 39,
+  "nextCommentNumber": 71,
+  "updatedAt": "2026-05-17T13:36:16.678Z",
+  "items": [
+    {
+      "id": "local-1",
+      "title": "Use to-issues to split the live plan into component work items",
+      "description": "Type: planning slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: dev-nexus-pharo-work-tracking-handoff.md, NOTES.md, CONTEXT.md, and target-state.md.\n\nGoal: refine the seeded local work-item stores into component-owned execution slices that a launched coordinator can select without relying on chat memory.\n\nAcceptance criteria:\n- Every seeded component work item has an owning component, stable behavior-oriented description, readiness classification, blocker notes, acceptance criteria, and safe verification guidance.\n- DevNexus core items are separated from specialization and live-runtime boundary items.\n- Runtime/image work remains planning-only until an isolated runner, disposable runtime boundary, and cleanup plan are recorded.\n- Target state is updated so the next coordinator cycle can continue from durable project state.\n\nVerification:\n- List ready dogfood work across components with the DevNexus work-item CLI.\n- Generate a DevNexus target report and confirm the latest cycle facts are durable.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "skills",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:25.739Z",
+      "updatedAt": "2026-05-16T12:42:16.924Z",
+      "closedAt": "2026-05-16T12:42:16.924Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-1",
+        "itemNumber": 1
+      }
+    },
+    {
+      "id": "local-2",
+      "title": "Harden coordinator result-file contract",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\n\nGoal: make launched coordinator result reporting harder to omit or mis-shape while preserving the boundary that DevNexus records facts but does not choose or supervise implementation work.\n\nAcceptance criteria:\n- The launch context exposes the result file path and the result contract a coordinator must satisfy.\n- The command environment exposes concise required/optional result-field hints.\n- Missing or malformed result JSON still fails the launch before recording completion.\n- Documentation describes the durable result JSON contract and the helper affordance.\n\nVerification:\n- Run focused agent-launch tests covering context, missing result files, and malformed result files.\n- Run the DevNexus build or broader check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "agent-launch",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:25.872Z",
+      "updatedAt": "2026-05-16T12:42:17.182Z",
+      "closedAt": "2026-05-16T12:42:17.182Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-2",
+        "itemNumber": 2
+      }
+    },
+    {
+      "id": "local-3",
+      "title": "Add relaunch readiness decision from target reports",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\n\nGoal: make relaunch, stop, wait, blocked, and failed decisions explicit from durable target reports instead of chat memory.\n\nAcceptance criteria:\n- Target reports combine the latest target cycle record, automation run ledger, target stop policy, and relaunch policy into an explicit relaunch decision.\n- The decision reports the latest cycle id, latest run id when present, eligible work count when known, and a human-readable reason.\n- The CLI and native MCP target-report surfaces expose the same decision shape.\n- Tests cover relaunch while eligible, stop when no eligible work remains, wait for active cycles, and blocked/failed reporting.\n\nVerification:\n- Run focused target-report tests.\n- Run automation target-report against this dogfood project after the cycle record is updated.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "target-loop",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:25.987Z",
+      "updatedAt": "2026-05-16T13:35:32.006Z",
+      "closedAt": "2026-05-16T13:35:32.006Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-3",
+        "itemNumber": 3
+      }
+    },
+    {
+      "id": "local-4",
+      "title": "Improve component worktree guidance for launched agents",
+      "description": "Type: documentation slice\nReadiness: autonomous agent-ready (AFK)\n\nGoal: document component-aware source and worktree conventions so launched agents can safely work across a multi-component DevNexus project.\n\nAcceptance criteria:\n- Documentation explains that each component has its own source root, worktree root, tracker, verification hints, publication policy, and relationships.\n- Agent guidance says to inspect dirty state before editing, keep generated worktrees and branches component-scoped, and report progress through the owning component work-item service.\n- The guidance makes clear that agent-launch mode supplies context but does not create implementation worktrees for the coordinator.\n- The guidance does not introduce specialization-specific terms into generic DevNexus source/docs.\n\nVerification:\n- Run documentation diff checks.\n- Run a specialization-term scan over DevNexus source/docs.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "multi-component",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:26.126Z",
+      "updatedAt": "2026-05-16T12:42:17.446Z",
+      "closedAt": "2026-05-16T12:42:17.446Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-4",
+        "itemNumber": 4
+      }
+    },
+    {
+      "id": "local-5",
+      "title": "Split transferred plan into next component work items",
+      "description": "Type: planning slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md, AGENTS.md, CONTEXT.md, dev-nexus.project.json, and target-state.md.\n\nGoal: split the transferred DevNexus dogfood plan into the next component-owned work-item batch so future cycles no longer depend on the old DevNexus-Control handoff or chat memory.\n\nAcceptance criteria:\n- Use the curated to-issues skill against PLAN.md.\n- Create or update component-owned work items across the configured components, not one monolithic issue.\n- Each item includes readiness, blocker, acceptance, verification, and publication notes.\n- Keep live-runtime items blocked until isolated-runner approval exists.\n- Update target-state.md with the chosen next direction and any decisions made.\n\nVerification:\n- List ready dogfood work across components with DevNexus work-item CLI.\n- Generate a DevNexus target report and confirm relaunch eligibility is based on durable project state.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "skills",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T13:35:38.543Z",
+      "updatedAt": "2026-05-16T14:06:20.389Z",
+      "closedAt": "2026-05-16T14:04:53.075Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-5",
+        "itemNumber": 5
+      }
+    },
+    {
+      "id": "local-6",
+      "title": "Add coordinator subagent dispatch progress surfaces",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md priority candidate 3.\n\nGoal: make coordinator-owned subagent dispatch visible in DevNexus records without making DevNexus choose, supervise, or assign implementation work.\n\nAcceptance criteria:\n- A coordinator can record selected, dispatched, in-progress, completed, blocked, and skipped work item facts per component through CLI and MCP target-cycle surfaces.\n- Recorded facts can include the selected agent profile, bounded notes, and component work item references without requiring chat memory.\n- The agent-launch context exposes enough policy for the coordinator to obey maxConcurrentSubagents and available profiles.\n- Documentation states that DevNexus records coordinator-reported facts but does not decide which subagents to launch.\n\nBlockers and boundaries:\n- Keep DevNexus generic; no DevNexus-Pharo, PLexus, launcher, or image-specific behavior in core.\n- Do not create implementation subagents from DevNexus itself.\n\nVerification:\n- Add focused target-cycle CLI/MCP tests for dispatch/progress fields.\n- Run the relevant DevNexus automation and CLI test files, then npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after focused and broader checks pass.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "agent-launch",
+        "multi-agent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:01.490Z",
+      "updatedAt": "2026-05-16T15:35:53.450Z",
+      "closedAt": "2026-05-16T15:35:53.248Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-6",
+        "itemNumber": 6
+      }
+    },
+    {
+      "id": "local-7",
+      "title": "Support component-scoped parallel worktree records",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md priority candidate 4.\n\nGoal: harden DevNexus worktree-parallel support so coordinators can prepare and report component-scoped implementation worktrees across multi-component targets.\n\nAcceptance criteria:\n- Worktree preparation and metadata clearly bind a worktree to one component, source root, branch, base ref, and owning work item.\n- Generated worktree paths stay under the configured component worktreesRoot and reject unsafe paths.\n- Target/run records can report component-scoped worktree ownership without collapsing a project to one repository.\n- Documentation gives launched coordinators a safe workflow for using source roots or generated worktrees per component.\n\nBlockers and boundaries:\n- Preserve unrelated changes in active component source roots.\n- Do not make agent-launch mode auto-create implementation worktrees; coordinators still choose when to create them.\n\nVerification:\n- Add focused gitWorktreeService, worktree metadata, CLI, and automation tests for component-scoped records.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "multi-component",
+        "worktrees",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:01.823Z",
+      "updatedAt": "2026-05-16T15:35:53.497Z",
+      "closedAt": "2026-05-16T15:33:23.529Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-7",
+        "itemNumber": 7
+      }
+    },
+    {
+      "id": "local-8",
+      "title": "Improve component-aware target completion reporting",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md priority candidate 5.\n\nGoal: make DevNexus target reports useful as factual completion reports for multi-component dogfood runs.\n\nAcceptance criteria:\n- The target report summarizes active blockers, per-component progress, selected work items, commits, verification, and publication decisions from durable cycle/run facts.\n- Work item references include titles/statuses when those facts are recorded or can be safely resolved through configured local trackers.\n- The report distinguishes ready eligible work, blocked HITL work, completed work, and skipped work without relying on chat memory.\n- JSON output remains stable for automation consumers.\n\nBlockers and boundaries:\n- Report factual recorded or tracker-resolved state only; do not infer hidden implementation status.\n- Avoid live external tracker calls unless a provider is configured and the operation is read-only.\n\nVerification:\n- Add focused target-report tests for multi-component progress, blockers, verification, publication, and relaunch decisions.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after focused and full checks pass.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "target-loop",
+        "reporting",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.007Z",
+      "updatedAt": "2026-05-16T15:52:03.549Z",
+      "closedAt": "2026-05-16T15:52:03.401Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-8",
+        "itemNumber": 8
+      }
+    },
+    {
+      "id": "local-9",
+      "title": "Add low-token agent-facing status and eligible-work commands",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md priority candidate 6.\n\nGoal: reduce coordinator discovery cost by exposing concise project status, target report, eligible work, work-item update/comment, cycle record, and agent profile inspection surfaces.\n\nAcceptance criteria:\n- CLI and native MCP expose a concise eligible-work listing grouped by component using the configured automation selector.\n- Agent profile inspection reports coordinatorProfileId, available profiles, maxConcurrentSubagents, and launch safety policy without dumping the full project config.\n- Existing work-item create/list/get/update/comment and target-cycle record surfaces remain compatible.\n- README or agent-facing docs show the shortest recommended commands for a coordinator cycle.\n\nBlockers and boundaries:\n- Keep the surface generic and component-aware.\n- Do not depend on the DevNexus-Pharo specialization adapter for generic orchestration.\n\nVerification:\n- Add CLI and MCP tests for the concise status, eligible-work, and agent-profile outputs.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after tests pass.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "mcp",
+        "cli",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.157Z",
+      "updatedAt": "2026-05-16T15:18:59.658Z",
+      "closedAt": "2026-05-16T15:18:59.645Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-9",
+        "itemNumber": 9
+      }
+    },
+    {
+      "id": "local-10",
+      "title": "Harden neutral work-tracker provider conformance",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) for provider contract and mocked API coverage; human-in-the-loop (HITL) for live provider credentials or project choices.\nSource plan: PLAN.md priority candidate 7.\n\nGoal: make GitHub Issues, GitHub Projects, GitLab Issues, Jira, Vibe Kanban, and local stores map consistently to neutral component work items without assuming one project equals one repository.\n\nAcceptance criteria:\n- Provider capability reporting clearly distinguishes list, create, update, comment, labels, assignees, milestones, board support, and board status support.\n- Mocked provider tests cover neutral status mapping, labels, comments, component configuration, and credential failure messages.\n- Missing provider features are reported as capability gaps rather than hidden runtime surprises.\n- Any GitHub Projects or Vibe Kanban gaps are captured as provider-specific follow-ups if they are too large for this slice.\n\nBlockers and boundaries:\n- Do not require live external credentials for this slice.\n- Do not create Vibe workspaces, sessions, executions, or workers for implementation.\n\nVerification:\n- Run focused workTracking provider/service tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after mocked provider coverage passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "work-tracking",
+        "providers",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.313Z",
+      "updatedAt": "2026-05-16T15:35:53.535Z",
+      "closedAt": "2026-05-16T15:35:53.328Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-10",
+        "itemNumber": 10
+      }
+    },
+    {
+      "id": "local-11",
+      "title": "Harden Codex and Claude agent profile policy schema",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md priority candidate 8.\n\nGoal: make agent profile configuration explicit enough for coordinators to choose Codex or Claude profiles and obey model, reasoning, sandbox, safety, and subagent-cap policy.\n\nAcceptance criteria:\n- Agent profile schema and validation cover executor, model, version or variant when configured, reasoning/intelligence level, command/args, sandbox or safety posture, and intended use.\n- Agent-launch context exposes the normalized profile policy needed by a coordinator without leaking unrelated host detail.\n- Invalid or incomplete coordinator profiles fail preflight with actionable errors.\n- Documentation explains coordinatorProfileId, subagent caps, and profile selection as infrastructure policy rather than work supervision.\n\nBlockers and boundaries:\n- Do not hard-code provider-specific behavior outside profile normalization/validation.\n- Preserve current user-local Codex profile compatibility.\n\nVerification:\n- Add focused automation config/profile tests and agent-launch context tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-profiles",
+        "safety",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.507Z",
+      "updatedAt": "2026-05-16T15:52:03.823Z",
+      "closedAt": "2026-05-16T15:52:03.694Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-11",
+        "itemNumber": 11
+      }
+    },
+    {
+      "id": "local-12",
+      "title": "Shape production-quality DevNexus project template from dogfood evidence",
+      "description": "Type: follow-up planning and implementation slice\nReadiness: autonomous agent-ready (AFK) after the dogfood loop reliably advances ready component work.\nSource plan: PLAN.md priority candidate 10.\n\nGoal: distill this dogfood evidence into a clean production-quality DevNexus project shape without carrying forward historical staging-project clutter.\n\nAcceptance criteria:\n- The template separates generic DevNexus project state, component configuration, target state, skills, and agent MCP projection cleanly.\n- Historical DevNexus-Control assumptions are removed or documented as migration-only evidence.\n- The shape works for one-component and multi-component projects without special casing arity one.\n- Migration notes identify what can be generated, what must be user-authored, and what remains local runtime state.\n\nBlockers and boundaries:\n- Wait until the current dogfood loop has exercised the component-owned work-item batch and target reporting surfaces.\n- Keep generated/runtime state out of source templates unless explicitly intended.\n\nVerification:\n- Validate the template with project status and MCP refresh on a throwaway local project root.\n- Run relevant DevNexus project scaffold/config tests.\n\nPublication notes:\n- Direct integration to origin/main after template checks pass.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "project-shape",
+        "handoff",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.658Z",
+      "updatedAt": "2026-05-16T16:29:30.712Z",
+      "closedAt": "2026-05-16T16:29:30.544Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-12",
+        "itemNumber": 12
+      }
+    },
+    {
+      "id": "local-13",
+      "title": "Add generic DevNexus plugin capability projection contract",
+      "description": "Type: generic plugin infrastructure slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: PLAN.md Plugin Direction.\n\nGoal: add a generic DevNexus plugin capability/projection contract so multiple plugins can contribute agent setup without replacing DevNexus or supervising implementation work.\n\nAcceptance criteria:\n- Project model and docs distinguish DevNexus core from additive plugins.\n- More than one plugin can be configured for one DevNexus project without assuming one plugin owns the project.\n- Plugin capability records can describe projected skills, MCP servers/tools, setup obligations, environment hints, and cleanup hooks for agent contexts.\n- Coordinator launch context or low-token agent-facing surfaces report available plugin capabilities without component-specific terms in DevNexus core.\n- Documentation states that plugins provide capabilities and setup policy only; the coordinator still chooses work, subagents, and supervision strategy.\n\nBlockers and boundaries:\n- Keep the contract generic; no DevNexus-Pharo, PLexus, launcher, or image-specific source behavior in DevNexus core.\n- Do not run live services or external plugin setup during this slice.\n\nVerification:\n- Add focused config/template/CLI/MCP tests for plugin declaration and projection surfaces.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugins",
+        "agent-setup",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T17:48:37.704Z",
+      "updatedAt": "2026-05-16T20:30:42.845Z",
+      "closedAt": "2026-05-16T20:30:42.845Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-13",
+        "itemNumber": 13
+      }
+    },
+    {
+      "id": "local-14",
+      "title": "Add shared coordination status and handoff records",
+      "description": "Type: shared coordination tracer-bullet implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: docs/shared-multi-host-coordination-prd.md.\n\nGoal: add the first generic DevNexus shared-coordination surface with status and handoff records, keeping the API small and avoiding hard locks.\n\nAcceptance criteria:\n- CLI and MCP expose coordination_status and coordination_handoff with minimal required inputs.\n- coordination_status infers current component, worktree, branch, base/upstream, dirty state, pushed state, related work-item handoffs, and likely next action from project config, Git, and the configured tracker.\n- coordination_handoff can write a structured work-item-backed record with host id, optional agent id, status, branch, base ref, head commit, changed areas, decisions, verification summary, and integration preference.\n- Stale handoffs are reported as advisory freshness warnings, not locks.\n- Documentation states that Git worktrees remain the parallelism mechanism and shared handoffs are coordination facts.\n\nBlockers and boundaries:\n- Keep this generic in DevNexus; no DevNexus-Pharo, PLexus, launcher, image, or Tailscale-specific behavior in core.\n- Do not require live external tracker credentials; use local and mocked providers for tests.\n- Do not auto-merge or auto-resolve conflicts in this slice.\n\nVerification:\n- Add focused CLI/MCP tests for status and handoff.\n- Add mocked Git/work-tracker tests for Windows and POSIX-style paths.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "multi-host",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T18:15:18.630Z",
+      "updatedAt": "2026-05-16T19:43:23.434Z",
+      "closedAt": "2026-05-16T19:43:23.434Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-14",
+        "itemNumber": 14
+      }
+    },
+    {
+      "id": "local-15",
+      "title": "Add shared coordination integration planning",
+      "description": "Type: shared coordination integration-planning slice\nReadiness: autonomous agent-ready (AFK) after coordination status/handoff records exist.\nSource plan: docs/shared-multi-host-coordination-prd.md.\n\nGoal: add coordination_integrate so either Mac or Windows can forecast and plan integration using shared handoff intent rather than local memory.\n\nAcceptance criteria:\n- coordination_integrate fetches configured remotes when policy allows and gathers related handoff branches for a work item, component, or target branch.\n- It uses Git merge-base, merge-tree or a temporary trial worktree, and range-diff where useful to report clean merges, textual conflicts, changed files, and competing branch decisions.\n- It reads recorded handoff decisions before suggesting merge direction or order.\n- It produces a structured integration plan without mutating source unless project policy explicitly enables integration branches/items.\n- Conflict output is concise enough for a coordinator agent to decide the next merge step.\n\nBlockers and boundaries:\n- Depends on dev-nexus shared coordination status/handoff records.\n- Do not implement automatic semantic conflict resolution.\n- Do not require Tailscale or live external services for tests.\n\nVerification:\n- Add synthetic Git fixture tests for clean merge, textual conflict, diverging decisions, and stale handoffs.\n- Add CLI/MCP tests for the integration plan shape.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "integration",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T18:15:18.800Z",
+      "updatedAt": "2026-05-16T20:49:16.734Z",
+      "closedAt": "2026-05-16T20:49:16.734Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-15",
+        "itemNumber": 15
+      }
+    },
+    {
+      "id": "local-16",
+      "title": "Choose shared coordination provider and transport for Mac Windows dogfood",
+      "description": "Type: shared project rollout decision slice\nReadiness: human-in-the-loop (HITL)\nSource plan: docs/shared-multi-host-coordination-prd.md.\n\nGoal: choose and configure the real shared coordination backing store for Mac and Windows dogfood once the generic coordination API is available.\n\nAcceptance criteria:\n- Decide the first shared tracker/provider for multi-host dogfood: GitHub Issues, GitHub Projects, or a DevNexus coordination service.\n- Decide whether non-protected handoff branches may be pushed automatically by coordination_handoff, per component policy.\n- Decide whether Tailscale is used only for private MCP transport or also for a hosted coordination service endpoint.\n- Record the portable meta-project shape and host-local override rules needed so Mac and Windows share project identity without committing local paths, ports, secrets, worktrees, or runtime artifacts.\n- Update project configuration only after the chosen provider and transport are explicit.\n\nBlockers and boundaries:\n- Blocked on a human/provider decision and any needed credentials or Tailscale setup.\n- Do not commit host-local paths, secrets, runtime ports, logs, or worktrees.\n- Do not mutate remote trackers until the provider is chosen.\n\nVerification:\n- Before provider approval, static plan/config review only.\n- After approval, run read-only provider status checks and one harmless handoff/status smoke.\n\nPublication notes:\n- Dogfood project-state changes may remain local if this root has no remote; DevNexus source changes follow direct integration policy.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "shared-tracker",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T18:15:18.957Z",
+      "updatedAt": "2026-05-17T00:06:30.327Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-16",
+        "itemNumber": 16
+      }
+    },
+    {
+      "id": "local-17",
+      "title": "Add external coordination request API",
+      "description": "Type: external coordination implementation slice\nReadiness: autonomous agent-ready (AFK) for provider-neutral API and mocked providers; human-in-the-loop (HITL) for live provider posting policy.\nSource plan: docs/shared-multi-host-coordination-prd.md external coordination extension.\n\nGoal: add coordination_request so agents can ask external humans or agents for approval, feedback, a choice, or review through configured provider surfaces, then continue from durable responses.\n\nAcceptance criteria:\n- CLI and MCP expose coordination_request with minimal inputs: intent, optional question/note, and optional target.\n- The tool infers component, work item, branch, commits, changed areas, verification evidence, and relevant provider object when possible.\n- Provider-neutral request intents are approval, feedback, choice, and review.\n- Provider-neutral statuses include waiting, answered, approved, changes_requested, timed_out, and blocked.\n- The implementation can draft requests without posting when provider mutation is not approved.\n- Mock provider adapters cover GitHub issue/PR, GitLab issue/MR, and Jira-style comment/read flows without live credentials.\n- Responses are summarized back into neutral DevNexus coordination records or work-item comments.\n\nBlockers and boundaries:\n- Keep the generic API provider-neutral; provider adapters handle GitHub/GitLab/Jira vocabulary.\n- Do not auto-approve, dismiss reviews, merge, or repeatedly ping external humans.\n- Do not require live provider credentials for the first slice.\n\nVerification:\n- Add focused CLI/MCP tests for draft, post-when-allowed, read/summarize, stale wait, and provider status mapping.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after mocked provider verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "external-feedback",
+        "mocked-provider",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T19:06:40.447Z",
+      "updatedAt": "2026-05-17T11:26:46.428Z",
+      "closedAt": "2026-05-17T11:26:46.232Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-17",
+        "itemNumber": 17
+      }
+    },
+    {
+      "id": "local-18",
+      "title": "Choose external coordination posting policy",
+      "description": "Type: external coordination rollout decision slice\nReadiness: human-in-the-loop (HITL)\nSource plan: docs/shared-multi-host-coordination-prd.md external coordination extension.\n\nGoal: decide which external provider actions DevNexus may perform automatically and which must remain draft-only for Mac/Windows dogfood and later shared projects.\n\nAcceptance criteria:\n- Decide whether coordination_request may post comments automatically to GitHub Issues, GitHub pull requests, GitLab issues, GitLab merge requests, Jira issues, and review threads.\n- Decide rate limits or quiet periods for follow-up pings and stale waits.\n- Decide whether provider credentials live only in host-local overlays or can be referenced by named secret providers.\n- Decide how to identify external humans/agents and when to require explicit target reviewer identities.\n- Record the chosen policy in project configuration or docs before enabling live provider mutation.\n\nBlockers and boundaries:\n- Blocked on human/provider policy decision and credentials.\n- Do not post to live external providers until policy is approved.\n- Do not store secrets in the shared meta project.\n\nVerification:\n- Static policy/config review before live provider use.\n- After approval, run one harmless draft and one approved provider smoke against a test issue or pull request.\n\nPublication notes:\n- Dogfood project-state changes may remain local if this root has no remote; DevNexus source changes follow direct integration policy.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "external-feedback",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T19:06:40.613Z",
+      "updatedAt": "2026-05-17T10:57:50.039Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-18",
+        "itemNumber": 18
+      }
+    },
+    {
+      "id": "local-19",
+      "title": "Materialize worker context bundles for component worktrees",
+      "description": "Type: implementation tracer-bullet\nReadiness: autonomous agent-ready (AFK)\nSource discussion: generated worker context should fix subagent confusion without changing the meaning of Git worktrees.\n\nGoal: materialize a DevNexus-owned worker context bundle inside each prepared component Git worktree while preserving worktreePath as the source checkout root.\n\nAcceptance criteria:\n- Prepared component worktrees get a generated support bundle under `.dev-nexus/context/` with at least `context.json` and `briefing.md`.\n- The context records projectRoot, component id, work item id/title, sourceRoot, worktreesRoot, worktreePath, branch/base ref, target-state path, root AGENTS/CONTEXT/PLAN paths, and result/handoff expectations when available.\n- The briefing clearly distinguishes read-only project context from writable component source and says the component checkout AGENTS.md remains authoritative for component source rules.\n- The bundle does not copy or overwrite root AGENTS.md, component AGENTS.md, PLAN.md, or target-state.md at the source root.\n- Generated context files are excluded from source control or live only in existing DevNexus support state.\n- CLI/run-once tests cover Windows and POSIX-style paths and prove existing Git worktree behavior still uses worktreePath as the checkout root.\n\nBlockers and boundaries:\n- Keep this generic in DevNexus; no DevNexus-Pharo, PLexus, launcher, image, or TypeScript-specific behavior.\n- Do not introduce nested workspaceRoot/sourceRoot semantics in this slice.\n\nVerification:\n- Run focused worktree setup, run-once, and execution metadata tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-context",
+        "worktrees",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T21:15:18.264Z",
+      "updatedAt": "2026-05-16T21:38:34.214Z",
+      "closedAt": "2026-05-16T21:38:34.188Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-19",
+        "itemNumber": 19
+      }
+    },
+    {
+      "id": "local-20",
+      "title": "Project local skills into prepared worker contexts",
+      "description": "Type: implementation follow-up\nReadiness: autonomous agent-ready (AFK) after the worker context bundle shape is available.\nSource discussion: workers should not depend on globally installed skills; DevNexus already manages project-local skill definitions and agent-native projections.\n\nGoal: make project-local DevNexus skills discoverable from prepared worker contexts without requiring machine-global Codex skill installation.\n\nAcceptance criteria:\n- Worker context records the project-managed skills root and selected agent-native skill projection paths.\n- Worktree setup can link or copy selected project-local skills into generated worker support state when the worker agent runs with cwd inside the component worktree.\n- Skill projection remains generated support state and is excluded from component source control by default.\n- The design distinguishes `.dev-nexus/skills` as DevNexus-managed source of skill definitions from `.agents/skills` or other agent-native projections.\n- Tests prove stale/missing projected skills are detected or refreshed without modifying component source files.\n\nBlockers and boundaries:\n- Depends on or should build on `dev-nexus:local-19` so the skill paths live in the same worker context model.\n- Do not install skills globally or write into user-global Codex directories.\n\nVerification:\n- Run focused skill materialization/projection and worktree setup tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-context",
+        "skills",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T21:15:18.430Z",
+      "updatedAt": "2026-05-16T21:56:05.215Z",
+      "closedAt": "2026-05-16T21:56:05.025Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-20",
+        "itemNumber": 20
+      }
+    },
+    {
+      "id": "local-21",
+      "title": "Allow plugins to contribute worker briefing fragments",
+      "description": "Type: generic plugin infrastructure follow-up\nReadiness: autonomous agent-ready (AFK) after the generic worker context bundle exists.\nSource discussion: plugins such as DevNexus-Pharo should be able to contribute task-specific agent briefing sections without replacing DevNexus or supervising work.\n\nGoal: let enabled DevNexus plugins contribute bounded worker context and briefing fragments that DevNexus renders into generated worker support files.\n\nAcceptance criteria:\n- The generic plugin capability model can declare worker context or briefing fragments with explicit id, title, body, intended agents/components when needed, and provenance.\n- DevNexus renders enabled fragments into the generated worker briefing/context without embedding plugin-specific vocabulary in core code paths.\n- Fragment ordering and conflict behavior are deterministic and documented.\n- Fragments are advisory setup/context only; they do not select work, launch subagents, or supervise implementation.\n- Tests use generic fake plugins to verify projection into agent launch and prepared worktree context surfaces.\n\nBlockers and boundaries:\n- Depends on `dev-nexus:local-19` for the base worker context bundle.\n- Keep Pharo-specific content out of DevNexus core tests and docs except as generic examples if needed.\n\nVerification:\n- Run focused plugin config/projection and worker context rendering tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugins",
+        "agent-context",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T21:15:18.598Z",
+      "updatedAt": "2026-05-16T21:56:05.573Z",
+      "closedAt": "2026-05-16T21:56:05.398Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-21",
+        "itemNumber": 21
+      }
+    },
+    {
+      "id": "local-22",
+      "title": "Decide whether to add nested execution workspaces",
+      "description": "Type: architecture decision and prototype slice\nReadiness: human-in-the-loop (HITL) after the simpler worker context bundle has been exercised.\nSource discussion: a generated meta-workspace root with nested source/ checkouts may be cleaner for multi-component or plugin-heavy tasks, but it would change the current worktree path model.\n\nGoal: decide whether DevNexus should add an optional execution workspace root containing one or more nested component Git checkouts.\n\nAcceptance criteria:\n- Evaluate real pain after `dev-nexus:local-19` and any needed skill projection work land.\n- Document whether the current `worktreePath = source checkout root` model is sufficient for normal component work.\n- If a nested model is still needed, define names and metadata such as `workspaceRoot`, `sourceRoot`, `componentCheckoutRoot`, and multi-component checkout layout.\n- Identify every deterministic tool surface that must receive both workspaceRoot and sourceRoot: Git status, verification cwd, commit discovery, archive/remove, dependency links, coordination integrate, plugin setup hooks, and DevNexus-Pharo Codex worktree helpers.\n- Produce an Architecture Decision Record or target-state decision before implementation.\n\nBlockers and boundaries:\n- Do not implement nested workspaceRoot/sourceRoot semantics until a human confirms the simpler context-bundle path is insufficient.\n- Do not break existing Git worktree behavior.\n\nVerification:\n- Static architecture review and, if useful, a throwaway prototype outside source publication.\n\nPublication notes:\n- Dogfood planning state can stay local; source changes require a follow-up implementation item.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "architecture",
+        "workspaces",
+        "hitl",
+        "deferred"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T21:15:18.764Z",
+      "updatedAt": "2026-05-16T21:15:18.764Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-22",
+        "itemNumber": 22
+      }
+    },
+    {
+      "id": "local-23",
+      "title": "Let toolchain plugins project dependencies into worker worktrees",
+      "description": "Type: generic toolchain/plugin setup slice\nReadiness: autonomous agent-ready (AFK) after worker context bundles, project-local skills, and plugin worker fragments landed in DevNexus 5895ea2.\nSource finding: generated JS/TS worktrees have no local node_modules, so test commands such as Vitest are unavailable and npx may attempt package fetches. Workers should not have to discover or repair this manually.\n\nGoal: let enabled toolchain plugins contribute simple generated-worktree dependency projections and environment hints so language-local commands run from the component worktree without global installs or ad hoc package fetches.\n\nDesign direction:\n- Keep DevNexus core generic. Add a dumb declarative plugin setup contribution that can be lowered to existing worktree setup primitives such as dependency links, generated support directories, Git excludes, and environment hints.\n- Do not make a combined Java/TypeScript special case in core. Use JavaScript/TypeScript as the first concrete toolchain plugin behavior; Java can reuse the same generic hook later for JDK/Maven/Gradle hints.\n- For JavaScript/TypeScript, prefer linking an already-reviewed source-root `node_modules` into the generated worktree when lockfiles match or when the project explicitly accepts the projection. Do not run npm/pnpm/yarn installs unless dependency installation is explicitly allowed by project safety policy.\n\nAcceptance criteria:\n- Plugin capability/config can declare generated-worktree dependency projections with id, source, target, required/optional behavior, source-control policy, and a concise reason shown in worker context/briefing.\n- Worktree setup materializes plugin-provided dependency projections alongside project `automation.setup.dependencyLinks`, excludes generated dependency support from component Git, and records the result in `setup` and `context.json`.\n- JavaScript/TypeScript fixture tests prove a generated worktree can resolve local npm/Vitest-style binaries through projected dependencies without global installs or `npx` package fetches.\n- Missing or stale dependency projections produce a clear preflight/setup result telling the worker what is unavailable, instead of silently falling through to package fetches.\n- The implementation does not install packages, mutate user-global tool directories, or add TypeScript-specific source paths to DevNexus core outside generic tests/fixtures/docs.\n\nVerification:\n- Add focused tests for plugin-provided dependency projection materialization, Git excludes, worker context reporting, and JS/TS binary resolution behavior.\n- Run `npm run check`.\n\nPublication notes:\n- Direct integration to DevNexus `origin/main` after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugins",
+        "agent-context",
+        "toolchain",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T21:57:08.093Z",
+      "updatedAt": "2026-05-16T22:19:41.641Z",
+      "closedAt": "2026-05-16T22:19:41.641Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-23",
+        "itemNumber": 23
+      }
+    },
+    {
+      "id": "local-24",
+      "title": "Support related-component dependency projections in worker worktrees",
+      "description": "Type: worker setup/toolchain follow-up\nReadiness: todo until local-23 dependency projection behavior is reviewed against component graph needs.\nSource finding: dev-nexus-pharo:local-4 workers could not run npm scripts in generated/manual DevNexus-Pharo worktrees because package.json expects ../DevNexus, but the worker worktree had no sibling DevNexus checkout.\n\nGoal: let DevNexus project worker setup project declared related-component dependencies, such as a sibling DevNexus checkout needed by DevNexus-Pharo package scripts, without opening arbitrary outside-source path access.\n\nAcceptance criteria:\n- Project config can declare a dependency projection sourced from another configured component by component id, not only from paths inside the current component source root.\n- Worker setup materializes the related component support path into the expected relative location while preserving Git ignore/support semantics.\n- Preflight rejects undeclared outside paths and missing required component sources with clear errors.\n- Generated worker context reports the related-component dependency projection and its source component.\n- Static tests cover the DevNexus-Pharo-style ../DevNexus sibling dependency without installing packages or running live services.\n\nBoundaries:\n- Do not loosen arbitrary path traversal for dependency projections.\n- Do not install packages, run live services, or require Docker.\n\nVerification:\n- Focused DevNexus dependency projection/setup/context tests.\n- npm run check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "toolchain",
+        "dependency-projection",
+        "worker-context",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T22:38:36.195Z",
+      "updatedAt": "2026-05-17T11:26:46.719Z",
+      "closedAt": "2026-05-17T11:26:46.568Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-24",
+        "itemNumber": 24
+      }
+    },
+    {
+      "id": "local-25",
+      "title": "Publish DevNexus scoped dogfood npm prerelease",
+      "description": "Type: packaging/publication slice\nReadiness: autonomous agent-ready for metadata, dry-run packing, and registry publish when npm auth allows.\nSource discussion: make DevNexus accessible from more computers without sibling checkout assumptions; use a scoped dogfood prerelease rather than a stable public release.\n\nGoal: publish DevNexus as a scoped npm dogfood prerelease suitable for DevNexus-Pharo and other plugins to consume.\n\nAcceptance criteria:\n- Package metadata uses a scoped Evref-BL npm name and a prerelease version/tag.\n- Published contents are limited to built runtime artifacts, types, README, and package metadata.\n- npm pack dry-run shows expected contents.\n- npm publish uses public access and the dogfood tag if npm auth allows; otherwise the blocker is recorded clearly.\n- No generic DevNexus behavior changes are mixed into this slice.\n\nVerification:\n- npm run check.\n- npm pack --dry-run.\n- npm whoami / npm publish result when attempted.\n\nPublication notes:\n- Commit and push package metadata changes to origin/main before or after registry publication, depending on registry auth outcome.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "packaging",
+        "npm"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T22:51:56.920Z",
+      "updatedAt": "2026-05-16T23:03:18.780Z",
+      "closedAt": "2026-05-16T23:03:18.780Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-25",
+        "itemNumber": 25
+      }
+    },
+    {
+      "id": "local-26",
+      "title": "Project MCP approval defaults into generated agent configs",
+      "description": "Type: implementation follow-up\nReadiness: autonomous agent-ready (AFK)\nSource: automation approval prompts after MCP rename.\n\nGoal: make DevNexus-generated Codex MCP configs include default MCP tool approval settings so automations and subagents do not block on trusted project MCP tools after project mcp refresh or worker setup.\n\nAcceptance criteria:\n- Project MCP refresh for Codex can emit default_tools_approval_mode = approve for configured trusted MCP servers.\n- Worker/project-local generated MCP configs keep current server names such as dev_nexus and dev_nexus_pharo, never the retired naming.\n- Existing generated config tests cover the approval default and server-name behavior.\n- Documentation or agent guidance notes that automation profiles use Codex approval_policy=never plus MCP tool approval defaults.\n\nBoundaries:\n- Keep this generic in DevNexus; do not hard-code Pharo plugin server names except in dogfood fixture/config tests.\n- Do not broaden unrelated app/plugin approval policy.\n\nVerification:\n- Run focused Codex config/MCP refresh tests.\n- Run npm run check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "mcp",
+        "automation",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T01:45:21.298Z",
+      "updatedAt": "2026-05-17T02:50:00.100Z",
+      "closedAt": "2026-05-17T02:50:00.100Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-26",
+        "itemNumber": 26
+      }
+    },
+    {
+      "id": "local-27",
+      "title": "Add DevNexus-managed conditional coordinator loop",
+      "description": "Type: automation infrastructure follow-up\nReadiness: autonomous agent-ready (AFK)\nSource finding: Codex standalone cron can wake a process, but it is the wrong long-term owner for perpetual DevNexus work. It runs on a timer rather than work-item or target conditions, has a restricted permission model in this environment, and can create concurrence instead of coordination if multiple wakeups overlap. The latest failure showed DevNexus run-once could load and record launch context, but the nested Codex coordinator failed before work selection because it was launched from the restricted cron shell.\n\nGoal: make DevNexus own the conditional perpetual coordinator loop. External schedulers may still start or keep alive a DevNexus process, but DevNexus must decide whether work is eligible, hold the coordination lock or lease, prevent overlapping coordinator runs, launch or adopt a coordinator only when appropriate, and record durable target/run facts.\n\nAcceptance criteria:\n- DevNexus exposes a simple managed loop command or service mode, such as automation watch/daemon, that periodically or eventfully evaluates target-report and eligible-work before launching any coordinator.\n- The loop exits, sleeps, or waits without launching when no eligible work exists, when backoff is active, or when another run owns the lock.\n- The loop uses the existing target lock/ledger/backoff policy and records skipped, blocked, launched, completed, failed, and wait decisions in target-cycle facts.\n- The loop can run as a user process, system service, GitHub/CI job, or thin host scheduler target without making Codex automation the source of truth.\n- DevNexus supports a current-agent adoption path for restricted hosts: an already-running coordinator can adopt launch context, result-file contract, target-cycle facts, and subagent cap policy without spawning a nested model process.\n- Command failure summaries preserve enough stdout/stderr tail on failures to diagnose launcher failures without relying on ephemeral temp files.\n- Docs explain the preferred architecture: DevNexus owns conditional scheduling and coordination; Codex heartbeat/cron is only a temporary or minimal wake-up bridge.\n- Existing process-launch behavior remains available for hosts that can safely spawn agents.\n\nBoundaries:\n- Do not make DevNexus choose implementation work; the coordinator still chooses and supervises work.\n- Keep the API generic, not Codex-only, even if Codex cron is the motivating failure.\n- Do not create Vibe workspaces/sessions/executions.\n\nVerification:\n- Add focused tests for no-work wait behavior, lock contention, backoff, current-agent adoption, result recording, target-report relaunch behavior, and failure-output diagnostics.\n- Run npm run check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "coordinator",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T09:11:07.106Z",
+      "updatedAt": "2026-05-17T10:06:12.515Z",
+      "closedAt": "2026-05-17T10:06:12.320Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-27",
+        "itemNumber": 27
+      }
+    },
+    {
+      "id": "local-28",
+      "title": "Fix MCP component-qualified work item routing",
+      "description": "Type: DevNexus MCP bug fix\nReadiness: autonomous agent-ready (AFK)\nObserved behavior: the DevNexus MCP work_item_get call with projectRoot C:\\dev\\code\\dev-nexus-dogfood and id dev-nexus:local-27 resolves the root project work tracker, which is configured as legacy vibe-kanban, and fails before checking the component-local work item store.\nExpected behavior: component-qualified work item ids such as dev-nexus:local-27 should select the named component and its configured work tracker, matching the CLI behavior for --component dev-nexus local-27.\n\nAcceptance criteria:\n- MCP work-item get/comment/update/status calls parse component-qualified ids before selecting a provider.\n- Existing unqualified ids keep current behavior and default component/root selection rules.\n- Focused tests cover component-qualified local ids from MCP-style inputs.\n\nVerification:\n- Add or update focused DevNexus tests.\n- Run the focused test and npm run check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "mcp",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T09:16:19.855Z",
+      "updatedAt": "2026-05-17T09:19:22.016Z",
+      "closedAt": "2026-05-17T09:19:21.836Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-28",
+        "itemNumber": 28
+      }
+    },
+    {
+      "id": "local-29",
+      "title": "Add current-agent coordinator adoption contract",
+      "description": "Type: automation infrastructure follow-up\nReadiness: autonomous agent-ready (AFK)\nSource: dev-nexus:local-27 delivered the DevNexus-managed conditional coordinator loop in af0b300, but intentionally left current-agent adoption as a separate contract.\n\nGoal: allow an already-running coordinator, such as a Codex heartbeat or another restricted host process, to adopt a DevNexus launch context without spawning a nested model process while preserving DevNexus target-cycle facts, result contracts, and subagent cap policy.\n\nAcceptance criteria:\n- DevNexus exposes a simple current-agent adoption command or MCP flow that creates or reuses launch context and returns the environment/result contract to the current coordinator.\n- The adopted run can record completed, blocked, failed, skipped, and verification/publication facts without using nested codex exec.\n- The flow composes with automation coordinator-loop so restricted schedulers can wake DevNexus while a current agent performs coordinator work only when DevNexus says a run should proceed.\n- Docs explain when to use process launch, coordinator-loop, and current-agent adoption.\n\nBoundaries:\n- DevNexus must not choose implementation work; the current coordinator still chooses and supervises work.\n- Keep the API generic, not Codex-only.\n- Do not create Vibe workspaces/sessions/executions.\n\nVerification:\n- Add focused tests for adoption context creation, result recording, target-report relaunch behavior, and CLI/MCP shape.\n- Run npm run check when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "coordinator",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:06:33.104Z",
+      "updatedAt": "2026-05-17T11:26:47.036Z",
+      "closedAt": "2026-05-17T11:26:46.873Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-29",
+        "itemNumber": 29
+      }
+    },
+    {
+      "id": "local-30",
+      "title": "Slice Codex app-server provider PRD into implementation work items",
+      "description": "Type: planning follow-up\nReadiness: human-in-the-loop (HITL) until the PRD is accepted.\nSource: docs/codex-app-server-provider-prd.md and local Codex app-server protocol discovery.\n\nGoal: review the Codex app-server provider Product Requirements Document (PRD), then use the issue-slicing workflow to create bounded DevNexus implementation items.\n\nAcceptance criteria:\n- Confirm the product boundary: Codex app-server is an optional executor/thread provider, not a Codex App automation or heartbeat manager.\n- Keep DevNexus as infrastructure only; the coordinator still chooses and supervises work.\n- Decide whether the first implementation should include only thread/turn control or also MCP tool relay.\n- Use the issue-slicing workflow after approval to create component-owned DevNexus work items for JSON-RPC client, agent profile schema, ephemeral thread launch, target-cycle facts, optional MCP relay, and docs.\n\nVerification:\n- Review docs/codex-app-server-provider-prd.md against the current DevNexus automation model and Codex generated app-server protocol.\n- Confirm no implementation item is marked ready before the PRD review decision.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "planning",
+        "codex-app-server",
+        "automation",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:34:10.753Z",
+      "updatedAt": "2026-05-17T10:38:45.366Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-30",
+        "itemNumber": 30
+      }
+    },
+    {
+      "id": "local-31",
+      "title": "Add Codex app-server JSON-RPC capability adapter",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: add the bounded Codex app-server protocol foundation DevNexus needs before it can use app-server as an executor provider.\n\nUser stories covered:\n- As a DevNexus user, I can see whether the configured Codex app-server surface has the thread/turn methods DevNexus needs.\n- As an automation operator, I get clear capability-gap errors instead of a failed opaque Codex launch.\n\nAcceptance criteria:\n- DevNexus has a small internal JSON-RPC client abstraction suitable for Codex app-server stdio or a mocked transport.\n- The adapter can initialize, detect method availability for thread/start, thread/fork, turn/start, turn/interrupt, thread/read or equivalent read/list methods, and report missing capabilities clearly.\n- The adapter does not assume automation, heartbeat, cron, or schedule-management methods exist.\n- Tests use a mocked JSON-RPC app-server and cover initialize success, missing method/capability reporting, protocol errors, and transport failure summaries.\n- No private Codex automation storage is read or written.\n\nBoundaries:\n- Keep Codex-specific code behind an executor/provider adapter; do not leak Codex protocol details into generic work-item, coordination, or plugin concepts.\n- Do not require a live Codex app-server for normal test runs.\n- Do not create Vibe workspaces, sessions, or executions.\n\nVerification:\n- Run focused adapter/capability tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "automation",
+        "executor",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:28.616Z",
+      "updatedAt": "2026-05-17T11:26:47.353Z",
+      "closedAt": "2026-05-17T11:26:47.197Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-31",
+        "itemNumber": 31
+      }
+    },
+    {
+      "id": "local-32",
+      "title": "Add Codex app-server agent profile schema",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: extend DevNexus agent profile configuration so projects can declare Codex app-server executor profiles without replacing existing codex exec profiles.\n\nUser stories covered:\n- As a DevNexus user, I can configure Codex app-server as an optional execution backend.\n- As a coordinator, I can inspect profile policy and know whether a profile uses codex exec or codex app-server.\n\nAcceptance criteria:\n- Agent profile schema and validation accept a Codex app-server executor mode with bounded app-server configuration such as connect/spawn mode, command, listen endpoint, ephemeral-thread default, and host-local safety hints.\n- Existing codex exec and Claude-style profiles remain compatible.\n- Host-local values such as socket paths, token files, or non-loopback endpoints are represented as local profile policy, not portable project requirements.\n- Concise agent-profile CLI and MCP summaries identify app-server profiles without dumping secrets or full host paths unnecessarily.\n- Invalid combinations, such as non-loopback endpoint without explicit policy or missing app-server command for spawn mode, fail with actionable messages.\n\nBoundaries:\n- This slice only validates and reports profile policy; it does not launch Codex app-server threads.\n- Keep the model generic enough that other executor providers can reuse the profile normalization pattern later.\n\nVerification:\n- Run focused project config, agent profile, CLI, and MCP summary tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "agent-profiles",
+        "automation",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:28.869Z",
+      "updatedAt": "2026-05-17T11:26:47.704Z",
+      "closedAt": "2026-05-17T11:26:47.550Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-32",
+        "itemNumber": 32
+      }
+    },
+    {
+      "id": "local-33",
+      "title": "Launch ephemeral Codex app-server worker threads",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after the JSON-RPC adapter and app-server profile schema are in place.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: let DevNexus launch a Codex app-server-backed worker thread or turn through the selected app-server profile, using ephemeral threads by default.\n\nUser stories covered:\n- As a coordinator, I can request a temporary Codex worker for a selected work item and receive thread/turn identity plus run metadata.\n- As a coordinator, I can start or fork a Codex thread with the intended cwd, model, reasoning, permissions, and project context.\n\nAcceptance criteria:\n- DevNexus can start or fork a Codex app-server thread from a configured profile and start a turn with coordinator-provided input.\n- Ephemeral threads are used by default when the profile requests them, with an explicit durable opt-in for visible/persisted Codex chats.\n- Launch input includes the DevNexus context/result contract paths and respects selected cwd, model, reasoning, approval policy, sandbox or permission profile, and MCP approval defaults where the protocol supports them.\n- The provider returns thread id, turn id, ephemeral status, cwd, model, and failure summaries to the caller.\n- Focused tests use the mocked app-server adapter and do not require live Codex.\n\nBlockers and sequencing:\n- Depends on the Codex app-server JSON-RPC capability adapter.\n- Depends on Codex app-server agent profile schema.\n\nBoundaries:\n- DevNexus still does not choose implementation work or supervise workers; the coordinator decides when to use the provider.\n- Do not implement MCP tool relay in this slice except as required to preserve normal thread startup configuration.\n\nVerification:\n- Run focused launch-provider tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "automation",
+        "executor",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:29.034Z",
+      "updatedAt": "2026-05-17T11:28:57.904Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-33",
+        "itemNumber": 33
+      }
+    },
+    {
+      "id": "local-34",
+      "title": "Record Codex app-server launch and target-cycle facts",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after Codex app-server worker launch is available.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: integrate Codex app-server-backed launches with DevNexus target-cycle, launch, result-file, verification, and failure recording so app-server runs are as observable as command-based runs.\n\nUser stories covered:\n- As an automation operator, I can run DevNexus coordinator-loop and see wait, launched, completed, blocked, failed, and skipped decisions recorded before and after app-server-backed work.\n- As a project maintainer, I can diagnose Codex app-server failures from DevNexus records without relying on private Codex UI state.\n\nAcceptance criteria:\n- App-server launch records include profile id, thread id, turn id, ephemeral/durable status, cwd, selected model, result path, and concise stdout/stderr or protocol failure summaries when available.\n- DevNexus does not mark an app-server-backed run successful until the configured result contract is present and valid.\n- Failed, blocked, interrupted, and timed-out app-server turns are reflected in automation run and target-cycle facts.\n- Coordinator-loop behavior remains consistent for no work, active locks, backoff, launch, completion, and failure when the selected profile uses app-server.\n- Tests cover target-cycle/report behavior for app-server run success, malformed result, failure, and timeout.\n\nBlockers and sequencing:\n- Depends on ephemeral Codex app-server worker launch.\n\nBoundaries:\n- Keep current command-based run-once/coordinator-loop behavior available.\n- Do not manage Codex heartbeat or cron automations.\n\nVerification:\n- Run focused automation run-once/coordinator-loop/target-report tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "codex-app-server",
+        "automation",
+        "target-loop",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:29.197Z",
+      "updatedAt": "2026-05-17T10:38:29.197Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-34",
+        "itemNumber": 34
+      }
+    },
+    {
+      "id": "local-35",
+      "title": "Optionally relay MCP tool calls through Codex app-server",
+      "description": "Type: implementation follow-up\nReadiness: autonomous agent-ready (AFK) after basic Codex app-server thread/turn launch and target-cycle recording are stable.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: optionally let DevNexus call Codex-managed MCP tools through app-server when a coordinator or worker needs a Codex-owned MCP server surface.\n\nUser stories covered:\n- As a coordinator, I can use Codex app-server to call a configured MCP tool in the context of a managed thread when that is safer than direct process-level wiring.\n- As a DevNexus user, I get clear MCP capability and approval failures instead of silent blocked automation.\n\nAcceptance criteria:\n- DevNexus can list or check MCP server status for an app-server thread when the protocol supports it.\n- DevNexus can relay a bounded MCP tool call through Codex app-server with structured arguments and receive structured content/error results.\n- Approval, permission, missing server, missing tool, and protocol errors are reported as infrastructure failures with actionable summaries.\n- The relay is optional and not required for basic app-server execution.\n- Tests use mocked app-server MCP responses and do not require live MCP servers.\n\nBlockers and sequencing:\n- Depends on stable Codex app-server launch and target-cycle recording.\n\nBoundaries:\n- Do not bypass Codex MCP trust or approval policy.\n- Do not hard-code DevNexus-Pharo, PLexus, or Pharo MCP server names in generic core.\n\nVerification:\n- Run focused app-server MCP relay tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "codex-app-server",
+        "mcp",
+        "automation",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:29.366Z",
+      "updatedAt": "2026-05-17T10:38:29.366Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-35",
+        "itemNumber": 35
+      }
+    },
+    {
+      "id": "local-36",
+      "title": "Document Codex exec, adoption, and app-server profile choices",
+      "description": "Type: documentation and operator guidance slice\nReadiness: autonomous agent-ready (AFK) after the first app-server execution path lands; can start earlier as draft documentation if useful.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: document when a DevNexus project should use codex exec, current-agent adoption, or Codex app-server profiles.\n\nUser stories covered:\n- As a DevNexus user, I can choose the simplest Codex integration mode for my host.\n- As an automation operator, I understand that Codex heartbeats are wake-up bridges and not DevNexus' long-term scheduling owner.\n\nAcceptance criteria:\n- Documentation compares command-based codex exec profiles, current-agent adoption, and Codex app-server profiles.\n- The docs explain ephemeral versus durable Codex threads and when to use each.\n- The docs state that DevNexus does not create or mutate Codex App heartbeat/cron automation records in the first version.\n- The docs cover safety defaults for loopback endpoints, non-loopback policy, tokens/socket paths as host-local config, and approval/sandbox preservation.\n- Examples avoid user-specific absolute paths except where clearly labeled as host-local placeholders.\n\nBlockers and sequencing:\n- Depends on final naming/config shape from the profile schema and launch-provider slices for non-draft docs.\n\nVerification:\n- Run documentation diff checks.\n- Run npm run check when feasible if docs are in the DevNexus package.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "codex-app-server",
+        "docs",
+        "automation",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T10:38:29.532Z",
+      "updatedAt": "2026-05-17T10:38:29.532Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-36",
+        "itemNumber": 36
+      }
+    },
+    {
+      "id": "local-37",
+      "title": "Provide JS/TS toolchain support for generated worker worktrees",
+      "description": "Type: worker setup/toolchain follow-up\nReadiness: autonomous agent-ready (AFK)\nSource finding: the five-agent DevNexus wave on 2026-05-17 showed generated Git worktrees often lack local node_modules. Workers A and E could implement changes but could not run npm run build or focused Vitest inside their assigned worktrees because tsc/vitest were not resolvable.\n\nGoal: make JavaScript/TypeScript DevNexus worker worktrees able to run configured project checks without ad hoc installs or unsafe registry fetches.\n\nAcceptance criteria:\n- DevNexus worker setup can project or reference a configured JS/TS toolchain/dependency context for generated worktrees.\n- The approach does not copy large node_modules blindly into every worktree unless explicitly configured.\n- Worker context explains how npm scripts and focused tests should be run in generated worktrees.\n- Preflight reports a clear blocker when the required dependency context is missing.\n- Static tests cover a generated worktree using dependency/toolchain support to resolve tsc/vitest from an approved source.\n\nBoundaries:\n- Do not require live network or npm registry access in normal tests.\n- Do not hide arbitrary outside-source path access behind the toolchain feature.\n- Keep this generic enough for future language plugins, but implement the JS/TS case first.\n\nVerification:\n- Focused worker setup/context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "toolchain",
+        "worker-context",
+        "dependency-projection",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T11:28:58.068Z",
+      "updatedAt": "2026-05-17T11:28:58.068Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-37",
+        "itemNumber": 37
+      }
+    },
+    {
+      "id": "local-38",
+      "title": "Add publication identity and remote guardrails",
+      "description": "Type: Git publication/account safety implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource discussion: the dogfood meta repository is owned by the dedicated machine user Gabot-Darbot while the human account Gabriel-Darbord remains the normal personal CLI/Git identity. Local setup uses plain gh for Gabriel-Darbord, gh-gabot with GH_CONFIG_DIR for Gabot-Darbot, origin for personal SSH access, and bot for the bot SSH host alias.\n\nGoal: make DevNexus prevent GitHub account and remote mix-ups by modeling publication identity and validating remotes/accounts before push or provider writes.\n\nAcceptance criteria:\n- Project/component publication policy can declare the intended actor for automated publication or provider writes, such as a named machine user, GitHub App, or human account.\n- Publication policy can declare the expected Git remote name, expected remote URL or SSH host alias, and optional command environment such as GH_CONFIG_DIR without storing secrets.\n- DevNexus preflight/status surfaces report the effective Git remote, upstream branch, push URL, expected actor, and observed actor when it can be checked safely.\n- Automation/worker launch context tells agents which remote/account is intended for human work versus bot automation.\n- Before any DevNexus-owned push or live provider mutation, DevNexus can block with an actionable error when the configured remote or actor does not match policy.\n- Documentation covers the recommended GitHub machine-user setup: SSH host alias for Git, isolated gh config for API calls, personal origin plus bot remote when both accounts need access, and no secrets in shared meta repos.\n- Tests mock git and gh/app-token checks; no live GitHub credentials are required.\n\nBoundaries:\n- Do not hard-code Gabot-Darbot or Gabriel-Darbord into DevNexus core; use them only as examples in dogfood-local docs/fixtures if needed.\n- Keep GitHub-specific details behind provider/adaptor policy so GitLab/Jira can reuse the generic actor concept later.\n- Do not make DevNexus choose work or merge policy; this only guards configured publication/provider actions.\n\nVerification:\n- Focused publication/account-policy tests.\n- Focused agent launch/context tests proving the intended actor/remote is surfaced.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "account-safety",
+        "github",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T13:36:16.678Z",
+      "updatedAt": "2026-05-17T13:36:16.678Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-38",
+        "itemNumber": 38
+      }
+    }
+  ],
+  "comments": {
+    "local-1": [
+      {
+        "id": "local-comment-1",
+        "body": "Coordinator selected this item for the current dogfood cycle. Scope: use the to-issues skill to refine the seeded component-owned local work items with acceptance criteria, HITL/AFK classification, blockers, and verification notes.",
+        "author": null,
+        "createdAt": "2026-05-16T12:39:27.927Z",
+        "updatedAt": "2026-05-16T12:39:27.927Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-1"
+        }
+      },
+      {
+        "id": "local-comment-4",
+        "body": "Completed: all seeded local work items across DevNexus, DevNexus-Pharo, PLexus, pharo-launcher-mcp, and MCP-Pharo now have component-owned issue bodies with readiness classification, blockers, acceptance criteria, and safe verification notes.",
+        "author": null,
+        "createdAt": "2026-05-16T12:42:16.792Z",
+        "updatedAt": "2026-05-16T12:42:16.792Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-4"
+        }
+      }
+    ],
+    "local-2": [
+      {
+        "id": "local-comment-2",
+        "body": "Coordinator selected this item for source/docs hardening: expose the result-file contract in agent launch context and keep the launcher validation strict.",
+        "author": null,
+        "createdAt": "2026-05-16T12:39:28.059Z",
+        "updatedAt": "2026-05-16T12:39:28.059Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-2"
+        }
+      },
+      {
+        "id": "local-comment-5",
+        "body": "Completed in DevNexus commit 95cec72: agent launch context now includes a result contract with the result file path, required/optional fields, statuses, verification statuses, and publication decision types; environment variables expose concise required/optional field hints; focused and full checks passed.",
+        "author": null,
+        "createdAt": "2026-05-16T12:42:17.042Z",
+        "updatedAt": "2026-05-16T12:42:17.042Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-5"
+        }
+      }
+    ],
+    "local-3": [
+      {
+        "id": "local-comment-7",
+        "body": "Completed in DevNexus commit 1863d04. Target-report relaunch decisions now prefer the latest target cycle runId when present, CLI/MCP report tests assert the decision shape, and focused wait/failed decision coverage was added. Verification passed: npm test -- src/nexusAutomationTargetReport.test.ts src/cli.test.ts src/nexusMcpServer.test.ts; npm run check.",
+        "author": null,
+        "createdAt": "2026-05-16T12:49:51.924Z",
+        "updatedAt": "2026-05-16T12:49:51.924Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-7"
+        }
+      }
+    ],
+    "local-4": [
+      {
+        "id": "local-comment-3",
+        "body": "Coordinator selected this item for DevNexus documentation: clarify component-aware source/worktree conventions for launched agents without creating runtime worktrees in agent-launch mode.",
+        "author": null,
+        "createdAt": "2026-05-16T12:39:28.175Z",
+        "updatedAt": "2026-05-16T12:39:28.175Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-3"
+        }
+      },
+      {
+        "id": "local-comment-6",
+        "body": "Completed in DevNexus commit 95cec72: README now documents component-aware source/worktree boundaries for launched agents and states that agent_launch mode supplies context but does not create implementation worktrees.",
+        "author": null,
+        "createdAt": "2026-05-16T12:42:17.310Z",
+        "updatedAt": "2026-05-16T12:42:17.310Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-6"
+        }
+      }
+    ],
+    "local-5": [
+      {
+        "id": "local-comment-8",
+        "body": "Coordinator selected this item for the current dogfood pass. Scope: use the curated to-issues skill against PLAN.md, create component-owned local work items with readiness/blocker/acceptance/verification/publication notes, and update durable target state. DevNexus is being used as project/work-item/target infrastructure only; no Vibe implementation workspace or live runtime work will be used.",
+        "author": null,
+        "createdAt": "2026-05-16T14:00:17.276Z",
+        "updatedAt": "2026-05-16T14:00:17.276Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-8"
+        }
+      },
+      {
+        "id": "local-comment-9",
+        "body": "Completed PLAN.md split using the curated to-issues skill. Created ready DevNexus core items local-6 through local-11; created later/dependent items dev-nexus:local-12, dev-nexus-pharo:local-2, pharo-launcher-mcp:local-2; created blocked HITL/runtime items plexus:local-3 and mcp-pharo:local-3; updated blocked live-runtime follow-ups plexus:local-2 and mcp-pharo:local-2 with explicit blocker, verification, and publication notes. Target state now points the next coordinator cycle at the six ready DevNexus items and keeps live runtime work blocked.",
+        "author": null,
+        "createdAt": "2026-05-16T14:04:48.931Z",
+        "updatedAt": "2026-05-16T14:04:48.931Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-9"
+        }
+      },
+      {
+        "id": "local-comment-10",
+        "body": "Tracked target-state handoff committed locally as 0d74a01 (Record component work item split). Final DevNexus target report shows six eligible ready dogfood items and relaunch decision relaunch.",
+        "author": null,
+        "createdAt": "2026-05-16T14:06:20.389Z",
+        "updatedAt": "2026-05-16T14:06:20.389Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-10"
+        }
+      }
+    ],
+    "local-6": [
+      {
+        "id": "local-comment-14",
+        "body": "Dispatched to subagent worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-6-dispatch-surfaces on branch codex/dev-nexus-local-6-dispatch-surfaces. Scope: coordinator subagent dispatch progress surfaces; avoid provider and worktree-record files owned by parallel workers.",
+        "author": null,
+        "createdAt": "2026-05-16T15:23:18.922Z",
+        "updatedAt": "2026-05-16T15:23:18.922Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-14"
+        }
+      },
+      {
+        "id": "local-comment-18",
+        "body": "Completed in parallel wave and integrated to DevNexus origin/main through ac07964. Worker commit a18e672 added target-cycle work-item status/profile/note progress surfaces for CLI and MCP. Verification passed after integration: npm run check, 36 files / 202 tests; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:35:53.450Z",
+        "updatedAt": "2026-05-16T15:35:53.450Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-18"
+        }
+      }
+    ],
+    "local-7": [
+      {
+        "id": "local-comment-16",
+        "body": "Dispatched to subagent worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-7-worktree-records on branch codex/dev-nexus-local-7-worktree-records. Scope: component-scoped worktree records and metadata; avoid dispatch and provider files owned by parallel workers.",
+        "author": null,
+        "createdAt": "2026-05-16T15:23:18.942Z",
+        "updatedAt": "2026-05-16T15:23:18.942Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-16"
+        }
+      },
+      {
+        "id": "local-comment-17",
+        "body": "Completed component-scoped worktree record support in local commit 5ca6317d0c5ad05a47cc74a75419bec5ab99e5ce. Verification passed: focused vitest specs and npm run check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:33:15.799Z",
+        "updatedAt": "2026-05-16T15:33:15.799Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-17"
+        }
+      },
+      {
+        "id": "local-comment-19",
+        "body": "Completed in parallel wave and integrated to DevNexus origin/main through ac07964. Worker commit 5ca6317 added component-scoped worktree ownership records and setup path safety. Verification passed after integration: npm run check, 36 files / 202 tests; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:35:53.497Z",
+        "updatedAt": "2026-05-16T15:35:53.497Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-19"
+        }
+      }
+    ],
+    "local-8": [
+      {
+        "id": "local-comment-21",
+        "body": "Dispatched to subagent worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-8-target-reporting on branch codex/dev-nexus-local-8-target-reporting. Scope: component-aware target completion reporting; own target-report aggregation/tests and avoid agent profile schema files unless integration requires a narrow adapter.",
+        "author": null,
+        "createdAt": "2026-05-16T15:40:54.081Z",
+        "updatedAt": "2026-05-16T15:40:54.081Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-21"
+        }
+      },
+      {
+        "id": "local-comment-23",
+        "body": "Completed in second parallel DevNexus wave and integrated to origin/main through e11df67. Worker commit 039380b added component-aware target completion reporting with local tracker title/status resolution, active blockers, execution summaries, per-component progress, verification, and publication decision summaries. Integrated verification passed: npm run check, 36 files / 205 tests; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:52:03.549Z",
+        "updatedAt": "2026-05-16T15:52:03.549Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-23"
+        }
+      }
+    ],
+    "local-9": [
+      {
+        "id": "local-comment-12",
+        "body": "Coordinator selected this bounded slice for the next DevNexus dogfood cycle: add concise eligible-work and agent-profile inspection surfaces for CLI/MCP, with focused tests and README command docs. No Vibe implementation workers will be used.",
+        "author": null,
+        "createdAt": "2026-05-16T15:14:23.774Z",
+        "updatedAt": "2026-05-16T15:14:23.774Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-12"
+        }
+      },
+      {
+        "id": "local-comment-13",
+        "body": "Completed in DevNexus commit f332378 and pushed to origin/main. Added concise CLI commands automation eligible-work and automation agent-profiles, native MCP tools eligible_work and agent_profiles, focused CLI/MCP tests, and README coordinator command docs. Verification passed: npm test -- src/cli.test.ts src/nexusMcpServer.test.ts; npm run check; dogfood command smokes; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:18:59.658Z",
+        "updatedAt": "2026-05-16T15:18:59.658Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-13"
+        }
+      }
+    ],
+    "local-10": [
+      {
+        "id": "local-comment-11",
+        "body": "Vibe backlog reconciliation on 2026-05-16: FCD-73 and FCD-84 remain useful provider-conformance evidence. Current Vibe MCP behavior to cover in this item: advertised start_workspace repo-id strings were rejected in favor of an object shape, start_workspace did not reliably create an execution for the initial prompt, get_execution can report final_message null despite rollout logs, and prompts need explicit project_id/issue_id. Do not re-enable Vibe implementation workers; model these as capability/schema/result-capture gaps or provider-specific follow-ups.",
+        "author": null,
+        "createdAt": "2026-05-16T14:42:18.208Z",
+        "updatedAt": "2026-05-16T14:42:18.208Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-11"
+        }
+      },
+      {
+        "id": "local-comment-15",
+        "body": "Dispatched to subagent worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-10-provider-conformance on branch codex/dev-nexus-local-10-provider-conformance. Scope: neutral work-tracker provider conformance and mocked provider tests; avoid dispatch and worktree-record files owned by parallel workers.",
+        "author": null,
+        "createdAt": "2026-05-16T15:23:18.927Z",
+        "updatedAt": "2026-05-16T15:23:18.927Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-15"
+        }
+      },
+      {
+        "id": "local-comment-20",
+        "body": "Completed in parallel wave and integrated to DevNexus origin/main through ac07964. Worker commit 96c4b69 added neutral provider capability reports and capability assertions with mocked provider coverage. Verification passed after integration: npm run check, 36 files / 202 tests; git diff --check. Follow-up noted: GitLab board/status support remains explicitly unsupported rather than inferred.",
+        "author": null,
+        "createdAt": "2026-05-16T15:35:53.535Z",
+        "updatedAt": "2026-05-16T15:35:53.535Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-20"
+        }
+      }
+    ],
+    "local-11": [
+      {
+        "id": "local-comment-22",
+        "body": "Dispatched to subagent worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-11-agent-profile-policy on branch codex/dev-nexus-local-11-agent-profile-policy. Scope: Codex/Claude agent profile policy schema and launch context; own profile/config/validation tests and avoid target-report aggregation files unless integration requires a narrow adapter.",
+        "author": null,
+        "createdAt": "2026-05-16T15:40:54.395Z",
+        "updatedAt": "2026-05-16T15:40:54.395Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-22"
+        }
+      },
+      {
+        "id": "local-comment-24",
+        "body": "Completed in second parallel DevNexus wave and integrated to origin/main through e11df67. Worker commit 51066d5 hardened Codex/Claude agent profile policy schema, normalized launch/profile surfaces, and added preflight/context validation. Integrated verification passed: npm run check, 36 files / 205 tests; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T15:52:03.823Z",
+        "updatedAt": "2026-05-16T15:52:03.823Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-24"
+        }
+      }
+    ],
+    "local-12": [
+      {
+        "id": "local-comment-25",
+        "body": "Promoted for parallel non-live dogfood wave. Scope: production-quality DevNexus project template from dogfood evidence.",
+        "author": null,
+        "createdAt": "2026-05-16T15:58:34.899Z",
+        "updatedAt": "2026-05-16T15:58:34.899Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-25"
+        }
+      },
+      {
+        "id": "local-comment-26",
+        "body": "Completed and published to DevNexus origin/main through 3891e3e. Worker commit 7ffc560 added generic project template scaffold; integration fix 3891e3e made template layout tolerate legacy/scaffold configs. Verification passed: npm run check, 37 files / 208 tests; throwaway project status and MCP refresh smoke; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T16:29:30.712Z",
+        "updatedAt": "2026-05-16T16:29:30.712Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-26"
+        }
+      }
+    ],
+    "local-13": [
+      {
+        "id": "local-comment-30",
+        "body": "Starting parallel DevNexus worktree implementation. Scope: generic plugin capability/projection contract only; no DevNexus-Pharo/PLexus/plugin-specific behavior or live setup.",
+        "author": null,
+        "createdAt": "2026-05-16T20:17:54.468Z",
+        "updatedAt": "2026-05-16T20:17:54.468Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-30"
+        }
+      },
+      {
+        "id": "local-comment-31",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 613ea217b17468049162c583114391b295734094\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-16T20:30:38.135Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-13\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-pharo\\\\DevNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"613ea217b17468049162c583114391b295734094\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusPluginCapabilities.ts\",\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusAutomationAgentSurface.ts\",\n    \"src/nexusAutomationAgentLaunch.ts\",\n    \"README.md\"\n  ],\n  \"decisions\": [\n    \"Implemented generic additive plugin capability projection; kept DevNexus core free of component-specific plugin behavior.\"\n  ],\n  \"verificationSummary\": \"npm run check passed: 38 test files, 214 tests.\",\n  \"integrationPreference\": \"Published by fast-forwarding and pushing dev-nexus origin/main to 613ea21.\",\n  \"note\": \"Parallel worker Boole implemented branch codex/dev-nexus-local-13-plugin-contract; coordinator reviewed and published.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-16T20:30:38.151Z",
+        "updatedAt": "2026-05-16T20:30:38.151Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-31"
+        }
+      }
+    ],
+    "local-14": [
+      {
+        "id": "local-comment-27",
+        "body": "Starting implementation in a component-scoped DevNexus worktree. Scope: generic coordination_status and coordination_handoff only; no MCP-Pharo, PLexus, Tailscale, external provider, auto-merge, or live service work.",
+        "author": null,
+        "createdAt": "2026-05-16T19:31:50.061Z",
+        "updatedAt": "2026-05-16T19:31:50.061Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-27"
+        }
+      },
+      {
+        "id": "local-comment-28",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: windows-devbox\nBranch: main\nHead: c0cb6d83aabda7c5f30033af4e98dad493267da6\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-16T19:43:18.188Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-14\",\n  \"hostId\": \"windows-devbox\",\n  \"agentId\": \"codex\",\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-pharo\\\\DevNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c0cb6d83aabda7c5f30033af4e98dad493267da6\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusCoordination.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\"\n  ],\n  \"decisions\": [\n    \"Use advisory tracker comments rather than locks for shared coordination.\"\n  ],\n  \"verificationSummary\": \"npm run check passed in the main DevNexus checkout.\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"Merged and pushed to origin/main as c0cb6d8.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-16T19:43:18.192Z",
+        "updatedAt": "2026-05-16T19:43:18.192Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-28"
+        }
+      }
+    ],
+    "local-15": [
+      {
+        "id": "local-comment-29",
+        "body": "Unblocked after dev-nexus:local-14 landed: coordination_status and coordination_handoff are implemented, tested, merged, and pushed as c0cb6d8.",
+        "author": null,
+        "createdAt": "2026-05-16T19:44:22.589Z",
+        "updatedAt": "2026-05-16T19:44:22.589Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-29"
+        }
+      },
+      {
+        "id": "local-comment-32",
+        "body": "Starting second parallel DevNexus worktree implementation. Scope: generic coordination_integrate planning only; no automatic conflict resolution, live services, or provider mutation.",
+        "author": null,
+        "createdAt": "2026-05-16T20:32:42.337Z",
+        "updatedAt": "2026-05-16T20:32:42.337Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-32"
+        }
+      },
+      {
+        "id": "local-comment-33",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: b2c219a81beee634182f3d15439ca6d6cefa00cc\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-16T20:49:12.291Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-15\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-pharo\\\\DevNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"b2c219a81beee634182f3d15439ca6d6cefa00cc\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusCoordination.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"README.md\"\n  ],\n  \"decisions\": [\n    \"Implemented read-only coordination_integrate planning from handoff records and Git merge analysis; fetch planning uses fetched remote refs when requested and allowed.\"\n  ],\n  \"verificationSummary\": \"npm run check passed: 38 test files, 221 tests.\",\n  \"integrationPreference\": \"Published by fast-forwarding and pushing DevNexus origin/main to b2c219a.\",\n  \"note\": \"Parallel worker Peirce implemented branch codex/dev-nexus-local-15-coordination-integrate; coordinator adjusted fetched target-ref planning before publishing.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-16T20:49:12.312Z",
+        "updatedAt": "2026-05-16T20:49:12.312Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-33"
+        }
+      }
+    ],
+    "local-16": [
+      {
+        "id": "local-comment-46",
+        "body": "Still blocked on a shared-coordination decision. Recommended minimal unblock: use pushed Git branches plus GitHub-backed work items/handoffs as the durable shared source of truth; treat Tailscale MCP as optional live transport, not the only source of truth; keep locks out of the first rollout.",
+        "author": null,
+        "createdAt": "2026-05-16T23:57:13.446Z",
+        "updatedAt": "2026-05-16T23:57:13.446Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-46"
+        }
+      },
+      {
+        "id": "local-comment-48",
+        "body": "Coordination investigation update: user deprioritized Tailscale for now and wants other shared work-item sources. Recommended path to evaluate first: GitHub Issues or GitHub Projects in a dedicated coordination organization/repository, accessed by DevNexus through a least-privilege bot/GitHub App. Linear is attractive if using OpenAI Codex cloud task delegation directly; Codex itself does not appear to provide a first-party Kanban/work-item database for DevNexus to use as source of truth.",
+        "author": null,
+        "createdAt": "2026-05-17T00:03:02.207Z",
+        "updatedAt": "2026-05-17T00:03:02.207Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-48"
+        }
+      },
+      {
+        "id": "local-comment-50",
+        "body": "User direction update: do not prioritize Tailscale for shared work items now. Do not push DevNexus meta-project repos into Evref-BL. Investigate a dedicated private GitHub organization and coordination repository/project, with automation acting through a clearly identified bot identity rather than the user personal account.",
+        "author": null,
+        "createdAt": "2026-05-17T00:06:30.327Z",
+        "updatedAt": "2026-05-17T00:06:30.327Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-50"
+        }
+      }
+    ],
+    "local-17": [
+      {
+        "id": "local-comment-44",
+        "body": "Unblocked for a non-live implementation slice: implement coordination_request with mocked/draft-only provider behavior only. Live GitHub/GitLab/Jira posting remains blocked by dev-nexus:local-18 and must not be enabled in this item.",
+        "author": null,
+        "createdAt": "2026-05-16T23:56:22.294Z",
+        "updatedAt": "2026-05-16T23:56:22.294Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-44"
+        }
+      },
+      {
+        "id": "local-comment-60",
+        "body": "Dispatched in parallel wave parallel-dev-nexus-wave-20260517-1115. Worker owns $(System.Collections.Hashtable.Path) with scope: coordination_request CLI/MCP/API and mocked provider records. Other workers are active in sibling worktrees; keep edits scoped and do not revert unrelated changes.",
+        "author": null,
+        "createdAt": "2026-05-17T11:05:47.215Z",
+        "updatedAt": "2026-05-17T11:05:47.215Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-60"
+        }
+      },
+      {
+        "id": "local-comment-65",
+        "body": "Completed in parallel wave parallel-dev-nexus-wave-20260517-1115. Integrated to DevNexus origin/main via merge commit $(System.Collections.Hashtable.Commit), final published head d0db6af. Verification: \npm run check passed after integration with 44 test files and 279 tests. Completed draft/mock coordination_request API through CLI and MCP, with provider-neutral intents/statuses, draft provider records, and local work-item comment summaries.",
+        "author": null,
+        "createdAt": "2026-05-17T11:26:46.428Z",
+        "updatedAt": "2026-05-17T11:26:46.428Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-65"
+        }
+      }
+    ],
+    "local-18": [
+      {
+        "id": "local-comment-47",
+        "body": "Still blocked on live external posting policy. Recommended minimal unblock: default coordination_request to draft-only everywhere; allow live GitHub/GitLab/Jira comments only when the project config explicitly names the provider surface and target issue/PR/MR, with no auto-approval, no merge action, and no repeated pings.",
+        "author": null,
+        "createdAt": "2026-05-16T23:57:13.610Z",
+        "updatedAt": "2026-05-16T23:57:13.610Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-47"
+        }
+      },
+      {
+        "id": "local-comment-49",
+        "body": "External posting policy investigation update: prefer draft-only by default. If using GitHub as the shared tracker, live comments/status updates can be allowed only from a dedicated bot/GitHub App to named issues/PRs/projects; no auto-approval, merge, repeated pings, or writes outside the configured coordination repo/project.",
+        "author": null,
+        "createdAt": "2026-05-17T00:03:02.373Z",
+        "updatedAt": "2026-05-17T00:03:02.373Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-49"
+        }
+      },
+      {
+        "id": "local-comment-51",
+        "body": "User direction update: automation should not act as the user personal GitHub account. Prefer a visible bot identity, ideally via a GitHub App or least-privilege dedicated machine user in a custom private organization. Live writes should stay scoped to the coordination org/repo/project.",
+        "author": null,
+        "createdAt": "2026-05-17T00:06:30.476Z",
+        "updatedAt": "2026-05-17T00:06:30.476Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-51"
+        }
+      },
+      {
+        "id": "local-comment-58",
+        "body": "Brainstormed live external coordination policy notes and recorded them in `docs/shared-multi-host-coordination-prd.md`.\n\nKey direction captured:\n- provider actions should be capability-scoped: draft, post, assign, label, ping, review, merge, close, and publish are not the same permission.\n- likely coordination events include error triage, solution agreement, option choice, ownership transfer, permission/runtime approval, PR/MR review, review response, CI ambiguity, integration conflicts, scope changes, API/config/dependency changes, release/rollback, stale waits, upstream dependency decisions, and human escalation.\n- assignment is useful as an ownership/expected-responder signal, but should not be treated as approval by default.\n- approval should come from provider-native review approval, configured label/comment/status transition, and recorded provider object/actor/timestamp evidence.\n- silence should become waiting/timed_out/blocked, not implicit approval.\n\nRemaining HITL decision: decide the first live-provider policy matrix before enabling external posting beyond draft/mocked flows.",
+        "author": null,
+        "createdAt": "2026-05-17T10:51:50.074Z",
+        "updatedAt": "2026-05-17T10:51:50.074Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-58"
+        }
+      },
+      {
+        "id": "local-comment-59",
+        "body": "Additional policy decision from user review:\n\n- The coordinator can make most ordinary event-handling decisions by default, and dogfood experience will refine the policy over time.\n- Every external coordination event should update the DevNexus project state machine: work-item status/labels, target-cycle facts, notes, continuation decisions, or publication gates.\n- Assignment is not approval. Assignment means ownership or expected responder.\n- Approval should be represented by explicit provider state transitions. For GitHub, prefer labels or GitHub Projects status/category moves for issue-level approval; for pull requests, require provider-native review approval plus required checks and DevNexus publication policy.\n\nRecorded this in `docs/shared-multi-host-coordination-prd.md` and target-state. Remaining live-posting blockers are concrete provider mapping, credentials/test target, and rate-limit/ping defaults before non-draft external mutations.",
+        "author": null,
+        "createdAt": "2026-05-17T10:57:50.039Z",
+        "updatedAt": "2026-05-17T10:57:50.039Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-59"
+        }
+      }
+    ],
+    "local-19": [
+      {
+        "id": "local-comment-34",
+        "body": "Coordinator started local-19. Scope: generate DevNexus-owned worker context bundles in prepared component worktrees, keep component source checkout as the worktree root, and avoid copying root AGENTS.md/PLAN.md/target-state into source.",
+        "author": null,
+        "createdAt": "2026-05-16T21:25:05.078Z",
+        "updatedAt": "2026-05-16T21:25:05.078Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-34"
+        }
+      },
+      {
+        "id": "local-comment-35",
+        "body": "Completed. Implemented generic worker context bundle materialization for prepared component worktrees and published DevNexus main commit 508b301. Verification: npm run check passed from the component worktree and again from DevNexus main (39 test files, 226 tests).",
+        "author": null,
+        "createdAt": "2026-05-16T21:38:34.214Z",
+        "updatedAt": "2026-05-16T21:38:34.214Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-35"
+        }
+      }
+    ],
+    "local-20": [
+      {
+        "id": "local-comment-36",
+        "body": "Unblocked after dev-nexus:local-19 was published in DevNexus 508b301. Ready for a worker-context follow-up focused on project-local skills; keep global skill installation out of scope.",
+        "author": null,
+        "createdAt": "2026-05-16T21:39:18.698Z",
+        "updatedAt": "2026-05-16T21:39:18.698Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-36"
+        }
+      },
+      {
+        "id": "local-comment-38",
+        "body": "Started in parallel follow-up wave worker-context-followups-20260516. Scope: project-local skills in prepared worker contexts; no global skill installation.",
+        "author": null,
+        "createdAt": "2026-05-16T21:41:02.618Z",
+        "updatedAt": "2026-05-16T21:41:02.618Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-38"
+        }
+      },
+      {
+        "id": "local-comment-40",
+        "body": "Completed and published in DevNexus 5895ea2. Worker contexts now include project-local skill projection metadata and worktree setup can materialize generated worker skill support without global installs. Verification: npm run check passed on main (40 files, 230 tests).",
+        "author": null,
+        "createdAt": "2026-05-16T21:56:05.215Z",
+        "updatedAt": "2026-05-16T21:56:05.215Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-40"
+        }
+      }
+    ],
+    "local-21": [
+      {
+        "id": "local-comment-37",
+        "body": "Unblocked after dev-nexus:local-19 was published in DevNexus 508b301. Ready for generic plugin-contributed worker briefing fragments; keep plugin-specific content out of DevNexus core.",
+        "author": null,
+        "createdAt": "2026-05-16T21:40:34.633Z",
+        "updatedAt": "2026-05-16T21:40:34.633Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-37"
+        }
+      },
+      {
+        "id": "local-comment-39",
+        "body": "Started in parallel follow-up wave worker-context-followups-20260516. Scope: generic plugin-contributed worker briefing fragments; no plugin-specific core content.",
+        "author": null,
+        "createdAt": "2026-05-16T21:41:02.945Z",
+        "updatedAt": "2026-05-16T21:41:02.945Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-39"
+        }
+      },
+      {
+        "id": "local-comment-41",
+        "body": "Completed and published in DevNexus 5895ea2. Plugins can now declare generic worker context and briefing fragments rendered into generated worker context without plugin-specific core content. Verification: npm run check passed on main (40 files, 230 tests).",
+        "author": null,
+        "createdAt": "2026-05-16T21:56:05.573Z",
+        "updatedAt": "2026-05-16T21:56:05.573Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-41"
+        }
+      }
+    ],
+    "local-22": [],
+    "local-23": [
+      {
+        "id": "local-comment-42",
+        "body": "Completed and published in DevNexus commit 6c0501c. Parallel workers implemented the plugin dependency_projection contract and setup/context materialization; coordinator integrated run-once wiring so enabled plugin projections are preflighted and materialized into generated worker worktrees. Verification passed: focused npm test for 5 relevant files (36 tests) and full npm run check (build plus 40 test files / 240 tests).",
+        "author": null,
+        "createdAt": "2026-05-16T22:19:41.456Z",
+        "updatedAt": "2026-05-16T22:19:41.456Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-42"
+        }
+      }
+    ],
+    "local-24": [
+      {
+        "id": "local-comment-45",
+        "body": "Unblocked after dev-nexus:local-23 landed and the DevNexus-Pharo worker gap was confirmed. Scope this item to declared related-component dependency projections using configured component ids; do not allow arbitrary outside paths, package installs, Docker, or live services.",
+        "author": null,
+        "createdAt": "2026-05-16T23:56:22.611Z",
+        "updatedAt": "2026-05-16T23:56:22.611Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-45"
+        }
+      },
+      {
+        "id": "local-comment-52",
+        "body": "Dogfood evidence from PLexus worker local-3 on 2026-05-17: a generated worktree attempted npm install, transiently could not reach the registry for @evref-bl/pharo-launcher-mcp, and left a real partial node_modules directory. The registry package exists and is reachable now at 0.1.1, but the damaged worker install also showed why setup should not silently fall through to ad hoc package fetches.\n\nTemporary repair applied only inside C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\plexus\\local-3-live-smoke-harness-20260517: removed ignored node_modules after path-boundary check, then ran npm ci --ignore-scripts --no-audit --no-fund from the existing lockfile. Verification: npm ls @evref-bl/pharo-launcher-mcp --depth=0 now resolves cleanly, and npm run test:smoke-policy passes 7 tests.\n\nPlease fold this into the acceptance for dependency projection/preflight: if a worker worktree needs npm dependencies, setup should either materialize the declared projection/install cleanly, or stop with a clear setup result before the agent runs. It should detect and repair or reject partial node_modules instead of leaving workers to recover manually.",
+        "author": null,
+        "createdAt": "2026-05-17T01:52:55.805Z",
+        "updatedAt": "2026-05-17T01:52:55.805Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-52"
+        }
+      },
+      {
+        "id": "local-comment-61",
+        "body": "Dispatched in parallel wave parallel-dev-nexus-wave-20260517-1115. Worker owns $(System.Collections.Hashtable.Path) with scope: related-component dependency projection setup/context tests. Other workers are active in sibling worktrees; keep edits scoped and do not revert unrelated changes.",
+        "author": null,
+        "createdAt": "2026-05-17T11:05:47.532Z",
+        "updatedAt": "2026-05-17T11:05:47.532Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-61"
+        }
+      },
+      {
+        "id": "local-comment-66",
+        "body": "Completed in parallel wave parallel-dev-nexus-wave-20260517-1115. Integrated to DevNexus origin/main via merge commit $(System.Collections.Hashtable.Commit), final published head d0db6af. Verification: \npm run check passed after integration with 44 test files and 279 tests. Completed related-component dependency projections for worker worktrees, including component-id sources, setup/context reporting, and static tests.",
+        "author": null,
+        "createdAt": "2026-05-17T11:26:46.719Z",
+        "updatedAt": "2026-05-17T11:26:46.719Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-66"
+        }
+      }
+    ],
+    "local-25": [
+      {
+        "id": "local-comment-43",
+        "body": "Completed. Published @evref-bl/dev-nexus@0.1.0-alpha.0 to npm with dogfood tag and public access; source metadata committed/pushed as DevNexus c6ed813. Verification passed: npm run check (40 files / 240 tests), npm pack --dry-run, npm publish --access public --tag dogfood, npm view bin metadata, and npm exec --package @evref-bl/dev-nexus@dogfood -- dev-nexus --help.",
+        "author": null,
+        "createdAt": "2026-05-16T23:03:18.629Z",
+        "updatedAt": "2026-05-16T23:03:18.629Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-43"
+        }
+      }
+    ],
+    "local-26": [
+      {
+        "id": "local-comment-53",
+        "body": "Implemented and published DevNexus source commit baa238a. Project MCP config now supports defaultToolsApprovalMode; Codex MCP refresh writes default_tools_approval_mode and preserves existing trusted-server settings. Verification: npm run check passed (40 files, 241 tests); git diff --check passed. Dogfood project MCP config was refreshed with the working Winget Node path and approve default.",
+        "author": null,
+        "createdAt": "2026-05-17T02:49:59.933Z",
+        "updatedAt": "2026-05-17T02:49:59.933Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-53"
+        }
+      }
+    ],
+    "local-27": [
+      {
+        "id": "local-comment-55",
+        "body": "Heartbeat coordinator selected this item for the 2026-05-17 parallel dogfood cycle. Write scope: DevNexus worktree worktrees/dev-nexus/local-27-coordinator-loop on branch codex/dev-nexus-local-27-coordinator-loop. Goal: DevNexus-managed conditional coordinator loop; Codex heartbeat remains only a temporary wake-up bridge.",
+        "author": null,
+        "createdAt": "2026-05-17T09:49:52.898Z",
+        "updatedAt": "2026-05-17T09:49:52.898Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-55"
+        }
+      },
+      {
+        "id": "local-comment-56",
+        "body": "Completed and published as DevNexus af0b300. Added automation coordinator-loop CLI/service mode with wait/skip behavior for no eligible work, lock contention, backoff, and blocked/failed report states; eligible launches record durable target-cycle facts. Failure diagnostics now preserve stdout/stderr tails. Verification on integrated main: npm run check passed with 41 files / 248 tests. Current-agent adoption remains an explicit follow-up beyond this loop foundation.",
+        "author": null,
+        "createdAt": "2026-05-17T10:06:12.515Z",
+        "updatedAt": "2026-05-17T10:06:12.515Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-56"
+        }
+      }
+    ],
+    "local-28": [
+      {
+        "id": "local-comment-54",
+        "body": "Completed in DevNexus source. MCP work-item get/update/comment/set_status now recognizes component-qualified ids whose prefix matches a configured component, routes to that component provider, and strips the prefix before provider lookup. Verification: npm test -- src/nexusMcpServer.test.ts; npm run check; rebuilt dist MCP smoke for dev-nexus:local-27.",
+        "author": null,
+        "createdAt": "2026-05-17T09:19:22.016Z",
+        "updatedAt": "2026-05-17T09:19:22.016Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-54"
+        }
+      }
+    ],
+    "local-29": [
+      {
+        "id": "local-comment-62",
+        "body": "Dispatched in parallel wave parallel-dev-nexus-wave-20260517-1115. Worker owns $(System.Collections.Hashtable.Path) with scope: current-agent adoption contract and automation facts. Other workers are active in sibling worktrees; keep edits scoped and do not revert unrelated changes.",
+        "author": null,
+        "createdAt": "2026-05-17T11:05:47.864Z",
+        "updatedAt": "2026-05-17T11:05:47.864Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-62"
+        }
+      },
+      {
+        "id": "local-comment-67",
+        "body": "Completed in parallel wave parallel-dev-nexus-wave-20260517-1115. Integrated to DevNexus origin/main via merge commit $(System.Collections.Hashtable.Commit), final published head d0db6af. Verification: \npm run check passed after integration with 44 test files and 279 tests. Completed current-agent coordinator adoption contract with CLI/MCP flow, target-cycle/result contract support, and docs.",
+        "author": null,
+        "createdAt": "2026-05-17T11:26:47.036Z",
+        "updatedAt": "2026-05-17T11:26:47.036Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-67"
+        }
+      }
+    ],
+    "local-30": [
+      {
+        "id": "local-comment-57",
+        "body": "Sliced the Codex app-server provider PRD into DevNexus-owned work items:\n\n- dev-nexus:local-31 Add Codex app-server JSON-RPC capability adapter (ready, AFK)\n- dev-nexus:local-32 Add Codex app-server agent profile schema (ready, AFK)\n- dev-nexus:local-33 Launch ephemeral Codex app-server worker threads (todo, depends on local-31/local-32)\n- dev-nexus:local-34 Record Codex app-server launch and target-cycle facts (todo, depends on local-33)\n- dev-nexus:local-35 Optionally relay MCP tool calls through Codex app-server (todo, depends on stable launch/recording)\n- dev-nexus:local-36 Document Codex exec, adoption, and app-server profile choices (todo, depends on final config shape)\n\nThe first two items are ready dogfood slices; dependent items stay todo so automation does not pick them prematurely.",
+        "author": null,
+        "createdAt": "2026-05-17T10:38:45.366Z",
+        "updatedAt": "2026-05-17T10:38:45.366Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-57"
+        }
+      }
+    ],
+    "local-31": [
+      {
+        "id": "local-comment-63",
+        "body": "Dispatched in parallel wave parallel-dev-nexus-wave-20260517-1115. Worker owns $(System.Collections.Hashtable.Path) with scope: Codex app-server JSON-RPC client and capability adapter. Other workers are active in sibling worktrees; keep edits scoped and do not revert unrelated changes.",
+        "author": null,
+        "createdAt": "2026-05-17T11:05:48.165Z",
+        "updatedAt": "2026-05-17T11:05:48.165Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-63"
+        }
+      },
+      {
+        "id": "local-comment-68",
+        "body": "Completed in parallel wave parallel-dev-nexus-wave-20260517-1115. Integrated to DevNexus origin/main via merge commit $(System.Collections.Hashtable.Commit), final published head d0db6af. Verification: \npm run check passed after integration with 44 test files and 279 tests. Completed Codex app-server JSON-RPC client and capability adapter foundation with mocked transport tests.",
+        "author": null,
+        "createdAt": "2026-05-17T11:26:47.353Z",
+        "updatedAt": "2026-05-17T11:26:47.353Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-68"
+        }
+      }
+    ],
+    "local-32": [
+      {
+        "id": "local-comment-64",
+        "body": "Dispatched in parallel wave parallel-dev-nexus-wave-20260517-1115. Worker owns $(System.Collections.Hashtable.Path) with scope: Codex app-server agent profile schema and summaries. Other workers are active in sibling worktrees; keep edits scoped and do not revert unrelated changes.",
+        "author": null,
+        "createdAt": "2026-05-17T11:05:48.496Z",
+        "updatedAt": "2026-05-17T11:05:48.496Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-64"
+        }
+      },
+      {
+        "id": "local-comment-69",
+        "body": "Completed in parallel wave parallel-dev-nexus-wave-20260517-1115. Integrated to DevNexus origin/main via merge commit $(System.Collections.Hashtable.Commit), final published head d0db6af. Verification: \npm run check passed after integration with 44 test files and 279 tests. Completed Codex app-server agent profile schema and concise CLI/MCP summaries.",
+        "author": null,
+        "createdAt": "2026-05-17T11:26:47.704Z",
+        "updatedAt": "2026-05-17T11:26:47.704Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-69"
+        }
+      }
+    ],
+    "local-33": [
+      {
+        "id": "local-comment-70",
+        "body": "Prerequisites dev-nexus:local-31 and dev-nexus:local-32 are complete and published through DevNexus d0db6af, so this app-server worker launch slice is now ready for the next DevNexus cycle.",
+        "author": null,
+        "createdAt": "2026-05-17T11:28:57.904Z",
+        "updatedAt": "2026-05-17T11:28:57.904Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-70"
+        }
+      }
+    ],
+    "local-34": [],
+    "local-35": [],
+    "local-36": [],
+    "local-37": [],
+    "local-38": []
+  }
+}

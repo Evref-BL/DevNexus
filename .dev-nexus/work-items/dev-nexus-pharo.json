@@ -1,0 +1,454 @@
+{
+  "version": 1,
+  "nextNumber": 10,
+  "nextCommentNumber": 20,
+  "updatedAt": "2026-05-17T10:06:12.505Z",
+  "items": [
+    {
+      "id": "local-1",
+      "title": "Align specialization adapter with native DevNexus MCP dogfood flow",
+      "description": "Type: specialization implementation slice\nReadiness: autonomous agent-ready (AFK), after DevNexus core dogfood reliability items are stable\n\nGoal: align the DevNexus-Pharo specialization adapter with the native DevNexus MCP and fresh multi-component dogfood project model.\n\nAcceptance criteria:\n- Generic project, automation, target, and work-item behavior is delegated to or kept consistent with DevNexus-native surfaces.\n- Specialization-only behavior remains in the adapter and does not leak into DevNexus core terminology.\n- The adapter handles component-owned work items without reintroducing project-equals-repository assumptions.\n- Non-mutating status or MCP checks verify the adapter still reports project state after changes.\n\nBlockers and boundaries:\n- Do not run live images, PLexus open/close flows, Docker, or runtime refreshes unless a separate isolated runner and cleanup plan is selected.\n\nVerification:\n- Run focused adapter/CLI/MCP tests that do not require live runtime cleanup.\n- Run a non-mutating project status check through the adapter when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "specialization",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:26.254Z",
+      "updatedAt": "2026-05-16T13:04:54.311Z",
+      "closedAt": "2026-05-16T13:04:54.301Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-1",
+        "itemNumber": 1
+      }
+    },
+    {
+      "id": "local-2",
+      "title": "Align specialization adapter after new DevNexus coordination surfaces",
+      "description": "Type: specialization follow-up slice\nReadiness: autonomous agent-ready (AFK) after the relevant DevNexus MCP/CLI surfaces land.\nSource plan: PLAN.md dependency direction and priority candidates 3, 5, and 6.\n\nGoal: keep DevNexus-Pharo aligned with DevNexus-native coordinator dispatch, target report, eligible-work, and profile inspection surfaces without moving generic orchestration into the specialization.\n\nAcceptance criteria:\n- The adapter delegates generic project, target, work-item, and report behavior to DevNexus-native APIs where possible.\n- DevNexus-Pharo-only behavior remains in the specialization boundary and does not leak into DevNexus core terms.\n- Component-owned work items and multi-component target reports work through the adapter without assuming one project equals one repository.\n- Read-only adapter checks verify the updated surfaces without opening live images or PLexus routes.\n\nBlockers and boundaries:\n- Depends on completion or stabilization of the relevant DevNexus core surfaces.\n- Do not run live images, PLexus open/close, Docker, or host process mutation.\n\nVerification:\n- Run focused adapter MCP/CLI tests and a read-only project status probe.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "specialization",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.789Z",
+      "updatedAt": "2026-05-16T16:29:31.180Z",
+      "closedAt": "2026-05-16T16:29:31.030Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-2",
+        "itemNumber": 2
+      }
+    },
+    {
+      "id": "local-3",
+      "title": "Run approved DevNexus-Pharo self-hosted startup smoke",
+      "description": "Type: live startup smoke follow-up\nReadiness: blocked on explicit human approval because this starts/stops local services and may use Docker or the configured Vibe backend.\nSource Vibe issue: FCD-40.\n\nCurrent finding: DevNexus-Pharo docs and tests cover `dev-nexus-pharo start`, self-hosted local auth, browser-open deduplication, control board linking, and Codex doctor/init paths, but DevNexus does not yet track a live self-hosted startup smoke.\n\nGoal: run the DevNexus-Pharo self-hosted startup flow through an approved isolated local profile and record factual results.\n\nAcceptance criteria:\n- Approval names the DevNexus-Pharo home/profile, backend mode, ports, timeout budget, log retention, browser expectation, and cleanup policy.\n- The smoke runs `dev-nexus-pharo stop`, `dev-nexus-pharo start`, confirms no duplicate browser-open behavior, confirms local-auth sign-in or records the configured auth state, confirms the control board is visible, and confirms agent MCP availability for `dev_nexus_pharo`, `plexus`, and Vibe tracker access.\n- Failures capture terminal output and relevant `<DEV_NEXUS_PHARO_HOME>\\logs` evidence without mutating unrelated source checkouts.\n\nBlockers and boundaries:\n- Do not start Docker, Vibe, DevNexus-Pharo services, browser automation, or host processes without explicit approval.\n\nVerification:\n- Before approval, static docs/tests inspection only.\n- After approval, run the smoke exactly once through the named profile and record cleanup evidence.\n\nPublication notes:\n- Direct integration to origin/main only if source changes are needed after the smoke.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "vibe-import",
+        "startup-smoke",
+        "unsafe-live-runtime",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:42:16.902Z",
+      "updatedAt": "2026-05-16T23:56:32.844Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-3",
+        "itemNumber": 3
+      }
+    },
+    {
+      "id": "local-4",
+      "title": "Model DevNexus-Pharo as a DevNexus plugin for Pharo agent setup",
+      "description": "Type: Pharo plugin implementation slice\nReadiness: autonomous agent-ready (AFK) after the generic DevNexus plugin contract, worker context bundle, plugin briefing fragments, and PLexus scoped context are stable.\nSource plan: PLAN.md Plugin Direction and worker context planning discussion.\n\nGoal: model DevNexus-Pharo explicitly as the Pharo plugin for DevNexus and use it to prepare Pharo-capable subagent contexts.\n\nAcceptance criteria:\n- DevNexus-Pharo declares its plugin contributions: Pharo skills, MCP projection, PLexus scoped project setup, gateway route expectations, worker briefing fragments, and cleanup hooks.\n- Generated Codex/Claude worker context for Pharo-owned work includes DevNexus-Pharo-provided guidance such as: use Pharo MCP directly for MCP-Pharo work, prefer scoped PLexus/gateway tools over file edits when operating in images, keep image lifecycle scoped, record imageId/route identity, and cleanup owned runtime resources.\n- Generated agent config for component worktrees includes the plugin-projected tools needed for scoped PLexus operations and Pharo MCP access.\n- The setup contract keeps coordinator choice and supervision outside DevNexus-Pharo.\n- Docs no longer imply DevNexus-Pharo replaces DevNexus; it composes with other possible plugins.\n- Static tests verify generated config, worker briefing fragments, and setup metadata without launching images.\n\nBlockers and boundaries:\n- Depends on dev-nexus:local-19, dev-nexus:local-21, and plexus:local-8 or equivalent stable contracts.\n- Do not run live Pharo images, PLexus open/close, or gateway live routes in this slice.\n\nVerification:\n- Run focused DevNexus-Pharo config/MCP/worktree-service tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugin",
+        "pharo-mcp",
+        "agent-context",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T17:48:38.064Z",
+      "updatedAt": "2026-05-16T22:38:57.978Z",
+      "closedAt": "2026-05-16T22:38:57.978Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-4",
+        "itemNumber": 4
+      }
+    },
+    {
+      "id": "local-5",
+      "title": "Verify DevNexus-Pharo-provided Pharo MCP access in subagent worktrees",
+      "description": "Type: live plugin integration smoke\nReadiness: blocked human-in-the-loop (HITL) until plugin setup contracts and isolated runner approval are available.\nSource plan: PLAN.md Plugin Direction; blocker from mcp-pharo:local-4 and mcp-pharo:local-5.\n\nGoal: prove that a subagent in a component worktree receives direct Pharo MCP access through DevNexus-Pharo-provided scoped PLexus setup before MCP-Pharo source work resumes.\n\nAcceptance criteria:\n- Approval names the disposable image/template, state root, workspace id, target id, port policy, cleanup sequence, artifact retention path, and failure policy.\n- A launched subagent receives scoped PLexus tools and a Pharo MCP route/tool surface without editing MCP-Pharo files directly.\n- The subagent can perform a safe read-only Pharo MCP query against the disposable image through the gateway using an explicit imageId or equivalent scoped route identity.\n- Cleanup verifies project close, route removal, process stop, and copied image deletion for only owned resources.\n- Passing evidence is recorded on the blocked MCP-Pharo work items before they are reopened.\n\nBlockers and boundaries:\n- Blocked on dev-nexus:local-13, plexus:local-8, dev-nexus-pharo:local-4, and explicit live-runner approval.\n- Do not launch images, run Docker, mutate live services, or delete images outside the approved runner.\n\nVerification:\n- Execute only through the approved isolated runner.\n- Record final source and runtime cleanup status.\n\nPublication notes:\n- Direct integration to origin/main only for source changes; runtime evidence remains retained artifact/log evidence.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugin",
+        "pharo-mcp",
+        "unsafe-live-runtime",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T17:48:38.214Z",
+      "updatedAt": "2026-05-16T23:57:13.793Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-5",
+        "itemNumber": 5
+      }
+    },
+    {
+      "id": "local-6",
+      "title": "Publish DevNexus-Pharo scoped dogfood npm prerelease",
+      "description": "Type: packaging/publication slice\nReadiness: autonomous agent-ready for metadata, dry-run packing, and registry publish when npm auth allows.\nSource discussion: remove DevNexus-Pharo sibling-project dependency friction by consuming DevNexus through npm, while preserving current import specifiers with an npm alias if useful.\n\nGoal: publish DevNexus-Pharo as a scoped npm dogfood prerelease and replace file:../DevNexus with a registry dependency path.\n\nAcceptance criteria:\n- Package metadata uses a scoped Evref-BL npm name and prerelease version/tag.\n- DevNexus is consumed through npm rather than a sibling checkout; source import churn is avoided unless necessary.\n- Build/test scripts do not require ../DevNexus.\n- Published contents are constrained to built artifacts, types, README, and package metadata.\n- npm pack dry-run shows expected contents.\n- npm publish uses public access and dogfood tag if npm auth allows; otherwise the blocker is recorded clearly.\n\nVerification:\n- npm run check.\n- npm pack --dry-run.\n- npm whoami / npm publish result when attempted.\n\nPublication notes:\n- Direct integration to origin/main after metadata and verification are complete.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "packaging",
+        "npm"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T22:52:11.035Z",
+      "updatedAt": "2026-05-16T23:03:32.243Z",
+      "closedAt": "2026-05-16T23:03:32.243Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-6",
+        "itemNumber": 6
+      }
+    },
+    {
+      "id": "local-7",
+      "title": "Verify DevNexus-Pharo name-based npm install after dogfood publish",
+      "description": "Type: packaging verification follow-up\nReadiness: blocked on npm registry packument becoming available or a packaging decision to publish a replacement prerelease.\nSource: dev-nexus-pharo:local-6 registry verification after first dogfood publish.\n\nGoal: ensure @evref-bl/dev-nexus-pharo can be installed by normal npm package spec, not only by direct tarball URL.\n\nCurrent evidence:\n- npm publish accepted @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 with dogfood tag and public access.\n- npm access get status reports public and npm dist-tag ls reports dogfood/latest at 0.1.0-alpha.0.\n- Direct tarball HEAD returned 200 and tarball install smoke ran dev-nexus-pharo --help successfully.\n- The packument endpoint https://registry.npmjs.org/@evref-bl%2fdev-nexus-pharo still returned 404, so npm view / npm exec by package name failed during the cycle.\n\nAcceptance criteria:\n- Retry npm view @evref-bl/dev-nexus-pharo@dogfood and npm exec --package @evref-bl/dev-nexus-pharo@dogfood -- dev-nexus-pharo --help.\n- If normal name-based install works, close this item with the observed commands.\n- If it still fails after registry propagation, decide whether to publish 0.1.0-alpha.1, contact npm support, or temporarily document tarball install for Mac setup.\n\nVerification:\n- npm view @evref-bl/dev-nexus-pharo@dogfood version bin --json --prefer-online.\n- npm exec --yes --prefer-online --package @evref-bl/dev-nexus-pharo@dogfood -- dev-nexus-pharo --help.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "packaging",
+        "npm"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T23:03:41.258Z",
+      "updatedAt": "2026-05-16T23:04:39.542Z",
+      "closedAt": "2026-05-16T23:04:31.815Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-7",
+        "itemNumber": 7
+      }
+    },
+    {
+      "id": "local-8",
+      "title": "Rename DevNexus-Pharo to DevNexus-Pharo",
+      "description": "Type: rename/publication slice\nReadiness: autonomous agent-ready for source/package/npm changes; GitHub repository rename may require manual web step because gh is not installed in this environment.\nSource discussion: avoid semantic conflict with older MooseNexus by renaming the DevNexus Pharo plugin away from DevNexus-Pharo.\n\nGoal: rename DevNexus-Pharo to DevNexus-Pharo in package metadata, CLI/user-facing docs, DevNexus dogfood project state, and npm publication.\n\nAcceptance criteria:\n- New npm package is @evref-bl/dev-nexus-pharo with dogfood tag and install-smoked CLI.\n- CLI/user-facing command is dev-nexus-pharo.\n- Old @evref-bl/dev-nexus-pharo package is unpublished if npm policy allows; otherwise record the blocker.\n- Dogfood project config/target state use the new component/plugin naming where safe.\n- Source commit is pushed to the owning repository; GitHub repo rename is either completed or explicitly handed off.\n\nVerification:\n- npm run check.\n- npm pack --dry-run.\n- npm publish --access public --tag dogfood.\n- npm exec --package @evref-bl/dev-nexus-pharo@dogfood -- dev-nexus-pharo --help.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "rename",
+        "npm"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T23:09:36.843Z",
+      "updatedAt": "2026-05-16T23:45:05.985Z",
+      "closedAt": "2026-05-16T23:21:27.718Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-8",
+        "itemNumber": 8
+      }
+    },
+    {
+      "id": "local-9",
+      "title": "Bundle MCP-Pharo domain skills through DevNexus-Pharo",
+      "description": "Type: Pharo skill bundle/projection slice\nReadiness: autonomous agent-ready (AFK); no live Pharo image, PLexus route, Docker run, or external provider posting required.\nSource: MCP-Pharo commit 8ba98ed added repo-local skills under user/skills.\n\nGoal: make the useful MCP-Pharo domain skills part of the DevNexus-Pharo-provided bundle projected to Pharo-capable subagents.\n\nSkills to include:\n- pharo-ci-repro for Docker/smalltalkCI reproduction and CI log diagnosis.\n- pharo-image-git-handoff for turning image-side changes into clean Tonel/Git handoffs.\n- pharo-project-load for loading Tonel/Metacello/Iceberg projects into Pharo images.\n- pharo-version-compat for PharoCompatibility and cross-version load/test work.\n\nAcceptance criteria:\n- DevNexus-Pharo skill pack includes these MCP-Pharo skills, with stable skill ids, descriptions, supported Codex target metadata, and provenance pointing to the MCP-Pharo source/commit or package version used.\n- `dev-nexus-pharo project skills refresh` materializes the skills under `.dev-nexus/skills` and projects them to agent-local skill directories when the project enables Codex skills.\n- DevNexus-Pharo plugin `projected_skill` capabilities include the new skill ids so worker context/profile summaries expose them to subagents.\n- Tests prove project creation/skill refresh installs the new skills and plugin capability projection stays in sync with the skill pack.\n- Docs explain that DevNexus-Pharo bundles these as Pharo-domain agent guidance, while MCP-Pharo remains the source project for image-side MCP behavior.\n- The implementation does not require a sibling MCP-Pharo checkout at runtime; if the skill source is copied, record the upstream commit in metadata/provenance.\n\nBoundaries:\n- Do not run live images, PLexus open/close, Docker, or Pharo MCP routes for this slice.\n- Do not create a runtime dependency from DevNexus core to MCP-Pharo.\n- If a dynamic cross-component skill import is desired instead of bundling/copying, record that as a separate DevNexus core design item rather than blocking this slice.\n\nVerification:\n- Run focused DevNexus-Pharo skill/plugin tests.\n- Run `npm run check` when feasible.\n- Optionally create a temporary DevNexus-Pharo project and run `dev-nexus-pharo project skills refresh` to inspect installed skill ids.\n\nPublication notes:\n- Direct integration to `origin/main` after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "skills",
+        "mcp-pharo",
+        "agent-context",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-17T01:29:22.101Z",
+      "updatedAt": "2026-05-17T10:06:12.505Z",
+      "closedAt": "2026-05-17T10:06:12.321Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-9",
+        "itemNumber": 9
+      }
+    }
+  ],
+  "comments": {
+    "local-1": [
+      {
+        "id": "local-comment-1",
+        "body": "Coordinator selected this as the bounded implementation item for run dogfood-fourth-codex-20260516-1454. Starting DevNexus-Pharo specialization adapter alignment; no live runtime or Vibe implementation workspace will be used.",
+        "author": null,
+        "createdAt": "2026-05-16T12:53:59.017Z",
+        "updatedAt": "2026-05-16T12:53:59.017Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-1"
+        }
+      },
+      {
+        "id": "local-comment-2",
+        "body": "Completed in DevNexus-Pharo commit c6629df, pushed to origin/main. The MCP adapter now delegates DevNexus automation target/report and neutral work-item tools to native DevNexus MCP surfaces, including component-scoped work item routing. Verification passed: npm test -- src/mcpServer.test.ts; npm test -- src/config.test.ts src/projectLifecycleFocused.test.ts src/projectService.test.ts; npm run check; git diff --check. A read-only project status probe through the adapter reported the dogfood project's five components and local tracker capabilities.",
+        "author": null,
+        "createdAt": "2026-05-16T13:04:54.311Z",
+        "updatedAt": "2026-05-16T13:04:54.311Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-2"
+        }
+      }
+    ],
+    "local-2": [
+      {
+        "id": "local-comment-3",
+        "body": "Promoted for parallel non-live dogfood wave. Scope: align specialization adapter with completed DevNexus coordination/report/profile surfaces; no live images or PLexus routes.",
+        "author": null,
+        "createdAt": "2026-05-16T15:58:35.303Z",
+        "updatedAt": "2026-05-16T15:58:35.303Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-3"
+        }
+      },
+      {
+        "id": "local-comment-4",
+        "body": "User correction during parallel wave: DevNexus-Pharo is responsible for setting up the infrastructure needed for subagents in component worktrees to access the Pharo MCP directly. Redirecting this item to prioritize Pharo MCP route/config setup before any further Pharo-code work.",
+        "author": null,
+        "createdAt": "2026-05-16T16:08:04.657Z",
+        "updatedAt": "2026-05-16T16:08:04.657Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-4"
+        }
+      },
+      {
+        "id": "local-comment-5",
+        "body": "Completed and published to DevNexus-Pharo origin/main through 3135210. Worker commit b61ac1c added Codex worktree Pharo MCP config projection and docs/tests so DevNexus-Pharo owns direct Pharo MCP infrastructure setup for subagents. Follow-up commit 3135210 aligned the project-service test with generated component worktree roots. Verification passed from canonical source root: npm run check, 18 files / 175 tests; read-only project_status probe passed. Live Pharo routing was not exercised and remains under live-runner approval.",
+        "author": null,
+        "createdAt": "2026-05-16T16:29:31.180Z",
+        "updatedAt": "2026-05-16T16:29:31.180Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-5"
+        }
+      }
+    ],
+    "local-3": [
+      {
+        "id": "local-comment-15",
+        "body": "Cleanup: renamed the active open work-item title/body from the old project name to DevNexus-Pharo. This remains blocked on explicit self-hosted runtime approval.",
+        "author": null,
+        "createdAt": "2026-05-16T23:56:32.844Z",
+        "updatedAt": "2026-05-16T23:56:32.844Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-15"
+        }
+      }
+    ],
+    "local-4": [
+      {
+        "id": "local-comment-6",
+        "body": "Updated during worker-context planning: this item now explicitly depends on DevNexus worker context bundles and plugin-contributed briefing fragments, and owns the Pharo-specific guidance fragment rather than duplicating generic DevNexus context infrastructure.",
+        "author": null,
+        "createdAt": "2026-05-16T21:15:31.931Z",
+        "updatedAt": "2026-05-16T21:15:31.931Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-6"
+        }
+      },
+      {
+        "id": "local-comment-7",
+        "body": "Dependencies are now satisfied: DevNexus generic plugin projection contract, worker context bundles, plugin briefing fragments, PLexus scoped context, and toolchain dependency projection support are published. This item can move from dependent todo to ready for a static DevNexus-Pharo plugin setup slice. Keep live Pharo images, PLexus open/close, and gateway live routes out of scope.",
+        "author": null,
+        "createdAt": "2026-05-16T22:20:29.574Z",
+        "updatedAt": "2026-05-16T22:20:29.574Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-7"
+        }
+      },
+      {
+        "id": "local-comment-8",
+        "body": "Completed static DevNexus-Pharo plugin setup slice. DevNexus-Pharo now exposes pharoNexusDevNexusPluginConfig with Pharo skills, scoped PLexus and direct pharo MCP capability declarations, setup obligations, env hints, cleanup expectations, affordances, and worker context/briefing fragments. create/import now persist the dev-nexus-pharo plugin entry without replacing DevNexus. Published DevNexus-Pharo origin/main through 75a038c. Verification passed: focused plugin/project/codex/worktree tests (5 files, 60 tests) and npm run check (19 files, 181 tests). No live images, Docker, PLexus open/close, or gateway live routes were run. Follow-up dev-nexus:local-24 captures the related-component dependency projection gap found by worker worktrees expecting ../DevNexus.",
+        "author": null,
+        "createdAt": "2026-05-16T22:38:54.411Z",
+        "updatedAt": "2026-05-16T22:38:54.411Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-8"
+        }
+      }
+    ],
+    "local-5": [
+      {
+        "id": "local-comment-16",
+        "body": "Cleanup: renamed the active open work-item title/body from the old project name to DevNexus-Pharo. This remains blocked until the approved live runner can prove scoped PLexus plus direct Pharo MCP access for subagents.",
+        "author": null,
+        "createdAt": "2026-05-16T23:56:32.993Z",
+        "updatedAt": "2026-05-16T23:56:32.993Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-16"
+        }
+      },
+      {
+        "id": "local-comment-17",
+        "body": "Non-live prerequisites are now satisfied: DevNexus plugin projection, worker context bundles, DevNexus-Pharo plugin setup, PLexus scoped context, and dependency projection baseline are published. Remaining blocker is explicit approval of a disposable live runner profile for scoped PLexus plus direct Pharo MCP access verification.",
+        "author": null,
+        "createdAt": "2026-05-16T23:57:13.793Z",
+        "updatedAt": "2026-05-16T23:57:13.793Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-17"
+        }
+      }
+    ],
+    "local-6": [
+      {
+        "id": "local-comment-9",
+        "body": "Completed source/package publication slice. Published @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 to npm with dogfood tag and public access; source metadata committed/pushed as DevNexus-Pharo f9a64eb. DevNexus-Pharo now consumes DevNexus through npm alias dev-nexus -> @evref-bl/dev-nexus@0.1.0-alpha.0 and no longer runs prebuild/pretest against ../DevNexus. Verification passed: npm run check (19 files / 181 tests), npm pack --dry-run, npm publish --access public --tag dogfood, and tarball install smoke from https://registry.npmjs.org/@evref-bl/dev-nexus-pharo/-/dev-nexus-pharo-0.1.0-alpha.0.tgz. Residual registry issue: npm access/dist-tags and tarball endpoint are valid, but the normal packument endpoint still returns 404, so name-based install via npm package spec needs a retry/follow-up before Mac setup depends on it.",
+        "author": null,
+        "createdAt": "2026-05-16T23:03:32.036Z",
+        "updatedAt": "2026-05-16T23:03:32.036Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-9"
+        }
+      }
+    ],
+    "local-7": [
+      {
+        "id": "local-comment-10",
+        "body": "Resolved after registry propagation. Verification passed: npm view @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 version bin --json --prefer-online returned metadata, and npm exec --yes --prefer-online --package @evref-bl/dev-nexus-pharo@dogfood -- dev-nexus-pharo --help ran successfully.",
+        "author": null,
+        "createdAt": "2026-05-16T23:04:31.651Z",
+        "updatedAt": "2026-05-16T23:04:31.651Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-10"
+        }
+      }
+    ],
+    "local-8": [
+      {
+        "id": "local-comment-11",
+        "body": "Renamed the source package/project to DevNexus-Pharo. Source commit 8024fa2 is pushed to the current GitHub remote (Evref-BL/DevNexus-Pharo.git pending manual repository rename). Published @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 with dogfood/latest tags; npm dist-tags and access status report public, but packument install/view still returns registry 404 during post-publish propagation. Old @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 was unpublished with --force; dist-tags are removed, though npm view still appears cached briefly.",
+        "author": null,
+        "createdAt": "2026-05-16T23:21:27.508Z",
+        "updatedAt": "2026-05-16T23:21:27.508Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-11"
+        }
+      },
+      {
+        "id": "local-comment-12",
+        "body": "npm registry propagation completed: npm view @evref-bl/dev-nexus-pharo@0.1.0-alpha.0 resolves, dist-tags dogfood/latest are present, access status is public, and clean temp-directory npm exec --package=@evref-bl/dev-nexus-pharo@0.1.0-alpha.0 -- dev-nexus-pharo --help passes.",
+        "author": null,
+        "createdAt": "2026-05-16T23:23:36.483Z",
+        "updatedAt": "2026-05-16T23:23:36.483Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-12"
+        }
+      },
+      {
+        "id": "local-comment-13",
+        "body": "GitHub repository rename completed through the GitHub REST API using the Git Credential Manager token. New repository: https://github.com/Evref-BL/DevNexus-Pharo. Local source remote and dogfood component remoteUrl now point to git@github.com:Evref-BL/DevNexus-Pharo.git. git ls-remote confirms HEAD 8024fa2.",
+        "author": null,
+        "createdAt": "2026-05-16T23:26:40.502Z",
+        "updatedAt": "2026-05-16T23:26:40.502Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-13"
+        }
+      },
+      {
+        "id": "local-comment-14",
+        "body": "Retired the obsolete GitHub rename redirect for the former DevNexus-Pharo repository slug. Created a temporary private Evref-BL/DevNexus-Pharo repository, verified its id differed from Evref-BL/DevNexus-Pharo, deleted only that temporary repository, then verified old API/web/Git URLs return not found while Evref-BL/DevNexus-Pharo remains available at HEAD 2f7fd35.",
+        "author": null,
+        "createdAt": "2026-05-16T23:45:05.985Z",
+        "updatedAt": "2026-05-16T23:45:05.985Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-14"
+        }
+      }
+    ],
+    "local-9": [
+      {
+        "id": "local-comment-18",
+        "body": "Heartbeat coordinator selected this item for the 2026-05-17 parallel dogfood cycle. Write scope: DevNexus-Pharo worktree worktrees/dev-nexus-pharo/local-9-mcp-pharo-skills on branch codex/dev-nexus-pharo-local-9-mcp-pharo-skills. Goal: bundle MCP-Pharo repo skills through DevNexus-Pharo without live runtime work.",
+        "author": null,
+        "createdAt": "2026-05-17T09:49:52.902Z",
+        "updatedAt": "2026-05-17T09:49:52.902Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-18"
+        }
+      },
+      {
+        "id": "local-comment-19",
+        "body": "Completed and published as DevNexus-Pharo ec14934. Bundled MCP-Pharo domain skills into DevNexus-Pharo skill/plugin projection with stable ids and provenance: pharo-ci-repro, pharo-image-git-handoff, pharo-project-load, and pharo-version-compat. Verification on integrated main: npm run check passed with 19 files / 182 tests. No live image, PLexus route, Docker, or Pharo MCP runtime work was run.",
+        "author": null,
+        "createdAt": "2026-05-17T10:06:12.505Z",
+        "updatedAt": "2026-05-17T10:06:12.505Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-19"
+        }
+      }
+    ]
+  }
+}

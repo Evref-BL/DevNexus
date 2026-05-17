@@ -1,0 +1,497 @@
+{
+  "version": 1,
+  "nextNumber": 11,
+  "nextCommentNumber": 22,
+  "updatedAt": "2026-05-17T02:41:46.850Z",
+  "items": [
+    {
+      "id": "local-1",
+      "title": "Define isolated PLexus live-smoke runner boundary",
+      "description": "Type: runtime-boundary planning slice\nReadiness: human-in-the-loop (HITL) for approval before any live smoke; documentation work is autonomous agent-ready (AFK)\n\nGoal: define the isolated PLexus live-smoke runner boundary before DevNexus authorizes any runtime launch or gateway smoke.\n\nAcceptance criteria:\n- The proposed runner boundary names disposable runtime inputs, cleanup responsibilities, timeout behavior, process ownership, and logs/artifacts to retain.\n- The boundary states which checks can run without launching live services and which require the isolated runner.\n- The work item records explicit approval criteria for enabling live PLexus smoke tests in a future cycle.\n- No live PLexus open/close, Docker, or host process mutation is performed in this slice.\n\nVerification:\n- Review the documented boundary against current project safety rules.\n- Confirm PLexus source working tree state is preserved and no runtime process is started.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "runtime-boundary",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T12:22:26.399Z",
+      "updatedAt": "2026-05-16T13:17:25.385Z",
+      "closedAt": "2026-05-16T13:17:25.385Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-1",
+        "itemNumber": 1
+      }
+    },
+    {
+      "id": "local-2",
+      "title": "Run approved isolated PLexus live-smoke",
+      "description": "Type: live-runtime follow-up\nReadiness: blocked on human approval and isolated runner availability\nSource plan: PLAN.md priority candidate 9.\n\nGoal: run the PLexus open/route/close live smoke only after the documented isolated runner boundary is approved and the runner harness is available.\n\nAcceptance criteria:\n- Approval names the source image or template, disposable state root, timeout budget, cleanup sequence, and retained artifacts.\n- The runner uses unique workspace and target identity, copied or temporary images, and dynamic or reserved ports.\n- Cleanup verifies project close, gateway route removal, process stop, copied image deletion, and artifact retention.\n- No source worktree, shared image, default launcher profile, or unrelated process is mutated.\n\nBlockers and boundaries:\n- Blocked on human approval of isolated runner inputs, timeout budget, cleanup sequence, retained artifacts, and failure policy.\n- Depends on the approved runner harness work in plexus:local-3 if that harness is needed before execution.\n\nVerification:\n- Execute through the approved isolated runner only.\n- Record runner logs and final source worktree status.\n\nPublication notes:\n- Direct integration to origin/main only for verified source changes, if any are needed.\n- Live smoke logs/artifacts are retained as runtime evidence and are not themselves source publication.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "runtime-boundary",
+        "unsafe-live-runtime",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T13:17:08.897Z",
+      "updatedAt": "2026-05-17T02:41:46.850Z",
+      "closedAt": "2026-05-17T02:31:47.995Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-2",
+        "itemNumber": 2
+      }
+    },
+    {
+      "id": "local-3",
+      "title": "Build approved isolated PLexus live-smoke runner harness",
+      "description": "Type: runtime harness implementation slice\nReadiness: human-in-the-loop (HITL) until isolated runner inputs and cleanup policy are approved; autonomous agent-ready (AFK) for implementation after approval.\nSource plan: PLAN.md priority candidate 9.\n\nGoal: turn the documented PLexus live-smoke boundary into a reusable runner harness that can safely execute disposable open/route/close checks after approval.\n\nAcceptance criteria:\n- The runner accepts approved disposable inputs: state root, workspace id, target id, image/template source, port policy, timeout budget, cleanup sequence, and artifact retention path.\n- It owns and records started processes/routes/images and verifies cleanup of only those owned resources.\n- It retains logs/artifacts needed for post-run diagnosis.\n- It refuses to run when approval inputs are missing or point at shared source/runtime state.\n\nBlockers and boundaries:\n- Blocked until human approval records the isolated runner inputs, timeout budget, cleanup sequence, retained artifacts, and failure policy.\n- Do not launch live services, Docker, images, or host process mutation before approval.\n\nVerification:\n- Before approval, add static/unit coverage for input validation and cleanup planning only.\n- After approval, run through the isolated runner and record final source worktree status.\n\nPublication notes:\n- Direct integration to origin/main only for verified harness/source changes; live-run artifacts remain retained runtime evidence, not source commits.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "runtime-boundary",
+        "approved-runner",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:03:02.941Z",
+      "updatedAt": "2026-05-17T02:41:41.655Z",
+      "closedAt": "2026-05-17T02:31:47.647Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-3",
+        "itemNumber": 3
+      }
+    },
+    {
+      "id": "local-4",
+      "title": "Finish PLexus gateway lifecycle/package boundary split",
+      "description": "Type: package-boundary implementation slice\nReadiness: autonomous agent-ready for source refactor and unit tests; no live Pharo image or gateway process is required.\nSource Vibe issues: FCD-8, FCD-10, FCD-11, FCD-13, FCD-14.\n\nCurrent finding: `docs/package-boundaries.md` still says the repository is transitional: `@plexus/gateway` depends on `@plexus/core`, and lifecycle tools may still be implemented/exposed by the gateway. `packages/plexus-gateway/package.json` currently depends on `@plexus/core`.\n\nGoal: finish the PLexus package split so the gateway is routing-only and lifecycle tools are owned by PLexus core/CLI.\n\nAcceptance criteria:\n- `@plexus/gateway` no longer imports or depends on `@plexus/core`.\n- Lifecycle tools such as `plexus_project_open`, `plexus_project_close`, and `plexus_project_status` are exposed from PLexus core/owned lifecycle MCP surface instead of the routing gateway.\n- Gateway-owned tools remain limited to route status, route registration/unregistration, stale-route cleanup, and forwarding calls to image MCP endpoints.\n- Package metadata and docs no longer describe the split as transitional.\n- Tests cover the new ownership boundary without live image startup.\n\nVerification:\n- Run package boundary/unit tests for core and gateway.\n- Run `npm run typecheck --workspaces` and `npm test` when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "vibe-import",
+        "package-boundary",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:42:17.068Z",
+      "updatedAt": "2026-05-16T16:29:31.633Z",
+      "closedAt": "2026-05-16T16:29:31.484Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-4",
+        "itemNumber": 4
+      }
+    },
+    {
+      "id": "local-5",
+      "title": "Add PLexus prepared image cache model and safe service boundary",
+      "description": "Type: image-cache design and implementation slice\nReadiness: autonomous agent-ready for config/model/service tests; human-in-the-loop for live image preparation or copy checks.\nSource Vibe issues: FCD-2, FCD-3, FCD-4, FCD-5, FCD-6, FCD-7.\n\nCurrent finding: PLexus has smoke-script image specs and startup-script MCP loading, but no durable prepared-image cache service/model. Current docs only mention a future prepared project image cache entry.\n\nGoal: add a project-owned prepared Pharo image cache capability without pushing PLexus policy into pharo-launcher-mcp.\n\nAcceptance criteria:\n- Project config can describe a prepared image spec with configurable MCP repository, baseline/load script, cache identity, and runtime copy behavior.\n- PLexus can statically validate cache specs and generate the preparation script without launching a live image.\n- The cache service boundary distinguishes safe source-only operations from live prepare/copy/delete operations requiring approved runner inputs.\n- Project open integration is designed so runtime images are copied from prepared cache entries before launch, but live execution remains blocked until approval.\n- Unit tests cover config validation, naming, script generation, and mocked launcher calls.\n\nBlockers and boundaries:\n- Do not create, copy, launch, or delete real images until the isolated runner/live image boundary is approved.\n\nVerification:\n- Run focused PLexus config/startup-script/cache unit tests.\n- Run broader typecheck/tests when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "vibe-import",
+        "image-cache",
+        "runtime-boundary",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:42:17.233Z",
+      "updatedAt": "2026-05-16T14:42:17.233Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-5",
+        "itemNumber": 5
+      }
+    },
+    {
+      "id": "local-6",
+      "title": "Align scoped pharo-launcher create and stop contract",
+      "description": "Type: scoped launcher contract implementation slice\nReadiness: autonomous agent-ready for contract/doc/unit-test alignment; human-in-the-loop for live image create/stop verification.\nSource Vibe issue: FCD-75.\n\nCurrent finding: `docs/kanban-agent-pharo-access.md` documents `pharo_launcher_image_create`, but `packages/plexus-core/src/scopedPharoLauncherServer.ts` exposes only list/info/start/stop, and stop currently throws `Scoped per-image stop is not implemented ... use PLexus project close policy`.\n\nGoal: make the scoped `pharo-launcher` facade match the documented PLexus workspace policy.\n\nAcceptance criteria:\n- Either implement scoped `pharo_launcher_image_create` for project-approved image specs/profiles, or remove/rename the documented create surface so docs and tools agree.\n- Either implement scoped stop for workspace-owned images, or make project-close-only policy explicit in tool naming, schema, docs, and tests.\n- The scoped surface cannot operate on arbitrary host-wide image names, pids, profiles, or deletion operations.\n- Tests prove list/info/start/create/stop behavior uses only PLexus project/workspace state and approved image ids.\n\nBlockers and boundaries:\n- Live create/stop checks require the approved runner; unit tests should use mocks/static state.\n\nVerification:\n- Run focused scoped launcher server tests.\n- Run PLexus typecheck/tests when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "vibe-import",
+        "scoped-launcher",
+        "runtime-boundary",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:42:17.401Z",
+      "updatedAt": "2026-05-16T14:42:17.401Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-6",
+        "itemNumber": 6
+      }
+    },
+    {
+      "id": "local-7",
+      "title": "Broaden PLexus OS-agnostic config tests and docs",
+      "description": "Type: portability test/docs slice\nReadiness: autonomous agent-ready for source/docs/tests; no live runtime required.\nSource Vibe issues: FCD-27, FCD-29, FCD-30.\n\nCurrent finding: PLexus has some OS-aware helper tests, and docs warn that executable logic should stay OS-agnostic, but the old Vibe item still captures a useful acceptance target: generated agent/MCP config and docs should not imply Windows-only behavior.\n\nGoal: broaden PLexus portability coverage around generated paths, config output, and documentation examples.\n\nAcceptance criteria:\n- Tests cover Windows and POSIX-style paths for generated PLexus/agent MCP configuration where that config is produced by PLexus.\n- Any remaining platform-specific behavior is behind small named helpers or clearly labeled scripts.\n- Contributor and user docs distinguish portable behavior from Windows-only examples.\n- No live PLexus route, image, or process startup is required.\n\nVerification:\n- Run focused config/path tests.\n- Run PLexus typecheck/tests when feasible.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "vibe-import",
+        "portability",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T14:42:17.547Z",
+      "updatedAt": "2026-05-16T16:29:32.154Z",
+      "closedAt": "2026-05-16T16:29:32.012Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-7",
+        "itemNumber": 7
+      }
+    },
+    {
+      "id": "local-8",
+      "title": "Expose scoped PLexus project context for DevNexus plugins",
+      "description": "Type: scoped runtime contract slice\nReadiness: autonomous agent-ready (AFK) for config/model/tests; live image actions remain blocked by existing isolated-runner work.\nSource plan: PLAN.md Plugin Direction and DevNexus-Pharo plugin setup requirement.\n\nGoal: expose the PLexus scoped project/workspace/image context a DevNexus plugin such as DevNexus-Pharo can hand to subagents.\n\nAcceptance criteria:\n- PLexus has a documented/modelled scoped context keyed by project/workspace/target/image ownership rather than host-wide image names.\n- The context can describe safe create/start/stop/delete affordances for owned disposable images without allowing arbitrary launcher mutation.\n- Gateway routing metadata includes how a subagent obtains or records the imageId needed for routed Pharo MCP calls.\n- Static/unit tests cover context validation, ownership boundaries, cleanup metadata, and route metadata without launching images.\n- Existing PLexus repo/package boundaries remain intact; this is not a split into multiple Git projects.\n\nBlockers and boundaries:\n- Do not create, start, stop, delete, or mutate real images before isolated-runner approval.\n- Coordinate with plexus:local-5 and plexus:local-6 rather than duplicating prepared-cache or scoped-launcher work.\n\nVerification:\n- Run focused PLexus config/context/gateway tests.\n- Run npm run typecheck --workspaces and npm test when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugin-support",
+        "scoped-runtime",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T17:48:37.881Z",
+      "updatedAt": "2026-05-16T20:49:28.696Z",
+      "closedAt": "2026-05-16T20:49:28.696Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-8",
+        "itemNumber": 8
+      }
+    },
+    {
+      "id": "local-9",
+      "title": "Make gateway the agent-facing Pharo MCP proxy",
+      "description": "Type: gateway surface implementation slice\nReadiness: autonomous agent-ready (AFK) for docs/config/tests; no live Pharo image or gateway process is required.\nSource discussion: agent-facing PLexus surfaces should be exactly two concepts: `pharo-launcher` for scoped image lifecycle and `gateway` for operating Pharo MCP tools inside selected images.\n\nGoal: make the PLexus gateway surface the normal agent-facing Pharo MCP proxy and hide raw routing by default.\n\nAcceptance criteria:\n- Generated workspace MCP config exposes two normal agent-facing servers: `pharo-launcher` for scoped lifecycle and `gateway` for typed Pharo MCP calls routed by `imageId`.\n- The current Pharo facade/proxy behavior is available through the `gateway` server name/surface: it lists project Pharo MCP tools, adds required `imageId`, validates the scoped route, strips `imageId`, and forwards to the selected image MCP server.\n- `plexus_route_to_image` is not exposed in normal generated agent config and is not part of the default gateway tool list.\n- Raw routing remains available only through an explicit opt-in setting such as `exposeRawRoutingTool` / environment or CLI flag; default is false.\n- Route registration, unregister, status, and stale-route cleanup remain internal/admin plumbing for PLexus core or operators, not a third normal agent-facing surface.\n- Existing compatibility names can remain temporarily if needed, but docs identify `gateway` as the agent-facing Pharo MCP proxy and mark old/default confusing surfaces for migration.\n\nBlockers and boundaries:\n- Do not launch live images, start a gateway service, mutate launcher state, or require external MCP servers.\n- Coordinate with `plexus:local-8`; this item owns naming/default tool exposure, while `local-8` owns scoped project/workspace/image context and route metadata.\n\nVerification:\n- Add/update gateway server tests for default tool lists, opt-in raw routing exposure, and `gateway` surface behavior.\n- Add/update workspace MCP config tests proving generated agent config contains `pharo-launcher` and `gateway`, and does not expose raw routing by default.\n- Run PLexus typecheck/tests when feasible.\n\nPublication notes:\n- Direct integration to origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "gateway",
+        "agent-facing",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T20:14:53.769Z",
+      "updatedAt": "2026-05-16T20:30:54.711Z",
+      "closedAt": "2026-05-16T20:30:54.711Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-9",
+        "itemNumber": 9
+      }
+    },
+    {
+      "id": "local-10",
+      "title": "Publish PLexus scoped dogfood npm packages",
+      "description": "Type: packaging/publication slice\nReadiness: autonomous agent-ready for metadata, dry-run packing, and registry publish when npm auth allows.\nSource discussion: make PLexus lifecycle and Pharo MCP gateway packages available to more machines through npm without splitting the Git repository.\n\nGoal: publish PLexus workspace packages as scoped npm dogfood prereleases while keeping the single PLexus repository and package boundary intact.\n\nAcceptance criteria:\n- Workspace packages use scoped Evref-BL npm names for lifecycle/core and gateway packages.\n- Root PLexus remains the private monorepo aggregator; only workspace packages are published.\n- Workspace package contents are constrained to dist/types/package metadata.\n- npm pack dry-runs show expected package contents for both packages.\n- npm publish uses public access and dogfood tag if npm auth allows; otherwise the blocker is recorded clearly.\n\nVerification:\n- npm run build.\n- npm run typecheck --workspaces.\n- npm test --workspaces.\n- npm pack --dry-run for each workspace package.\n\nPublication notes:\n- Direct integration to origin/main after metadata and verification are complete.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "packaging",
+        "npm"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-16T22:52:04.202Z",
+      "updatedAt": "2026-05-16T23:03:25.131Z",
+      "closedAt": "2026-05-16T23:03:25.131Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-10",
+        "itemNumber": 10
+      }
+    }
+  ],
+  "comments": {
+    "local-1": [
+      {
+        "id": "local-comment-1",
+        "body": "Completed in this cycle. Added docs/live-smoke-runner-boundary.md and linked it from docs/development.md. The boundary names disposable inputs, runner/process ownership, cleanup responsibilities, timeout behavior, retained artifacts, checks allowed without live services, checks requiring the runner, and approval criteria for future live PLexus smoke tests. No PLexus open/close, Docker, image launch, gateway live probe, package install, or host process mutation was performed.\n\nVerification passed: git diff --check; npm run build; npm test. Published PLexus commit 916e1d5 to origin/main. Created blocked follow-up plexus:local-2 for the approved live-smoke runner execution.",
+        "author": null,
+        "createdAt": "2026-05-16T13:17:25.218Z",
+        "updatedAt": "2026-05-16T13:17:25.218Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-1"
+        }
+      }
+    ],
+    "local-2": [
+      {
+        "id": "local-comment-2",
+        "body": "Updated during dev-nexus:local-5 plan split to include explicit source-plan, blocker, verification, and publication notes. Live runtime execution remains blocked until the isolated runner is approved.",
+        "author": null,
+        "createdAt": "2026-05-16T14:03:27.007Z",
+        "updatedAt": "2026-05-16T14:03:27.007Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-2"
+        }
+      },
+      {
+        "id": "local-comment-19",
+        "body": "Completed by approved run `dogfood-overnight-local-3-20260517-0428` after the launcher-side profile and detached-launch fixes landed.\n\nResult:\n- Copied `MCP12-2` to owned disposable image `PlexusSmokedev177898486735637520`.\n- Opened PLexus project successfully; state after open recorded image `dev` as running on port 7101 with pid 29560.\n- Verified image MCP tools/list returned 15 tools.\n- Routed `find-packages` and received `7 packages found [scope=projects] (7 matched).`\n- Closed project, verified process gone, route unregistered, closed target absent from gateway status, and deleted only the copied disposable image.\n- Post-run launcher check found no remaining `Plexus*` disposable images or processes; only the existing Pharo Launcher UI process remained.\n\nArtifacts: `C:\\dev\\code\\dev-nexus-dogfood\\.dev-nexus\\runtime\\artifacts\\overnight-live-20260517\\dogfood-overnight-local-3-20260517-0428`.",
+        "author": null,
+        "createdAt": "2026-05-17T02:31:47.833Z",
+        "updatedAt": "2026-05-17T02:31:47.833Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-19"
+        }
+      },
+      {
+        "id": "local-comment-21",
+        "body": "Approved npm-path live smoke completed as dogfood-overnight-local-3-npm-20260517-0442. It copied MCP12-2 to an owned disposable image, opened PLexus, routed find-packages through the gateway, closed the project, verified route/process cleanup, and deleted the copied image. Artifacts are retained under .dev-nexus/runtime/artifacts/overnight-live-20260517/dogfood-overnight-local-3-npm-20260517-0442.",
+        "author": null,
+        "createdAt": "2026-05-17T02:41:46.850Z",
+        "updatedAt": "2026-05-17T02:41:46.850Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-21"
+        }
+      }
+    ],
+    "local-3": [
+      {
+        "id": "local-comment-13",
+        "body": "Still blocked on isolated runner approval. Smallest unblock is a named disposable runner profile: state root, image/template policy, allowed Docker or no-Docker mode, port range, timeout budget, artifact/log retention path, cleanup sequence, and failure policy. Until approved, only static/unit work should run.",
+        "author": null,
+        "createdAt": "2026-05-16T23:57:13.960Z",
+        "updatedAt": "2026-05-16T23:57:13.960Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-13"
+        }
+      },
+      {
+        "id": "local-comment-14",
+        "body": "Runner profile overnight-live-20260517 is approved and recorded in .dev-nexus/automation/runtime-profile-overnight-live-20260517.md. Docker/Podman works, local npm dependency repair is allowed in component/worktree scope, pharo-launcher-mcp is now under C:\\\\dev\\\\code\\\\git\\\\pharo-launcher-mcp, PLexus workspace package links were repaired, stale generated old-name package was pruned, and npm run smoke:open-route-close -- --help reaches the runner. Proceed with harness hardening or focused live runner validation inside that profile only.",
+        "author": null,
+        "createdAt": "2026-05-17T01:17:25.028Z",
+        "updatedAt": "2026-05-17T01:17:25.028Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-14"
+        }
+      },
+      {
+        "id": "local-comment-15",
+        "body": "Additional setup verification: pharo-launcher-mcp live-smoke passed using profile overnight-live-20260517 and StateRoot C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\.dev-nexus\\\\runtime\\\\pharo-launcher\\\\overnight-live-20260517. It copied only the launcher image/changes into the disposable profile and passed health, version, and validate-installation checks. No source checkout changes were produced by the smoke.",
+        "author": null,
+        "createdAt": "2026-05-17T01:18:16.596Z",
+        "updatedAt": "2026-05-17T01:18:16.596Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-15"
+        }
+      },
+      {
+        "id": "local-comment-16",
+        "body": "Progress/blocker from overnight-live-harness-20260517:\n\nImplemented a focused local PLexus harness hardening slice in `C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\plexus\\local-3-live-smoke-harness-20260517`:\n- `scripts/smoke-open-route-close.mjs` now requires an approval profile, isolated pharo-launcher-mcp profile root, disposable PLexus state root, artifact root, run id, workspace/target ids, and timeout budget before live execution.\n- Added `scripts/live-smoke-runner-policy.mjs` with node-native policy tests and wired `npm test` to include them.\n- Runner writes manifest/events and selected state/gateway artifacts under the approved artifact root, and records cleanup actions only for owned images/processes.\n\nVerification passed:\n- `node --test scripts/live-smoke-runner-policy.test.mjs`\n- `node --check scripts/smoke-open-route-close.mjs`\n- unapproved `node scripts/smoke-open-route-close.mjs --copyFromImageName MCP12-2` exits before launcher access with `--approvalProfile is required`\n- `git diff --check`\n\nBlocked live verification:\n- Approved run `dogfood-overnight-local-3-20260517-0152` used the recorded disposable PLexus state root, launcher profile root, artifact root, and `dogfood-overnight` workspace/target ids.\n- The run failed before project open/route while copying `MCP12-2` to an owned `PlexusSmoke...` image: Pharo Launcher raised `PrimitiveFailed: primitive #createDirectory: in WindowsStore failed` from `PhLDirectoryBasedImageRepository>>prepareForNewImageNamed:`.\n- Artifact evidence is retained at `C:\\dev\\code\\dev-nexus-dogfood\\.dev-nexus\\runtime\\artifacts\\overnight-live-20260517\\dogfood-overnight-local-3-20260517-0152`.\n- A retry with `PHARO_LAUNCHER_MCP_LAUNCHER_CONFIGURATION=overnight-live-20260517` failed earlier because Pharo Launcher looked for `C:\\Users\\gabriel.darbord\\AppData\\Local\\Pharo Launcher\\overnight-live-20260517`.\n\nNo PLexus project was opened, no route was registered, and the source `MCP12-2` image was not deleted or intentionally mutated. Next step is to fix or document the pharo-launcher-mcp isolated profile/config path used by image copy before re-running this PLexus smoke.",
+        "author": null,
+        "createdAt": "2026-05-17T01:51:50.643Z",
+        "updatedAt": "2026-05-17T01:51:50.643Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-16"
+        }
+      },
+      {
+        "id": "local-comment-17",
+        "body": "Dependency repair note from coordinator on 2026-05-17: the worker reported npm install could not reach @evref-bl/pharo-launcher-mcp and left partial node_modules. The package is currently reachable on npm at 0.1.1. I removed only this generated worktree's ignored node_modules after verifying the path stayed inside the local-3 worktree, then ran npm ci --ignore-scripts --no-audit --no-fund from the existing package-lock.\n\nFocused verification now passes: npm ls @evref-bl/pharo-launcher-mcp --depth=0 resolves through local workspaces, and npm run test:smoke-policy passes 7 tests. Source edits in package.json and scripts/* were preserved and not changed by this repair. Durable DevNexus setup follow-up is recorded on dev-nexus:local-24.",
+        "author": null,
+        "createdAt": "2026-05-17T01:53:03.460Z",
+        "updatedAt": "2026-05-17T01:53:03.460Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-17"
+        }
+      },
+      {
+        "id": "local-comment-18",
+        "body": "Completed and published.\n\nCommit: PLexus 5953274 (`Harden live smoke runner`) pushed to origin/main.\n\nWhat changed:\n- `scripts/smoke-open-route-close.mjs` now requires an approval profile, launcher profile root, artifact root, disposable state root, run/workspace/target identity, and timeout budget before live execution.\n- Added `scripts/live-smoke-runner-policy.mjs` and policy tests for required inputs, disposable path boundaries, id prefix enforcement, timeout parsing, and copy-source/target alias rejection.\n- The runner now records manifest/events plus before/open/close state and gateway artifacts, and cleanup records only owned process/image actions.\n\nVerification:\n- `npm run typecheck` passed.\n- `npm test` passed: core 70 tests, gateway 28 tests, smoke policy 7 tests.\n- `git diff --check` passed.\n- Approved live smoke `dogfood-overnight-local-3-20260517-0428` passed copy, open, route `find-packages`, close, unregister, process stop, and copied-image delete. Artifacts retained at `C:\\dev\\code\\dev-nexus-dogfood\\.dev-nexus\\runtime\\artifacts\\overnight-live-20260517\\dogfood-overnight-local-3-20260517-0428`.",
+        "author": null,
+        "createdAt": "2026-05-17T02:31:47.462Z",
+        "updatedAt": "2026-05-17T02:31:47.462Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-18"
+        }
+      },
+      {
+        "id": "local-comment-20",
+        "body": "Follow-up publication: PLexus now depends on @evref-bl/pharo-launcher-mcp@^0.1.2 in source commit 7d34f86. Verification passed with npm run typecheck, npm test, git diff --check, and approved live smoke dogfood-overnight-local-3-npm-20260517-0442 using the published package path instead of a local launcher checkout.",
+        "author": null,
+        "createdAt": "2026-05-17T02:41:41.655Z",
+        "updatedAt": "2026-05-17T02:41:41.655Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-20"
+        }
+      }
+    ],
+    "local-4": [
+      {
+        "id": "local-comment-3",
+        "body": "Promoted for parallel non-live dogfood wave. Scope: gateway lifecycle/package boundary split; no live gateway/image/process startup.",
+        "author": null,
+        "createdAt": "2026-05-16T15:58:35.766Z",
+        "updatedAt": "2026-05-16T15:58:35.766Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-3"
+        }
+      },
+      {
+        "id": "local-comment-5",
+        "body": "Completed and published to PLexus origin/main through a616dd4. Worker commit 0fe745a split gateway lifecycle ownership into core lifecycle/server surfaces and kept gateway routing-focused. Integrated verification passed: npm run typecheck --workspaces; npm test; node --check scripts/smoke-open-route-close.mjs; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T16:29:31.633Z",
+        "updatedAt": "2026-05-16T16:29:31.633Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-5"
+        }
+      }
+    ],
+    "local-5": [],
+    "local-6": [],
+    "local-7": [
+      {
+        "id": "local-comment-4",
+        "body": "Promoted for parallel non-live dogfood wave. Scope: OS-agnostic config tests/docs. Docker may be documented as an optional Linux verification path, but Docker must not be run in this wave without explicit isolated-runner approval.",
+        "author": null,
+        "createdAt": "2026-05-16T15:58:36.164Z",
+        "updatedAt": "2026-05-16T15:58:36.164Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-4"
+        }
+      },
+      {
+        "id": "local-comment-6",
+        "body": "Completed and published to PLexus origin/main through a616dd4. Worker commit e1afeea broadened OS-agnostic config/path tests and docs, including Docker as optional Linux verification documentation without running Docker. Integrated verification passed: npm run typecheck --workspaces; npm test; node --check scripts/smoke-open-route-close.mjs; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-16T16:29:32.154Z",
+        "updatedAt": "2026-05-16T16:29:32.154Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-6"
+        }
+      }
+    ],
+    "local-8": [
+      {
+        "id": "local-comment-7",
+        "body": "Surface naming/defaults split out to plexus:local-9. Keep this item focused on scoped project/workspace/image context and route metadata that lets DevNexus-Pharo/DevNexus hand subagents an imageId safely.",
+        "author": null,
+        "createdAt": "2026-05-16T20:14:58.358Z",
+        "updatedAt": "2026-05-16T20:14:58.358Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-7"
+        }
+      },
+      {
+        "id": "local-comment-10",
+        "body": "Starting second parallel PLexus worktree implementation. Scope: scoped project/workspace/image context and route metadata for plugin handoff; no live images or launcher mutation.",
+        "author": null,
+        "createdAt": "2026-05-16T20:32:50.229Z",
+        "updatedAt": "2026-05-16T20:32:50.229Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-10"
+        }
+      },
+      {
+        "id": "local-comment-11",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: de0d5c690a52998cf11ecba7ca5770bc1aa1669b\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-16T20:49:24.778Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-8\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\git\\\\PLexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"de0d5c690a52998cf11ecba7ca5770bc1aa1669b\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/scopedProjectContext.ts\",\n    \"packages/plexus-gateway/src/routingTable.ts\",\n    \"docs/project-model.md\",\n    \"docs/kanban-agent-pharo-access.md\"\n  ],\n  \"decisions\": [\n    \"Added scoped project/workspace/target/image context for plugin handoff; route metadata tells subagents to carry imageId into gateway calls while deletion remains workspace cleanup policy.\"\n  ],\n  \"verificationSummary\": \"npm run typecheck --workspaces passed; npm test --workspaces passed: core 70 tests, gateway 28 tests.\",\n  \"integrationPreference\": \"Published by fast-forwarding and pushing PLexus origin/main to de0d5c6.\",\n  \"note\": \"Parallel worker Godel implemented branch codex/plexus-local-8-scoped-plugin-context; coordinator reviewed and published.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-16T20:49:24.795Z",
+        "updatedAt": "2026-05-16T20:49:24.795Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-11"
+        }
+      }
+    ],
+    "local-9": [
+      {
+        "id": "local-comment-8",
+        "body": "Starting parallel PLexus worktree implementation. Scope: gateway surface naming/defaults and raw routing opt-in only; no live images or gateway services.",
+        "author": null,
+        "createdAt": "2026-05-16T20:18:01.217Z",
+        "updatedAt": "2026-05-16T20:18:01.217Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-8"
+        }
+      },
+      {
+        "id": "local-comment-9",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 4a0b813f0ca54f233c0cf260d7028ac9f9d36900\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-16T20:30:49.457Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-9\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\git\\\\PLexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"4a0b813f0ca54f233c0cf260d7028ac9f9d36900\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"packages/plexus-gateway/src/server.ts\",\n    \"packages/plexus-core/src/workspaceMcpConfig.ts\",\n    \"packages/plexus-gateway/src/server.test.ts\",\n    \"packages/plexus-core/src/workspaceMcpConfig.test.ts\",\n    \"docs/package-boundaries.md\"\n  ],\n  \"decisions\": [\n    \"Made gateway the default agent-facing Pharo MCP proxy; kept route-management tools internal/admin and made raw routing opt-in with one flag.\"\n  ],\n  \"verificationSummary\": \"npm run typecheck --workspaces passed; npm test --workspaces passed: core 64 tests, gateway 27 tests.\",\n  \"integrationPreference\": \"Published by fast-forwarding and pushing PLexus origin/main to 4a0b813.\",\n  \"note\": \"Parallel worker Nash implemented branch codex/plexus-local-9-gateway-surface; coordinator adjusted raw opt-in on gateway surface before publishing.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-16T20:30:49.472Z",
+        "updatedAt": "2026-05-16T20:30:49.472Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-9"
+        }
+      }
+    ],
+    "local-10": [
+      {
+        "id": "local-comment-12",
+        "body": "Completed. Published @evref-bl/plexus-core@0.1.0-alpha.0 and @evref-bl/plexus-gateway@0.1.0-alpha.0 to npm with dogfood tag and public access; source metadata/docs committed/pushed as PLexus ecac759. Verification passed: npm run build, npm run typecheck --workspaces, npm test --workspaces (core 70 tests, gateway 28 tests), npm pack --dry-run for both workspaces, npm publish for both workspaces, npm view bin metadata, npm exec --package @evref-bl/plexus-core@dogfood -- plexus --help, and tarball import smoke for @evref-bl/plexus-gateway.",
+        "author": null,
+        "createdAt": "2026-05-16T23:03:24.979Z",
+        "updatedAt": "2026-05-16T23:03:24.979Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-12"
+        }
+      }
+    ]
+  }
+}
