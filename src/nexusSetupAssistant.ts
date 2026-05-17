@@ -127,6 +127,9 @@ const setupFlows: NexusSetupFlowSummary[] = [
   },
 ];
 
+const agentProjectSessionStepId = "open-agent-project-session";
+const legacyCodexDesktopProjectStepId = "open-codex-desktop-project";
+
 export function listNexusSetupFlows(): NexusSetupFlowSummary[] {
   return setupFlows.map((flow) => ({ ...flow }));
 }
@@ -174,6 +177,7 @@ export function buildNexusSetupCheck(options: {
   const platform = normalizeSetupPlatform(options.platform);
   const projectRoot = path.resolve(options.projectRoot);
   const checks: NexusSetupCheckResult[] = [];
+  const setupState = readNexusSetupState(nexusSetupStatePath(projectRoot));
 
   let projectConfig: NexusProjectConfig | null = null;
   try {
@@ -205,15 +209,38 @@ export function buildNexusSetupCheck(options: {
     missingStatus: "blocked",
   }));
 
-  checks.push(pathCheck({
-    id: "agent-mcp-config",
-    title: "Agent MCP config",
-    pathName: path.join(projectRoot, ".codex", "config.toml"),
-    passedSummary: "Codex MCP config exists for this project root.",
-    blockedSummary: "Codex MCP config has not been projected for this machine.",
-    nextAction: "Run dev-nexus project mcp refresh . --agent codex after installing DevNexus.",
-    missingStatus: "warning",
-  }));
+  const agentMcpTargets = setupAgentMcpTargets(projectConfig);
+  for (const target of agentMcpTargets) {
+    checks.push(pathCheck({
+      id: `agent-mcp-config-${target.agent}`,
+      title: `${target.agent} MCP config`,
+      pathName: path.join(projectRoot, target.configPath),
+      passedSummary: `${target.agent} MCP config exists for this project root.`,
+      blockedSummary: `${target.agent} MCP config has not been projected for this machine.`,
+      nextAction:
+        "Run dev-nexus project mcp refresh . after installing DevNexus.",
+      missingStatus: "warning",
+    }));
+  }
+
+  if (flow.id === "join-existing-project" && agentMcpTargets.length > 0) {
+    const flowState = setupState.flows[flow.id];
+    checks.push(recordedStepCheck({
+      id: "agent-project-session",
+      title: "Agent project session",
+      record:
+        flowState?.steps[agentProjectSessionStepId] ??
+        flowState?.steps[legacyCodexDesktopProjectStepId],
+      passedSummary:
+        "Agent application project/session opening and DevNexus MCP visibility were recorded for this machine.",
+      pendingSummary:
+        "Repo-local MCP config exists, but opening the configured agent application or session on this project root has not been recorded.",
+      blockedSummary:
+        "Agent application project/session setup was recorded as blocked for this machine.",
+      nextAction:
+        `Open or restart the configured agent application on this project root, confirm DevNexus MCP tools are visible, then run dev-nexus setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible."`,
+    }));
+  }
 
   if (projectConfig) {
     for (const component of projectConfig.components) {
@@ -504,30 +531,38 @@ function joinExistingProjectSteps(options: {
       scope: "host-local",
       summary: "Project DevNexus MCP and agent support files for this machine.",
       commands: [
-        `${devNexusCommand} project mcp refresh . --agent codex`,
+        `${devNexusCommand} project mcp refresh .`,
         `${devNexusCommand} automation eligible-work . --json`,
       ],
       manualInstructions: [
         "Run from the meta-project root after installing DevNexus and configuring local paths.",
       ],
-      checks: ["test -f .codex/config.toml", `${devNexusCommand} automation eligible-work . --json`],
+      checks: [
+        ...agentMcpConfigCheckCommands(options.projectConfig),
+        `${devNexusCommand} automation eligible-work . --json`,
+      ],
     },
     {
-      id: "open-codex-desktop-project",
-      title: "Open Codex Desktop project",
+      id: agentProjectSessionStepId,
+      title: "Open agent project session",
       kind: "manual",
       scope: "host-local",
       summary:
-        "Open or create the Codex Desktop project for this meta-project root; DevNexus projects repo-local Codex config but does not mutate Codex app state.",
-      commands: [],
+        "Open or create the configured agent application project/session for this meta-project root; DevNexus projects repo-local MCP config but does not mutate private agent app state.",
+      commands: [
+        `${devNexusCommand} setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible in the configured agent application."`,
+      ],
       manualInstructions: [
-        `In Codex Desktop, create or open a project rooted at ${projectRootForPlatform}.`,
-        "Confirm the project is using the generated .codex/config.toml from the meta-project root.",
-        "Reload or restart Codex if the DevNexus MCP tools are not visible after opening the project.",
-        "Do not edit Codex global state or app databases directly; treat project registration as a manual app action until a supported API exists.",
+        `In the configured agent application or CLI provider, create, open, or select a project/session rooted at ${projectRootForPlatform}.`,
+        "Confirm the provider is using the generated MCP config from the meta-project root.",
+        "For Codex Desktop, this means opening or creating a Codex project at the meta-project root; other providers may use a different project/session model.",
+        "Reload, restart, or start a fresh provider session if the DevNexus MCP tools are not visible after the MCP refresh.",
+        "Run the setup record command only after the active provider session can see the DevNexus MCP tools.",
+        "Do not edit provider global state or app databases directly; treat project/session registration as a manual provider action until a supported API exists.",
       ],
       checks: [
-        "Open Codex Desktop on the meta-project root and confirm DevNexus MCP tools are visible.",
+        "Open the configured agent application or session on the meta-project root and confirm DevNexus MCP tools are visible.",
+        `${devNexusCommand} setup check . join-existing-project --platform ${options.platform} --json`,
       ],
     },
     {
@@ -613,6 +648,44 @@ function githubMetaProjectSteps(options: {
   ];
 }
 
+function setupAgentMcpTargets(
+  projectConfig: NexusProjectConfig | null,
+): { agent: string; configPath: string }[] {
+  if (projectConfig?.mcp?.enabled === false) {
+    return [];
+  }
+
+  const targets =
+    projectConfig?.mcp?.agentTargets?.filter((target) => target.enabled !== false) ??
+    [{ agent: "codex" }];
+
+  return targets.map((target) => ({
+    agent: target.agent,
+    configPath: target.configPath ?? defaultSetupAgentMcpConfigPath(target.agent),
+  }));
+}
+
+function agentMcpConfigCheckCommands(projectConfig: NexusProjectConfig): string[] {
+  return setupAgentMcpTargets(projectConfig).map(
+    (target) => `test -f ${shellPathPlaceholder(target.configPath)}`,
+  );
+}
+
+function defaultSetupAgentMcpConfigPath(agent: string): string {
+  if (agent === "codex") {
+    return path.join(".codex", "config.toml");
+  }
+  if (agent === "claude") {
+    return ".mcp.json";
+  }
+  return path.join(`.${safeAgentConfigDirectoryName(agent)}`, "mcp.json");
+}
+
+function safeAgentConfigDirectoryName(agent: string): string {
+  const safe = agent.replace(/[^A-Za-z0-9_-]/gu, "-").replace(/-+/gu, "-");
+  return safe.length > 0 ? safe : "agent";
+}
+
 function pathCheck(options: {
   id: string;
   title: string;
@@ -636,6 +709,48 @@ function pathCheck(options: {
     title: options.title,
     status: options.missingStatus,
     summary: options.blockedSummary,
+    nextAction: options.nextAction,
+  };
+}
+
+function recordedStepCheck(options: {
+  id: string;
+  title: string;
+  record: NexusSetupStepRecord | undefined;
+  passedSummary: string;
+  pendingSummary: string;
+  blockedSummary: string;
+  nextAction: string;
+}): NexusSetupCheckResult {
+  if (options.record?.status === "completed") {
+    return {
+      id: options.id,
+      title: options.title,
+      status: "passed",
+      summary: options.passedSummary,
+      nextAction: null,
+    };
+  }
+
+  if (options.record?.status === "blocked") {
+    return {
+      id: options.id,
+      title: options.title,
+      status: "blocked",
+      summary: options.record.note
+        ? `${options.blockedSummary} ${options.record.note}`
+        : options.blockedSummary,
+      nextAction: options.nextAction,
+    };
+  }
+
+  return {
+    id: options.id,
+    title: options.title,
+    status: "warning",
+    summary: options.record?.note
+      ? `${options.pendingSummary} ${options.record.note}`
+      : options.pendingSummary,
     nextAction: options.nextAction,
   };
 }

@@ -92,7 +92,7 @@ describe("nexus setup assistant", () => {
       "configure-meta-remotes",
       "prepare-component-checkouts",
       "refresh-agent-mcp-and-skills",
-      "open-codex-desktop-project",
+      "open-agent-project-session",
       "run-final-preflight",
     ]);
     expect(plan.steps.find((step) => step.id === "configure-automation-auth-profile"))
@@ -110,19 +110,29 @@ describe("nexus setup assistant", () => {
     expect(cloneStep.manualInstructions).toContain(
       "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
     );
-    const codexStep = plan.steps.find(
-      (step) => step.id === "open-codex-desktop-project",
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
     )!;
-    expect(codexStep).toMatchObject({
+    expect(refreshStep.commands).toContain("dev-nexus project mcp refresh .");
+    const agentStep = plan.steps.find(
+      (step) => step.id === "open-agent-project-session",
+    )!;
+    expect(agentStep).toMatchObject({
       kind: "manual",
       scope: "host-local",
     });
-    expect(codexStep.summary).toContain("does not mutate Codex app state");
-    expect(codexStep.manualInstructions.join("\n")).toContain(
-      "create or open a project rooted at $HOME/dev-nexus/mac-demo",
+    expect(agentStep.summary).toContain("does not mutate private agent app state");
+    expect(agentStep.commands).toContain(
+      'dev-nexus setup record . join-existing-project open-agent-project-session --status completed --note "DevNexus MCP tools visible in the configured agent application."',
     );
-    expect(codexStep.manualInstructions.join("\n")).toContain(
-      "Do not edit Codex global state or app databases directly",
+    expect(agentStep.manualInstructions.join("\n")).toContain(
+      "create, open, or select a project/session rooted at $HOME/dev-nexus/mac-demo",
+    );
+    expect(agentStep.manualInstructions.join("\n")).toContain(
+      "other providers may use a different project/session model",
+    );
+    expect(agentStep.manualInstructions.join("\n")).toContain(
+      "Do not edit provider global state or app databases directly",
     );
     expect(JSON.stringify(plan)).not.toContain("gho_");
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
@@ -233,6 +243,62 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("uses configured agent MCP targets in setup guidance and checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-targets-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+
+    const normalizedChecks = refreshStep.checks.map((check) =>
+      check.replace(/\\/gu, "/"),
+    );
+    expect(refreshStep.commands).toContain("dev-nexus project mcp refresh .");
+    expect(normalizedChecks).toContain("test -f .codex/config.toml");
+    expect(normalizedChecks).toContain("test -f .mcp.json");
+
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), "");
+    fs.writeFileSync(path.join(projectRoot, ".mcp.json"), "{}");
+    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
+      recursive: true,
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-codex",
+        status: "passed",
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-claude",
+        status: "passed",
+      }),
+    );
+    expect(check.status).toBe("warning");
+  });
+
   it("checks safe local Mac setup facts without contacting GitHub", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-check-");
     writeProject(projectRoot);
@@ -257,6 +323,58 @@ describe("nexus setup assistant", () => {
       expect.objectContaining({
         id: "component-dev-nexus-source-root",
         status: "blocked",
+      }),
+    );
+  });
+
+  it("warns until agent MCP visibility is recorded for the host", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-session-");
+    writeProject(projectRoot);
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), "");
+    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
+      recursive: true,
+    });
+
+    const warningCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(warningCheck.status).toBe("warning");
+    expect(warningCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-project-session",
+        status: "warning",
+        summary: expect.stringContaining("has not been recorded"),
+      }),
+    );
+    expect(warningCheck.nextActions.join("\n")).toContain(
+      "open-agent-project-session",
+    );
+
+    recordNexusSetupStep({
+      projectRoot,
+      flowId: "join-existing-project",
+      stepId: "open-agent-project-session",
+      status: "completed",
+      note: "DevNexus MCP visible in fresh agent session.",
+      now: () => "2026-05-17T16:00:00.000Z",
+    });
+
+    const passedCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(passedCheck.status).toBe("passed");
+    expect(passedCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-project-session",
+        status: "passed",
       }),
     );
   });
