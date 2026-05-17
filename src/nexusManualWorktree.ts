@@ -39,6 +39,7 @@ export interface PrepareNexusManualWorktreeOptions {
   topic?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
+  workItemDescription?: string | null;
   gitRunner?: GitRunner;
   now?: () => Date | string;
 }
@@ -106,6 +107,13 @@ export function prepareNexusManualWorktree(
     ...(options.workItemTitle ? { workItemTitle: options.workItemTitle } : {}),
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
+  const contextWorkItem =
+    worktree.workItem && options.workItemDescription !== undefined
+      ? {
+          ...worktree.workItem,
+          description: options.workItemDescription,
+        }
+      : worktree.workItem;
   const setup = materializeNexusAutomationWorktreeSetup({
     sourceRoot: target.sourceRoot,
     worktreesRoot: target.worktreesRoot,
@@ -126,7 +134,7 @@ export function prepareNexusManualWorktree(
         worktreePath: worktree.worktreePath,
         branchName: worktree.branchName,
         baseRef: worktree.baseRef,
-        workItem: worktree.workItem,
+        workItem: contextWorkItem,
       },
       pluginFragments: projectPluginWorkerFragments(projectConfig, {
         componentId: target.ownerId,

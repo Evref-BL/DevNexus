@@ -1133,16 +1133,22 @@ async function handleWorktreeCommand(
   const command = argv[1];
   if (command === "prepare") {
     const parsed = parseWorktreePrepareCommand(argv);
+    const resolvedWorkItem = await resolveWorktreePrepareWorkItem(
+      parsed,
+      dependencies,
+    );
     const result = prepareNexusManualWorktree({
       projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
+      componentId: resolvedWorkItem.componentId ?? parsed.componentId,
       projectMeta: parsed.projectMeta,
       branchName: parsed.branchName,
       worktreeName: parsed.worktreeName,
       baseRef: parsed.baseRef,
       topic: parsed.topic,
-      workItemId: parsed.workItemId,
-      workItemTitle: parsed.workItemTitle,
+      workItemId: resolvedWorkItem.itemId ?? parsed.workItemId,
+      workItemTitle:
+        parsed.workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
+      workItemDescription: resolvedWorkItem.workItem?.description ?? null,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -1155,6 +1161,48 @@ async function handleWorktreeCommand(
   }
 
   throw new Error("worktree requires prepare");
+}
+
+async function resolveWorktreePrepareWorkItem(
+  parsed: ParsedWorktreePrepareCommand,
+  dependencies: DevNexusCliDependencies,
+): Promise<{
+  componentId?: string;
+  itemId?: string;
+  workItem?: WorkItem | null;
+}> {
+  if (!parsed.workItemId || parsed.projectMeta) {
+    return {};
+  }
+
+  const resolvedRef = resolveCliWorkItemReference(
+    parsed.projectRoot,
+    parsed.componentId,
+    parsed.workItemId,
+  );
+  try {
+    const service = workItemService(parsed.projectRoot, dependencies);
+    const workItem = await service.getWorkItem({
+      projectRoot: parsed.projectRoot,
+      componentId: resolvedRef.componentId,
+      id: resolvedRef.itemId,
+    });
+    return {
+      componentId: resolvedRef.componentId,
+      itemId: resolvedRef.itemId,
+      workItem,
+    };
+  } catch (error) {
+    if (parsed.workItemTitle || parsed.topic) {
+      return {
+        componentId: resolvedRef.componentId,
+        itemId: resolvedRef.itemId,
+        workItem: null,
+      };
+    }
+
+    throw error;
+  }
 }
 
 async function handleWorkItemCommand(

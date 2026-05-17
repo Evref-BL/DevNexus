@@ -17,7 +17,8 @@ export type NexusWorkerContextFileId =
   | "agents"
   | "context"
   | "plan"
-  | "target-state";
+  | "target-state"
+  | `project-doc:${string}`;
 
 export interface NexusWorkerContextFileReference {
   id: NexusWorkerContextFileId;
@@ -49,6 +50,7 @@ export interface NexusWorkerProjectContextReferences {
   contextPath: string;
   planPath: string;
   targetStatePath: string;
+  referencedFiles: NexusWorkerContextFileReference[];
   files: NexusWorkerContextFileReference[];
 }
 
@@ -114,6 +116,7 @@ export interface NexusWorkerContextDependencySupport {
 export interface NexusWorkerContextBundleWorkItem {
   id: string;
   title: string | null;
+  description?: string | null;
   status?: WorkStatus;
   provider?: WorkTrackingProviderName | string;
   labels?: string[];
@@ -240,6 +243,7 @@ export function buildNexusWorkerContextBundle(
   const projectContext = projectContextReferences({
     projectRoot,
     targetStatePath: options.targetStatePath,
+    workItem,
   });
   const skills = normalizeWorkerContextSkills(projectRoot, options.skills);
   const dependencySupport = normalizeWorkerDependencySupport(
@@ -326,6 +330,7 @@ export function renderNexusWorkerBriefing(
     `- CONTEXT.md: ${context.projectContext.contextPath}`,
     `- PLAN.md: ${context.projectContext.planPath}`,
     `- target-state: ${context.projectContext.targetStatePath}`,
+    ...renderReferencedProjectFileLines(context.projectContext.referencedFiles),
     "",
     "Skills:",
     `Project-managed skills: ${context.skills.projectManagedRoot}`,
@@ -371,6 +376,7 @@ export function materializeNexusWorkerContextBundle(
 function projectContextReferences(options: {
   projectRoot: string;
   targetStatePath?: string | null;
+  workItem: NexusWorkerContextBundleWorkItem | null;
 }): NexusWorkerProjectContextReferences {
   const targetStatePath = resolveInsideProjectRoot(
     options.projectRoot,
@@ -380,20 +386,96 @@ function projectContextReferences(options: {
   const agentsPath = path.join(options.projectRoot, "AGENTS.md");
   const contextPath = path.join(options.projectRoot, "CONTEXT.md");
   const planPath = path.join(options.projectRoot, "PLAN.md");
-  const files: NexusWorkerContextFileReference[] = [
+  const defaultFiles: NexusWorkerContextFileReference[] = [
     { id: "agents", path: agentsPath, access: "read_only" },
     { id: "context", path: contextPath, access: "read_only" },
     { id: "plan", path: planPath, access: "read_only" },
     { id: "target-state", path: targetStatePath, access: "read_only" },
   ];
+  const referencedFiles = referencedProjectFiles({
+    projectRoot: options.projectRoot,
+    textSources: [
+      options.workItem?.title ?? "",
+      options.workItem?.description ?? "",
+    ],
+  });
 
   return {
     agentsPath,
     contextPath,
     planPath,
     targetStatePath,
-    files,
+    referencedFiles,
+    files: [...defaultFiles, ...referencedFiles],
   };
+}
+
+function referencedProjectFiles(options: {
+  projectRoot: string;
+  textSources: string[];
+}): NexusWorkerContextFileReference[] {
+  const references = new Map<string, NexusWorkerContextFileReference>();
+  for (const text of options.textSources) {
+    for (const relativePath of extractRootRelativeProjectDocReferences(text)) {
+      if (references.has(relativePath)) {
+        continue;
+      }
+      const resolvedPath = resolveInsideProjectRoot(
+        options.projectRoot,
+        relativePath,
+        "referencedProjectFile",
+      );
+      if (!fs.existsSync(resolvedPath)) {
+        throw new NexusWorkerContextBundleError(
+          `Referenced project context file is missing: ${relativePath} (${resolvedPath})`,
+        );
+      }
+      references.set(relativePath, {
+        id: `project-doc:${relativePath}`,
+        path: resolvedPath,
+        access: "read_only",
+      });
+    }
+  }
+
+  return [...references.values()];
+}
+
+function extractRootRelativeProjectDocReferences(text: string): string[] {
+  const matches = text.matchAll(
+    /(?:^|[\s"'`(])((?:docs?|adrs?)\/[A-Za-z0-9._/-]+\.(?:md|markdown|txt|json|toml|ya?ml))(?=$|[\s"'`),.;:])/giu,
+  );
+
+  return [...matches]
+    .map((match) => normalizeProjectDocReference(match[1]!))
+    .filter((reference): reference is string => Boolean(reference));
+}
+
+function normalizeProjectDocReference(value: string): string | null {
+  const normalized = value.replaceAll("\\", "/").replace(/^\.\//u, "");
+  if (
+    normalized.length === 0 ||
+    normalized.includes("..") ||
+    path.isAbsolute(normalized)
+  ) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function renderReferencedProjectFileLines(
+  files: NexusWorkerContextFileReference[],
+): string[] {
+  if (files.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Referenced project docs:",
+    ...files.map((file) => `- ${file.id.slice("project-doc:".length)}: ${file.path}`),
+  ];
 }
 
 function normalizeWorkerContextSkills(
@@ -656,6 +738,13 @@ function normalizeWorkerContextWorkItem(
   return {
     id: requiredNonEmptyString(workItem.id, "workItem.id"),
     title: optionalNullableString(workItem.title, "workItem.title") ?? null,
+    ...(workItem.description !== undefined
+      ? {
+          description:
+            optionalNullableString(workItem.description, "workItem.description") ??
+            null,
+        }
+      : {}),
     ...(workItem.status ? { status: workItem.status } : {}),
     ...(workItem.provider
       ? { provider: requiredNonEmptyString(workItem.provider, "workItem.provider") }

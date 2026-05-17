@@ -205,6 +205,78 @@ describe("nexus worker context bundle", () => {
     });
   });
 
+  it("records planning docs referenced by work item descriptions as read-only root context", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
+    const worktreePath = path.join(worktreesRoot, "local-44");
+    const prdPath = path.join(projectRoot, "docs", "component-multi-tracker-prd.md");
+    fs.mkdirSync(path.dirname(prdPath), { recursive: true });
+    fs.writeFileSync(prdPath, "# Component Multi-Tracker PRD\n", "utf8");
+    const workItem: WorkItem = {
+      id: "local-44",
+      title: "Add component multi-tracker schema",
+      description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
+      status: "ready",
+      provider: "local",
+      labels: ["dogfood"],
+    };
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "dev-nexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-44-component-trackers",
+      baseRef: "origin/main",
+      workItem,
+    });
+
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(worktreePath), "utf8"),
+    );
+    const expectedReference = {
+      id: "project-doc:docs/component-multi-tracker-prd.md",
+      path: prdPath,
+      access: "read_only",
+    };
+    expect(context.projectContext.files).toContainEqual(expectedReference);
+    expect(context.projectContext.referencedFiles).toEqual([expectedReference]);
+    expect(context.boundaries.read.files).toContainEqual(expectedReference);
+    expect(result.briefingMarkdown).toContain("Referenced project docs:");
+    expect(result.briefingMarkdown).toContain(
+      `- docs/component-multi-tracker-prd.md: ${prdPath}`,
+    );
+  });
+
+  it("fails before worker launch when a referenced planning doc is missing", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
+    const worktreePath = path.join(worktreesRoot, "local-44");
+    const workItem: WorkItem = {
+      id: "local-44",
+      title: "Add component multi-tracker schema",
+      description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
+      status: "ready",
+      provider: "local",
+    };
+
+    expect(() =>
+      materializeNexusWorkerContextBundle({
+        projectRoot,
+        componentId: "dev-nexus",
+        sourceRoot,
+        worktreesRoot,
+        worktreePath,
+        branchName: "codex/local-44-component-trackers",
+        baseRef: "origin/main",
+        workItem,
+      }),
+    ).toThrow(/Referenced project context file is missing/);
+  });
+
   it("records project-managed skills and worker-local agent projections", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "dev-nexus");

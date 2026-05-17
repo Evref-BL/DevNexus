@@ -701,9 +701,13 @@ describe("nexus automation run once", () => {
       projectRoot,
       now: fixedClock("2026-05-16T09:00:00.000Z"),
     });
+    const prdPath = path.join(projectRoot, "docs", "component-multi-tracker-prd.md");
+    fs.mkdirSync(path.dirname(prdPath), { recursive: true });
+    fs.writeFileSync(prdPath, "# Component Multi-Tracker PRD\n", "utf8");
     await tracker.createWorkItem({
       projectRoot,
       title: "Run with worker context",
+      description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
       status: "ready",
       labels: ["automation"],
     });
@@ -771,7 +775,17 @@ describe("nexus automation run once", () => {
         workItem: {
           id: "local-1",
           title: "Run with worker context",
+          description: "Source PRD: `docs/component-multi-tracker-prd.md`.",
         },
+      },
+      projectContext: {
+        referencedFiles: [
+          {
+            id: "project-doc:docs/component-multi-tracker-prd.md",
+            path: prdPath,
+            access: "read_only",
+          },
+        ],
       },
       pluginFragments: {
         context: [
@@ -817,6 +831,10 @@ describe("nexus automation run once", () => {
       "Source and Git commands run from the component checkout root",
     );
     expect(briefing).toContain("Fake Setup Note");
+    expect(briefing).toContain("Referenced project docs:");
+    expect(briefing).toContain(
+      `- docs/component-multi-tracker-prd.md: ${prdPath}`,
+    );
     expect(briefing).toContain(
       "Use this fake plugin note as advisory setup context.",
     );

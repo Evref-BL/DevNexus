@@ -446,7 +446,7 @@ export async function runNexusAutomationOnce(
           worktreePath: worktree.worktreePath,
           branchName: worktree.branchName,
           baseRef: worktree.baseRef,
-          workItem: worktree.workItem,
+          workItem,
         },
         pluginFragments: projectPluginWorkerFragments(projectConfig, {
           componentId: primaryComponent.id,
