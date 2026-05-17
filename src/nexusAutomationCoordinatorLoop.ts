@@ -315,9 +315,19 @@ export async function runNexusAutomationCoordinatorLoop(
       });
       runs.push(run);
       const finishedAt = currentIso(options.now);
+      const finalStatus =
+        run.status === "completed"
+          ? await getNexusAutomationStatus({
+              projectRoot,
+              providerFactory: options.providerFactory,
+              providerOptions: options.providerOptions,
+              gitRunner: options.gitRunner,
+              now: options.now,
+            })
+          : status;
       const targetCycle = recordCoordinatorLoopCycle({
         projectRoot,
-        status,
+        status: finalStatus,
         targetReport,
         cycleId,
         runId,
@@ -325,8 +335,8 @@ export async function runNexusAutomationCoordinatorLoop(
         startedAt: tickStartedAt,
         finishedAt,
         summary: run.summary,
-        eligibleWorkItemCount: eligibleWorkItemCount(status),
-        workItems: targetCycleWorkItems(status),
+        eligibleWorkItemCount: eligibleWorkItemCount(finalStatus),
+        workItems: targetCycleWorkItems(finalStatus),
         blockers:
           run.status === "blocked" || run.status === "failed"
             ? [run.summary]

@@ -9,6 +9,7 @@ import {
   defaultNexusAutomationConfig,
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
+  buildNexusAutomationTargetReport,
   runNexusAutomationCoordinatorLoop,
   saveProjectConfig,
   type NexusProjectConfig,
@@ -316,5 +317,53 @@ describe("nexus automation coordinator loop", () => {
         runId: "loop-20260517-t100000-000-z-1",
       },
     ]);
+  });
+
+  it("records no eligible work after a completed coordinator closes selected work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Coordinator-completed task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: async ({ eligibleWorkItems }) => {
+        expect(eligibleWorkItems).toHaveLength(1);
+        await tracker.updateWorkItem(
+          { id: eligibleWorkItems[0]!.id },
+          { status: "done" },
+        );
+        return {
+          status: "completed",
+          summary: "Coordinator completed all selected work",
+        };
+      },
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "completed",
+      eligibleWorkItemCount: 0,
+      workItems: [],
+    });
+    expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
+      relaunchDecision: {
+        type: "stop",
+        eligibleWorkItemCount: 0,
+        latestCycleId: "target-cycle-loop-20260517-t100000-000-z-1",
+      },
+    });
   });
 });
