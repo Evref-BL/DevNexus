@@ -90,6 +90,17 @@ import {
   type NexusCoordinationRequestStatus,
 } from "./nexusCoordinationRequest.js";
 import {
+  createNexusRemoteExecutionRequest,
+  getNexusRemoteExecutionRecord,
+  recordNexusRemoteExecutionResult,
+  type NexusRemoteExecutionAttachmentRef,
+  type NexusRemoteExecutionCleanupStatus,
+  type NexusRemoteExecutionRequestRecord,
+  type NexusRemoteExecutionRequestStatus,
+  type NexusRemoteExecutionResultRecord,
+  type NexusRemoteExecutionVerificationOutcome,
+} from "./nexusRemoteExecution.js";
+import {
   buildNexusCleanupPlan,
   type NexusCleanupPlan,
 } from "./nexusCleanupPlan.js";
@@ -202,6 +213,7 @@ import {
 } from "./workItemTrackerLinks.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
+import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 import type {
   WorkComment,
   WorkItem,
@@ -590,6 +602,50 @@ interface ParsedCoordinationRequestCommand {
   json?: boolean;
 }
 
+interface ParsedRemoteExecutionRequestCreateCommand {
+  projectRoot: string;
+  componentId?: string;
+  workItemId?: string;
+  requestingHostId: string;
+  requestingAgentId?: string | null;
+  targetHostId?: string | null;
+  requiredCapabilities: string[];
+  runnerProfileId: string;
+  repository: string;
+  ref: string;
+  commandProfileId: string;
+  timeoutMs: number;
+  expectedArtifacts: string[];
+  mutationClass: NexusRunnerMutationClass;
+  initialStatus?: NexusRemoteExecutionRequestStatus;
+  coordinationRecordIds: string[];
+  json?: boolean;
+}
+
+interface ParsedRemoteExecutionResultRecordCommand {
+  projectRoot: string;
+  requestId: string;
+  status: NexusRemoteExecutionRequestStatus;
+  hostId: string;
+  runnerProfileId: string;
+  actualRef?: string | null;
+  actualCommit?: string | null;
+  commands: string[];
+  exitCode?: number | null;
+  verificationOutcome: NexusRemoteExecutionVerificationOutcome;
+  outputTail?: string | null;
+  artifactRefs: string[];
+  cleanupStatus: NexusRemoteExecutionCleanupStatus;
+  blockerSafetyReason?: string | null;
+  json?: boolean;
+}
+
+interface ParsedRemoteExecutionResultGetCommand {
+  projectRoot: string;
+  requestId: string;
+  json?: boolean;
+}
+
 interface ParsedWorktreePrepareCommand {
   projectRoot: string;
   componentId?: string;
@@ -676,6 +732,9 @@ export function usage(): string {
     "  dev-nexus coordination integrate <project-root> [options]",
     "  dev-nexus coordination cleanup-plan <project-root> [options]",
     "  dev-nexus coordination request <project-root> --intent <intent> (--question <text>|--note <text>) [options]",
+    "  dev-nexus remote-execution request create <project-root> [options]",
+    "  dev-nexus remote-execution result record <project-root> <request-id> [options]",
+    "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item list <project-root> [options]",
@@ -811,6 +870,42 @@ export function usage(): string {
     "  --responder <id>",
     "  --requested-change <text>  repeatable",
     "  --worktree <path>         git worktree or source checkout used for context",
+    "  --json",
+    "",
+    "Options for remote-execution request create:",
+    "  --component <id>          defaults to the primary component",
+    "  --work-item <id>",
+    "  --requesting-host <id>",
+    "  --requesting-agent <id>",
+    "  --target-host <id>",
+    "  --capability <tag>         repeatable; required when --target-host is omitted",
+    "  --runner-profile <id>",
+    "  --repository <repository>",
+    "  --ref <ref>",
+    "  --command-profile <id>",
+    "  --timeout-ms <ms>",
+    "  --expected-artifact <ref>  repeatable",
+    "  --mutation-class <none|verification|project_local|live_runtime|destructive>",
+    "  --status <queued|accepted|running|completed|failed|blocked|timed_out|cancelled>",
+    "  --attach-coordination-record <id>  repeatable",
+    "  --json",
+    "",
+    "Options for remote-execution result record:",
+    "  --status <queued|accepted|running|completed|failed|blocked|timed_out|cancelled>",
+    "  --host <id>",
+    "  --runner-profile <id>",
+    "  --actual-ref <ref>",
+    "  --actual-commit <commit>",
+    "  --command <command>        repeatable",
+    "  --exit-code <code>",
+    "  --verification-outcome <passed|failed|not_run|blocked|timed_out|cancelled>",
+    "  --output-tail <text>",
+    "  --artifact <ref>           repeatable",
+    "  --cleanup-status <not_required|completed|failed|blocked|unknown>",
+    "  --blocker-safety-reason <text>",
+    "  --json",
+    "",
+    "Options for remote-execution result get:",
     "  --json",
     "",
     "Options for worktree prepare:",
@@ -1052,6 +1147,9 @@ export async function main(
   if (argv[0] === "coordination") {
     return handleCoordinationCommand(argv, dependencies);
   }
+  if (argv[0] === "remote-execution") {
+    return handleRemoteExecutionCommand(argv, dependencies);
+  }
   if (argv[0] === "worktree") {
     return handleWorktreeCommand(argv, dependencies);
   }
@@ -1067,7 +1165,7 @@ export async function main(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, coordination, worktree, work-item, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, coordination, remote-execution, worktree, work-item, automation, mcp-stdio, or --help",
   );
 }
 
@@ -1530,6 +1628,88 @@ async function handleCoordinationCommand(
   }
 
   throw new Error("coordination requires status, handoff, integrate, cleanup-plan, or request");
+}
+
+async function handleRemoteExecutionCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const scope = argv[1];
+  const command = argv[2];
+  const stdout = dependencies.stdout ?? process.stdout;
+
+  if (scope === "request" && command === "create") {
+    const parsed = parseRemoteExecutionRequestCreateCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "remote-execution request create",
+      mutationClass: "coordination_record",
+      componentId: parsed.componentId,
+    });
+    const request = createNexusRemoteExecutionRequest({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      requestingHostId: parsed.requestingHostId,
+      requestingAgentId: parsed.requestingAgentId,
+      targetHostId: parsed.targetHostId,
+      requiredCapabilities: parsed.requiredCapabilities,
+      runnerProfileId: parsed.runnerProfileId,
+      repository: parsed.repository,
+      ref: parsed.ref,
+      commandProfileId: parsed.commandProfileId,
+      timeoutMs: parsed.timeoutMs,
+      expectedArtifacts: parsed.expectedArtifacts,
+      mutationClass: parsed.mutationClass,
+      initialStatus: parsed.initialStatus,
+      attachmentRefs: remoteExecutionCoordinationAttachmentRefs(parsed),
+      now: dependencies.now,
+    });
+    printRemoteExecutionRequestCreateResult(request, parsed, stdout);
+    return 0;
+  }
+
+  if (scope === "result" && command === "record") {
+    const parsed = parseRemoteExecutionResultRecordCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "remote-execution result record",
+      mutationClass: "coordination_record",
+    });
+    const result = recordNexusRemoteExecutionResult({
+      projectRoot: parsed.projectRoot,
+      requestId: parsed.requestId,
+      status: parsed.status,
+      hostId: parsed.hostId,
+      runnerProfileId: parsed.runnerProfileId,
+      actualRef: parsed.actualRef,
+      actualCommit: parsed.actualCommit,
+      commands: parsed.commands,
+      exitCode: parsed.exitCode,
+      verificationOutcome: parsed.verificationOutcome,
+      outputTail: parsed.outputTail,
+      artifactRefs: parsed.artifactRefs,
+      cleanupStatus: parsed.cleanupStatus,
+      blockerSafetyReason: parsed.blockerSafetyReason,
+      now: dependencies.now,
+    });
+    printRemoteExecutionResultRecordResult(result, parsed, stdout);
+    return 0;
+  }
+
+  if (scope === "result" && command === "get") {
+    const parsed = parseRemoteExecutionResultGetCommand(argv);
+    const record = getNexusRemoteExecutionRecord({
+      projectRoot: parsed.projectRoot,
+      requestId: parsed.requestId,
+    });
+    printRemoteExecutionResultGetResult(record, parsed, stdout);
+    return 0;
+  }
+
+  throw new Error(
+    "remote-execution requires request create, result record, or result get",
+  );
 }
 
 async function handleWorktreeCommand(
@@ -2325,6 +2505,41 @@ function workItemTrackerLinkService(
       resolveDirectProject(projectRoot, selector.componentId),
     now: dependencies.now,
   });
+}
+
+function remoteExecutionCoordinationAttachmentRefs(
+  parsed: ParsedRemoteExecutionRequestCreateCommand,
+): NexusRemoteExecutionAttachmentRef[] {
+  if (parsed.coordinationRecordIds.length === 0) {
+    return [];
+  }
+
+  const resolvedProjectRoot = path.resolve(parsed.projectRoot);
+  const config = loadProjectConfig(resolvedProjectRoot);
+  const qualifiedWorkItem = parsed.workItemId
+    ? componentQualifiedWorkItemId(resolvedProjectRoot, parsed.workItemId)
+    : null;
+  const componentId = parsed.componentId ?? qualifiedWorkItem?.componentId;
+  const component = componentId
+    ? resolveProjectComponents(resolvedProjectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  const workItemId =
+    qualifiedWorkItem?.itemId ??
+    (parsed.workItemId && parsed.workItemId.trim().length > 0
+      ? parsed.workItemId.trim()
+      : null);
+
+  return parsed.coordinationRecordIds.map((recordId) => ({
+    kind: "coordination_record" as const,
+    componentId: component.id,
+    recordId,
+    workItemId,
+  }));
 }
 
 function resolveDirectProject(
@@ -3296,6 +3511,233 @@ function parseCoordinationRequestCommand(
   }
 
   return parsed as ParsedCoordinationRequestCommand;
+}
+
+function parseRemoteExecutionRequestCreateCommand(
+  argv: string[],
+): ParsedRemoteExecutionRequestCreateCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("remote-execution request create requires a project root");
+  }
+
+  const parsed: Partial<ParsedRemoteExecutionRequestCreateCommand> = {
+    projectRoot,
+    requiredCapabilities: [],
+    expectedArtifacts: [],
+    coordinationRecordIds: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--requesting-host":
+        parsed.requestingHostId = next();
+        break;
+      case "--requesting-agent":
+        parsed.requestingAgentId = next();
+        break;
+      case "--target-host":
+        parsed.targetHostId = next();
+        break;
+      case "--capability":
+        parsed.requiredCapabilities?.push(next());
+        break;
+      case "--runner-profile":
+        parsed.runnerProfileId = next();
+        break;
+      case "--repository":
+        parsed.repository = next();
+        break;
+      case "--ref":
+        parsed.ref = next();
+        break;
+      case "--command-profile":
+        parsed.commandProfileId = next();
+        break;
+      case "--timeout-ms":
+        parsed.timeoutMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--expected-artifact":
+        parsed.expectedArtifacts?.push(next());
+        break;
+      case "--mutation-class":
+        parsed.mutationClass = parseRemoteExecutionMutationClass(next(), arg);
+        break;
+      case "--status":
+        parsed.initialStatus = parseRemoteExecutionRequestStatus(next(), arg);
+        break;
+      case "--attach-coordination-record":
+        parsed.coordinationRecordIds?.push(next());
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown remote-execution request create option: ${arg}`);
+    }
+  }
+
+  if (!parsed.requestingHostId) {
+    throw new Error("remote-execution request create requires --requesting-host");
+  }
+  if (!parsed.runnerProfileId) {
+    throw new Error("remote-execution request create requires --runner-profile");
+  }
+  if (!parsed.repository) {
+    throw new Error("remote-execution request create requires --repository");
+  }
+  if (!parsed.ref) {
+    throw new Error("remote-execution request create requires --ref");
+  }
+  if (!parsed.commandProfileId) {
+    throw new Error("remote-execution request create requires --command-profile");
+  }
+  if (!parsed.timeoutMs) {
+    throw new Error("remote-execution request create requires --timeout-ms");
+  }
+  if (!parsed.mutationClass) {
+    throw new Error("remote-execution request create requires --mutation-class");
+  }
+
+  return parsed as ParsedRemoteExecutionRequestCreateCommand;
+}
+
+function parseRemoteExecutionResultRecordCommand(
+  argv: string[],
+): ParsedRemoteExecutionResultRecordCommand {
+  const [, , , projectRoot, requestId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("remote-execution result record requires a project root");
+  }
+  if (!requestId || requestId.startsWith("--")) {
+    throw new Error("remote-execution result record requires a request id");
+  }
+
+  const parsed: Partial<ParsedRemoteExecutionResultRecordCommand> = {
+    projectRoot,
+    requestId,
+    commands: [],
+    artifactRefs: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--status":
+        parsed.status = parseRemoteExecutionRequestStatus(next(), arg);
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--runner-profile":
+        parsed.runnerProfileId = next();
+        break;
+      case "--actual-ref":
+        parsed.actualRef = next();
+        break;
+      case "--actual-commit":
+        parsed.actualCommit = next();
+        break;
+      case "--command":
+        parsed.commands?.push(next());
+        break;
+      case "--exit-code":
+        parsed.exitCode = parseNonNegativeInteger(next(), arg);
+        break;
+      case "--verification-outcome":
+        parsed.verificationOutcome = parseRemoteExecutionVerificationOutcome(
+          next(),
+          arg,
+        );
+        break;
+      case "--output-tail":
+        parsed.outputTail = next();
+        break;
+      case "--artifact":
+        parsed.artifactRefs?.push(next());
+        break;
+      case "--cleanup-status":
+        parsed.cleanupStatus = parseRemoteExecutionCleanupStatus(next(), arg);
+        break;
+      case "--blocker-safety-reason":
+        parsed.blockerSafetyReason = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown remote-execution result record option: ${arg}`);
+    }
+  }
+
+  if (!parsed.status) {
+    throw new Error("remote-execution result record requires --status");
+  }
+  if (!parsed.hostId) {
+    throw new Error("remote-execution result record requires --host");
+  }
+  if (!parsed.runnerProfileId) {
+    throw new Error("remote-execution result record requires --runner-profile");
+  }
+  if (!parsed.verificationOutcome) {
+    throw new Error(
+      "remote-execution result record requires --verification-outcome",
+    );
+  }
+  if (!parsed.cleanupStatus) {
+    throw new Error("remote-execution result record requires --cleanup-status");
+  }
+
+  return parsed as ParsedRemoteExecutionResultRecordCommand;
+}
+
+function parseRemoteExecutionResultGetCommand(
+  argv: string[],
+): ParsedRemoteExecutionResultGetCommand {
+  const [, , , projectRoot, requestId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("remote-execution result get requires a project root");
+  }
+  if (!requestId || requestId.startsWith("--")) {
+    throw new Error("remote-execution result get requires a request id");
+  }
+
+  const parsed: ParsedRemoteExecutionResultGetCommand = {
+    projectRoot,
+    requestId,
+  };
+  for (const arg of rest) {
+    if (arg === "--json") {
+      parsed.json = true;
+      continue;
+    }
+    throw new Error(`Unknown remote-execution result get option: ${arg}`);
+  }
+
+  return parsed;
 }
 
 function parseWorktreePrepareCommand(
@@ -5283,6 +5725,67 @@ function printCoordinationRequestResult(
   }
 }
 
+function printRemoteExecutionRequestCreateResult(
+  request: NexusRemoteExecutionRequestRecord,
+  parsed: ParsedRemoteExecutionRequestCreateCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, localOnly: true, request };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus remote execution request recorded locally.");
+  writeLine(stdout, `  Request: ${request.id}`);
+  writeLine(stdout, `  Component: ${request.componentId}`);
+  if (request.workItemId) {
+    writeLine(stdout, `  Work item: ${request.workItemId}`);
+  }
+  writeLine(stdout, `  Status: ${request.status}`);
+  writeLine(stdout, `  Runner profile: ${request.runnerProfileId}`);
+  writeLine(stdout, `  Command profile: ${request.commandProfileId}`);
+}
+
+function printRemoteExecutionResultRecordResult(
+  result: NexusRemoteExecutionResultRecord,
+  parsed: ParsedRemoteExecutionResultRecordCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, localOnly: true, result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus remote execution result recorded locally.");
+  writeLine(stdout, `  Request: ${result.requestId}`);
+  writeLine(stdout, `  Status: ${result.status}`);
+  writeLine(stdout, `  Host: ${result.hostId}`);
+  writeLine(stdout, `  Verification: ${result.verificationOutcome}`);
+}
+
+function printRemoteExecutionResultGetResult(
+  record: ReturnType<typeof getNexusRemoteExecutionRecord>,
+  parsed: ParsedRemoteExecutionResultGetCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, localOnly: true, record };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus remote execution record.");
+  writeLine(stdout, `  Request: ${record.request.id}`);
+  writeLine(stdout, `  Component: ${record.request.componentId}`);
+  writeLine(stdout, `  Status: ${record.request.status}`);
+  writeLine(
+    stdout,
+    `  Result: ${record.result ? record.result.verificationOutcome : "none"}`,
+  );
+}
+
 function printWorktreePrepareResult(
   result: PrepareNexusManualWorktreeResult,
   parsed: ParsedWorktreePrepareCommand,
@@ -6301,6 +6804,84 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   }
 
   throw new Error(`${optionName} must be a valid work status`);
+}
+
+function parseRemoteExecutionRequestStatus(
+  value: string,
+  optionName: string,
+): NexusRemoteExecutionRequestStatus {
+  if (
+    value === "queued" ||
+    value === "accepted" ||
+    value === "running" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "blocked" ||
+    value === "timed_out" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be a valid remote execution status`);
+}
+
+function parseRemoteExecutionVerificationOutcome(
+  value: string,
+  optionName: string,
+): NexusRemoteExecutionVerificationOutcome {
+  if (
+    value === "passed" ||
+    value === "failed" ||
+    value === "not_run" ||
+    value === "blocked" ||
+    value === "timed_out" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    `${optionName} must be passed, failed, not_run, blocked, timed_out, or cancelled`,
+  );
+}
+
+function parseRemoteExecutionCleanupStatus(
+  value: string,
+  optionName: string,
+): NexusRemoteExecutionCleanupStatus {
+  if (
+    value === "not_required" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "blocked" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    `${optionName} must be not_required, completed, failed, blocked, or unknown`,
+  );
+}
+
+function parseRemoteExecutionMutationClass(
+  value: string,
+  optionName: string,
+): NexusRunnerMutationClass {
+  if (
+    value === "none" ||
+    value === "verification" ||
+    value === "project_local" ||
+    value === "live_runtime" ||
+    value === "destructive"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    `${optionName} must be none, verification, project_local, live_runtime, or destructive`,
+  );
 }
 
 function parseStatusMapEntry(
