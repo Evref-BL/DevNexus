@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 65,
-  "nextCommentNumber": 142,
-  "updatedAt": "2026-05-18T05:26:31.209Z",
+  "nextNumber": 66,
+  "nextCommentNumber": 148,
+  "updatedAt": "2026-05-18T06:08:56.107Z",
   "items": [
     {
       "id": "local-1",
@@ -1151,7 +1151,7 @@
       "id": "local-47",
       "title": "Add dry-run work-item sync planner",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker link records land.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: build a mutation-free sync planner that shows which selected source items would create, update, skip, or conflict with target tracker items.\n\nUser stories covered:\n- As a maintainer, I can dry-run sync and review planned changes before DevNexus writes to an external provider.\n- As a coordinator, I can see missing capabilities or credentials before attempting sync.\n\nAcceptance criteria:\n- Sync policy config can name source tracker, target tracker, direction, filters, field set, comment policy, status mapping, conflict policy, and write policy.\n- A dry-run planner reads source and target trackers through provider capabilities and existing link records.\n- Planner output includes creates, updates, skipped items, conflicting fields, missing provider capabilities, missing credentials, and policy blocks.\n- Planner detects linked versus unlinked target items without creating provider objects.\n- Planner treats provider capability gaps as planned skips or blockers, not silent partial success.\n- CLI and MCP expose a dry-run sync plan with concise JSON suitable for agents.\n\nDependencies:\n- Depends on `dev-nexus:local-44`, `dev-nexus:local-45`, and `dev-nexus:local-46`.\n\nBoundaries:\n- Dry-run only: no provider mutation, no link creation, and no external comments.\n- Two-way sync remains out of scope.\n\nVerification:\n- Focused sync-policy validation and dry-run planner tests with mocked providers.\n- Cases: create, update, skip, missing capability, missing credential, stale link, and conflict.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1160,12 +1160,13 @@
         "planner",
         "dry-run",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.856Z",
-      "updatedAt": "2026-05-17T13:59:50.856Z",
+      "updatedAt": "2026-05-18T06:08:47.137Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1204,7 +1205,7 @@
       "id": "local-49",
       "title": "Expose multi-tracker state in agent status and automation context",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker bindings and link records are available.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: update low-token status, eligible-work, and agent-launch context so agents understand component tracker bindings, defaults, roles, and linked eligible work without reading raw project config.\n\nUser stories covered:\n- As a coordinator, I can list eligible work without seeing duplicate copies from multiple trackers.\n- As a Mac or Windows agent, I can see whether coordination is local, shared, mirrored, or blocked by policy.\n\nAcceptance criteria:\n- Project status, automation status, eligible-work summaries, and agent launch context report tracker ids, providers, roles, enabled/default state, and capability summaries per component.\n- Eligible work remains selected from the default tracker unless config explicitly says otherwise.\n- Linked provider copies are grouped under one logical work item when link records are available.\n- Run and target-cycle facts include selected tracker id and logical item id when available.\n- Status output includes sync warnings such as stale mirrors or missing coordination tracker capability without blocking unrelated local work.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-46`.\n\nBoundaries:\n- Do not change coordinator work selection semantics beyond reporting and deduping linked views.\n- Do not execute sync.\n\nVerification:\n- Focused automation status, eligible-work, target-cycle, and agent launch context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1212,12 +1213,13 @@
         "automation",
         "agent-context",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.260Z",
-      "updatedAt": "2026-05-17T13:59:51.260Z",
+      "updatedAt": "2026-05-18T06:08:56.107Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1230,7 +1232,7 @@
       "id": "local-50",
       "title": "Allow coordination tools to target tracker roles",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands; live external posting remains policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: let coordination status, handoff, integrate, and request flows use configured tracker roles such as coordination or external_feedback instead of assuming the component default tracker is the only backing store.\n\nUser stories covered:\n- As a Mac agent, I can read shared handoff state from a GitHub-backed coordination tracker while work selection remains local.\n- As an external reviewer, I can respond in a provider-native thread while DevNexus records the neutral effect locally.\n\nAcceptance criteria:\n- Coordination configuration can select a tracker by id or role for handoffs and external request records.\n- Work selection and canonical item updates still use the component default tracker unless policy says otherwise.\n- Handoff records include selected work item, logical item id, tracker references, branch facts, and provider target refs.\n- Integration planning can read handoffs from a coordination tracker and work details from the primary/default tracker.\n- Provider capability gaps for reading/writing comments are reported clearly.\n- Live external posting stays disabled unless coordination provider policy allows it.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n- Complements `dev-nexus:local-16` and `dev-nexus:local-18` for shared provider and external posting policy decisions.\n\nBoundaries:\n- Do not infer approval or merge permission from mirrored coordination records.\n- Do not create Vibe workspaces, sessions, executions, or implementation workers.\n\nVerification:\n- Focused coordination status/handoff/integrate/request tests with local and mocked external coordination trackers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1244,8 +1246,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.423Z",
-      "updatedAt": "2026-05-18T05:12:24.888Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T06:08:16.632Z",
+      "closedAt": "2026-05-18T06:07:41.373Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1607,6 +1609,33 @@
         "provider": "local",
         "itemId": "local-64",
         "itemNumber": 64
+      }
+    },
+    {
+      "id": "local-65",
+      "title": "Harden coordinator completion status reconciliation",
+      "description": "Type: automation data-integrity defect\nReadiness: autonomous agent-ready (AFK)\nSource: heartbeat reflection after coordinator-loop-20260518-t054231-514-z-1. The coordinator result file, target-state, and work-item comments recorded dev-nexus:local-50 as completed and published, but the local tracker item remained in_progress until post-cycle reflection reconciled it manually. Eligible-work reported idle only because the item was no longer ready, which could hide a stale in-progress item.\n\nGoal: harden coordinator completion/status reconciliation so DevNexus detects or repairs mismatches between coordinator results, target-cycle facts, and component work-item status.\n\nAcceptance criteria:\n- Coordinator finalization validates selected work-item statuses against the result contract and target-cycle completion facts before reporting a clean completed run.\n- If a result says a selected item completed but the tracker remains in_progress or ready, DevNexus either updates it through the work-item service or records a structured reconciliation blocker with the component, tracker, and item id.\n- Multi-item runs distinguish completed, blocked, failed, and skipped items without forcing every selected item to done.\n- Target-report and eligible-work summaries surface stale in_progress coordinator-owned items instead of silently treating them as no-work.\n- Tests cover completed single-item, partial multi-item, blocked, failed, and tracker-update failure paths.\n\nBoundaries:\n- Do not infer implementation success without a valid coordinator result contract.\n- Do not perform live external tracker writes; use local and mocked providers.\n\nVerification:\n- Focused coordinator-loop, target-report, and work-item service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes; refresh dogfood runtime package if the coordinator-loop runtime needs the fix.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "target-loop",
+        "work-tracking",
+        "data-integrity",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T06:08:36.212Z",
+      "updatedAt": "2026-05-18T06:08:36.212Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-65",
+        "itemNumber": 65
       }
     }
   ],
@@ -2945,9 +2974,33 @@
         }
       }
     ],
-    "local-47": [],
+    "local-47": [
+      {
+        "id": "local-comment-146",
+        "body": "Promoted during heartbeat reflection after local-50 completed. Dependencies local-44, local-45, and local-46 are done; this is now the next bounded dry-run-only sync planner slice. Live provider mutation remains out of scope.",
+        "author": null,
+        "createdAt": "2026-05-18T06:08:47.137Z",
+        "updatedAt": "2026-05-18T06:08:47.137Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-146"
+        }
+      }
+    ],
     "local-48": [],
-    "local-49": [],
+    "local-49": [
+      {
+        "id": "local-comment-147",
+        "body": "Promoted during heartbeat reflection after local-50 completed. Dependencies local-44 and local-46 are done; this reporting/context slice remains non-mutating and should make multi-tracker state visible to future coordinators.",
+        "author": null,
+        "createdAt": "2026-05-18T06:08:56.107Z",
+        "updatedAt": "2026-05-18T06:08:56.107Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-147"
+        }
+      }
+    ],
     "local-50": [
       {
         "id": "local-comment-136",
@@ -2969,6 +3022,50 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-139"
+        }
+      },
+      {
+        "id": "local-comment-142",
+        "body": "Coordinator cycle coordinator-loop-20260518-t054231-514-z-1 selected this as the only eligible dogfood item. Starting implementation in an isolated dev-nexus component worktree; live external provider posting remains disabled by policy.",
+        "author": null,
+        "createdAt": "2026-05-18T05:45:19.314Z",
+        "updatedAt": "2026-05-18T05:45:19.314Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-142"
+        }
+      },
+      {
+        "id": "local-comment-143",
+        "body": "Implemented tracker id/role targeting for coordination status, handoff, integrate, and request flows in the dev-nexus local-50 worktree. Focused coordination/request, CLI/MCP, tracker selection/link, and full npm run check verification passed; preparing direct integration publication.",
+        "author": null,
+        "createdAt": "2026-05-18T06:01:16.596Z",
+        "updatedAt": "2026-05-18T06:01:16.596Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-143"
+        }
+      },
+      {
+        "id": "local-comment-144",
+        "body": "Completed and published DevNexus commit 7fdbe92 to origin/main. Verification passed in the worktree and the main checkout: focused coordination/request tests, CLI/MCP tests, tracker selection/link/provider tests, git diff --check, and npm run check (52 test files / 382 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T06:02:51.824Z",
+        "updatedAt": "2026-05-18T06:02:51.824Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-144"
+        }
+      },
+      {
+        "id": "local-comment-145",
+        "body": "Post-cycle reconciliation: coordinator-loop-20260518-t054231-514-z-1 result, target state, and prior comments all recorded this item as completed and published, but the local tracker entry was still in_progress. Reconciled the tracker to done during heartbeat reflection; follow-up work will harden coordinator completion/status reconciliation so this is detected automatically.",
+        "author": null,
+        "createdAt": "2026-05-18T06:08:16.632Z",
+        "updatedAt": "2026-05-18T06:08:16.632Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-145"
         }
       }
     ],
@@ -3283,6 +3380,7 @@
           "itemId": "local-comment-117"
         }
       }
-    ]
+    ],
+    "local-65": []
   }
 }

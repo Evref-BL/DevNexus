@@ -6,36 +6,50 @@ work through the DevNexus agent-launch loop.
 
 Current cycle:
 
-- Run `coordinator-loop-20260518-t051011-392-z-1` completed on 2026-05-18.
-- Selected `dev-nexus:local-35` and `dev-nexus:local-46` as the safe bounded
-  parallel batch. Left `dev-nexus:local-50` ready for the next cycle because it
-  builds on link records and overlaps coordination tracker-role surfaces.
-- Published verified DevNexus commits to `origin/main`:
-  - `5aa008f` for `dev-nexus:local-35`, optional Codex app-server MCP status
-    listing/checking and bounded MCP tool relay with mocked protocol coverage.
-  - `9ae0a41` for `dev-nexus:local-46`, neutral work-item tracker link
-    records plus CLI and MCP link/show/unlink surfaces.
-- Closed `dev-nexus:local-35` and `dev-nexus:local-46` as `done` with tracker
-  comments.
+- Run `coordinator-loop-20260518-t054231-514-z-1` completed on 2026-05-18.
+- Selected `dev-nexus:local-50` as the only eligible dogfood item.
+- Published verified DevNexus commit `7fdbe92` to `origin/main` for
+  coordination tracker id/role targeting across status, handoff, integrate, and
+  request flows.
+- Closed `dev-nexus:local-50` as `done` with tracker comments.
 - Target-cycle final record
-  `target-cycle-coordinator-loop-20260518-t051011-392-z-1-final` records
-  `completed` with current eligible count `1`.
+  `target-cycle-coordinator-loop-20260518-t054231-514-z-1-final` records
+  `completed` with current eligible count `0`.
+- Post-cycle reflection found the tracker entry for `dev-nexus:local-50` still
+  marked `in_progress` even though the result, target state, and comments all
+  said it completed. The local tracker was reconciled to `done`, and
+  `dev-nexus:local-65` now tracks hardening coordinator completion/status
+  reconciliation.
 
 Verification for this cycle:
 
-- `npm test -- src/codexAppServerMcpRelay.test.ts src/codexAppServerCapabilityAdapter.test.ts src/nexusAutomationCodexAppServerLaunch.test.ts src/workItemTrackerLinks.test.ts src/workItemService.test.ts src/cli.test.ts src/nexusMcpServer.test.ts`
-  passed in `C:\dev\code\sources\dev-nexus` with 7 test files and 86 tests.
-- `git diff --check origin/main..HEAD` passed before publication.
-- `npm run check` passed in `C:\dev\code\sources\dev-nexus` with build plus
-  52 test files and 379 tests.
+- `npm test -- src/nexusCoordination.test.ts src/nexusCoordinationRequest.test.ts`
+  passed in the `dev-nexus:local-50` worktree with 22 tests.
+- `npm test -- src/cli.test.ts src/nexusMcpServer.test.ts` passed in the
+  worktree with 52 tests.
+- `npm test -- src/workItemService.test.ts src/workItemTrackerLinks.test.ts src/workTrackingProviderService.test.ts`
+  passed in the worktree with 19 tests.
+- `git diff --check` passed in the worktree before publication.
+- `npm run check` passed in both the worktree and
+  `C:\dev\code\sources\dev-nexus` main checkout with build plus 52 test files
+  and 382 tests.
+- `git diff --check origin/main..HEAD` passed in
+  `C:\dev\code\sources\dev-nexus` before publication.
 
 Near-term direction:
 
-- Next coordinator-loop should pick up `dev-nexus:local-50`, coordination tools
-  targeting configured tracker roles, now that neutral link records exist.
-- Keep `dev-nexus:local-47`, `dev-nexus:local-48`, `dev-nexus:local-49`, and
-  `dev-nexus:local-51` parked until later sync or coordination shape lands.
-  Live sync policy remains blocked on `dev-nexus:local-52`.
+- Current ready dogfood eligible work after reflection is:
+  `dev-nexus:local-47`, `dev-nexus:local-49`, and `dev-nexus:local-65`.
+- `dev-nexus:local-47` is ready because tracker link records and tracker role
+  targeting have landed. Keep it dry-run only with no provider mutation.
+- `dev-nexus:local-49` is ready because tracker bindings and link records have
+  landed. Keep it reporting/context only with no sync execution.
+- `dev-nexus:local-65` is ready because the latest heartbeat exposed a concrete
+  coordinator completion/status reconciliation gap.
+- Keep `dev-nexus:local-48` parked until the dry-run planner in
+  `dev-nexus:local-47` lands. Keep `dev-nexus:local-51` parked until the sync
+  and status/reporting shape is stable. Live sync policy remains blocked on
+  `dev-nexus:local-52`.
 - Final PLexus legacy gateway support removal remains human-in-the-loop and
   must not be performed without a separate explicit decision.
 
