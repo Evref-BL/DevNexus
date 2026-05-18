@@ -91,6 +91,57 @@ Generated worktrees also receive `.dev-nexus/context/` support files:
 Source edits, verification commands, and Git commands still run from the
 component checkout root.
 
+## Interactive Chat Worktrees
+
+Mutating interactive DevNexus or Codex chats should prepare or adopt an
+isolated worktree before editing. Use a component worktree for component source
+changes. Use a project-meta worktree for durable project files such as
+`dev-nexus.project.json`, `.dev-nexus/**`, target state, planning documents, or
+agent instructions. A chat that starts in a shared checkout can read status,
+inspect Git state, and prepare or adopt the right worktree, but it should not
+make source or project-state edits there unless it explicitly owns integration
+or project-state mutation.
+
+The workflow uses a small checkout vocabulary:
+
+- Stable component source root: the configured component `sourceRoot`. Treat it
+  as the durable baseline and normal human checkout, not as disposable worker
+  state.
+- Shared checkout: any project or component checkout opened by multiple chats.
+  Treat it as a read-mostly control room for status, coordination, setup, and
+  integration planning.
+- Worker worktree: an isolated branch and filesystem path for one bounded work
+  item, component, or project-meta surface. Run edits, verification, and Git
+  commands for that work from this path.
+- Integration branch: a temporary branch used to serialize or batch ready
+  worker branches before publishing to a target branch.
+- Rescue branch: a preservation branch for useful, ambiguous, or abandoned work
+  discovered during status checks or cleanup. Creating one preserves evidence;
+  it does not by itself prove that cleanup is safe.
+
+Worker and integrator are workflow behaviors, not a second authority model. A
+worker owns one bounded surface, keeps edits inside the adopted worktree,
+verifies the result, commits useful work before ending when possible, and leaves
+a handoff that names the branch, head commit, changed areas, verification, and
+remaining decisions. An integrator serializes ready work by reading handoffs,
+Git state, verification, active related work, and recoverability before merging
+or preparing a publishable result.
+
+Actor identity, direct integration, pull requests, provider mutation, approval,
+and publication permission belong to the authority model tracked by
+`dev-nexus:local-87` through `dev-nexus:local-95`. Worktree coordination should
+consume that effective authority result before mutating shared checkouts,
+pushing, opening provider requests, merging, approving, publishing, or deleting
+branches and worktrees. Until those source slices land, this section describes
+the expected operating practice; it is not a claim that DevNexus enforces every
+guardrail automatically.
+
+The no-loss default is conservative. Commit or hand off useful work before
+ending a mutating chat. Do not delete branches or worktrees when ownership,
+dirty state, pushed state, merge state, or publication state is ambiguous. Run
+a cleanup dry-run or equivalent read-only status review first, and preserve
+uncertain work with a rescue branch or explicit handoff instead of guessing.
+
 ## Coordination
 
 Coordination commands record advisory handoff facts in the configured

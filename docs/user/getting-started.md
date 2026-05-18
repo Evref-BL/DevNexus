@@ -46,15 +46,21 @@ state under `.dev-nexus/`. By default, put stable component source checkouts
 under `components/<component-id>` inside the project root, and put generated
 implementation worktrees under `worktrees/<component-id>`.
 
+Stable component source roots are durable checkouts. They are useful for human
+inspection, baseline status, and integration, but mutating parallel chats
+should prepare or adopt isolated worker worktrees before editing. Project-meta
+changes should use the same worktree-first expectation for project support
+files and durable planning documents.
+
 Common generated or support paths:
 
 | Area | Typical path | Notes |
 | --- | --- | --- |
 | Project config | `dev-nexus.project.json` | User-authored shared configuration. |
 | Project state | `.dev-nexus/` | DevNexus support records, local ledgers, setup state, and generated files. |
-| Component sources | `components/<component-id>` | Stable component source checkouts. |
+| Component sources | `components/<component-id>` | Stable component source checkouts, not disposable worker paths. |
 | Target state | `.dev-nexus/automation/target-state.md` | Concise user-authored memory for an automation target. |
-| Generated worktrees | `<worktreesRoot>/<component-id>/` | Component-scoped worktrees for parallel work. |
+| Generated worktrees | `<worktreesRoot>/<component-id>/` | Component-scoped worker worktrees for parallel source work. |
 | Agent MCP config | `.codex/config.toml`, `.mcp.json`, or another configured target | Generated from `mcp.agentTargets`. |
 
 ## Components

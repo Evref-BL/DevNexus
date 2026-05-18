@@ -87,6 +87,11 @@ dev-nexus automation agent-profiles <project-root> --json
 
 ## Common Workflows
 
+For mutating interactive chats, start from a shared checkout only long enough
+to inspect status and prepare or adopt an isolated component or project-meta
+worktree. Keep shared checkouts and stable component source roots read-mostly
+unless the chat explicitly owns integration or project-state mutation.
+
 Prepare an isolated component worktree for parallel work:
 
 ```bash
@@ -129,7 +134,8 @@ dev-nexus automation current-agent record <project-root> --run-id current-1 --st
 - [Getting started](docs/user/getting-started.md) covers installation, project
   layout, setup checks, portable paths, and tracker basics.
 - [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, work-item
-  commands, automation loops, result files, and coordination handoffs.
+  commands, worktree-first chat workflows, automation loops, result files, and
+  coordination handoffs.
 - [Architecture notes](docs/dev/architecture.md) covers project boundaries,
   components, plugin capabilities, worker context, automation internals, and
   source development.
