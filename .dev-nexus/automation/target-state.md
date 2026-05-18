@@ -28,7 +28,8 @@ and ready for coordinator-driven work across its components.
   status model, and `dev-nexus:local-120` is published as `4fa962f` for
   deterministic dry-run hosting plan actions. `dev-nexus:local-121` is
   published as `37717f7` for read-only hosting status/plan CLI and MCP
-  surfaces.
+  surfaces, and `dev-nexus:local-122` is published as `afe5549` for
+  policy-gated local remote repair apply.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -41,9 +42,10 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-118` is complete for access declarations and provisioning
   gates; `dev-nexus:local-119` is complete for the read-only hosting status
   model; `local-120` is complete for deterministic dry-run plan actions;
-  `local-121` is complete for CLI/MCP status and plan surfaces; and
-  `local-122` is ready for local remote repair apply. `local-123` through
-  `local-126` should be promoted as prerequisites land.
+  `local-121` is complete for CLI/MCP status and plan surfaces; `local-122`
+  is complete for local remote repair apply; and `local-123` is ready for
+  GitHub repository creation apply. `local-124` through `local-126` should be
+  promoted as prerequisites land.
   `local-127` is an opt-in fake-project GitHub integration test and must not
   depend on `dev-nexus-plexus` or any other active project.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
@@ -81,6 +83,8 @@ and ready for coordinator-driven work across its components.
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
+- Default `npm run check` now passes on the integrated DevNexus main with 57
+  test files and 464 tests after the latest Windows DevNexus batch.
 - Mac verification after syncing to DevNexus `37717f7` found an OS/setup
   friction regression: `npm run check` fails in `src/nexusSetupAssistant.test.ts`
   with 8 failures around macOS setup path rendering, source-root fallback, and
@@ -146,7 +150,7 @@ and ready for coordinator-driven work across its components.
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-122`, and
+  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-123`, and
   `dev-nexus:local-129`, subject to dependency and concurrency limits. Include
   `dev-nexus:local-138` early because current Mac `npm run check` is red.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 141,
-  "nextCommentNumber": 230,
-  "updatedAt": "2026-05-18T20:46:15.855Z",
+  "nextCommentNumber": 231,
+  "updatedAt": "2026-05-18T20:46:22.878Z",
   "items": [
     {
       "id": "local-1",
@@ -3106,7 +3106,7 @@
       "id": "local-122",
       "title": "Add local remote repair hosting apply",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-120 and dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: implement the first safe apply path by repairing only declared local Git remotes through the hosting plan.\n\nUser stories covered:\n- As an automation account, I can configure the declared remotes without accidentally using the human account.\n- As a maintainer, I can run apply twice against a healthy project without churn.\n\nAcceptance criteria:\n- `project hosting apply` or equivalent apply service recomputes the plan immediately before mutation.\n- Local remote add/update actions execute only when remote repair is explicitly allowed by project provisioning policy.\n- Apply mutates only declared remote names and preserves undeclared remotes.\n- Apply refuses blocked/manual actions and reports skipped actions clearly.\n- Apply returns a final status or plan summary after mutation.\n- Running apply twice against already-correct remotes performs no further mutations.\n\nDependencies:\n- Depends on dev-nexus:local-120 and dev-nexus:local-121.\n\nBoundaries:\n- Do not create repositories or call live provider mutation APIs in this slice.\n- Do not delete local remotes.\n- Do not mutate unknown remotes.\n\nVerification:\n- Focused tests for add remote, update remote, preserve undeclared remote, blocked gate, idempotent rerun, and final status reporting.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3120,8 +3120,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:09.542Z",
-      "updatedAt": "2026-05-18T20:23:58.019Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T20:46:22.856Z",
+      "closedAt": "2026-05-18T20:46:22.856Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3133,7 +3133,7 @@
       "id": "local-123",
       "title": "Add GitHub repository creation hosting apply",
       "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-120 and dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: implement policy-gated GitHub repository creation behind the provider adapter and hosting apply plan.\n\nUser stories covered:\n- As a project owner, I can declare that a private meta-project repository should exist under the automation namespace.\n- As an automation account, DevNexus can create the repository only when project policy explicitly allows it.\n\nAcceptance criteria:\n- GitHub provider adapter can create a repository under a user or organization namespace in mocked tests.\n- Apply executes repository creation only when the recomputed plan marks it allowed and repository creation is explicitly enabled.\n- Creation uses declared visibility and default branch intent where supported, and reports provider URL and remote URL facts after mutation.\n- Missing auth profile, wrong actor, insufficient token scope, organization policy blocks, namespace mismatch, and already-existing repository states produce actionable results.\n- Re-running apply after creation is idempotent and does not attempt duplicate creation.\n\nDependencies:\n- Depends on dev-nexus:local-120 and dev-nexus:local-121.\n\nBoundaries:\n- Do not implement collaborator repair or invitation acceptance in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not create organizations or provider accounts.\n\nVerification:\n- Mocked GitHub provider tests for create success, already exists, insufficient permission, namespace policy rejection, missing auth profile, and idempotent rerun.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3148,7 +3148,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:20.149Z",
-      "updatedAt": "2026-05-18T16:16:20.149Z",
+      "updatedAt": "2026-05-18T20:46:22.878Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6344,6 +6344,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-229"
+        }
+      },
+      {
+        "id": "local-comment-230",
+        "body": "Completed and published as DevNexus source commit afe5549. Added policy-gated local remote repair apply through the core hosting service, CLI, and MCP. Apply recomputes the plan, only executes allowed local remote add/update actions, preserves undeclared remotes, skips blocked/manual local remote actions clearly, and returns refreshed final status/plan evidence. Verification passed: npm test -- src/nexusProjectHosting.test.ts; npm test -- src/nexusProjectHosting.test.ts src/cli.test.ts src/nexusMcpServer.test.ts src/nexusSharedCheckoutGuard.test.ts; npm run build; git diff --check; npm run check (57 files, 464 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T20:46:18.636Z",
+        "updatedAt": "2026-05-18T20:46:18.636Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-230"
         }
       }
     ],
