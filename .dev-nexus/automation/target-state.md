@@ -63,6 +63,12 @@ and ready for coordinator-driven work across its components.
   docs, `local-99` for advisory worktree leases, and `local-102` for cleanup
   dry-run safety classification. Publication and provider mutation gating stay
   with the authority items `local-91` and `local-92`.
+- `docs/agent-target-projection-opt-in-prd.md` records the decision that
+  provider-native MCP, skills, plugin, and worker projections should be
+  generated only for active agent targets. `dev-nexus:local-104` tracks slicing
+  and implementation. Current dogfood evidence: MCP is Codex-only, but
+  `skills.agentTargets` still includes Claude, so `.claude/skills` is stale
+  ignored support state for this Codex-only workflow.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
