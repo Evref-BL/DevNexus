@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 23,
-  "nextCommentNumber": 56,
-  "updatedAt": "2026-05-18T06:24:33.519Z",
+  "nextCommentNumber": 57,
+  "updatedAt": "2026-05-18T06:30:27.627Z",
   "items": [
     {
       "id": "local-1",
@@ -532,7 +532,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T06:13:18.731Z",
-      "updatedAt": "2026-05-18T06:24:33.519Z",
+      "updatedAt": "2026-05-18T06:30:27.627Z",
       "closedAt": "2026-05-18T06:23:54.731Z",
       "webUrl": null,
       "externalRef": {
@@ -1187,6 +1187,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-55"
+        }
+      },
+      {
+        "id": "local-comment-56",
+        "body": "Follow-up cleanup published to PLexus origin/main as 840d9d3. Removed the remaining retired gateway concept references from projectLifecycle tests; a full repository scan for retired gateway compatibility terms now returns no matches. Verification passed again: focused projectLifecycle test, npm run typecheck --workspaces, npm test, npm run build, git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-18T06:30:27.627Z",
+        "updatedAt": "2026-05-18T06:30:27.627Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-56"
         }
       }
     ]
