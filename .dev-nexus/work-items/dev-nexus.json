@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 121,
-  "updatedAt": "2026-05-18T00:26:51.700Z",
+  "nextCommentNumber": 123,
+  "updatedAt": "2026-05-18T02:24:58.114Z",
   "items": [
     {
       "id": "local-1",
@@ -987,7 +987,7 @@
       "id": "local-41",
       "title": "Add GitHub bot and meta-repo onboarding flow",
       "description": "Type: GitHub/meta-project onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting config shape are available.\nSource discussion: DevNexus should hand-hold users through creating or choosing a bot/machine-user account, deciding whether meta projects live under the bot account or an organization, configuring SSH/GitHub CLI auth profiles, and creating/pushing the shared DevNexus meta repo.\n\nGoal: add a DevNexus setup flow for initial project creation with GitHub-backed meta-project hosting and a dedicated automation actor.\n\nAcceptance criteria:\n- Setup flow can recommend and customize names for a bot account and optional org/namespace, such as `<user>-bot` and `<user>-dev-nexus`, while allowing custom names like `Gabot-Darbot`.\n- The flow explains what must be manual, such as creating a GitHub account, verifying email, completing browser/device auth, and creating an organization if GitHub API permissions cannot do it.\n- The flow can generate exact commands for SSH key creation, SSH host alias config, isolated `gh` config via `GH_CONFIG_DIR`, and Git remotes without exposing private material.\n- The flow can verify plain user auth, bot auth, SSH host aliases, repo existence, collaborator access, and intended remotes.\n- The flow can create or propose creating the private meta repo when policy and credentials allow; otherwise it emits precise manual steps and resumes from verification checks.\n- The flow configures DevNexus project hosting metadata and publication guardrails so future agents know which actor/remote is intended.\n- The flow produces a final setup report suitable for handoff to another machine or agent.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration.\n- Complements `dev-nexus:local-38` for actor/remote guardrails.\n\nBoundaries:\n- Do not automate GitHub account creation; GitHub account creation remains a manual step.\n- Do not store secrets in the shared meta repo.\n- Do not force an organization; support bot-owned repos and org-owned repos.\n\nVerification:\n- Mocked GitHub/gh/SSH checks for happy path and missing-permission paths.\n- Static docs/example checks.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -995,12 +995,13 @@
         "meta-project",
         "auth-profiles",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:53:46.258Z",
-      "updatedAt": "2026-05-17T13:53:46.258Z",
+      "updatedAt": "2026-05-18T02:24:45.878Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1022,12 +1023,13 @@
         "mcp",
         "toolchain",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-17T17:33:07.152Z",
+      "updatedAt": "2026-05-18T02:24:58.114Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2570,7 +2572,19 @@
         }
       }
     ],
-    "local-41": [],
+    "local-41": [
+      {
+        "id": "local-comment-121",
+        "body": "Heartbeat reflection promoted this item to ready dogfood work. Evidence: declared dependencies dev-nexus:local-40, dev-nexus:local-39, and dev-nexus:local-38 are done and published; the user-facing onboarding gap remains relevant after the manual Gabot-Darbot setup. Boundary: do not automate GitHub account creation or store secrets; implement flow/docs/checks with mocked provider paths and exact manual handoff steps.",
+        "author": null,
+        "createdAt": "2026-05-18T02:24:45.878Z",
+        "updatedAt": "2026-05-18T02:24:45.878Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-121"
+        }
+      }
+    ],
     "local-42": [
       {
         "id": "local-comment-76",
@@ -2691,6 +2705,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-91"
+        }
+      },
+      {
+        "id": "local-comment-122",
+        "body": "Heartbeat reflection added the missing dogfood selector label. Evidence: this item is already ready, dependencies dev-nexus:local-40, dev-nexus:local-39, and dev-nexus:local-38 are done, and recent Mac onboarding exposed the exact new-machine setup gaps. Boundary: keep baseline onboarding safe and non-live; do not overwrite dirty sources, store secrets, or launch PLexus/Pharo/Docker runtime services.",
+        "author": null,
+        "createdAt": "2026-05-18T02:24:58.114Z",
+        "updatedAt": "2026-05-18T02:24:58.114Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-122"
         }
       }
     ],

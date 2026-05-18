@@ -120,9 +120,14 @@ Immediate direction:
     `npm run build` passed. No live image, Docker, or gateway process was
     started.
 - Current ready `dogfood` work matching the automation selector:
-  - None after completing `plexus:local-20`. Final legacy support removal
-    remains human-in-the-loop and must not be performed without a separate
-    explicit decision.
+  - `dev-nexus:local-41` GitHub bot and meta-repo onboarding flow. It is ready
+    after generic setup, hosting config, and publication guardrails landed.
+    Implementation must not automate GitHub account creation or store secrets.
+  - `dev-nexus:local-42` new-machine setup flow for existing DevNexus projects.
+    It is ready after the Mac onboarding dogfood exposed the remaining
+    host-local auth, source-root, MCP, skills, and toolchain setup gaps.
+  - Final PLexus legacy gateway support removal remains human-in-the-loop and
+    must not be performed without a separate explicit decision.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
@@ -204,12 +209,13 @@ Immediate direction:
     provider-aware targets for Codex, Claude, OpenCode, manual, and custom
     providers, plus explicit unsupported-capability gaps and Windows
     `dev-nexus.cmd` command projection.
-  - `dev-nexus:local-41` will add the initial GitHub bot/machine-user and
-    meta-repo setup flow after the generic setup assistant and hosting config
-    shape exist.
-  - `dev-nexus:local-42` will add the new-machine setup flow for joining an
-    existing shared DevNexus project, including host-local auth, source roots,
-    MCP refresh, skills projection, and toolchain preflight.
+  - `dev-nexus:local-41` is ready to add the initial GitHub bot/machine-user
+    and meta-repo setup flow. It should cover exact manual steps, auth-profile
+    checks, SSH/gh setup, repo creation/proposal, and publication guardrail
+    configuration without handling secrets or GitHub account creation.
+  - `dev-nexus:local-42` is ready to add the new-machine setup flow for joining
+    an existing shared DevNexus project, including host-local auth, source
+    roots, MCP refresh, skills projection, and toolchain preflight.
 - The five-agent DevNexus wave completed and was published through DevNexus
   `d0db6af`:
   - `dev-nexus:local-17` added draft-only/mocked `coordination_request`
