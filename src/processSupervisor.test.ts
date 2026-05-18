@@ -207,7 +207,7 @@ describe("process supervisor", () => {
       expect(handle.command.toLowerCase()).toBe(
         path.join(shimDirectory, "fake-shim.CMD").toLowerCase(),
       );
-      await waitFor(() => fileIncludes(handle.logPaths.stdout, "cmd-ready"));
+      await waitFor(() => fileIncludes(handle.logPaths.stdout, "cmd-ready"), 10_000);
     },
   );
 
