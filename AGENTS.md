@@ -15,6 +15,10 @@ separate from the older staging root.
   when a component is explicitly configured for it.
 - Prefer local DevNexus MCP/CLI tools for project, automation, target, and
   work-item operations.
+- Human account defaults are for manual human actions only. Agent-created Git
+  and GitHub activity, including pushes, issues, comments, and bridge messages,
+  must use the configured bot/automation profile unless the user explicitly
+  instructs otherwise.
 
 ## Per-Cycle Workflow
 
