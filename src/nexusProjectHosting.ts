@@ -296,6 +296,76 @@ export interface NexusProjectHostingStatusResult {
   issues: NexusProjectHostingPreflightIssue[];
 }
 
+export type NexusProjectHostingPlanStatus = "passed" | "manual" | "blocked";
+
+export type NexusProjectHostingPlanActionDisposition =
+  | "allowed"
+  | "blocked"
+  | "manual";
+
+export type NexusProjectHostingPlanMutationClass =
+  | "read_only"
+  | "repository_create"
+  | "local_remote_repair"
+  | "access_repair"
+  | "invitation_acceptance"
+  | "default_branch_repair"
+  | "visibility_repair";
+
+export type NexusProjectHostingPlanActionKind =
+  | "configure_hosting"
+  | "create_repository"
+  | "add_local_remote"
+  | "update_local_remote"
+  | "invite_collaborator"
+  | "add_collaborator"
+  | "update_collaborator_permission"
+  | "accept_invitation"
+  | "wait_for_invitation"
+  | "repair_default_branch"
+  | "repair_visibility"
+  | "unsupported_provider_operation";
+
+export interface NexusProjectHostingPlanActionRepository {
+  namespace: string;
+  name: string;
+}
+
+export interface NexusProjectHostingPlanActionTarget {
+  type: "hosting" | "repository" | "remote" | "principal";
+  name?: string;
+  kind?: NexusProjectHostingAccessPrincipalKind;
+  providerIdentity?: string;
+}
+
+export interface NexusProjectHostingPlanAction {
+  id: string;
+  kind: NexusProjectHostingPlanActionKind;
+  provider: NexusProjectHostingProviderName | null;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  target: NexusProjectHostingPlanActionTarget;
+  current: Record<string, unknown>;
+  desired: Record<string, unknown>;
+  mutationClass: NexusProjectHostingPlanMutationClass;
+  disposition: NexusProjectHostingPlanActionDisposition;
+  reason: string;
+  authProfile: string | null;
+}
+
+export interface NexusProjectHostingPlanOptions {
+  hosting?: NexusProjectHostingConfig;
+  status: NexusProjectHostingStatusResult;
+}
+
+export interface NexusProjectHostingPlanResult {
+  ok: boolean;
+  status: NexusProjectHostingPlanStatus;
+  provider: NexusProjectHostingProviderName | null;
+  namespace: string | null;
+  repositoryName: string | null;
+  actions: NexusProjectHostingPlanAction[];
+}
+
 export class NexusProjectHostingError extends Error {
   constructor(message: string) {
     super(message);
@@ -493,6 +563,194 @@ export async function statusNexusProjectHosting(
     authProfiles,
     access,
     issues,
+  });
+}
+
+export function planNexusProjectHosting(
+  options: NexusProjectHostingPlanOptions,
+): NexusProjectHostingPlanResult {
+  if (!options.hosting || !options.status.configured) {
+    return hostingPlanResult({
+      provider: options.status.provider,
+      namespace: options.status.namespace,
+      repositoryName: options.status.repositoryName,
+      actions: [
+        {
+          id: "hosting:configure",
+          kind: "configure_hosting",
+          provider: options.status.provider,
+          repository: null,
+          target: {
+            type: "hosting",
+          },
+          current: {
+            configured: false,
+          },
+          desired: {
+            configured: true,
+          },
+          mutationClass: "read_only",
+          disposition: "manual",
+          reason: "Project hosting must be configured before DevNexus can plan provisioning actions.",
+          authProfile: null,
+        },
+      ],
+    });
+  }
+
+  const hosting = options.hosting;
+  const status = options.status;
+  const repository = hostingPlanRepository(status);
+  const actions: NexusProjectHostingPlanAction[] = [];
+  const providerMutationAuthProfile = providerMutationAuthProfileForHosting(hosting);
+
+  if (repository && status.repository.exists === false) {
+    actions.push(
+      hostingPlanAction({
+        id: "repository:create",
+        kind: "create_repository",
+        provider: hosting.provider,
+        repository,
+        target: {
+          type: "repository",
+          name: repository.name,
+        },
+        current: {
+          exists: false,
+        },
+        desired: {
+          exists: true,
+          visibility: hosting.repository.visibility,
+          defaultBranch: hosting.repository.defaultBranch,
+        },
+        mutationClass: "repository_create",
+        disposition: gateDisposition(hosting.provisioning.allowCreate),
+        reason: hosting.provisioning.allowCreate
+          ? "Repository creation is allowed by hosting.provisioning.allowCreate."
+          : "Repository creation is blocked because hosting.provisioning.allowCreate is false.",
+        authProfile: providerMutationAuthProfile,
+      }),
+    );
+  }
+
+  for (const remote of status.remotes) {
+    if (remote.status === "missing") {
+      actions.push(
+        localRemotePlanAction({
+          kind: "add_local_remote",
+          remote,
+          hosting,
+          repository,
+          reasonWhenAllowed: `Local Git remote ${remote.name} will be added from hosting intent.`,
+          reasonWhenBlocked:
+            `Local Git remote ${remote.name} is missing, but ` +
+            "hosting.provisioning.allowLocalRemoteRepair is false.",
+        }),
+      );
+    } else if (remote.status === "mismatch") {
+      actions.push(
+        localRemotePlanAction({
+          kind: "update_local_remote",
+          remote,
+          hosting,
+          repository,
+          reasonWhenAllowed: `Local Git remote ${remote.name} will be updated to the declared URL.`,
+          reasonWhenBlocked:
+            `Local Git remote ${remote.name} does not match hosting intent, ` +
+            "but hosting.provisioning.allowLocalRemoteRepair is false.",
+        }),
+      );
+    }
+  }
+
+  for (const access of status.access) {
+    const action = accessPlanAction({
+      access,
+      hosting,
+      repository,
+      providerMutationAuthProfile,
+    });
+    if (action) {
+      actions.push(action);
+    }
+  }
+
+  if (
+    repository &&
+    status.repository.defaultBranch &&
+    status.repository.defaultBranch !== hosting.repository.defaultBranch
+  ) {
+    actions.push(
+      hostingPlanAction({
+        id: "repository:default-branch",
+        kind: "repair_default_branch",
+        provider: hosting.provider,
+        repository,
+        target: {
+          type: "repository",
+          name: repository.name,
+        },
+        current: {
+          defaultBranch: status.repository.defaultBranch,
+        },
+        desired: {
+          defaultBranch: hosting.repository.defaultBranch,
+        },
+        mutationClass: "default_branch_repair",
+        disposition: gateDisposition(hosting.provisioning.allowDefaultBranchRepair),
+        reason: hosting.provisioning.allowDefaultBranchRepair
+          ? "Default-branch repair is allowed by hosting.provisioning.allowDefaultBranchRepair."
+          : "Default-branch repair is blocked because hosting.provisioning.allowDefaultBranchRepair is false.",
+        authProfile: providerMutationAuthProfile,
+      }),
+    );
+  }
+
+  if (
+    repository &&
+    status.repository.visibility &&
+    status.repository.visibility !== hosting.repository.visibility
+  ) {
+    const safeVisibilityChange = visibilityRepairIsSafe(
+      status.repository.visibility,
+      hosting.repository.visibility,
+    );
+    actions.push(
+      hostingPlanAction({
+        id: "repository:visibility",
+        kind: "repair_visibility",
+        provider: hosting.provider,
+        repository,
+        target: {
+          type: "repository",
+          name: repository.name,
+        },
+        current: {
+          visibility: status.repository.visibility,
+        },
+        desired: {
+          visibility: hosting.repository.visibility,
+        },
+        mutationClass: "visibility_repair",
+        disposition:
+          hosting.provisioning.allowVisibilityRepair && safeVisibilityChange
+            ? "allowed"
+            : "blocked",
+        reason: !hosting.provisioning.allowVisibilityRepair
+          ? "Visibility repair is blocked because hosting.provisioning.allowVisibilityRepair is false."
+          : safeVisibilityChange
+            ? "Visibility repair tightens or preserves repository exposure and is allowed by policy."
+            : "Visibility repair would broaden repository exposure and is declined as unsafe.",
+        authProfile: providerMutationAuthProfile,
+      }),
+    );
+  }
+
+  return hostingPlanResult({
+    provider: status.provider,
+    namespace: status.namespace,
+    repositoryName: status.repositoryName,
+    actions,
   });
 }
 
@@ -1114,6 +1372,338 @@ function hostingStatusResult(options: {
           ? "warning"
           : "passed",
     ...options,
+  };
+}
+
+function localRemotePlanAction(options: {
+  kind: Extract<
+    NexusProjectHostingPlanActionKind,
+    "add_local_remote" | "update_local_remote"
+  >;
+  remote: NexusProjectHostingRemoteStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  reasonWhenAllowed: string;
+  reasonWhenBlocked: string;
+}): NexusProjectHostingPlanAction {
+  return hostingPlanAction({
+    id: `remote:${normalizePlanIdPart(options.remote.name)}:` +
+      (options.kind === "add_local_remote" ? "add" : "update"),
+    kind: options.kind,
+    provider: options.hosting.provider,
+    repository: options.repository,
+    target: {
+      type: "remote",
+      name: options.remote.name,
+    },
+    current: {
+      url: options.remote.currentUrl,
+    },
+    desired: {
+      url: options.remote.expectedUrl,
+    },
+    mutationClass: "local_remote_repair",
+    disposition: gateDisposition(
+      options.hosting.provisioning.allowLocalRemoteRepair,
+    ),
+    reason: options.hosting.provisioning.allowLocalRemoteRepair
+      ? options.reasonWhenAllowed
+      : options.reasonWhenBlocked,
+    authProfile: options.remote.authProfile,
+  });
+}
+
+function accessPlanAction(options: {
+  access: NexusProjectHostingAccessStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  providerMutationAuthProfile: string | null;
+}): NexusProjectHostingPlanAction | null {
+  switch (options.access.status) {
+    case "missing":
+      return accessRepairPlanAction({
+        ...options,
+        kind: isCollaboratorPrincipal(options.access)
+          ? "invite_collaborator"
+          : "add_collaborator",
+        current: {
+          effectivePermission: null,
+        },
+        desired: {
+          effectivePermission: options.access.requiredPermission,
+        },
+        reasonWhenAllowed:
+          `Access for ${principalLabel(options.access)} will be granted as ` +
+          `${options.access.requiredPermission}.`,
+        reasonWhenBlocked:
+          `Access for ${principalLabel(options.access)} is missing, but ` +
+          "hosting.provisioning.allowAccessRepair is false.",
+      });
+    case "insufficient":
+      return accessRepairPlanAction({
+        ...options,
+        kind: "update_collaborator_permission",
+        current: {
+          effectivePermission: options.access.effectivePermission,
+        },
+        desired: {
+          effectivePermission: options.access.requiredPermission,
+        },
+        reasonWhenAllowed:
+          `Access for ${principalLabel(options.access)} will be updated from ` +
+          `${options.access.effectivePermission} to ` +
+          `${options.access.requiredPermission}.`,
+        reasonWhenBlocked:
+          `Access for ${principalLabel(options.access)} is insufficient, but ` +
+          "hosting.provisioning.allowAccessRepair is false.",
+      });
+    case "pending":
+      return pendingInvitationPlanAction(options);
+    case "unsupported":
+      return hostingPlanAction({
+        id: `access:${principalIdPart(options.access)}:unsupported`,
+        kind: "unsupported_provider_operation",
+        provider: options.hosting.provider,
+        repository: options.repository,
+        target: principalTarget(options.access),
+        current: {
+          status: "unsupported",
+        },
+        desired: {
+          effectivePermission: options.access.requiredPermission,
+        },
+        mutationClass: "read_only",
+        disposition: "blocked",
+        reason:
+          `Provider ${options.hosting.provider} did not report access state ` +
+          `for ${principalLabel(options.access)}.`,
+        authProfile: options.providerMutationAuthProfile,
+      });
+    case "satisfied":
+    case "unchecked":
+      return null;
+  }
+}
+
+function accessRepairPlanAction(options: {
+  access: NexusProjectHostingAccessStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  providerMutationAuthProfile: string | null;
+  kind: Extract<
+    NexusProjectHostingPlanActionKind,
+    "invite_collaborator" | "add_collaborator" | "update_collaborator_permission"
+  >;
+  current: Record<string, unknown>;
+  desired: Record<string, unknown>;
+  reasonWhenAllowed: string;
+  reasonWhenBlocked: string;
+}): NexusProjectHostingPlanAction {
+  return hostingPlanAction({
+    id: `access:${principalIdPart(options.access)}:` +
+      accessActionIdSuffix(options.kind),
+    kind: options.kind,
+    provider: options.hosting.provider,
+    repository: options.repository,
+    target: principalTarget(options.access),
+    current: options.current,
+    desired: options.desired,
+    mutationClass: "access_repair",
+    disposition: gateDisposition(options.hosting.provisioning.allowAccessRepair),
+    reason: options.hosting.provisioning.allowAccessRepair
+      ? options.reasonWhenAllowed
+      : options.reasonWhenBlocked,
+    authProfile: options.providerMutationAuthProfile,
+  });
+}
+
+function pendingInvitationPlanAction(options: {
+  access: NexusProjectHostingAccessStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  providerMutationAuthProfile: string | null;
+}): NexusProjectHostingPlanAction {
+  if (options.access.invitationPolicy === "auto_accept") {
+    const allowed =
+      options.hosting.provisioning.allowInvitationAcceptance &&
+      Boolean(options.access.authProfile);
+    return hostingPlanAction({
+      id: `access:${principalIdPart(options.access)}:accept-invitation`,
+      kind: "accept_invitation",
+      provider: options.hosting.provider,
+      repository: options.repository,
+      target: principalTarget(options.access),
+      current: {
+        pendingInvitation: true,
+      },
+      desired: {
+        pendingInvitation: false,
+        effectivePermission: options.access.requiredPermission,
+      },
+      mutationClass: "invitation_acceptance",
+      disposition: allowed ? "allowed" : "blocked",
+      reason: !options.hosting.provisioning.allowInvitationAcceptance
+        ? "Invitation acceptance is blocked because hosting.provisioning.allowInvitationAcceptance is false."
+        : options.access.authProfile
+          ? `Pending invitation for ${principalLabel(options.access)} can be accepted through the invitee auth profile.`
+          : `Pending invitation for ${principalLabel(options.access)} cannot be accepted because no invitee auth profile is configured.`,
+      authProfile: options.access.authProfile,
+    });
+  }
+
+  return hostingPlanAction({
+    id: `access:${principalIdPart(options.access)}:wait-invitation`,
+    kind: "wait_for_invitation",
+    provider: options.hosting.provider,
+    repository: options.repository,
+    target: principalTarget(options.access),
+    current: {
+      pendingInvitation: true,
+    },
+    desired: {
+      pendingInvitation: false,
+      effectivePermission: options.access.requiredPermission,
+    },
+    mutationClass: "read_only",
+    disposition: "manual",
+    reason:
+      `Pending invitation for ${principalLabel(options.access)} requires ` +
+      `${options.access.invitationPolicy === "manual" ? "manual acceptance" : "waiting for acceptance"}.`,
+    authProfile: options.access.authProfile,
+  });
+}
+
+function providerMutationAuthProfileForHosting(
+  hosting: NexusProjectHostingConfig,
+): string | null {
+  if (hosting.provisioning.providerMutationAuthProfile) {
+    return hosting.provisioning.providerMutationAuthProfile;
+  }
+
+  const automationAccess = hosting.access.find(
+    (access) => access.role === "automation" && access.authProfile,
+  );
+  if (automationAccess?.authProfile) {
+    return automationAccess.authProfile;
+  }
+
+  const automationRemote = hosting.remotes.find(
+    (remote) => remote.role === "automation",
+  );
+  if (automationRemote) {
+    return authProfileIdForNexusProjectHostingRemote(hosting, automationRemote);
+  }
+
+  return hosting.authProfile ?? null;
+}
+
+function hostingPlanRepository(
+  status: NexusProjectHostingStatusResult,
+): NexusProjectHostingPlanActionRepository | null {
+  if (!status.namespace || !status.repositoryName) {
+    return null;
+  }
+
+  return {
+    namespace: status.namespace,
+    name: status.repositoryName,
+  };
+}
+
+function hostingPlanAction(
+  action: NexusProjectHostingPlanAction,
+): NexusProjectHostingPlanAction {
+  return action;
+}
+
+function gateDisposition(
+  allowed: boolean,
+): NexusProjectHostingPlanActionDisposition {
+  return allowed ? "allowed" : "blocked";
+}
+
+function principalTarget(
+  access: NexusProjectHostingAccessStatusRecord,
+): NexusProjectHostingPlanActionTarget {
+  return {
+    type: "principal",
+    kind: access.kind,
+    providerIdentity: access.providerIdentity,
+  };
+}
+
+function principalLabel(access: NexusProjectHostingAccessStatusRecord): string {
+  return `${access.kind}:${access.providerIdentity}`;
+}
+
+function principalIdPart(access: NexusProjectHostingAccessStatusRecord): string {
+  return `${access.kind}:${normalizePlanIdPart(access.providerIdentity)}`;
+}
+
+function normalizePlanIdPart(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/gu, "-");
+}
+
+function isCollaboratorPrincipal(
+  access: NexusProjectHostingAccessStatusRecord,
+): boolean {
+  return access.kind === "human" || access.kind === "machine_user";
+}
+
+function accessActionIdSuffix(
+  kind: Extract<
+    NexusProjectHostingPlanActionKind,
+    "invite_collaborator" | "add_collaborator" | "update_collaborator_permission"
+  >,
+): string {
+  if (kind === "invite_collaborator") {
+    return "invite";
+  }
+  if (kind === "add_collaborator") {
+    return "add";
+  }
+  return "update";
+}
+
+function visibilityRepairIsSafe(
+  current: NexusProjectHostingRepositoryVisibility,
+  desired: NexusProjectHostingRepositoryVisibility,
+): boolean {
+  return visibilityExposureRank(desired) <= visibilityExposureRank(current);
+}
+
+function visibilityExposureRank(
+  visibility: NexusProjectHostingRepositoryVisibility,
+): number {
+  switch (visibility) {
+    case "private":
+      return 1;
+    case "internal":
+      return 2;
+    case "public":
+      return 3;
+  }
+}
+
+function hostingPlanResult(options: {
+  provider: NexusProjectHostingProviderName | null;
+  namespace: string | null;
+  repositoryName: string | null;
+  actions: NexusProjectHostingPlanAction[];
+}): NexusProjectHostingPlanResult {
+  const hasBlockedAction = options.actions.some(
+    (action) => action.disposition === "blocked",
+  );
+  const hasManualAction = options.actions.some(
+    (action) => action.disposition === "manual",
+  );
+  return {
+    ok: !hasBlockedAction,
+    status: hasBlockedAction ? "blocked" : hasManualAction ? "manual" : "passed",
+    provider: options.provider,
+    namespace: options.namespace,
+    repositoryName: options.repositoryName,
+    actions: options.actions,
   };
 }
 
