@@ -20,10 +20,13 @@ export type NexusAutomationTargetCycleWorkItemStatus =
   | "in_progress"
   | "completed"
   | "blocked"
+  | "failed"
   | "skipped";
 
 export interface NexusAutomationTargetCycleWorkItem {
   componentId: string | null;
+  trackerId: string | null;
+  trackerProvider: string | null;
   id: string;
   title: string | null;
   status: WorkStatus | null;
@@ -68,6 +71,8 @@ export interface NexusAutomationTargetCycleRecordInput {
 
 export interface NexusAutomationTargetCycleWorkItemInput {
   componentId?: string | null;
+  trackerId?: string | null;
+  trackerProvider?: string | null;
   id: string;
   title?: string | null;
   status?: WorkStatus | null;
@@ -383,6 +388,8 @@ function normalizeWorkItem(
   const record = value as Record<string, unknown>;
   return {
     componentId: optionalNullableString(record.componentId) ?? null,
+    trackerId: optionalNullableString(record.trackerId) ?? null,
+    trackerProvider: optionalNullableString(record.trackerProvider) ?? null,
     id: requiredNonEmptyString(record.id, `${pathName}.id`),
     title: optionalNullableString(record.title) ?? null,
     status: optionalWorkStatus(record.status, `${pathName}.status`),
@@ -462,13 +469,14 @@ function optionalCycleWorkItemStatus(
     value === "in_progress" ||
     value === "completed" ||
     value === "blocked" ||
+    value === "failed" ||
     value === "skipped"
   ) {
     return value;
   }
 
   throw new NexusAutomationTargetCycleError(
-    `${name} must be eligible, selected, dispatched, in_progress, completed, blocked, or skipped`,
+    `${name} must be eligible, selected, dispatched, in_progress, completed, blocked, failed, or skipped`,
   );
 }
 

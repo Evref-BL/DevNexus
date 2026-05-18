@@ -3302,7 +3302,14 @@ describe("dev-nexus cli", () => {
             id: "target-cycle-cli-loop-20260517-t100000-000-z-1",
             runId: "cli-loop-20260517-t100000-000-z-1",
             status: "completed",
-            eligibleWorkItemCount: 1,
+            eligibleWorkItemCount: 0,
+            workItems: [
+              {
+                id: "local-1",
+                status: "done",
+                cycleStatus: "completed",
+              },
+            ],
           },
         },
       ],

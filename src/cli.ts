@@ -873,7 +873,7 @@ export function usage(): string {
     "  --summary <text>",
     "  --eligible-work-items <count>",
     "  --work-item <component-id:id>  repeatable",
-    "  --work-item-status <selected|dispatched|in_progress|completed|blocked|skipped>",
+    "  --work-item-status <selected|dispatched|in_progress|completed|blocked|failed|skipped>",
     "  --work-item-agent-profile <id>",
     "  --work-item-note <text>",
     "  --blocker <text>              repeatable",
@@ -5295,6 +5295,12 @@ function printAutomationEligibleWorkResult(
   }
 
   writeLine(stdout, `DevNexus eligible work: ${result.eligibleWorkItemCount}.`);
+  if (result.staleInProgressWorkItemCount > 0) {
+    writeLine(
+      stdout,
+      `  Stale in-progress coordinator-owned work: ${result.staleInProgressWorkItemCount}`,
+    );
+  }
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(stdout, `  Status: ${result.status}`);
   if (result.selector) {
@@ -5307,6 +5313,12 @@ function printAutomationEligibleWorkResult(
     );
     for (const item of component.workItems) {
       writeLine(stdout, `    ${item.id} [${item.status}] ${item.title}`);
+    }
+    for (const item of component.staleInProgressWorkItems) {
+      writeLine(
+        stdout,
+        `    ${item.id} [${item.status}] stale coordinator-owned ${item.title}`,
+      );
     }
   }
 }
@@ -5632,6 +5644,7 @@ function parseTargetCycleWorkItemStatus(
     value === "in_progress" ||
     value === "completed" ||
     value === "blocked" ||
+    value === "failed" ||
     value === "skipped"
   ) {
     return value;

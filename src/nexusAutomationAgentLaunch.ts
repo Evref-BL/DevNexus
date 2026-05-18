@@ -82,6 +82,21 @@ export type NexusAutomationAgentLaunchStatus =
   | "failed"
   | "blocked";
 
+export type NexusAutomationAgentResultWorkItemStatus =
+  | "completed"
+  | "blocked"
+  | "failed"
+  | "skipped";
+
+export interface NexusAutomationAgentResultWorkItem {
+  componentId?: string | null;
+  trackerId?: string | null;
+  id: string;
+  status: NexusAutomationAgentResultWorkItemStatus;
+  summary?: string | null;
+  notes?: string | null;
+}
+
 export interface NexusAutomationAgentLaunchComponentContext {
   id: string;
   name: string;
@@ -144,6 +159,7 @@ export interface NexusAutomationAgentResultContract {
   requiredFields: string[];
   optionalFields: string[];
   statuses: NexusAutomationAgentLaunchStatus[];
+  workItemStatuses: NexusAutomationAgentResultWorkItemStatus[];
   verificationStatuses: WorktreeVerificationStatus[];
   publicationDecisionTypes: WorktreePublicationDecisionInput["type"][];
 }
@@ -169,6 +185,7 @@ export interface NexusAutomationAgentLaunchResult {
   commitIds?: string[];
   verification?: WorktreeVerificationInput[];
   publicationDecision?: WorktreePublicationDecisionInput;
+  workItems?: NexusAutomationAgentResultWorkItem[];
   error?: string | null;
   codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata;
 }
@@ -703,6 +720,7 @@ export function createNexusAutomationAgentCommandLauncher(
         verification,
         commitIds: reported.result?.commitIds ?? [],
         publicationDecision: reported.result?.publicationDecision,
+        workItems: reported.result?.workItems,
         error: commandSummary(commandResult),
       };
     }
@@ -723,6 +741,7 @@ export function createNexusAutomationAgentCommandLauncher(
       verification,
       commitIds: reported.result?.commitIds ?? [],
       publicationDecision: reported.result?.publicationDecision,
+      workItems: reported.result?.workItems,
       error: reported.result?.error ?? null,
     };
   };
@@ -1026,9 +1045,11 @@ function agentResultContract(resultFile: string): NexusAutomationAgentResultCont
       "commitIds",
       "verification",
       "publicationDecision",
+      "workItems",
       "error",
     ],
     statuses: ["completed", "failed", "blocked"],
+    workItemStatuses: ["completed", "blocked", "failed", "skipped"],
     verificationStatuses: ["passed", "failed", "not_run"],
     publicationDecisionTypes: [
       "not_decided",
@@ -1070,7 +1091,7 @@ function agentLaunchEnvironment(
     DEV_NEXUS_AGENT_RESULT_FILE: input.resultFile,
     DEV_NEXUS_AGENT_RESULT_REQUIRED_FIELDS: "status,summary",
     DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS:
-      "commitIds,verification,publicationDecision,error",
+      "commitIds,verification,publicationDecision,workItems,error",
     DEV_NEXUS_TARGET_ID: input.automationConfig.target.id ?? "",
     DEV_NEXUS_TARGET_STATE_FILE: readNexusAutomationTargetContext({
       projectRoot: input.projectRoot,
@@ -1146,10 +1167,57 @@ function normalizeAgentResult(value: unknown): NexusAutomationAgentLaunchResult 
             record.publicationDecision,
           ),
         }),
+    ...(record.workItems === undefined
+      ? {}
+      : { workItems: normalizeAgentResultWorkItems(record.workItems) }),
     ...(record.error === undefined
       ? {}
       : { error: optionalNullableString(record.error) ?? null }),
   };
+}
+
+function normalizeAgentResultWorkItems(
+  value: unknown,
+): NexusAutomationAgentResultWorkItem[] {
+  if (!Array.isArray(value)) {
+    throw new NexusAutomationAgentLaunchError(
+      "agent result.workItems must be an array",
+    );
+  }
+
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new NexusAutomationAgentLaunchError(
+        `agent result.workItems[${index}] must be an object`,
+      );
+    }
+    const record = item as Record<string, unknown>;
+    return {
+      ...(record.componentId === undefined
+        ? {}
+        : {
+            componentId:
+              optionalNullableString(record.componentId) ?? null,
+          }),
+      ...(record.trackerId === undefined
+        ? {}
+        : {
+            trackerId:
+              optionalNullableString(record.trackerId) ?? null,
+          }),
+      id: requiredNonEmptyString(record.id, `agent result.workItems[${index}].id`),
+      status: normalizeAgentResultWorkItemStatus(
+        record.status,
+        `agent result.workItems[${index}].status`,
+      ),
+      ...(record.summary === undefined
+        ? {}
+        : { summary: optionalNullableString(record.summary) ?? null }),
+      ...(record.notes === undefined
+        ? {}
+        : { notes: optionalNullableString(record.notes) ?? null }),
+    };
+  });
 }
 
 function normalizeVerificationInputList(
@@ -1281,6 +1349,24 @@ function normalizeAgentStatus(
 
   throw new NexusAutomationAgentLaunchError(
     "agent launch status must be completed, failed, or blocked",
+  );
+}
+
+function normalizeAgentResultWorkItemStatus(
+  status: unknown,
+  name: string,
+): NexusAutomationAgentResultWorkItemStatus {
+  if (
+    status === "completed" ||
+    status === "blocked" ||
+    status === "failed" ||
+    status === "skipped"
+  ) {
+    return status;
+  }
+
+  throw new NexusAutomationAgentLaunchError(
+    `${name} must be completed, blocked, failed, or skipped`,
   );
 }
 

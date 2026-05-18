@@ -12,6 +12,9 @@ import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  getNexusAutomationEligibleWorkSummary,
+} from "./nexusAutomationAgentSurface.js";
+import {
   defaultNexusAutomationConfig,
 } from "./nexusAutomationConfig.js";
 import {
@@ -646,6 +649,113 @@ describe("nexus automation target report", () => {
         type: "not_ready",
         reason: "No target cycle is recorded",
       },
+    });
+  });
+
+  it("surfaces stale in-progress coordinator-owned work in target and eligible-work reports", async () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: () => "2026-05-16T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinator-owned stale item",
+      status: "in_progress",
+      labels: ["automation"],
+    });
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "cycle-completed-stale",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        runId: "run-completed-stale",
+        status: "completed",
+        summary: "Coordinator reported completion.",
+        eligibleWorkItemCount: 0,
+        workItems: [
+          {
+            componentId: "primary",
+            trackerId: "default",
+            trackerProvider: "local",
+            id: "local-1",
+            title: "Coordinator-owned stale item",
+            cycleStatus: "completed",
+          },
+        ],
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:30:00.000Z",
+    });
+
+    expect(report).toMatchObject({
+      status: "completed",
+      relaunchDecision: {
+        type: "report_blocked",
+        reason:
+          "Latest target cycle cycle-completed-stale has 1 stale coordinator-owned in_progress work item(s)",
+        eligibleWorkItemCount: 0,
+        latestCycleId: "cycle-completed-stale",
+        latestRunId: "run-completed-stale",
+      },
+      activeBlockers: [
+        {
+          source: "work_item",
+          componentId: "primary",
+          trackerId: "default",
+          trackerProvider: "local",
+          cycleId: "cycle-completed-stale",
+          runId: "run-completed-stale",
+          workItemId: "local-1",
+          workItemTitle: "Coordinator-owned stale item",
+          message:
+            "Coordinator-owned work item is still in_progress after target cycle cycle-completed-stale completed.",
+        },
+      ],
+      workItemSummary: {
+        progress: {
+          staleInProgressWork: [
+            {
+              componentId: "primary",
+              trackerId: "default",
+              trackerProvider: "local",
+              id: "local-1",
+              status: "in_progress",
+              latestCycleStatus: "completed",
+            },
+          ],
+        },
+      },
+    });
+
+    const eligibleWork = await getNexusAutomationEligibleWorkSummary({
+      projectRoot,
+    });
+    expect(eligibleWork).toMatchObject({
+      eligibleWorkItemCount: 0,
+      staleInProgressWorkItemCount: 1,
+      components: [
+        {
+          componentId: "primary",
+          workItems: [],
+          staleInProgressWorkItems: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              status: "in_progress",
+              title: "Coordinator-owned stale item",
+            },
+          ],
+        },
+      ],
     });
   });
 

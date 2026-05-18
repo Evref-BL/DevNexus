@@ -2414,6 +2414,9 @@ function targetCycleWorkItemFromRecord(
 ): NexusAutomationTargetCycleWorkItemInput {
   return {
     componentId: optionalNullableString(record, "componentId", pathName) ?? null,
+    trackerId: optionalNullableString(record, "trackerId", pathName) ?? null,
+    trackerProvider:
+      optionalNullableString(record, "trackerProvider", pathName) ?? null,
     id: requiredString(record, "id", pathName),
     title: optionalNullableString(record, "title", pathName) ?? null,
     status: nullableWorkStatus(record, "status", pathName),
@@ -2453,6 +2456,7 @@ function nullableTargetCycleWorkItemStatus(
     value === "in_progress" ||
     value === "completed" ||
     value === "blocked" ||
+    value === "failed" ||
     value === "skipped"
   ) {
     return value;

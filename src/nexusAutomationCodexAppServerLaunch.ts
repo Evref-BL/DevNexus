@@ -564,9 +564,11 @@ function devNexusLaunchContract(
         "commitIds",
         "verification",
         "publicationDecision",
+        "workItems",
         "error",
       ],
       statuses: ["completed", "failed", "blocked"],
+      workItemStatuses: ["completed", "blocked", "failed", "skipped"],
     },
   };
 }

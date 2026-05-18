@@ -1,8 +1,13 @@
 import path from "node:path";
 import type { GitRunner } from "./gitWorktreeService.js";
 import {
+  eligibleNexusAutomationWorkItems,
+} from "./nexusAutomation.js";
+import {
   runNexusAutomationAgentLaunchOnce,
   type NexusAutomationAgentLauncher,
+  type NexusAutomationAgentResultWorkItem,
+  type NexusAutomationAgentResultWorkItemStatus,
   type RunNexusAutomationAgentLaunchOnceResult,
 } from "./nexusAutomationAgentLaunch.js";
 import {
@@ -16,6 +21,8 @@ import {
   recordNexusAutomationTargetCycleRecord,
   type NexusAutomationTargetCycleRecord,
   type NexusAutomationTargetCycleStatus,
+  type NexusAutomationTargetCycleWorkItemInput,
+  type NexusAutomationTargetCycleWorkItemStatus,
 } from "./nexusAutomationTargetCycle.js";
 import {
   buildNexusAutomationTargetReport,
@@ -25,7 +32,16 @@ import type {
   NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
 import type { CreateWorkTrackerProviderOptions } from "./workTrackingProviderService.js";
-import type { WorkItem } from "./workTrackingTypes.js";
+import {
+  createWorkItemService,
+  type WorkItemProviderFactory,
+  type WorkItemProjectResolver,
+} from "./workItemService.js";
+import type {
+  WorkItem,
+  WorkItemRef,
+  WorkStatus,
+} from "./workTrackingTypes.js";
 
 export type NexusAutomationCoordinatorLoopAction =
   | "launched"
@@ -315,36 +331,34 @@ export async function runNexusAutomationCoordinatorLoop(
       });
       runs.push(run);
       const finishedAt = currentIso(options.now);
-      const finalStatus =
-        run.status === "completed"
-          ? await getNexusAutomationStatus({
-              projectRoot,
-              providerFactory: options.providerFactory,
-              providerOptions: options.providerOptions,
-              gitRunner: options.gitRunner,
-              now: options.now,
-            })
-          : status;
+      const finalization = await finalizeCoordinatorRun({
+        projectRoot,
+        initialStatus: status,
+        run,
+        finishedAt,
+        providerFactory: options.providerFactory,
+        providerOptions: options.providerOptions,
+        gitRunner: options.gitRunner,
+        now: options.now,
+      });
       const targetCycle = recordCoordinatorLoopCycle({
         projectRoot,
-        status: finalStatus,
+        status: finalization.status,
         targetReport,
         cycleId,
         runId,
-        cycleStatus: targetCycleStatusForRun(run.status),
+        cycleStatus: finalization.cycleStatus,
         startedAt: tickStartedAt,
         finishedAt,
         summary: run.summary,
-        eligibleWorkItemCount: eligibleWorkItemCount(finalStatus),
-        workItems: targetCycleWorkItems(finalStatus),
-        blockers:
-          run.status === "blocked" || run.status === "failed"
-            ? [run.summary]
-            : [],
+        eligibleWorkItemCount: finalization.eligibleWorkItemCount,
+        workItems: finalization.workItems,
+        blockers: finalization.blockers,
         notes: [
           "managed-loop: decision=launch",
           "managed-loop: coordinator launched",
           `managed-loop: coordinator ${run.status}`,
+          ...finalization.notes,
           ...agentLaunchTargetCycleNotes(run),
         ],
       });
@@ -544,6 +558,482 @@ function targetCycleStatusForRun(
   return "skipped";
 }
 
+interface FinalizeCoordinatorRunResult {
+  status: NexusAutomationStatus;
+  cycleStatus: NexusAutomationTargetCycleStatus;
+  eligibleWorkItemCount: number;
+  workItems: NexusAutomationTargetCycleWorkItemInput[];
+  blockers: string[];
+  notes: string[];
+}
+
+interface SelectedCoordinatorWorkItem
+  extends NexusAutomationTargetCycleWorkItemInput {
+  componentId: string;
+  trackerId: string;
+  trackerProvider: string | null;
+}
+
+interface ReconciledCoordinatorWorkItem {
+  cycleItem: NexusAutomationTargetCycleWorkItemInput;
+  workItem: WorkItem | null;
+  blocker: string | null;
+  note: string | null;
+}
+
+async function finalizeCoordinatorRun(options: {
+  projectRoot: string;
+  initialStatus: NexusAutomationStatus;
+  run: RunNexusAutomationAgentLaunchOnceResult;
+  finishedAt: string;
+  providerFactory?: NexusAutomationWorkTrackerProviderFactory;
+  providerOptions?: CreateWorkTrackerProviderOptions;
+  gitRunner?: GitRunner;
+  now?: () => Date | string;
+}): Promise<FinalizeCoordinatorRunResult> {
+  const selectedItems = selectedCoordinatorWorkItems(options.initialStatus);
+  const resultMapping = mapCoordinatorResultWorkItems(
+    options.run,
+    selectedItems,
+  );
+  const service = coordinatorWorkItemService({
+    projectRoot: options.projectRoot,
+    status: options.initialStatus,
+    providerFactory: options.providerFactory,
+    providerOptions: options.providerOptions,
+    now: options.now,
+  });
+  const reconciled: ReconciledCoordinatorWorkItem[] = [];
+
+  for (const selected of selectedItems) {
+    reconciled.push(
+      await reconcileSelectedWorkItem({
+        service,
+        projectRoot: options.projectRoot,
+        selected,
+        result: resultMapping.results.get(workItemKey(selected)) ?? null,
+      }),
+    );
+  }
+
+  const blockers = [
+    ...resultMapping.blockers,
+    ...reconciled.flatMap((item) => (item.blocker ? [item.blocker] : [])),
+    ...(options.run.status === "blocked" || options.run.status === "failed"
+      ? [options.run.summary]
+      : []),
+  ];
+  const notes = reconciled.flatMap((item) => (item.note ? [item.note] : []));
+  const refreshedStatus =
+    options.run.status === "completed"
+      ? await getNexusAutomationStatus({
+          projectRoot: options.projectRoot,
+          providerFactory: options.providerFactory,
+          providerOptions: options.providerOptions,
+          gitRunner: options.gitRunner,
+          now: options.now,
+        })
+      : options.initialStatus;
+  const selectedKeys = new Set(selectedItems.map(workItemKey));
+  const nonSelectedEligibleWorkItems = targetCycleWorkItems(refreshedStatus)
+    .filter((item) => !selectedKeys.has(workItemKey(item)));
+  const selectedEligibleCount = reconciled.filter((item) =>
+    item.workItem
+      ? eligibleNexusAutomationWorkItems(
+          [item.workItem],
+          options.initialStatus.automationConfig!,
+        ).length > 0
+      : false,
+  ).length;
+  const eligibleWorkItemCount =
+    selectedEligibleCount + nonSelectedEligibleWorkItems.length;
+  const workItems = [
+    ...reconciled.map((item) => item.cycleItem),
+    ...nonSelectedEligibleWorkItems,
+  ];
+
+  return {
+    status: refreshedStatus,
+    cycleStatus: reconciledCycleStatus({
+      runStatus: options.run.status,
+      workItems,
+      blockers,
+    }),
+    eligibleWorkItemCount,
+    workItems,
+    blockers,
+    notes,
+  };
+}
+
+function selectedCoordinatorWorkItems(
+  status: NexusAutomationStatus,
+): SelectedCoordinatorWorkItem[] {
+  return targetCycleWorkItems(status).map((item) => ({
+    ...item,
+    componentId: item.componentId ?? primaryComponentId(status),
+    trackerId: item.trackerId ?? "default",
+    trackerProvider: item.trackerProvider ?? null,
+  }));
+}
+
+function mapCoordinatorResultWorkItems(
+  run: RunNexusAutomationAgentLaunchOnceResult,
+  selectedItems: SelectedCoordinatorWorkItem[],
+): {
+  results: Map<string, NexusAutomationAgentResultWorkItem>;
+  blockers: string[];
+} {
+  const explicitResults = run.launch?.workItems;
+  const blockers: string[] = [];
+  const results = new Map<string, NexusAutomationAgentResultWorkItem>();
+  if (!explicitResults || explicitResults.length === 0) {
+    if (selectedItems.length === 1) {
+      const selected = selectedItems[0]!;
+      results.set(workItemKey(selected), {
+        componentId: selected.componentId,
+        trackerId: selected.trackerId,
+        id: selected.id,
+        status: defaultWorkItemResultStatus(run.status),
+        summary: run.summary,
+      });
+    } else if (selectedItems.length > 1 && run.status !== "completed") {
+      for (const selected of selectedItems) {
+        results.set(workItemKey(selected), {
+          componentId: selected.componentId,
+          trackerId: selected.trackerId,
+          id: selected.id,
+          status: defaultWorkItemResultStatus(run.status),
+          summary: run.summary,
+        });
+      }
+    } else if (selectedItems.length > 1) {
+      blockers.push(
+        "Coordinator result contract is missing workItems for a multi-item completed run",
+      );
+    }
+
+    return { results, blockers };
+  }
+
+  for (const result of explicitResults) {
+    const matched = matchResultToSelectedWorkItem(result, selectedItems);
+    if (!matched) {
+      blockers.push(
+        reconciliationBlocker({
+          componentId: result.componentId ?? null,
+          trackerId: result.trackerId ?? null,
+          trackerProvider: null,
+          itemId: result.id,
+          reason: "Coordinator result referenced an item that was not selected",
+        }),
+      );
+      continue;
+    }
+
+    const key = workItemKey(matched);
+    if (results.has(key)) {
+      blockers.push(
+        reconciliationBlocker({
+          componentId: matched.componentId,
+          trackerId: matched.trackerId,
+          trackerProvider: matched.trackerProvider,
+          itemId: matched.id,
+          reason: "Coordinator result reported the selected item more than once",
+        }),
+      );
+      continue;
+    }
+
+    results.set(key, {
+      ...result,
+      componentId: matched.componentId,
+      trackerId: matched.trackerId,
+    });
+  }
+
+  for (const selected of selectedItems) {
+    if (!results.has(workItemKey(selected))) {
+      blockers.push(
+        reconciliationBlocker({
+          componentId: selected.componentId,
+          trackerId: selected.trackerId,
+          trackerProvider: selected.trackerProvider,
+          itemId: selected.id,
+          reason: "Coordinator result did not report a status for the selected item",
+        }),
+      );
+    }
+  }
+
+  return { results, blockers };
+}
+
+async function reconcileSelectedWorkItem(options: {
+  service: ReturnType<typeof createWorkItemService>;
+  projectRoot: string;
+  selected: SelectedCoordinatorWorkItem;
+  result: NexusAutomationAgentResultWorkItem | null;
+}): Promise<ReconciledCoordinatorWorkItem> {
+  const selector = {
+    projectRoot: options.projectRoot,
+    componentId: options.selected.componentId,
+    trackerId: options.selected.trackerId,
+  };
+  let current: WorkItem | null = null;
+  let blocker: string | null = null;
+  try {
+    current = await options.service.getWorkItem({
+      ...selector,
+      id: options.selected.id,
+      ...(options.selected.trackerProvider
+        ? { provider: options.selected.trackerProvider }
+        : {}),
+    });
+  } catch (error) {
+    blocker = reconciliationBlocker({
+      componentId: options.selected.componentId,
+      trackerId: options.selected.trackerId,
+      trackerProvider: options.selected.trackerProvider,
+      itemId: options.selected.id,
+      reason: `Tracker item could not be read: ${errorMessage(error)}`,
+    });
+  }
+
+  const desiredStatus = desiredTrackerStatus(options.result?.status ?? null);
+  const shouldUpdate =
+    current &&
+    desiredStatus &&
+    current.status !== desiredStatus &&
+    (current.status === "ready" || current.status === "in_progress");
+  if (shouldUpdate) {
+    try {
+      current = await options.service.setStatus({
+        ...selector,
+        ref: workItemRef(options.selected),
+        status: desiredStatus,
+      });
+    } catch (error) {
+      blocker = reconciliationBlocker({
+        componentId: options.selected.componentId,
+        trackerId: options.selected.trackerId,
+        trackerProvider: options.selected.trackerProvider,
+        itemId: options.selected.id,
+        reason:
+          `Tracker status update to ${desiredStatus} failed: ${errorMessage(error)}`,
+      });
+    }
+  }
+
+  const resultStatus = options.result?.status ?? null;
+  const cycleStatus = blocker
+    ? "blocked"
+    : cycleWorkItemStatusForResult(resultStatus);
+  const note = blocker ?? resultNote(options.result);
+
+  return {
+    cycleItem: {
+      componentId: options.selected.componentId,
+      trackerId: options.selected.trackerId,
+      trackerProvider: options.selected.trackerProvider,
+      id: options.selected.id,
+      title: current?.title ?? options.selected.title ?? null,
+      status: current?.status ?? options.selected.status ?? null,
+      cycleStatus,
+      agentProfileId: options.selected.agentProfileId ?? null,
+      notes: note,
+    },
+    workItem: current,
+    blocker,
+    note: blocker ? `managed-loop: reconciliation blocked ${blocker}` : null,
+  };
+}
+
+function coordinatorWorkItemService(options: {
+  projectRoot: string;
+  status: NexusAutomationStatus;
+  providerFactory?: NexusAutomationWorkTrackerProviderFactory;
+  providerOptions?: CreateWorkTrackerProviderOptions;
+  now?: () => Date | string;
+}) {
+  const componentById = new Map(
+    options.status.components.map((component) => [component.id, component]),
+  );
+  const primaryComponent =
+    options.status.components.find((component) => component.role === "primary") ??
+    options.status.components[0] ??
+    null;
+  const resolveProject: WorkItemProjectResolver = async (selector) => {
+    const component =
+      componentById.get(selector.componentId ?? primaryComponent?.id ?? "") ??
+      primaryComponent;
+    if (!component?.workTracking) {
+      throw new NexusAutomationCoordinatorLoopError(
+        `Component ${selector.componentId ?? "primary"} work tracking is not configured`,
+      );
+    }
+
+    return {
+      homePath: options.projectRoot,
+      projectRoot: options.projectRoot,
+      projectId: options.status.projectConfig.id,
+      projectName: options.status.projectConfig.name,
+      componentId: component.id,
+      componentName: component.name,
+      sourceRoot: component.sourceRoot,
+      defaultTrackerId: component.defaultTrackerId,
+      workTrackers: component.workTrackers.map((tracker) => ({
+        id: tracker.id,
+        name: tracker.name,
+        enabled: tracker.enabled,
+        roles: tracker.roles,
+        workTracking: tracker.workTracking,
+      })),
+      workTracking: component.workTracking,
+    };
+  };
+  const providerFactory: WorkItemProviderFactory | undefined =
+    options.providerFactory
+      ? (context) => {
+          const component =
+            componentById.get(context.componentId ?? primaryComponent?.id ?? "") ??
+            primaryComponent;
+          if (!component) {
+            throw new NexusAutomationCoordinatorLoopError(
+              `Component ${context.componentId ?? "primary"} is not configured`,
+            );
+          }
+
+          return options.providerFactory!({
+            projectRoot: options.projectRoot,
+            sourceRoot: component.sourceRoot,
+            projectConfig: options.status.projectConfig,
+            component,
+            workTracking: context.workTracking,
+          });
+        }
+      : undefined;
+
+  return createWorkItemService({
+    resolveProject,
+    ...(providerFactory ? { providerFactory } : {}),
+    providerOptions: options.providerOptions,
+    now: options.now,
+  });
+}
+
+function defaultWorkItemResultStatus(
+  status: RunNexusAutomationAgentLaunchOnceResult["status"],
+): NexusAutomationAgentResultWorkItemStatus {
+  if (status === "blocked") {
+    return "blocked";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "skipped") {
+    return "skipped";
+  }
+
+  return "completed";
+}
+
+function desiredTrackerStatus(
+  status: NexusAutomationAgentResultWorkItemStatus | null,
+): WorkStatus | null {
+  if (status === "completed") {
+    return "done";
+  }
+  if (status === "blocked") {
+    return "blocked";
+  }
+
+  return null;
+}
+
+function cycleWorkItemStatusForResult(
+  status: NexusAutomationAgentResultWorkItemStatus | null,
+): NexusAutomationTargetCycleWorkItemStatus {
+  if (status === "completed") {
+    return "completed";
+  }
+  if (status === "blocked") {
+    return "blocked";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "skipped") {
+    return "skipped";
+  }
+
+  return "selected";
+}
+
+function reconciledCycleStatus(options: {
+  runStatus: RunNexusAutomationAgentLaunchOnceResult["status"];
+  workItems: NexusAutomationTargetCycleWorkItemInput[];
+  blockers: string[];
+}): NexusAutomationTargetCycleStatus {
+  if (options.workItems.some((item) => item.cycleStatus === "failed")) {
+    return "failed";
+  }
+  if (
+    options.blockers.length > 0 ||
+    options.workItems.some((item) => item.cycleStatus === "blocked")
+  ) {
+    return "blocked";
+  }
+
+  return targetCycleStatusForRun(options.runStatus);
+}
+
+function matchResultToSelectedWorkItem(
+  result: NexusAutomationAgentResultWorkItem,
+  selectedItems: SelectedCoordinatorWorkItem[],
+): SelectedCoordinatorWorkItem | null {
+  const candidates = selectedItems.filter((item) => item.id === result.id);
+  if (result.componentId) {
+    return (
+      candidates.find((item) => item.componentId === result.componentId) ?? null
+    );
+  }
+  if (result.trackerId) {
+    return candidates.find((item) => item.trackerId === result.trackerId) ?? null;
+  }
+
+  return candidates.length === 1 ? candidates[0]! : null;
+}
+
+function resultNote(
+  result: NexusAutomationAgentResultWorkItem | null,
+): string | null {
+  return result?.notes ?? result?.summary ?? null;
+}
+
+function workItemRef(item: SelectedCoordinatorWorkItem): WorkItemRef {
+  return {
+    id: item.id,
+    ...(item.trackerProvider ? { provider: item.trackerProvider } : {}),
+  };
+}
+
+function reconciliationBlocker(options: {
+  componentId: string | null;
+  trackerId: string | null;
+  trackerProvider: string | null;
+  itemId: string;
+  reason: string;
+}): string {
+  return `reconciliation_blocker ${JSON.stringify(options)}`;
+}
+
+function workItemKey(
+  item: Pick<NexusAutomationTargetCycleWorkItemInput, "componentId" | "id">,
+): string {
+  return `${item.componentId ?? ""}:${item.id}`;
+}
+
 function recordDecisionTick(options: {
   projectRoot: string;
   status: NexusAutomationStatus;
@@ -558,7 +1048,7 @@ function recordDecisionTick(options: {
   run: RunNexusAutomationAgentLaunchOnceResult | null;
   cycleStatus: NexusAutomationTargetCycleStatus;
   eligibleWorkItemCount?: number | null;
-  workItems?: ReturnType<typeof targetCycleWorkItems>;
+  workItems?: NexusAutomationTargetCycleWorkItemInput[];
   blockers?: string[];
   nextCycleNotBefore?: string | null;
   notes?: string[];
@@ -604,7 +1094,7 @@ function recordCoordinatorLoopCycle(options: {
   finishedAt: string | null;
   summary: string;
   eligibleWorkItemCount: number | null;
-  workItems: ReturnType<typeof targetCycleWorkItems>;
+  workItems: NexusAutomationTargetCycleWorkItemInput[];
   blockers?: string[];
   nextCycleNotBefore?: string | null;
   notes?: string[];
@@ -644,7 +1134,9 @@ function recordCoordinatorLoopCycle(options: {
   return ledger.cycles.at(-1)!;
 }
 
-function targetCycleWorkItems(status: NexusAutomationStatus) {
+function targetCycleWorkItems(
+  status: NexusAutomationStatus,
+): NexusAutomationTargetCycleWorkItemInput[] {
   const grouped =
     status.componentEligibleWorkItems ??
     (status.selectedWorkItem
@@ -655,15 +1147,30 @@ function targetCycleWorkItems(status: NexusAutomationStatus) {
           },
         ]
       : []);
+  const componentById = new Map(
+    status.components.map((component) => [component.id, component]),
+  );
 
   return grouped.flatMap((component) =>
-    component.workItems.map((item: WorkItem) => ({
-      componentId: component.componentId,
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      cycleStatus: "eligible" as const,
-    })),
+    component.workItems.map((item: WorkItem) => {
+      const resolvedComponent = componentById.get(component.componentId);
+      return {
+        componentId: component.componentId,
+        trackerId:
+          item.trackerRef?.trackerId ??
+          resolvedComponent?.defaultTrackerId ??
+          "default",
+        trackerProvider:
+          item.trackerRef?.provider ??
+          resolvedComponent?.workTracking?.provider ??
+          item.provider ??
+          null,
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        cycleStatus: "eligible" as const,
+      };
+    }),
   );
 }
 
@@ -799,6 +1306,10 @@ function dateFrom(value: Date | string, name: string): Date {
   }
 
   return date;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function defaultSleep(ms: number): Promise<void> {

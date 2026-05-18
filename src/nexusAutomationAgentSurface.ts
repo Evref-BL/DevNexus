@@ -11,6 +11,9 @@ import {
   type GetNexusAutomationStatusOptions,
 } from "./nexusAutomationStatus.js";
 import {
+  buildNexusAutomationTargetReport,
+} from "./nexusAutomationTargetReport.js";
+import {
   projectPluginCapabilityProjections,
   type NexusPluginCapabilityProjection,
 } from "./nexusPluginCapabilities.js";
@@ -41,6 +44,7 @@ export interface NexusAutomationEligibleWorkComponentSummary {
   sourceRoot: string | null;
   workTrackingProvider: string | null;
   workItems: NexusAutomationEligibleWorkItemSummary[];
+  staleInProgressWorkItems: NexusAutomationEligibleWorkItemSummary[];
 }
 
 export interface NexusAutomationEligibleWorkSummary {
@@ -50,6 +54,7 @@ export interface NexusAutomationEligibleWorkSummary {
   summary: string;
   selector: NexusAutomationConfig["selector"] | null;
   eligibleWorkItemCount: number;
+  staleInProgressWorkItemCount: number;
   components: NexusAutomationEligibleWorkComponentSummary[];
 }
 
@@ -108,21 +113,68 @@ export async function getNexusAutomationEligibleWorkSummary(
           },
         ]
       : []);
-  const components = grouped
-    .filter((component) => component.workItems.length > 0)
-    .map((component) => {
-      const resolved = componentById.get(component.componentId);
-      return {
-        componentId: component.componentId,
-        componentName: resolved?.name ?? component.componentId,
-        role: resolved?.role ?? "primary",
-        sourceRoot: resolved?.sourceRoot ?? null,
-        workTrackingProvider: resolved?.workTracking?.provider ?? null,
-        workItems: component.workItems.map((item) =>
-          summarizeEligibleWorkItem(component.componentId, item),
-        ),
-      };
+  const targetReport = buildNexusAutomationTargetReport({
+    projectRoot: status.projectRoot,
+  });
+  const staleInProgressWorkItems =
+    targetReport.workItemSummary?.progress.staleInProgressWork ?? [];
+  const summariesByComponent = new Map<
+    string,
+    NexusAutomationEligibleWorkComponentSummary
+  >();
+  const ensureComponentSummary = (
+    componentId: string,
+  ): NexusAutomationEligibleWorkComponentSummary => {
+    const existing = summariesByComponent.get(componentId);
+    if (existing) {
+      return existing;
+    }
+
+    const resolved = componentById.get(componentId);
+    const summary = {
+      componentId,
+      componentName: resolved?.name ?? componentId,
+      role: resolved?.role ?? "primary",
+      sourceRoot: resolved?.sourceRoot ?? null,
+      workTrackingProvider: resolved?.workTracking?.provider ?? null,
+      workItems: [],
+      staleInProgressWorkItems: [],
+    };
+    summariesByComponent.set(componentId, summary);
+    return summary;
+  };
+
+  for (const component of grouped) {
+    if (component.workItems.length === 0) {
+      continue;
+    }
+    ensureComponentSummary(component.componentId).workItems.push(
+      ...component.workItems.map((item) =>
+        summarizeEligibleWorkItem(component.componentId, item),
+      ),
+    );
+  }
+
+  for (const item of staleInProgressWorkItems) {
+    const componentId = item.componentId ?? status.components[0]?.id ?? "primary";
+    ensureComponentSummary(componentId).staleInProgressWorkItems.push({
+      componentId,
+      id: item.id,
+      title: item.title ?? item.id,
+      status: item.status ?? "in_progress",
+      labels: [],
+      assignees: [],
+      milestone: null,
+      updatedAt: null,
+      webUrl: null,
     });
+  }
+
+  const components = [...summariesByComponent.values()].filter(
+    (component) =>
+      component.workItems.length > 0 ||
+      component.staleInProgressWorkItems.length > 0,
+  );
 
   return {
     projectRoot: status.projectRoot,
@@ -135,6 +187,10 @@ export async function getNexusAutomationEligibleWorkSummary(
     selector: status.automationConfig?.selector ?? null,
     eligibleWorkItemCount: components.reduce(
       (total, component) => total + component.workItems.length,
+      0,
+    ),
+    staleInProgressWorkItemCount: components.reduce(
+      (total, component) => total + component.staleInProgressWorkItems.length,
       0,
     ),
     components,

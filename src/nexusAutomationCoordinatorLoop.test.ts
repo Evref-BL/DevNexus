@@ -14,6 +14,7 @@ import {
   saveProjectConfig,
   type NexusProjectConfig,
 } from "./index.js";
+import type { WorkTrackerProvider } from "./workTrackingTypes.js";
 
 const tempDirs: string[] = [];
 
@@ -232,10 +233,11 @@ describe("nexus automation coordinator loop", () => {
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const config = projectConfig();
     saveProjectConfig(projectRoot, config);
-    await createLocalWorkTrackerProvider({
+    const tracker = createLocalWorkTrackerProvider({
       projectRoot,
       now: fixedClock("2026-05-17T09:00:00.000Z"),
-    }).createWorkItem({
+    });
+    await tracker.createWorkItem({
       projectRoot,
       title: "Coordinator-selectable task",
       status: "ready",
@@ -280,15 +282,15 @@ describe("nexus automation coordinator loop", () => {
           },
           targetCycle: {
             status: "completed",
-            eligibleWorkItemCount: 1,
+            eligibleWorkItemCount: 0,
             runId: "loop-20260517-t100000-000-z-1",
             workItems: [
               {
                 componentId: "primary",
                 id: "local-1",
                 title: "Coordinator-selectable task",
-                status: "ready",
-                cycleStatus: "eligible",
+                status: "done",
+                cycleStatus: "completed",
               },
             ],
             notes: expect.arrayContaining([
@@ -305,8 +307,11 @@ describe("nexus automation coordinator loop", () => {
       readNexusAutomationRunLedger(projectRoot, config.automation!).runs.at(-1),
     ).toMatchObject({
       id: "loop-20260517-t100000-000-z-1",
-      status: "completed",
-      commitIds: ["abc123"],
+        status: "completed",
+        commitIds: ["abc123"],
+      });
+    expect(await tracker.getWorkItem({ id: "local-1" })).toMatchObject({
+      status: "done",
     });
     expect(
       readNexusAutomationTargetCycleLedger(projectRoot, config.automation!).cycles,
@@ -356,7 +361,14 @@ describe("nexus automation coordinator loop", () => {
     expect(result.ticks[0]?.targetCycle).toMatchObject({
       status: "completed",
       eligibleWorkItemCount: 0,
-      workItems: [],
+      workItems: [
+        {
+          componentId: "primary",
+          id: "local-1",
+          status: "done",
+          cycleStatus: "completed",
+        },
+      ],
     });
     expect(buildNexusAutomationTargetReport({ projectRoot })).toMatchObject({
       relaunchDecision: {
@@ -364,6 +376,299 @@ describe("nexus automation coordinator loop", () => {
         eligibleWorkItemCount: 0,
         latestCycleId: "target-cycle-loop-20260517-t100000-000-z-1",
       },
+    });
+  });
+
+  it("records partial multi-item completion without forcing skipped work done", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Completed item",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Skipped item",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: () => ({
+        status: "completed",
+        summary: "Coordinator completed one item and deferred one item",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            status: "completed",
+            summary: "Implemented and verified.",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            status: "skipped",
+            summary: "Left for the next coordinator cycle.",
+          },
+        ],
+      }),
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "completed",
+      eligibleWorkItemCount: 1,
+      workItems: [
+        {
+          componentId: "primary",
+          id: "local-1",
+          status: "done",
+          cycleStatus: "completed",
+          notes: "Implemented and verified.",
+        },
+        {
+          componentId: "primary",
+          id: "local-2",
+          status: "ready",
+          cycleStatus: "skipped",
+          notes: "Left for the next coordinator cycle.",
+        },
+      ],
+    });
+    expect(await tracker.getWorkItem({ id: "local-1" })).toMatchObject({
+      status: "done",
+    });
+    expect(await tracker.getWorkItem({ id: "local-2" })).toMatchObject({
+      status: "ready",
+    });
+  });
+
+  it("records blocked item results without closing every selected item", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Blocked item",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Unstarted item",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: () => ({
+        status: "blocked",
+        summary: "Coordinator needs credentials",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            status: "blocked",
+            summary: "Missing credentials.",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            status: "skipped",
+            summary: "Not started.",
+          },
+        ],
+      }),
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "blocked",
+      blockers: ["Coordinator needs credentials"],
+      eligibleWorkItemCount: 1,
+      workItems: [
+        {
+          id: "local-1",
+          status: "blocked",
+          cycleStatus: "blocked",
+          notes: "Missing credentials.",
+        },
+        {
+          id: "local-2",
+          status: "ready",
+          cycleStatus: "skipped",
+          notes: "Not started.",
+        },
+      ],
+    });
+    expect(await tracker.getWorkItem({ id: "local-1" })).toMatchObject({
+      status: "blocked",
+    });
+    expect(await tracker.getWorkItem({ id: "local-2" })).toMatchObject({
+      status: "ready",
+    });
+  });
+
+  it("records failed item results distinctly from blocked and skipped work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Failed item",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Skipped after failure",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: () => ({
+        status: "failed",
+        summary: "Coordinator verification failed",
+        error: "Focused tests failed.",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            status: "failed",
+            summary: "Focused tests failed.",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            status: "skipped",
+            summary: "Not attempted after failure.",
+          },
+        ],
+      }),
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "failed",
+      blockers: ["Coordinator verification failed"],
+      eligibleWorkItemCount: 2,
+      workItems: [
+        {
+          id: "local-1",
+          status: "ready",
+          cycleStatus: "failed",
+          notes: "Focused tests failed.",
+        },
+        {
+          id: "local-2",
+          status: "ready",
+          cycleStatus: "skipped",
+          notes: "Not attempted after failure.",
+        },
+      ],
+    });
+  });
+
+  it("records a reconciliation blocker when tracker completion update fails", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Completed but stale tracker item",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const failingProvider: WorkTrackerProvider = {
+      provider: tracker.provider,
+      capabilities: tracker.capabilities,
+      createWorkItem: tracker.createWorkItem.bind(tracker),
+      listWorkItems: tracker.listWorkItems.bind(tracker),
+      getWorkItem: tracker.getWorkItem.bind(tracker),
+      updateWorkItem: tracker.updateWorkItem.bind(tracker),
+      addComment: tracker.addComment.bind(tracker),
+      setStatus: async () => {
+        throw new Error("tracker store is locked");
+      },
+    };
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      providerFactory: () => failingProvider,
+      launcher: () => ({
+        status: "completed",
+        summary: "Coordinator completed selected work",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            status: "completed",
+            summary: "Implementation finished.",
+          },
+        ],
+      }),
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "blocked",
+      eligibleWorkItemCount: 1,
+      blockers: expect.arrayContaining([
+        expect.stringContaining('"itemId":"local-1"'),
+      ]),
+      workItems: [
+        {
+          componentId: "primary",
+          trackerId: "default",
+          trackerProvider: "local",
+          id: "local-1",
+          status: "ready",
+          cycleStatus: "blocked",
+          notes: expect.stringContaining("tracker store is locked"),
+        },
+      ],
+    });
+    const reconciliationBlocker = result.ticks[0]?.targetCycle?.blockers[0] ?? "";
+    expect(reconciliationBlocker).toContain('"componentId":"primary"');
+    expect(reconciliationBlocker).toContain('"trackerId":"default"');
+    expect(reconciliationBlocker).toContain('"itemId":"local-1"');
+    expect(await tracker.getWorkItem({ id: "local-1" })).toMatchObject({
+      status: "ready",
     });
   });
 

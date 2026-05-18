@@ -284,7 +284,7 @@ describe("nexus automation agent launch", () => {
         "status,summary",
       );
       expect(options.env.DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS).toBe(
-        "commitIds,verification,publicationDecision,error",
+        "commitIds,verification,publicationDecision,workItems,error",
       );
       expect(options.env.GH_CONFIG_DIR).toBe("home:.config/gh-example-bot");
       expect(options.env.DEV_NEXUS_PUBLICATION_REMOTE).toBe("bot");
@@ -442,9 +442,11 @@ describe("nexus automation agent launch", () => {
             "commitIds",
             "verification",
             "publicationDecision",
+            "workItems",
             "error",
           ],
           statuses: ["completed", "failed", "blocked"],
+          workItemStatuses: ["completed", "blocked", "failed", "skipped"],
           verificationStatuses: ["passed", "failed", "not_run"],
           publicationDecisionTypes: [
             "not_decided",
