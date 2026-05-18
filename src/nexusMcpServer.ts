@@ -37,6 +37,9 @@ import {
   type NexusProjectStatusBase,
 } from "./nexusProjectRegistry.js";
 import {
+  getNexusWorkItemDiscoveryStatus,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
   getNexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
@@ -765,6 +768,19 @@ const tools: McpTool[] = [
         milestone: { type: ["string", "null"] },
       },
       required: ["title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "work_item_discovery_status",
+    description: "Report read-only tracker discovery status and provider readability without mutating tracker or provider state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
       additionalProperties: false,
     },
   },
@@ -1524,6 +1540,13 @@ export async function callDevNexusMcpTool(
             labels: optionalStringArray(args, "labels", "arguments") ?? [],
             assignees: optionalStringArray(args, "assignees", "arguments") ?? [],
             milestone: optionalNullableString(args, "milestone", "arguments"),
+          }),
+        });
+      case "work_item_discovery_status":
+        return toolResult({
+          ok: true,
+          ...getNexusWorkItemDiscoveryStatus({
+            projectRoot: projectRootFromArgs(args),
           }),
         });
       case "work_item_list":

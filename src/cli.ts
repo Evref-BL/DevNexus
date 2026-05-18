@@ -188,6 +188,10 @@ import {
   type NexusProjectStatusBase,
 } from "./nexusProjectRegistry.js";
 import {
+  getNexusWorkItemDiscoveryStatus,
+  type NexusWorkItemDiscoveryStatus,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
@@ -367,6 +371,11 @@ interface ParsedWorkItemCreateCommand {
   labels: string[];
   assignees: string[];
   milestone?: string | null;
+  json?: boolean;
+}
+
+interface ParsedWorkItemDiscoveryStatusCommand {
+  projectRoot: string;
   json?: boolean;
 }
 
@@ -749,6 +758,7 @@ export function usage(): string {
     "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
+    "  dev-nexus work-item discovery-status <project-root> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
@@ -946,6 +956,9 @@ export function usage(): string {
     "  --label <label>            repeatable",
     "  --assignee <assignee>      repeatable",
     "  --milestone <text>",
+    "  --json",
+    "",
+    "Options for work-item discovery-status:",
     "  --json",
     "",
     "Options for work-item list:",
@@ -1826,6 +1839,19 @@ async function handleWorkItemCommand(
     return 0;
   }
 
+  if (command === "discovery-status") {
+    const parsed = parseWorkItemDiscoveryStatusCommand(argv);
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot: parsed.projectRoot,
+    });
+    printWorkItemDiscoveryStatusResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (command === "list") {
     const parsed = parseWorkItemListCommand(argv);
     const items = await workItemService(parsed.projectRoot, dependencies)
@@ -2077,7 +2103,7 @@ async function handleWorkItemCommand(
   }
 
   throw new Error(
-    "work-item requires create, list, get, update, comment, set-status, link, show-links, unlink, sync-plan, or sync-execute",
+    "work-item requires create, discovery-status, list, get, update, comment, set-status, link, show-links, unlink, sync-plan, or sync-execute",
   );
 }
 
@@ -3911,6 +3937,28 @@ function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand
   }
 
   return parsed as ParsedWorkItemCreateCommand;
+}
+
+function parseWorkItemDiscoveryStatusCommand(
+  argv: string[],
+): ParsedWorkItemDiscoveryStatusCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item discovery-status requires a project root");
+  }
+
+  const parsed: ParsedWorkItemDiscoveryStatusCommand = { projectRoot };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item discovery-status option: ${arg}`);
+    }
+  }
+
+  return parsed;
 }
 
 function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
@@ -5910,6 +5958,44 @@ function printWorkItemCreateResult(
   writeLine(stdout, `  Id: ${item.id}`);
   writeLine(stdout, `  Title: ${item.title}`);
   writeLine(stdout, `  Status: ${item.status}`);
+}
+
+function printWorkItemDiscoveryStatusResult(
+  result: NexusWorkItemDiscoveryStatus,
+  parsed: ParsedWorkItemDiscoveryStatusCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus work item discovery status: ${result.project.id}`);
+  writeLine(stdout, `  Summary: ${result.summary}`);
+  for (const component of result.components) {
+    const defaultTracker = component.defaultTracker
+      ? `${component.defaultTracker.id} [${component.defaultTracker.provider}]`
+      : "not configured";
+    writeLine(stdout, `  Component ${component.componentId}:`);
+    writeLine(stdout, `    Default tracker: ${defaultTracker}`);
+    writeLine(
+      stdout,
+      `    Discovery roles: ${component.effectiveDiscoveryPolicy.scannedRoles.join(",")}`,
+    );
+    for (const tracker of component.configuredTrackers) {
+      writeLine(
+        stdout,
+        `    ${tracker.id} [${tracker.provider}] roles=${tracker.roles.join(",")} selected=${String(tracker.selectedForDiscovery)} readable=${tracker.readable.status}`,
+      );
+    }
+  }
+  for (const warning of result.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+  for (const blocker of result.blockers) {
+    writeLine(stdout, `  Blocker: ${blocker}`);
+  }
 }
 
 function printWorkItemListResult(

@@ -26,6 +26,7 @@ export * from "./nexusCoordinationRequest.js";
 export * from "./nexusCleanupPlan.js";
 export * from "./nexusCoreMcpTools.js";
 export * from "./nexusWorkerContextBundle.js";
+export * from "./nexusWorkItemDiscoveryStatus.js";
 export * from "./nexusWorkItemRouting.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAutomationWorktreeSetup.js";

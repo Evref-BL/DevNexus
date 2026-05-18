@@ -2598,6 +2598,112 @@ describe("dev-nexus cli", () => {
     expect(payload.projectConfig).toBeUndefined();
   });
 
+  it("prints read-only work item discovery status as json", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "local",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                },
+              },
+              {
+                id: "github-inbox",
+                name: "GitHub Inbox",
+                enabled: true,
+                roles: ["external_inbox", "eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "disabled",
+              importRequiredFirst: true,
+              providerFilters: [],
+              queryLimit: 10,
+              conflictWinner: "default_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const output = captureOutput();
+
+    await main(["work-item", "discovery-status", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      project: {
+        id: "demo-project",
+      },
+      warnings: [expect.stringContaining("github-inbox skipped")],
+      blockers: [],
+      components: [
+        {
+          componentId: "primary",
+          defaultTracker: {
+            id: "local",
+          },
+          effectiveDiscoveryPolicy: {
+            scannedRoles: ["primary", "eligible_source"],
+            missingCredentialBehavior: "skip",
+          },
+          configuredTrackers: [
+            {
+              id: "local",
+              selectedForDiscovery: true,
+              readable: {
+                status: "readable",
+              },
+            },
+            {
+              id: "github-inbox",
+              selectedForDiscovery: true,
+              readable: {
+                status: "skipped",
+              },
+              capabilityReport: {
+                provider: "github",
+                capabilities: {
+                  list: true,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(payload.projectConfig).toBeUndefined();
+  });
+
   it("prints concise agent profile policy", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
