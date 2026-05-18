@@ -5,10 +5,11 @@ and ready for coordinator-driven work across its components.
 
 ## Current State
 
-- The latest completed source work is `dev-nexus:local-71`, merged into
-  DevNexus main as `b4aa3af` from PR
-  https://github.com/Evref-BL/DevNexus/pull/2. It added the
-  `componentsRoot:` portable path base for project-local component clones.
+- The latest completed DevNexus source batch published to main through the
+  `bot` remote includes `dev-nexus:local-67` as `ce9b7d2` for duplicate
+  explicit target-cycle id rejection, `dev-nexus:local-97` as `ff981bc` for
+  worktree-first parallel chat documentation, and `dev-nexus:local-79` as
+  `4ca4362` for host-local and remote-host registry overlays.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -36,13 +37,12 @@ and ready for coordinator-driven work across its components.
 - Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
   been pruned after verifying they were merged or superseded by completed work
   items.
-- Re-triage promoted `dev-nexus:local-48` and `dev-nexus:local-67` to `ready`.
-  `local-48` remains mocked/local-provider only with no live external writes.
-  `local-67` should reject duplicate explicit target-cycle ids with an
-  actionable non-interactive error.
+- Re-triage promoted `dev-nexus:local-48`; it remains mocked/local-provider
+  only with no live external writes.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86`, `dev-nexus-pharo:local-14`, and
-  `plexus:local-23`; `dev-nexus:local-79` is the first ready source slice.
+  `plexus:local-23`; `dev-nexus:local-79` is complete and `local-80` is ready
+  as the next source slice.
 - Verification for `local-71` found that default `npm run check` repeatedly
   times out in an existing full-suite coordination test under parallel load.
   `dev-nexus:local-76` tracks stabilizing that check; focused tests and a
@@ -61,10 +61,10 @@ and ready for coordinator-driven work across its components.
   advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
-  `local-103`. Ready slices are `local-97` for authority-aware worktree-first
-  docs, `local-99` for advisory worktree leases, and `local-102` for cleanup
-  dry-run safety classification. Publication and provider mutation gating stay
-  with the authority items `local-91` and `local-92`.
+  `local-103`. `local-97` is complete; ready slices are `local-99` for
+  advisory worktree leases and `local-102` for cleanup dry-run safety
+  classification. Publication and provider mutation gating stay with the
+  authority items `local-91` and `local-92`.
 - `docs/agent-target-projection-opt-in-prd.md` records the decision that
   provider-native MCP, skills, plugin, and worker projections should be
   generated only for active agent targets. `dev-nexus:local-104` tracks slicing
@@ -84,14 +84,18 @@ and ready for coordinator-driven work across its components.
   six Pharo-owned `pharo_project_*` project/skill tools, has no default
   tool-name overlap with core `dev_nexus`, and no longer carries obsolete
   DevNexus-Pharo config migration paths.
+- DevNexus core guardrail work `dev-nexus:local-112` is ready to prevent future
+  plugin MCP tool overlap.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-48`,
-  `dev-nexus:local-67`, `dev-nexus:local-72`, `dev-nexus:local-76`, and
-  `dev-nexus:local-78`/`local-79` if they remain ready.
-- Keep remote host execution ordered: implement `dev-nexus:local-79` before
+  `dev-nexus:local-72`, `dev-nexus:local-76`, `dev-nexus:local-78`,
+  `dev-nexus:local-80`, `dev-nexus:local-87`, `dev-nexus:local-99`,
+  `dev-nexus:local-102`, `dev-nexus:local-105`, and
+  `dev-nexus:local-112`, subject to dependency and concurrency limits.
+- Keep remote host execution ordered: implement `dev-nexus:local-80` before
   runner profiles, request/result records, SSH transport, or live dogfood
   smokes.
 - Keep parallel-agent workflow ordered: implement documentation and read-only

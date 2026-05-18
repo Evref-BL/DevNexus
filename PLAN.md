@@ -41,8 +41,9 @@ target-cycle facts, commits, and the target report.
   workers with domain tools and skills without leaking plugin concepts into
   DevNexus core.
 - DevNexus-Pharo MCP cleanup: delegated generic DevNexus MCP tools, generic
-  tracker wrappers, and generic worktree compatibility tools have been removed;
-  next remove the remaining MCP naming overlap and old config migration paths.
+  tracker wrappers, generic worktree compatibility tools, remaining MCP naming
+  overlap, and old config migration paths have been removed. Continue with the
+  generic DevNexus guardrail slice `dev-nexus:local-112`.
 - Project hygiene: keep this dogfood root free of old staging artifacts,
   obsolete local runtime profiles, and stale completed-cycle narration.
 
@@ -60,15 +61,19 @@ target-cycle facts, commits, and the target report.
 
 ## Next Work Candidates
 
-- Promote and implement `dev-nexus:local-48` when one-way local-to-GitHub sync
-  execution can stay mocked and policy-gated.
-- Implement `dev-nexus:local-67` to clarify duplicate target-cycle record
-  behavior.
-- Implement `dev-nexus:local-79` as the first remote-host execution slice before
-  runner profiles, request/result records, SSH transport, or live dogfood
-  smokes.
-- Implement `dev-nexus-pharo:local-18` and `local-19` to finish the
-  no-overlap/no-legacy DevNexus-Pharo cleanup before `dev-nexus:local-112`.
+- Implement `dev-nexus:local-48` while one-way local-to-GitHub sync execution
+  can stay mocked and policy-gated.
+- Stabilize `dev-nexus:local-76` to remove the remaining full-suite
+  coordination timeout under parallel load.
+- Continue remote-host execution with `dev-nexus:local-80` after the host
+  registry overlay foundation in `local-79`.
+- Continue parallel-agent workflow with ready advisory/read-only slices
+  `dev-nexus:local-99` and `dev-nexus:local-102`.
+- Start generic MCP overlap guardrails with `dev-nexus:local-112`, now that the
+  DevNexus-Pharo side has removed legacy overlap.
+- Continue authority configuration at `dev-nexus:local-87` before promoting
+  dependent authority slices.
+- Continue agent-target projection at `dev-nexus:local-105`.
 - Promote `dev-nexus:local-51` after the multi-tracker implementation shape is
   stable enough for user-facing migration documentation.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

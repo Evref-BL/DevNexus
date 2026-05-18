@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 113,
-  "nextCommentNumber": 174,
-  "updatedAt": "2026-05-18T13:56:06.795Z",
+  "nextCommentNumber": 183,
+  "updatedAt": "2026-05-18T15:28:37.256Z",
   "items": [
     {
       "id": "local-1",
@@ -1668,7 +1668,7 @@
       "id": "local-67",
       "title": "Harden target-cycle record duplicate id behavior",
       "description": "Type: implementation hardening slice\nReadiness: autonomous agent-ready (AFK)\nSource observation: during dev-nexus:local-66 bookkeeping, `automation target-cycle record` accepted a repeated `--cycle-id` and appended a duplicate fact. Historical duplicate ids already exist in `.dev-nexus/automation/target-cycles.json`, so consumers cannot treat the ledger id as unique today.\n\nPolicy decision for this slice: reject duplicate `target-cycle record --cycle-id` calls with an actionable, non-interactive recovery message. Do not silently append, upsert, or replace existing records in this first hardening pass.\n\nGoal: make target-cycle fact recording reject duplicate ids so automated coordination cannot silently create ambiguous facts.\n\nAcceptance criteria:\n- Repeated `target-cycle record --cycle-id` calls fail before writing another record when the id already exists.\n- The error explains how to recover without opening an editor or requiring interactive repair, such as choosing a new id or inspecting the existing record.\n- Tests cover duplicate-id rejection for the CLI/service path.\n- Coordinator-loop generated records remain unaffected and keep stable run/cycle references.\n- Command help or relevant docs state that explicit cycle ids must be unique.\n\nBoundaries:\n- Do not rewrite historical ignored local ledgers as part of the source change.\n- Do not add upsert/replacement behavior in this slice.\n- Do not change target-report semantics beyond what is required to consume the clarified ledger behavior.\n\nVerification:\n- Focused target-cycle CLI/service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1680,8 +1680,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T09:36:22.991Z",
-      "updatedAt": "2026-05-18T11:25:09.983Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:27:58.778Z",
+      "closedAt": "2026-05-18T15:27:58.778Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1965,7 +1965,7 @@
       "id": "local-79",
       "title": "Add remote host registry and host-local overlay model",
       "description": "Type: remote host execution tracer-bullet implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add the first generic DevNexus host registry model so shared project state can name trusted hosts and required capabilities while host-local overlays keep transport details, paths, and credentials out of the meta project.\n\nUser stories covered:\n- As a coordinator, I can see which logical hosts exist and what capabilities they advertise before requesting platform-specific verification.\n- As a maintainer, I can keep Tailscale addresses, SSH users, command paths, and credential profile details in host-local state rather than shared config.\n\nAcceptance criteria:\n- Project config can declare logical host ids, display names, platform/capability tags, enabled state, and optional notes without storing secrets or machine-local paths.\n- Host-local DevNexus home config can provide transport details and workspace roots for a declared host by stable host id.\n- Project/status or a new low-token status surface reports host ids, capability tags, whether host-local overlay details are configured, and any missing overlay warnings.\n- Setup check warns when shared project config contains forbidden host-local details such as Tailscale IPs, SSH usernames, credential material, absolute personal paths, live ports, or runtime artifact paths.\n- Existing projects without host registry config continue to load with an empty host list.\n\nBoundaries:\n- Do not run SSH, Tailscale, remote commands, package installs, live Pharo images, Docker, or host process cleanup in this slice.\n- Do not make DevNexus core understand Pharo Launcher, PLexus, or image-side MCP capabilities beyond generic capability strings.\n\nVerification:\n- Focused config normalization/status/setup tests for no hosts, shared host declarations, host-local overlays, missing overlays, and forbidden shared fields.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1977,8 +1977,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:04:29.097Z",
-      "updatedAt": "2026-05-18T13:04:29.097Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:27:58.848Z",
+      "closedAt": "2026-05-18T15:27:58.848Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1990,7 +1990,7 @@
       "id": "local-80",
       "title": "Add runner profile schema with safety classes and approval gates",
       "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: model generic runner profiles that constrain what a local or remote host may execute for a DevNexus project.\n\nUser stories covered:\n- As a human, I can approve one live-runtime runner profile without granting broad arbitrary shell access.\n- As a maintainer, I can see whether a requested remote action is read-only, project-local mutation, live-runtime, or destructive before it runs.\n\nAcceptance criteria:\n- Project config can declare runner profiles with required capabilities, allowed operation classes, command profile references, timeout/output limits, artifact retention policy, credential identity policy, mutation class, and approval requirement.\n- Validation rejects runner profiles that allow live-runtime or destructive work without explicit approval metadata or policy gates.\n- Status surfaces show each profile's required capabilities, mutation class, approval state, and missing host capability warnings.\n- Agent-facing context summarizes runner profile policy without exposing host-local secrets, paths, SSH targets, or tokens.\n- Tests cover read-only, verification-only, project-local mutation, live-runtime, destructive, and invalid profile combinations.\n\nBoundaries:\n- Do not execute runner profiles in this slice.\n- Do not introduce plugin-specific runner fields into DevNexus core; plugins can contribute generic capabilities and profile templates later.\n\nVerification:\n- Focused profile schema/status/agent-context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2003,7 +2003,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:04:29.601Z",
-      "updatedAt": "2026-05-18T13:04:29.601Z",
+      "updatedAt": "2026-05-18T15:28:37.239Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2440,7 +2440,7 @@
       "id": "local-97",
       "title": "Document authority-aware worktree-first chat workflow",
       "description": "Type: documentation and agent-workflow slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nRelated authority work: dev-nexus:local-87 through dev-nexus:local-95\nParent planning item: dev-nexus:local-96\n\nGoal: document the worktree-first default for interactive DevNexus/Codex chats while explaining how authority roles remain a separate policy layer.\n\nUser stories covered:\n- As a human, I can start several chats in one project without remembering which branch each chat should use.\n- As a worker agent, I know that shared checkouts are read-mostly and generated worktrees are the normal writable implementation surface.\n\nAcceptance criteria:\n- User and agent-facing docs state that mutating interactive chats should prepare or adopt an isolated component or project-meta worktree before editing.\n- Docs distinguish shared checkouts, worker worktrees, integration branches, rescue branches, and stable component source roots.\n- Docs explain worker versus integrator behavior without creating a second authority role model.\n- Docs explicitly defer actor identity, direct integration, pull requests, provider mutation, approval, and publication permission to the authority model from dev-nexus:local-87 through dev-nexus:local-95.\n- Docs include no-loss expectations: commit or hand off useful work before ending, do not delete ambiguous branches/worktrees, and use cleanup dry-run first.\n- Generic docs avoid dogfood-specific account names except in dogfood-only examples.\n\nBoundaries:\n- Do not document enforcement as implemented before the corresponding source slices land.\n- Do not change runtime, provider, or publication behavior in this slice.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if repository checks cover docs.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2453,8 +2453,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:22:16.851Z",
-      "updatedAt": "2026-05-18T13:22:16.851Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:27:58.814Z",
+      "closedAt": "2026-05-18T15:27:58.814Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2839,7 +2839,7 @@
       "id": "local-112",
       "title": "Reject plugin MCP tool overlap with DevNexus core tools",
       "description": "Type: core guardrail slice\nReadiness: todo/dependent after DevNexus-Pharo default MCP overlap is removed\nDepends on: dev-nexus-pharo:local-18\nSource: user direction on 2026-05-18: plugins are additive and must not re-expose DevNexus core tools.\n\nGoal:\nAdd a generic DevNexus guardrail that detects plugin-projected MCP tool names overlapping DevNexus core MCP tools so future plugins cannot recreate a replacement/specialization surface accidentally.\n\nAcceptance criteria:\n- DevNexus has a generic additive-plugin validation or setup/status diagnostic for plugin MCP server capabilities whose declared tool names duplicate DevNexus core MCP tool names.\n- The diagnostic names the plugin id, server name, duplicate tool names, and replacement owner: use dev_nexus for generic DevNexus operations.\n- The guardrail is blocking for generated setup/status or project validation once current plugin surfaces are cleaned; there is no compatibility allow-list for old DevNexus-Pharo names.\n- Tests cover a clean additive plugin, a plugin duplicating work_item_list, a plugin duplicating project_status, and multiple plugin MCP servers.\n- Documentation states that plugin MCP servers are additive domain surfaces, not alternate generic DevNexus servers.\n\nBoundaries:\n- Keep DevNexus core generic; do not hardcode Pharo-specific plugin behavior.\n- Do not inspect live external MCP servers or run plugin commands; use declared capability metadata and the DevNexus core tool list.\n\nVerification:\n- Run focused DevNexus plugin capability/config/setup tests.\n- Run npm run check in DevNexus when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2853,7 +2853,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:06.795Z",
-      "updatedAt": "2026-05-18T13:56:06.795Z",
+      "updatedAt": "2026-05-18T15:28:37.256Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -4742,6 +4742,39 @@
           "provider": "local",
           "itemId": "local-comment-161"
         }
+      },
+      {
+        "id": "local-comment-174",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-67\nHead: cb6ae9704217154d6be5d78d7d353edffa272091\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:08:41.086Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-67\",\n  \"logicalItemId\": \"local-67\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-67\",\n    \"itemNumber\": 67,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-67\",\n    \"itemNumber\": 67,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-67\",\n        \"itemNumber\": 67\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-67\",\n  \"branch\": \"codex/dev-nexus/local-67\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"cb6ae9704217154d6be5d78d7d353edffa272091\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Main agent owns duplicate cycle id hardening in isolated worktree.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:08:41.113Z",
+        "updatedAt": "2026-05-18T15:08:41.113Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-174"
+        }
+      },
+      {
+        "id": "local-comment-177",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-67\nHead: ce9b7d2352ee00c0d7cff7fe6c0015211aaa2fbf\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:13:56.658Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-67\",\n  \"logicalItemId\": \"local-67\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-67\",\n    \"itemNumber\": 67,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-67\",\n    \"itemNumber\": 67,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-67\",\n      \"itemNumber\": 67,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-67\",\n        \"itemNumber\": 67\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-67\",\n  \"branch\": \"codex/dev-nexus/local-67\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"ce9b7d2352ee00c0d7cff7fe6c0015211aaa2fbf\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Committed ce9b7d2. Verification passed: npm test -- src/nexusAutomationTargetCycle.test.ts src/cli.test.ts --testTimeout=30000; npm run build.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:13:56.681Z",
+        "updatedAt": "2026-05-18T15:13:56.681Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-177"
+        }
+      },
+      {
+        "id": "local-comment-179",
+        "body": "Completed and published to DevNexus main as ce9b7d2. Explicit target-cycle ids are now rejected before append if the id already exists, with a non-interactive recovery message to choose a new --cycle-id or inspect existing records. Verification: focused target-cycle/CLI tests passed; integrated npm run check passed after final batch integration.",
+        "author": null,
+        "createdAt": "2026-05-18T15:27:48.430Z",
+        "updatedAt": "2026-05-18T15:27:48.430Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-179"
+        }
       }
     ],
     "local-68": [
@@ -4905,8 +4938,43 @@
         }
       }
     ],
-    "local-79": [],
-    "local-80": [],
+    "local-79": [
+      {
+        "id": "local-comment-176",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-79\nHead: cb6ae9704217154d6be5d78d7d353edffa272091\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:08:41.097Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-79\",\n  \"logicalItemId\": \"local-79\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-79\",\n    \"itemNumber\": 79,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-79\",\n      \"itemNumber\": 79\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-79\",\n    \"itemNumber\": 79,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-79\",\n      \"itemNumber\": 79\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-79\",\n      \"itemNumber\": 79,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-79\",\n        \"itemNumber\": 79\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-79\",\n  \"branch\": \"codex/dev-nexus/local-79\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"cb6ae9704217154d6be5d78d7d353edffa272091\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns host registry and host-local overlay model in isolated worktree.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:08:41.162Z",
+        "updatedAt": "2026-05-18T15:08:41.162Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-176"
+        }
+      },
+      {
+        "id": "local-comment-178",
+        "body": "Completed and published to DevNexus main as 4ca4362. Added generic host registry declarations, host-local overlay config, project/status overlay reporting, setup warnings for forbidden shared host-local details, and focused tests. Verification: worker focused tests and npm run check passed; integrated focused tests/build and npm run check passed after batch integration.",
+        "author": null,
+        "createdAt": "2026-05-18T15:27:48.389Z",
+        "updatedAt": "2026-05-18T15:27:48.389Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-178"
+        }
+      }
+    ],
+    "local-80": [
+      {
+        "id": "local-comment-181",
+        "body": "Promoted to ready after dev-nexus:local-79 landed on DevNexus main as 4ca4362. The host registry and host-local overlay model now exists, so runner profile schema and safety gates can build on it.",
+        "author": null,
+        "createdAt": "2026-05-18T15:28:37.072Z",
+        "updatedAt": "2026-05-18T15:28:37.072Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-181"
+        }
+      }
+    ],
     "local-81": [],
     "local-82": [],
     "local-83": [],
@@ -4923,7 +4991,30 @@
     "local-94": [],
     "local-95": [],
     "local-96": [],
-    "local-97": [],
+    "local-97": [
+      {
+        "id": "local-comment-175",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-97\nHead: cb6ae9704217154d6be5d78d7d353edffa272091\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:08:41.091Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-97\",\n  \"logicalItemId\": \"local-97\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-97\",\n    \"itemNumber\": 97,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-97\",\n      \"itemNumber\": 97\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-97\",\n    \"itemNumber\": 97,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-97\",\n      \"itemNumber\": 97\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-97\",\n      \"itemNumber\": 97,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-97\",\n        \"itemNumber\": 97\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-97\",\n  \"branch\": \"codex/dev-nexus/local-97\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"cb6ae9704217154d6be5d78d7d353edffa272091\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns documentation-only worktree-first workflow slice in isolated worktree.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:08:41.132Z",
+        "updatedAt": "2026-05-18T15:08:41.132Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-175"
+        }
+      },
+      {
+        "id": "local-comment-180",
+        "body": "Completed and published to DevNexus main as ff981bc. Documented worktree-first interactive chat workflow, checkout vocabulary, worker/integrator behavior, no-loss defaults, and the deferral of identity/publication/provider permissions to the authority model. Verification: worker npm run build and diff check passed; integrated npm run check passed after batch integration.",
+        "author": null,
+        "createdAt": "2026-05-18T15:27:48.445Z",
+        "updatedAt": "2026-05-18T15:27:48.445Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-180"
+        }
+      }
+    ],
     "local-98": [],
     "local-99": [],
     "local-100": [],
@@ -4950,6 +5041,18 @@
     "local-109": [],
     "local-110": [],
     "local-111": [],
-    "local-112": []
+    "local-112": [
+      {
+        "id": "local-comment-182",
+        "body": "Promoted to ready after DevNexus-Pharo cleanup completed local-18/local-19 and verified zero default MCP tool-name overlap with core dev_nexus. This guardrail can now enforce additive plugin MCP surfaces without legacy allow-lists.",
+        "author": null,
+        "createdAt": "2026-05-18T15:28:37.103Z",
+        "updatedAt": "2026-05-18T15:28:37.103Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-182"
+        }
+      }
+    ]
   }
 }
