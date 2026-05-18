@@ -1,5 +1,6 @@
 export * from "./browserOpener.js";
 export * from "./codexAppServerCapabilityAdapter.js";
+export * from "./codexAppServerInitializeProbe.js";
 export * from "./codexAppServerJsonRpc.js";
 export * from "./codexAppServerMcpRelay.js";
 export * from "./gitWorktreeService.js";
