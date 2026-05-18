@@ -16,6 +16,10 @@ import {
   resolveNexusAutomationAgentCommand,
 } from "./nexusAutomationAgentProfile.js";
 import {
+  probeCodexAppServerInitialize,
+  type CodexAppServerInitializeProbeReport,
+} from "./codexAppServerInitializeProbe.js";
+import {
   enqueueNexusAutomationWorkItem,
   type EnqueueNexusAutomationWorkItemResult,
 } from "./nexusAutomationEnqueue.js";
@@ -500,6 +504,12 @@ interface ParsedAutomationAgentProfilesCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationAppServerProbeCommand {
+  projectRoot: string;
+  profileId?: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationEnqueueCommand {
   projectRoot: string;
   title: string;
@@ -750,6 +760,7 @@ export function usage(): string {
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation eligible-work <project-root> [options]",
     "  dev-nexus automation agent-profiles <project-root> [options]",
+    "  dev-nexus automation app-server-probe <project-root> [options]",
     "  dev-nexus automation enqueue <project-root> --title <title> [options]",
     "  dev-nexus automation target-cycle list <project-root> [options]",
     "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
@@ -1033,6 +1044,10 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation agent-profiles:",
+    "  --json",
+    "",
+    "Options for automation app-server-probe:",
+    "  --profile <id>            app-server profile id; defaults to coordinator profile",
     "  --json",
     "",
     "Options for automation enqueue:",
@@ -2106,6 +2121,20 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "app-server-probe") {
+    const parsed = parseAutomationAppServerProbeCommand(argv);
+    const result = await probeCodexAppServerInitialize({
+      projectRoot: parsed.projectRoot,
+      profileId: parsed.profileId,
+    });
+    printAutomationAppServerProbeResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "enqueue") {
     const parsed = parseAutomationEnqueueCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -2244,7 +2273,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, eligible-work, agent-profiles, enqueue, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
+      "automation requires status, eligible-work, agent-profiles, app-server-probe, enqueue, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
     );
   }
 
@@ -4771,6 +4800,40 @@ function parseAutomationAgentProfilesCommand(
   return parsed;
 }
 
+function parseAutomationAppServerProbeCommand(
+  argv: string[],
+): ParsedAutomationAppServerProbeCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation app-server-probe requires a project root");
+  }
+
+  const parsed: ParsedAutomationAppServerProbeCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--profile":
+        parsed.profileId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation app-server-probe option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationScheduleCommand(
   argv: string[],
 ): ParsedAutomationScheduleCommand {
@@ -6540,6 +6603,51 @@ function printAutomationAgentProfilesResult(
     writeLine(
       stdout,
       `    ${plugin.pluginId} capabilities=${plugin.capabilityCount}`,
+    );
+  }
+}
+
+function printAutomationAppServerProbeResult(
+  result: CodexAppServerInitializeProbeReport,
+  parsed: ParsedAutomationAppServerProbeCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: result.status === "ready", probe: result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus Codex app-server probe: ${result.status}.`);
+  writeLine(stdout, `  Profile: ${result.profileId}`);
+  writeLine(
+    stdout,
+    `  Transport: ${result.transportMode} endpoint=${result.endpointScope}`,
+  );
+  writeLine(stdout, `  Client: ${result.clientIdentity.name}`);
+  writeLine(stdout, `  Codex version: ${result.codexVersion ?? "unknown"}`);
+  writeLine(
+    stdout,
+    `  Advertised methods: ${result.advertisedMethods.length > 0 ? result.advertisedMethods.join(", ") : "none"}`,
+  );
+  writeLine(stdout, "  Required capabilities:");
+  for (const capability of result.requiredCapabilities) {
+    writeLine(
+      stdout,
+      `    ${capability.capability}: ${capability.status}${capability.method ? ` (${capability.method})` : ""}`,
+    );
+  }
+  writeLine(stdout, "  Optional capabilities:");
+  for (const capability of result.optionalCapabilities) {
+    writeLine(
+      stdout,
+      `    ${capability.capability}: ${capability.status}${capability.method ? ` (${capability.method})` : ""}`,
+    );
+  }
+  if (result.blockerSummary) {
+    writeLine(
+      stdout,
+      `  Blocker: ${result.blockerKind ?? "unknown"} - ${result.blockerSummary}`,
     );
   }
 }

@@ -223,6 +223,7 @@ describe("DevNexus MCP server", () => {
       "automation_status",
       "eligible_work",
       "agent_profiles",
+      "codex_app_server_probe",
       "setup_flow_list",
       "setup_plan",
       "setup_check",

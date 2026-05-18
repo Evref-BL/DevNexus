@@ -44,6 +44,9 @@ import {
   getNexusAutomationEligibleWorkSummary,
 } from "./nexusAutomationAgentSurface.js";
 import {
+  probeCodexAppServerInitialize,
+} from "./codexAppServerInitializeProbe.js";
+import {
   appendNexusAutomationTargetCycleRecord,
   maxNexusAutomationTargetCycleNoteLength,
   readNexusAutomationTargetCycleLedger,
@@ -242,6 +245,20 @@ const tools: McpTool[] = [
         homePath: { type: "string" },
         project: { type: "string" },
         projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "codex_app_server_probe",
+    description: "Safely initialize the configured Codex app-server and report advertised methods and capability blockers without starting turns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        profileId: { type: "string" },
       },
       additionalProperties: false,
     },
@@ -1096,6 +1113,16 @@ export async function callDevNexusMcpTool(
           ok: true,
           ...getNexusAutomationAgentProfileSummary(projectRootFromArgs(args)),
         });
+      case "codex_app_server_probe": {
+        const probe = await probeCodexAppServerInitialize({
+          projectRoot: projectRootFromArgs(args),
+          profileId: optionalString(args, "profileId", "arguments"),
+        });
+        return toolResult({
+          ok: probe.status === "ready",
+          probe,
+        });
+      }
       case "setup_flow_list":
         return toolResult({
           ok: true,
