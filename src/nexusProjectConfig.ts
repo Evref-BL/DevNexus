@@ -65,6 +65,17 @@ import {
   type NexusRunnerProfileConfig,
   type NexusRunnerProfileLimitsConfig,
 } from "./nexusRunnerProfile.js";
+import {
+  nexusAuthorityActionNames,
+  recommendedNexusAuthorityRoleDefinitions,
+  type NexusAuthorityAction,
+  type NexusAuthorityActorConfig,
+  type NexusAuthorityActorKind,
+  type NexusAuthorityConfig,
+  type NexusAuthorityRoleBindingConfig,
+  type NexusAuthorityRoleDefinitionConfig,
+  type NexusAuthorityScopeConfig,
+} from "./nexusAuthority.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -267,6 +278,7 @@ export interface NexusProjectConfig {
   automation?: NexusAutomationConfig;
   hosts?: NexusProjectHostConfig[];
   runnerProfiles?: NexusRunnerProfileConfig[];
+  authority?: NexusAuthorityConfig;
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -669,6 +681,289 @@ function normalizeLegacyAgentTargets(
 
 function legacyMcpProvider(target: NexusProjectAgentMcpTarget): string {
   return (target.provider ?? target.agent).trim().toLowerCase();
+}
+
+const nexusAuthorityActionNameSet = new Set<string>(nexusAuthorityActionNames);
+const nexusAuthorityScopeKeys = [
+  "project",
+  "component",
+  "provider",
+  "tracker",
+  "repository",
+  "targetBranch",
+  "environment",
+] as const;
+
+function validateNexusAuthorityActorKind(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityActorKind {
+  if (
+    value === "human" ||
+    value === "machine_user" ||
+    value === "service_account" ||
+    value === "external_agent" ||
+    value === "local" ||
+    value === "team"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be human, machine_user, service_account, external_agent, local, or team`,
+  );
+}
+
+function validateNexusAuthorityActor(
+  value: unknown,
+  index: number,
+): NexusAuthorityActorConfig {
+  const pathName = `project config.authority.actors[${index}]`;
+  const record = assertRecord(value, pathName);
+  const handles = optionalStringRecord(record, "handles", pathName);
+
+  return {
+    id: requiredString(record, "id", pathName),
+    kind: validateNexusAuthorityActorKind(record.kind, `${pathName}.kind`),
+    provider: nullableString(record, "provider", pathName),
+    providerIdentity: requiredString(record, "providerIdentity", pathName),
+    displayName: requiredString(record, "displayName", pathName),
+    ...(handles ? { handles } : {}),
+  };
+}
+
+function validateNexusAuthorityActors(
+  value: unknown,
+): NexusAuthorityActorConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.authority.actors must be an array");
+  }
+
+  const actors = value.map(validateNexusAuthorityActor);
+  const actorIds = new Set<string>();
+  for (const actor of actors) {
+    if (actorIds.has(actor.id)) {
+      throw new NexusConfigError(
+        `project config.authority.actors contains duplicate id: ${actor.id}`,
+      );
+    }
+    actorIds.add(actor.id);
+  }
+
+  return actors;
+}
+
+function validateNexusAuthorityAction(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAction {
+  if (typeof value === "string" && nexusAuthorityActionNameSet.has(value)) {
+    return value as NexusAuthorityAction;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be one of ${nexusAuthorityActionNames.join(", ")}`,
+  );
+}
+
+function validateNexusAuthorityActions(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAction[] {
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(`${pathName} must not be empty`);
+  }
+
+  const actions = value.map((action, index) =>
+    validateNexusAuthorityAction(action, `${pathName}[${index}]`),
+  );
+  assertUniqueValues(actions, pathName);
+
+  return actions;
+}
+
+function validateNexusAuthorityRoleDefinition(
+  value: unknown,
+  index: number,
+): NexusAuthorityRoleDefinitionConfig {
+  const pathName = `project config.authority.roles[${index}]`;
+  const record = assertRecord(value, pathName);
+  const name = optionalString(record, "name", pathName);
+  const description = optionalString(record, "description", pathName);
+
+  return {
+    id: requiredString(record, "id", pathName),
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {}),
+    actions: validateNexusAuthorityActions(record.actions, `${pathName}.actions`),
+  };
+}
+
+function validateNexusAuthorityRoles(
+  value: unknown,
+): NexusAuthorityRoleDefinitionConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.authority.roles must be an array");
+  }
+
+  const roles = value.map(validateNexusAuthorityRoleDefinition);
+  const roleIds = new Set<string>();
+  for (const role of roles) {
+    if (roleIds.has(role.id)) {
+      throw new NexusConfigError(
+        `project config.authority.roles contains duplicate id: ${role.id}`,
+      );
+    }
+    roleIds.add(role.id);
+  }
+
+  return roles;
+}
+
+function validateNexusAuthorityScope(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityScopeConfig {
+  if (value === undefined) {
+    throw new NexusConfigError(`${pathName} must contain at least one scope`);
+  }
+
+  const record = assertRecord(value, pathName);
+  const scope: NexusAuthorityScopeConfig = {};
+  for (const key of nexusAuthorityScopeKeys) {
+    const scopeValue = optionalString(record, key, pathName);
+    if (scopeValue !== undefined) {
+      scope[key] = scopeValue;
+    }
+  }
+
+  if (Object.keys(scope).length === 0) {
+    throw new NexusConfigError(`${pathName} must contain at least one scope`);
+  }
+
+  return scope;
+}
+
+function validateNexusAuthorityBindingRoles(
+  value: unknown,
+  pathName: string,
+  knownRoleIds: Set<string>,
+): string[] {
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(`${pathName} must not be empty`);
+  }
+
+  const roles = value.map((role, index) => {
+    const roleId = role;
+    if (typeof roleId !== "string" || roleId.trim().length === 0) {
+      throw new NexusConfigError(
+        `${pathName}[${index}] must be a non-empty string`,
+      );
+    }
+    if (!knownRoleIds.has(roleId)) {
+      throw new NexusConfigError(
+        `${pathName}[${index}] references unknown role: ${roleId}`,
+      );
+    }
+
+    return roleId;
+  });
+  assertUniqueValues(roles, pathName);
+
+  return roles;
+}
+
+function validateNexusAuthorityRoleBinding(
+  value: unknown,
+  index: number,
+  knownRoleIds: Set<string>,
+): NexusAuthorityRoleBindingConfig {
+  const pathName = `project config.authority.roleBindings[${index}]`;
+  const record = assertRecord(value, pathName);
+
+  return {
+    actorId: requiredString(record, "actorId", pathName),
+    roles: validateNexusAuthorityBindingRoles(
+      record.roles,
+      `${pathName}.roles`,
+      knownRoleIds,
+    ),
+    scope: validateNexusAuthorityScope(record.scope, `${pathName}.scope`),
+  };
+}
+
+function validateNexusAuthorityRoleBindings(
+  value: unknown,
+  knownRoleIds: Set<string>,
+): NexusAuthorityRoleBindingConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(
+      "project config.authority.roleBindings must be an array",
+    );
+  }
+
+  return value.map((binding, index) =>
+    validateNexusAuthorityRoleBinding(binding, index, knownRoleIds),
+  );
+}
+
+function validateNexusAuthorityConfig(
+  value: unknown,
+): NexusAuthorityConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const pathName = "project config.authority";
+  const record = assertRecord(value, pathName);
+  const actors = validateNexusAuthorityActors(record.actors);
+  const roles = validateNexusAuthorityRoles(record.roles);
+  const knownRoleIds = new Set<string>(
+    recommendedNexusAuthorityRoleDefinitions.map((role) => role.id),
+  );
+  for (const role of roles ?? []) {
+    knownRoleIds.add(role.id);
+  }
+
+  const unknownActorFallbackRole = optionalString(
+    record,
+    "unknownActorFallbackRole",
+    pathName,
+  );
+  if (
+    unknownActorFallbackRole !== undefined &&
+    !knownRoleIds.has(unknownActorFallbackRole)
+  ) {
+    throw new NexusConfigError(
+      `${pathName}.unknownActorFallbackRole references unknown role: ${unknownActorFallbackRole}`,
+    );
+  }
+  const roleBindings = validateNexusAuthorityRoleBindings(
+    record.roleBindings,
+    knownRoleIds,
+  );
+
+  return {
+    ...(actors !== undefined ? { actors } : {}),
+    ...(roles !== undefined ? { roles } : {}),
+    ...(roleBindings !== undefined ? { roleBindings } : {}),
+    ...(unknownActorFallbackRole !== undefined ? { unknownActorFallbackRole } : {}),
+  };
 }
 
 function validateKanbanConfig(
@@ -2998,6 +3293,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const automation = validateNexusAutomationConfig(record.automation);
   const hosts = validateProjectHostsConfig(record.hosts);
   const runnerProfiles = validateRunnerProfilesConfig(record.runnerProfiles);
+  const authority = validateNexusAuthorityConfig(record.authority);
   const repo = validateRepoConfig(record.repo);
   const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
@@ -3030,6 +3326,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(automation ? { automation } : {}),
     hosts,
     ...(runnerProfiles !== undefined ? { runnerProfiles } : {}),
+    ...(authority ? { authority } : {}),
   };
 }
 
