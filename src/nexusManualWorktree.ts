@@ -13,6 +13,7 @@ import {
   type NexusAutomationWorktreeSetupResult,
 } from "./nexusAutomationWorktreeSetup.js";
 import {
+  activeNexusProjectAgentProviders,
   loadProjectConfig,
   projectWorktreesRootPath,
   type NexusProjectConfig,
@@ -238,6 +239,7 @@ export function prepareNexusManualWorktree(
       },
       pluginFragments: projectPluginWorkerFragments(projectConfig, {
         componentId: target.ownerId,
+        activeAgents: activeNexusProjectAgentProviders(projectConfig),
       }),
       runnerProfiles: buildNexusRunnerProfilePolicySummary(
         projectConfig.runnerProfiles,
@@ -377,6 +379,7 @@ function manualWorktreePluginDependencyProjections(options: {
 
   return projectPluginDependencyProjections(options.projectConfig, {
     componentId: options.componentId,
+    activeAgents: activeNexusProjectAgentProviders(options.projectConfig),
   }).map((projection) => {
     const sourceComponent = projection.sourceComponentId
       ? componentsById.get(projection.sourceComponentId)

@@ -149,6 +149,7 @@ import {
 } from "./nexusHomeConfig.js";
 import {
   loadProjectConfig,
+  selectNexusProjectMcpAgentTargets,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -1375,9 +1376,10 @@ async function handleProjectMcpCommand(
   const result = materializeNexusProjectAgentMcpConfig({
     projectRoot,
     mcpConfig: projectConfig.mcp,
-    ...(parsed.agents.length > 0
-      ? { agentTargets: parsed.agents.map((agent) => ({ agent })) }
-      : {}),
+    agentTargets: selectNexusProjectMcpAgentTargets(
+      projectConfig,
+      parsed.agents,
+    ),
   });
   printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
   return 0;

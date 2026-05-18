@@ -61,6 +61,7 @@ export interface NexusProjectSkillsConfig {
 export interface MaterializeNexusProjectSkillsOptions {
   projectRoot: string;
   skillsConfig?: NexusProjectSkillsConfig;
+  agentTargets?: NexusProjectSkillAgentTarget[];
   skillDefinitions?: NexusSkillDefinition[];
   excludeFromGit?: boolean;
 }
@@ -1007,7 +1008,9 @@ export function materializeNexusProjectSkills(
   const installed = expected.map(({ definition, manifest }) =>
     materializeSkill(options.projectRoot, definition, manifest),
   );
-  const agentTargets = (options.skillsConfig?.agentTargets ?? [])
+  const configuredAgentTargets =
+    options.agentTargets ?? options.skillsConfig?.agentTargets ?? [];
+  const agentTargets = configuredAgentTargets
     .filter((target) => target.enabled !== false)
     .map((target) => {
       const targetSkillsDirectory = resolveAgentSkillsDirectory(

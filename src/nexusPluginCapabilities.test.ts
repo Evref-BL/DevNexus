@@ -235,6 +235,44 @@ describe("nexus plugin dependency projections", () => {
       },
     ]);
   });
+
+  it("filters dependency projections by compatible active agents", () => {
+    expect(
+      projectPluginDependencyProjections(
+        {
+          plugins: [
+            {
+              id: "agent-tools",
+              enabled: true,
+              capabilities: [
+                {
+                  kind: "dependency_projection",
+                  id: "codex-only",
+                  source: "codex",
+                  target: "codex",
+                  targetAgents: ["codex"],
+                },
+                {
+                  kind: "dependency_projection",
+                  id: "claude-only",
+                  source: "claude",
+                  target: "claude",
+                  targetAgents: ["claude"],
+                },
+                {
+                  kind: "dependency_projection",
+                  id: "all-active",
+                  source: "all",
+                  target: "all",
+                },
+              ],
+            },
+          ],
+        },
+        { activeAgents: ["codex"] },
+      ).map((projection) => projection.id),
+    ).toEqual(["all-active", "codex-only"]);
+  });
 });
 
 describe("nexus plugin worker fragments", () => {
@@ -357,6 +395,58 @@ describe("nexus plugin worker fragments", () => {
             version: null,
             capabilityId: "shared",
           },
+        },
+      ],
+    });
+  });
+
+  it("filters worker fragments by compatible active agents", () => {
+    expect(
+      projectPluginWorkerFragments(
+        {
+          plugins: [
+            {
+              id: "agent-fragments",
+              enabled: true,
+              capabilities: [
+                {
+                  kind: "worker_context_fragment",
+                  id: "codex-facts",
+                  title: "Codex Facts",
+                  body: "Codex context.",
+                  provenance: "agent-fragments",
+                  targetAgents: ["codex"],
+                },
+                {
+                  kind: "worker_context_fragment",
+                  id: "claude-facts",
+                  title: "Claude Facts",
+                  body: "Claude context.",
+                  provenance: "agent-fragments",
+                  targetAgents: ["claude"],
+                },
+                {
+                  kind: "worker_briefing_fragment",
+                  id: "shared-briefing",
+                  title: "Shared Briefing",
+                  body: "Shared briefing.",
+                  provenance: "agent-fragments",
+                },
+              ],
+            },
+          ],
+        },
+        { activeAgents: ["codex"] },
+      ),
+    ).toMatchObject({
+      context: [
+        {
+          id: "codex-facts",
+        },
+      ],
+      briefing: [
+        {
+          id: "shared-briefing",
         },
       ],
     });

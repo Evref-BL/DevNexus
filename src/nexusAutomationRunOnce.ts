@@ -26,6 +26,7 @@ import {
   type NexusAutomationWorktreeSetupResult,
 } from "./nexusAutomationWorktreeSetup.js";
 import {
+  activeNexusProjectAgentProviders,
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -450,6 +451,7 @@ export async function runNexusAutomationOnce(
         },
         pluginFragments: projectPluginWorkerFragments(projectConfig, {
           componentId: primaryComponent.id,
+          activeAgents: activeNexusProjectAgentProviders(projectConfig),
         }),
         publication: resolveNexusPublicationPolicy(
           projectConfig,
@@ -703,6 +705,7 @@ function automationPluginDependencyProjections(
 
   return projectPluginDependencyProjections(projectConfig, {
     componentId,
+    activeAgents: activeNexusProjectAgentProviders(projectConfig),
   }).map((projection) => {
     const sourceComponent = projection.sourceComponentId
       ? componentsById.get(projection.sourceComponentId)

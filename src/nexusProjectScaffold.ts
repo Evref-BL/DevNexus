@@ -8,8 +8,12 @@ import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
-import type { NexusProjectMcpConfig } from "./nexusProjectConfig.js";
-import type { NexusProjectConfig } from "./nexusProjectConfig.js";
+import {
+  activeNexusProjectMcpAgentTargets,
+  activeNexusProjectSkillAgentTargets,
+  type NexusProjectMcpConfig,
+  type NexusProjectConfig,
+} from "./nexusProjectConfig.js";
 import {
   materializeNexusProjectTemplate,
   type MaterializeNexusProjectTemplateResult,
@@ -91,6 +95,10 @@ export function scaffoldNexusProject<
       : materializeNexusProjectSkills({
           projectRoot: options.projectRoot,
           skillsConfig: options.skills,
+          agentTargets: activeNexusProjectSkillAgentTargets({
+            ...options.projectConfig,
+            ...(options.skills !== undefined ? { skills: options.skills } : {}),
+          }),
           skillDefinitions: [
             ...extensionSkills,
             ...(options.skillDefinitions ?? []),
@@ -102,6 +110,10 @@ export function scaffoldNexusProject<
       : materializeNexusProjectAgentMcpConfig({
           projectRoot: options.projectRoot,
           mcpConfig: options.mcp,
+          agentTargets: activeNexusProjectMcpAgentTargets({
+            ...options.projectConfig,
+            mcp: options.mcp,
+          }),
         });
 
   return {

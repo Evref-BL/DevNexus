@@ -48,6 +48,7 @@ export interface NexusPluginMcpServerCapability
   extends NexusPluginCapabilityBase {
   kind: "mcp_server";
   serverName: string;
+  targetAgents?: string[];
   tools?: NexusPluginMcpToolCapability[];
 }
 
@@ -136,6 +137,7 @@ export type NexusPluginCapabilityProjectionRecord =
       id: string;
       description: string | null;
       serverName: string;
+      targetAgents: string[];
       tools: Array<{
         name: string;
         description: string | null;
@@ -227,6 +229,7 @@ export interface NexusPluginWorkerFragmentsProjection {
 export interface ProjectPluginWorkerFragmentsOptions {
   componentId?: string | null;
   agent?: string | null;
+  activeAgents?: string[];
 }
 
 export interface NexusPluginDependencyProjectionSource {
@@ -254,6 +257,7 @@ export interface NexusPluginDependencyProjection {
 export interface ProjectPluginDependencyProjectionsOptions {
   componentId?: string | null;
   agent?: string | null;
+  activeAgents?: string[];
 }
 
 export function projectPluginCapabilityProjections(config: {
@@ -333,6 +337,7 @@ function projectCapabilityRecord(
       id: capability.id,
       description: capability.description ?? null,
       serverName: capability.serverName,
+      targetAgents: capability.targetAgents ?? [],
       tools: (capability.tools ?? []).map((tool) => ({
         name: tool.name,
         description: tool.description ?? null,
@@ -479,7 +484,7 @@ function dependencyProjectionMatchesScope(
 ): boolean {
   return (
     targetMatches(capability.targetComponents, options.componentId) &&
-    targetMatches(capability.targetAgents, options.agent)
+    targetAgentMatches(capability.targetAgents, options)
   );
 }
 
@@ -489,8 +494,23 @@ function workerFragmentMatchesScope(
 ): boolean {
   return (
     targetMatches(capability.targetComponents, options.componentId) &&
-    targetMatches(capability.targetAgents, options.agent)
+    targetAgentMatches(capability.targetAgents, options)
   );
+}
+
+function targetAgentMatches(
+  targets: string[] | undefined,
+  options: { agent?: string | null; activeAgents?: string[] },
+): boolean {
+  if (options.agent) {
+    return targetMatches(targets, options.agent);
+  }
+  if (!targets || targets.length === 0 || !options.activeAgents) {
+    return true;
+  }
+
+  const activeAgents = new Set(options.activeAgents);
+  return targets.some((target) => activeAgents.has(target));
 }
 
 function targetMatches(

@@ -574,6 +574,69 @@ export function normalizeNexusProjectAgentTargets(
   };
 }
 
+export function activeNexusProjectMcpAgentTargets(
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
+): NexusProjectAgentMcpTarget[] {
+  return normalizeNexusProjectAgentTargets(config).targets.flatMap((target) =>
+    target.mcp.enabled && target.mcp.target ? [target.mcp.target] : [],
+  );
+}
+
+export function activeNexusProjectSkillAgentTargets(
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
+): NexusProjectSkillAgentTarget[] {
+  return normalizeNexusProjectAgentTargets(config).targets.flatMap((target) =>
+    target.skills.enabled && target.skills.target ? [target.skills.target] : [],
+  );
+}
+
+export function activeNexusProjectAgentProviders(
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
+): string[] {
+  return normalizeNexusProjectAgentTargets(config).targets.map(
+    (target) => target.provider,
+  );
+}
+
+export function selectNexusProjectMcpAgentTargets(
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
+  selectedAgents: readonly string[],
+): NexusProjectAgentMcpTarget[] {
+  const activeTargets = activeNexusProjectMcpAgentTargets(config);
+  if (selectedAgents.length === 0) {
+    return activeTargets;
+  }
+
+  return selectedAgents.map((agent) =>
+    findConfiguredMcpTarget(config, activeTargets, agent) ?? { agent },
+  );
+}
+
+function findConfiguredMcpTarget(
+  config: Pick<NexusProjectConfig, "mcp">,
+  activeTargets: readonly NexusProjectAgentMcpTarget[],
+  agent: string,
+): NexusProjectAgentMcpTarget | null {
+  const selected = agent.trim().toLowerCase();
+  return (
+    activeTargets.find((target) => mcpTargetMatchesSelection(target, selected)) ??
+    config.mcp?.agentTargets?.find((target) =>
+      target.enabled !== false && mcpTargetMatchesSelection(target, selected),
+    ) ??
+    null
+  );
+}
+
+function mcpTargetMatchesSelection(
+  target: NexusProjectAgentMcpTarget,
+  selected: string,
+): boolean {
+  return (
+    target.agent.trim().toLowerCase() === selected ||
+    (target.provider ?? target.agent).trim().toLowerCase() === selected
+  );
+}
+
 function normalizeExplicitAgentTarget(
   target: NexusProjectActiveAgentTargetConfig,
 ): NormalizedNexusProjectAgentTarget {
@@ -1661,12 +1724,14 @@ function validatePluginCapabilityRecord(
   }
 
   if (kind === "mcp_server") {
+    const targetAgents = optionalStringArray(record, "targetAgents", pathName);
     const tools = validatePluginMcpTools(record.tools, `${pathName}.tools`);
     return {
       kind,
       id,
       ...(description !== undefined ? { description } : {}),
       serverName: requiredString(record, "serverName", pathName),
+      ...(targetAgents !== undefined ? { targetAgents } : {}),
       ...(tools !== undefined ? { tools } : {}),
     };
   }

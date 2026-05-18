@@ -185,6 +185,97 @@ describe("nexus project scaffold", () => {
     ).toBe(true);
   });
 
+  it("materializes only Codex support for a Codex active target", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+    const projectConfig = minimalProjectConfig({
+      id: "project-1",
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      skills: {
+        defaultCorePack: false,
+        items: [{ id: "handoff" }],
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    });
+
+    scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig,
+      skills: projectConfig.skills,
+      mcp: projectConfig.mcp,
+    });
+
+    expect(
+      fs.existsSync(path.join(projectRoot, ".agents", "skills", "handoff")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, ".claude"))).toBe(false);
+    expect(fs.existsSync(path.join(projectRoot, ".mcp.json"))).toBe(false);
+  });
+
+  it("materializes both native providers when both are active", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+    const projectConfig = minimalProjectConfig({
+      id: "project-1",
+      agentTargets: {
+        active: [
+          { provider: "codex" },
+          { provider: "claude" },
+        ],
+      },
+      skills: {
+        defaultCorePack: false,
+        items: [{ id: "handoff" }],
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    });
+
+    scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig,
+      skills: projectConfig.skills,
+      mcp: projectConfig.mcp,
+    });
+
+    expect(
+      fs.existsSync(path.join(projectRoot, ".agents", "skills", "handoff")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".claude", "skills", "handoff")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, ".mcp.json"))).toBe(true);
+  });
+
   it("materializes the generic project template layout without arity-one worktree special casing", () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     const worktreesRoot = path.join(projectRoot, "worktrees");

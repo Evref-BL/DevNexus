@@ -129,6 +129,31 @@ describe("nexus skills", () => {
     ).toBe(false);
   });
 
+  it("projects skills only into the selected agent-native target set", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+
+    const result = materializeNexusProjectSkills({
+      projectRoot,
+      skillsConfig: {
+        defaultCorePack: false,
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+        items: [{ id: "handoff" }],
+      },
+      agentTargets: [{ agent: "codex" }],
+    });
+
+    expect(result.agentTargets.map((target) => target.agent)).toEqual([
+      "codex",
+    ]);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".agents", "skills", "handoff")),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, ".claude"))).toBe(false);
+  });
+
   it("includes planning and documentation skills with expanded acronyms", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
