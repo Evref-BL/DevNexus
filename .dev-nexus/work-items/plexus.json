@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 44,
-  "updatedAt": "2026-05-18T00:30:34.108Z",
+  "nextCommentNumber": 47,
+  "updatedAt": "2026-05-18T01:27:47.187Z",
   "items": [
     {
       "id": "local-1",
@@ -445,7 +445,7 @@
       "id": "local-19",
       "title": "Improve PLexus runtime diagnostics",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-16, plexus:local-17, plexus:local-18.\n\nGoal:\nMake split-brain and mixed-state situations visible from PLexus status, and report fresh no-image projects as healthy idle runtime scopes.\n\nAcceptance criteria:\n- Project status reports state root, target id, workspace id, gateway endpoint, control endpoint, image MCP ports, and active port claims.\n- Diagnostics identify conflicting listeners and stale claims separately.\n- Route table state is visible enough to tell whether the gateway can route a configured image.\n- Legacy gateway or legacy MCP configuration is called out with migration guidance.\n- Zero-image projects report operational-but-idle when their runtime policy and gateway state are valid.\n\nVerification:\nRun status/diagnostics tests and capture one local status sample for a zero-image project.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -457,8 +457,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.095Z",
-      "updatedAt": "2026-05-18T00:30:34.108Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T01:27:47.187Z",
+      "closedAt": "2026-05-18T01:27:47.187Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1025,6 +1025,39 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-43"
+        }
+      },
+      {
+        "id": "local-comment-44",
+        "body": "Coordinator selected this item for the current parallel dogfood batch. Implementation will run in an isolated PLexus component worktree; any local status sample must stay within approved runtime policy and avoid unrelated live image mutation.",
+        "author": null,
+        "createdAt": "2026-05-18T01:11:52.202Z",
+        "updatedAt": "2026-05-18T01:11:52.202Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-44"
+        }
+      },
+      {
+        "id": "local-comment-45",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/plexus/local-19-runtime-diagnostics\nHead: 6b5958ef7a38204c7199681cd1bd60425e3bbc60\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T01:27:37.042Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-19\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\plexus\\\\local-19-runtime-diagnostics\",\n  \"branch\": \"codex/plexus/local-19-runtime-diagnostics\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"6b5958ef7a38204c7199681cd1bd60425e3bbc60\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/projectLifecycle.ts\",\n    \"packages/plexus-core/src/projectLifecycle.test.ts\"\n  ],\n  \"decisions\": [\n    \"Published direct integration commit 6b5958e to origin/main.\",\n    \"Zero-image projects now report operational-but-idle when runtime scope, gateway endpoints, claims, and route table are valid.\"\n  ],\n  \"verificationSummary\": \"Focused diagnostics tests passed; npm test passed; npm run typecheck passed; npm run build passed.\",\n  \"integrationPreference\": \"Already fast-forwarded to origin/main.\",\n  \"note\": \"Zero-image status sample captured under the local worktree .plexus sample directory; no live image or gateway process was started.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T01:27:37.057Z",
+        "updatedAt": "2026-05-18T01:27:37.057Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-45"
+        }
+      },
+      {
+        "id": "local-comment-46",
+        "body": "Completed and published to origin/main as PLexus 6b5958e. Verification: focused diagnostics tests passed; npm test passed; npm run typecheck passed; npm run build passed. Captured a zero-image status sample in the implementation worktree showing operational-but-idle with active gateway claim and registered route table. No live image or gateway process was started.",
+        "author": null,
+        "createdAt": "2026-05-18T01:27:47.163Z",
+        "updatedAt": "2026-05-18T01:27:47.163Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-46"
         }
       }
     ],

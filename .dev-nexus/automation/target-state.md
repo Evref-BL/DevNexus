@@ -84,6 +84,11 @@ Immediate direction:
     through PLexus `b220adf`. The integration first incorporated the upstream
     runtime foundation commits `75b6bc4` and `8a8b407`, then added image MCP
     port-claim allocation and project-local gateway deployment.
+  - `plexus:local-19` is complete and published through PLexus `6b5958e`.
+    `plexus_project_status` now reports runtime scope, state root, target and
+    workspace ids, gateway/control endpoints, image MCP ports, active/stale
+    port claims, conflicting listeners, route-table state, legacy migration
+    guidance, and zero-image `operational-but-idle` diagnostics.
 - The six-item parallel dogfood wave selected by
   `coordinator-loop-20260517-t220947-388-z-1` is complete:
   - `dev-nexus:local-33`, `dev-nexus:local-58`, `dev-nexus:local-59`, and
@@ -92,13 +97,23 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus-pharo:local-13` project-scoped Codex setup generation. Promoted
-    after PLexus runtime dependencies `plexus:local-15` and `plexus:local-18`
-    completed.
-  - `plexus:local-19` runtime diagnostics/status reporting. Promoted after
-    PLexus runtime dependencies `plexus:local-16`, `plexus:local-17`, and
-    `plexus:local-18` completed.
+- The two-item runtime setup/diagnostics batch selected by
+  `coordinator-loop-20260518-t010948-846-z-1` is complete:
+  - `dev-nexus-pharo:local-13` is published through DevNexus-Pharo `a2cb09f`.
+    Codex setup generation now preserves unrelated MCP entries, migrates
+    managed legacy Pharo/PLexus entries to project-scoped `plexus_project`,
+    `pharo_launcher`, `route_control`, and `gateway` entries, assigns
+    project-local gateway ports, preserves existing images and image execution
+    policy, and keeps fresh zero-image PLexus projects ready for future Pharo
+    work. The generated PLexus gateway runtime metadata matches PLexus policy
+    fields (`agentMcpPath`, `routeControlMcpPath`) and `/control-mcp`.
+  - `plexus:local-19` is published through PLexus `6b5958e`.
+  - DevNexus-Pharo focused setup tests plus `npm run check` passed; PLexus
+    focused diagnostics tests, `npm test`, `npm run typecheck`, and
+    `npm run build` passed. No live image, Docker, or gateway process was
+    started.
+- Current ready `dogfood` work matching the automation selector: none after
+  closing `dev-nexus-pharo:local-13` and `plexus:local-19`.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

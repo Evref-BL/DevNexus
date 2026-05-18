@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 14,
-  "nextCommentNumber": 29,
-  "updatedAt": "2026-05-18T00:30:34.037Z",
+  "nextCommentNumber": 32,
+  "updatedAt": "2026-05-18T01:27:47.175Z",
   "items": [
     {
       "id": "local-1",
@@ -300,7 +300,7 @@
       "id": "local-13",
       "title": "Generate clean DevNexus-Pharo Codex setup per project",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-18.\n\nGoal:\nUpdate the DevNexus-Pharo setup path so each managed Codex project receives clean project-scoped PLexus configuration, project-local gateway settings, and the expected Pharo skills and Model Context Protocol (MCP) tools without deleting fresh zero-image PLexus projects.\n\nAcceptance criteria:\n- Generated Codex configuration preserves unrelated MCP entries while adding or updating the PLexus project, Pharo Launcher, route-control, and gateway entries needed for the project.\n- Generated project-local gateway ports are unique by policy and validated before being written.\n- Existing project images and image execution settings are preserved during config regeneration.\n- A fresh project with no images keeps its PLexus files and reports as ready for future Pharo work.\n- Tests cover config merge behavior, unique gateway port assignment, zero-image preservation, and migration from the current home-scoped DevNexus-Pharo config shape.\n\nVerification:\nRun the DevNexus-Pharo unit tests that exercise Codex/MCP config generation and extension install/update flows.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -313,8 +313,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.193Z",
-      "updatedAt": "2026-05-18T00:30:34.037Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T01:27:47.175Z",
+      "closedAt": "2026-05-18T01:27:47.175Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -655,6 +655,39 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-28"
+        }
+      },
+      {
+        "id": "local-comment-29",
+        "body": "Coordinator selected this item for the current parallel dogfood batch. Implementation will run in an isolated dev-nexus-pharo component worktree; no live Pharo image mutation is planned.",
+        "author": null,
+        "createdAt": "2026-05-18T01:11:52.198Z",
+        "updatedAt": "2026-05-18T01:11:52.198Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-29"
+        }
+      },
+      {
+        "id": "local-comment-30",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus-pharo/local-13-project-scoped-codex-setup\nHead: a2cb09f92a2563db07a4c0b823b081f32edf7f49\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T01:27:37.025Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-13\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-pharo\\\\local-13-project-scoped-codex-setup\",\n  \"branch\": \"codex/dev-nexus-pharo/local-13-project-scoped-codex-setup\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"a2cb09f92a2563db07a4c0b823b081f32edf7f49\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/codexConfig.ts\",\n    \"src/devNexusPharoExtension.ts\",\n    \"src/devNexusPharoPlugin.ts\",\n    \"README.md\",\n    \"docs/development.md\"\n  ],\n  \"decisions\": [\n    \"Published direct integration commit a2cb09f to origin/main.\",\n    \"Generated PLexus runtime metadata now matches PLexus policy field names agentMcpPath and routeControlMcpPath with /control-mcp.\"\n  ],\n  \"verificationSummary\": \"npx vitest run src/codexConfig.test.ts passed; focused setup tests passed; npm run check passed (20 files, 191 tests).\",\n  \"integrationPreference\": \"Already fast-forwarded to origin/main.\",\n  \"note\": \"No live PLexus gateway, image, Docker, route, or OS listener smoke was run.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T01:27:37.045Z",
+        "updatedAt": "2026-05-18T01:27:37.045Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-30"
+        }
+      },
+      {
+        "id": "local-comment-31",
+        "body": "Completed and published to origin/main as DevNexus-Pharo a2cb09f. Verification: npx vitest run src/codexConfig.test.ts passed; focused setup tests passed; npm run check passed (20 test files, 191 tests). Coordinator patched generated PLexus gateway metadata to match PLexus runtime policy fields and /control-mcp before publication. No live gateway/image/Docker smoke was run.",
+        "author": null,
+        "createdAt": "2026-05-18T01:27:47.148Z",
+        "updatedAt": "2026-05-18T01:27:47.148Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-31"
         }
       }
     ]
