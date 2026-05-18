@@ -1,7 +1,504 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T19:47:06.471Z",
+  "updatedAt": "2026-05-18T21:53:58.247Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-46a1f9f10723ca3b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-127",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusProjectHostingIntegrationFixture.ts",
+        "src/nexusProjectHostingIntegrationFixture.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:52:08.045Z",
+      "lastSeenAt": "2026-05-18T21:52:08.045Z",
+      "updatedAt": "2026-05-18T21:52:08.045Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "ba9976e39c6da20bb2a1148351a13843482e78e3",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published to bot/main in merge commit ba9976e.",
+        "Verification: Integrated with local-87 and local-81 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-edb50c38d752b06e",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-81",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusRemoteExecution.ts",
+        "src/nexusRemoteExecution.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:52:07.266Z",
+      "lastSeenAt": "2026-05-18T21:52:07.266Z",
+      "updatedAt": "2026-05-18T21:52:07.266Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "ba9976e39c6da20bb2a1148351a13843482e78e3",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published to bot/main in merge commit ba9976e.",
+        "Verification: Integrated with local-87 and local-127 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-4795830a9525b891",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-87",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:52:06.308Z",
+      "lastSeenAt": "2026-05-18T21:52:06.308Z",
+      "updatedAt": "2026-05-18T21:52:06.308Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "ba9976e39c6da20bb2a1148351a13843482e78e3",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published to bot/main in merge commit ba9976e.",
+        "Verification: Integrated with local-81 and local-127 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f7228e0a4e4ed9a4",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-127",
+      "branchName": "codex/dev-nexus-local-127-hosting-fixture-test",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-127-hosting-fixture-test"
+      },
+      "writeScope": [
+        "src/nexusProjectHostingIntegrationFixture.ts",
+        "src/nexusProjectHostingIntegrationFixture.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:42:19.376Z",
+      "lastSeenAt": "2026-05-18T21:53:58.247Z",
+      "updatedAt": "2026-05-18T21:53:58.247Z",
+      "refreshCount": 2,
+      "lastObservedHeadCommit": "da3ed560f31c16411ab69a26b2ad8a71143bba33",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-127-hosting-fixture-test"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Committed source branch codex/dev-nexus-local-127-hosting-fixture-test at da3ed56. Full npm run check not run because the Windows checkout still has known Mac-owned nexusSetupAssistant path assertion failures.",
+        "Verification: Passed: npm test -- src/nexusProjectHostingIntegrationFixture.test.ts; npm test -- src/nexusProjectHosting.test.ts src/nexusProjectHostingIntegrationFixture.test.ts; npm test -- --exclude src/nexusSetupAssistant.test.ts; npm run build; git diff --check.",
+        "Source branch codex/dev-nexus-local-127-hosting-fixture-test was merged to DevNexus main at ba9976e, pushed through bot/main, then its worktree and branch were removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-07eeb165489f9caa",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-81",
+      "branchName": "codex/dev-nexus-local-81-remote-records",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-81-remote-records"
+      },
+      "writeScope": [
+        "src/nexusRemoteExecution.ts",
+        "src/nexusRemoteExecution.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusCoreMcpTools.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:32:36.780Z",
+      "lastSeenAt": "2026-05-18T21:53:58.247Z",
+      "updatedAt": "2026-05-18T21:53:58.247Z",
+      "refreshCount": 2,
+      "lastObservedHeadCommit": "9133beead49f621855fbed8cec5ab5fd59eaf0b0",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-81-remote-records"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Rebased onto bot/main 5290da8 before final verification and commit.",
+        "Verification: Passed: npm run build; npm test -- src/nexusRemoteExecution.test.ts; npm test -- src/nexusMcpServer.test.ts; git diff --check. npm run check still fails only src/nexusSetupAssistant.test.ts path-rendering assertions outside local-81 scope.",
+        "Integration preference: Ready for integration from local commit 9133bee; not pushed per user instruction.",
+        "Source branch codex/dev-nexus-local-81-remote-records was merged to DevNexus main at ba9976e, pushed through bot/main, then its worktree and branch were removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-508c2a165aad59ee",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-87",
+      "branchName": "codex/dev-nexus-local-87-authority-handoff",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/local-87-authority-handoff"
+      },
+      "writeScope": [
+        ".dev-nexus/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:43:33.447Z",
+      "lastSeenAt": "2026-05-18T21:53:58.247Z",
+      "updatedAt": "2026-05-18T21:53:58.247Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "7d58251e6f37735afaa905caea31b75aa0b0fd85",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/local-87-authority-handoff"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Temporary project-meta handoff worktree was superseded by preserved local-87 tracker comment local-comment-247 and merged handoff local-comment-244, then its worktree and branch were removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-941fd5bf25ea2a65",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-126",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusSetupAssistant.ts",
+        "src/nexusSetupAssistant.test.ts",
+        "src/nexusProjectHosting.ts",
+        "docs/user/getting-started.md",
+        "docs/dev/architecture.md",
+        "README.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:39:51.799Z",
+      "lastSeenAt": "2026-05-18T21:39:51.799Z",
+      "updatedAt": "2026-05-18T21:39:51.799Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "5290da843d48d7cd2280d3e05d0d9bb33847b95f",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Source main now includes 5290da8.",
+        "Verification: Passed on integrated main: npm test -- src/nexusSetupAssistant.test.ts -t \"GitHub meta-project\"; npm test -- src/nexusProjectHosting.test.ts; npm run build; git diff --check.",
+        "Integration preference: Published to bot/main."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-20ea9e3f75937239",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-126",
+      "branchName": "codex/dev-nexus-local-126-hosting-setup",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-126-hosting-setup"
+      },
+      "writeScope": [
+        "src/nexusSetupAssistant.ts",
+        "src/nexusSetupAssistant.test.ts",
+        "src/nexusProjectHosting.ts",
+        "docs/user/getting-started.md",
+        "docs/dev/architecture.md",
+        "README.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:32:30.139Z",
+      "lastSeenAt": "2026-05-18T21:53:58.247Z",
+      "updatedAt": "2026-05-18T21:53:58.247Z",
+      "refreshCount": 2,
+      "lastObservedHeadCommit": "81e2ac8b990eb4b91e610e64fdfa692e8e42b639",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-126-hosting-setup"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Committed 81e2ac8 on codex/dev-nexus-local-126-hosting-setup.",
+        "Verification: Passed: npm test -- src/nexusSetupAssistant.test.ts -t \"GitHub meta-project\"; npm test -- src/nexusProjectHosting.test.ts; npm run build; git diff --check. Broader src/nexusSetupAssistant.test.ts still fails in known Mac path assertions outside this slice.",
+        "Integration preference: Direct integration to bot/main after coordinator review.",
+        "Source branch codex/dev-nexus-local-126-hosting-setup was previously merged to DevNexus main at 5290da8, pushed through bot/main, then its worktree and branch were removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-08771dcde05da44d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-87",
+      "branchName": "codex/dev-nexus-local-87-authority-model",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-87-authority-model"
+      },
+      "writeScope": [
+        "src/config.ts",
+        "src/nexusProject.ts",
+        "src/**authority**",
+        "src/**Authority**",
+        "src/*config*.test.ts",
+        "src/*Project*.test.ts",
+        "docs/coordination-roles-authority-prd.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T21:32:42.462Z",
+      "lastSeenAt": "2026-05-18T21:53:58.247Z",
+      "updatedAt": "2026-05-18T21:53:58.247Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "c6d9ac9df5cda13fec8880e74aab0241c0c17dcf",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-87-authority-model"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Worker owns neutral authority config model only. Do not implement enforcement/gating behavior in this slice.",
+        "Source branch codex/dev-nexus-local-87-authority-model was merged to DevNexus main at ba9976e, pushed through bot/main, then its worktree and branch were removed."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

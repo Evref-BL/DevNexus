@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 143,
-  "nextCommentNumber": 240,
-  "updatedAt": "2026-05-18T21:27:14.180Z",
+  "nextCommentNumber": 248,
+  "updatedAt": "2026-05-18T21:52:57.960Z",
   "items": [
     {
       "id": "local-1",
@@ -2017,7 +2017,7 @@
       "id": "local-81",
       "title": "Record remote execution requests and results",
       "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 and dev-nexus:local-80\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add durable request/result records for bounded remote host work while keeping DevNexus coordination state separate from the eventual execution transport.\n\nUser stories covered:\n- As a Windows agent, I can request Mac-specific verification and later read a structured result without relying on terminal chat.\n- As a Mac agent, I can record a Windows-specific verification result with command, commit, exit code, and output tail.\n\nAcceptance criteria:\n- DevNexus can create an execution request with project, component, optional work item, requesting host/agent, required capabilities or target host, runner profile, repository/ref, command profile, timeout, expected artifacts, mutation class, and initial status.\n- DevNexus can record a result with host id, runner profile id, actual commit/ref, commands run, exit code, verification outcome, output tail, artifact references, cleanup status, and blocker/safety reason when applicable.\n- Request statuses include queued, accepted, running, completed, failed, blocked, timed_out, and cancelled.\n- CLI and MCP expose request creation and result read/record operations in draft/local form with no remote execution.\n- Request/result records can be attached to work items or coordination records without duplicating source-of-truth fields.\n\nBoundaries:\n- Do not run local or remote commands in this slice.\n- Do not post to live external providers unless an existing provider policy explicitly allows it; local tracker coverage is sufficient.\n\nVerification:\n- Focused CLI/MCP/service tests for request creation, status transitions, result recording, malformed output tails, and component/work-item references.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2030,8 +2030,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:04:30.003Z",
-      "updatedAt": "2026-05-18T15:52:01.747Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T21:52:19.433Z",
+      "closedAt": "2026-05-18T21:52:19.433Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2176,7 +2176,7 @@
       "id": "local-87",
       "title": "Add actor role and authority configuration model",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add the neutral actor, role, action, and scoped authority configuration model without changing publication behavior yet.\n\nUser stories covered:\n- As a project owner, I can declare that a bot account is a maintainer for my private DevNexus project and a contributor for external repositories.\n- As a maintainer, I can define recommended roles without hard-coding dogfood account names.\n\nAcceptance criteria:\n- Project configuration accepts logical actors with stable ids, kind, provider identity, display name, and optional handles.\n- Project configuration accepts role definitions that expand into explicit authority actions.\n- Project configuration accepts scoped role bindings for project, component, provider, tracker, repository, target branch, and environment scopes.\n- Built-in recommended role names are available as defaults or examples: maintainer, contributor, reviewer, observer, runtime operator, and release operator.\n- Unknown actors normalize to observer authority unless a project explicitly configures another fallback.\n- Config validation rejects unknown roles, duplicate actor ids, duplicate role ids, invalid action names, and unusable empty scoped bindings.\n- Existing project configs without authority policy continue to load safely.\n\nBoundaries:\n- Do not gate commands in this slice.\n- Do not perform live provider permission checks.\n- Do not store secrets or host-local credential paths in shared project config.\n\nVerification:\n- Focused project config and lifecycle tests for default, custom, invalid, and scoped authority policies.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2189,8 +2189,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.505Z",
-      "updatedAt": "2026-05-18T13:08:00.505Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T21:52:57.960Z",
+      "closedAt": "2026-05-18T21:52:19.457Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3217,7 +3217,7 @@
       "id": "local-126",
       "title": "Integrate hosting status into setup and documentation",
       "description": "Type: setup and documentation slice\nReadiness: todo/dependent on dev-nexus:local-121, with follow-up refresh after apply slices land\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: replace ad hoc setup guidance with DevNexus hosting status and plan output, and document the minimal API.\n\nUser stories covered:\n- As a new host joining a project, I can validate that host-local human and bot auth profiles match shared hosting intent before running automation.\n- As a maintainer, I can understand that provider-specific mechanics belong in the tool, not in project config or agent chat memory.\n\nAcceptance criteria:\n- Setup checks consume hosting status and plan instead of telling users to manually run provider-specific commands for normal facts DevNexus can inspect.\n- Setup/status output reports repository, remote, auth profile, actor, access, and pending invitation drift concisely.\n- Documentation shows minimal hosting config examples for repository, remotes, required access, and provisioning gates.\n- Documentation explains that provider details, collaborator invitations, and invitation acceptance are handled by hosting adapters.\n- Documentation states that secrets and local credential material stay in host-local config, not shared project config.\n- After apply slices land, setup docs are updated to describe allowed repair and invitation acceptance behavior.\n\nDependencies:\n- Depends on dev-nexus:local-121 for read-only status/plan surfaces; should be revisited after dev-nexus:local-122 through dev-nexus:local-125.\n\nBoundaries:\n- Do not run live GitHub mutation from setup checks.\n- Do not include personal paths, tokens, or account-specific dogfood-only details in generic docs.\n\nVerification:\n- Focused setup assistant tests for hosting status integration, missing auth profile, pending invitation, blocked plan action, and no-provider-mutation behavior.\n- Static documentation review.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3231,8 +3231,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:47.737Z",
-      "updatedAt": "2026-05-18T21:27:05.046Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T21:39:51.831Z",
+      "closedAt": "2026-05-18T21:39:51.831Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3244,7 +3244,7 @@
       "id": "local-127",
       "title": "Add opt-in fake-project hosting integration test",
       "description": "Type: opt-in integration testing slice\nReadiness: todo/dependent on mocked provider apply support in dev-nexus:local-123 through dev-nexus:local-125\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: validate live GitHub hosting provisioning against a disposable fake DevNexus project/repository fixture, not against `dev-nexus-plexus` or any other active project.\n\nUser stories covered:\n- As a maintainer, I can prove repository creation, collaborator repair, and invitation acceptance work end to end without risking an active project.\n- As an agent, I can run normal tests without live GitHub mutation unless the integration test is explicitly enabled.\n\nAcceptance criteria:\n- Integration test fixture builds a disposable fake DevNexus project config with a unique repository name, declared remotes, required access, and provisioning gates.\n- Live GitHub integration test is opt-in only through explicit test configuration or environment, and is skipped by default in normal `npm run check`.\n- The test creates or connects only the disposable fake repository, applies allowed hosting repairs, validates final status, and records enough cleanup information for safe teardown.\n- The test does not depend on `dev-nexus-plexus`, dogfood project state, or any active project repository.\n- Cleanup behavior avoids deleting or mutating non-fixture repositories and refuses to proceed when the repository name/owner does not match the disposable fixture policy.\n- Missing live credentials, missing invitee profile, wrong actor, provider policy block, and cleanup refusal produce clear skipped or blocked results rather than destructive fallback.\n\nDependencies:\n- Depends on dev-nexus:local-123, dev-nexus:local-124, and dev-nexus:local-125.\n\nBoundaries:\n- Do not run live GitHub mutation in default tests.\n- Do not use active DevNexus projects as integration fixtures.\n- Do not delete arbitrary repositories or broaden cleanup outside the disposable fixture naming policy.\n\nVerification:\n- Mocked tests for fixture planning, opt-in gating, wrong-owner refusal, cleanup refusal, and skipped default behavior.\n- Optional live GitHub integration run only when explicitly configured.\n- npm run check must pass without live credentials.\n\nPublication notes:\n- Direct integration to DevNexus main after mocked verification passes; live integration evidence can be recorded separately when explicitly run.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3258,8 +3258,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:56.851Z",
-      "updatedAt": "2026-05-18T21:27:14.180Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T21:52:19.476Z",
+      "closedAt": "2026-05-18T21:52:19.476Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -5966,6 +5966,28 @@
           "provider": "local",
           "itemId": "local-comment-196"
         }
+      },
+      {
+        "id": "local-comment-242",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-local-81-remote-records\nHead: 9133beead49f621855fbed8cec5ab5fd59eaf0b0\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:48:13.884Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-81\",\n  \"logicalItemId\": \"local-81\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-81\",\n    \"itemNumber\": 81,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-81\",\n    \"itemNumber\": 81,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-81\",\n        \"itemNumber\": 81\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"leaseId\": \"lease-07eeb165489f9caa\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-81-remote-records\",\n  \"branch\": \"codex/dev-nexus-local-81-remote-records\",\n  \"upstream\": \"bot/main\",\n  \"baseRef\": \"bot/main\",\n  \"headCommit\": \"9133beead49f621855fbed8cec5ab5fd59eaf0b0\",\n  \"dirty\": false,\n  \"ahead\": 1,\n  \"behind\": 0,\n  \"pushed\": false,\n  \"changedAreas\": [\n    \"src/nexusRemoteExecution.ts\",\n    \"src/nexusRemoteExecution.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusCoreMcpTools.ts\"\n  ],\n  \"decisions\": [\n    \"Remote execution requests/results are stored locally in .dev-nexus/remote-execution-records.json and do not run commands.\",\n    \"Work item and coordination attachments are reference-only records without copied titles/descriptions/source-of-truth fields.\",\n    \"CLI and MCP surfaces are draft/local-only: request create, result record, and result get.\"\n  ],\n  \"verificationSummary\": \"Passed: npm run build; npm test -- src/nexusRemoteExecution.test.ts; npm test -- src/nexusMcpServer.test.ts; git diff --check. npm run check still fails only src/nexusSetupAssistant.test.ts path-rendering assertions outside local-81 scope.\",\n  \"integrationPreference\": \"Ready for integration from local commit 9133bee; not pushed per user instruction.\",\n  \"note\": \"Rebased onto bot/main 5290da8 before final verification and commit.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:48:13.923Z",
+        "updatedAt": "2026-05-18T21:48:13.923Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-242"
+        }
+      },
+      {
+        "id": "local-comment-245",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: ba9976e39c6da20bb2a1148351a13843482e78e3\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:52:07.266Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-81\",\n  \"logicalItemId\": \"local-81\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-81\",\n    \"itemNumber\": 81,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-81\",\n    \"itemNumber\": 81,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-81\",\n      \"itemNumber\": 81,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-81\",\n        \"itemNumber\": 81\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-edb50c38d752b06e\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"ba9976e39c6da20bb2a1148351a13843482e78e3\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusRemoteExecution.ts\",\n    \"src/nexusRemoteExecution.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Integrated durable local remote execution request/result records from commit 9133bee.\",\n    \"CLI and MCP surfaces remain draft/local record operations only and do not run local or remote commands.\"\n  ],\n  \"verificationSummary\": \"Integrated with local-87 and local-127 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions.\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to bot/main in merge commit ba9976e.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:52:07.276Z",
+        "updatedAt": "2026-05-18T21:52:07.276Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-245"
+        }
       }
     ],
     "local-82": [],
@@ -5973,7 +5995,30 @@
     "local-84": [],
     "local-85": [],
     "local-86": [],
-    "local-87": [],
+    "local-87": [
+      {
+        "id": "local-comment-244",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: ba9976e39c6da20bb2a1148351a13843482e78e3\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:52:06.308Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-87\",\n  \"logicalItemId\": \"local-87\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-87\",\n    \"itemNumber\": 87,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-87\",\n      \"itemNumber\": 87\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-87\",\n    \"itemNumber\": 87,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-87\",\n      \"itemNumber\": 87\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-87\",\n      \"itemNumber\": 87,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-87\",\n        \"itemNumber\": 87\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-4795830a9525b891\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"ba9976e39c6da20bb2a1148351a13843482e78e3\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusProjectConfig.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Integrated neutral authority configuration model from commit 32731d1.\",\n    \"No command gating, publication behavior, provider permission checks, or credential storage were added in this slice.\"\n  ],\n  \"verificationSummary\": \"Integrated with local-81 and local-127 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions.\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to bot/main in merge commit ba9976e.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:52:06.317Z",
+        "updatedAt": "2026-05-18T21:52:06.317Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-244"
+        }
+      },
+      {
+        "id": "local-comment-247",
+        "body": "Preserved worker ready handoff from the temporary project-meta handoff worktree before cleanup.\n\nWorker branch: codex/dev-nexus-local-87-authority-model\nWorker commit: 32731d1ece899d49815bd70e9129b81815e7ed1a\nStatus at handoff: ready\nVerification reported by worker: npm test -- src/nexusProjectConfig.test.ts passed; npm run build passed; npm test -- --exclude src/nexusSetupAssistant.test.ts passed; git diff --check passed. Full npm run check still failed only the pre-existing setup-assistant Windows path assertions.\n\nDecisions reported by worker: added a neutral declarative authority model only; no command gating, publication behavior changes, live provider permission checks, or credential storage. Recommended roles are built in, project-defined roles can add or replace definitions by id during normalization, and unknown actors resolve to the configured fallback role defaulting to observer.\n\nThis is now superseded by the merged handoff for DevNexus main at ba9976e.",
+        "author": null,
+        "createdAt": "2026-05-18T21:52:57.960Z",
+        "updatedAt": "2026-05-18T21:52:57.960Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-247"
+        }
+      }
+    ],
     "local-88": [],
     "local-89": [],
     "local-90": [],
@@ -6482,6 +6527,28 @@
           "provider": "local",
           "itemId": "local-comment-238"
         }
+      },
+      {
+        "id": "local-comment-240",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-local-126-hosting-setup\nHead: 81e2ac8b990eb4b91e610e64fdfa692e8e42b639\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:38:29.684Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-126\",\n  \"logicalItemId\": \"local-126\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-126\",\n    \"itemNumber\": 126,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-126\",\n    \"itemNumber\": 126,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-126\",\n        \"itemNumber\": 126\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"leaseId\": \"lease-20ea9e3f75937239\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-126-hosting-setup\",\n  \"branch\": \"codex/dev-nexus-local-126-hosting-setup\",\n  \"upstream\": \"bot/main\",\n  \"baseRef\": \"bot/main\",\n  \"headCommit\": \"81e2ac8b990eb4b91e610e64fdfa692e8e42b639\",\n  \"dirty\": false,\n  \"ahead\": 1,\n  \"behind\": 0,\n  \"pushed\": false,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\",\n    \"src/nexusProjectHosting.ts\",\n    \"docs/user/getting-started.md\",\n    \"docs/dev/architecture.md\",\n    \"README.md\"\n  ],\n  \"decisions\": [\n    \"Setup plan now routes normal repository facts through dev-nexus project hosting status/plan/apply instead of direct gh repo view/create commands.\",\n    \"Setup check adds concise hosting status and hosting plan summaries using the no-provider local hosting status path.\",\n    \"Documentation now shows minimal portable hosting config and keeps provider mechanics/secrets out of shared config.\"\n  ],\n  \"verificationSummary\": \"Passed: npm test -- src/nexusSetupAssistant.test.ts -t \\\"GitHub meta-project\\\"; npm test -- src/nexusProjectHosting.test.ts; npm run build; git diff --check. Broader src/nexusSetupAssistant.test.ts still fails in known Mac path assertions outside this slice.\",\n  \"integrationPreference\": \"Direct integration to bot/main after coordinator review.\",\n  \"note\": \"Committed 81e2ac8 on codex/dev-nexus-local-126-hosting-setup.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:38:29.693Z",
+        "updatedAt": "2026-05-18T21:38:29.693Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-240"
+        }
+      },
+      {
+        "id": "local-comment-241",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 5290da843d48d7cd2280d3e05d0d9bb33847b95f\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:39:51.799Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-126\",\n  \"logicalItemId\": \"local-126\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-126\",\n    \"itemNumber\": 126,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-126\",\n    \"itemNumber\": 126,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-126\",\n      \"itemNumber\": 126,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-126\",\n        \"itemNumber\": 126\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-941fd5bf25ea2a65\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"5290da843d48d7cd2280d3e05d0d9bb33847b95f\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\",\n    \"src/nexusProjectHosting.ts\",\n    \"docs/user/getting-started.md\",\n    \"docs/dev/architecture.md\",\n    \"README.md\"\n  ],\n  \"decisions\": [\n    \"Integrated local-126 into DevNexus main through bot remote as merge commit 5290da8.\"\n  ],\n  \"verificationSummary\": \"Passed on integrated main: npm test -- src/nexusSetupAssistant.test.ts -t \\\"GitHub meta-project\\\"; npm test -- src/nexusProjectHosting.test.ts; npm run build; git diff --check.\",\n  \"integrationPreference\": \"Published to bot/main.\",\n  \"note\": \"Source main now includes 5290da8.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:39:51.811Z",
+        "updatedAt": "2026-05-18T21:39:51.811Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-241"
+        }
       }
     ],
     "local-127": [
@@ -6494,6 +6561,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-239"
+        }
+      },
+      {
+        "id": "local-comment-243",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-local-127-hosting-fixture-test\nHead: da3ed560f31c16411ab69a26b2ad8a71143bba33\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:49:15.264Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-127\",\n  \"logicalItemId\": \"local-127\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-127\",\n    \"itemNumber\": 127,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-127\",\n    \"itemNumber\": 127,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-127\",\n        \"itemNumber\": 127\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"leaseId\": \"lease-f7228e0a4e4ed9a4\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-127-hosting-fixture-test\",\n  \"branch\": \"codex/dev-nexus-local-127-hosting-fixture-test\",\n  \"upstream\": \"bot/main\",\n  \"baseRef\": \"bot/main\",\n  \"headCommit\": \"da3ed560f31c16411ab69a26b2ad8a71143bba33\",\n  \"dirty\": false,\n  \"ahead\": 1,\n  \"behind\": 0,\n  \"pushed\": false,\n  \"changedAreas\": [\n    \"src/nexusProjectHostingIntegrationFixture.ts\",\n    \"src/nexusProjectHostingIntegrationFixture.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Added reusable disposable GitHub hosting fixture builder with explicit env opt-in planning.\",\n    \"Fixture provisioning runner loops over status/plan/apply passes until convergence and records cleanup boundaries.\",\n    \"Fixture runner blocks before mutations when provider mutation auth is missing or mismatched.\"\n  ],\n  \"verificationSummary\": \"Passed: npm test -- src/nexusProjectHostingIntegrationFixture.test.ts; npm test -- src/nexusProjectHosting.test.ts src/nexusProjectHostingIntegrationFixture.test.ts; npm test -- --exclude src/nexusSetupAssistant.test.ts; npm run build; git diff --check.\",\n  \"integrationPreference\": null,\n  \"note\": \"Committed source branch codex/dev-nexus-local-127-hosting-fixture-test at da3ed56. Full npm run check not run because the Windows checkout still has known Mac-owned nexusSetupAssistant path assertion failures.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:49:15.278Z",
+        "updatedAt": "2026-05-18T21:49:15.278Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-243"
+        }
+      },
+      {
+        "id": "local-comment-246",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: ba9976e39c6da20bb2a1148351a13843482e78e3\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:52:08.045Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-127\",\n  \"logicalItemId\": \"local-127\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-127\",\n    \"itemNumber\": 127,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-127\",\n    \"itemNumber\": 127,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-127\",\n      \"itemNumber\": 127,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-127\",\n        \"itemNumber\": 127\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-46a1f9f10723ca3b\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"ba9976e39c6da20bb2a1148351a13843482e78e3\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusProjectHostingIntegrationFixture.ts\",\n    \"src/nexusProjectHostingIntegrationFixture.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Integrated disposable GitHub hosting fixture builder and mocked opt-in fixture runner coverage from commit da3ed56.\",\n    \"Fixture runner blocks before provider/local mutation when provider mutation auth is missing or mismatched.\"\n  ],\n  \"verificationSummary\": \"Integrated with local-87 and local-81 on DevNexus main. Passed focused suite: npm test -- src/nexusProjectConfig.test.ts src/nexusRemoteExecution.test.ts src/nexusMcpServer.test.ts src/nexusProjectHostingIntegrationFixture.test.ts src/nexusProjectHosting.test.ts. Passed npm run build, git diff --check, and npm test -- --exclude src/nexusSetupAssistant.test.ts. Full npm run check still fails only the two known nexusSetupAssistant Windows path assertions.\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to bot/main in merge commit ba9976e.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:52:08.055Z",
+        "updatedAt": "2026-05-18T21:52:08.055Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-246"
         }
       }
     ],

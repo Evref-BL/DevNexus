@@ -36,7 +36,12 @@ and ready for coordinator-driven work across its components.
   repository creation apply, `dev-nexus:local-124` is published as `6e42b7f`
   for provider-gated collaborator access repair apply, and
   `dev-nexus:local-125` is published as `09513af` for invitee-auth-profile
-  invitation acceptance apply.
+  invitation acceptance apply. The latest Windows batch published
+  `dev-nexus:local-126` as `5290da8` for hosting setup/documentation
+  integration, then published `dev-nexus:local-87`, `dev-nexus:local-81`, and
+  `dev-nexus:local-127` together through `ba9976e` for the neutral authority
+  config model, durable remote execution request/result records, and the
+  opt-in disposable hosting fixture.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -53,8 +58,8 @@ and ready for coordinator-driven work across its components.
   is complete for local remote repair apply; `local-123` is complete for
   GitHub repository creation apply; `local-124` is complete for collaborator
   repair and pending invite detection; `local-125` is complete for invitee
-  auth-profile invitation acceptance; `local-126` is ready for setup and
-  documentation integration; and `local-127` is ready for an opt-in fake-project
+  auth-profile invitation acceptance; `local-126` is complete for setup and
+  documentation integration; and `local-127` is complete for an opt-in fake-project
   GitHub integration test that must not depend on `dev-nexus-plexus` or any
   other active project.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
@@ -90,9 +95,14 @@ and ready for coordinator-driven work across its components.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
-  `local-79` and `local-80` are complete, and `local-81` is ready for durable
-  request/result records.
-- Default DevNexus `npm run check` passes on the integrated DevNexus main.
+  `local-79`, `local-80`, and `local-81` are complete; follow-on host checks,
+  SSH transport, verification execution, and live dogfood smokes should remain
+  ordered behind the durable request/result record model.
+- DevNexus integrated verification for source main `ba9976e` passed the
+  focused local-81/local-87/local-127 suites, `npm run build`,
+  `git diff --check`, and `npm test -- --exclude src/nexusSetupAssistant.test.ts`
+  on Windows. Full Windows `npm run check` still fails only in the two known
+  `src/nexusSetupAssistant.test.ts` path-rendering assertions.
   Mac verification after publishing DevNexus `c19b493` is green again:
   `npm test -- src/nexusSetupAssistant.test.ts` passes 22 tests, and
   DevNexus `npm run check` passes 57 files, 463 tests, and 1 skipped test.
@@ -100,12 +110,12 @@ and ready for coordinator-driven work across its components.
   DevNexus-Pharo and DevNexus-TypeScript `npm run check` also passed on this
   Mac after sync.
 - The focused hosting verification for `dev-nexus:local-123` through
-  `dev-nexus:local-125` passes on Windows after rebasing over the Mac
-  setup-assistant commit. The latest hosting slice passed
-  `npm test -- src/nexusProjectHosting.test.ts`, `npm run build`, focused
-  hosting/CLI/MCP/guard tests with 4 files and 101 tests, and
-  `git diff --check`. Full Windows `npm run check` still fails only in the two
-  Mac-owned `src/nexusSetupAssistant.test.ts` path-rendering assertions.
+  `dev-nexus:local-127` passes on Windows after rebasing over the Mac
+  setup-assistant commit. The latest hosting fixture slice passed
+  `npm test -- src/nexusProjectHostingIntegrationFixture.test.ts`,
+  `npm test -- src/nexusProjectHosting.test.ts src/nexusProjectHostingIntegrationFixture.test.ts`,
+  `npm run build`, `npm test -- --exclude src/nexusSetupAssistant.test.ts`,
+  and `git diff --check`.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -114,10 +124,10 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-78` and is attached to the work item through a local
   DevNexus comment.
 - The authority PRD has been sliced: start with `dev-nexus:local-87` for the
-  actor/role/action configuration model, then promote dependent slices
-  `local-88` through `local-94` as their prerequisites land. `local-95` is a
-  blocked HITL decision item for self-approval, temporary elevation, and
-  advanced role-policy questions.
+  actor/role/action configuration model, which is now complete. Promote
+  dependent slices `local-88` through `local-94` as their prerequisites land.
+  `local-95` is a blocked HITL decision item for self-approval, temporary
+  elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
   `local-103`. `local-97`, `local-98`, `local-99`, and `local-102` are
@@ -157,17 +167,19 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-113` is complete, fixing stdio wire protocol compatibility.
   `local-114` and `local-115` are ready for notification/server-request routing
   and safe capability probes; `local-116` should wait until event routing lands.
-- No active implementation subagents are expected.
+- No active implementation subagents are expected, and the merged worktrees and
+  local branches for `local-126`, `local-127`, `local-81`, and `local-87` were
+  removed after publication.
 
 ## Near-Term Direction
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
-  `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-126`,
-  `dev-nexus:local-127`, and `dev-nexus:local-129`, subject to dependency and
+  `dev-nexus:local-104`, `dev-nexus:local-114`, `dev-nexus:local-115`,
+  `dev-nexus:local-128`, and `dev-nexus:local-129`, subject to dependency and
   concurrency limits.
-- Keep remote host execution ordered: implement `dev-nexus:local-81` before
-  host checks, SSH transport, verification execution, or live dogfood smokes.
+- Keep remote host execution ordered: promote host checks, SSH transport,
+  verification execution, or live dogfood smokes only after their dependencies
+  on completed `dev-nexus:local-81` are explicit.
 - Keep parallel-agent workflow ordered: use completed fail-closed
   shared-checkout mutation enforcement (`local-98`) and read-only cleanup
   classification (`local-102`) before cleanup execution, and keep status
