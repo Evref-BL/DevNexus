@@ -2,7 +2,7 @@
   "version": 1,
   "nextNumber": 22,
   "nextCommentNumber": 52,
-  "updatedAt": "2026-05-18T20:55:50.653Z",
+  "updatedAt": "2026-05-18T21:46:49.109Z",
   "items": [
     {
       "id": "local-1",
@@ -505,8 +505,8 @@
     },
     {
       "id": "local-21",
-      "title": "Stop normal DevNexus-Pharo import from retaining legacy PLexus kanban metadata",
-      "description": "Type: project setup/config cleanup defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved friction:\nDuring normal DevNexus-Pharo project import/repair for the dedicated MCP-Pharo project, `plexus.project.json` retained or reintroduced `kanban.provider: vibe-kanban` metadata even though no Vibe tracker sync/link was requested and current dogfood policy says not to create Vibe workspaces, sessions, executions, or implementation workers.\n\nCurrent evidence:\n- `normalizePlexusProjectConfig(...)` preserves `existing.kanban.projectId` when no explicit `vibeKanbanProjectId` is supplied.\n- `installDevNexusPharoProjectFiles(...)` passes `options.vibeKanbanProjectId ?? options.projectConfig.kanban?.projectId ?? null`, so generic/project-level legacy kanban metadata can flow into the PLexus config during import.\n- Manual cleanup was needed to keep the focused MCP-Pharo DevNexus project free of legacy Vibe metadata.\n\nGoal:\nEnsure normal DevNexus-Pharo project create/import does not introduce or preserve legacy PLexus `kanban` metadata unless the user explicitly requests tracker linking/sync behavior that still requires it.\n\nAcceptance criteria:\n- Creating/importing a DevNexus-Pharo project without an explicit tracker/link/sync option produces a PLexus config with no `kanban` block.\n- Re-importing an existing PLexus config with legacy `kanban` metadata either removes it during normalization or reports a clear cleanup/migration action; choose one behavior and document it.\n- Explicit tracker-linked flows, if still supported, remain separately tested or are deliberately removed according to current no-legacy policy.\n- Tests cover fresh import without tracker id, re-import with existing PLexus kanban metadata, and any explicit tracker-linked exception.\n\nBoundaries:\n- Do not create Vibe workspaces, sessions, executions, or workers.\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n- Keep generic tracker behavior in DevNexus core; this item owns DevNexus-Pharo/PLexus config normalization.\n\nVerification:\n- Focused DevNexus-Pharo project extension/config tests.\n- `npm run check` in DevNexus-Pharo when feasible.\n- Static temp-project create/import smoke without live runtime startup.",
+      "title": "Stop normal DevNexus-Pharo import from retaining legacy PLexus/Vibe metadata",
+      "description": "Type: project setup/config cleanup defect\nReadiness: autonomous agent-ready for DevNexus-Pharo config-generation tests; paired PLexus runtime readiness depends on `plexus:local-33`.\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved friction:\nDuring normal DevNexus-Pharo project import/repair for the dedicated MCP-Pharo project, project setup retained or reintroduced Vibe-Kanban-shaped metadata even though no Vibe tracker sync/link was requested and current dogfood policy says not to create Vibe workspaces, sessions, executions, or implementation workers.\n\nCurrent evidence:\n- The globally installed `/opt/homebrew/bin/dev-nexus-pharo` still validates `plexus.project.json` by requiring `kanban.provider: \"vibe-kanban\"` and a string `kanban.projectId`; without that block, `dev-nexus-pharo codex doctor` reports the PLexus config as missing required `name, kanban, or images` fields.\n- The DevNexus-Pharo source checkout already contains commit `b0088b1 Remove default Vibe linkage from PLexus config`, and current source `src/codexConfig.ts` validates only neutral `id`, `name`, and `images`. The installed CLI/package therefore appears stale relative to source and needs release/install alignment.\n- Generated `.codex/config.toml` for the dedicated MCP-Pharo project still includes `VIBE_KANBAN_WORKSPACE_ID` in the PLexus project and pharo-launcher MCP server environments, even when no Vibe integration was requested.\n- `normalizePlexusProjectConfig(...)` and related install paths must not preserve or reintroduce legacy `kanban` metadata unless an explicit Vibe tracker/link/sync option was requested.\n- PLexus core still hard-requires Vibe-shaped `kanban` as project identity; that upstream dependency is tracked separately as `plexus:local-33`.\n\nGoal:\nEnsure normal DevNexus-Pharo project create/import/Codex setup does not introduce, preserve, or emit Vibe-Kanban metadata or environment variables unless the user explicitly enables a Vibe provider/integration.\n\nAcceptance criteria:\n- Creating/importing a DevNexus-Pharo project without explicit Vibe tracker/link/sync options produces a PLexus config with no `kanban` block.\n- Re-importing an existing PLexus config with legacy `kanban` metadata either removes it during normalization or reports a clear cleanup/migration action; choose one behavior and document it.\n- Generated `.codex/config.toml` for non-Vibe projects contains no `VIBE_KANBAN_*` environment variables and no `vibe_kanban` MCP server entry.\n- `dev-nexus-pharo codex doctor` from the installed package accepts neutral PLexus config once the source fix is released/installed; if PLexus core still blocks full readiness, the diagnostic points to `plexus:local-33` instead of suggesting Vibe metadata.\n- Explicit Vibe-linked flows, if still supported, remain separately tested or are deliberately removed according to current no-legacy policy.\n- Tests cover fresh import without tracker id, re-import with existing PLexus kanban metadata, Codex config generation without Vibe env, installed/dist doctor behavior, and any explicit Vibe-linked exception.\n\nBoundaries:\n- Do not create Vibe workspaces, sessions, executions, or workers.\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n- Keep generic tracker behavior in DevNexus core; this item owns DevNexus-Pharo project/Codex setup behavior.\n\nVerification:\n- Focused DevNexus-Pharo project extension/config/Codex setup tests.\n- `npm run check` in DevNexus-Pharo when feasible.\n- Static temp-project create/import/Codex setup smoke without live runtime startup.",
       "status": "todo",
       "provider": "local",
       "labels": [
@@ -514,6 +514,7 @@
         "project-import",
         "plexus",
         "config",
+        "codex-config",
         "vibe-kanban",
         "bug",
         "afk"
@@ -521,7 +522,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T20:55:50.653Z",
-      "updatedAt": "2026-05-18T20:55:50.653Z",
+      "updatedAt": "2026-05-18T21:46:49.109Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {

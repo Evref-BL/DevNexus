@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "nextNumber": 143,
+  "nextNumber": 146,
   "nextCommentNumber": 248,
   "updatedAt": "2026-05-18T21:52:57.960Z",
   "items": [
@@ -3674,6 +3674,78 @@
         "itemId": "local-142",
         "itemNumber": 142
       }
+    },
+    {
+      "id": "local-143",
+      "title": "Resolve component docs in worker context bundles",
+      "description": "Type: DevNexus worktree setup defect\nSource: DevNexus PLexus project plexus local-31 on 2026-05-18.\n\nFinding: component worktree preparation can fail after creating the worktree when a work item mentions a component-local documentation file. The worker context builder treats the relative documentation path as project metadata context and validates it under the DevNexus project root, even when the file exists in the selected component checkout/worktree.\n\nGoal: worker context bundles should include component documentation references from the selected component source root when the project metadata root does not contain the referenced file.\n\nAcceptance criteria:\n- Existing project-root planning document references keep resolving as project context.\n- Component-local documentation references resolve against the selected component source root and appear as read-only component context.\n- Missing documentation errors name both the project metadata root and component source root scopes that were checked.\n- Regression coverage proves a component doc present only in the component source root does not fail worktree preparation.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "worktree-setup",
+        "component-context",
+        "tool-friction"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:18:47.178Z",
+      "updatedAt": "2026-05-18T21:33:31.719Z",
+      "closedAt": "2026-05-18T21:33:26.566Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-143",
+        "itemNumber": 143
+      }
+    },
+    {
+      "id": "local-144",
+      "title": "Use component repository in coordination integration plans",
+      "description": "Type: DevNexus coordination tooling defect\nSource: DevNexus PLexus project plexus local-30 on 2026-05-18.\n\nFinding: `coordination_integrate` accepts `componentId: \"plexus\"` and returns the selected component metadata, but still computes `target.commit` and merge analysis from the DevNexus project metadata repository. In the PLexus repro, `target.commit` was `504fe72b7b1798e81cd16b55875995041ca8d864`, the project metadata `main`, while PLexus component `main` was `764edb5a45ed1fe21cc709f3228b1663025a6b05`.\n\nGoal: coordination integration planning must analyze the selected component repository when `componentId` is supplied, including target branch lookup, handoff branch merge analysis, changed files, conflict files, range-diff, and missing-branch errors.\n\nAcceptance criteria:\n- When a git component is selected, target branch resolution uses the component source root/worktree repository, not the DevNexus project metadata root.\n- Returned target commit and merge diagnostics are from the selected component repo.\n- If a handoff branch is absent from the selected component repo, the warning/error names that component repo and branch.\n- Regression coverage uses a project metadata repo and a component repo with distinct `main` commits to prove the component repo is used.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "component-repository",
+        "tool-friction"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:23:26.089Z",
+      "updatedAt": "2026-05-18T21:35:18.413Z",
+      "closedAt": "2026-05-18T21:35:13.453Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-144",
+        "itemNumber": 144
+      }
+    },
+    {
+      "id": "local-145",
+      "title": "Repair setup assistant full-check failures blocking dogfood publication",
+      "description": "Type: DevNexus verification blocker\nSource: DevNexus PLexus dogfood work on 2026-05-18.\n\nFinding: `npm run check` fails on DevNexus branches that otherwise pass focused tests and build because `src/nexusSetupAssistant.test.ts` has 6 failing assertions. The failures are unrelated to the worker-context and coordination-integration patches, but they block direct publication according to the component verification policy.\n\nObserved failures:\n- macOS setup plan tests expect `$HOME/dev-nexus/...` clone guidance but commands no longer include it.\n- Windows setup check tests create POSIX fixture paths, while current checks resolve component paths under `$env:USERPROFILE\\dev-nexus\\...`, causing missing-check and blocked-status results.\n- Agent MCP/session/plugin projection tests expect warning overall status but receive blocked because component source root checks fail first.\n\nGoal: either correct setup assistant behavior or update the tests to the intended platform/path semantics so full `npm run check` is meaningful again.\n\nAcceptance criteria:\n- `npm test -- src/nexusSetupAssistant.test.ts` passes.\n- Full `npm run check` passes on a clean DevNexus worktree.\n- The chosen behavior clearly distinguishes plan-time platform-specific guidance from check-time host filesystem validation.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "verification",
+        "setup-assistant",
+        "tool-friction"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:27:03.746Z",
+      "updatedAt": "2026-05-18T21:32:22.691Z",
+      "closedAt": "2026-05-18T21:32:13.333Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-145",
+        "itemNumber": 145
+      }
     }
   ],
   "comments": {
@@ -6659,6 +6731,122 @@
       }
     ],
     "local-141": [],
-    "local-142": []
+    "local-142": [],
+    "local-143": [
+      {
+        "id": "local-comment-233",
+        "body": "Implemented a worker-context fix in DevNexus core on branch `codex/local-143-component-doc-context`, commit `33df6f4540f3f56b4fe28fbc70ffc28eaf639ed8`.\n\nChange summary:\n- Resolve referenced context docs against the DevNexus project root first, then the selected component `sourceRoot`.\n- Classify component-owned docs as `component-doc:<path>` instead of project docs.\n- Render separate project-doc and component-doc sections in worker briefings.\n- Improve missing-doc errors to show both searched scopes.\n\nVerification:\n- `npm test -- src/nexusWorkerContextBundle.test.ts` passed.\n- `git diff --check` passed.\n- `npm run build` passed.\n- Patched CLI verified the PLexus repro: `worktree prepare ... --component plexus --work-item local-31 ... --json` returned `ok:true` and included `component-doc:docs/kanban-agent-pharo-access.md` from `/Users/gabriel.darbord/dev-nexus/sources/plexus/docs/kanban-agent-pharo-access.md`.\n\nBlocker before publishing: full `npm run check` still fails in unrelated existing `src/nexusSetupAssistant.test.ts` expectations (6 failures around platform/path/status behavior). I have not pushed or integrated this branch.",
+        "author": null,
+        "createdAt": "2026-05-18T21:22:20.030Z",
+        "updatedAt": "2026-05-18T21:22:20.030Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-233"
+        }
+      },
+      {
+        "id": "local-comment-234",
+        "body": "DevNexus coordination handoff\n\nStatus: blocked\nHost: Host-001.lan\nBranch: codex/local-143-component-doc-context\nHead: 33df6f4540f3f56b4fe28fbc70ffc28eaf639ed8\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:22:26.402Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-143\",\n  \"logicalItemId\": \"local-143\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-143\",\n    \"itemNumber\": 143,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-143\",\n    \"itemNumber\": 143,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-143\",\n        \"itemNumber\": 143\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"blocked\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus/codex-local-143-component-doc-context\",\n  \"branch\": \"codex/local-143-component-doc-context\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"33df6f4540f3f56b4fe28fbc70ffc28eaf639ed8\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusWorkerContextBundle.ts\",\n    \"src/nexusWorkerContextBundle.test.ts\"\n  ],\n  \"decisions\": [\n    \"Resolve referenced docs against project root first, then selected component sourceRoot.\",\n    \"Represent component-owned docs as component-doc ids and render them separately from project docs.\",\n    \"Do not publish while full npm run check fails in unrelated nexusSetupAssistant tests.\"\n  ],\n  \"verificationSummary\": \"Commit 33df6f4540f3f56b4fe28fbc70ffc28eaf639ed8. Passed: npm test -- src/nexusWorkerContextBundle.test.ts; git diff --check; npm run build. Patched CLI verified PLexus local-31 worktree prepare resolves component-doc docs/kanban-agent-pharo-access.md. Blocked: npm run check fails in unrelated src/nexusSetupAssistant.test.ts (6 failures).\",\n  \"integrationPreference\": null,\n  \"note\": \"Source fix is committed locally but not pushed/integrated. Active DevNexus MCP surface still has old behavior until this lands and the server reloads.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:22:26.405Z",
+        "updatedAt": "2026-05-18T21:22:26.405Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-234"
+        }
+      },
+      {
+        "id": "local-comment-239",
+        "body": "Rebased, reverified, and published the worker-context component-doc fix.\n\nOriginal local commit was superseded by rebased commit pushed to `bot/main`: `df506418bd219b607b8730be6e2d38cd4f9e2148`.\n\nVerification after rebasing on current `bot/main`:\n- `npm test -- src/nexusWorkerContextBundle.test.ts` passed (10 tests).\n- `git diff --check` passed.\n- `npm run check` passed (57 files; 476 passed, 1 skipped).\n\nPLexus repro remains verified through patched CLI: component docs such as `docs/kanban-agent-pharo-access.md` resolve from the PLexus component source root and are recorded as component-doc context. Active MCP processes may need reload/restart before the live `worktree_prepare` tool reflects this published code.",
+        "author": null,
+        "createdAt": "2026-05-18T21:33:23.374Z",
+        "updatedAt": "2026-05-18T21:33:23.374Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-239"
+        }
+      },
+      {
+        "id": "local-comment-240",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: Host-001.lan\nBranch: codex/local-143-component-doc-context\nHead: df506418bd219b607b8730be6e2d38cd4f9e2148\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:33:31.716Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-143\",\n  \"logicalItemId\": \"local-143\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-143\",\n    \"itemNumber\": 143,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-143\",\n    \"itemNumber\": 143,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-143\",\n      \"itemNumber\": 143,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-143\",\n        \"itemNumber\": 143\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus/codex-local-143-component-doc-context\",\n  \"branch\": \"codex/local-143-component-doc-context\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"df506418bd219b607b8730be6e2d38cd4f9e2148\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusWorkerContextBundle.ts\",\n    \"src/nexusWorkerContextBundle.test.ts\"\n  ],\n  \"decisions\": [\n    \"Resolve referenced docs against project root first, then selected component sourceRoot.\",\n    \"Represent component-owned docs as component-doc ids and render them separately from project docs.\",\n    \"Published after setup-assistant full-suite blocker was cleared.\"\n  ],\n  \"verificationSummary\": \"Rebased commit df506418bd219b607b8730be6e2d38cd4f9e2148 pushed to bot/main. Passed: npm test -- src/nexusWorkerContextBundle.test.ts; git diff --check; npm run check (57 files, 476 passed, 1 skipped).\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to DevNexus bot/main. Active MCP processes may need reload before worktree_prepare reflects this code.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:33:31.719Z",
+        "updatedAt": "2026-05-18T21:33:31.719Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-240"
+        }
+      }
+    ],
+    "local-144": [
+      {
+        "id": "local-comment-235",
+        "body": "Implemented a coordination integration planner fix on branch `codex/local-144-component-integration-repo`, commit `15f07effd348f2785364bffca201c0126ae37873`.\n\nChange summary:\n- `getNexusCoordinationIntegrationPlan` now prefers the selected component source repository when resolving the git repository used for target refs and merge analysis.\n- Status/handoff git capture keeps its current-path-first behavior.\n- Added a regression where the DevNexus project metadata repo and component source repo have different `main` commits; integration planning is invoked from the project repo but must report the component commit and merge the component branch.\n\nVerification:\n- Red regression reproduced the project-repo commit before the fix.\n- `npm test -- src/nexusCoordination.test.ts` passed (12 tests).\n- `git diff --check` passed.\n- `npm run build` passed.\n- Patched CLI verified the PLexus repro: `coordination integrate ... --component plexus --work-item local-30 --target-branch main --json` returned target commit `764edb5a45ed1fe21cc709f3228b1663025a6b05`, matching `/Users/gabriel.darbord/dev-nexus/sources/plexus`.\n\nBlocker before publishing: full `npm run check` still fails in unrelated `src/nexusSetupAssistant.test.ts` assertions. I filed that as `dev-nexus:local-145`. This branch has not been pushed or integrated.",
+        "author": null,
+        "createdAt": "2026-05-18T21:27:10.008Z",
+        "updatedAt": "2026-05-18T21:27:10.008Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-235"
+        }
+      },
+      {
+        "id": "local-comment-236",
+        "body": "DevNexus coordination handoff\n\nStatus: blocked\nHost: Host-001.lan\nBranch: codex/local-144-component-integration-repo\nHead: 15f07effd348f2785364bffca201c0126ae37873\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:27:34.186Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-144\",\n  \"logicalItemId\": \"local-144\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-144\",\n    \"itemNumber\": 144,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-144\",\n    \"itemNumber\": 144,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-144\",\n        \"itemNumber\": 144\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"blocked\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus/codex-local-144-component-integration-repo\",\n  \"branch\": \"codex/local-144-component-integration-repo\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"15f07effd348f2785364bffca201c0126ae37873\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusCoordination.ts\",\n    \"src/nexusCoordination.test.ts\"\n  ],\n  \"decisions\": [\n    \"Integration planning should prefer the selected component source repository for target refs and merge analysis.\",\n    \"Coordination status and handoff capture remain current-path-first.\",\n    \"Do not publish while full npm run check fails in unrelated setup-assistant tests.\"\n  ],\n  \"verificationSummary\": \"Commit 15f07effd348f2785364bffca201c0126ae37873. Passed: npm test -- src/nexusCoordination.test.ts; git diff --check; npm run build. Patched CLI verified PLexus local-30 returns target commit 764edb5 from /Users/gabriel.darbord/dev-nexus/sources/plexus. Blocked: npm run check fails in unrelated src/nexusSetupAssistant.test.ts (6 failures), tracked as dev-nexus:local-145.\",\n  \"integrationPreference\": null,\n  \"note\": \"Source fix is committed locally but not pushed/integrated. Active DevNexus MCP surface still has old behavior until this lands and the server reloads.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:27:34.189Z",
+        "updatedAt": "2026-05-18T21:27:34.189Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-236"
+        }
+      },
+      {
+        "id": "local-comment-241",
+        "body": "Rebased, reverified, and published the coordination integration component-repository fix.\n\nOriginal local commit was superseded by rebased commit pushed to `bot/main`: `7c130889793375e91a3a7b1ce43223e511b95939`.\n\nVerification after rebasing on current `bot/main`:\n- `npm test -- src/nexusCoordination.test.ts` passed (12 tests).\n- `git diff --check` passed.\n- `npm run check` passed (57 files; 477 passed, 1 skipped).\n\nThe regression now uses the current fake Git fixture style and proves that integration planning invoked from the project repo asks the component source repo for `rev-parse --show-toplevel`, reports the component main commit, and analyzes the component branch. Active MCP processes may need reload/restart before live `coordination_integrate` reflects this published code.",
+        "author": null,
+        "createdAt": "2026-05-18T21:35:10.896Z",
+        "updatedAt": "2026-05-18T21:35:10.896Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-241"
+        }
+      },
+      {
+        "id": "local-comment-242",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: Host-001.lan\nBranch: codex/local-144-component-integration-repo\nHead: 7c130889793375e91a3a7b1ce43223e511b95939\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:35:18.410Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-144\",\n  \"logicalItemId\": \"local-144\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-144\",\n    \"itemNumber\": 144,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-144\",\n    \"itemNumber\": 144,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-144\",\n      \"itemNumber\": 144,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-144\",\n        \"itemNumber\": 144\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus/codex-local-144-component-integration-repo\",\n  \"branch\": \"codex/local-144-component-integration-repo\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"7c130889793375e91a3a7b1ce43223e511b95939\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusCoordination.ts\",\n    \"src/nexusCoordination.test.ts\"\n  ],\n  \"decisions\": [\n    \"Integration planning prefers the selected component source repository for target refs and merge analysis.\",\n    \"Coordination status and handoff capture remain current-path-first.\",\n    \"Regression uses current fake Git fixtures to prove project-root currentPath still analyzes the component repo.\"\n  ],\n  \"verificationSummary\": \"Rebased commit 7c130889793375e91a3a7b1ce43223e511b95939 pushed to bot/main. Passed: npm test -- src/nexusCoordination.test.ts; git diff --check; npm run check (57 files, 477 passed, 1 skipped).\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to DevNexus bot/main. Active MCP processes may need reload before coordination_integrate reflects this code.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:35:18.413Z",
+        "updatedAt": "2026-05-18T21:35:18.413Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-242"
+        }
+      }
+    ],
+    "local-145": [
+      {
+        "id": "local-comment-237",
+        "body": "Fixed and published the setup-assistant full-check blocker.\n\nBranch: `codex/local-145-setup-assistant-checks`\nCommit pushed to `bot/main`: `c6d9ac9df5cda13fec8880e74aab0241c0c17dcf`\n\nResolution:\n- Preserved the newer upstream setup-assistant path model.\n- Ensured setup plan guidance uses the platform/default onboarding root while live setup checks inspect the current host-accessible component source paths.\n\nVerification after rebasing on `bot/main`:\n- `npm test -- src/nexusSetupAssistant.test.ts` passed (22 tests).\n- `git diff --check` passed.\n- `npm run check` passed (57 files; 475 passed, 1 skipped).\n\nPublication: pushed fast-forward to `bot/main`.",
+        "author": null,
+        "createdAt": "2026-05-18T21:32:10.877Z",
+        "updatedAt": "2026-05-18T21:32:10.877Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-237"
+        }
+      },
+      {
+        "id": "local-comment-238",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: Host-001.lan\nBranch: codex/local-145-setup-assistant-checks\nHead: c6d9ac9df5cda13fec8880e74aab0241c0c17dcf\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:32:22.688Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-145\",\n  \"logicalItemId\": \"local-145\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-145\",\n    \"itemNumber\": 145,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-145\",\n      \"itemNumber\": 145\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-145\",\n    \"itemNumber\": 145,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-145\",\n      \"itemNumber\": 145\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-145\",\n      \"itemNumber\": 145,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-145\",\n        \"itemNumber\": 145\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus/codex-local-145-setup-assistant-checks\",\n  \"branch\": \"codex/local-145-setup-assistant-checks\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"c6d9ac9df5cda13fec8880e74aab0241c0c17dcf\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\"\n  ],\n  \"decisions\": [\n    \"Setup plans render the platform/default onboarding root.\",\n    \"Live setup checks inspect current host-accessible component source paths.\",\n    \"Preserved upstream componentSetupSourceRoot model after rebase.\"\n  ],\n  \"verificationSummary\": \"Commit c6d9ac9df5cda13fec8880e74aab0241c0c17dcf pushed to bot/main. Passed: npm test -- src/nexusSetupAssistant.test.ts; git diff --check; npm run check (57 files, 475 passed, 1 skipped).\",\n  \"integrationPreference\": null,\n  \"note\": \"Published to DevNexus bot/main to clear the full-suite blocker for local-143 and local-144.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:32:22.691Z",
+        "updatedAt": "2026-05-18T21:32:22.691Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-238"
+        }
+      }
+    ]
   }
 }
