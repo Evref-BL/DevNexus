@@ -31,7 +31,6 @@ function initializeTransport(
   methods: string[],
 ): MockCodexAppServerTransport {
   return new MockCodexAppServerTransport((request) => ({
-    jsonrpc: "2.0",
     id: request.id,
     result: {
       serverInfo: {
@@ -138,7 +137,6 @@ describe("Codex app-server capability adapter", () => {
 
   it("summarizes JSON-RPC protocol errors", async () => {
     const transport = new MockCodexAppServerTransport((request) => ({
-      jsonrpc: "2.0",
       id: Number(request.id) + 1,
       result: {},
     }));

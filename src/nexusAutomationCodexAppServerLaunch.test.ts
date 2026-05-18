@@ -124,7 +124,6 @@ function appServerProjectConfig(
 
 function initializeResult(request: CodexAppServerJsonRpcRequest): CodexAppServerJsonRpcResponse {
   return {
-    jsonrpc: "2.0",
     id: request.id,
     result: {
       capabilities: {
@@ -198,7 +197,6 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { threadId: "thread-1" },
         };
@@ -209,7 +207,6 @@ describe("nexus automation Codex app-server launch", () => {
           summary: "Codex app-server started thread thread-1 and turn turn-1",
         });
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { turn: { id: "turn-1" } },
         };
@@ -326,7 +323,6 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/fork") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { thread: { id: "forked-thread" } },
         };
@@ -338,7 +334,6 @@ describe("nexus automation Codex app-server launch", () => {
             "Codex app-server forked thread forked-thread and turn forked-turn",
         });
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { turnId: "forked-turn" },
         };
@@ -403,14 +398,12 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { threadId: "thread-without-result" },
         };
       }
       if (request.method === "turn/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { turnId: "turn-without-result" },
         };
@@ -485,7 +478,6 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { threadId: "thread-blocked" },
         };
@@ -497,7 +489,6 @@ describe("nexus automation Codex app-server launch", () => {
           error: "approval missing",
         });
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { turnId: "turn-blocked" },
         };
@@ -557,7 +548,6 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { threadId: "thread-malformed" },
         };
@@ -567,7 +557,6 @@ describe("nexus automation Codex app-server launch", () => {
           summary: "missing status",
         });
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { turnId: "turn-malformed" },
         };
@@ -617,14 +606,12 @@ describe("nexus automation Codex app-server launch", () => {
       }
       if (request.method === "thread/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: { id: "thread-before-failure" },
         };
       }
       if (request.method === "turn/start") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           error: {
             code: -32000,

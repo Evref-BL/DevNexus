@@ -67,7 +67,6 @@ describe("Codex app-server MCP relay", () => {
     const transport = new MockCodexAppServerTransport((request) => {
       if (request.method === "mcpServerStatus/list") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: {
             servers: [
@@ -131,7 +130,6 @@ describe("Codex app-server MCP relay", () => {
     const transport = new MockCodexAppServerTransport((request) => {
       if (request.method === "mcpServer/tool/call") {
         return {
-          jsonrpc: "2.0",
           id: request.id,
           result: {
             content: [
@@ -196,7 +194,6 @@ describe("Codex app-server MCP relay", () => {
 
   it("returns MCP tool error results as structured results, not infrastructure failures", async () => {
     const transport = new MockCodexAppServerTransport((request) => ({
-      jsonrpc: "2.0",
       id: request.id,
       result: {
         isError: true,
@@ -280,7 +277,6 @@ describe("Codex app-server MCP relay", () => {
     "classifies remote MCP relay infrastructure failure: $expectedKind",
     async ({ message, expectedKind, expectedSummary }) => {
       const transport = new MockCodexAppServerTransport((request) => ({
-        jsonrpc: "2.0",
         id: request.id,
         error: {
           code: -32000,
@@ -305,7 +301,6 @@ describe("Codex app-server MCP relay", () => {
 
   it("reports malformed app-server MCP responses as protocol failures", async () => {
     const transport = new MockCodexAppServerTransport((request) => ({
-      jsonrpc: "2.0",
       id: request.id,
       result: {
         content: [

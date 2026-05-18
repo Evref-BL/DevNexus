@@ -7,20 +7,20 @@ import {
 export type CodexAppServerJsonRpcId = string | number;
 
 export interface CodexAppServerJsonRpcRequest {
-  jsonrpc: "2.0";
+  jsonrpc?: "2.0";
   id: CodexAppServerJsonRpcId;
   method: string;
   params?: unknown;
 }
 
 export interface CodexAppServerJsonRpcSuccessResponse {
-  jsonrpc: "2.0";
+  jsonrpc?: "2.0";
   id: CodexAppServerJsonRpcId;
   result: unknown;
 }
 
 export interface CodexAppServerJsonRpcErrorResponse {
-  jsonrpc: "2.0";
+  jsonrpc?: "2.0";
   id: CodexAppServerJsonRpcId;
   error: {
     code: number;
@@ -94,7 +94,6 @@ export class CodexAppServerJsonRpcClient {
   ): Promise<Result> {
     const requestMethod = requiredNonEmptyString(method, "method");
     const request: CodexAppServerJsonRpcRequest = {
-      jsonrpc: "2.0",
       id: this.nextId(),
       method: requestMethod,
       ...(params === undefined ? {} : { params }),
@@ -113,10 +112,10 @@ export class CodexAppServerJsonRpcClient {
     }
 
     const record = responseRecord(response, requestMethod);
-    if (record.jsonrpc !== "2.0") {
+    if (hasOwn(record, "jsonrpc") && record.jsonrpc !== "2.0") {
       throw protocolError(
         requestMethod,
-        `response jsonrpc must be "2.0", got ${JSON.stringify(record.jsonrpc)}`,
+        `response jsonrpc must be absent or "2.0", got ${JSON.stringify(record.jsonrpc)}`,
       );
     }
 
@@ -222,7 +221,7 @@ class CodexAppServerStdioJsonRpcTransport
         reject,
       });
       const body = JSON.stringify(request);
-      const message = `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`;
+      const message = `${body}\n`;
       this.child.stdin!.write(message, "utf8", (error?: Error | null) => {
         if (!error) {
           return;
@@ -254,28 +253,18 @@ class CodexAppServerStdioJsonRpcTransport
 
   private processBuffer(): void {
     while (true) {
-      const headerEnd = this.headerEndIndex();
-      if (!headerEnd) {
+      const lineEnd = this.buffer.indexOf("\n");
+      if (lineEnd < 0) {
         return;
       }
 
-      const [endIndex, separatorLength] = headerEnd;
-      const header = this.buffer.slice(0, endIndex).toString("utf8");
-      const lengthMatch = /^Content-Length:\s*(\d+)\s*$/imu.exec(header);
-      if (!lengthMatch) {
-        throw new Error("Codex app-server stdio response is missing Content-Length header");
+      const line = this.buffer.slice(0, lineEnd).toString("utf8").trim();
+      this.buffer = this.buffer.slice(lineEnd + 1);
+      if (line.length === 0) {
+        continue;
       }
 
-      const contentLength = Number(lengthMatch[1]);
-      const messageStart = endIndex + separatorLength;
-      const messageEnd = messageStart + contentLength;
-      if (this.buffer.length < messageEnd) {
-        return;
-      }
-
-      const body = this.buffer.slice(messageStart, messageEnd).toString("utf8");
-      this.buffer = this.buffer.slice(messageEnd);
-      this.resolveResponse(JSON.parse(body) as Record<string, unknown>);
+      this.resolveResponse(parseStdioJsonLine(line));
     }
   }
 
@@ -294,16 +283,6 @@ class CodexAppServerStdioJsonRpcTransport
     pending.resolve(response as unknown as CodexAppServerJsonRpcResponse);
   }
 
-  private headerEndIndex(): [number, number] | undefined {
-    const crlfIndex = this.buffer.indexOf("\r\n\r\n");
-    if (crlfIndex >= 0) {
-      return [crlfIndex, 4];
-    }
-
-    const lfIndex = this.buffer.indexOf("\n\n");
-    return lfIndex >= 0 ? [lfIndex, 2] : undefined;
-  }
-
   private failAll(error: Error): void {
     this.closedError = error;
     for (const pending of this.pending.values()) {
@@ -311,6 +290,23 @@ class CodexAppServerStdioJsonRpcTransport
     }
     this.pending.clear();
   }
+}
+
+function parseStdioJsonLine(line: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch (error) {
+    throw new Error(
+      `Codex app-server stdio response is not valid newline-delimited JSON: ${errorMessage(error)}`,
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Codex app-server stdio response line must be a JSON object");
+  }
+
+  return parsed as Record<string, unknown>;
 }
 
 export function summarizeCodexAppServerJsonRpcFailure(error: unknown): string {
