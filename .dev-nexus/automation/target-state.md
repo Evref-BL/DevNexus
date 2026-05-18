@@ -120,12 +120,8 @@ Immediate direction:
     `npm run build` passed. No live image, Docker, or gateway process was
     started.
 - Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-41` GitHub bot and meta-repo onboarding flow. It is ready
-    after generic setup, hosting config, and publication guardrails landed.
-    Implementation must not automate GitHub account creation or store secrets.
-  - `dev-nexus:local-42` new-machine setup flow for existing DevNexus projects.
-    It is ready after the Mac onboarding dogfood exposed the remaining
-    host-local auth, source-root, MCP, skills, and toolchain setup gaps.
+  - No ready work remains after `dev-nexus:local-41` and `dev-nexus:local-42`
+    completed in the current coordinator cycle.
   - Final PLexus legacy gateway support removal remains human-in-the-loop and
     must not be performed without a separate explicit decision.
 - GitHub identity dogfood state:
@@ -209,13 +205,14 @@ Immediate direction:
     provider-aware targets for Codex, Claude, OpenCode, manual, and custom
     providers, plus explicit unsupported-capability gaps and Windows
     `dev-nexus.cmd` command projection.
-  - `dev-nexus:local-41` is ready to add the initial GitHub bot/machine-user
-    and meta-repo setup flow. It should cover exact manual steps, auth-profile
-    checks, SSH/gh setup, repo creation/proposal, and publication guardrail
-    configuration without handling secrets or GitHub account creation.
-  - `dev-nexus:local-42` is ready to add the new-machine setup flow for joining
-    an existing shared DevNexus project, including host-local auth, source
-    roots, MCP refresh, skills projection, and toolchain preflight.
+  - `dev-nexus:local-41` and `dev-nexus:local-42` are complete through
+    DevNexus `260d07a`: setup guidance now covers GitHub machine-user or org
+    meta-project onboarding without automating account/org creation or storing
+    secrets; repo creation is an approval-required proposal when policy allows
+    it; setup checks report expected meta remotes, host-local auth-profile
+    presence, live GitHub preflight gaps, component Git checkout/origin/dirty
+    state, and host-local setup report handoff commands. Focused setup tests,
+    the configured focused suite, and `npm run check` passed.
 - The five-agent DevNexus wave completed and was published through DevNexus
   `d0db6af`:
   - `dev-nexus:local-17` added draft-only/mocked `coordination_request`

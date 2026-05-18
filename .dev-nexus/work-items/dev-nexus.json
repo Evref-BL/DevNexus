@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 123,
-  "updatedAt": "2026-05-18T02:24:58.114Z",
+  "nextCommentNumber": 125,
+  "updatedAt": "2026-05-18T03:22:59.000Z",
   "items": [
     {
       "id": "local-1",
@@ -987,7 +987,7 @@
       "id": "local-41",
       "title": "Add GitHub bot and meta-repo onboarding flow",
       "description": "Type: GitHub/meta-project onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting config shape are available.\nSource discussion: DevNexus should hand-hold users through creating or choosing a bot/machine-user account, deciding whether meta projects live under the bot account or an organization, configuring SSH/GitHub CLI auth profiles, and creating/pushing the shared DevNexus meta repo.\n\nGoal: add a DevNexus setup flow for initial project creation with GitHub-backed meta-project hosting and a dedicated automation actor.\n\nAcceptance criteria:\n- Setup flow can recommend and customize names for a bot account and optional org/namespace, such as `<user>-bot` and `<user>-dev-nexus`, while allowing custom names like `Gabot-Darbot`.\n- The flow explains what must be manual, such as creating a GitHub account, verifying email, completing browser/device auth, and creating an organization if GitHub API permissions cannot do it.\n- The flow can generate exact commands for SSH key creation, SSH host alias config, isolated `gh` config via `GH_CONFIG_DIR`, and Git remotes without exposing private material.\n- The flow can verify plain user auth, bot auth, SSH host aliases, repo existence, collaborator access, and intended remotes.\n- The flow can create or propose creating the private meta repo when policy and credentials allow; otherwise it emits precise manual steps and resumes from verification checks.\n- The flow configures DevNexus project hosting metadata and publication guardrails so future agents know which actor/remote is intended.\n- The flow produces a final setup report suitable for handoff to another machine or agent.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration.\n- Complements `dev-nexus:local-38` for actor/remote guardrails.\n\nBoundaries:\n- Do not automate GitHub account creation; GitHub account creation remains a manual step.\n- Do not store secrets in the shared meta repo.\n- Do not force an organization; support bot-owned repos and org-owned repos.\n\nVerification:\n- Mocked GitHub/gh/SSH checks for happy path and missing-permission paths.\n- Static docs/example checks.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -1001,8 +1001,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:53:46.258Z",
-      "updatedAt": "2026-05-18T02:24:45.878Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T03:22:58.980Z",
+      "closedAt": "2026-05-18T03:22:58.980Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1014,7 +1014,7 @@
       "id": "local-42",
       "title": "Add new-machine setup flow for existing DevNexus projects",
       "description": "Type: existing-project/new-machine onboarding flow slice\nReadiness: todo/dependent until the generic setup assistant service and meta-project hosting/auth-profile config shape are available.\nSource discussion: users should be able to bring a shared DevNexus project onto another machine, such as Mac plus Windows, without re-discovering bot account setup, remotes, component roots, MCP refresh, skills projection, and local toolchain dependencies by hand.\n\nGoal: add a DevNexus setup flow for joining an existing shared DevNexus meta project on a new machine.\n\nAcceptance criteria:\n- Flow starts from a meta repo URL or known hosting config and guides clone/fetch of the DevNexus meta project into a local root.\n- Flow identifies portable project state versus host-local state and prompts/generates missing host-local overrides for source roots, worktree roots, auth profiles, MCP config, skills projection, runtime/state roots, and toolchain paths.\n- Flow verifies personal and bot/API auth profiles according to project policy, including plain user `gh`, bot wrapper or app profile, SSH host aliases, and remote access.\n- Flow verifies component source checkouts: clone if absent when policy allows, fetch/pull if present, preserve dirty local changes, and report conflicts instead of overwriting.\n- Flow refreshes or proposes refreshing MCP/projected skill configuration for the local agent target and reports approval/default-tool settings needed for automation.\n- Flow runs safe preflight checks for required runtimes/toolchains and reports actionable blockers, without running live PLexus/Pharo/Docker work unless an approved runtime profile exists.\n- Flow produces a machine-local setup report that another agent can read before continuing work.\n\nDependencies:\n- Depends on `dev-nexus:local-40` for the generic setup assistant service.\n- Depends on `dev-nexus:local-39` for meta-project hosting configuration and auth profile references.\n- Depends on `dev-nexus:local-38` for actor/remote guardrails when publishing from the new machine.\n\nBoundaries:\n- Do not overwrite existing dirty component source roots or host-local config.\n- Do not copy secrets into shared project state.\n- Do not launch live runtime services/images during baseline onboarding.\n\nVerification:\n- Mocked filesystem/Git/gh checks for fresh-machine and existing-dirty-machine cases.\n- Fixture project with host-local overrides and component source roots.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after dependencies and verification pass.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -1029,8 +1029,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:54:23.339Z",
-      "updatedAt": "2026-05-18T02:24:58.114Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T03:22:59.000Z",
+      "closedAt": "2026-05-18T03:22:59.000Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2583,6 +2583,17 @@
           "provider": "local",
           "itemId": "local-comment-121"
         }
+      },
+      {
+        "id": "local-comment-123",
+        "body": "Implemented GitHub meta-project onboarding in integrated branch codex/dev-nexus/local-41-42-onboarding-flows: richer bot/org naming guidance, manual account/org boundary, non-secret GH_CONFIG_DIR/SSH/remote commands, approval-required repository creation proposal, hosting/auth/remote setup checks, and host-local report guidance. Verification passed: npm test -- src/nexusSetupAssistant.test.ts; npm test -- --exclude src/processSupervisor.test.ts; npm run check.",
+        "author": null,
+        "createdAt": "2026-05-18T03:22:08.807Z",
+        "updatedAt": "2026-05-18T03:22:08.807Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-123"
+        }
       }
     ],
     "local-42": [
@@ -2716,6 +2727,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-122"
+        }
+      },
+      {
+        "id": "local-comment-124",
+        "body": "Implemented new-machine setup hardening in integrated branch codex/dev-nexus/local-41-42-onboarding-flows: final host-local setup report command, safer component checkout checks for Git checkout/origin/dirty state, existing MCP/session readiness retained, and stronger component preparation guidance. Verification passed: npm test -- src/nexusSetupAssistant.test.ts; npm test -- --exclude src/processSupervisor.test.ts; npm run check.",
+        "author": null,
+        "createdAt": "2026-05-18T03:22:08.866Z",
+        "updatedAt": "2026-05-18T03:22:08.866Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-124"
         }
       }
     ],
