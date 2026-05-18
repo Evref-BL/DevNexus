@@ -26,10 +26,12 @@ and ready for coordinator-driven work across its components.
 - Windows automation publication is intentionally blocked until the host-local
   bot GitHub CLI profile is authenticated at
   `home:.config/gh-automation-github`; the Mac bot profile is authenticated.
-- Fresh Mac onboarding showed the project was synced and ready for non-live
-  coordinator work. Generic `dev_nexus` and `dev_nexus_pharo` stdio MCP
-  `tools/list` probes worked, but PLexus-backed MCP lacked the `plexus`
-  command on `PATH` and direct Pharo HTTP MCP was not live.
+- Fresh Mac onboarding has been remediated for the advertised MCP surface.
+  Local source-linked CLIs expose `dev-nexus`, `dev-nexus-pharo`, and `plexus`;
+  direct `tools/list` probes pass for `dev_nexus`, `dev_nexus_pharo`,
+  `plexus_project`, `pharo_launcher`, `route_control`, and `gateway`. The
+  project-local PLexus gateway is pinned to `127.0.0.1:17576` and reports
+  operational-but-idle because no Pharo images are declared for this project.
 - Cleanup work `dev-nexus:local-68` is complete.
 - Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
   been pruned after verifying they were merged or superseded by completed work

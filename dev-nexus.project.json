@@ -355,8 +355,32 @@
         },
         {
           "kind": "mcp_server",
-          "id": "mcp-pharo",
-          "serverName": "pharo",
+          "id": "plexus-route-control-mcp",
+          "serverName": "route_control",
+          "description": "Trusted PLexus gateway route-control surface for lifecycle route registration and diagnostics.",
+          "tools": [
+            {
+              "name": "plexus_gateway_register_target",
+              "description": "Register or update scoped project routes in the PLexus gateway."
+            },
+            {
+              "name": "plexus_gateway_unregister_target",
+              "description": "Remove scoped project routes from the PLexus gateway."
+            },
+            {
+              "name": "plexus_gateway_status",
+              "description": "Read gateway route status for the scoped project target."
+            },
+            {
+              "name": "plexus_gateway_cleanup_stale_routes",
+              "description": "Clean stale gateway routes owned by the scoped project."
+            }
+          ]
+        },
+        {
+          "kind": "mcp_server",
+          "id": "mcp-gateway",
+          "serverName": "gateway",
           "description": "PLexus-projected direct Pharo MCP facade for the selected scoped image.",
           "tools": [
             {

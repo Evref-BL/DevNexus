@@ -15,5 +15,14 @@
       "autoRemove": true,
       "mountProjectReadOnly": true
     }
+  },
+  "runtime": {
+    "gateway": {
+      "mode": "project-local",
+      "host": "127.0.0.1",
+      "port": 17576,
+      "agentMcpPath": "/mcp",
+      "routeControlMcpPath": "/control-mcp"
+    }
   }
 }

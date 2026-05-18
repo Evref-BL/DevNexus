@@ -1,4 +1,5 @@
 .dev-nexus/automation/agent-launches/
+.DS_Store
 .dev-nexus/automation/host-runs/
 .dev-nexus/automation/last-codex-message.md
 .dev-nexus/automation/last-agent-result.json
