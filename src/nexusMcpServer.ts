@@ -72,6 +72,12 @@ import {
   parseNexusCoordinationRequestStatus,
 } from "./nexusCoordinationRequest.js";
 import {
+  createNexusRemoteExecutionRequest,
+  getNexusRemoteExecutionRecord,
+  recordNexusRemoteExecutionResult,
+  type NexusRemoteExecutionAttachmentRef,
+} from "./nexusRemoteExecution.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -115,6 +121,7 @@ import type {
   WorkItemRef,
   WorkStatus,
 } from "./workTrackingTypes.js";
+import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 
 export const devNexusMcpProtocolVersion = "2024-11-05";
 
@@ -604,6 +611,121 @@ const tools: McpTool[] = [
         currentPath: { type: "string" },
       },
       required: ["intent"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "remote_execution_request_create",
+    description: "Create a draft/local durable remote execution request without running commands.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        workItemId: { type: ["string", "null"] },
+        requestingHostId: { type: "string" },
+        requestingAgentId: { type: ["string", "null"] },
+        targetHostId: { type: ["string", "null"] },
+        requiredCapabilities: { type: "array", items: { type: "string" } },
+        runnerProfileId: { type: "string" },
+        repository: { type: "string" },
+        ref: { type: "string" },
+        commandProfileId: { type: "string" },
+        timeoutMs: { type: "number" },
+        expectedArtifacts: { type: "array", items: { type: "string" } },
+        mutationClass: {
+          type: "string",
+          enum: ["none", "verification", "project_local", "live_runtime", "destructive"],
+        },
+        initialStatus: {
+          type: "string",
+          enum: [
+            "queued",
+            "accepted",
+            "running",
+            "completed",
+            "failed",
+            "blocked",
+            "timed_out",
+            "cancelled",
+          ],
+        },
+        attachmentRefs: { type: "array", items: { type: "object" } },
+      },
+      required: [
+        "projectRoot",
+        "requestingHostId",
+        "runnerProfileId",
+        "repository",
+        "ref",
+        "commandProfileId",
+        "timeoutMs",
+        "mutationClass",
+      ],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "remote_execution_result_record",
+    description: "Record a draft/local remote execution result without running commands.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        requestId: { type: "string" },
+        status: {
+          type: "string",
+          enum: [
+            "queued",
+            "accepted",
+            "running",
+            "completed",
+            "failed",
+            "blocked",
+            "timed_out",
+            "cancelled",
+          ],
+        },
+        hostId: { type: "string" },
+        runnerProfileId: { type: "string" },
+        actualRef: { type: ["string", "null"] },
+        actualCommit: { type: ["string", "null"] },
+        commands: { type: "array", items: { type: "string" } },
+        exitCode: { type: ["number", "null"] },
+        verificationOutcome: {
+          type: "string",
+          enum: ["passed", "failed", "not_run", "blocked", "timed_out", "cancelled"],
+        },
+        outputTail: { type: ["string", "null"] },
+        artifactRefs: { type: "array", items: { type: "string" } },
+        cleanupStatus: {
+          type: "string",
+          enum: ["not_required", "completed", "failed", "blocked", "unknown"],
+        },
+        blockerSafetyReason: { type: ["string", "null"] },
+      },
+      required: [
+        "projectRoot",
+        "requestId",
+        "status",
+        "hostId",
+        "runnerProfileId",
+        "verificationOutcome",
+        "cleanupStatus",
+      ],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "remote_execution_result_get",
+    description: "Read a draft/local remote execution request and recorded result by request id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        requestId: { type: "string" },
+      },
+      required: ["projectRoot", "requestId"],
       additionalProperties: false,
     },
   },
@@ -1247,6 +1369,116 @@ export async function callDevNexusMcpTool(
             gitRunner: context.gitRunner,
             now: context.now,
           })),
+        });
+      case "remote_execution_request_create":
+        assertMcpMutationAllowed(args, context, {
+          command: "remote_execution_request_create",
+          mutationClass: "coordination_record",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+        return toolResult({
+          ok: true,
+          localOnly: true,
+          request: createNexusRemoteExecutionRequest({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            workItemId: optionalNullableString(args, "workItemId", "arguments"),
+            requestingHostId: requiredString(
+              args,
+              "requestingHostId",
+              "arguments",
+            ),
+            requestingAgentId: optionalNullableString(
+              args,
+              "requestingAgentId",
+              "arguments",
+            ),
+            targetHostId: optionalNullableString(
+              args,
+              "targetHostId",
+              "arguments",
+            ),
+            requiredCapabilities:
+              optionalStringArray(args, "requiredCapabilities", "arguments") ??
+              [],
+            runnerProfileId: requiredString(
+              args,
+              "runnerProfileId",
+              "arguments",
+            ),
+            repository: requiredString(args, "repository", "arguments"),
+            ref: requiredString(args, "ref", "arguments"),
+            commandProfileId: requiredString(
+              args,
+              "commandProfileId",
+              "arguments",
+            ),
+            timeoutMs: requiredPositiveInteger(args, "timeoutMs", "arguments"),
+            expectedArtifacts:
+              optionalStringArray(args, "expectedArtifacts", "arguments") ?? [],
+            mutationClass: remoteExecutionMutationClassFromArgs(args),
+            initialStatus: optionalString(args, "initialStatus", "arguments"),
+            attachmentRefs: remoteExecutionAttachmentRefsFromArgs(args),
+            now: context.now,
+          }),
+        });
+      case "remote_execution_result_record":
+        assertMcpMutationAllowed(args, context, {
+          command: "remote_execution_result_record",
+          mutationClass: "coordination_record",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+        return toolResult({
+          ok: true,
+          localOnly: true,
+          result: recordNexusRemoteExecutionResult({
+            projectRoot: projectRootFromArgs(args),
+            requestId: requiredString(args, "requestId", "arguments"),
+            status: requiredString(args, "status", "arguments"),
+            hostId: requiredString(args, "hostId", "arguments"),
+            runnerProfileId: requiredString(
+              args,
+              "runnerProfileId",
+              "arguments",
+            ),
+            actualRef: optionalNullableString(args, "actualRef", "arguments"),
+            actualCommit: optionalNullableString(
+              args,
+              "actualCommit",
+              "arguments",
+            ),
+            commands:
+              optionalStringArray(args, "commands", "arguments") ?? [],
+            exitCode: optionalNullableInteger(args, "exitCode", "arguments"),
+            verificationOutcome: requiredString(
+              args,
+              "verificationOutcome",
+              "arguments",
+            ),
+            outputTail: optionalNullableString(args, "outputTail", "arguments"),
+            artifactRefs:
+              optionalStringArray(args, "artifactRefs", "arguments") ?? [],
+            cleanupStatus: requiredString(
+              args,
+              "cleanupStatus",
+              "arguments",
+            ),
+            blockerSafetyReason: optionalNullableString(
+              args,
+              "blockerSafetyReason",
+              "arguments",
+            ),
+            now: context.now,
+          }),
+        });
+      case "remote_execution_result_get":
+        return toolResult({
+          ok: true,
+          localOnly: true,
+          record: getNexusRemoteExecutionRecord({
+            projectRoot: projectRootFromArgs(args),
+            requestId: requiredString(args, "requestId", "arguments"),
+          }),
         });
       case "work_item_create":
         assertMcpMutationAllowed(args, context, {
@@ -2211,6 +2443,44 @@ function workItemPatchFromArgs(args: Record<string, unknown>): WorkItemPatch {
   return patch;
 }
 
+function remoteExecutionAttachmentRefsFromArgs(
+  args: Record<string, unknown>,
+): NexusRemoteExecutionAttachmentRef[] {
+  const values = args.attachmentRefs;
+  if (values === undefined || values === null) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    throw new Error("arguments.attachmentRefs must be an array");
+  }
+
+  return values.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`arguments.attachmentRefs[${index}] must be an object`);
+    }
+    return value as NexusRemoteExecutionAttachmentRef;
+  });
+}
+
+function remoteExecutionMutationClassFromArgs(
+  args: Record<string, unknown>,
+): NexusRunnerMutationClass {
+  const value = requiredString(args, "mutationClass", "arguments");
+  if (
+    value === "none" ||
+    value === "verification" ||
+    value === "project_local" ||
+    value === "live_runtime" ||
+    value === "destructive"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    "arguments.mutationClass must be none, verification, project_local, live_runtime, or destructive",
+  );
+}
+
 function workItemSyncPolicyFromArgs(
   args: Record<string, unknown>,
 ): WorkItemSyncPolicyConfig {
@@ -2634,6 +2904,35 @@ function optionalPositiveInteger(
   }
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     throw new Error(`${pathName}.${key} must be a positive integer`);
+  }
+
+  return value;
+}
+
+function requiredPositiveInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number {
+  const value = optionalPositiveInteger(record, key, pathName);
+  if (value === undefined) {
+    throw new Error(`${pathName}.${key} is required`);
+  }
+
+  return value;
+}
+
+function optionalNullableInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${pathName}.${key} must be an integer or null`);
   }
 
   return value;
