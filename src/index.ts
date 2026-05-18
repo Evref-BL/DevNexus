@@ -35,6 +35,7 @@ export * from "./nexusNpmRuntime.js";
 export * from "./nexusPathResolver.js";
 export * from "./nexusPluginCapabilities.js";
 export * from "./nexusProjectHosting.js";
+export * from "./nexusProjectHostingIntegrationFixture.js";
 export * from "./nexusPublicationPolicy.js";
 export * from "./nexusRemoteExecution.js";
 export * from "./nexusProjectScaffold.js";
