@@ -242,6 +242,7 @@ describe("DevNexus MCP server", () => {
       "remote_execution_result_record",
       "remote_execution_result_get",
       "work_item_create",
+      "work_item_discovery_status",
       "work_item_list",
       "work_item_get",
       "work_item_update",
@@ -1008,6 +1009,93 @@ describe("DevNexus MCP server", () => {
       }),
     ]);
     expect(rawOutput).not.toContain("127.0.0.1:17655");
+  });
+
+  it("reports read-only work item discovery status through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "MCP Demo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "local",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                },
+              },
+              {
+                id: "github-inbox",
+                name: "GitHub Inbox",
+                enabled: true,
+                roles: ["eligible_source", "external_inbox"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "disabled",
+              importRequiredFirst: true,
+              providerFilters: [],
+              queryLimit: 10,
+              conflictWinner: "default_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const result = toolJson(
+      await callDevNexusMcpTool("work_item_discovery_status", { projectRoot }),
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      project: {
+        id: "mcp-demo",
+      },
+      warnings: [expect.stringContaining("github-inbox skipped")],
+      components: [
+        {
+          componentId: "primary",
+          discoveryTrackerIds: ["local", "github-inbox"],
+          configuredTrackers: [
+            {
+              id: "local",
+              readable: {
+                status: "readable",
+              },
+            },
+            {
+              id: "github-inbox",
+              readable: {
+                status: "skipped",
+              },
+            },
+          ],
+        },
+      ],
+    });
   });
 
   it("records and reports coordination handoffs through MCP tools", async () => {

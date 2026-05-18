@@ -1,0 +1,276 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  getNexusWorkItemDiscoveryStatus,
+  saveProjectConfig,
+  type NexusProjectConfig,
+} from "./index.js";
+
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
+
+afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+function projectConfig(
+  components: NexusProjectConfig["components"],
+): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "discovery-demo",
+    name: "Discovery Demo",
+    home: null,
+    repo: {
+      kind: "git",
+      remoteUrl: "git@example.invalid:demo/project.git",
+      defaultBranch: "main",
+      sourceRoot: "source",
+    },
+    components,
+    worktreesRoot: "worktrees",
+    workTracking: {
+      provider: "local",
+    },
+  };
+}
+
+describe("work item discovery status", () => {
+  it("reports defaults, configured trackers, roles, policy, capabilities, and readability", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig([
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/core.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "local",
+          workTrackers: [
+            {
+              id: "local",
+              name: "Local Work",
+              enabled: true,
+              roles: ["primary"],
+              workTracking: { provider: "local" },
+            },
+            {
+              id: "github-inbox",
+              name: "GitHub Inbox",
+              enabled: true,
+              roles: ["external_inbox", "eligible_source"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "demo",
+                },
+              },
+            },
+          ],
+          trackerDiscovery: {
+            scannedRoles: ["primary", "eligible_source"],
+            directExternalSelection: "disabled",
+            importRequiredFirst: true,
+            providerFilters: [],
+            queryLimit: 25,
+            conflictWinner: "default_tracker",
+            missingCredentialBehavior: "skip",
+          },
+          relationships: [],
+        },
+      ]),
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      env: {},
+    });
+
+    expect(result).toMatchObject({
+      project: {
+        id: "discovery-demo",
+      },
+      blockers: [],
+      warnings: [
+        expect.stringContaining("github-inbox skipped"),
+      ],
+      components: [
+        {
+          componentId: "core",
+          defaultTracker: {
+            id: "local",
+            provider: "local",
+          },
+          effectiveDiscoveryPolicy: {
+            scannedRoles: ["primary", "eligible_source"],
+            queryLimit: 25,
+            missingCredentialBehavior: "skip",
+            defaultTrackerOnly: false,
+          },
+          discoveryTrackerIds: ["local", "github-inbox"],
+          configuredTrackers: [
+            {
+              id: "local",
+              provider: "local",
+              roles: ["primary"],
+              default: true,
+              selectedForDiscovery: true,
+              capabilityReport: {
+                provider: "local",
+                capabilities: {
+                  list: true,
+                },
+              },
+              credentials: {
+                status: "not_required",
+              },
+              readable: {
+                status: "readable",
+              },
+            },
+            {
+              id: "github-inbox",
+              provider: "github",
+              roles: ["external_inbox", "eligible_source"],
+              selectedForDiscovery: true,
+              credentials: {
+                status: "missing",
+                required: true,
+              },
+              readable: {
+                status: "skipped",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("reports required missing provider credentials as blockers without mutating local stores", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    const storePath = path.join(projectRoot, ".dev-nexus", "work-items.json");
+    const linkPath = path.join(projectRoot, ".dev-nexus", "work-item-links.json");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig([
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/core.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "github-inbox",
+          workTrackers: [
+            {
+              id: "github-inbox",
+              name: "GitHub Inbox",
+              enabled: true,
+              roles: ["primary", "external_inbox"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "demo",
+                },
+              },
+            },
+          ],
+          relationships: [],
+        },
+      ]),
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      env: {},
+    });
+
+    expect(result.blockers).toEqual([
+      expect.stringContaining("github-inbox blocked"),
+    ]);
+    expect(result.components[0]!.configuredTrackers[0]).toMatchObject({
+      id: "github-inbox",
+      selectedForDiscovery: true,
+      readable: {
+        status: "blocked",
+      },
+    });
+    expect(fs.existsSync(storePath)).toBe(false);
+    expect(fs.existsSync(linkPath)).toBe(false);
+  });
+
+  it("keeps the default policy scoped to only the component default tracker", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig([
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@example.invalid:demo/core.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          defaultWorkTrackerId: "local",
+          workTrackers: [
+            {
+              id: "local",
+              name: "Local Work",
+              enabled: true,
+              roles: ["primary"],
+              workTracking: { provider: "local" },
+            },
+            {
+              id: "archive",
+              name: "Archive",
+              enabled: true,
+              roles: ["archive"],
+              workTracking: { provider: "local", storePath: "archive.json" },
+            },
+          ],
+          relationships: [],
+        },
+      ]),
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      env: {},
+    });
+
+    expect(result.components[0]).toMatchObject({
+      effectiveDiscoveryPolicy: {
+        defaultTrackerOnly: true,
+      },
+      discoveryTrackerIds: ["local"],
+      configuredTrackers: [
+        {
+          id: "local",
+          selectedForDiscovery: true,
+        },
+        {
+          id: "archive",
+          selectedForDiscovery: false,
+        },
+      ],
+    });
+  });
+});
