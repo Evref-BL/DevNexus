@@ -77,9 +77,12 @@ and ready for coordinator-driven work across its components.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
   `local-103`. `local-97`, `local-99`, and `local-102` are complete.
-  `local-100` should wait for
-  authority status summaries before status expansion. Publication and provider
-  mutation gating stay with the authority items `local-91` and `local-92`.
+  `local-98` is now the first fail-safe implementation slice:
+  DevNexus-controlled mutations should fail closed before writing shared
+  project or component checkouts, without waiting for full authority
+  resolution. `local-100` should wait for authority status summaries before
+  status expansion. Publication and provider mutation gating stay with the
+  authority items `local-91` and `local-92`.
 - `docs/agent-target-projection-opt-in-prd.md` records the decision that
   provider-native MCP, skills, plugin, and worker projections should be
   generated only for active agent targets. `dev-nexus:local-104` tracks slicing
@@ -114,14 +117,16 @@ and ready for coordinator-driven work across its components.
 ## Near-Term Direction
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
-  `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, and `dev-nexus:local-118`,
-  subject to dependency and concurrency limits.
+  `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-98`,
+  `dev-nexus:local-104`, `dev-nexus:local-114`, `dev-nexus:local-115`, and
+  `dev-nexus:local-118`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
-- Keep parallel-agent workflow ordered: use completed read-only cleanup
-  classification (`local-102`) before cleanup execution, and keep status
-  expansion/start-adopt slices behind their authority dependencies.
+- Keep parallel-agent workflow ordered: implement fail-closed shared-checkout
+  mutation enforcement (`local-98`) before relying on additional mutating
+  parallel-agent flows; use completed read-only cleanup classification
+  (`local-102`) before cleanup execution, and keep status expansion/start-adopt
+  slices behind their authority dependencies.
 - Continue agent-target projection planning at `dev-nexus:local-104`; `local-111`
   is the dogfood Codex-only migration and should wait for active target
   filtering plus stale cleanup safety.

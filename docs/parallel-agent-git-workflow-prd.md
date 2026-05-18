@@ -24,6 +24,8 @@ task into a heavyweight process.
 ## Goals
 
 - Make isolated worktrees the default for agent-created mutations.
+- Make DevNexus-controlled mutations fail closed when the target is a shared
+  project or component checkout.
 - Keep shared project and component checkouts useful as read-mostly control
   rooms for status, coordination, setup, and integration.
 - Let multiple chats work in parallel when they own different work items,
@@ -73,6 +75,12 @@ edit project state directly, the tracker files can collect unrelated changes
 from different chats. This is tolerable for one coordinator but fragile when
 multiple interactive chats and multiple hosts are active.
 
+Instructions alone are not enough here. Mistakes happen before a model has time
+to reason about policy: a tool writes a tracker file, refreshes projected
+skills, stages a change, or commits on `main`. When DevNexus controls the
+infrastructure operation, DevNexus should enforce the boundary in code instead
+of relying on prompt compliance.
+
 ## Relationship To Authority
 
 This workflow is adjacent to the Coordination Roles And Authority Product
@@ -91,6 +99,38 @@ The overlap is intentional at the command boundary. For example,
 `coordination integrate` may report both merge conflicts from the parallel-work
 model and "merge not allowed" from the authority model. Those facts should be
 shown together, but they come from different subsystems.
+
+## Fail-Safe Principle
+
+DevNexus-controlled mutations should fail closed unless the writable surface is
+an owned worktree or an explicitly allowed bootstrap or integration operation.
+
+A DevNexus-controlled mutation is any DevNexus CLI, MCP, automation, setup, or
+coordination operation that writes Git state, project state, component source,
+local work-item stores, projected support files, handoff records, target state,
+branches, remotes, provider state, or cleanup results.
+
+The guard should run before mutation, classify the target checkout, and refuse
+ambiguous writes. The refusal should be non-interactive and machine-readable:
+include the attempted action, target path, checkout classification, reason, and
+safe next action such as prepare a project-meta worktree, prepare a component
+worktree, adopt an existing owned worktree, or run the operation as an explicit
+integrator.
+
+The guard is not a hard lock between independent branches. It is a local
+write-surface fail-safe: a worker may proceed in an owned worktree even if
+another worker has an advisory lease. Related active work should still be
+reported through coordination status and integration planning.
+
+Allowed exceptions should be narrow:
+
+- Read-only status, setup check, planning, and inspection commands.
+- Bootstrap commands whose purpose is to create or adopt an owned worktree.
+- Explicit integrator operations that serialize verified branches into `main`.
+- Explicit rescue operations that preserve discovered work before cleanup.
+
+Branch name is not proof of isolation. A worker branch checked out in the shared
+project directory is still a shared-checkout mutation risk.
 
 ## Users
 
@@ -235,6 +275,8 @@ When proof is missing, cleanup should report a blocker instead of deleting.
   prepared worktree, branch, ownership metadata, and write-scope guidance.
 - As a worker agent, I am blocked before editing the shared checkout unless I
   explicitly own integration or project-state mutation.
+- As a human maintainer, I can rely on DevNexus tools to block shared-checkout
+  mutations before they touch `main`, not merely warn an agent after the fact.
 - As a Mac agent, I can see that a Windows agent is already working on a related
   component surface before I start editing.
 - As an integration agent, I can see all ready branches, their verification
@@ -261,6 +303,18 @@ The result should tell the agent:
 - Which files or areas are in scope.
 - Which related active work may conflict.
 - What handoff is expected.
+
+### Mutation Guard
+
+Every DevNexus-controlled mutating command should pass through the same checkout
+mutation guard. The guard should decide whether the command is read-only,
+bootstrap, worker mutation, integration, rescue, cleanup, provider mutation, or
+unknown. Unknown mutating commands should be refused until classified.
+
+The first implementation can use explicit command and action allowlists instead
+of waiting for the full authority resolver. Authority should later refine who
+may use overrides, integrate to `main`, push branches, mutate providers, or run
+cleanup.
 
 ### Coordination Status
 
@@ -298,9 +352,12 @@ or worktree is safe, blocked, stale, or needs human review.
 
 ## Implementation Decisions
 
-- Default mutating chat behavior should be worktree-first.
-- Shared checkouts should be read-mostly except for explicit integrator or
-  project-state-owner roles.
+- Default mutating chat behavior should be worktree-first and tool-enforced.
+- Shared checkouts should be read-mostly. DevNexus-controlled writes to shared
+  checkouts should fail closed except for explicit bootstrap, integration,
+  rescue, or authority-approved project-state ownership.
+- Tool enforcement should happen before a file write, Git mutation, provider
+  mutation, or tracker mutation, not after detecting a dirty checkout.
 - Worktree leases should be advisory, not hard locks.
 - Branch names should include enough component and work-item context for humans
   to scan them.
@@ -341,8 +398,10 @@ or worktree is safe, blocked, stale, or needs human review.
 
 1. Document the worktree-first policy in project instructions and agent
    workflow docs.
-2. Add a shared-checkout mutation warning or failure for DevNexus-controlled
-   mutating flows.
+2. Add a fail-closed shared-checkout mutation guard for DevNexus-controlled
+   mutating flows, starting with local work-item writes, target/project-state
+   writes, skill/MCP projection refreshes, coordination handoffs, publication,
+   integration, and cleanup execution.
 3. Add explicit worktree lease records and coordination status output.
 4. Teach handoff and status commands to report dirty shared checkouts,
    unpushed commits, and branch recoverability.
@@ -368,8 +427,8 @@ or worktree is safe, blocked, stale, or needs human review.
 
 - Should every interactive chat start by adopting a DevNexus current-agent
   context, even for small planning questions?
-- Should DevNexus enforce worktree-first at the CLI level, through generated
-  agent instructions, or both?
+- Which legacy mutating commands need temporary explicit overrides while the
+  fail-closed guard is rolled out?
 - What is the right lease storage location before shared provider-backed
   coordination is enabled?
 - Should project-meta edits use a dedicated meta component in the project model?

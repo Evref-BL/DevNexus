@@ -59,6 +59,10 @@ coordinator agent chooses and supervises implementation work.
 - Parallel interactive chats should use isolated worktrees for mutating work;
   shared checkouts are read-mostly control rooms unless an agent explicitly owns
   integration or project-state mutation.
+- DevNexus-controlled mutations should fail closed before writing a shared
+  project or component checkout. Branch name alone is not proof of isolation;
+  writable worker surfaces need an owned worktree or an explicit
+  bootstrap/integration classification.
 - External coordination should use provider-native systems such as GitHub
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.
