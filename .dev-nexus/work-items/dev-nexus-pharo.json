@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 20,
+  "nextNumber": 22,
   "nextCommentNumber": 52,
-  "updatedAt": "2026-05-18T14:56:59.871Z",
+  "updatedAt": "2026-05-18T20:55:50.653Z",
   "items": [
     {
       "id": "local-1",
@@ -475,6 +475,59 @@
         "provider": "local",
         "itemId": "local-19",
         "itemNumber": 19
+      }
+    },
+    {
+      "id": "local-20",
+      "title": "Package DevNexus-Pharo project templates used by project import",
+      "description": "Type: packaging/import defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved failure:\nA packaged/global `dev-nexus-pharo project import` failed before completing setup with `Default AGENTS.md template is missing: /opt/homebrew/lib/node_modules/@evref-bl/dev-nexus-pharo/AGENTS.md`.\n\nCurrent evidence:\n- `src/devNexusPharoExtension.ts` resolves the default template as package-root `AGENTS.md` through `defaultAgentsTemplatePath()` and `installDefaultAgentsFile()`.\n- `package.json` publishes only `dist`, `README.md`, and `package.json`, so `AGENTS.md` is not included in the installed package.\n- The source checkout has `AGENTS.md`; the installed package path did not.\n\nGoal:\nMake DevNexus-Pharo project create/import work from a normal packaged install without relying on a source checkout.\n\nAcceptance criteria:\n- `AGENTS.md` or an equivalent explicit template is included in published package contents, embedded in built output, or moved to a packaged template path.\n- A packaged-install smoke proves `dev-nexus-pharo project create` and `dev-nexus-pharo project import` can install the project AGENTS file.\n- Missing-template errors, if still possible, clearly report a package integrity/setup problem before ambiguous manual repair is needed.\n- Regression coverage exercises the packaged/template lookup path, not only the repository source layout.\n\nBoundaries:\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n- Keep generic project creation/import behavior in DevNexus core; this item owns the DevNexus-Pharo template/package defect.\n\nVerification:\n- `npm run check` in DevNexus-Pharo.\n- `npm pack --dry-run` or equivalent package-content assertion.\n- Temp install/package smoke that runs project create/import far enough to prove the template is available.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "project-import",
+        "packaging",
+        "onboarding",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T20:55:26.592Z",
+      "updatedAt": "2026-05-18T20:55:26.592Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-20",
+        "itemNumber": 20
+      }
+    },
+    {
+      "id": "local-21",
+      "title": "Stop normal DevNexus-Pharo import from retaining legacy PLexus kanban metadata",
+      "description": "Type: project setup/config cleanup defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved friction:\nDuring normal DevNexus-Pharo project import/repair for the dedicated MCP-Pharo project, `plexus.project.json` retained or reintroduced `kanban.provider: vibe-kanban` metadata even though no Vibe tracker sync/link was requested and current dogfood policy says not to create Vibe workspaces, sessions, executions, or implementation workers.\n\nCurrent evidence:\n- `normalizePlexusProjectConfig(...)` preserves `existing.kanban.projectId` when no explicit `vibeKanbanProjectId` is supplied.\n- `installDevNexusPharoProjectFiles(...)` passes `options.vibeKanbanProjectId ?? options.projectConfig.kanban?.projectId ?? null`, so generic/project-level legacy kanban metadata can flow into the PLexus config during import.\n- Manual cleanup was needed to keep the focused MCP-Pharo DevNexus project free of legacy Vibe metadata.\n\nGoal:\nEnsure normal DevNexus-Pharo project create/import does not introduce or preserve legacy PLexus `kanban` metadata unless the user explicitly requests tracker linking/sync behavior that still requires it.\n\nAcceptance criteria:\n- Creating/importing a DevNexus-Pharo project without an explicit tracker/link/sync option produces a PLexus config with no `kanban` block.\n- Re-importing an existing PLexus config with legacy `kanban` metadata either removes it during normalization or reports a clear cleanup/migration action; choose one behavior and document it.\n- Explicit tracker-linked flows, if still supported, remain separately tested or are deliberately removed according to current no-legacy policy.\n- Tests cover fresh import without tracker id, re-import with existing PLexus kanban metadata, and any explicit tracker-linked exception.\n\nBoundaries:\n- Do not create Vibe workspaces, sessions, executions, or workers.\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n- Keep generic tracker behavior in DevNexus core; this item owns DevNexus-Pharo/PLexus config normalization.\n\nVerification:\n- Focused DevNexus-Pharo project extension/config tests.\n- `npm run check` in DevNexus-Pharo when feasible.\n- Static temp-project create/import smoke without live runtime startup.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "project-import",
+        "plexus",
+        "config",
+        "vibe-kanban",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T20:55:50.653Z",
+      "updatedAt": "2026-05-18T20:55:50.653Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-21",
+        "itemNumber": 21
       }
     }
   ],
@@ -1076,6 +1129,8 @@
           "itemId": "local-comment-51"
         }
       }
-    ]
+    ],
+    "local-20": [],
+    "local-21": []
   }
 }
