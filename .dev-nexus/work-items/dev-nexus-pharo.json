@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 14,
+  "nextNumber": 15,
   "nextCommentNumber": 32,
-  "updatedAt": "2026-05-18T01:27:47.175Z",
+  "updatedAt": "2026-05-18T13:04:31.676Z",
   "items": [
     {
       "id": "local-1",
@@ -320,6 +320,33 @@
         "provider": "local",
         "itemId": "local-13",
         "itemNumber": 13
+      }
+    },
+    {
+      "id": "local-14",
+      "title": "Contribute DevNexus-Pharo host capability probes and runner profile templates",
+      "description": "Type: plugin integration slice\nReadiness: todo/dependent on DevNexus host registry and runner profile surfaces\nSource PRD: docs/remote-host-execution-prd.md\nRelated parent: dev-nexus:local-77\n\nGoal: let DevNexus-Pharo contribute Pharo-specific host capability probes and safe runner profile templates without adding Pharo concepts to DevNexus core.\n\nUser stories covered:\n- As a coordinator, I can ask whether a Mac host has Pharo Launcher, PLexus tooling, and relevant MCP configuration available before assigning Pharo verification.\n- As a plugin author, I can define a safe profile template for Pharo-domain checks without granting live image mutation.\n\nAcceptance criteria:\n- DevNexus-Pharo exposes or documents generic capability contributions such as pharo, pharo-launcher, plexus, mcp, dev-nexus-pharo, and gui-adjacent.\n- Capability probes can run in static/read-only mode and report missing command, missing MCP config, missing PLexus gateway command, and missing Pharo Launcher installation separately.\n- Runner profile templates distinguish read-only status, MCP tool-list checks, verification-only checks, and live-runtime profiles that remain approval-gated.\n- Generated worker context or setup status can include these plugin capabilities through generic DevNexus host/runner surfaces.\n- Tests use mocked command/MCP probes and do not launch images, PLexus services, Docker, or GUI automation.\n\nBoundaries:\n- Do not run live Pharo images or PLexus open/close.\n- Do not require the Mac to be reachable over SSH for normal tests.\n- Keep all Pharo-specific behavior in DevNexus-Pharo or lower-level dependencies, not DevNexus core.\n\nVerification:\n- Focused DevNexus-Pharo setup/capability tests with mocked host facts.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "dev-nexus-pharo",
+        "mcp",
+        "capabilities",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:31.676Z",
+      "updatedAt": "2026-05-18T13:04:31.676Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-14",
+        "itemNumber": 14
       }
     }
   ],
@@ -690,6 +717,7 @@
           "itemId": "local-comment-31"
         }
       }
-    ]
+    ],
+    "local-14": []
   }
 }

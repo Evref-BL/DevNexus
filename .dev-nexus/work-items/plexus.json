@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 23,
+  "nextNumber": 24,
   "nextCommentNumber": 57,
-  "updatedAt": "2026-05-18T06:30:27.627Z",
+  "updatedAt": "2026-05-18T13:04:31.909Z",
   "items": [
     {
       "id": "local-1",
@@ -539,6 +539,33 @@
         "provider": "local",
         "itemId": "local-22",
         "itemNumber": 22
+      }
+    },
+    {
+      "id": "local-23",
+      "title": "Align isolated live-smoke runner boundary with generic remote runner profiles",
+      "description": "Type: runtime-boundary alignment slice\nReadiness: autonomous agent-ready for docs/config/tests after generic runner profile concepts exist; human-in-the-loop for any live runtime execution\nSource PRD: docs/remote-host-execution-prd.md and docs/live-smoke-runner-boundary.md\nRelated parent: dev-nexus:local-77\n\nGoal: map the existing PLexus isolated live-smoke runner boundary onto the generic DevNexus remote runner profile model, so future Pharo runtime smokes can be requested through the same bounded request/result language.\n\nUser stories covered:\n- As a human, I can approve a PLexus live-runtime profile without granting arbitrary remote shell access.\n- As a maintainer, I can see cleanup evidence and runtime boundary facts in the same result shape as other remote host execution.\n\nAcceptance criteria:\n- PLexus documentation or config examples describe how live-runtime operation classes map to project open, route registration, routed read-only probes, project close, and cleanup evidence.\n- The boundary separates static/read-only checks from project-local mutation, live runtime, and destructive cleanup.\n- The result shape needed by PLexus smokes is documented in generic terms: run id, workspace id, target id, image ids, route status, process status, output tail, artifacts, and cleanup status.\n- Tests or static fixtures cover profile validation and result-shape mapping without starting images, gateway services, Docker, or Pharo Launcher.\n- Existing blocked live-smoke items can reference this boundary without changing their approval requirements.\n\nBoundaries:\n- Do not perform live PLexus open/close, gateway route registration, Docker, Pharo image launch, or image deletion in this slice.\n- Do not make PLexus depend on DevNexus core implementation details beyond documented generic runner/request/result concepts.\n\nVerification:\n- Static docs/config fixture tests or focused PLexus validation tests.\n- npm run typecheck/tests when feasible.\n\nPublication notes:\n- Direct integration to PLexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "plexus-runtime",
+        "runner-profiles",
+        "dependent",
+        "afk",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:31.908Z",
+      "updatedAt": "2026-05-18T13:04:31.908Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-23",
+        "itemNumber": 23
       }
     }
   ],
@@ -1200,6 +1227,7 @@
           "itemId": "local-comment-56"
         }
       }
-    ]
+    ],
+    "local-23": []
   }
 }

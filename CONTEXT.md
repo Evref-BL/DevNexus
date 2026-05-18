@@ -34,6 +34,11 @@ coordinator agent chooses and supervises implementation work.
   remote.
 - Direct-integration component publication policies use component `bot`
   remotes; `origin` remains the normal human/manual remote.
+- User policy as of 2026-05-18: agents may integrate verified dogfood
+  component work into main without waiting for manual human review, using the
+  configured bot/automation profile when permissions allow. Components that
+  still have an explicit non-integration publication policy must be updated
+  before automation treats them as direct-integration targets.
 - The active scheduler path is DevNexus `automation coordinator-loop`.
   Heartbeats may wake that loop, but DevNexus owns lock, backoff, run facts, and
   relaunch decisions.
@@ -52,6 +57,9 @@ coordinator agent chooses and supervises implementation work.
 - Mac and Windows agents coordinate through shared work-item intent, Git
   branches, structured handoffs, target-cycle facts, and provider-backed
   requests. Hard locks are avoided by default.
+- Parallel interactive chats should use isolated worktrees for mutating work;
+  shared checkouts are read-mostly control rooms unless an agent explicitly owns
+  integration or project-state mutation.
 - External coordination should use provider-native systems such as GitHub
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.

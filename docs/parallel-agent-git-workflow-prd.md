@@ -73,6 +73,25 @@ edit project state directly, the tracker files can collect unrelated changes
 from different chats. This is tolerable for one coordinator but fragile when
 multiple interactive chats and multiple hosts are active.
 
+## Relationship To Authority
+
+This workflow is adjacent to the Coordination Roles And Authority Product
+Requirements Document (PRD), but it should not duplicate that policy layer.
+Authority answers "is this actor allowed to take this action?" Parallel-agent
+workflow answers "which work surface does this chat own, where should it edit,
+what else is active, and how do we preserve or integrate the result?"
+
+The authority model should own actor identity, roles, action grants, provider
+approval signals, direct integration, pull-request behavior, provider mutation,
+and publication gating. Parallel-agent workflow should consume the effective
+authority result before mutating shared checkouts, writing leases, pushing
+branches, integrating branches, or deleting branches and worktrees.
+
+The overlap is intentional at the command boundary. For example,
+`coordination integrate` may report both merge conflicts from the parallel-work
+model and "merge not allowed" from the authority model. Those facts should be
+shown together, but they come from different subsystems.
+
 ## Users
 
 - A human maintainer starting several Codex chats in one DevNexus project.
@@ -293,8 +312,11 @@ or worktree is safe, blocked, stale, or needs human review.
 - Local work-item stores remain acceptable for dogfood, but shared multi-host
   operation should eventually use a provider-backed coordination tracker or
   robust sync layer.
-- Automation identity checks should run before any agent-created GitHub or Git
-  publication activity.
+- Automation identity and authority checks should run before agent-created Git,
+  GitHub, provider, integration, cleanup, or publication mutations.
+- Publication and provider mutation behavior should defer to the authority
+  resolver instead of introducing a second role model in the parallel-agent
+  workflow.
 
 ## Testing Decisions
 

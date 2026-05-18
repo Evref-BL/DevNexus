@@ -28,6 +28,13 @@ target-cycle facts, commits, and the target report.
 - Shared multi-host coordination: Mac and Windows agents coordinate through
   work-item intent, Git branches, structured handoffs, integration planning, and
   provider-backed approval or feedback requests.
+- Parallel interactive chats: default mutating work to isolated worktrees,
+  record advisory leases and handoffs, keep shared checkouts read-mostly, and
+  serialize cleanup/integration through authority-aware guardrails.
+- Remote host execution: trusted Mac, Windows, and Linux hosts can eventually
+  run bounded verification requests through capability-based runner profiles,
+  with Tailscale/SSH as an initial transport and DevNexus as the durable
+  request/result owner.
 - Codex app-server support: optional executor/thread provider for ephemeral
   workers, while retaining `codex exec` where it is simpler.
 - Plugin projection: DevNexus-Pharo and DevNexus-TypeScript should set up
@@ -54,6 +61,9 @@ target-cycle facts, commits, and the target report.
   execution can stay mocked and policy-gated.
 - Implement `dev-nexus:local-67` to clarify duplicate target-cycle record
   behavior.
+- Implement `dev-nexus:local-79` as the first remote-host execution slice before
+  runner profiles, request/result records, SSH transport, or live dogfood
+  smokes.
 - Promote `dev-nexus:local-51` after the multi-tracker implementation shape is
   stable enough for user-facing migration documentation.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

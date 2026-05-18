@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 77,
-  "nextCommentNumber": 167,
-  "updatedAt": "2026-05-18T12:26:59.163Z",
+  "nextNumber": 104,
+  "nextCommentNumber": 173,
+  "updatedAt": "2026-05-18T13:22:29.611Z",
   "items": [
     {
       "id": "local-1",
@@ -1763,7 +1763,7 @@
       "id": "local-71",
       "title": "Add componentsRoot portable path base for project-local component clones",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: add a first-class project-local component path base so shared DevNexus config can express stable source checkouts under the meta project root without absolute host paths or sibling-directory guessing.\n\nAcceptance criteria:\n- The central path resolver accepts `componentsRoot:<component-id-or-path>` and resolves it to `<projectRoot>/components/<component-id-or-path>` on Windows, macOS, and Linux path styles.\n- Existing project-relative paths, `projectRoot:`, `projectParent:`, `sourcesRoot:`, and compatible absolute legacy paths continue to work.\n- Agent profile/path-expression detection and setup/status surfaces that validate portable paths recognize `componentsRoot:` as portable.\n- User docs and examples state that `componentsRoot:<component-id>` is the preferred sourceRoot for normal project-local component clones; `sourcesRoot:` remains an advanced external-layout option.\n- Focused tests cover Windows and POSIX resolution, empty/tail normalization, compatibility with existing bases, and setup/status path analysis where relevant.\n\nBoundaries:\n- Do not migrate this dogfood project's component source roots in this slice.\n- Do not remove `sourcesRoot:` compatibility.\n- Do not introduce host-local secrets or absolute paths into shared config.\n\nVerification:\n- Focused path resolver and setup/status tests.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "blocked",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1775,8 +1775,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:56:51.724Z",
-      "updatedAt": "2026-05-18T12:26:47.321Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T12:32:05.536Z",
+      "closedAt": "2026-05-18T12:32:05.536Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1787,21 +1787,20 @@
     {
       "id": "local-72",
       "title": "Make join-existing-project prepare project-local component checkouts",
-      "description": "Type: implementation slice\nReadiness: todo/dependent on dev-nexus:local-71\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: make `join-existing-project` guide and verify project-local component checkouts under `components/<component-id>` by default, instead of sending users to sibling `sources/` directories unless the project explicitly chooses that layout.\n\nAcceptance criteria:\n- Setup plan text and generated clone commands prefer `componentsRoot:<component-id>` or the resolved `<projectRoot>/components/<component-id>` destination for normal component source checkouts.\n- Missing component clone checks give actionable clone/fetch commands using each component `remoteUrl` and `defaultBranch` when available.\n- Existing dirty component checkouts are detected before fetch/pull guidance and the next action tells agents to preserve local changes.\n- Incompatible or absent legacy `sourceRoot` values fall back to project-local `components/<component-id>` in the setup plan, not `$HOME/dev-nexus/sources`.\n- Fixture tests cover Windows and macOS join-existing-project plans/checks for fresh meta clones, missing component directories, existing clean component checkouts, and dirty checkout blockers.\n\nBoundaries:\n- Do not auto-delete, move, or overwrite any existing source checkout.\n- Do not run live provider writes, package installs, Pharo images, Docker, or PLexus runtime services.\n- Keep this generic in DevNexus core; no Pharo-specific setup logic.\n\nVerification:\n- Focused setup assistant tests.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "description": "Type: implementation slice. Readiness: autonomous agent-ready (AFK) after dev-nexus:local-71 merged into DevNexus main at b4aa3af. Parent: dev-nexus:local-69. Goal: make join-existing-project guide and verify project-local component checkouts under components/<component-id> by default, instead of sending users to sibling sources directories unless the project explicitly chooses that layout. Acceptance: setup plan text and clone commands prefer componentsRoot:<component-id> or resolved <projectRoot>/components/<component-id>; missing clones provide actionable clone/fetch commands using remoteUrl/defaultBranch; dirty checkouts are detected before fetch/pull guidance; incompatible or absent legacy sourceRoot values fall back to project-local components/<component-id>; Windows and macOS fixtures cover fresh meta clones, missing directories, clean checkouts, and dirty blockers. Boundaries: do not auto-delete, move, or overwrite existing checkouts; do not run live provider writes, package installs, Pharo images, Docker, or PLexus runtime services; keep this generic in DevNexus core. Verification: focused setup assistant tests; npm run check when feasible. Publication: direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
         "source-roots",
         "setup",
         "onboarding",
-        "dependent",
         "afk"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:57:02.574Z",
-      "updatedAt": "2026-05-18T11:57:02.574Z",
+      "updatedAt": "2026-05-18T12:33:40.763Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1909,6 +1908,718 @@
         "provider": "local",
         "itemId": "local-76",
         "itemNumber": 76
+      }
+    },
+    {
+      "id": "local-77",
+      "title": "Slice remote host execution PRD into work items",
+      "description": "Type: planning slice\nReadiness: autonomous agent-ready (AFK)\nSource plan: docs/remote-host-execution-prd.md.\n\nGoal: turn the remote host execution PRD into component-owned implementation work items for generic DevNexus host/runner support and plugin-specific capability probes.\n\nAcceptance criteria:\n- Slice the PRD into bounded DevNexus core, DevNexus-Pharo, PLexus, and project-state work items where appropriate.\n- Keep the durable coordination layer separate from the SSH/Tailscale execution transport.\n- First slices must be read-only or verification-only by default; live runtime, package install, Docker, GUI, and destructive cleanup profiles remain human-in-the-loop.\n- Include identity policy acceptance criteria so agent-created Git/GitHub activity cannot fall back to the human account.\n- Record sequencing, blockers, and verification guidance on each created item.\n\nVerification:\n- List created work items through the DevNexus work-item CLI.\n- Confirm no live network, Tailscale, SSH command execution, Pharo image startup, Docker, package install, or destructive cleanup is required for the slicing pass.\n\nPublication notes:\n- Dogfood planning state stays in the meta project until the sliced source work lands through each component publication policy.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "coordination",
+        "remote-host",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T12:33:36.294Z",
+      "updatedAt": "2026-05-18T13:05:28.590Z",
+      "closedAt": "2026-05-18T13:05:28.590Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-77",
+        "itemNumber": 77
+      }
+    },
+    {
+      "id": "local-78",
+      "title": "Model coordination roles for merge and approval authority",
+      "description": "Type: coordination/publication policy slice. Readiness: autonomous agent-ready (AFK). Source: user clarified that integration behavior is a coordination role decision: an agent may be a maintainer that can merge verified work, a contributor that opens PRs and waits for approval, a reviewer that can approve but not merge, or an observer that only reports. Goal: add explicit project/component/provider role policy for agent authority instead of encoding this only as informal target-state text. Acceptance: config can declare role/authority for automation actors per component or provider; agent context/status reports whether the current actor may push, open PRs, approve, merge, request review, or only hand off; publication/coordination commands block when the role does not allow the requested action; GitHub PR and direct-push examples are documented without hard-coding dogfood account names; tests cover maintainer direct merge, contributor PR-only, reviewer approval-only, and observer read-only behavior with mocked providers. Boundaries: do not make DevNexus choose implementation work; do not infer approval from assignment or comments; do not require live GitHub credentials. Dependencies: builds on dev-nexus:local-38 actor/remote guardrails and dev-nexus:local-50 coordination tracker roles. Verification: focused config/status/publication policy tests and npm run check when feasible. Publication: direct integration to DevNexus main after verification.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "publication",
+        "roles",
+        "github",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T12:35:06.278Z",
+      "updatedAt": "2026-05-18T13:22:29.611Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-78",
+        "itemNumber": 78
+      }
+    },
+    {
+      "id": "local-79",
+      "title": "Add remote host registry and host-local overlay model",
+      "description": "Type: remote host execution tracer-bullet implementation slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add the first generic DevNexus host registry model so shared project state can name trusted hosts and required capabilities while host-local overlays keep transport details, paths, and credentials out of the meta project.\n\nUser stories covered:\n- As a coordinator, I can see which logical hosts exist and what capabilities they advertise before requesting platform-specific verification.\n- As a maintainer, I can keep Tailscale addresses, SSH users, command paths, and credential profile details in host-local state rather than shared config.\n\nAcceptance criteria:\n- Project config can declare logical host ids, display names, platform/capability tags, enabled state, and optional notes without storing secrets or machine-local paths.\n- Host-local DevNexus home config can provide transport details and workspace roots for a declared host by stable host id.\n- Project/status or a new low-token status surface reports host ids, capability tags, whether host-local overlay details are configured, and any missing overlay warnings.\n- Setup check warns when shared project config contains forbidden host-local details such as Tailscale IPs, SSH usernames, credential material, absolute personal paths, live ports, or runtime artifact paths.\n- Existing projects without host registry config continue to load with an empty host list.\n\nBoundaries:\n- Do not run SSH, Tailscale, remote commands, package installs, live Pharo images, Docker, or host process cleanup in this slice.\n- Do not make DevNexus core understand Pharo Launcher, PLexus, or image-side MCP capabilities beyond generic capability strings.\n\nVerification:\n- Focused config normalization/status/setup tests for no hosts, shared host declarations, host-local overlays, missing overlays, and forbidden shared fields.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "host-registry",
+        "config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:29.097Z",
+      "updatedAt": "2026-05-18T13:04:29.097Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-79",
+        "itemNumber": 79
+      }
+    },
+    {
+      "id": "local-80",
+      "title": "Add runner profile schema with safety classes and approval gates",
+      "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: model generic runner profiles that constrain what a local or remote host may execute for a DevNexus project.\n\nUser stories covered:\n- As a human, I can approve one live-runtime runner profile without granting broad arbitrary shell access.\n- As a maintainer, I can see whether a requested remote action is read-only, project-local mutation, live-runtime, or destructive before it runs.\n\nAcceptance criteria:\n- Project config can declare runner profiles with required capabilities, allowed operation classes, command profile references, timeout/output limits, artifact retention policy, credential identity policy, mutation class, and approval requirement.\n- Validation rejects runner profiles that allow live-runtime or destructive work without explicit approval metadata or policy gates.\n- Status surfaces show each profile's required capabilities, mutation class, approval state, and missing host capability warnings.\n- Agent-facing context summarizes runner profile policy without exposing host-local secrets, paths, SSH targets, or tokens.\n- Tests cover read-only, verification-only, project-local mutation, live-runtime, destructive, and invalid profile combinations.\n\nBoundaries:\n- Do not execute runner profiles in this slice.\n- Do not introduce plugin-specific runner fields into DevNexus core; plugins can contribute generic capabilities and profile templates later.\n\nVerification:\n- Focused profile schema/status/agent-context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "runner-profiles",
+        "safety",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:29.601Z",
+      "updatedAt": "2026-05-18T13:04:29.601Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-80",
+        "itemNumber": 80
+      }
+    },
+    {
+      "id": "local-81",
+      "title": "Record remote execution requests and results",
+      "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 and dev-nexus:local-80\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add durable request/result records for bounded remote host work while keeping DevNexus coordination state separate from the eventual execution transport.\n\nUser stories covered:\n- As a Windows agent, I can request Mac-specific verification and later read a structured result without relying on terminal chat.\n- As a Mac agent, I can record a Windows-specific verification result with command, commit, exit code, and output tail.\n\nAcceptance criteria:\n- DevNexus can create an execution request with project, component, optional work item, requesting host/agent, required capabilities or target host, runner profile, repository/ref, command profile, timeout, expected artifacts, mutation class, and initial status.\n- DevNexus can record a result with host id, runner profile id, actual commit/ref, commands run, exit code, verification outcome, output tail, artifact references, cleanup status, and blocker/safety reason when applicable.\n- Request statuses include queued, accepted, running, completed, failed, blocked, timed_out, and cancelled.\n- CLI and MCP expose request creation and result read/record operations in draft/local form with no remote execution.\n- Request/result records can be attached to work items or coordination records without duplicating source-of-truth fields.\n\nBoundaries:\n- Do not run local or remote commands in this slice.\n- Do not post to live external providers unless an existing provider policy explicitly allows it; local tracker coverage is sufficient.\n\nVerification:\n- Focused CLI/MCP/service tests for request creation, status transitions, result recording, malformed output tails, and component/work-item references.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "coordination",
+        "request-result",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:30.003Z",
+      "updatedAt": "2026-05-18T13:04:30.003Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-81",
+        "itemNumber": 81
+      }
+    },
+    {
+      "id": "local-82",
+      "title": "Add read-only host capability check command",
+      "description": "Type: remote host execution tracer-bullet implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 through dev-nexus:local-81\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: provide the first useful host runner behavior: read-only capability checks for the current host and mocked remote hosts, with structured results recorded through the request/result model.\n\nUser stories covered:\n- As a coordinator, I can ask for a setup check and see whether generic DevNexus, Node, Git, MCP config, and plugin-declared tools are visible on that host.\n- As a maintainer, I can see that a host is unavailable or missing capability facts without treating it as broken.\n\nAcceptance criteria:\n- CLI and MCP expose a read-only host check operation that can target local host facts and a mocked remote transport in tests.\n- The check reports platform, shell kind, DevNexus CLI availability, Git availability, Node availability when applicable, configured host capabilities, and MCP configuration visibility at a summary level.\n- The check records or returns a structured result without exposing absolute personal paths except through host-local logs.\n- Missing tools or unavailable hosts produce blocked/unavailable facts, not uncaught transport errors.\n- Output is small enough for agent consumption and includes recommended next action.\n\nBoundaries:\n- Do not open real SSH/Tailscale connections in default tests.\n- Do not install packages, mutate repos, start services, launch images, run Docker, or refresh MCP config in this slice.\n\nVerification:\n- Focused tests for local host probe fixtures, mocked remote success/failure, missing command capability, MCP config summary, and redaction of host-local details.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "host-check",
+        "setup",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:30.225Z",
+      "updatedAt": "2026-05-18T13:04:30.225Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-82",
+        "itemNumber": 82
+      }
+    },
+    {
+      "id": "local-83",
+      "title": "Plan SSH transport execution without live network dependency",
+      "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 through dev-nexus:local-82\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add the SSH/Tailscale transport planning layer without requiring a live network connection in normal verification.\n\nUser stories covered:\n- As an agent, I can see exactly what SSH command would run, which host-local profile it uses, what working directory it expects, and which safety gate blocks it before any remote process starts.\n- As a maintainer, I can verify that Tailscale addresses, SSH users, and key aliases stay host-local.\n\nAcceptance criteria:\n- DevNexus can build an SSH execution plan from a host id, host-local overlay, runner profile, repository/ref, and command profile.\n- The plan includes sanitized command shape, working-directory resolution class, timeout, output-tail policy, and required environment keys without printing secrets or personal absolute paths in shared records.\n- Missing SSH overlay, missing Tailscale or host address, missing remote workspace root, and unsupported shell kind produce actionable blocked plans.\n- Tests use mocked transport and command runners only.\n- The implementation is transport-neutral enough that future local daemon, GitHub runner, or app-server transports can share request/result records.\n\nBoundaries:\n- Do not execute real SSH, Tailscale, remote commands, Git fetches, package installs, or live runtime commands in this slice.\n- Do not make SSH the only future transport.\n\nVerification:\n- Focused SSH plan tests for macOS, Windows, Linux, missing overlay fields, PowerShell/posix shell quoting, timeout policy, and redaction.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "ssh",
+        "transport",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:30.500Z",
+      "updatedAt": "2026-05-18T13:04:30.500Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-83",
+        "itemNumber": 83
+      }
+    },
+    {
+      "id": "local-84",
+      "title": "Execute verification-only remote commands through approved runner profiles",
+      "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 through dev-nexus:local-83\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: execute bounded verification-only remote commands through approved runner profiles and record structured results, while preserving publication and automation identity guardrails.\n\nUser stories covered:\n- As a Windows agent, I can ask a Mac host to verify a specific branch or commit and get pass/fail evidence.\n- As a maintainer, I can see which bot or human identity was used for every Git or GitHub operation involved in remote verification.\n\nAcceptance criteria:\n- The executor refuses arbitrary freeform commands unless they match an approved command profile or verification profile.\n- Remote execution checks out or verifies the requested repository ref before running the command, according to the runner profile's mutation class.\n- Agent-created Git and GitHub operations use the configured automation identity; failure to authenticate as the automation actor blocks rather than falling back to the human account.\n- Results include actual commit, commands run, exit code, verification status, output tail, and artifact references when configured.\n- Timeouts and output limits are enforced and reported as timed_out or failed with actionable summaries.\n\nBoundaries:\n- Do not enable live-runtime, package install, Docker, GUI automation, publication, merge, or destructive cleanup operation classes in this slice.\n- Live SSH smoke remains a separate policy-gated dogfood item.\n\nVerification:\n- Mocked transport tests for pass, fail, timeout, wrong actor, missing command profile, missing ref, and output truncation.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "verification",
+        "identity",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:30.754Z",
+      "updatedAt": "2026-05-18T13:04:30.754Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-84",
+        "itemNumber": 84
+      }
+    },
+    {
+      "id": "local-85",
+      "title": "Choose first Mac Windows remote runner dogfood policy",
+      "description": "Type: remote host execution rollout decision slice\nReadiness: human-in-the-loop (HITL)\nSource PRD: docs/remote-host-execution-prd.md open questions\nParent: dev-nexus:local-77\n\nGoal: choose the first real Mac/Windows dogfood policy for remote host execution after the generic request/result and runner surfaces exist.\n\nDecision points:\n- Should the first shared host registry live in this dogfood meta project, in DevNexus home-level host config, or both?\n- Should the first execution mode be push-based SSH from requester to target, pull-based polling by each host, or both behind the same request/result model?\n- Which host ids and capability tags should represent the current Windows and Mac machines?\n- Which command profiles are allowed first: setup check only, npm check, Pharo Launcher read-only status, MCP tool listing, or another narrow profile?\n- Which auth profiles and bot identities are allowed for any Git/GitHub activity on each host?\n- Which quiet-period and unavailable-host behavior should a coordinator follow?\n\nAcceptance criteria:\n- Record the chosen host registry location, transport mode, initial host ids, allowed command profiles, auth profile rules, timeout/output limits, and unavailable-host policy.\n- Confirm whether live SSH execution is approved for one harmless read-only smoke or whether rollout remains dry-run only.\n- Update project config or target state only after the policy is explicit.\n\nBoundaries:\n- Do not perform live SSH/Tailscale execution as part of the decision.\n- Do not store Tailscale IPs, SSH usernames, keys, personal absolute paths, ports, or secrets in shared project state.\n\nVerification:\n- Static policy/config review before live use.\n- After approval, one read-only host status smoke through the chosen transport.\n\nPublication notes:\n- Dogfood project-state/policy change only unless DevNexus source changes are required later.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "policy",
+        "macos",
+        "windows",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:31.108Z",
+      "updatedAt": "2026-05-18T13:04:31.108Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-85",
+        "itemNumber": 85
+      }
+    },
+    {
+      "id": "local-86",
+      "title": "Run first read-only Mac Windows remote host status smoke",
+      "description": "Type: remote host execution dogfood smoke\nReadiness: blocked on dev-nexus:local-79 through dev-nexus:local-83 and explicit live SSH approval from dev-nexus:local-85\nSource PRD: docs/remote-host-execution-prd.md rollout plan\nParent: dev-nexus:local-77\n\nGoal: prove the generic remote host execution surface with one harmless read-only status check between the Windows and Mac dogfood machines.\n\nAcceptance criteria:\n- The approved runner profile names the exact requester host, target host, transport mode, command profile, timeout, output retention, and cleanup expectation.\n- The smoke records a remote execution request, runs the read-only host check, and records a structured result with platform, configured capabilities, DevNexus availability, Git availability, Node availability where relevant, and MCP summary.\n- The result is recorded back into DevNexus without relying on this chat transcript.\n- Any unavailable host, missing command, or authentication mismatch is recorded as blocked with actionable next steps.\n- No packages are installed, no repositories are mutated except any approved read-only fetch/status operation, no services are started, and no live Pharo images, Docker, GUI automation, or cleanup actions run.\n\nBoundaries:\n- Requires explicit approval for live SSH/Tailscale use.\n- Do not broaden the smoke into verification, package install, runtime, or publication work.\n\nVerification:\n- Execute the single approved read-only smoke and inspect the recorded request/result.\n- Run no broader checks unless separately approved.\n\nPublication notes:\n- Dogfood evidence only unless source changes are needed to fix the runner surface.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "remote-host",
+        "ssh",
+        "macos",
+        "windows",
+        "smoke",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:04:31.396Z",
+      "updatedAt": "2026-05-18T13:04:31.396Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-86",
+        "itemNumber": 86
+      }
+    },
+    {
+      "id": "local-87",
+      "title": "Add actor role and authority configuration model",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add the neutral actor, role, action, and scoped authority configuration model without changing publication behavior yet.\n\nUser stories covered:\n- As a project owner, I can declare that a bot account is a maintainer for my private DevNexus project and a contributor for external repositories.\n- As a maintainer, I can define recommended roles without hard-coding dogfood account names.\n\nAcceptance criteria:\n- Project configuration accepts logical actors with stable ids, kind, provider identity, display name, and optional handles.\n- Project configuration accepts role definitions that expand into explicit authority actions.\n- Project configuration accepts scoped role bindings for project, component, provider, tracker, repository, target branch, and environment scopes.\n- Built-in recommended role names are available as defaults or examples: maintainer, contributor, reviewer, observer, runtime operator, and release operator.\n- Unknown actors normalize to observer authority unless a project explicitly configures another fallback.\n- Config validation rejects unknown roles, duplicate actor ids, duplicate role ids, invalid action names, and unusable empty scoped bindings.\n- Existing project configs without authority policy continue to load safely.\n\nBoundaries:\n- Do not gate commands in this slice.\n- Do not perform live provider permission checks.\n- Do not store secrets or host-local credential paths in shared project config.\n\nVerification:\n- Focused project config and lifecycle tests for default, custom, invalid, and scoped authority policies.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "roles",
+        "config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:00.505Z",
+      "updatedAt": "2026-05-18T13:08:00.505Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-87",
+        "itemNumber": 87
+      }
+    },
+    {
+      "id": "local-88",
+      "title": "Resolve current actor from host-local auth profiles",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority configuration model exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: detect or report the current actor from configured host-local auth profiles so agents know whether they are acting as a human, bot, machine user, service account, external agent, or local observer.\n\nUser stories covered:\n- As a worker agent, I can know whether my Git and provider actions are using the intended bot profile.\n- As a human maintainer, I can see account mismatches before automation publishes as the wrong account.\n\nAcceptance criteria:\n- Host-local auth profile metadata can bind a logical actor id to non-secret credential mechanisms such as GitHub CLI profile names, SSH host aliases, wrapper command names, or environment keys.\n- Actor resolution can identify the configured automation actor for a component or report unknown, ambiguous, missing, or mismatched actor state.\n- Human/manual profiles and automation/bot profiles remain distinct and do not silently fall back to each other.\n- Status output includes concise warnings for missing auth profile, ambiguous account, mismatched remote, or missing provider capability.\n- Resolution is safe when no live provider credentials are available.\n\nDependencies:\n- Depends on the actor/role/authority configuration model.\n- Builds on existing publication identity and remote guardrail behavior.\n\nBoundaries:\n- Do not require live GitHub, GitLab, or Jira credentials for normal tests.\n- Do not mutate credentials, SSH config, or provider profiles.\n\nVerification:\n- Focused tests for expected actor, missing actor, ambiguous actor, human-vs-bot mismatch, and unknown local process fallback.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "auth",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:00.771Z",
+      "updatedAt": "2026-05-18T13:08:00.771Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-88",
+        "itemNumber": 88
+      }
+    },
+    {
+      "id": "local-89",
+      "title": "Add effective authority resolver",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after authority config and current-actor resolution exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add a pure effective-authority resolver that answers whether a requested action is allowed, blocked, or waiting on provider state.\n\nUser stories covered:\n- As a coordinator agent, I can know whether I may merge verified DevNexus work directly or must open a pull request.\n- As a worker agent, I can choose a safe fallback such as request review or record a handoff when authority is missing.\n\nAcceptance criteria:\n- Resolver inputs include actor, auth profile, project, component, provider/tracker/remote/repository scope, target branch, requested action, component publication policy, automation safety profile, and provider state when available.\n- Resolver output includes allowed or blocked status, matched actor/role/rule, required missing actions or provider signals, recommended fallback action, and concise explanation.\n- Scope precedence is deterministic across project default, component override, provider override, tracker override, branch override, and environment/runtime override.\n- Direct integration requires both component publication policy and actor authority.\n- Pull request review approval and issue-level design approval remain distinct concepts.\n- Assignment, casual comments, and silence are not treated as approval by default.\n\nDependencies:\n- Depends on authority configuration and actor resolution.\n\nBoundaries:\n- Keep resolver pure and unit-testable.\n- Do not perform command gating or live provider calls in this slice.\n\nVerification:\n- Focused resolver tests for maintainer direct integration, contributor pull-request-only, reviewer approval-only, observer read-only, runtime operator without merge authority, and release operator without implementation authority.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "policy",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:00.990Z",
+      "updatedAt": "2026-05-18T13:08:00.990Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-89",
+        "itemNumber": 89
+      }
+    },
+    {
+      "id": "local-90",
+      "title": "Surface effective authority in status reports and agent context",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the effective authority resolver exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make authority visible before agents take action by projecting effective authority into project status, target reports, coordination status, and generated worker context.\n\nUser stories covered:\n- As a worker agent, I can see whether I am expected to integrate, open a pull request, request review, or only hand off.\n- As a human maintainer, I can inspect a target report and see why an agent did or did not publish.\n\nAcceptance criteria:\n- Project status summarizes current actor identity when detectable, auth profile name, component role bindings, and key allowed actions.\n- Automation target reports and target-cycle facts can include concise authority decisions and blockers.\n- Generated worker context and briefings include component-specific publication/coordination authority and safe fallback instructions.\n- Coordination status reports authority next to branch, tracker, handoff, and integration facts.\n- Low-token summaries remain concise and do not include secrets, full tokens, private key paths, or host-local credential material.\n\nDependencies:\n- Depends on the effective authority resolver.\n\nBoundaries:\n- Reporting only; do not block commands in this slice.\n- Do not require live provider credentials.\n\nVerification:\n- Focused tests for project status, target report, coordination status, and worker context authority summaries.\n- Snapshot or text-output tests should check for concise allowed/blocked/fallback information without secrets.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "status",
+        "agent-context",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:01.222Z",
+      "updatedAt": "2026-05-18T13:08:01.222Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-90",
+        "itemNumber": 90
+      }
+    },
+    {
+      "id": "local-91",
+      "title": "Gate publication actions with authority checks",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make publication helpers and automation publication decisions refuse unsafe push, pull request, merge, approval, and publish actions when the current actor lacks authority.\n\nUser stories covered:\n- As a coordinator agent, I can directly integrate verified work only when the project says my actor is allowed to do so.\n- As an open-source contributor agent, I can prepare a branch and pull request without needing maintainer permissions.\n\nAcceptance criteria:\n- Direct target-branch push is blocked unless component publication policy, actor authority, and resolved auth profile all allow it.\n- Pull request or merge request creation is allowed for contributor-style actors when configured, and is recommended as fallback when direct integration is blocked.\n- Pull request or merge request merge is blocked unless merge authority, provider approval state, required checks, branch policy, and component publication policy all allow it.\n- Package or release publication is gated separately from merge authority.\n- Blocked publication produces a non-interactive, machine-readable result and a human-readable fallback suggestion.\n- Existing direct-integration dogfood behavior remains possible for configured maintainer bots.\n\nDependencies:\n- Depends on effective authority resolution and current actor detection.\n\nBoundaries:\n- Use mocked provider/merge state in tests.\n- Do not self-approve pull requests unless a later explicit policy item allows it.\n- Do not require live GitHub credentials for the first implementation.\n\nVerification:\n- Focused publication tests for direct push allowed, direct push blocked with PR fallback, PR-only contributor, merge blocked by missing approval, merge blocked by failed checks, release publish blocked without release authority, and dogfood maintainer merge allowed.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "publication",
+        "github",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:01.456Z",
+      "updatedAt": "2026-05-18T13:08:01.456Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-91",
+        "itemNumber": 91
+      }
+    },
+    {
+      "id": "local-92",
+      "title": "Gate coordination and provider mutation actions with authority checks",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: apply authority checks to coordination handoff, integration planning, coordination requests, provider comments, labels, assignments, transitions, approvals, and review decisions.\n\nUser stories covered:\n- As a coordinator agent, I can draft or post a provider request only when policy allows the underlying action.\n- As a reviewer, I can approve or request changes without receiving merge authority.\n\nAcceptance criteria:\n- Read-only coordination status and mutation-free integration planning remain available to observer-style actors.\n- Coordination handoff, work-item comments, provider comments, labels, assignments, workflow transitions, and review approvals each check the relevant authority action before mutation.\n- Coordination request can draft when provider posting is disallowed, and can post only when provider mutation authority allows it.\n- Review approval, requested changes, and merge authority remain separate decisions.\n- Blocked coordination mutation records a clear reason and suggested fallback without silently dropping the coordination fact.\n\nDependencies:\n- Depends on effective authority resolution.\n- Builds on coordination tracker role selection and external request surfaces.\n\nBoundaries:\n- No live provider posting is required for this slice.\n- Do not infer approval from assignment, silence, or casual comments.\n\nVerification:\n- Focused coordination tests for observer read-only status, contributor handoff allowed but provider label blocked, draft-only request, provider-comment allowed, assignment blocked, reviewer approval allowed, and merge still blocked after reviewer approval.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "providers",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:01.653Z",
+      "updatedAt": "2026-05-18T13:08:01.653Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-92",
+        "itemNumber": 92
+      }
+    },
+    {
+      "id": "local-93",
+      "title": "Map provider approval and branch-policy signals into authority state",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority resolver and provider-neutral signal shape exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add mocked provider adapters or adapter helpers that translate provider-native review, check, branch-policy, issue-status, and workflow signals into neutral DevNexus authority signals.\n\nUser stories covered:\n- As an integration agent, I can understand whether provider approval, checks, branch policy, and DevNexus publication policy all allow merging.\n- As a worker agent, I can see that an issue-level design approval and a pull-request merge approval are different signals.\n\nAcceptance criteria:\n- Neutral provider authority signals include waiting_for_approval, approved, changes_requested, rejected, checks_pending, checks_failed, checks_passed, branch_policy_blocked, mergeable, merge_conflict, and timed_out.\n- GitHub-style mocked provider state maps pull request reviews, required checks, mergeability, branch protection, labels, and project-status signals into neutral signals.\n- GitLab-style mocked provider state maps merge request approvals, pipeline state, mergeability, labels, and status transitions into neutral signals.\n- Jira-style mocked provider state maps workflow transitions, assignees, comments, and status categories into neutral signals for issue-level decisions.\n- Assignment remains ownership or expected-responder metadata unless a project explicitly overrides it.\n- Provider signal summaries can be consumed by the effective authority resolver without provider-specific branching in command code.\n\nDependencies:\n- Depends on effective authority resolver concepts and provider abstraction points.\n\nBoundaries:\n- Mocked providers only for the first implementation.\n- Do not add webhooks or continuous polling.\n\nVerification:\n- Focused provider-signal mapping tests for GitHub, GitLab, Jira, ambiguous signals, assignment-not-approval, and branch-policy blockers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "providers",
+        "github",
+        "gitlab",
+        "jira",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:01.871Z",
+      "updatedAt": "2026-05-18T13:08:01.871Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-93",
+        "itemNumber": 93
+      }
+    },
+    {
+      "id": "local-94",
+      "title": "Document authority roles for private bots and open-source contributors",
+      "description": "Type: documentation and onboarding slice\nReadiness: autonomous agent-ready (AFK) after the implemented authority configuration shape stabilizes\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: document how users configure agent roles and authority for private DevNexus projects, bot accounts, existing project onboarding, and open-source contribution workflows.\n\nUser stories covered:\n- As a project owner, I can configure a machine-user bot as maintainer for my private meta-project.\n- As an open-source contributor, I can use DevNexus to prepare work and propose pull requests without adding DevNexus artifacts or needing maintainer rights.\n\nAcceptance criteria:\n- Documentation explains actors, auth profiles, roles, action grants, scoped role bindings, effective authority, and safe defaults.\n- Documentation includes generic examples for maintainer bot, contributor-only bot, reviewer, observer, runtime operator, and release operator roles.\n- Documentation explains human/manual profile versus automation/bot profile separation and account mismatch warnings.\n- Onboarding guidance covers project creation and joining an existing project on a new machine without storing secrets in the shared meta-project.\n- Open-source contribution guidance explains PR-only behavior, review waits, no direct integration by default, and no DevNexus artifact contamination of target repositories.\n- Dogfood-specific account names appear only in dogfood-specific examples or state, not in generic user-facing docs.\n\nDependencies:\n- Depends on the stabilized authority configuration and status/reporting shape.\n\nBoundaries:\n- Do not document unsupported live provider behavior as available.\n- Do not include secrets, personal tokens, or private SSH key paths.\n\nVerification:\n- Static documentation review.\n- Run repository documentation/check command when available.\n- npm run check when feasible if docs are included in checks.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "docs",
+        "onboarding",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:02.071Z",
+      "updatedAt": "2026-05-18T13:08:02.071Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-94",
+        "itemNumber": 94
+      }
+    },
+    {
+      "id": "local-95",
+      "title": "Decide advanced authority policies for self-approval and temporary elevation",
+      "description": "Type: product policy decision slice\nReadiness: human-in-the-loop (HITL)\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: decide advanced authority policy questions that should not be guessed by implementation agents.\n\nQuestions to resolve:\n- Should DevNexus ship built-in role definitions, or only recommended role names that projects define explicitly?\n- Should direct integration require separate maintainer and publish roles, or is one maintainer role enough for normal projects?\n- Should a maintainer bot ever be allowed to self-approve a pull request, or should approval and merge authority require different actors by default?\n- How should temporary authority elevation for a single target cycle be represented and audited?\n- Should project-local role policy be mirrored to shared trackers for external participants, or kept only in the DevNexus meta-project?\n\nAcceptance criteria:\n- Record decisions in the PRD, project docs, or configuration guidance.\n- Identify any follow-up implementation issues created by the decisions.\n- Keep conservative defaults until decisions are explicit.\n\nBoundaries:\n- Do not implement self-approval, broad live permission probing, or temporary elevation before this policy is resolved.\n- Do not require provider credentials to answer the policy questions.\n\nVerification:\n- Static policy review against the PRD and current dogfood target state.\n\nPublication notes:\n- Dogfood planning state can remain in the meta-project; source changes require a follow-up implementation item.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "authority",
+        "decision",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:08:02.324Z",
+      "updatedAt": "2026-05-18T13:08:02.324Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-95",
+        "itemNumber": 95
+      }
+    },
+    {
+      "id": "local-96",
+      "title": "Slice parallel agent Git workflow PRD into authority-aware work items",
+      "description": "Type: planning slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nRelated PRD: docs/coordination-roles-authority-prd.md\n\nGoal: slice the Parallel Agent Git Workflow PRD into bounded DevNexus work items that complement, rather than duplicate, the coordination roles and authority work.\n\nAcceptance criteria:\n- Compare the parallel-agent PRD against the authority PRD and existing dev-nexus:local-87 through dev-nexus:local-95.\n- Keep actor identity, roles, provider mutation, publication gating, approval signals, and direct integration authority assigned to the authority work items.\n- Create parallel-agent issues only for work ownership, shared-checkout boundaries, worktree leases, start/adopt flow, coordination visibility, and no-loss cleanup.\n- Record dependencies from parallel-agent issues to authority items where mutation authority is required.\n\nVerification:\n- Created work items can be listed through the DevNexus work-item CLI.\n- No live providers, SSH, Tailscale, Pharo, PLexus, Docker, package installs, or destructive cleanup are used.\n\nPublication notes:\n- Dogfood planning state stays in the meta project until sliced source work lands through the DevNexus component publication policy.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "coordination",
+        "worktrees",
+        "parallel-agents",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:16.438Z",
+      "updatedAt": "2026-05-18T13:22:16.438Z",
+      "closedAt": "2026-05-18T13:22:16.438Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-96",
+        "itemNumber": 96
+      }
+    },
+    {
+      "id": "local-97",
+      "title": "Document authority-aware worktree-first chat workflow",
+      "description": "Type: documentation and agent-workflow slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nRelated authority work: dev-nexus:local-87 through dev-nexus:local-95\nParent planning item: dev-nexus:local-96\n\nGoal: document the worktree-first default for interactive DevNexus/Codex chats while explaining how authority roles remain a separate policy layer.\n\nUser stories covered:\n- As a human, I can start several chats in one project without remembering which branch each chat should use.\n- As a worker agent, I know that shared checkouts are read-mostly and generated worktrees are the normal writable implementation surface.\n\nAcceptance criteria:\n- User and agent-facing docs state that mutating interactive chats should prepare or adopt an isolated component or project-meta worktree before editing.\n- Docs distinguish shared checkouts, worker worktrees, integration branches, rescue branches, and stable component source roots.\n- Docs explain worker versus integrator behavior without creating a second authority role model.\n- Docs explicitly defer actor identity, direct integration, pull requests, provider mutation, approval, and publication permission to the authority model from dev-nexus:local-87 through dev-nexus:local-95.\n- Docs include no-loss expectations: commit or hand off useful work before ending, do not delete ambiguous branches/worktrees, and use cleanup dry-run first.\n- Generic docs avoid dogfood-specific account names except in dogfood-only examples.\n\nBoundaries:\n- Do not document enforcement as implemented before the corresponding source slices land.\n- Do not change runtime, provider, or publication behavior in this slice.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if repository checks cover docs.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "docs",
+        "parallel-agents",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:16.851Z",
+      "updatedAt": "2026-05-18T13:22:16.851Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-97",
+        "itemNumber": 97
+      }
+    },
+    {
+      "id": "local-98",
+      "title": "Add shared-checkout mutation boundary checks",
+      "description": "Type: implementation slice\nReadiness: todo/dependent on authority configuration and effective authority resolution\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: prevent DevNexus-controlled mutating flows from accidentally editing shared project or component checkouts when the agent should be using an owned worktree.\n\nUser stories covered:\n- As a worker agent, I am blocked before editing the shared checkout unless I explicitly own integration or project-state mutation.\n- As a human maintainer, I can trust that ordinary parallel chats will not silently mutate the shared branch.\n\nAcceptance criteria:\n- DevNexus can classify the current Git checkout as shared source checkout, generated component worktree, project-meta worktree, integration worktree, or unknown.\n- Mutating DevNexus-controlled flows that prepare implementation, record write-scope ownership, publish, or clean up check the checkout classification before proceeding.\n- Shared-checkout mutation requires explicit override or an effective authority result that allows the requested shared-checkout action.\n- Read-only commands such as project status, coordination status, and integration planning continue to work from shared checkouts.\n- Blocked mutation returns a non-interactive machine-readable result with the safer next action, such as prepare a worktree, adopt an owned worktree, or run as the integrator.\n- Tests cover component source checkout, project meta checkout, generated component worktree, generated project-meta worktree, unknown checkout, explicit override, and authority-allowed integrator cases.\n\nDependencies:\n- Depends on dev-nexus:local-87 for authority action vocabulary.\n- Depends on dev-nexus:local-89 for effective authority resolution before enforcement uses roles instead of a simple override.\n- Complements dev-nexus:local-91 and dev-nexus:local-92; do not duplicate publication or provider mutation gating there.\n\nBoundaries:\n- Do not make hard locks for ordinary parallel work.\n- Do not infer implementation ownership from branch name alone when checkout metadata is available.\n- Do not require live provider credentials.\n\nVerification:\n- Focused checkout-classification and command-boundary tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "guardrails",
+        "authority",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:17.061Z",
+      "updatedAt": "2026-05-18T13:22:17.061Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-98",
+        "itemNumber": 98
+      }
+    },
+    {
+      "id": "local-99",
+      "title": "Record advisory worktree leases for active agent work",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: add advisory worktree lease records so parallel chats and multi-host agents can see active ownership intent without introducing mandatory hard locks.\n\nUser stories covered:\n- As a Mac agent, I can see that a Windows agent is already working on a related component surface before I start editing.\n- As a maintainer, I can inspect one coordination surface and understand what is working, ready, blocked, merged, stale, or abandoned.\n\nAcceptance criteria:\n- DevNexus can create or refresh a lease for component or project-meta work with project id, host id, optional agent/chat id, component or meta scope, optional work item, branch, base ref, intended write scope, status, timestamps, and notes.\n- Lease status supports working, ready, blocked, integrating, merged, abandoned, and stale.\n- Lease records include last observed head commit, dirty state, and pushed state when Git facts are available.\n- Leases are advisory freshness signals; stale or conflicting leases warn but do not become hard locks by default.\n- Worktree prepare and coordination handoff can attach or update lease information when policy allows.\n- Tests cover lease creation, refresh, stale detection, status transitions, component and project-meta scopes, and missing host or agent ids.\n\nDependencies:\n- Builds on existing worktree prepare and coordination handoff behavior from dev-nexus:local-14, dev-nexus:local-15, and dev-nexus:local-19.\n- Can later include current actor details from dev-nexus:local-88 without blocking the first lease model.\n\nBoundaries:\n- Do not block work solely because a lease exists.\n- Do not store absolute personal paths in shared lease records; use project-relative or classified paths where possible.\n- Do not require a shared external provider in the first implementation.\n\nVerification:\n- Focused lease model, lifecycle, and coordination integration tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "leases",
+        "parallel-agents",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:17.248Z",
+      "updatedAt": "2026-05-18T13:22:17.248Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-99",
+        "itemNumber": 99
+      }
+    },
+    {
+      "id": "local-100",
+      "title": "Expand coordination status for active parallel work",
+      "description": "Type: implementation slice\nReadiness: todo/dependent on advisory worktree leases and authority status summaries\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: make coordination status answer what active work may affect the current agent before it edits, hands off, integrates, or cleans up.\n\nUser stories covered:\n- As a worker agent, I can see related active branches and likely overlap before starting work.\n- As an integration agent, I can see ready branches, verification state, likely conflicts, and suggested next action.\n\nAcceptance criteria:\n- coordination status reports active and stale leases, ready handoffs, dirty shared checkouts, dirty generated worktrees, unpushed commits, branches ahead/behind target, and missing upstream branches.\n- Status groups related branches by component, work item, branch naming hints, handoff records, lease records, and changed-area overlap.\n- Status reports likely overlap at file/package/component granularity without claiming semantic conflict resolution.\n- When authority summaries are available, status shows whether the current actor can read, hand off, push branch, integrate, clean up, or must fall back to a request or handoff.\n- Output includes a concise next action such as prepare worktree, continue owned lease, wait, integrate, push branch, record handoff, or run cleanup dry-run.\n- Tests cover no active work, one owned lease, another-host active lease, stale lease, dirty shared checkout, unpushed branch, overlapping changed areas, and missing authority summary.\n\nDependencies:\n- Depends on dev-nexus:local-99 for lease records.\n- Depends on dev-nexus:local-90 for authority summaries when available, but should degrade gracefully before authority reporting is complete.\n\nBoundaries:\n- Read-only by default.\n- Do not create or delete branches, worktrees, provider records, or leases from status alone.\n\nVerification:\n- Focused coordination status tests with synthetic Git and tracker fixtures.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "leases",
+        "status",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:17.449Z",
+      "updatedAt": "2026-05-18T13:22:17.449Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-100",
+        "itemNumber": 100
+      }
+    },
+    {
+      "id": "local-101",
+      "title": "Add start or adopt flow for interactive chats",
+      "description": "Type: implementation slice\nReadiness: todo/dependent on leases, coordination status, and authority resolution\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: give an interactive chat one low-friction DevNexus flow that either prepares a safe worktree or adopts an existing owned worktree before mutation starts.\n\nUser stories covered:\n- As a human, I can start several chats in one project without remembering which branch each chat should use.\n- As a worker agent, I can ask DevNexus for a safe starting point and receive a prepared worktree, branch, ownership metadata, and write-scope guidance.\n\nAcceptance criteria:\n- The flow inspects current project, component, work item or topic, Git checkout classification, active leases, handoffs, branch state, and effective authority when available.\n- For new work, it prepares a component or project-meta worktree with branch name, context bundle, write-scope metadata, and initial lease.\n- For existing owned work, it can adopt an active lease/worktree after verifying the branch, worktree path, dirty state, and requested scope still match.\n- For conflicting or unsafe work, it reports a clear blocked result with alternatives such as choose another work item, continue existing branch, wait for handoff, or run integration planning.\n- The flow can run in dry-run mode to explain what it would do without creating a branch or lease.\n- Tests cover fresh work item, topic-only project-meta work, adopting owned work, conflicting lease, shared checkout mutation attempt, missing component, and blocked authority.\n\nDependencies:\n- Depends on dev-nexus:local-98 for shared-checkout boundary checks.\n- Depends on dev-nexus:local-99 and dev-nexus:local-100 for leases and status.\n- Depends on dev-nexus:local-89 for effective authority before mutating shared or provider-backed state.\n\nBoundaries:\n- Do not make DevNexus choose which implementation work should be done; the caller still supplies or selects intent.\n- Do not launch live runtime, package install, provider mutation, or remote host execution.\n\nVerification:\n- Focused start/adopt CLI and service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "interactive-agents",
+        "authority",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:17.674Z",
+      "updatedAt": "2026-05-18T13:22:17.674Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-101",
+        "itemNumber": 101
+      }
+    },
+    {
+      "id": "local-102",
+      "title": "Add branch and worktree cleanup dry-run safety classifier",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: provide a read-only cleanup plan that classifies generated worktrees and branches by safety before any deletion or pruning is allowed.\n\nUser stories covered:\n- As a cleanup agent, I can prune old worktrees and branches without deleting unmerged or unpushed work.\n- As an agent, I can preserve useful uncommitted work by moving it to a rescue branch instead of leaving it hidden in a dirty checkout.\n\nAcceptance criteria:\n- Cleanup dry-run scans configured component and project-meta worktree roots plus known codex/dev-nexus branches for the selected scope.\n- Each branch/worktree is classified as safe, blocked, stale, merged, superseded, dirty, unpushed, missing handoff, unknown merge state, active lease, abandoned, or needs rescue.\n- The classifier checks dirty files, untracked files, unpushed commits, upstream existence, merge-base containment, handoff status, lease status, and known publication target where available.\n- The plan explains the proof that makes a candidate safe or the missing evidence that blocks cleanup.\n- The plan is read-only and can output structured JSON for automation.\n- Tests cover clean merged branch, dirty worktree, untracked files, unpushed commits, missing upstream, stale lease, ready handoff, superseded commit, and unknown target branch.\n\nDependencies:\n- Builds on existing Git worktree and coordination handoff services.\n- Can consume lease records from dev-nexus:local-99 when available, but should report no-lease state safely before then.\n\nBoundaries:\n- Do not delete branches or worktrees in this slice.\n- Do not assume branch naming alone proves safety.\n- Do not require live provider credentials.\n\nVerification:\n- Focused cleanup classification tests with synthetic Git fixtures.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "cleanup",
+        "safety",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:17.914Z",
+      "updatedAt": "2026-05-18T13:22:17.914Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-102",
+        "itemNumber": 102
+      }
+    },
+    {
+      "id": "local-103",
+      "title": "Execute cleanup with rescue preservation under authority gates",
+      "description": "Type: implementation slice\nReadiness: todo/dependent on cleanup dry-run and effective authority resolution\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: execute only proven-safe branch and worktree cleanup while preserving ambiguous or valuable work through rescue branches or archive records.\n\nUser stories covered:\n- As a cleanup agent, I can remove stale generated worktrees without losing work.\n- As a maintainer, I can see why a branch was deleted, preserved, rescued, or blocked.\n\nAcceptance criteria:\n- Cleanup execution requires a prior cleanup plan or recomputes the plan immediately before mutation.\n- Execution removes only candidates classified as safe under the selected policy and current effective authority.\n- Dirty, unpushed, unknown, active, or missing-handoff candidates are refused by default.\n- When policy allows rescue, DevNexus can create a rescue branch or archive record before removing an abandoned worktree.\n- Cleanup records results with branch/worktree identity, proof, actor authority summary, actions taken, skipped candidates, and recovery guidance.\n- Tests cover safe removal, blocked removal, rescue branch creation, authority-blocked cleanup, stale plan refusal, and idempotent reruns.\n\nDependencies:\n- Depends on dev-nexus:local-102 for cleanup dry-run classification.\n- Depends on dev-nexus:local-89 for effective authority resolution.\n- Depends on dev-nexus:local-92 or equivalent authority actions for coordination/provider cleanup records when provider mutation is involved.\n\nBoundaries:\n- Do not delete source checkouts or non-generated worktrees unless explicitly classified and authorized.\n- Do not perform destructive cleanup without a machine-readable proof record.\n- Do not require live provider credentials for local cleanup tests.\n\nVerification:\n- Focused cleanup execution and rescue tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "worktrees",
+        "cleanup",
+        "authority",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:22:18.185Z",
+      "updatedAt": "2026-05-18T13:22:18.185Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-103",
+        "itemNumber": 103
       }
     }
   ],
@@ -3876,12 +4587,108 @@
           "provider": "local",
           "itemId": "local-comment-166"
         }
+      },
+      {
+        "id": "local-comment-167",
+        "body": "Integrated by automation account after user authorized agents to integrate dogfood component work. PR https://github.com/Evref-BL/DevNexus/pull/2 merged into Evref-BL/DevNexus main at b4aa3af. Source branch commit d747f9b is included in the merge. Verification before merge: focused path/profile/setup tests passed; npm run build plus serialized Vitest passed 53 files / 397 tests. Default parallel npm run check timeout remains tracked separately as dev-nexus:local-76.",
+        "author": null,
+        "createdAt": "2026-05-18T12:32:05.317Z",
+        "updatedAt": "2026-05-18T12:32:05.317Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-167"
+        }
       }
     ],
-    "local-72": [],
+    "local-72": [
+      {
+        "id": "local-comment-168",
+        "body": "Promoted after dev-nexus:local-71 was merged into DevNexus main at b4aa3af. The componentsRoot base is now available for the join-existing-project setup slice.",
+        "author": null,
+        "createdAt": "2026-05-18T12:32:05.756Z",
+        "updatedAt": "2026-05-18T12:32:05.756Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-168"
+        }
+      }
+    ],
     "local-73": [],
     "local-74": [],
     "local-75": [],
-    "local-76": []
+    "local-76": [],
+    "local-77": [
+      {
+        "id": "local-comment-169",
+        "body": "Completed issue slicing for docs/remote-host-execution-prd.md.\n\nCreated implementation and rollout slices:\n- dev-nexus:local-79 ready: host registry and host-local overlay model.\n- dev-nexus:local-80 todo/dependent: runner profile schema and safety gates.\n- dev-nexus:local-81 todo/dependent: remote execution request/result records.\n- dev-nexus:local-82 todo/dependent: read-only host capability checks.\n- dev-nexus:local-83 todo/dependent: SSH transport planning with mocked tests.\n- dev-nexus:local-84 todo/dependent: verification-only remote command execution with identity guardrails.\n- dev-nexus:local-85 blocked/HITL: choose first Mac/Windows remote runner dogfood policy.\n- dev-nexus:local-86 blocked/HITL: run first read-only Mac/Windows remote host status smoke.\n- dev-nexus-pharo:local-14 todo/dependent: plugin host capability probes and runner profile templates.\n- plexus:local-23 todo/dependent: align isolated live-smoke runner boundary with generic remote runner profiles.\n\nSequencing decision: dev-nexus:local-79 is the first autonomous implementation slice. Live SSH/Tailscale, Pharo runtime, Docker, package install, GUI, publication, and destructive cleanup behavior remain dependent or blocked until policy and runner profiles are explicit.\n\nVerification: work-item creation completed through the DevNexus CLI; no live network, SSH, Tailscale, Pharo image, Docker, package install, or destructive cleanup was run.",
+        "author": null,
+        "createdAt": "2026-05-18T13:05:28.354Z",
+        "updatedAt": "2026-05-18T13:05:28.354Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-169"
+        }
+      }
+    ],
+    "local-78": [
+      {
+        "id": "local-comment-170",
+        "body": "Product Requirements Document drafted: docs/coordination-roles-authority-prd.md. It defines the actor/role/action authority model for maintainer, contributor, reviewer, observer, runtime operator, and release operator flows; expected command gating; provider approval signal mapping; target-state effects; and implementation slicing for dev-nexus:local-78.",
+        "author": null,
+        "createdAt": "2026-05-18T13:05:45.800Z",
+        "updatedAt": "2026-05-18T13:05:45.800Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-170"
+        }
+      },
+      {
+        "id": "local-comment-171",
+        "body": "Sliced docs/coordination-roles-authority-prd.md into component-owned DevNexus work items:\n\n- dev-nexus:local-87 Add actor role and authority configuration model (ready)\n- dev-nexus:local-88 Resolve current actor from host-local auth profiles (dependent)\n- dev-nexus:local-89 Add effective authority resolver (dependent)\n- dev-nexus:local-90 Surface effective authority in status reports and agent context (dependent)\n- dev-nexus:local-91 Gate publication actions with authority checks (dependent)\n- dev-nexus:local-92 Gate coordination and provider mutation actions with authority checks (dependent)\n- dev-nexus:local-93 Map provider approval and branch-policy signals into authority state (dependent)\n- dev-nexus:local-94 Document authority roles for private bots and open-source contributors (dependent)\n- dev-nexus:local-95 Decide advanced authority policies for self-approval and temporary elevation (blocked/HITL)\n\nImplementation should start with local-87. Keep live provider behavior mocked or policy-gated, do not infer approval from assignment or comments, and keep local-78 as the umbrella planning item.",
+        "author": null,
+        "createdAt": "2026-05-18T13:08:13.547Z",
+        "updatedAt": "2026-05-18T13:08:13.547Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-171"
+        }
+      },
+      {
+        "id": "local-comment-172",
+        "body": "Parallel-agent Git workflow slicing cross-check completed.\n\nThe new parallel-agent items are dev-nexus:local-96 through dev-nexus:local-103. They intentionally do not duplicate the authority model from this item family:\n- Actor identity, roles, action grants, effective authority, publication gating, provider mutation gating, and approval signal mapping remain owned by dev-nexus:local-87 through dev-nexus:local-95.\n- Parallel-agent items own work ownership and safety mechanics: shared-checkout mutation boundaries, advisory worktree leases, start/adopt flow, coordination visibility for active branches, and cleanup dry-run/execution safety.\n- Publication/direct integration behavior should continue through dev-nexus:local-91, and provider mutation/review behavior through dev-nexus:local-92.\n\nThe parallel-agent PRD now has an explicit Relationship To Authority section so future implementation work consumes effective authority rather than introducing a second role model.",
+        "author": null,
+        "createdAt": "2026-05-18T13:22:29.611Z",
+        "updatedAt": "2026-05-18T13:22:29.611Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-172"
+        }
+      }
+    ],
+    "local-79": [],
+    "local-80": [],
+    "local-81": [],
+    "local-82": [],
+    "local-83": [],
+    "local-84": [],
+    "local-85": [],
+    "local-86": [],
+    "local-87": [],
+    "local-88": [],
+    "local-89": [],
+    "local-90": [],
+    "local-91": [],
+    "local-92": [],
+    "local-93": [],
+    "local-94": [],
+    "local-95": [],
+    "local-96": [],
+    "local-97": [],
+    "local-98": [],
+    "local-99": [],
+    "local-100": [],
+    "local-101": [],
+    "local-102": [],
+    "local-103": []
   }
 }
