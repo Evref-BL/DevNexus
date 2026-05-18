@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 266,
-  "updatedAt": "2026-05-18T22:41:36.206Z",
+  "nextCommentNumber": 268,
+  "updatedAt": "2026-05-18T22:43:37.565Z",
   "items": [
     {
       "id": "local-1",
@@ -2202,7 +2202,7 @@
       "id": "local-88",
       "title": "Resolve current actor from host-local auth profiles",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority configuration model exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: detect or report the current actor from configured host-local auth profiles so agents know whether they are acting as a human, bot, machine user, service account, external agent, or local observer.\n\nUser stories covered:\n- As a worker agent, I can know whether my Git and provider actions are using the intended bot profile.\n- As a human maintainer, I can see account mismatches before automation publishes as the wrong account.\n\nAcceptance criteria:\n- Host-local auth profile metadata can bind a logical actor id to non-secret credential mechanisms such as GitHub CLI profile names, SSH host aliases, wrapper command names, or environment keys.\n- Actor resolution can identify the configured automation actor for a component or report unknown, ambiguous, missing, or mismatched actor state.\n- Human/manual profiles and automation/bot profiles remain distinct and do not silently fall back to each other.\n- Status output includes concise warnings for missing auth profile, ambiguous account, mismatched remote, or missing provider capability.\n- Resolution is safe when no live provider credentials are available.\n\nDependencies:\n- Depends on the actor/role/authority configuration model.\n- Builds on existing publication identity and remote guardrail behavior.\n\nBoundaries:\n- Do not require live GitHub, GitLab, or Jira credentials for normal tests.\n- Do not mutate credentials, SSH config, or provider profiles.\n\nVerification:\n- Focused tests for expected actor, missing actor, ambiguous actor, human-vs-bot mismatch, and unknown local process fallback.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2215,7 +2215,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.771Z",
-      "updatedAt": "2026-05-18T22:20:45.732Z",
+      "updatedAt": "2026-05-18T22:43:30.749Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3326,7 +3326,7 @@
       "id": "local-130",
       "title": "Report read-only tracker discovery status",
       "description": "Type: read-only status implementation slice\nReadiness: todo/dependent on dev-nexus:local-129\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only discovery status surface that tells maintainers and agents exactly which configured trackers are visible, eligible, optional, blocked, or import-only.\n\nUser stories covered:\n- As a maintainer, I can ask whether a GitHub inbox will be ignored, listed directly, or imported before selection.\n- As a worker on another host, I can see whether provider credentials are required for discovery and whether missing access is a warning or blocker.\n\nAcceptance criteria:\n- DevNexus exposes a read-only discovery status service and a small CLI/MCP surface such as work_item_discovery_status or an equivalent naming convention that fits the codebase.\n- Output includes each component's default tracker, configured tracker bindings, roles, effective discovery policy, provider capability report, and whether each tracker is readable by the current actor.\n- Missing optional credentials are warnings or skipped trackers according to policy; required credentials are blockers.\n- The command never mutates local tracker files, Git state, provider issues, or link records.\n- Mocked local and GitHub tracker cases cover readable, missing credentials, unsupported capability, disabled tracker, and policy-blocked tracker states.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n\nBoundaries:\n- Do not aggregate eligible work or create local imported items in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused service, CLI, and MCP tests for status output, JSON/text shape, provider capability reporting, optional/required credential behavior, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3341,7 +3341,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:46.510Z",
-      "updatedAt": "2026-05-18T22:41:36.206Z",
+      "updatedAt": "2026-05-18T22:43:37.565Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6272,6 +6272,17 @@
           "provider": "local",
           "itemId": "local-comment-257"
         }
+      },
+      {
+        "id": "local-comment-266",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-88-current-actor` on branch `codex/dev-nexus-local-88-current-actor`. Scope: host-local current-actor resolution and concise status warnings; no credential mutation or live-provider requirement for normal tests.",
+        "author": null,
+        "createdAt": "2026-05-18T22:43:30.749Z",
+        "updatedAt": "2026-05-18T22:43:30.749Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-266"
+        }
       }
     ],
     "local-89": [],
@@ -7022,6 +7033,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-265"
+        }
+      },
+      {
+        "id": "local-comment-267",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-130-discovery-status` on branch `codex/dev-nexus-local-130-discovery-status`. Scope: read-only tracker discovery status service/CLI/MCP tests; no eligible-work aggregation, provider issue import, or tracker mutation.",
+        "author": null,
+        "createdAt": "2026-05-18T22:43:37.565Z",
+        "updatedAt": "2026-05-18T22:43:37.565Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-267"
         }
       }
     ],
