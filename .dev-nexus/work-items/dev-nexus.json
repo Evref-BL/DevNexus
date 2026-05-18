@@ -2,7 +2,7 @@
   "version": 1,
   "nextNumber": 128,
   "nextCommentNumber": 212,
-  "updatedAt": "2026-05-18T16:17:05.555Z",
+  "updatedAt": "2026-05-18T16:49:58.176Z",
   "items": [
     {
       "id": "local-1",
@@ -1863,7 +1863,7 @@
     {
       "id": "local-75",
       "title": "Migrate dogfood sources to project-local components layout",
-      "description": "Type: dogfood migration slice\nReadiness: todo/HITL after dev-nexus:local-71, dev-nexus:local-72, and dev-nexus:local-73 are completed and published\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: migrate this clean dogfood meta project from external `sourcesRoot:` junction-backed component roots to project-local component clones under `components/<component-id>` once DevNexus setup support is ready.\n\nAcceptance criteria:\n- Clone or otherwise prepare all six configured components under this meta project root: DevNexus, DevNexus-Pharo, DevNexus-TypeScript, PLexus, pharo-launcher-mcp, and MCP-Pharo.\n- Preserve each component's remote, default branch, unpushed work, and dirty-state safety; stop and report if a component has unresolved local work that would be lost or ambiguous.\n- Update shared dogfood config to use `componentsRoot:<component-id>` or the accepted project-local expression for each component sourceRoot.\n- Refresh DevNexus MCP/skills/config as needed after the config migration.\n- Run setup check on Windows and, if available, provide the exact Mac check command for the Mac agent to run against the same shared config.\n- Verify `git status --short --branch` for every project-local component checkout and the meta project.\n- Leave old external checkout locations untouched until the user separately approves cleanup.\n\nBoundaries:\n- Do not delete old `C:\\dev\\code\\sources` junction targets or older checkouts in this slice.\n- Do not mutate MCP-Pharo through a live Pharo image or Iceberg checkout; use a normal Git clone for the project-local component source.\n- Do not store host-specific absolute paths in shared config.\n\nVerification:\n- `dev-nexus setup check . join-existing-project --platform windows --json` passes or reports only expected active-session warnings.\n- `dev-nexus project status . --json` and `dev-nexus automation eligible-work . --json` work after migration.\n- Component Git status summary is recorded in the work item.\n\nPublication notes:\n- Commit and push dogfood meta-project config/state changes through the configured bot remote after migration succeeds.",
+      "description": "Type: dogfood migration slice\nReadiness: todo/HITL after dev-nexus:local-71, dev-nexus:local-72, and dev-nexus:local-73 are completed and published\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: migrate this clean dogfood meta project from external `sourcesRoot:` junction-backed component roots to project-local component clones under `components/<component-id>` once DevNexus setup support is ready.\n\nAcceptance criteria:\n- Clone or otherwise prepare the three configured components under this meta project root: DevNexus, DevNexus-Pharo, and DevNexus-TypeScript.\n- Preserve each component's remote, default branch, unpushed work, and dirty-state safety; stop and report if a component has unresolved local work that would be lost or ambiguous.\n- Update shared dogfood config to use `componentsRoot:<component-id>` or the accepted project-local expression for each component sourceRoot.\n- Refresh DevNexus MCP/skills/config as needed after the config migration.\n- Run setup check on Windows and, if available, provide the exact Mac check command for the Mac agent to run against the same shared config.\n- Verify `git status --short --branch` for every project-local component checkout and the meta project.\n- Leave old external checkout locations untouched until the user separately approves cleanup.\n\nBoundaries:\n- Do not delete old `C:\\dev\\code\\sources` junction targets or older checkouts in this slice.\n- Do not migrate PLexus, pharo-launcher-mcp, or MCP-Pharo here; direct runtime component work belongs in the sibling `dev-nexus-plexus` project.\n- Do not store host-specific absolute paths in shared config.\n\nVerification:\n- `dev-nexus setup check . join-existing-project --platform windows --json` passes or reports only expected active-session warnings.\n- `dev-nexus project status . --json` and `dev-nexus automation eligible-work . --json` work after migration.\n- Component Git status summary is recorded in the work item.\n\nPublication notes:\n- Commit and push dogfood meta-project config/state changes through the configured bot remote after migration succeeds.",
       "status": "todo",
       "provider": "local",
       "labels": [
@@ -1877,7 +1877,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:57:40.483Z",
-      "updatedAt": "2026-05-18T11:57:40.483Z",
+      "updatedAt": "2026-05-18T16:49:58.176Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
