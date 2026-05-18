@@ -20,7 +20,11 @@ import { findForbiddenSharedHostLocalDetails } from "./nexusHostRegistry.js";
 import {
   deriveNexusProjectHostingRepositoryName,
   expectedNexusProjectHostingRemotes,
+  planNexusProjectHosting,
+  statusNexusProjectHostingLocal,
   type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingPlanResult,
+  type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
 import { analyzeNexusProjectPath, resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type {
@@ -820,14 +824,7 @@ function githubMetaProjectSteps(options: {
     automationSshHost,
   } = metaProjectRemotePlan(options.projectConfig);
   const guide = metaProjectHostingGuide(options.projectConfig);
-  const repoVisibilityFlag =
-    guide.visibility === "public"
-      ? "--public"
-      : guide.visibility === "internal"
-        ? "--internal"
-        : "--private";
-  const createCommand =
-    `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh repo create ${guide.namespace}/${guide.repositoryName} ${repoVisibilityFlag} --disable-wiki --disable-issues`;
+  const devNexusCommand = "dev-nexus";
   return [
     {
       id: "choose-hosting-namespace",
@@ -890,8 +887,11 @@ function githubMetaProjectSteps(options: {
           ? "Propose creating or connecting the shared meta repository; live creation still requires explicit approval and configured credentials."
           : "Connect the shared meta repository; automatic GitHub repository creation is disabled by project policy.",
       commands: [
-        `gh repo view ${guide.namespace}/${guide.repositoryName}`,
-        ...(guide.allowCreate ? [createCommand] : []),
+        `${devNexusCommand} project hosting status . --json`,
+        `${devNexusCommand} project hosting plan . --json`,
+        ...(guide.allowCreate
+          ? [`${devNexusCommand} project hosting apply . --json`]
+          : []),
         `git remote set-url origin ${humanRemote}`,
         `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
         "git remote -v",
@@ -900,13 +900,14 @@ function githubMetaProjectSteps(options: {
       ],
       manualInstructions: [
         guide.allowCreate
-          ? "Treat the gh repo create command as an approval-required proposal; run it only after confirming the selected namespace, actor permissions, and no-secret boundary."
-          : "If gh repo view fails, create the repository manually in GitHub or update hosting metadata; do not let setup create it automatically while allowCreate is false.",
+          ? "Treat project hosting apply as an approval-required operation; review the plan first and run apply only after confirming the selected namespace, actor permissions, and no-secret boundary."
+          : "If project hosting status or plan reports a missing repository, create it manually in the provider or update hosting metadata; apply will not create it while allowCreate is false.",
         "Use origin for human/manual access and bot for the automation actor remote so later publication guardrails can distinguish actors.",
         "Do not push until repository existence, remotes, and actor permissions are verified.",
       ],
       checks: [
-        `gh repo view ${guide.namespace}/${guide.repositoryName}`,
+        `${devNexusCommand} project hosting status . --json`,
+        `${devNexusCommand} project hosting plan . --json`,
         `git ls-remote ${humanRemote} HEAD`,
         `git ls-remote ${botRemote} HEAD`,
         "git remote -v",
@@ -1627,7 +1628,6 @@ function githubMetaProjectReadinessChecks(
   const checks: NexusSetupCheckResult[] = [];
   const hosting = projectConfig.hosting;
   const remotePlan = metaProjectRemotePlan(projectConfig);
-  const hostingGuide = metaProjectHostingGuide(projectConfig);
 
   if (hosting || options.checkFallbackRemotes !== false) {
     checks.push(...metaRepositoryRemoteChecks({
@@ -1641,15 +1641,29 @@ function githubMetaProjectReadinessChecks(
 
   if (hosting) {
     checks.push(...hostingAuthProfileChecks(projectRoot, projectConfig));
-    checks.push({
-      id: "github-hosting-provider-live-preflight",
-      title: "GitHub hosting live preflight",
-      status: "warning",
-      summary:
-        `GitHub repository ${hosting.namespace}/${hostingGuide.repositoryName} must be verified through gh or a provider adapter before live provisioning.`,
-      nextAction:
-        `Run gh repo view ${hosting.namespace}/${hostingGuide.repositoryName} with the configured human and automation profiles, then record the ${hosting.provisioning.allowCreate ? "approval to create or connect" : "connect-only"} outcome in setup state.`,
+    const authProfiles = loadSetupHomeAuthProfiles(projectRoot, projectConfig);
+    const hostingStatus = statusNexusProjectHostingLocal({
+      project: {
+        id: projectConfig.id,
+        name: projectConfig.name,
+      },
+      hosting,
+      authProfiles: authProfiles.ok ? authProfiles.authProfiles : [],
+      localRemotes: expectedNexusProjectHostingRemotes({
+        project: projectConfig,
+        hosting,
+        authProfiles: authProfiles.ok ? authProfiles.authProfiles : [],
+      }).flatMap((remote) => {
+        const url = gitRemoteUrl(projectRoot, remote.name);
+        return url === null ? [] : [{ name: remote.name, url }];
+      }),
     });
+    const hostingPlan = planNexusProjectHosting({
+      hosting,
+      status: hostingStatus,
+    });
+    checks.push(hostingStatusSetupCheck(hostingStatus));
+    checks.push(hostingPlanSetupCheck(hostingPlan));
   } else if (options.warnWhenHostingMissing !== false) {
     checks.push({
       id: "github-hosting-config",
@@ -1663,6 +1677,98 @@ function githubMetaProjectReadinessChecks(
   }
 
   return checks;
+}
+
+function hostingStatusSetupCheck(
+  status: NexusProjectHostingStatusResult,
+): NexusSetupCheckResult {
+  return {
+    id: "github-hosting-status",
+    title: "GitHub hosting status",
+    status: setupStatusFromHostingStatus(status.status),
+    summary: [
+      `Hosting status is ${status.status}`,
+      `repository=${repositoryStatusSummary(status)}`,
+      `remotes=${statusCountSummary(status.remotes.map((remote) => remote.status))}`,
+      `authProfiles=${statusCountSummary(status.authProfiles.map((profile) => profile.status))}`,
+      `access=${statusCountSummary(status.access.map((access) => access.status))}`,
+      `issues=${status.issues.length}`,
+    ].join("; ") + ".",
+    nextAction:
+      status.status === "passed"
+        ? null
+        : "Run dev-nexus project hosting status . --json for full drift details, then dev-nexus project hosting plan . --json before any apply.",
+  };
+}
+
+function hostingPlanSetupCheck(
+  plan: NexusProjectHostingPlanResult,
+): NexusSetupCheckResult {
+  const dispositions = plan.actions.map((action) => action.disposition);
+  const mutationClasses = Array.from(new Set(
+    plan.actions.map((action) => action.mutationClass),
+  )).sort();
+  return {
+    id: "github-hosting-plan",
+    title: "GitHub hosting plan",
+    status:
+      plan.status === "passed"
+        ? "passed"
+        : plan.status === "manual"
+          ? "warning"
+          : "blocked",
+    summary:
+      `Hosting plan is ${plan.status} for ${plan.namespace ?? "<none>"}/` +
+      `${plan.repositoryName ?? "<none>"}: ` +
+      `${statusCountSummary(dispositions)}` +
+      `${mutationClasses.length > 0 ? `; mutations=${mutationClasses.join(",")}` : ""}.`,
+    nextAction:
+      plan.status === "passed"
+        ? null
+        : "Run dev-nexus project hosting plan . --json and use dev-nexus project hosting apply . --json only when provisioning policy allows the proposed repairs.",
+  };
+}
+
+function setupStatusFromHostingStatus(
+  status: NexusProjectHostingStatusResult["status"],
+): NexusSetupCheckStatus {
+  if (status === "blocked") {
+    return "blocked";
+  }
+  if (status === "passed") {
+    return "passed";
+  }
+  return "warning";
+}
+
+function repositoryStatusSummary(status: NexusProjectHostingStatusResult): string {
+  if (status.repository.exists === true) {
+    return [
+      "exists",
+      status.repository.visibility ? `visibility=${status.repository.visibility}` : null,
+      status.repository.defaultBranch
+        ? `defaultBranch=${status.repository.defaultBranch}`
+        : null,
+    ].filter((part): part is string => Boolean(part)).join(",");
+  }
+  if (status.repository.exists === false) {
+    return "missing";
+  }
+  return "unchecked";
+}
+
+function statusCountSummary(values: string[]): string {
+  if (values.length === 0) {
+    return "none";
+  }
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([value, count]) => `${value}=${count}`)
+    .join(",");
 }
 
 function githubMetaProjectSetupRecordChecks(

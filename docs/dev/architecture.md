@@ -30,8 +30,10 @@ areas are:
 - `plugins`: additive capability declarations.
 - `automation`: launch policy, target policy, agent profiles, safety policy,
   ledgers, locks, and publication defaults.
-- `hosting`: optional portable repository intent and remote/auth profile
-  references.
+- `hosting`: optional portable repository intent, declared remotes, required
+  access, auth profile references, and provisioning gates. Provider mechanics
+  such as repository creation, collaborator repair, pending invitations, and
+  invitation acceptance stay behind hosting adapters.
 
 Project support state lives under `.dev-nexus/`. Shared user-authored state and
 generated local/runtime state should stay distinguishable so refresh commands

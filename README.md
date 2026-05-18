@@ -43,6 +43,13 @@ Inspect a project root:
 dev-nexus project status <project-root>
 ```
 
+Inspect declared repository hosting before onboarding or publication:
+
+```bash
+dev-nexus project hosting status <project-root>
+dev-nexus project hosting plan <project-root>
+```
+
 Configure local work tracking and create a work item:
 
 ```bash

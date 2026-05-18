@@ -143,6 +143,83 @@ projections, and host-local readiness. If a plugin declares projected skills or
 MCP servers, setup reports whether the generated agent-facing files and server
 entries are present.
 
+When a project declares `hosting`, setup checks summarize the same hosting
+status and plan used by the dedicated hosting commands. Normal onboarding
+should inspect these generic commands before touching provider-specific tools:
+
+```bash
+dev-nexus project hosting status <project-root> --json
+dev-nexus project hosting plan <project-root> --json
+dev-nexus project hosting apply <project-root> --json
+```
+
+The shared project config records portable intent only: provider, namespace,
+repository name or template, visibility, default branch, declared remotes,
+required principals, and provisioning gates. Host-local auth profiles point to
+local credential context, but tokens, private keys, GitHub CLI state, SSH key
+paths, and wrapper scripts stay outside shared project config.
+
+```json
+{
+  "hosting": {
+    "provider": "github",
+    "namespace": "ExampleOrg",
+    "repository": {
+      "nameTemplate": "{projectId}",
+      "visibility": "private",
+      "defaultBranch": "main"
+    },
+    "remotes": [
+      {
+        "name": "origin",
+        "role": "human",
+        "protocol": "ssh",
+        "authProfile": "human-github"
+      },
+      {
+        "name": "bot",
+        "role": "automation",
+        "protocol": "ssh",
+        "authProfile": "bot-github",
+        "sshHost": "github.com-bot"
+      }
+    ],
+    "access": [
+      {
+        "kind": "human",
+        "providerIdentity": "alice",
+        "role": "human",
+        "requiredPermission": "admin",
+        "authProfile": "human-github",
+        "invitationPolicy": "auto_accept"
+      },
+      {
+        "kind": "machine_user",
+        "providerIdentity": "example-bot",
+        "role": "automation",
+        "requiredPermission": "write",
+        "authProfile": "bot-github",
+        "invitationPolicy": "require_accepted"
+      }
+    ],
+    "provisioning": {
+      "allowCreate": false,
+      "allowLocalRemoteRepair": true,
+      "allowAccessRepair": false,
+      "allowInvitationAcceptance": true,
+      "allowDefaultBranchRepair": false,
+      "allowVisibilityRepair": false,
+      "providerMutationAuthProfile": "bot-github"
+    }
+  }
+}
+```
+
+Provider adapters own repository creation, collaborator invitations, access
+repair, and invitation acceptance. Setup status reports repository, remote,
+auth-profile, actor, access, and invitation drift, but setup checks do not
+mutate provider state.
+
 When setup depends on recently published npm packages, DevNexus distinguishes
 registry propagation delay, network failure, missing versions, and damaged
 local `node_modules` state so agents do not discover package fetch failures in
