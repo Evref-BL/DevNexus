@@ -77,6 +77,17 @@ import {
   type WorkItemProjectSelector,
 } from "./workItemService.js";
 import {
+  createWorkItemSyncPlan,
+  defaultWorkItemSyncPolicy,
+  parseWorkItemSyncCommentPolicyMode,
+  parseWorkItemSyncConflictPolicyMode,
+  parseWorkItemSyncCredentialPolicy,
+  parseWorkItemSyncDirection,
+  parseWorkItemSyncField,
+  parseWorkItemSyncWriteDisposition,
+  type WorkItemSyncPolicyConfig,
+} from "./workItemSyncPlanner.js";
+import {
   createWorkItemTrackerLinkService,
 } from "./workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
@@ -730,6 +741,46 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "work_item_sync_plan",
+    description: "Build a mutation-free dry-run plan for syncing work items from one configured tracker to another.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        sourceTrackerId: { type: "string" },
+        targetTrackerId: { type: "string" },
+        direction: { type: "string", enum: ["source_to_target"] },
+        filters: { type: "object" },
+        fieldSet: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "title",
+              "description",
+              "status",
+              "labels",
+              "assignees",
+              "milestone",
+            ],
+          },
+        },
+        commentPolicy: { type: "string", enum: ["ignore", "plan"] },
+        statusMapping: { type: "object" },
+        conflictPolicy: {
+          type: "string",
+          enum: ["block", "source_wins", "target_wins"],
+        },
+        writePolicy: { type: "object" },
+      },
+      required: ["sourceTrackerId", "targetTrackerId"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export function listDevNexusMcpTools(): McpTool[] {
@@ -1149,6 +1200,19 @@ export async function callDevNexusMcpTool(
             itemId: requiredString(args, "itemId", "arguments"),
             reason: optionalNullableString(args, "reason", "arguments"),
           })),
+        });
+      }
+      case "work_item_sync_plan": {
+        const homePath = homePathFromArgs(args);
+        return toolResult({
+          ok: true,
+          plan: await createWorkItemSyncPlan({
+            ...projectSelectorFromArgs(args),
+            policy: workItemSyncPolicyFromArgs(args),
+            resolveProject: (selector) =>
+              resolveWorkItemProject(selector, homePath),
+            now: context.now,
+          }),
         });
       }
       default:
@@ -1779,6 +1843,139 @@ function workItemPatchFromArgs(args: Record<string, unknown>): WorkItemPatch {
   }
 
   return patch;
+}
+
+function workItemSyncPolicyFromArgs(
+  args: Record<string, unknown>,
+): WorkItemSyncPolicyConfig {
+  const direction = optionalString(args, "direction", "arguments");
+  const commentPolicy = optionalString(args, "commentPolicy", "arguments");
+  const conflictPolicy = optionalString(args, "conflictPolicy", "arguments");
+  const fieldSet = optionalStringArray(args, "fieldSet", "arguments")?.map(
+    (field) => parseWorkItemSyncField(field, "arguments.fieldSet"),
+  );
+
+  return defaultWorkItemSyncPolicy({
+    sourceTrackerId: requiredString(args, "sourceTrackerId", "arguments"),
+    targetTrackerId: requiredString(args, "targetTrackerId", "arguments"),
+    ...(direction
+      ? { direction: parseWorkItemSyncDirection(direction, "arguments.direction") }
+      : {}),
+    filters: workItemSyncFiltersFromArgs(args),
+    ...(fieldSet ? { fieldSet } : {}),
+    ...(commentPolicy
+      ? {
+          commentPolicy: {
+            mode: parseWorkItemSyncCommentPolicyMode(
+              commentPolicy,
+              "arguments.commentPolicy",
+            ),
+          },
+        }
+      : {}),
+    statusMapping: workItemSyncStatusMappingFromArgs(args),
+    ...(conflictPolicy
+      ? {
+          conflictPolicy: {
+            mode: parseWorkItemSyncConflictPolicyMode(
+              conflictPolicy,
+              "arguments.conflictPolicy",
+            ),
+          },
+        }
+      : {}),
+    writePolicy: workItemSyncWritePolicyFromArgs(args),
+  });
+}
+
+function workItemSyncFiltersFromArgs(
+  args: Record<string, unknown>,
+): NonNullable<WorkItemSyncPolicyConfig["filters"]> {
+  const filters = hasOwn(args, "filters")
+    ? asRecord(args.filters, "arguments.filters")
+    : args;
+  return {
+    status: optionalWorkStatusQuery(filters, "status", "arguments.filters"),
+    labels: optionalStringArray(filters, "labels", "arguments.filters"),
+    assignees: optionalStringArray(filters, "assignees", "arguments.filters"),
+    search: optionalString(filters, "search", "arguments.filters"),
+    limit: optionalPositiveInteger(filters, "limit", "arguments.filters"),
+  };
+}
+
+function workItemSyncStatusMappingFromArgs(
+  args: Record<string, unknown>,
+): NonNullable<WorkItemSyncPolicyConfig["statusMapping"]> {
+  if (!hasOwn(args, "statusMapping")) {
+    return {};
+  }
+  const mapping = asRecord(args.statusMapping, "arguments.statusMapping");
+  const parsed: Partial<Record<WorkStatus, WorkStatus>> = {};
+  for (const [source, target] of Object.entries(mapping)) {
+    parsed[parseWorkStatus(source, "arguments.statusMapping key")] =
+      parseWorkStatus(
+        requiredPlainString(target, `arguments.statusMapping.${source}`),
+        `arguments.statusMapping.${source}`,
+      );
+  }
+
+  return parsed;
+}
+
+function workItemSyncWritePolicyFromArgs(
+  args: Record<string, unknown>,
+): NonNullable<WorkItemSyncPolicyConfig["writePolicy"]> {
+  if (!hasOwn(args, "writePolicy")) {
+    return {
+      mode: "dry_run",
+    };
+  }
+  const writePolicy = asRecord(args.writePolicy, "arguments.writePolicy");
+  const mode = optionalString(writePolicy, "mode", "arguments.writePolicy");
+  const creates = optionalString(writePolicy, "creates", "arguments.writePolicy");
+  const updates = optionalString(writePolicy, "updates", "arguments.writePolicy");
+  const credentials = optionalString(
+    writePolicy,
+    "credentials",
+    "arguments.writePolicy",
+  );
+  return {
+    mode: mode ?? "dry_run",
+    ...(creates
+      ? {
+          creates: parseWorkItemSyncWriteDisposition(
+            creates,
+            "arguments.writePolicy.creates",
+          ),
+        }
+      : {}),
+    ...(updates
+      ? {
+          updates: parseWorkItemSyncWriteDisposition(
+            updates,
+            "arguments.writePolicy.updates",
+          ),
+        }
+      : {}),
+    ...(credentials
+      ? {
+          credentials: parseWorkItemSyncCredentialPolicy(
+            credentials,
+            "arguments.writePolicy.credentials",
+          ),
+        }
+      : {}),
+    ...(hasOwn(writePolicy, "reason")
+      ? {
+          reason:
+            optionalNullableString(
+              writePolicy,
+              "reason",
+              "arguments.writePolicy",
+            ) ?? null,
+        }
+      : {}),
+  };
 }
 
 function parseToolCallParams(value: unknown): { name: string; arguments?: unknown } {

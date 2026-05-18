@@ -151,6 +151,23 @@ import {
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
 import {
+  createWorkItemSyncPlan,
+  defaultWorkItemSyncPolicy,
+  parseWorkItemSyncCommentPolicyMode,
+  parseWorkItemSyncConflictPolicyMode,
+  parseWorkItemSyncCredentialPolicy,
+  parseWorkItemSyncDirection,
+  parseWorkItemSyncField,
+  parseWorkItemSyncWriteDisposition,
+  type WorkItemSyncCommentPolicyMode,
+  type WorkItemSyncConflictPolicyMode,
+  type WorkItemSyncCredentialPolicy,
+  type WorkItemSyncField,
+  type WorkItemSyncPlan,
+  type WorkItemSyncPolicyConfig,
+  type WorkItemSyncWriteDisposition,
+} from "./workItemSyncPlanner.js";
+import {
   createWorkItemTrackerLinkService,
   type LinkWorkItemTrackerReferenceResult,
   type ShowWorkItemTrackerLinksResult,
@@ -367,6 +384,28 @@ interface ParsedWorkItemUnlinkCommand {
   json?: boolean;
 }
 
+interface ParsedWorkItemSyncPlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  sourceTrackerId: string;
+  targetTrackerId: string;
+  direction?: "source_to_target";
+  statuses: WorkStatus[];
+  labels: string[];
+  assignees: string[];
+  search?: string;
+  limit?: number;
+  fields: WorkItemSyncField[];
+  commentPolicy?: WorkItemSyncCommentPolicyMode;
+  statusMapping: Partial<Record<WorkStatus, WorkStatus>>;
+  conflictPolicy?: WorkItemSyncConflictPolicyMode;
+  writeCreates?: WorkItemSyncWriteDisposition;
+  writeUpdates?: WorkItemSyncWriteDisposition;
+  credentials?: WorkItemSyncCredentialPolicy;
+  policyReason?: string | null;
+  json?: boolean;
+}
+
 interface ParsedAutomationRunOnceCommand {
   projectRoot: string;
   command?: string;
@@ -576,6 +615,7 @@ export function usage(): string {
     "  dev-nexus work-item link <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
     "  dev-nexus work-item show-links <project-root> <logical-item-id> [options]",
     "  dev-nexus work-item unlink <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
+    "  dev-nexus work-item sync-plan <project-root> --source-tracker <id> --target-tracker <id> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation eligible-work <project-root> [options]",
     "  dev-nexus automation agent-profiles <project-root> [options]",
@@ -783,6 +823,26 @@ export function usage(): string {
     "  --tracker <id>            configured tracker binding id",
     "  --item-id <id>",
     "  --reason <text>",
+    "  --json",
+    "",
+    "Options for work-item sync-plan:",
+    "  --component <id>          defaults to the primary component",
+    "  --source-tracker <id>",
+    "  --target-tracker <id>",
+    "  --direction <source_to_target>",
+    "  --status <todo|ready|in_progress|blocked|done|wont_do>  repeatable",
+    "  --label <label>            repeatable",
+    "  --assignee <assignee>      repeatable",
+    "  --search <text>",
+    "  --limit <count>",
+    "  --field <title|description|status|labels|assignees|milestone>  repeatable",
+    "  --comment-policy <ignore|plan>",
+    "  --status-map <source:target>  repeatable",
+    "  --conflict-policy <block|source_wins|target_wins>",
+    "  --write-create <plan|skip|block>",
+    "  --write-update <plan|skip|block>",
+    "  --credentials <not_required|available|missing>",
+    "  --policy-reason <text>",
     "  --json",
     "",
     "Options for automation status:",
@@ -1522,8 +1582,26 @@ async function handleWorkItemCommand(
     return 0;
   }
 
+  if (command === "sync-plan") {
+    const parsed = parseWorkItemSyncPlanCommand(argv);
+    const plan = await createWorkItemSyncPlan({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: parsed.componentId,
+      policy: workItemSyncPolicyFromParsed(parsed),
+      resolveProject: (selector) =>
+        resolveDirectProject(parsed.projectRoot, selector.componentId),
+      now: dependencies.now,
+    });
+    printWorkItemSyncPlanResult(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "work-item requires create, list, get, update, comment, set-status, link, show-links, or unlink",
+    "work-item requires create, list, get, update, comment, set-status, link, show-links, unlink, or sync-plan",
   );
 }
 
@@ -3458,6 +3536,105 @@ function parseWorkItemUnlinkCommand(
   return parsed as ParsedWorkItemUnlinkCommand;
 }
 
+function parseWorkItemSyncPlanCommand(
+  argv: string[],
+): ParsedWorkItemSyncPlanCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item sync-plan requires a project root");
+  }
+
+  const parsed: Partial<ParsedWorkItemSyncPlanCommand> = {
+    projectRoot,
+    statuses: [],
+    labels: [],
+    assignees: [],
+    fields: [],
+    statusMapping: {},
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--source-tracker":
+        parsed.sourceTrackerId = next();
+        break;
+      case "--target-tracker":
+        parsed.targetTrackerId = next();
+        break;
+      case "--direction":
+        parsed.direction = parseWorkItemSyncDirection(next(), arg);
+        break;
+      case "--status":
+        parsed.statuses?.push(parseWorkStatus(next(), arg));
+        break;
+      case "--label":
+        parsed.labels?.push(next());
+        break;
+      case "--assignee":
+        parsed.assignees?.push(next());
+        break;
+      case "--search":
+        parsed.search = next();
+        break;
+      case "--limit":
+        parsed.limit = parsePositiveInteger(next(), arg);
+        break;
+      case "--field":
+        parsed.fields?.push(parseWorkItemSyncField(next(), arg));
+        break;
+      case "--comment-policy":
+        parsed.commentPolicy = parseWorkItemSyncCommentPolicyMode(next(), arg);
+        break;
+      case "--status-map": {
+        const [source, target] = parseStatusMapEntry(next(), arg);
+        parsed.statusMapping![source] = target;
+        break;
+      }
+      case "--conflict-policy":
+        parsed.conflictPolicy = parseWorkItemSyncConflictPolicyMode(next(), arg);
+        break;
+      case "--write-create":
+        parsed.writeCreates = parseWorkItemSyncWriteDisposition(next(), arg);
+        break;
+      case "--write-update":
+        parsed.writeUpdates = parseWorkItemSyncWriteDisposition(next(), arg);
+        break;
+      case "--credentials":
+        parsed.credentials = parseWorkItemSyncCredentialPolicy(next(), arg);
+        break;
+      case "--policy-reason":
+        parsed.policyReason = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item sync-plan option: ${arg}`);
+    }
+  }
+
+  if (!parsed.sourceTrackerId) {
+    throw new Error("work-item sync-plan requires --source-tracker");
+  }
+  if (!parsed.targetTrackerId) {
+    throw new Error("work-item sync-plan requires --target-tracker");
+  }
+
+  return parsed as ParsedWorkItemSyncPlanCommand;
+}
+
 function parseAutomationEnqueueCommand(
   argv: string[],
 ): ParsedAutomationEnqueueCommand {
@@ -4668,6 +4845,33 @@ function printWorkItemUnlinkResult(
   }
 }
 
+function printWorkItemSyncPlanResult(
+  plan: WorkItemSyncPlan,
+  parsed: ParsedWorkItemSyncPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item sync dry-run plan.");
+  writeLine(
+    stdout,
+    `  Source: ${plan.sourceTracker.trackerId} [${plan.sourceTracker.provider}]`,
+  );
+  writeLine(
+    stdout,
+    `  Target: ${plan.targetTracker.trackerId} [${plan.targetTracker.provider}]`,
+  );
+  writeLine(stdout, `  Creates: ${plan.counts.creates}`);
+  writeLine(stdout, `  Updates: ${plan.counts.updates}`);
+  writeLine(stdout, `  Skips: ${plan.counts.skips}`);
+  writeLine(stdout, `  Conflicts: ${plan.counts.conflicts}`);
+  writeLine(stdout, `  Blockers: ${plan.counts.blockers}`);
+}
+
 function printAutomationScheduleTick(
   tick: NexusAutomationSchedulerTick,
   stdout: TextWriter,
@@ -5284,6 +5488,42 @@ function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefi
   return statuses.length === 1 ? statuses[0] : statuses;
 }
 
+function workItemSyncPolicyFromParsed(
+  parsed: ParsedWorkItemSyncPlanCommand,
+): WorkItemSyncPolicyConfig {
+  return defaultWorkItemSyncPolicy({
+    sourceTrackerId: parsed.sourceTrackerId,
+    targetTrackerId: parsed.targetTrackerId,
+    ...(parsed.direction ? { direction: parsed.direction } : {}),
+    filters: {
+      ...(parsed.statuses.length > 0
+        ? { status: statusQuery(parsed.statuses) }
+        : {}),
+      ...(parsed.labels.length > 0 ? { labels: parsed.labels } : {}),
+      ...(parsed.assignees.length > 0 ? { assignees: parsed.assignees } : {}),
+      ...(parsed.search ? { search: parsed.search } : {}),
+      ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
+    },
+    ...(parsed.fields.length > 0 ? { fieldSet: parsed.fields } : {}),
+    ...(parsed.commentPolicy
+      ? { commentPolicy: { mode: parsed.commentPolicy } }
+      : {}),
+    statusMapping: parsed.statusMapping,
+    ...(parsed.conflictPolicy
+      ? { conflictPolicy: { mode: parsed.conflictPolicy } }
+      : {}),
+    writePolicy: {
+      mode: "dry_run",
+      ...(parsed.writeCreates ? { creates: parsed.writeCreates } : {}),
+      ...(parsed.writeUpdates ? { updates: parsed.writeUpdates } : {}),
+      ...(parsed.credentials ? { credentials: parsed.credentials } : {}),
+      ...(parsed.policyReason !== undefined
+        ? { reason: parsed.policyReason }
+        : {}),
+    },
+  });
+}
+
 function parseWorkStatus(value: string, optionName: string): WorkStatus {
   if (
     value === "todo" ||
@@ -5297,6 +5537,22 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   }
 
   throw new Error(`${optionName} must be a valid work status`);
+}
+
+function parseStatusMapEntry(
+  value: string,
+  optionName: string,
+): [WorkStatus, WorkStatus] {
+  const separator = value.includes(":") ? ":" : "=";
+  const [source, target, extra] = value.split(separator);
+  if (!source || !target || extra !== undefined) {
+    throw new Error(`${optionName} must use source:target`);
+  }
+
+  return [
+    parseWorkStatus(source, `${optionName} source`),
+    parseWorkStatus(target, `${optionName} target`),
+  ];
 }
 
 function parseCurrentAgentResultStatus(

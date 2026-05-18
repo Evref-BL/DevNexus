@@ -217,6 +217,7 @@ describe("DevNexus MCP server", () => {
       "work_item_link",
       "work_item_show_links",
       "work_item_unlink",
+      "work_item_sync_plan",
     ]);
   });
 
@@ -1699,6 +1700,108 @@ describe("DevNexus MCP server", () => {
     expect(afterUnlink).toMatchObject({
       ok: true,
       references: [],
+    });
+  });
+
+  it("returns dry-run work-item sync plans through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-primary.json",
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: {
+        provider: "local",
+        storePath: ".dev-nexus/work-items-primary.json",
+      },
+    }).createWorkItem({
+      projectRoot,
+      title: "Mirror through MCP",
+      status: "ready",
+      labels: ["sync"],
+    });
+
+    const toolNames = listDevNexusMcpTools().map((tool) => tool.name);
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_sync_plan",
+        {
+          projectRoot,
+          componentId: "primary",
+          sourceTrackerId: "primary",
+          targetTrackerId: "mirror",
+          filters: {
+            status: ["ready"],
+            labels: ["sync"],
+          },
+          fieldSet: ["title", "status"],
+        },
+        { now: fixedClock("2026-05-18T09:00:00.000Z") },
+      ),
+    );
+
+    expect(toolNames).toContain("work_item_sync_plan");
+    expect(result).toMatchObject({
+      ok: true,
+      plan: {
+        dryRun: true,
+        sourceTracker: {
+          trackerId: "primary",
+        },
+        targetTracker: {
+          trackerId: "mirror",
+        },
+        creates: [
+          {
+            source: {
+              title: "Mirror through MCP",
+            },
+            targetDetection: "unlinked",
+          },
+        ],
+        counts: {
+          creates: 1,
+        },
+      },
     });
   });
 

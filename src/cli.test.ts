@@ -1185,6 +1185,128 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints dry-run work-item sync plans through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/primary-items.json",
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/mirror-items.json",
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: {
+        provider: "local",
+        storePath: ".dev-nexus/primary-items.json",
+      },
+    }).createWorkItem({
+      projectRoot,
+      title: "Mirror through CLI",
+      status: "ready",
+      labels: ["sync"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: {
+        provider: "local",
+        storePath: ".dev-nexus/mirror-items.json",
+      },
+    }).createWorkItem({
+      projectRoot,
+      title: "Unlinked target",
+      status: "ready",
+    });
+
+    const output = captureOutput();
+    await main(
+      [
+        "work-item",
+        "sync-plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--source-tracker",
+        "primary",
+        "--target-tracker",
+        "mirror",
+        "--status",
+        "ready",
+        "--label",
+        "sync",
+        "--field",
+        "title",
+        "--field",
+        "status",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        now: fixedClock("2026-05-18T09:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      plan: {
+        dryRun: true,
+        sourceTracker: {
+          trackerId: "primary",
+        },
+        targetTracker: {
+          trackerId: "mirror",
+        },
+        creates: [
+          {
+            source: {
+              title: "Mirror through CLI",
+            },
+            targetDetection: "unlinked",
+          },
+        ],
+        counts: {
+          creates: 1,
+          unlinkedTargets: 1,
+        },
+      },
+    });
+  });
+
   it("gets, updates, and comments on local work items", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
