@@ -8,6 +8,7 @@ import {
   NexusConfigError,
   projectConfigPath,
   projectWorktreesRootPath,
+  normalizeNexusProjectAgentTargets,
   resolveNexusAgentConfig,
   saveProjectConfig,
   validateProjectConfig,
@@ -252,6 +253,306 @@ describe("project config", () => {
         enabled: true,
       },
     ]);
+  });
+
+  it("accepts explicit active agent targets and normalizes projection settings", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "agent-target-project",
+      name: "Agent Target Project",
+      agentTargets: {
+        active: [
+          {
+            provider: "Codex",
+            sourceControl: "support",
+            mcp: {
+              configPath: ".codex/config.toml",
+              defaultToolsApprovalMode: "approve",
+            },
+            skills: {
+              directory: ".agents/skills",
+            },
+            setupNotes: ["Codex is the active provider for this project."],
+          },
+        ],
+      },
+    });
+
+    expect(config.agentTargets).toEqual({
+      active: [
+        {
+          provider: "codex",
+          sourceControl: "support",
+          mcp: {
+            configPath: ".codex/config.toml",
+            defaultToolsApprovalMode: "approve",
+          },
+          skills: {
+            directory: ".agents/skills",
+          },
+          setupNotes: ["Codex is the active provider for this project."],
+        },
+      ],
+    });
+
+    expect(normalizeNexusProjectAgentTargets(config)).toMatchObject({
+      explicit: true,
+      recommendations: [],
+      targets: [
+        {
+          provider: "codex",
+          sourceControl: "support",
+          mcp: {
+            enabled: true,
+            source: "explicit",
+            target: {
+              agent: "codex",
+              provider: "codex",
+              configPath: ".codex/config.toml",
+              defaultToolsApprovalMode: "approve",
+            },
+          },
+          skills: {
+            enabled: true,
+            source: "explicit",
+            target: {
+              agent: "codex",
+              directory: ".agents/skills",
+            },
+          },
+          setupNotes: ["Codex is the active provider for this project."],
+          compatibilitySource: "explicit",
+        },
+      ],
+    });
+  });
+
+  it("preserves multi-provider active target configuration", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "multi-agent-project",
+      name: "Multi Agent Project",
+      agentTargets: {
+        active: [
+          {
+            provider: "codex",
+            skills: {
+              enabled: false,
+            },
+          },
+          {
+            provider: "claude",
+            mcp: {
+              enabled: false,
+            },
+            skills: {
+              directory: ".claude/skills",
+              sourceControl: "source",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(normalizeNexusProjectAgentTargets(config).targets).toMatchObject([
+      {
+        provider: "codex",
+        mcp: {
+          enabled: true,
+          target: {
+            agent: "codex",
+            provider: "codex",
+          },
+        },
+        skills: {
+          enabled: false,
+          target: null,
+        },
+      },
+      {
+        provider: "claude",
+        mcp: {
+          enabled: false,
+          target: null,
+        },
+        skills: {
+          enabled: true,
+          target: {
+            agent: "claude",
+            directory: ".claude/skills",
+            sourceControl: "source",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("normalizes legacy MCP and skill targets into compatibility policy", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "legacy-agent-project",
+      name: "Legacy Agent Project",
+      mcp: {
+        agentTargets: [
+          {
+            agent: "codex",
+          },
+        ],
+      },
+      skills: {
+        agentTargets: [
+          {
+            agent: "codex",
+          },
+          {
+            agent: "claude",
+            directory: ".claude/skills",
+          },
+        ],
+      },
+    });
+
+    expect(normalizeNexusProjectAgentTargets(config)).toMatchObject({
+      explicit: false,
+      recommendations: [
+        expect.stringContaining("legacy mcp.agentTargets and skills.agentTargets"),
+      ],
+      targets: [
+        {
+          provider: "codex",
+          mcp: {
+            enabled: true,
+            source: "legacy",
+          },
+          skills: {
+            enabled: true,
+            source: "legacy",
+          },
+        },
+        {
+          provider: "claude",
+          mcp: {
+            enabled: false,
+            source: "disabled",
+          },
+          skills: {
+            enabled: true,
+            source: "legacy",
+            target: {
+              agent: "claude",
+              directory: ".claude/skills",
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it("normalizes legacy MCP-only and skills-only project configs", () => {
+    const mcpOnly = validateProjectConfig({
+      version: 1,
+      id: "mcp-only-project",
+      name: "MCP Only Project",
+      mcp: {
+        agentTargets: [
+          {
+            agent: "codex",
+          },
+        ],
+      },
+    });
+    const skillsOnly = validateProjectConfig({
+      version: 1,
+      id: "skills-only-project",
+      name: "Skills Only Project",
+      mcp: {
+        enabled: false,
+      },
+      skills: {
+        agentTargets: [
+          {
+            agent: "claude",
+          },
+        ],
+      },
+    });
+
+    expect(normalizeNexusProjectAgentTargets(mcpOnly).targets).toMatchObject([
+      {
+        provider: "codex",
+        mcp: { enabled: true },
+        skills: { enabled: false },
+      },
+    ]);
+    expect(normalizeNexusProjectAgentTargets(skillsOnly).targets).toMatchObject([
+      {
+        provider: "claude",
+        mcp: { enabled: false },
+        skills: { enabled: true },
+      },
+    ]);
+  });
+
+  it("rejects invalid active agent target policies", () => {
+    const configWithAgentTargets = (active: unknown[]) => ({
+      version: 1,
+      id: "invalid-agent-target-project",
+      name: "Invalid Agent Target Project",
+      agentTargets: {
+        active,
+      },
+    });
+
+    expect(() =>
+      validateProjectConfig(configWithAgentTargets([])),
+    ).toThrow(/agentTargets\.active must not be empty/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAgentTargets([
+          {
+            provider: "codex",
+          },
+          {
+            provider: "Codex",
+          },
+        ]),
+      ),
+    ).toThrow(/duplicate provider: codex/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAgentTargets([
+          {
+            provider: "unknown-agent",
+          },
+        ]),
+      ),
+    ).toThrow(/provider must be codex, claude, opencode, manual, or custom/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAgentTargets([
+          {
+            provider: "codex",
+            enabled: false,
+          },
+        ]),
+      ),
+    ).toThrow(/enabled must not be false/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAgentTargets([
+          {
+            provider: "codex",
+            skills: {
+              sourceControl: "shared",
+            },
+          },
+        ]),
+      ),
+    ).toThrow(/agentTargets\.active\[0\]\.skills\.sourceControl/);
   });
 
   it("accepts generic runner profiles across safety classes", () => {

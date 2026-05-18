@@ -174,6 +174,75 @@ export interface NexusProjectMcpConfig {
   agentTargets?: NexusProjectAgentMcpTarget[];
 }
 
+export type NexusProjectActiveAgentProvider =
+  | "codex"
+  | "claude"
+  | "opencode"
+  | "manual"
+  | "custom";
+
+export type NexusProjectAgentProjectionSource =
+  | "explicit"
+  | "legacy"
+  | "default"
+  | "disabled";
+
+export interface NexusProjectActiveAgentMcpSettings {
+  enabled?: boolean;
+  configPath?: string;
+  configFormat?: NexusProjectAgentMcpConfigFormat;
+  configSchema?: string;
+  sourceControl?: NexusSkillSourceControl;
+  serverName?: string;
+  command?: string;
+  args?: string[];
+  defaultToolsApprovalMode?: string;
+  activationNotes?: string[];
+  trustSemantics?: string;
+  manualInstructions?: string[];
+}
+
+export interface NexusProjectActiveAgentSkillSettings {
+  enabled?: boolean;
+  directory?: string;
+  sourceControl?: NexusSkillSourceControl;
+}
+
+export interface NexusProjectActiveAgentTargetConfig {
+  provider: NexusProjectActiveAgentProvider;
+  enabled?: true;
+  sourceControl?: NexusSkillSourceControl;
+  mcp?: NexusProjectActiveAgentMcpSettings;
+  skills?: NexusProjectActiveAgentSkillSettings;
+  setupNotes?: string[];
+}
+
+export interface NexusProjectAgentTargetsConfig {
+  active: NexusProjectActiveAgentTargetConfig[];
+}
+
+export interface NormalizedNexusProjectAgentProjection<TTarget> {
+  enabled: boolean;
+  source: NexusProjectAgentProjectionSource;
+  target: TTarget | null;
+}
+
+export interface NormalizedNexusProjectAgentTarget {
+  provider: NexusProjectActiveAgentProvider | string;
+  enabled: true;
+  sourceControl: NexusSkillSourceControl;
+  mcp: NormalizedNexusProjectAgentProjection<NexusProjectAgentMcpTarget>;
+  skills: NormalizedNexusProjectAgentProjection<NexusProjectSkillAgentTarget>;
+  setupNotes: string[];
+  compatibilitySource: "explicit" | "legacy";
+}
+
+export interface NormalizedNexusProjectAgentTargets {
+  explicit: boolean;
+  targets: NormalizedNexusProjectAgentTarget[];
+  recommendations: string[];
+}
+
 export interface NexusProjectConfig {
   version: 1;
   id: string;
@@ -186,6 +255,7 @@ export interface NexusProjectConfig {
   workTracking?: WorkTrackingConfig;
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
+  agentTargets?: NexusProjectAgentTargetsConfig;
   mcp?: NexusProjectMcpConfig;
   skills?: NexusProjectSkillsConfig;
   plugins?: NexusProjectPluginsConfig;
@@ -421,6 +491,180 @@ export function resolveNexusAgentConfig(
     ...agentConfigFromSource(options.project),
     ...agentConfigFromSource(options.issue),
   });
+}
+
+export function normalizeNexusProjectAgentTargets(
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
+): NormalizedNexusProjectAgentTargets {
+  if (config.agentTargets) {
+    return {
+      explicit: true,
+      targets: config.agentTargets.active.map(normalizeExplicitAgentTarget),
+      recommendations: [],
+    };
+  }
+
+  const targets = normalizeLegacyAgentTargets(config);
+  return {
+    explicit: false,
+    targets,
+    recommendations: targets.length > 0
+      ? [
+          "Project uses legacy mcp.agentTargets and skills.agentTargets compatibility; add project config.agentTargets.active to make active provider selection explicit.",
+        ]
+      : [],
+  };
+}
+
+function normalizeExplicitAgentTarget(
+  target: NexusProjectActiveAgentTargetConfig,
+): NormalizedNexusProjectAgentTarget {
+  const sourceControl = target.sourceControl ?? "support";
+  const mcpEnabled = target.mcp?.enabled !== false;
+  const skillsEnabled = target.skills?.enabled !== false;
+
+  return {
+    provider: target.provider,
+    enabled: true,
+    sourceControl,
+    mcp: mcpEnabled
+      ? {
+          enabled: true,
+          source: "explicit",
+          target: activeMcpSettingsToLegacyTarget(target, sourceControl),
+        }
+      : {
+          enabled: false,
+          source: "disabled",
+          target: null,
+        },
+    skills: skillsEnabled
+      ? {
+          enabled: true,
+          source: "explicit",
+          target: activeSkillSettingsToLegacyTarget(target, sourceControl),
+        }
+      : {
+          enabled: false,
+          source: "disabled",
+          target: null,
+        },
+    setupNotes: target.setupNotes ?? [],
+    compatibilitySource: "explicit",
+  };
+}
+
+function activeMcpSettingsToLegacyTarget(
+  target: NexusProjectActiveAgentTargetConfig,
+  sourceControl: NexusSkillSourceControl,
+): NexusProjectAgentMcpTarget {
+  const settings = target.mcp;
+  return {
+    agent: target.provider,
+    provider: target.provider,
+    sourceControl: settings?.sourceControl ?? sourceControl,
+    ...(settings?.configPath !== undefined ? { configPath: settings.configPath } : {}),
+    ...(settings?.configFormat !== undefined ? { configFormat: settings.configFormat } : {}),
+    ...(settings?.configSchema !== undefined ? { configSchema: settings.configSchema } : {}),
+    ...(settings?.serverName !== undefined ? { serverName: settings.serverName } : {}),
+    ...(settings?.command !== undefined ? { command: settings.command } : {}),
+    ...(settings?.args !== undefined ? { args: settings.args } : {}),
+    ...(settings?.defaultToolsApprovalMode !== undefined
+      ? { defaultToolsApprovalMode: settings.defaultToolsApprovalMode }
+      : {}),
+    ...(settings?.activationNotes !== undefined
+      ? { activationNotes: settings.activationNotes }
+      : {}),
+    ...(settings?.trustSemantics !== undefined
+      ? { trustSemantics: settings.trustSemantics }
+      : {}),
+    ...(settings?.manualInstructions !== undefined
+      ? { manualInstructions: settings.manualInstructions }
+      : {}),
+  };
+}
+
+function activeSkillSettingsToLegacyTarget(
+  target: NexusProjectActiveAgentTargetConfig,
+  sourceControl: NexusSkillSourceControl,
+): NexusProjectSkillAgentTarget {
+  const settings = target.skills;
+  return {
+    agent: target.provider,
+    sourceControl: settings?.sourceControl ?? sourceControl,
+    ...(settings?.directory !== undefined ? { directory: settings.directory } : {}),
+  };
+}
+
+function normalizeLegacyAgentTargets(
+  config: Pick<NexusProjectConfig, "mcp" | "skills">,
+): NormalizedNexusProjectAgentTarget[] {
+  const targets = new Map<string, NormalizedNexusProjectAgentTarget>();
+  const ensureTarget = (provider: string): NormalizedNexusProjectAgentTarget => {
+    const existing = targets.get(provider);
+    if (existing) {
+      return existing;
+    }
+    const created: NormalizedNexusProjectAgentTarget = {
+      provider,
+      enabled: true,
+      sourceControl: "support",
+      mcp: {
+        enabled: false,
+        source: "disabled",
+        target: null,
+      },
+      skills: {
+        enabled: false,
+        source: "disabled",
+        target: null,
+      },
+      setupNotes: [],
+      compatibilitySource: "legacy",
+    };
+    targets.set(provider, created);
+    return created;
+  };
+
+  if (config.mcp?.enabled !== false) {
+    const mcpTargets = config.mcp?.agentTargets ?? [{ agent: "codex" }];
+    const mcpSource: NexusProjectAgentProjectionSource =
+      config.mcp?.agentTargets ? "legacy" : "default";
+    for (const target of mcpTargets.filter((entry) => entry.enabled !== false)) {
+      const provider = legacyMcpProvider(target);
+      const normalized = ensureTarget(provider);
+      normalized.sourceControl =
+        target.sourceControl ?? config.mcp?.sourceControl ?? normalized.sourceControl;
+      normalized.mcp = {
+        enabled: true,
+        source: mcpSource,
+        target: {
+          ...target,
+          provider: target.provider ?? provider,
+        },
+      };
+    }
+  }
+
+  for (const target of (config.skills?.agentTargets ?? []).filter(
+    (entry) => entry.enabled !== false,
+  )) {
+    const provider = target.agent.trim().toLowerCase();
+    const normalized = ensureTarget(provider);
+    normalized.sourceControl =
+      target.sourceControl ?? config.skills?.sourceControl ?? normalized.sourceControl;
+    normalized.skills = {
+      enabled: true,
+      source: "legacy",
+      target,
+    };
+  }
+
+  return [...targets.values()];
+}
+
+function legacyMcpProvider(target: NexusProjectAgentMcpTarget): string {
+  return (target.provider ?? target.agent).trim().toLowerCase();
 }
 
 function validateKanbanConfig(
@@ -1258,6 +1502,167 @@ function validateProjectPluginsConfig(
   }
 
   return plugins;
+}
+
+function validateProjectAgentTargetsConfig(
+  value: unknown,
+): NexusProjectAgentTargetsConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = assertRecord(value, "project config.agentTargets");
+  const active = record.active;
+  if (!Array.isArray(active)) {
+    throw new NexusConfigError(
+      "project config.agentTargets.active must be an array",
+    );
+  }
+  if (active.length === 0) {
+    throw new NexusConfigError(
+      "project config.agentTargets.active must not be empty",
+    );
+  }
+
+  const targets = active.map(validateProjectActiveAgentTargetConfig);
+  const providers = new Set<string>();
+  for (const target of targets) {
+    if (providers.has(target.provider)) {
+      throw new NexusConfigError(
+        `project config.agentTargets.active contains duplicate provider: ${target.provider}`,
+      );
+    }
+    providers.add(target.provider);
+  }
+
+  return { active: targets };
+}
+
+function validateProjectActiveAgentTargetConfig(
+  value: unknown,
+  index: number,
+): NexusProjectActiveAgentTargetConfig {
+  const pathName = `project config.agentTargets.active[${index}]`;
+  const record = assertRecord(value, pathName);
+  const provider = validateActiveAgentProvider(record.provider, `${pathName}.provider`);
+  const enabled = optionalBoolean(record, "enabled", pathName);
+  if (enabled === false) {
+    throw new NexusConfigError(`${pathName}.enabled must not be false`);
+  }
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+  const mcp = validateProjectActiveAgentMcpSettings(record.mcp, `${pathName}.mcp`);
+  const skills = validateProjectActiveAgentSkillSettings(
+    record.skills,
+    `${pathName}.skills`,
+  );
+  const setupNotes = optionalStringArray(record, "setupNotes", pathName);
+
+  return {
+    provider,
+    ...(enabled === true ? { enabled } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(mcp !== undefined ? { mcp } : {}),
+    ...(skills !== undefined ? { skills } : {}),
+    ...(setupNotes !== undefined ? { setupNotes } : {}),
+  };
+}
+
+function validateProjectActiveAgentMcpSettings(
+  value: unknown,
+  pathName: string,
+): NexusProjectActiveAgentMcpSettings | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName);
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+  const configPath = optionalString(record, "configPath", pathName);
+  const configFormat = validateAgentMcpConfigFormat(
+    record.configFormat,
+    `${pathName}.configFormat`,
+  );
+  const configSchema = optionalString(record, "configSchema", pathName);
+  const serverName = optionalString(record, "serverName", pathName);
+  const command = optionalString(record, "command", pathName);
+  const args = optionalStringArray(record, "args", pathName);
+  const defaultToolsApprovalMode = optionalString(
+    record,
+    "defaultToolsApprovalMode",
+    pathName,
+  );
+  const activationNotes = optionalStringArray(record, "activationNotes", pathName);
+  const trustSemantics = optionalString(record, "trustSemantics", pathName);
+  const manualInstructions = optionalStringArray(
+    record,
+    "manualInstructions",
+    pathName,
+  );
+
+  return {
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(configPath !== undefined ? { configPath } : {}),
+    ...(configFormat !== undefined ? { configFormat } : {}),
+    ...(configSchema !== undefined ? { configSchema } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+    ...(serverName !== undefined ? { serverName } : {}),
+    ...(command !== undefined ? { command } : {}),
+    ...(args !== undefined ? { args } : {}),
+    ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
+    ...(activationNotes !== undefined ? { activationNotes } : {}),
+    ...(trustSemantics !== undefined ? { trustSemantics } : {}),
+    ...(manualInstructions !== undefined ? { manualInstructions } : {}),
+  };
+}
+
+function validateProjectActiveAgentSkillSettings(
+  value: unknown,
+  pathName: string,
+): NexusProjectActiveAgentSkillSettings | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName);
+  const sourceControl = validateSkillSourceControl(
+    record.sourceControl,
+    `${pathName}.sourceControl`,
+  );
+  const directory = optionalString(record, "directory", pathName);
+
+  return {
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(directory !== undefined ? { directory } : {}),
+    ...(sourceControl !== undefined ? { sourceControl } : {}),
+  };
+}
+
+function validateActiveAgentProvider(
+  value: unknown,
+  pathName: string,
+): NexusProjectActiveAgentProvider {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new NexusConfigError(`${pathName} must be a non-empty string`);
+  }
+  const provider = value.trim().toLowerCase();
+  if (
+    provider === "codex" ||
+    provider === "claude" ||
+    provider === "opencode" ||
+    provider === "manual" ||
+    provider === "custom"
+  ) {
+    return provider;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be codex, claude, opencode, manual, or custom`,
+  );
 }
 
 function validateProjectMcpAgentTarget(
@@ -2394,6 +2799,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const skills = validateProjectSkillsConfig(record.skills);
   const plugins = validateProjectPluginsConfig(record.plugins);
   const mcp = validateProjectMcpConfig(record.mcp);
+  const agentTargets = validateProjectAgentTargetsConfig(record.agentTargets);
   const hosting = validateProjectHostingConfig(record.hosting);
   const automation = validateNexusAutomationConfig(record.automation);
   const hosts = validateProjectHostsConfig(record.hosts);
@@ -2422,6 +2828,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     components,
     ...(extensions ? { extensions } : {}),
     ...(agent ? { agent } : {}),
+    ...(agentTargets ? { agentTargets } : {}),
     ...(mcp ? { mcp } : {}),
     ...(skills ? { skills } : {}),
     ...(plugins ? { plugins } : {}),
