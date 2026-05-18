@@ -71,10 +71,18 @@ function writeHome(root: string, authProfiles: unknown[] = []) {
   );
 }
 
+function initGitRepository(cwd: string) {
+  childProcess.execFileSync(
+    "git",
+    ["-c", "init.defaultBranch=main", "init"],
+    { cwd },
+  );
+}
+
 function createComponentGitCheckout(projectRoot: string) {
   const componentRoot = path.join(projectRoot, "components", "DevNexus");
   fs.mkdirSync(componentRoot, { recursive: true });
-  childProcess.execFileSync("git", ["init"], { cwd: componentRoot });
+  initGitRepository(componentRoot);
   childProcess.execFileSync(
     "git",
     ["remote", "add", "origin", "git@github.com:Evref-BL/DevNexus.git"],
@@ -397,7 +405,7 @@ describe("nexus setup assistant", () => {
         },
       },
     });
-    childProcess.execFileSync("git", ["init"], { cwd: projectRoot });
+    initGitRepository(projectRoot);
     childProcess.execFileSync(
       "git",
       ["remote", "add", "origin", "git@github.com:WrongOrg/mac-demo.git"],
@@ -502,7 +510,7 @@ describe("nexus setup assistant", () => {
 
     fs.rmSync(componentRoot, { recursive: true, force: true });
     fs.mkdirSync(componentRoot, { recursive: true });
-    childProcess.execFileSync("git", ["init"], { cwd: componentRoot });
+    initGitRepository(componentRoot);
     childProcess.execFileSync(
       "git",
       ["remote", "add", "origin", "git@github.com:WrongOrg/DevNexus.git"],

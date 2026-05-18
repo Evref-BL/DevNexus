@@ -294,11 +294,9 @@ export function buildNexusSetupCheck(options: {
 
   if (projectConfig) {
     for (const component of projectConfig.components) {
-      const sourceRootPlan = componentSetupSourceRoot(
+      const sourceRootPlan = componentCheckSourceRoot(
         component,
-        platform,
         projectRoot,
-        projectConfig,
       );
 
       checks.push(pathCheck({
@@ -1954,25 +1952,11 @@ function planProjectRootPath(
   projectConfig: NexusProjectConfig,
   platform: NexusSetupPlatform,
 ): string {
-  if (!isPathIncompatibleWithPlatform(projectRoot, platform)) {
-    return projectRoot;
-  }
-
   if (platform === "windows") {
     return `$env:USERPROFILE\\dev-nexus\\${projectConfig.id}`;
   }
 
   return `$HOME/dev-nexus/${projectConfig.id}`;
-}
-
-function componentResolutionProjectRoot(
-  projectRoot: string,
-  projectConfig: NexusProjectConfig,
-  platform: NexusSetupPlatform,
-): string {
-  return isPathIncompatibleWithPlatform(projectRoot, platform)
-    ? planProjectRootPath(projectRoot, projectConfig, platform)
-    : projectRoot;
 }
 
 function componentPlanSourceRoot(
@@ -1981,25 +1965,38 @@ function componentPlanSourceRoot(
   projectRoot: string,
   projectConfig: NexusProjectConfig,
 ): string {
-  return componentSetupSourceRoot(component, platform, projectRoot, projectConfig).path;
-}
-
-function componentSetupSourceRoot(
-  component: NexusProjectConfig["components"][number],
-  platform: NexusSetupPlatform,
-  projectRoot: string,
-  projectConfig: NexusProjectConfig,
-): { path: string; reason: string } {
-  const resolutionRoot = componentResolutionProjectRoot(
-    projectRoot,
-    projectConfig,
-    platform,
-  );
-  const projectLocalPath = componentProjectLocalSourceRoot(
+  return componentSetupSourceRoot({
     component,
     platform,
+    projectRoot: planProjectRootPath(projectRoot, projectConfig, platform),
+    pathPlatform: platform,
+  }).path;
+}
+
+function componentCheckSourceRoot(
+  component: NexusProjectConfig["components"][number],
+  projectRoot: string,
+): { path: string; reason: string } {
+  const hostPlatform = currentSetupPlatform();
+  return componentSetupSourceRoot({
+    component,
+    platform: hostPlatform,
     projectRoot,
-    projectConfig,
+    pathPlatform: hostPlatform,
+  });
+}
+
+function componentSetupSourceRoot(options: {
+  component: NexusProjectConfig["components"][number];
+  platform: NexusSetupPlatform;
+  projectRoot: string;
+  pathPlatform: NexusSetupPlatform;
+}): { path: string; reason: string } {
+  const { component, platform, projectRoot, pathPlatform } = options;
+  const projectLocalPath = componentProjectLocalSourceRoot(
+    component,
+    pathPlatform,
+    projectRoot,
   );
 
   if (!component.sourceRoot) {
@@ -2011,9 +2008,9 @@ function componentSetupSourceRoot(
   }
 
   const analysis = analyzeNexusProjectPath({
-    projectRoot: resolutionRoot,
+    projectRoot,
     value: component.sourceRoot,
-    platform,
+    platform: pathPlatform,
   });
   if (analysis.compatible) {
     return {
@@ -2033,10 +2030,9 @@ function componentProjectLocalSourceRoot(
   component: NexusProjectConfig["components"][number],
   platform: NexusSetupPlatform,
   projectRoot: string,
-  projectConfig: NexusProjectConfig,
 ): string {
   return resolveNexusProjectPath({
-    projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
+    projectRoot,
     value: `componentsRoot:${component.id}`,
     platform,
   });
@@ -2053,27 +2049,8 @@ function makeDirectoryCommand(
   return `mkdir -p ${shellPathPlaceholder(directoryPath)}`;
 }
 
-function isPathIncompatibleWithPlatform(
-  value: string,
-  platform: NexusSetupPlatform,
-): boolean {
-  if (platform === "auto") {
-    return false;
-  }
-
-  if (platform === "windows") {
-    return isPosixAbsolutePath(value);
-  }
-
-  return isWindowsAbsolutePath(value);
-}
-
 function isWindowsAbsolutePath(value: string): boolean {
   return /^[A-Za-z]:[\\/]/u.test(value);
-}
-
-function isPosixAbsolutePath(value: string): boolean {
-  return value.startsWith("/");
 }
 
 function componentCloneCommands(
