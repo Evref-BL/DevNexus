@@ -7,6 +7,7 @@ import {
   callDevNexusMcpTool,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
+  defaultLocalWorkTrackingStorePath,
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
   listMcpInputSchemaProviderIssues,
@@ -880,6 +881,46 @@ describe("DevNexus MCP server", () => {
           },
         ],
       },
+    });
+  });
+
+  it("returns coordination integration tracker diagnostics through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-61");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const storePath = defaultLocalWorkTrackingStorePath(projectRoot);
+    fs.mkdirSync(path.dirname(storePath), { recursive: true });
+    fs.writeFileSync(storePath, "{ malformed local tracker store\n", "utf8");
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_integrate",
+        {
+          projectRoot,
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-16T10:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          kind: "coordination_tracker_read_failure",
+          componentId: "primary",
+          trackerId: "default",
+          provider: "local",
+          storePath: path.resolve(storePath),
+          operation: "readCoordinationHandoffs",
+          stage: "parse",
+        },
+      ],
     });
   });
 

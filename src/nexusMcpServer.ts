@@ -52,6 +52,7 @@ import {
   createNexusCoordinationHandoff,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
+  nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
 } from "./nexusCoordination.js";
 import {
@@ -1004,7 +1005,7 @@ export async function callDevNexusMcpTool(
     return toolResult(
       {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        ...nexusCoordinationErrorPayload(error),
       },
       true,
     );

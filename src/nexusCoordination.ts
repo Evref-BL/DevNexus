@@ -22,8 +22,10 @@ import {
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
 import {
+  LocalWorkTrackerProviderError,
   loadLocalWorkTrackingStore,
   resolveLocalWorkTrackingStorePath,
+  type LocalWorkTrackingStoreDiagnostic,
 } from "./workTrackingLocalProvider.js";
 import type {
   LocalWorkTrackingConfig,
@@ -97,7 +99,59 @@ export interface NexusCoordinationHandoffCollection {
   available: boolean;
   provider: string | null;
   records: NexusCoordinationHandoffSummary[];
+  diagnostics: NexusCoordinationDiagnostic[];
   warnings: string[];
+}
+
+export type NexusCoordinationDiagnosticSeverity = "error" | "warning";
+
+export interface NexusCoordinationDiagnosticBase {
+  severity: NexusCoordinationDiagnosticSeverity;
+  componentId: string;
+  trackerId: string | null;
+  provider: string | null;
+  storePath: string | null;
+  operation: string;
+  stage: string;
+  workItemId: string | null;
+  commentId: string | null;
+  recovery: string;
+  cause: string;
+  message: string;
+}
+
+export interface NexusCoordinationTrackerReadDiagnostic
+  extends NexusCoordinationDiagnosticBase {
+  kind: "coordination_tracker_read_failure";
+  severity: "error";
+  localStorePath: string | null;
+}
+
+export interface NexusCoordinationHandoffCommentDiagnostic
+  extends NexusCoordinationDiagnosticBase {
+  kind: "coordination_handoff_comment_malformed";
+  severity: "warning";
+}
+
+export type NexusCoordinationDiagnostic =
+  | NexusCoordinationTrackerReadDiagnostic
+  | NexusCoordinationHandoffCommentDiagnostic;
+
+export class NexusCoordinationTrackerReadError extends Error {
+  readonly diagnostic: NexusCoordinationTrackerReadDiagnostic;
+
+  constructor(
+    message: string,
+    diagnostic: NexusCoordinationTrackerReadDiagnostic,
+    options: { cause?: unknown } = {},
+  ) {
+    super(message);
+    this.name = "NexusCoordinationTrackerReadError";
+    this.diagnostic = diagnostic;
+    if (options.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
 }
 
 export type NexusCoordinationIntegrationScope =
@@ -186,6 +240,7 @@ export interface NexusCoordinationIntegrationPlan {
     activeCount: number;
     staleCount: number;
     records: NexusCoordinationHandoffSummary[];
+    diagnostics: NexusCoordinationDiagnostic[];
     warnings: string[];
   };
   branches: NexusCoordinationIntegrationBranchPlan[];
@@ -448,6 +503,7 @@ export async function getNexusCoordinationIntegrationPlan(
       ).length,
       staleCount: relatedRecords.filter((record) => record.stale).length,
       records: relatedRecords,
+      diagnostics: handoffCollection.diagnostics,
       warnings: handoffCollection.warnings,
     },
     branches,
@@ -468,6 +524,27 @@ export function parseNexusCoordinationHandoffStatus(
   }
 
   throw new Error(`${pathName} must be working, ready, blocked, or merged`);
+}
+
+export function nexusCoordinationDiagnosticsFromError(
+  error: unknown,
+): NexusCoordinationDiagnostic[] {
+  if (error instanceof NexusCoordinationTrackerReadError) {
+    return [error.diagnostic];
+  }
+
+  return [];
+}
+
+export function nexusCoordinationErrorPayload(error: unknown): {
+  error: string;
+  diagnostics?: NexusCoordinationDiagnostic[];
+} {
+  const diagnostics = nexusCoordinationDiagnosticsFromError(error);
+  return {
+    error: error instanceof Error ? error.message : String(error),
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
+  };
 }
 
 export function formatCoordinationHandoffComment(
@@ -1323,6 +1400,7 @@ function readCoordinationHandoffs(options: {
       available: false,
       provider,
       records: [],
+      diagnostics: [],
       warnings: [
         "Related handoffs cannot be read because the configured provider does not expose comments through DevNexus core.",
       ],
@@ -1335,11 +1413,25 @@ function readCoordinationHandoffs(options: {
     options.context.projectRoot,
     workTracking,
   );
-  const store = loadLocalWorkTrackingStore(
-    storePath,
-    undefined,
-    "readCoordinationHandoffs",
-  );
+  let store: ReturnType<typeof loadLocalWorkTrackingStore>;
+  try {
+    store = loadLocalWorkTrackingStore(
+      storePath,
+      undefined,
+      "readCoordinationHandoffs",
+    );
+  } catch (error) {
+    const diagnostic = coordinationTrackerReadDiagnostic({
+      context: options.context,
+      storePath,
+      error,
+    });
+    throw new NexusCoordinationTrackerReadError(
+      diagnostic.message,
+      diagnostic,
+      { cause: error },
+    );
+  }
   const comments = options.workItemId
     ? (store.comments[options.workItemId] ?? []).map((comment) => ({
         workItemId: options.workItemId!,
@@ -1350,19 +1442,29 @@ function readCoordinationHandoffs(options: {
       );
   const nowMs = Date.parse(options.now);
   const warnings: string[] = [];
-  const records = comments
-    .map(({ workItemId, comment }) =>
-      handoffSummaryFromComment({
+  const diagnostics: NexusCoordinationDiagnostic[] = [];
+  const records: NexusCoordinationHandoffSummary[] = [];
+  for (const { workItemId, comment } of comments) {
+    const result = handoffSummaryFromComment({
         comment,
         fallbackWorkItemId: workItemId,
         projectId: options.context.projectConfig.id,
         componentId: options.context.component.id,
+        trackerId: options.context.component.defaultTrackerId,
+        provider,
+        storePath,
         nowMs,
         maxHandoffAgeMs: options.maxHandoffAgeMs,
-      }),
-    )
-    .filter((record): record is NexusCoordinationHandoffSummary => Boolean(record))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      });
+    if (result.record) {
+      records.push(result.record);
+    }
+    if (result.diagnostic) {
+      diagnostics.push(result.diagnostic);
+      warnings.push(malformedHandoffWarning(result.diagnostic));
+    }
+  }
+  records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   for (const record of records) {
     if (record.stale) {
@@ -1376,6 +1478,7 @@ function readCoordinationHandoffs(options: {
     available: true,
     provider,
     records,
+    diagnostics,
     warnings,
   };
 }
@@ -1385,18 +1488,38 @@ function handoffSummaryFromComment(options: {
   fallbackWorkItemId: string;
   projectId: string;
   componentId: string;
+  trackerId: string | null;
+  provider: string | null;
+  storePath: string;
   nowMs: number;
   maxHandoffAgeMs: number;
-}): NexusCoordinationHandoffSummary | null {
-  const record = parseCoordinationHandoffComment(options.comment.body);
-  if (!record) {
-    return null;
+}): {
+  record: NexusCoordinationHandoffSummary | null;
+  diagnostic: NexusCoordinationHandoffCommentDiagnostic | null;
+} {
+  const parsed = parseCoordinationHandoffComment(options.comment.body);
+  if (!parsed.record) {
+    return {
+      record: null,
+      diagnostic: parsed.diagnostic
+        ? coordinationHandoffCommentDiagnostic({
+            componentId: options.componentId,
+            trackerId: options.trackerId,
+            provider: options.provider,
+            storePath: options.storePath,
+            workItemId: options.fallbackWorkItemId,
+            comment: options.comment,
+            diagnostic: parsed.diagnostic,
+          })
+        : null,
+    };
   }
+  const record = parsed.record;
   if (
     record.projectId !== options.projectId ||
     record.componentId !== options.componentId
   ) {
-    return null;
+    return { record: null, diagnostic: null };
   }
 
   const createdMs = Date.parse(record.createdAt);
@@ -1406,35 +1529,161 @@ function handoffSummaryFromComment(options: {
       : null;
 
   return {
-    ...record,
-    workItemId: record.workItemId || options.fallbackWorkItemId,
-    commentId: options.comment.id ?? null,
-    commentCreatedAt: options.comment.createdAt ?? null,
-    stale:
-      ageMs !== null && options.maxHandoffAgeMs >= 0
-        ? ageMs > options.maxHandoffAgeMs
-        : false,
-    ageMs,
+    record: {
+      ...record,
+      workItemId: record.workItemId || options.fallbackWorkItemId,
+      commentId: options.comment.id ?? null,
+      commentCreatedAt: options.comment.createdAt ?? null,
+      stale:
+        ageMs !== null && options.maxHandoffAgeMs >= 0
+          ? ageMs > options.maxHandoffAgeMs
+          : false,
+      ageMs,
+    },
+    diagnostic: null,
   };
 }
 
 function parseCoordinationHandoffComment(
   body: string,
-): NexusCoordinationHandoffRecord | null {
+): {
+  record: NexusCoordinationHandoffRecord | null;
+  diagnostic: { stage: string; message: string; cause: string } | null;
+} {
   if (!body.includes(coordinationHandoffCommentMarker)) {
-    return null;
+    return { record: null, diagnostic: null };
   }
 
   const match = /```json\s*([\s\S]*?)```/u.exec(body);
   if (!match) {
-    return null;
+    return {
+      record: null,
+      diagnostic: {
+        stage: "handoff_comment_json_block",
+        message:
+          "Coordination handoff marker is present but no JSON code block was found.",
+        cause: "missing JSON code block",
+      },
+    };
   }
 
   try {
-    return handoffRecordFromUnknown(JSON.parse(match[1]!));
-  } catch {
-    return null;
+    const record = handoffRecordFromUnknown(JSON.parse(match[1]!));
+    return record
+      ? { record, diagnostic: null }
+      : {
+          record: null,
+          diagnostic: {
+            stage: "handoff_comment_record",
+            message:
+              "Coordination handoff JSON block is not a valid version 1 DevNexus handoff record.",
+            cause: "invalid handoff record",
+          },
+        };
+  } catch (error) {
+    return {
+      record: null,
+      diagnostic: {
+        stage:
+          error instanceof SyntaxError
+            ? "handoff_comment_json_parse"
+            : "handoff_comment_record",
+        message: `Coordination handoff comment could not be parsed: ${errorDetail(error)}`,
+        cause: errorDetail(error),
+      },
+    };
   }
+}
+
+function coordinationTrackerReadDiagnostic(options: {
+  context: ResolvedCoordinationContext;
+  storePath: string;
+  error: unknown;
+}): NexusCoordinationTrackerReadDiagnostic {
+  const localDiagnostic = localWorkTrackingDiagnostic(options.error);
+  const stage = localDiagnostic?.stage ?? "read";
+  const operation = localDiagnostic?.operation ?? "readCoordinationHandoffs";
+  const storePath = localDiagnostic?.storePath ?? path.resolve(options.storePath);
+  const trackerId = options.context.component.defaultTrackerId;
+  const provider = options.context.component.workTracking?.provider ?? null;
+  const componentId = options.context.component.id;
+  const message =
+    `Coordination handoff read failed for component "${componentId}" ` +
+    `tracker "${trackerId ?? "default"}" provider "${provider ?? "unknown"}" ` +
+    `at ${storePath} during ${operation} (${stage}).`;
+
+  return {
+    kind: "coordination_tracker_read_failure",
+    severity: "error",
+    componentId,
+    trackerId,
+    provider,
+    storePath,
+    localStorePath: provider === "local" ? storePath : null,
+    operation,
+    stage,
+    workItemId: options.context.workItemId ?? null,
+    commentId: null,
+    recovery:
+      localDiagnostic?.recovery ??
+      "Repair the configured work tracker state, then retry coordination integrate.",
+    cause: localDiagnostic?.cause ?? errorDetail(options.error),
+    message,
+  };
+}
+
+function localWorkTrackingDiagnostic(
+  error: unknown,
+): LocalWorkTrackingStoreDiagnostic | null {
+  if (error instanceof LocalWorkTrackerProviderError) {
+    return error.diagnostic ?? null;
+  }
+
+  return null;
+}
+
+function coordinationHandoffCommentDiagnostic(options: {
+  componentId: string;
+  trackerId: string | null;
+  provider: string | null;
+  storePath: string;
+  workItemId: string;
+  comment: WorkComment;
+  diagnostic: { stage: string; message: string; cause: string };
+}): NexusCoordinationHandoffCommentDiagnostic {
+  return {
+    kind: "coordination_handoff_comment_malformed",
+    severity: "warning",
+    componentId: options.componentId,
+    trackerId: options.trackerId,
+    provider: options.provider,
+    storePath: path.resolve(options.storePath),
+    operation: "readCoordinationHandoffs",
+    stage: options.diagnostic.stage,
+    workItemId: options.workItemId,
+    commentId: options.comment.id ?? null,
+    recovery:
+      "Edit or remove the malformed DevNexus coordination handoff comment; valid handoffs from other comments are still considered.",
+    cause: options.diagnostic.cause,
+    message: options.diagnostic.message,
+  };
+}
+
+function malformedHandoffWarning(
+  diagnostic: NexusCoordinationHandoffCommentDiagnostic,
+): string {
+  return (
+    `Skipped malformed coordination handoff comment ` +
+    `${diagnostic.commentId ?? "unknown"} on ${diagnostic.workItemId ?? "unknown"} ` +
+    `for component "${diagnostic.componentId}" during ${diagnostic.stage}: ` +
+    diagnostic.message
+  );
+}
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error
+    ? `${error.name}: ${error.message}`
+    : String(error);
 }
 
 function handoffRecordFromUnknown(

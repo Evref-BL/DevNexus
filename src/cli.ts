@@ -72,6 +72,7 @@ import {
   createNexusCoordinationHandoff,
   getNexusCoordinationIntegrationPlan,
   getNexusCoordinationStatus,
+  nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
   type NexusCoordinationHandoffResult,
   type NexusCoordinationHandoffStatus,
@@ -1078,22 +1079,32 @@ async function handleCoordinationCommand(
 
   if (command === "integrate") {
     const parsed = parseCoordinationIntegrateCommand(argv);
-    const plan = await getNexusCoordinationIntegrationPlan({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      workItemId: parsed.workItemId,
-      targetBranch: parsed.targetBranch,
-      fetch: parsed.fetch,
-      currentPath: parsed.currentPath ?? process.cwd(),
-      gitRunner: dependencies.gitRunner,
-      now: dependencies.now,
-    });
-    printCoordinationIntegrationPlan(
-      plan,
-      parsed,
-      dependencies.stdout ?? process.stdout,
-    );
-    return 0;
+    try {
+      const plan = await getNexusCoordinationIntegrationPlan({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        workItemId: parsed.workItemId,
+        targetBranch: parsed.targetBranch,
+        fetch: parsed.fetch,
+        currentPath: parsed.currentPath ?? process.cwd(),
+        gitRunner: dependencies.gitRunner,
+        now: dependencies.now,
+      });
+      printCoordinationIntegrationPlan(
+        plan,
+        parsed,
+        dependencies.stdout ?? process.stdout,
+      );
+      return 0;
+    } catch (error) {
+      printCoordinationIntegrationError(
+        error,
+        parsed,
+        dependencies.stdout ?? process.stdout,
+        dependencies.stderr ?? process.stderr,
+      );
+      return 1;
+    }
   }
 
   if (command === "request") {
@@ -3791,6 +3802,34 @@ function printCoordinationIntegrationPlan(
     }
   }
   writeLine(stdout, `  Next action: ${plan.nextAction}`);
+}
+
+function printCoordinationIntegrationError(
+  error: unknown,
+  parsed: ParsedCoordinationIntegrateCommand,
+  stdout: TextWriter,
+  stderr: TextWriter,
+): void {
+  const payload = { ok: false, ...nexusCoordinationErrorPayload(error) };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stderr, payload.error);
+  for (const diagnostic of payload.diagnostics ?? []) {
+    writeLine(
+      stderr,
+      `  Component: ${diagnostic.componentId}; tracker: ${
+        diagnostic.trackerId ?? "default"
+      }; provider: ${diagnostic.provider ?? "unknown"}`,
+    );
+    if (diagnostic.storePath) {
+      writeLine(stderr, `  Store: ${diagnostic.storePath}`);
+    }
+    writeLine(stderr, `  Stage: ${diagnostic.operation}/${diagnostic.stage}`);
+    writeLine(stderr, `  Recovery: ${diagnostic.recovery}`);
+  }
 }
 
 function printCoordinationRequestResult(

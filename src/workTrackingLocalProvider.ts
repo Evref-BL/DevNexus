@@ -48,10 +48,35 @@ export interface LocalWorkTrackerProviderOptions {
   now?: () => Date | string;
 }
 
+export type LocalWorkTrackingStoreFailureStage =
+  | "lock"
+  | "read"
+  | "parse"
+  | "validate"
+  | "write";
+
+export interface LocalWorkTrackingStoreDiagnostic {
+  provider: "local";
+  storePath: string;
+  operation: string;
+  stage: LocalWorkTrackingStoreFailureStage;
+  recovery: string;
+  cause: string;
+}
+
 export class LocalWorkTrackerProviderError extends Error {
-  constructor(message: string, options: { cause?: unknown } = {}) {
+  readonly diagnostic?: LocalWorkTrackingStoreDiagnostic;
+
+  constructor(
+    message: string,
+    options: {
+      cause?: unknown;
+      diagnostic?: LocalWorkTrackingStoreDiagnostic;
+    } = {},
+  ) {
     super(message);
     this.name = "LocalWorkTrackerProviderError";
+    this.diagnostic = options.diagnostic;
     if (options.cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = options.cause;
     }
@@ -364,13 +389,25 @@ export function loadLocalWorkTrackingStore(
     return emptyStore(timestamp);
   }
 
+  let text: string;
+  try {
+    text = fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, "");
+  } catch (error) {
+    throw localStoreReadError(storePath, operation, error);
+  }
+
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, ""));
+    raw = JSON.parse(text);
   } catch (error) {
     throw localStoreParseError(storePath, operation, error);
   }
-  return validateStore(raw);
+
+  try {
+    return validateStore(raw);
+  } catch (error) {
+    throw localStoreValidateError(storePath, operation, error);
+  }
 }
 
 export function saveLocalWorkTrackingStore(
@@ -501,9 +538,46 @@ function localStoreParseError(
   operation: string,
   error: unknown,
 ): LocalWorkTrackerProviderError {
+  const recovery =
+    "Repair the JSON store or restore it from backup before retrying.";
   return new LocalWorkTrackerProviderError(
-    `Failed to parse local work item store at ${path.resolve(storePath)} during ${operation}. DevNexus did not write changes to this store. Recovery: repair the JSON store or restore it from backup before retrying. Original error: ${errorDetail(error)}`,
-    { cause: error },
+    `Failed to parse local work item store at ${path.resolve(storePath)} during ${operation}. DevNexus did not write changes to this store. Recovery: ${recovery} Original error: ${errorDetail(error)}`,
+    {
+      cause: error,
+      diagnostic: localStoreDiagnostic(storePath, operation, "parse", recovery, error),
+    },
+  );
+}
+
+function localStoreReadError(
+  storePath: string,
+  operation: string,
+  error: unknown,
+): LocalWorkTrackerProviderError {
+  const recovery =
+    "Verify the store path exists and is readable, then retry.";
+  return new LocalWorkTrackerProviderError(
+    `Failed to read local work item store at ${path.resolve(storePath)} during ${operation}. Recovery: ${recovery} Original error: ${errorDetail(error)}`,
+    {
+      cause: error,
+      diagnostic: localStoreDiagnostic(storePath, operation, "read", recovery, error),
+    },
+  );
+}
+
+function localStoreValidateError(
+  storePath: string,
+  operation: string,
+  error: unknown,
+): LocalWorkTrackerProviderError {
+  const recovery =
+    "Repair the local work item store schema or restore it from backup before retrying.";
+  return new LocalWorkTrackerProviderError(
+    `Failed to validate local work item store at ${path.resolve(storePath)} during ${operation}. Recovery: ${recovery} Original error: ${errorDetail(error)}`,
+    {
+      cause: error,
+      diagnostic: localStoreDiagnostic(storePath, operation, "validate", recovery, error),
+    },
   );
 }
 
@@ -512,10 +586,32 @@ function localStoreWriteError(
   operation: string,
   error: unknown,
 ): LocalWorkTrackerProviderError {
+  const recovery =
+    "Verify filesystem permissions and free space, then retry.";
   return new LocalWorkTrackerProviderError(
-    `Failed to write local work item store at ${path.resolve(storePath)} during ${operation}. Recovery: verify filesystem permissions and free space, then retry. Original error: ${errorDetail(error)}`,
-    { cause: error },
+    `Failed to write local work item store at ${path.resolve(storePath)} during ${operation}. Recovery: ${recovery} Original error: ${errorDetail(error)}`,
+    {
+      cause: error,
+      diagnostic: localStoreDiagnostic(storePath, operation, "write", recovery, error),
+    },
   );
+}
+
+function localStoreDiagnostic(
+  storePath: string,
+  operation: string,
+  stage: LocalWorkTrackingStoreFailureStage,
+  recovery: string,
+  error: unknown,
+): LocalWorkTrackingStoreDiagnostic {
+  return {
+    provider: "local",
+    storePath: path.resolve(storePath),
+    operation,
+    stage,
+    recovery,
+    cause: errorDetail(error),
+  };
 }
 
 function errorDetail(error: unknown): string {

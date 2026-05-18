@@ -1259,6 +1259,169 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("returns actionable JSON when coordination integration cannot parse a local tracker store", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-61");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const storePath = defaultLocalWorkTrackingStorePath(projectRoot);
+    fs.mkdirSync(path.dirname(storePath), { recursive: true });
+    fs.writeFileSync(storePath, "{ malformed local tracker store\n", "utf8");
+    const output = captureOutput();
+    const gitRunner = fakeCoordinationIntegrationGitRunner(worktreePath);
+
+    const exitCode = await main(
+      [
+        "coordination",
+        "integrate",
+        projectRoot,
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-17T10:15:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(exitCode).toBe(1);
+    expect(payload).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          kind: "coordination_tracker_read_failure",
+          severity: "error",
+          componentId: "primary",
+          trackerId: "default",
+          provider: "local",
+          storePath: path.resolve(storePath),
+          localStorePath: path.resolve(storePath),
+          operation: "readCoordinationHandoffs",
+          stage: "parse",
+          workItemId: null,
+          commentId: null,
+        },
+      ],
+    });
+    expect(payload.error).toContain("Coordination handoff read failed");
+    expect(payload.diagnostics[0].message).toContain("component \"primary\"");
+    expect(payload.diagnostics[0].message).toContain("tracker \"default\"");
+    expect(payload.diagnostics[0].message).toContain("provider \"local\"");
+    expect(payload.diagnostics[0].message).toContain(path.resolve(storePath));
+    expect(payload.diagnostics[0].recovery).toContain("Repair the JSON store");
+    expect(payload.diagnostics[0].cause).toContain("SyntaxError");
+  });
+
+  it("reports malformed handoff comments without hiding valid coordination handoffs", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-61");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock(
+        "2026-05-16T09:00:00.000Z",
+        "2026-05-16T09:05:00.000Z",
+        "2026-05-16T09:10:00.000Z",
+      ),
+    });
+    const validItem = await tracker.createWorkItem({
+      title: "Valid handoff",
+      status: "in_progress",
+    });
+    const malformedItem = await tracker.createWorkItem({
+      title: "Malformed handoff",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+    const gitRunner = fakeCoordinationIntegrationGitRunner(worktreePath);
+
+    await main(
+      [
+        "coordination",
+        "handoff",
+        projectRoot,
+        validItem.id,
+        "--status",
+        "ready",
+        "--changed-area",
+        "src/nexusCoordination.ts",
+        "--decision",
+        "Keep integration planning read-only.",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: captureOutput().writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:05:00.000Z"),
+    }).addComment(
+      { id: malformedItem.id },
+      "DevNexus coordination handoff\n\n```json\n{ malformed handoff\n```",
+    );
+    await main(
+      [
+        "coordination",
+        "integrate",
+        projectRoot,
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-16T10:15:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      plan: {
+        handoffs: {
+          totalCount: 1,
+          diagnostics: [
+            {
+              kind: "coordination_handoff_comment_malformed",
+              severity: "warning",
+              componentId: "primary",
+              trackerId: "default",
+              provider: "local",
+              workItemId: malformedItem.id,
+              commentId: "local-comment-2",
+              operation: "readCoordinationHandoffs",
+              stage: "handoff_comment_json_parse",
+            },
+          ],
+        },
+        branches: [
+          {
+            workItemId: validItem.id,
+            branch: "codex/shared-coordination",
+            merge: {
+              status: "clean",
+            },
+          },
+        ],
+      },
+    });
+    expect(payload.plan.handoffs.warnings[0]).toContain("local-comment-2");
+    expect(payload.plan.handoffs.warnings[0]).toContain(malformedItem.id);
+    expect(payload.plan.warnings[0]).toContain("local-comment-2");
+  });
+
   it("prints read-only automation status", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
