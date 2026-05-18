@@ -1181,6 +1181,367 @@ describe("project hosting", () => {
     expect(result.finalPlan?.actions).toEqual([]);
   });
 
+  it("repairs missing and insufficient collaborator access through the provider", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "allow_pending",
+        },
+        {
+          kind: "machine_user",
+          providerIdentity: "example-bot",
+          role: "automation",
+          requiredPermission: "write",
+          authProfile: "bot-github",
+          invitationPolicy: "require_accepted",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: true,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    const accessState = new Map<string, NexusProjectHostingProviderAccessRecord>([
+      ["human:alice", { effectivePermission: null }],
+      ["machine_user:example-bot", { effectivePermission: "read" }],
+    ]);
+    const repairInputs: unknown[] = [];
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async getAccess(input) {
+        return (
+          accessState.get(
+            `${input.principal.kind}:${input.principal.providerIdentity}`.toLowerCase(),
+          ) ?? { effectivePermission: null }
+        );
+      },
+      async repairAccess(input) {
+        repairInputs.push(input);
+        const key =
+          `${input.principal.kind}:${input.principal.providerIdentity}`.toLowerCase();
+        const access = {
+          effectivePermission: input.requiredPermission,
+        };
+        accessState.set(key, access);
+        return {
+          status: input.operation === "update" ? "updated" : "invited",
+          access,
+        };
+      },
+    };
+    const initialStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    const result = await applyNexusProjectHosting({
+      hosting: config,
+      status: initialStatus,
+      authProfiles,
+      provider: hostingProvider,
+      refreshStatus: () =>
+        statusNexusProjectHosting({
+          project,
+          hosting: config,
+          authProfiles,
+          provider: hostingProvider,
+        }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(
+      result.actions.map((action) => [
+        action.actionId,
+        action.kind,
+        action.disposition,
+        action.providerResult?.status,
+      ]),
+    ).toEqual([
+      [
+        "access:human:alice:invite",
+        "invite_collaborator",
+        "applied",
+        "invited",
+      ],
+      [
+        "access:machine_user:example-bot:update",
+        "update_collaborator_permission",
+        "applied",
+        "updated",
+      ],
+    ]);
+    expect(repairInputs).toEqual([
+      expect.objectContaining({
+        namespace: "ExampleOrg",
+        repositoryName: "example-suite-meta",
+        operation: "invite",
+        requiredPermission: "admin",
+        principal: expect.objectContaining({
+          kind: "human",
+          providerIdentity: "alice",
+        }),
+        mutationAuthProfile: expect.objectContaining({ id: "bot-github" }),
+      }),
+      expect.objectContaining({
+        operation: "update",
+        requiredPermission: "write",
+        principal: expect.objectContaining({
+          kind: "machine_user",
+          providerIdentity: "example-bot",
+        }),
+        mutationAuthProfile: expect.objectContaining({ id: "bot-github" }),
+      }),
+    ]);
+    expect(result.finalStatus?.access.map((access) => access.status)).toEqual([
+      "satisfied",
+      "satisfied",
+    ]);
+    expect(result.finalPlan?.actions).toEqual([]);
+
+    const rerun = await applyNexusProjectHosting({
+      hosting: config,
+      status: result.finalStatus!,
+      authProfiles,
+      provider: hostingProvider,
+    });
+    expect(rerun).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [],
+    });
+    expect(repairInputs).toHaveLength(2);
+  });
+
+  it("blocks access repair before provider mutation when auth is missing or mismatched", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "require_accepted",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: true,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let repairCalls = 0;
+    const baseProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAccess() {
+        return {
+          effectivePermission: null,
+        };
+      },
+      async repairAccess() {
+        repairCalls += 1;
+        return {
+          status: "invited",
+        };
+      },
+    };
+
+    const missingAuthStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      provider: baseProvider,
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: missingAuthStatus,
+        provider: baseProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:invite",
+          disposition: "blocked",
+          reason:
+            "Skipped access repair: host-local auth profile is missing: bot-github.",
+        },
+      ],
+    });
+
+    const wrongActorProvider: NexusProjectHostingProviderAdapter = {
+      ...baseProvider,
+      async getAuthenticatedAccount() {
+        return "mallory";
+      },
+    };
+    const wrongActorStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: wrongActorProvider,
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: wrongActorStatus,
+        authProfiles,
+        provider: wrongActorProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:invite",
+          disposition: "blocked",
+          reason:
+            "Skipped access repair: auth profile bot-github is authenticated as mallory; expected example-bot.",
+        },
+      ],
+    });
+    expect(repairCalls).toBe(0);
+  });
+
+  it("reports provider access repair blockers and unsupported principal kinds", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "deploy_key",
+          providerIdentity: "ci-read-key",
+          role: "automation",
+          requiredPermission: "read",
+          invitationPolicy: "require_accepted",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: true,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async getAccess() {
+        return {
+          effectivePermission: null,
+        };
+      },
+      async repairAccess() {
+        return {
+          status: "blocked",
+          code: "unsupported_principal_kind",
+          message:
+            "GitHub access repair for deploy_key principals is not supported by this adapter.",
+        };
+      },
+    };
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status,
+        authProfiles,
+        provider: hostingProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:deploy_key:ci-read-key:add",
+          disposition: "blocked",
+          providerResult: {
+            code: "unsupported_principal_kind",
+          },
+          reason:
+            "GitHub access repair for deploy_key principals is not supported by this adapter.",
+        },
+      ],
+    });
+  });
+
   it("blocks repository creation before provider mutation when auth is missing or mismatched", async () => {
     const config = hosting({
       provisioning: {

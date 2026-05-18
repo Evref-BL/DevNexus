@@ -189,7 +189,7 @@ const tools: McpTool[] = [
   },
   {
     name: "project_hosting_apply",
-    description: "Apply policy-gated local Git remote repairs from the DevNexus project hosting plan.",
+    description: "Apply policy-gated DevNexus project hosting repairs.",
     inputSchema: {
       type: "object",
       properties: {
