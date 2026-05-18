@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 112,
+  "nextNumber": 113,
   "nextCommentNumber": 174,
-  "updatedAt": "2026-05-18T13:34:31.535Z",
+  "updatedAt": "2026-05-18T13:56:06.795Z",
   "items": [
     {
       "id": "local-1",
@@ -2834,6 +2834,33 @@
         "itemId": "local-111",
         "itemNumber": 111
       }
+    },
+    {
+      "id": "local-112",
+      "title": "Reject plugin MCP tool overlap with DevNexus core tools",
+      "description": "Type: core guardrail slice\nReadiness: todo/dependent after DevNexus-Pharo default MCP overlap is removed\nDepends on: dev-nexus-pharo:local-18\nSource: user direction on 2026-05-18: plugins are additive and must not re-expose DevNexus core tools.\n\nGoal:\nAdd a generic DevNexus guardrail that detects plugin-projected MCP tool names overlapping DevNexus core MCP tools so future plugins cannot recreate a replacement/specialization surface accidentally.\n\nAcceptance criteria:\n- DevNexus has a generic additive-plugin validation or setup/status diagnostic for plugin MCP server capabilities whose declared tool names duplicate DevNexus core MCP tool names.\n- The diagnostic names the plugin id, server name, duplicate tool names, and replacement owner: use dev_nexus for generic DevNexus operations.\n- The guardrail is blocking for generated setup/status or project validation once current plugin surfaces are cleaned; there is no compatibility allow-list for old DevNexus-Pharo names.\n- Tests cover a clean additive plugin, a plugin duplicating work_item_list, a plugin duplicating project_status, and multiple plugin MCP servers.\n- Documentation states that plugin MCP servers are additive domain surfaces, not alternate generic DevNexus servers.\n\nBoundaries:\n- Keep DevNexus core generic; do not hardcode Pharo-specific plugin behavior.\n- Do not inspect live external MCP servers or run plugin commands; use declared capability metadata and the DevNexus core tool list.\n\nVerification:\n- Run focused DevNexus plugin capability/config/setup tests.\n- Run npm run check in DevNexus when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "plugins",
+        "mcp",
+        "guardrail",
+        "cleanup",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:56:06.795Z",
+      "updatedAt": "2026-05-18T13:56:06.795Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-112",
+        "itemNumber": 112
+      }
     }
   ],
   "comments": {
@@ -4922,6 +4949,7 @@
     "local-108": [],
     "local-109": [],
     "local-110": [],
-    "local-111": []
+    "local-111": [],
+    "local-112": []
   }
 }

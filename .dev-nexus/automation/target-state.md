@@ -77,6 +77,12 @@ and ready for coordinator-driven work across its components.
   land. Do not remove `.claude/skills` until stale-projection diagnostics and
   cleanup safety behavior are available, unless a separate manual cleanup is
   explicitly approved.
+- DevNexus-Pharo MCP/plugin cleanup has been re-sliced with an explicit
+  no-legacy/no-compatibility direction. Start with ready source deletions
+  `dev-nexus-pharo:local-15` through `local-17`; then complete dependent
+  cleanup `local-18` and `local-19`. Core guardrail work
+  `dev-nexus:local-112` should follow once DevNexus-Pharo has zero default
+  MCP tool overlap with `dev_nexus`.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
@@ -94,6 +100,10 @@ and ready for coordinator-driven work across its components.
 - Start agent-target projection work at `dev-nexus:local-105`; `local-111`
   is the dogfood Codex-only migration and should wait for active target
   filtering plus stale cleanup safety.
+- Start DevNexus-Pharo additive MCP cleanup at ready items
+  `dev-nexus-pharo:local-15`, `local-16`, and `local-17`. These supersede the
+  older deprecation/compatibility posture: remove obsolete wrappers and
+  delegated surfaces instead of preserving migration aliases.
 - Revisit `dev-nexus:local-51` after the sync execution shape from
   `dev-nexus:local-48` lands.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
