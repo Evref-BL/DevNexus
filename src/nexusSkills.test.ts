@@ -133,7 +133,7 @@ describe("nexus skills", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
     expect(skillIds).toEqual([
-      "use-devnexus",
+      "dev-nexus",
       "diagnose",
       "tdd",
       "handoff",
@@ -154,18 +154,18 @@ describe("nexus skills", () => {
         skill.files[nexusSkillMarkdownFileName],
       ]),
     );
-    expect(skillMarkdown["use-devnexus"]).toContain(
+    expect(skillMarkdown["dev-nexus"]).toContain(
       "Product Requirements Document (PRD)",
     );
-    expect(skillMarkdown["use-devnexus"]).toContain(
+    expect(skillMarkdown["dev-nexus"]).toContain(
       "Test-Driven Development (TDD)",
     );
-    expect(skillMarkdown["use-devnexus"]).toContain(
+    expect(skillMarkdown["dev-nexus"]).toContain(
       "component-qualified work-item ids",
     );
-    expect(skillMarkdown["use-devnexus"]).toContain("worktree_prepare");
-    expect(skillMarkdown["use-devnexus"]).toContain("project/meta worktree");
-    expect(skillMarkdown["use-devnexus"]).toContain("dependency_projection");
+    expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
+    expect(skillMarkdown["dev-nexus"]).toContain("project/meta worktree");
+    expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",

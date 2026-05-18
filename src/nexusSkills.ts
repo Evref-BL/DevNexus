@@ -201,11 +201,11 @@ function curatedCoreSkill(
 
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
-    "use-devnexus",
-    "use-devnexus",
+    "dev-nexus",
+    "dev-nexus",
     "DevNexus-managed project workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus project, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
     `
-# Use DevNexus
+# DevNexus
 
 Use this skill when working inside a DevNexus-managed project.
 
