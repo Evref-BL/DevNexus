@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 70,
-  "nextCommentNumber": 159,
-  "updatedAt": "2026-05-18T11:22:48.642Z",
+  "nextCommentNumber": 162,
+  "updatedAt": "2026-05-18T11:25:09.983Z",
   "items": [
     {
       "id": "local-1",
@@ -1179,9 +1179,10 @@
       "id": "local-48",
       "title": "Execute one-way local-to-GitHub work-item sync with mocked providers",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dry-run sync planning lands; live external writes remain policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add idempotent one-way sync execution for the first narrow provider path: local primary tracker to GitHub mirror or coordination tracker, covered by mocked provider tests.\n\nUser stories covered:\n- As a project maintainer, I can mirror selected local items to GitHub without duplicating issues on rerun.\n- As a worker, canonical local status can be reflected into an approved GitHub mirror when policy allows.\n\nAcceptance criteria:\n- Sync execution consumes a prior plan or rebuilds an equivalent plan immediately before mutation.\n- Execution can create missing target GitHub issues when policy and provider capabilities allow it.\n- Execution can update only configured fields owned by the source policy.\n- Created or updated target items are linked to the logical work item immediately and idempotently.\n- DevNexus-generated comments include stable markers or fingerprints to prevent duplicate/echo comments.\n- Execution records a sync run summary with created, updated, skipped, conflicted, and blocked counts plus provider links.\n- Live external writes require explicit provider write policy and configured auth identity; default tests use mocked providers only.\n\nDependencies:\n- Depends on `dev-nexus:local-47`.\n- Composes with `dev-nexus:local-38` publication identity guardrails and `dev-nexus:local-39` meta-project hosting config before live dogfood writes.\n\nBoundaries:\n- Do not implement unrestricted two-way sync.\n- Do not propagate deletes.\n- Do not enable live GitHub sync in the dogfood project without explicit policy approval.\n\nVerification:\n- Mocked GitHub/local provider execution tests for idempotent create, update, link, comment marker, skipped capability, and blocked policy cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
+        "dogfood",
         "work-tracking",
         "multi-tracker",
         "sync",
@@ -1192,7 +1193,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.018Z",
-      "updatedAt": "2026-05-17T13:59:51.018Z",
+      "updatedAt": "2026-05-18T11:25:09.503Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1666,8 +1667,8 @@
     {
       "id": "local-67",
       "title": "Harden target-cycle record duplicate id behavior",
-      "description": "Type: implementation hardening slice\nReadiness: todo; promote after deciding whether target-cycle records should reject duplicate ids, replace existing ids, or generate unique ids automatically.\nSource observation: during dev-nexus:local-66 bookkeeping, `automation target-cycle record` accepted a repeated `--cycle-id` and appended a duplicate fact. Historical duplicate ids already exist in `.dev-nexus/automation/target-cycles.json`, so consumers cannot treat the ledger id as unique today.\n\nGoal: make target-cycle fact recording idempotent or explicitly reject duplicate cycle ids so automated coordination cannot silently create ambiguous facts.\n\nAcceptance criteria:\n- Define the desired behavior for repeated `target-cycle record --cycle-id` calls: reject with actionable error, replace/upsert, or require a generated suffix.\n- Add tests covering the chosen duplicate-id behavior.\n- Ensure coordinator-loop generated records remain unaffected and keep stable run/cycle references.\n- If rejecting duplicates, error output must explain how to recover without opening an editor or needing interactive repair.\n- Document the behavior in the automation/target-cycle command help or relevant docs.\n\nBoundaries:\n- Do not rewrite historical ignored local ledgers as part of the source change.\n- Do not change target-report semantics beyond what is required to consume the clarified ledger behavior.\n\nVerification:\n- Focused target-cycle CLI/service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "description": "Type: implementation hardening slice\nReadiness: autonomous agent-ready (AFK)\nSource observation: during dev-nexus:local-66 bookkeeping, `automation target-cycle record` accepted a repeated `--cycle-id` and appended a duplicate fact. Historical duplicate ids already exist in `.dev-nexus/automation/target-cycles.json`, so consumers cannot treat the ledger id as unique today.\n\nPolicy decision for this slice: reject duplicate `target-cycle record --cycle-id` calls with an actionable, non-interactive recovery message. Do not silently append, upsert, or replace existing records in this first hardening pass.\n\nGoal: make target-cycle fact recording reject duplicate ids so automated coordination cannot silently create ambiguous facts.\n\nAcceptance criteria:\n- Repeated `target-cycle record --cycle-id` calls fail before writing another record when the id already exists.\n- The error explains how to recover without opening an editor or requiring interactive repair, such as choosing a new id or inspecting the existing record.\n- Tests cover duplicate-id rejection for the CLI/service path.\n- Coordinator-loop generated records remain unaffected and keep stable run/cycle references.\n- Command help or relevant docs state that explicit cycle ids must be unique.\n\nBoundaries:\n- Do not rewrite historical ignored local ledgers as part of the source change.\n- Do not add upsert/replacement behavior in this slice.\n- Do not change target-report semantics beyond what is required to consume the clarified ledger behavior.\n\nVerification:\n- Focused target-cycle CLI/service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1679,7 +1680,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T09:36:22.991Z",
-      "updatedAt": "2026-05-18T09:36:22.991Z",
+      "updatedAt": "2026-05-18T11:25:09.983Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3108,7 +3109,19 @@
         }
       }
     ],
-    "local-48": [],
+    "local-48": [
+      {
+        "id": "local-comment-159",
+        "body": "Triage: promoted after dependencies landed (local-38, local-39, and local-47). Scope remains mocked/local-provider tests only; no live GitHub issue creation, external comments, or provider writes without a separate explicit policy item.",
+        "author": null,
+        "createdAt": "2026-05-18T11:24:51.138Z",
+        "updatedAt": "2026-05-18T11:24:51.138Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-159"
+        }
+      }
+    ],
     "local-49": [
       {
         "id": "local-comment-147",
@@ -3583,7 +3596,30 @@
         }
       }
     ],
-    "local-67": [],
+    "local-67": [
+      {
+        "id": "local-comment-160",
+        "body": "Triage: promoted with the conservative policy choice that duplicate \target-cycle record --cycle-id calls should be rejected with an actionable, non-interactive recovery message. Upsert/replacement can be added later only if a real workflow needs it.",
+        "author": null,
+        "createdAt": "2026-05-18T11:24:51.528Z",
+        "updatedAt": "2026-05-18T11:24:51.528Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-160"
+        }
+      },
+      {
+        "id": "local-comment-161",
+        "body": "Correction: promoted with the conservative policy choice that duplicate `target-cycle record --cycle-id` calls should be rejected with an actionable, non-interactive recovery message. Upsert/replacement can be added later only if a real workflow needs it.",
+        "author": null,
+        "createdAt": "2026-05-18T11:25:09.983Z",
+        "updatedAt": "2026-05-18T11:25:09.983Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-161"
+        }
+      }
+    ],
     "local-68": [
       {
         "id": "local-comment-157",

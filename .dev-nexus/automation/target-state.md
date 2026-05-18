@@ -8,14 +8,18 @@ and ready for coordinator-driven work across its components.
 - The latest completed source work is `dev-nexus:local-66`, published as
   DevNexus commit `b0f2cfd` with `automation coordinator-loop --progress-jsonl`.
 - Cleanup work `dev-nexus:local-68` is complete.
-- `dev-nexus automation eligible-work . --json` reported `idle` with eligible
-  count `0` before cleanup began.
+- Re-triage promoted `dev-nexus:local-48` and `dev-nexus:local-67` to `ready`.
+  `local-48` remains mocked/local-provider only with no live external writes.
+  `local-67` should reject duplicate explicit target-cycle ids with an
+  actionable non-interactive error.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
 
-- Re-triage `dev-nexus:local-48`, `dev-nexus:local-51`, and
-  `dev-nexus:local-67` after cleanup.
+- Run the next coordinator cycle on `dev-nexus:local-48` and
+  `dev-nexus:local-67`.
+- Revisit `dev-nexus:local-51` after the sync execution shape from
+  `dev-nexus:local-48` lands.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
   runner approval is explicit.
 - Resolve `dev-nexus:local-69` before relying on Windows source roots as clean
