@@ -78,12 +78,12 @@ and ready for coordinator-driven work across its components.
   cleanup safety behavior are available, unless a separate manual cleanup is
   explicitly approved.
 - DevNexus-Pharo MCP/plugin cleanup has completed source deletions
-  `dev-nexus-pharo:local-15` through `local-17` and published commits
-  `1ef5709`, `eb55b9c`, and `c5f7a90` to DevNexus-Pharo main through the bot
-  remote. `dev_nexus_pharo` now lists only six project/skill tools. Follow-up
-  cleanup `local-18` and `local-19` are ready; core guardrail work
-  `dev-nexus:local-112` should follow once DevNexus-Pharo has zero default MCP
-  tool overlap with `dev_nexus`.
+  `dev-nexus-pharo:local-15` through `local-19` and published commits
+  `1ef5709`, `eb55b9c`, `c5f7a90`, `be1f866`, and `1dd2141` to
+  DevNexus-Pharo main through the bot remote. `dev_nexus_pharo` now lists only
+  six Pharo-owned `pharo_project_*` project/skill tools, has no default
+  tool-name overlap with core `dev_nexus`, and no longer carries obsolete
+  DevNexus-Pharo config migration paths.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
@@ -101,10 +101,9 @@ and ready for coordinator-driven work across its components.
 - Start agent-target projection work at `dev-nexus:local-105`; `local-111`
   is the dogfood Codex-only migration and should wait for active target
   filtering plus stale cleanup safety.
-- Continue DevNexus-Pharo additive MCP cleanup with ready items
-  `dev-nexus-pharo:local-18` and `local-19`. These continue the
-  no-legacy/no-compatibility posture: rename remaining MCP tools to
-  Pharo-owned names, then remove old config migration paths.
+- Continue MCP boundary hardening with core guardrail work
+  `dev-nexus:local-112`, now that the DevNexus-Pharo side has zero default
+  MCP tool overlap with `dev_nexus`.
 - Revisit `dev-nexus:local-51` after the sync execution shape from
   `dev-nexus:local-48` lands.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
