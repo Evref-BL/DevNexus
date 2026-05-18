@@ -1,7 +1,62 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T16:17:57.030Z",
+  "updatedAt": "2026-05-18T18:57:48.152Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-09bf5ca2f3080691",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-72",
+      "branchName": "codex/dev-nexus/local-72",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-72"
+      },
+      "writeScope": [
+        "src/nexusSetupAssistant.ts",
+        "src/nexusSetupAssistant.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T18:53:14.947Z",
+      "lastSeenAt": "2026-05-18T18:57:48.152Z",
+      "updatedAt": "2026-05-18T18:57:48.152Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "911464f7ea2ed7367c477b5f558996d2cb5496d4",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-72"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "local-72 complete; worktree branch codex/dev-nexus/local-72 fast-forwarded into main.",
+        "Verification: npm test -- src/nexusSetupAssistant.test.ts passed; npm run check passed.",
+        "Integration preference: Merged to DevNexus main and pushed to bot/main at 911464f."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

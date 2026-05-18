@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 128,
-  "nextCommentNumber": 212,
-  "updatedAt": "2026-05-18T16:52:06.974Z",
+  "nextCommentNumber": 214,
+  "updatedAt": "2026-05-18T18:57:48.188Z",
   "items": [
     {
       "id": "local-1",
@@ -1789,7 +1789,7 @@
       "id": "local-72",
       "title": "Make join-existing-project prepare project-local component checkouts",
       "description": "Type: implementation slice. Readiness: autonomous agent-ready (AFK) after dev-nexus:local-71 merged into DevNexus main at b4aa3af. Parent: dev-nexus:local-69. Goal: make join-existing-project guide and verify project-local component checkouts under components/<component-id> by default, instead of sending users to sibling sources directories unless the project explicitly chooses that layout. Acceptance: setup plan text and clone commands prefer componentsRoot:<component-id> or resolved <projectRoot>/components/<component-id>; missing clones provide actionable clone/fetch commands using remoteUrl/defaultBranch; dirty checkouts are detected before fetch/pull guidance; incompatible or absent legacy sourceRoot values fall back to project-local components/<component-id>; Windows and macOS fixtures cover fresh meta clones, missing directories, clean checkouts, and dirty blockers. Boundaries: do not auto-delete, move, or overwrite existing checkouts; do not run live provider writes, package installs, Pharo images, Docker, or PLexus runtime services; keep this generic in DevNexus core. Verification: focused setup assistant tests; npm run check when feasible. Publication: direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1801,8 +1801,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:57:02.574Z",
-      "updatedAt": "2026-05-18T12:33:40.763Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T18:57:48.188Z",
+      "closedAt": "2026-05-18T18:57:13.168Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -5367,6 +5367,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-168"
+        }
+      },
+      {
+        "id": "local-comment-212",
+        "body": "Implemented in DevNexus commit 911464f. join-existing-project now falls back missing or cross-OS component source roots to project-local components/<component-id>, keeps explicitly compatible configured roots, and includes defaultBranch in component clone/fetch commands. Verification passed: npm test -- src/nexusSetupAssistant.test.ts; npm run check.",
+        "author": null,
+        "createdAt": "2026-05-18T18:56:48.331Z",
+        "updatedAt": "2026-05-18T18:56:48.331Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-212"
+        }
+      },
+      {
+        "id": "local-comment-213",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-72\nHead: 911464f7ea2ed7367c477b5f558996d2cb5496d4\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T18:57:48.152Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-72\",\n  \"logicalItemId\": \"local-72\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-72\",\n    \"itemNumber\": 72,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-72\",\n      \"itemNumber\": 72\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-72\",\n    \"itemNumber\": 72,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-72\",\n      \"itemNumber\": 72\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-72\",\n      \"itemNumber\": 72,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-72\",\n        \"itemNumber\": 72\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-09bf5ca2f3080691\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-72\",\n  \"branch\": \"codex/dev-nexus/local-72\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"911464f7ea2ed7367c477b5f558996d2cb5496d4\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm test -- src/nexusSetupAssistant.test.ts passed; npm run check passed.\",\n  \"integrationPreference\": \"Merged to DevNexus main and pushed to bot/main at 911464f.\",\n  \"note\": \"local-72 complete; worktree branch codex/dev-nexus/local-72 fast-forwarded into main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T18:57:48.188Z",
+        "updatedAt": "2026-05-18T18:57:48.188Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-213"
         }
       }
     ],
