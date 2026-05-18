@@ -81,8 +81,14 @@ and ready for coordinator-driven work across its components.
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
-- Default `npm run check` now passes on the integrated DevNexus main with 57
-  test files and 459 tests after the latest DevNexus batch.
+- Mac verification after syncing to DevNexus `37717f7` found an OS/setup
+  friction regression: `npm run check` fails in `src/nexusSetupAssistant.test.ts`
+  with 8 failures around macOS setup path rendering, source-root fallback, and
+  advisory setup-check status. `dev-nexus:local-138` is ready for the primary
+  Mac path/source-root fix, `local-139` tracks advisory status masking as a
+  dependent follow-up, and `local-140` tracks noisy Git default-branch warnings
+  from Git 2.54.0. DevNexus-Pharo and DevNexus-TypeScript `npm run check`
+  passed on this Mac after sync.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -141,7 +147,8 @@ and ready for coordinator-driven work across its components.
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
   `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-122`, and
-  `dev-nexus:local-129`, subject to dependency and concurrency limits.
+  `dev-nexus:local-129`, subject to dependency and concurrency limits. Include
+  `dev-nexus:local-138` early because current Mac `npm run check` is red.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
 - Keep parallel-agent workflow ordered: use completed fail-closed

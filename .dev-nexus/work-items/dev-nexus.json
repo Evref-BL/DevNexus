@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 138,
+  "nextNumber": 141,
   "nextCommentNumber": 230,
-  "updatedAt": "2026-05-18T20:23:58.019Z",
+  "updatedAt": "2026-05-18T20:46:15.855Z",
   "items": [
     {
       "id": "local-1",
@@ -3540,6 +3540,88 @@
         "itemId": "local-137",
         "itemNumber": 137
       }
+    },
+    {
+      "id": "local-138",
+      "title": "Fix Mac setup assistant path rendering and source-root fallback",
+      "description": "Type: Mac setup regression fix\nReadiness: ready\nSource evidence: Mac sync/test run on 2026-05-18 after syncing DevNexus to 37717f7.\n\nObserved failure:\n- Command: npm run check\n- Host: macOS 26.4.1, Node v26.0.0, npm 11.12.1, git 2.54.0\n- Package: @evref-bl/dev-nexus@0.1.0-alpha.16\n- Failing file: src/nexusSetupAssistant.test.ts\n- Full result: 1 failed test file, 8 failed tests, 56 passed test files, 450 passed tests, 1 skipped.\n\nRepresentative failures:\n- Mac setup plan expected clone commands containing $HOME/dev-nexus and $HOME/dev-nexus/mac-demo, but generated commands did not include those host-friendly Mac paths.\n- Mac setup with a Windows sourceRoot expected fallback to $HOME/dev-nexus/mac-demo/components/dev-nexus, but generated commands used a /var/folders/... temporary project path.\n- Setup check with an existing component directory expected component-dev-nexus-git-checkout to report a non-Git checkout, but the check reported a missing source root under a Windows-style $env:USERPROFILE path.\n\nGoal: make join-existing-project setup path resolution deterministic and platform-correct on macOS while preserving Windows behavior.\n\nAcceptance criteria:\n- buildNexusSetupPlan({ platform: \"macos\" }) renders Mac user-facing setup commands with $HOME-style paths where the tests expect portable Mac guidance.\n- A Windows-only sourceRoot in project config is ignored for Mac setup commands and falls back to the Mac project-local component checkout path.\n- Missing sourceRoot falls back to the Mac project-local component checkout path rather than the temporary fixture root or a Windows path.\n- buildNexusSetupCheck inspects an existing component directory at the resolved platform-appropriate component path and reports not-a-Git-checkout, wrong remote, and dirty-state cases correctly.\n- The failing Mac path/source-root tests in src/nexusSetupAssistant.test.ts pass on this Mac.\n\nBoundaries:\n- Do not weaken setup safety checks or hide genuinely missing component checkouts.\n- Do not encode this developer's absolute /Users path in generic setup output.\n\nVerification:\n- npm test -- src/nexusSetupAssistant.test.ts\n- npm run check on macOS.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "setup",
+        "macos",
+        "tests",
+        "os-friction",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T20:46:00.478Z",
+      "updatedAt": "2026-05-18T20:46:00.478Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-138",
+        "itemNumber": 138
+      }
+    },
+    {
+      "id": "local-139",
+      "title": "Keep setup assistant advisory checks from being masked by component path failures",
+      "description": "Type: setup-check status classification fix\nReadiness: todo/dependent on dev-nexus:local-138 unless investigation proves an independent root cause\nSource evidence: Mac sync/test run on 2026-05-18 after syncing DevNexus to 37717f7.\n\nObserved failure:\n- Command: npm run check\n- Host: macOS 26.4.1, Node v26.0.0, npm 11.12.1, git 2.54.0\n- Package: @evref-bl/dev-nexus@0.1.0-alpha.16\n- Failing file: src/nexusSetupAssistant.test.ts\n\nSpecific failed expectations:\n- uses configured agent MCP targets in setup guidance and checks: expected overall setup check status warning, received blocked.\n- warns when plugin-projected skills and MCP servers are not materialized: expected warning, received blocked.\n- warns until agent MCP visibility is recorded for the host: expected warning, received blocked.\n\nLikely relationship to local-138:\n- These tests are intended to assert advisory missing-agent-session or missing-projection warnings.\n- On this Mac run, setup status becomes blocked because component source-root resolution reports a blocking missing checkout before those advisory checks can determine the overall status.\n\nGoal: keep setup assistant advisory checks observable and warning-classified when component checkout fixtures are present, instead of letting platform path resolution or unrelated component checks mask them.\n\nAcceptance criteria:\n- Agent MCP target checks, plugin projection checks, and agent project-session checks remain warning-classified when their only problem is missing materialization or unrecorded visibility.\n- Test fixtures that create a component checkout are recognized by setup checks on macOS and Windows.\n- Blocking component checkout problems still make the overall status blocked when they are genuinely present.\n- The three advisory-status failures in src/nexusSetupAssistant.test.ts pass on this Mac.\n\nDependencies:\n- Depends on dev-nexus:local-138 if the root cause is the same platform path resolver.\n\nVerification:\n- npm test -- src/nexusSetupAssistant.test.ts\n- npm run check on macOS.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "setup",
+        "macos",
+        "tests",
+        "os-friction",
+        "agent-targets",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T20:46:09.063Z",
+      "updatedAt": "2026-05-18T20:46:09.063Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-139",
+        "itemNumber": 139
+      }
+    },
+    {
+      "id": "local-140",
+      "title": "Suppress Git default-branch warning noise in setup assistant tests",
+      "description": "Type: test hygiene and toolchain-friction fix\nReadiness: todo\nSource evidence: Mac sync/test run on 2026-05-18 after syncing DevNexus to 37717f7.\n\nObserved friction:\n- Command: npm run check\n- Host: macOS 26.4.1, Node v26.0.0, npm 11.12.1, git 2.54.0\n- During src/nexusSetupAssistant.test.ts, multiple tests that run git init emit Git's default-branch warning: \"Using 'master' as the name for the initial branch. This default branch name will change to 'main' in Git 3.0...\"\n\nGoal: keep setup assistant test output quiet and deterministic across Git versions and host defaults.\n\nAcceptance criteria:\n- Test helpers that create temporary Git repositories specify an initial branch or otherwise suppress the Git default-branch advice in a local, test-scoped way.\n- The tests do not require changing the developer's global Git config.\n- The generated temporary repositories still exercise the same setup-check behavior.\n- npm test -- src/nexusSetupAssistant.test.ts no longer prints repeated default-branch warning blocks on this Mac.\n\nBoundaries:\n- Do not hide stderr globally for commands whose failures should remain diagnosable.\n- Do not require a specific global init.defaultBranch setting.\n\nVerification:\n- npm test -- src/nexusSetupAssistant.test.ts\n- npm run check on macOS.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "setup",
+        "macos",
+        "tests",
+        "git",
+        "os-friction",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T20:46:15.855Z",
+      "updatedAt": "2026-05-18T20:46:15.855Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-140",
+        "itemNumber": 140
+      }
     }
   ],
   "comments": {
@@ -6302,6 +6384,9 @@
     "local-134": [],
     "local-135": [],
     "local-136": [],
-    "local-137": []
+    "local-137": [],
+    "local-138": [],
+    "local-139": [],
+    "local-140": []
   }
 }
