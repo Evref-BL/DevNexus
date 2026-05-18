@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 104,
+  "nextNumber": 105,
   "nextCommentNumber": 173,
-  "updatedAt": "2026-05-18T13:22:29.611Z",
+  "updatedAt": "2026-05-18T13:30:34.960Z",
   "items": [
     {
       "id": "local-1",
@@ -2621,6 +2621,33 @@
         "itemId": "local-103",
         "itemNumber": 103
       }
+    },
+    {
+      "id": "local-104",
+      "title": "Make agent-native projections opt-in by active target",
+      "description": "Type: projection policy / setup UX PRD follow-up\nReadiness: autonomous agent-ready (AFK) for issue slicing and first implementation planning\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make agent-native MCP, skills, plugin, and worker support projections opt-in by active agent target so Codex-only projects do not receive Claude artifacts and vice versa.\n\nCurrent dogfood finding:\n- The dogfood project MCP target is Codex-only.\n- The dogfood project skills targets currently include Codex and Claude, so DevNexus generated ignored `.claude/skills` support state.\n- This is not tracked source, but it is root clutter and a misleading active-provider signal for a Codex-only project.\n\nAcceptance criteria:\n- Use the PRD to slice implementation-ready DevNexus work items.\n- The design distinguishes supported providers from active agent targets.\n- MCP, skills, plugin capability projection, setup checks, and worker context generation consume one active target policy.\n- Setup reports stale generated provider projections and can safely clean generated support state when no longer selected.\n- Codex-only projects do not receive `.claude` support directories by default.\n- Multi-provider projects can still explicitly opt into Codex plus Claude or other provider combinations.\n\nBoundaries:\n- Do not remove provider support.\n- Do not delete manually authored or source-controlled provider files automatically.\n- Do not edit provider-global credentials or user-global skill directories.\n- Keep this generic; do not hard-code Codex-only behavior into DevNexus core.\n\nVerification:\n- After slicing, implementation issues should cover config normalization, projection filtering, setup diagnostics, cleanup dry-run/execution, worker context behavior, and docs.\n\nPublication notes:\n- Direct integration to DevNexus main for source changes after focused and full checks pass under dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "skills",
+        "mcp",
+        "projection",
+        "cleanup",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:30:34.960Z",
+      "updatedAt": "2026-05-18T13:30:34.960Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-104",
+        "itemNumber": 104
+      }
     }
   ],
   "comments": {
@@ -4689,6 +4716,7 @@
     "local-100": [],
     "local-101": [],
     "local-102": [],
-    "local-103": []
+    "local-103": [],
+    "local-104": []
   }
 }
