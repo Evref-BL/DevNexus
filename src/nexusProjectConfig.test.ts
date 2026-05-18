@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  activeNexusProjectMcpAgentTargets,
+  activeNexusProjectSkillAgentTargets,
   devNexusProjectConfigFileName,
   loadProjectConfig,
   NexusConfigError,
@@ -12,6 +14,7 @@ import {
   normalizeNexusProjectAgentTargets,
   resolveNexusAgentConfig,
   saveProjectConfig,
+  selectNexusProjectMcpAgentTargets,
   validateProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -634,6 +637,70 @@ describe("project config", () => {
           },
         },
       },
+    ]);
+  });
+
+  it("derives active MCP and skill targets from the active agent policy", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "active-target-project",
+      name: "Active Target Project",
+      agentTargets: {
+        active: [
+          {
+            provider: "codex",
+            mcp: {
+              configPath: ".codex/project.toml",
+            },
+            skills: {
+              directory: ".agents/project-skills",
+            },
+          },
+          {
+            provider: "claude",
+            mcp: {
+              enabled: false,
+            },
+          },
+        ],
+      },
+      mcp: {
+        agentTargets: [{ agent: "claude" }],
+      },
+      skills: {
+        agentTargets: [{ agent: "claude" }],
+      },
+    });
+
+    expect(activeNexusProjectMcpAgentTargets(config)).toMatchObject([
+      {
+        agent: "codex",
+        provider: "codex",
+        configPath: ".codex/project.toml",
+      },
+    ]);
+    expect(activeNexusProjectSkillAgentTargets(config)).toMatchObject([
+      {
+        agent: "codex",
+        directory: ".agents/project-skills",
+      },
+      {
+        agent: "claude",
+      },
+    ]);
+    expect(selectNexusProjectMcpAgentTargets(config, [])).toMatchObject([
+      {
+        agent: "codex",
+        configPath: ".codex/project.toml",
+      },
+    ]);
+    expect(selectNexusProjectMcpAgentTargets(config, ["claude"])).toMatchObject([
+      {
+        agent: "claude",
+      },
+    ]);
+    expect(selectNexusProjectMcpAgentTargets(config, ["opencode"])).toEqual([
+      { agent: "opencode" },
     ]);
   });
 
@@ -2150,6 +2217,7 @@ describe("project config", () => {
                 kind: "mcp_server",
                 id: "analysis-mcp",
                 serverName: "analysis_tools",
+                targetAgents: ["codex"],
                 tools: [
                   {
                     name: "inspect_facts",
@@ -2233,6 +2301,7 @@ describe("project config", () => {
             kind: "mcp_server",
             id: "analysis-mcp",
             serverName: "analysis_tools",
+            targetAgents: ["codex"],
             tools: [
               {
                 name: "inspect_facts",
@@ -2322,6 +2391,7 @@ describe("project config", () => {
                 kind: "mcp_server",
                 id: "analysis-mcp",
                 serverName: "analysis_tools",
+                targetAgents: ["codex"],
                 tools: [
                   {
                     name: "inspect_facts",
@@ -2337,6 +2407,7 @@ describe("project config", () => {
       kind: "mcp_server",
       id: "analysis-mcp",
       serverName: "analysis_tools",
+      targetAgents: ["codex"],
       tools: [
         {
           name: "inspect_facts",

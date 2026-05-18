@@ -447,6 +447,7 @@ describe("nexus automation agent launch", () => {
                 id: "analysis-mcp",
                 description: null,
                 serverName: "analysis_tools",
+                targetAgents: [],
                 tools: [
                   {
                     name: "inspect_facts",

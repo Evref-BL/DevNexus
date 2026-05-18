@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { NexusProjectMcpConfig } from "./nexusProjectConfig.js";
 import {
+  activeNexusProjectMcpAgentTargets,
+  activeNexusProjectSkillAgentTargets,
   devNexusProjectConfigFileName,
   projectWorktreesRootPath,
   type NexusProjectAgentMcpTarget,
@@ -150,7 +152,12 @@ export function buildNexusProjectTemplateLayout(
       sourceControl: "support",
       description: "DevNexus-owned curated skill definitions.",
     });
-    for (const target of resolvedSkillAgentTargets(options.skillsConfig)) {
+    for (const target of resolvedSkillAgentTargets({
+      ...options.projectConfig,
+      ...(options.skillsConfig !== undefined
+        ? { skills: options.skillsConfig || undefined }
+        : {}),
+    })) {
       entries.push({
         area: "skills",
         owner: "generated",
@@ -162,7 +169,10 @@ export function buildNexusProjectTemplateLayout(
   }
 
   if (options.mcpConfig && options.mcpConfig.enabled !== false) {
-    for (const target of resolvedMcpAgentTargets(options.mcpConfig)) {
+    for (const target of resolvedMcpAgentTargets({
+      ...options.projectConfig,
+      mcp: options.mcpConfig,
+    })) {
       entries.push({
         area: "agent_mcp_projection",
         owner: "generated",
@@ -247,18 +257,17 @@ export function nexusProjectTemplateMigrationNotes(): string[] {
 }
 
 function resolvedSkillAgentTargets(
-  config: NexusProjectSkillsConfig | undefined,
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
 ): Array<{
   agent: string;
   directory: string;
   sourceControl: NexusSkillSourceControl;
 }> {
-  return (config?.agentTargets ?? [])
-    .filter((target) => target.enabled !== false)
+  return activeNexusProjectSkillAgentTargets(config)
     .map((target) => ({
       agent: target.agent,
       directory: skillAgentTargetDirectory(target),
-      sourceControl: target.sourceControl ?? config?.sourceControl ?? "support",
+      sourceControl: target.sourceControl ?? config.skills?.sourceControl ?? "support",
     }));
 }
 
@@ -277,19 +286,17 @@ function skillAgentTargetDirectory(target: NexusProjectSkillAgentTarget): string
 }
 
 function resolvedMcpAgentTargets(
-  config: NexusProjectMcpConfig,
+  config: Pick<NexusProjectConfig, "agentTargets" | "mcp" | "skills">,
 ): Array<{
   agent: string;
   configPath: string;
   sourceControl: NexusSkillSourceControl;
 }> {
-  const targets = config.agentTargets ?? [{ agent: "codex" }];
-  return targets
-    .filter((target) => target.enabled !== false)
+  return activeNexusProjectMcpAgentTargets(config)
     .map((target) => ({
       agent: target.agent,
       configPath: mcpAgentTargetConfigPath(target),
-      sourceControl: target.sourceControl ?? config.sourceControl ?? "support",
+      sourceControl: target.sourceControl ?? config.mcp?.sourceControl ?? "support",
     }));
 }
 

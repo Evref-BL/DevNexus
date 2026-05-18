@@ -618,12 +618,14 @@ describe("nexus setup assistant", () => {
     expect(prepareStep.commands.join("\n")).toContain(
       "git clone --branch main git@github.com:Evref-BL/DevNexus.git $HOME/dev-nexus/mac-demo/components/dev-nexus",
     );
-    expect(check.checks).toContainEqual(
-      expect.objectContaining({
-        id: "component-dev-nexus-source-root",
-        status: "blocked",
-        summary: expect.stringContaining("components/dev-nexus"),
-      }),
+    const sourceRootCheck = check.checks.find(
+      (entry) => entry.id === "component-dev-nexus-source-root",
+    )!;
+    expect(sourceRootCheck).toMatchObject({
+      status: "blocked",
+    });
+    expect(sourceRootCheck.summary.replace(/\\/gu, "/")).toContain(
+      "components/dev-nexus",
     );
   });
 
@@ -660,12 +662,14 @@ describe("nexus setup assistant", () => {
     expect(prepareStep.commands.join("\n")).toContain(
       "$HOME/dev-nexus/mac-demo/components/dev-nexus",
     );
-    expect(check.checks).toContainEqual(
-      expect.objectContaining({
-        id: "component-dev-nexus-source-root",
-        status: "blocked",
-        summary: expect.stringContaining("components/dev-nexus"),
-      }),
+    const sourceRootCheck = check.checks.find(
+      (entry) => entry.id === "component-dev-nexus-source-root",
+    )!;
+    expect(sourceRootCheck).toMatchObject({
+      status: "blocked",
+    });
+    expect(sourceRootCheck.summary.replace(/\\/gu, "/")).toContain(
+      "components/dev-nexus",
     );
     expect(check.checks).not.toContainEqual(
       expect.objectContaining({
@@ -858,6 +862,125 @@ describe("nexus setup assistant", () => {
       }),
     );
     expect(check.status).toBe("warning");
+  });
+
+  it("limits setup guidance to Codex active agent targets", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-codex-active-");
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      skills: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      plugins: [
+        {
+          id: "example-runtime-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "skill-codex",
+              skillId: "codex-diagnostic",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "projected_skill",
+              id: "skill-claude",
+              skillId: "claude-diagnostic",
+              targetAgents: ["claude"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-codex",
+              serverName: "codex_runtime",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-claude",
+              serverName: "claude_runtime",
+              targetAgents: ["claude"],
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const checks = refreshStep.checks.join("\n").replace(/\\/gu, "/");
+
+    expect(checks).toContain(".codex/config.toml");
+    expect(checks).toContain(".agents/skills/codex-diagnostic/SKILL.md");
+    expect(checks).toContain("codex_runtime");
+    expect(checks).not.toContain(".mcp.json");
+    expect(checks).not.toContain(".claude");
+    expect(checks).not.toContain("claude_runtime");
+  });
+
+  it("limits setup guidance to Claude active agent targets", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-claude-active-");
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [{ provider: "claude" }],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      skills: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      plugins: [
+        {
+          id: "claude-runtime-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "skill-claude",
+              skillId: "claude-diagnostic",
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const checks = refreshStep.checks.join("\n").replace(/\\/gu, "/");
+
+    expect(checks).toContain(".mcp.json");
+    expect(checks).toContain(".claude/skills/claude-diagnostic/SKILL.md");
+    expect(checks).not.toContain(".codex/config.toml");
+    expect(checks).not.toContain(".agents/skills");
   });
 
   it("passes the agent MCP server check when the expected server is configured", () => {

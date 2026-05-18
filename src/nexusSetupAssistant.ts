@@ -12,6 +12,8 @@ import {
   validateNexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
 import {
+  activeNexusProjectMcpAgentTargets,
+  activeNexusProjectSkillAgentTargets,
   loadProjectConfig,
   projectConfigPath,
   type NexusProjectConfig,
@@ -301,6 +303,7 @@ export function buildNexusSetupCheck(options: {
       const sourceRootPlan = componentCheckSourceRoot(
         component,
         projectRoot,
+        platform,
       );
 
       checks.push(pathCheck({
@@ -967,6 +970,9 @@ function setupAgentMcpTargets(
   return resolveNexusProjectAgentMcpTargets({
     projectRoot,
     mcpConfig: projectConfig?.mcp,
+    ...(projectConfig
+      ? { agentTargets: activeNexusProjectMcpAgentTargets(projectConfig) }
+      : {}),
   });
 }
 
@@ -991,6 +997,10 @@ function pluginProjectionCheckCommands(
   const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
 
   for (const { capability } of pluginProjectedSkillCapabilities(projectConfig)) {
+    const matchingSkillTargets = skillTargetsForCapability(capability, skillTargets);
+    if (matchingSkillTargets.length === 0) {
+      continue;
+    }
     commands.push(
       `test -f ${shellPathPlaceholder(setupCommandJoin(platform,
         nexusSkillSupportDirectoryName,
@@ -999,7 +1009,7 @@ function pluginProjectionCheckCommands(
         nexusSkillMarkdownFileName,
       ))}`,
     );
-    for (const target of skillTargetsForCapability(capability, skillTargets)) {
+    for (const target of matchingSkillTargets) {
       commands.push(
         `test -f ${shellPathPlaceholder(setupCommandJoin(platform,
           target.directory,
@@ -1011,7 +1021,7 @@ function pluginProjectionCheckCommands(
   }
 
   for (const { capability } of pluginMcpServerCapabilities(projectConfig)) {
-    for (const target of mcpTargets) {
+    for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
       const marker =
         target.configSchema === "codex.mcp_servers"
           ? `[mcp_servers.${capability.serverName}]`
@@ -1044,6 +1054,10 @@ function pluginProjectedSkillChecks(
   const skillTargets = setupAgentSkillTargets(projectConfig);
 
   for (const { plugin, capability } of pluginProjectedSkillCapabilities(projectConfig)) {
+    const matchingSkillTargets = skillTargetsForCapability(capability, skillTargets);
+    if (matchingSkillTargets.length === 0) {
+      continue;
+    }
     const pluginLabel = setupPluginLabel(plugin);
     const skillId = capability.skillId;
     checks.push(pathCheck({
@@ -1063,7 +1077,7 @@ function pluginProjectedSkillChecks(
       missingStatus: "warning",
     }));
 
-    for (const target of skillTargetsForCapability(capability, skillTargets)) {
+    for (const target of matchingSkillTargets) {
       checks.push(pathCheck({
         id: `plugin-${setupCheckIdPart(plugin.id)}-skill-${setupCheckIdPart(skillId)}-${setupCheckIdPart(target.agent)}`,
         title: `${target.agent} skill ${skillId}`,
@@ -1093,7 +1107,7 @@ function pluginMcpServerChecks(
   const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
-    for (const target of mcpTargets) {
+    for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
       checks.push(pluginMcpServerCheck({
         projectRoot,
         plugin,
@@ -1237,12 +1251,11 @@ function agentMcpServerConfiguredCheck(
 function setupAgentSkillTargets(
   projectConfig: NexusProjectConfig | null,
 ): { agent: string; directory: string }[] {
-  if (projectConfig?.skills?.agentTargets === undefined) {
+  if (!projectConfig) {
     return [];
   }
 
-  return projectConfig.skills.agentTargets
-    .filter((target) => target.enabled !== false)
+  return activeNexusProjectSkillAgentTargets(projectConfig)
     .map((target) => ({
       agent: target.agent,
       directory: target.directory ?? defaultSetupAgentSkillDirectory(target.agent),
@@ -1269,6 +1282,20 @@ function skillTargetsForCapability(
 
   const targetAgents = new Set(capability.targetAgents);
   return skillTargets.filter((target) => targetAgents.has(target.agent));
+}
+
+function mcpTargetsForCapability(
+  capability: NexusPluginMcpServerCapability,
+  mcpTargets: readonly MaterializedNexusAgentMcpTarget[],
+): MaterializedNexusAgentMcpTarget[] {
+  if (!capability.targetAgents || capability.targetAgents.length === 0) {
+    return [...mcpTargets];
+  }
+
+  const targetAgents = new Set(capability.targetAgents);
+  return mcpTargets.filter((target) =>
+    targetAgents.has(target.agent) || targetAgents.has(target.provider),
+  );
 }
 
 function pluginProjectedSkillCapabilities(
@@ -2080,13 +2107,13 @@ function componentPlanSourceRoot(
 function componentCheckSourceRoot(
   component: NexusProjectConfig["components"][number],
   projectRoot: string,
+  platform: NexusSetupPlatform,
 ): { path: string; reason: string } {
-  const hostPlatform = currentSetupPlatform();
   return componentSetupSourceRoot({
     component,
-    platform: hostPlatform,
+    platform,
     projectRoot,
-    pathPlatform: hostPlatform,
+    pathPlatform: platform,
   });
 }
 

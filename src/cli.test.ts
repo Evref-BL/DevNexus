@@ -2823,6 +2823,58 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("refreshes only active project MCP targets by default", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const output = captureOutput();
+    saveProjectConfig(projectRoot, projectConfig({
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    }));
+
+    await main(["project", "mcp", "refresh", projectRoot], {
+      stdout: output.writer,
+    });
+
+    expect(
+      fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, ".mcp.json"))).toBe(false);
+  });
+
+  it("refreshes an explicitly selected MCP target without touching others", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const output = captureOutput();
+    saveProjectConfig(projectRoot, projectConfig({
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    }));
+
+    await main(["project", "mcp", "refresh", projectRoot, "--agent", "claude"], {
+      stdout: output.writer,
+    });
+
+    expect(fs.existsSync(path.join(projectRoot, ".mcp.json"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
+    ).toBe(false);
+  });
+
   it("records and lists target cycles through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
