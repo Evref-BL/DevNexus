@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   buildNexusAutomationWorkItemQuery,
-  eligibleNexusAutomationWorkItems,
   evaluateNexusAutomationLedgerBackoff,
   nexusAutomationLockPath,
   readNexusAutomationRunLedger,
@@ -19,11 +18,19 @@ import {
   type NexusAutomationAgentLaunchComponentProvider,
   type NexusAutomationComponentEligibleWorkItems,
 } from "./nexusAutomationAgentLaunch.js";
-import { annotateDefaultTrackerWorkItems } from "./nexusAutomationWorkTrackerSummary.js";
 import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
+import {
+  listNexusEligibleWorkByComponent,
+  type NexusEligibleWorkItem,
+  type NexusEligibleWorkMode,
+  type NexusEligibleWorkProviderFactory,
+} from "./nexusEligibleWork.js";
+import type {
+  NexusWorkItemDiscoveryCredentialResolver,
+} from "./nexusWorkItemDiscoveryStatus.js";
 import {
   resolveNexusCurrentAutomationActor,
   type NexusCurrentActorResolution,
@@ -106,6 +113,9 @@ export interface NexusAutomationStatusLock {
 export interface GetNexusAutomationStatusOptions {
   projectRoot: string;
   homePath?: string;
+  eligibleWorkMode?: NexusEligibleWorkMode;
+  env?: NodeJS.ProcessEnv;
+  credentialResolver?: NexusWorkItemDiscoveryCredentialResolver;
   authProfiles?: NexusHostingAuthProfileConfig[];
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
@@ -135,7 +145,11 @@ export interface NexusAutomationStatus {
   currentActors: NexusCurrentActorResolution[];
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
-  eligibleWorkItems: WorkItem[] | null;
+  eligibleWorkMode: NexusEligibleWorkMode;
+  eligibleWorkItems: NexusEligibleWorkItem[] | null;
+  importCandidateWorkItems: NexusEligibleWorkItem[] | null;
+  eligibleWorkWarnings: string[];
+  eligibleWorkBlockers: string[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] | null;
   selectedWorkItem: WorkItem | null;
 }
@@ -323,15 +337,60 @@ export async function getNexusAutomationStatus(
     }
 
     const selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
-    const componentEligibleWorkItems = await listStatusEligibleWorkItemsByComponent(
-      componentProviders,
-      selectorQuery,
-      automationConfig,
+    const eligibleWork = await listNexusEligibleWorkByComponent({
       projectRoot,
-    );
-    const eligibleWorkItems = componentEligibleWorkItems.flatMap(
-      (component) => component.workItems,
-    );
+      projectConfig,
+      components,
+      automationConfig,
+      selectorQuery,
+      mode: options.eligibleWorkMode ?? "default",
+      provider: options.provider,
+      providerFactory: statusEligibleWorkProviderFactory({
+        options,
+        projectRoot,
+        projectConfig,
+      }),
+      providerOptions: options.providerOptions,
+      credentialResolver: options.credentialResolver,
+      env: options.env,
+      now: options.now,
+    });
+    const componentEligibleWorkItems = eligibleWork.componentEligibleWorkItems;
+    const eligibleWorkItems = eligibleWork.eligibleWorkItems;
+    if (eligibleWork.blockers.length > 0) {
+      const summary = eligibleWork.blockers.join("; ");
+      return statusResult({
+        projectRoot,
+        sourceRoot,
+        components,
+        projectConfig,
+        automationConfig,
+        status: "blocked",
+        summary,
+        lock,
+        ledger,
+        backoff,
+        preflight: [
+          ...preflight,
+          {
+            name: "eligibleWorkDiscovery",
+            status: "failed",
+            message: summary,
+          },
+        ],
+        selectorQuery,
+        candidateCount: eligibleWorkItems.length,
+        eligibleWorkMode: eligibleWork.mode,
+        eligibleWorkItems,
+        importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
+        eligibleWorkWarnings: eligibleWork.warnings,
+        eligibleWorkBlockers: eligibleWork.blockers,
+        componentEligibleWorkItems,
+        selectedWorkItem: null,
+        publication,
+        currentActors,
+      });
+    }
     const status: NexusAutomationStatusKind =
       eligibleWorkItems.length > 0 ? "ready" : "idle";
     const summary =
@@ -353,7 +412,11 @@ export async function getNexusAutomationStatus(
       preflight,
       selectorQuery,
       candidateCount: eligibleWorkItems.length,
+      eligibleWorkMode: eligibleWork.mode,
       eligibleWorkItems,
+      importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
+      eligibleWorkWarnings: eligibleWork.warnings,
+      eligibleWorkBlockers: eligibleWork.blockers,
       componentEligibleWorkItems,
       selectedWorkItem: null,
       publication,
@@ -623,38 +686,16 @@ function createStatusComponentProvider(options: {
   });
 }
 
-async function listStatusEligibleWorkItemsByComponent(
-  componentProviders: NexusAutomationAgentLaunchComponentProvider[],
-  selectorQuery: WorkItemQuery,
-  automationConfig: NexusAutomationConfig,
-  projectRoot: string,
-): Promise<NexusAutomationComponentEligibleWorkItems[]> {
-  const grouped: NexusAutomationComponentEligibleWorkItems[] = [];
-  for (const { component, provider } of componentProviders) {
-    grouped.push({
-      componentId: component.id,
-      workItems: annotateDefaultTrackerWorkItems(
-        component,
-        eligibleNexusAutomationWorkItems(
-          await provider.listWorkItems({
-            ...selectorQuery,
-            projectRoot,
-          }),
-          automationConfig,
-        ),
-      ),
-    });
-  }
-
-  return grouped;
-}
-
 type AutomationStatusInput = Omit<
   NexusAutomationStatus,
   | "agent"
   | "componentEligibleWorkItems"
   | "components"
   | "currentActors"
+  | "eligibleWorkBlockers"
+  | "eligibleWorkMode"
+  | "eligibleWorkWarnings"
+  | "importCandidateWorkItems"
   | "publication"
   | "runnerProfiles"
   | "target"
@@ -667,6 +708,10 @@ type AutomationStatusInput = Omit<
       | "componentEligibleWorkItems"
       | "components"
       | "currentActors"
+      | "eligibleWorkBlockers"
+      | "eligibleWorkMode"
+      | "eligibleWorkWarnings"
+      | "importCandidateWorkItems"
       | "publication"
       | "runnerProfiles"
       | "target"
@@ -712,7 +757,30 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     currentActors: result.currentActors ?? [],
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
+    eligibleWorkMode: result.eligibleWorkMode ?? "default",
+    importCandidateWorkItems: result.importCandidateWorkItems ?? null,
+    eligibleWorkWarnings: result.eligibleWorkWarnings ?? [],
+    eligibleWorkBlockers: result.eligibleWorkBlockers ?? [],
   };
+}
+
+function statusEligibleWorkProviderFactory(options: {
+  options: GetNexusAutomationStatusOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+}): NexusEligibleWorkProviderFactory | undefined {
+  if (!options.options.providerFactory) {
+    return undefined;
+  }
+
+  return (context) =>
+    options.options.providerFactory!({
+      projectRoot: options.projectRoot,
+      sourceRoot: context.component.sourceRoot,
+      projectConfig: options.projectConfig,
+      component: context.component,
+      workTracking: context.tracker.workTracking,
+    });
 }
 
 function currentAutomationActors(options: {

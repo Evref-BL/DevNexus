@@ -57,10 +57,13 @@ import type {
 } from "./nexusPublicationPolicy.js";
 import {
   getNexusAutomationAgentProfileSummary,
-  getNexusAutomationEligibleWorkSummary,
   type NexusAutomationAgentProfileSummary,
-  type NexusAutomationEligibleWorkSummary,
 } from "./nexusAutomationAgentSurface.js";
+import {
+  getNexusEligibleWorkSummary,
+  type NexusEligibleWorkMode,
+  type NexusEligibleWorkSummary,
+} from "./nexusEligibleWorkSummary.js";
 import {
   appendNexusAutomationTargetCycleRecord,
   readNexusAutomationTargetCycleLedger,
@@ -507,6 +510,7 @@ interface ParsedAutomationStatusCommand {
 
 interface ParsedAutomationEligibleWorkCommand {
   projectRoot: string;
+  mode?: NexusEligibleWorkMode;
   json?: boolean;
 }
 
@@ -1057,6 +1061,8 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation eligible-work:",
+    "  --mode <default|discovery>",
+    "  --discovery               shortcut for --mode discovery",
     "  --json",
     "",
     "Options for automation agent-profiles:",
@@ -2131,8 +2137,9 @@ async function handleAutomationCommand(
 
   if (argv[1] === "eligible-work") {
     const parsed = parseAutomationEligibleWorkCommand(argv);
-    const result = await getNexusAutomationEligibleWorkSummary({
+    const result = await getNexusEligibleWorkSummary({
       projectRoot: parsed.projectRoot,
+      eligibleWorkMode: parsed.mode,
       now: dependencies.now,
     });
     printAutomationEligibleWorkResult(
@@ -4832,10 +4839,24 @@ function parseAutomationEligibleWorkCommand(
   }
 
   const parsed: ParsedAutomationEligibleWorkCommand = { projectRoot };
-  for (const arg of rest) {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
     switch (arg) {
       case "--json":
         parsed.json = true;
+        break;
+      case "--discovery":
+        parsed.mode = "discovery";
+        break;
+      case "--mode":
+        parsed.mode = parseEligibleWorkMode(next(), arg);
         break;
       default:
         throw new Error(`Unknown automation eligible-work option: ${arg}`);
@@ -4843,6 +4864,17 @@ function parseAutomationEligibleWorkCommand(
   }
 
   return parsed;
+}
+
+function parseEligibleWorkMode(
+  value: string,
+  optionName: string,
+): NexusEligibleWorkMode {
+  if (value === "default" || value === "discovery") {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be default or discovery`);
 }
 
 function parseAutomationAgentProfilesCommand(
@@ -6613,7 +6645,7 @@ function formatPublicationActor(actor: NexusPublicationActorStatus): string {
 }
 
 function printAutomationEligibleWorkResult(
-  result: NexusAutomationEligibleWorkSummary,
+  result: NexusEligibleWorkSummary,
   parsed: ParsedAutomationEligibleWorkCommand,
   stdout: TextWriter,
 ): void {
@@ -6624,6 +6656,13 @@ function printAutomationEligibleWorkResult(
   }
 
   writeLine(stdout, `DevNexus eligible work: ${result.eligibleWorkItemCount}.`);
+  writeLine(stdout, `  Mode: ${result.mode}`);
+  if (result.importCandidateWorkItemCount > 0) {
+    writeLine(
+      stdout,
+      `  Import candidates: ${result.importCandidateWorkItemCount}`,
+    );
+  }
   if (result.staleInProgressWorkItemCount > 0) {
     writeLine(
       stdout,
@@ -6632,6 +6671,12 @@ function printAutomationEligibleWorkResult(
   }
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(stdout, `  Status: ${result.status}`);
+  for (const warning of result.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+  for (const blocker of result.blockers) {
+    writeLine(stdout, `  Blocker: ${blocker}`);
+  }
   if (result.selector) {
     writeLine(stdout, `  Selector: ${formatAutomationSelector(result.selector)}`);
   }
@@ -6642,6 +6687,12 @@ function printAutomationEligibleWorkResult(
     );
     for (const item of component.workItems) {
       writeLine(stdout, `    ${item.id} [${item.status}] ${item.title}`);
+    }
+    for (const item of component.importCandidateWorkItems) {
+      writeLine(
+        stdout,
+        `    ${item.id} [${item.status}] import-only ${item.title}`,
+      );
     }
     for (const item of component.staleInProgressWorkItems) {
       writeLine(
@@ -6770,7 +6821,7 @@ function printAutomationAppServerProbeResult(
 }
 
 function formatAutomationSelector(
-  selector: NonNullable<NexusAutomationEligibleWorkSummary["selector"]>,
+  selector: NonNullable<NexusEligibleWorkSummary["selector"]>,
 ): string {
   const parts: string[] = [];
   if (selector.statuses.length > 0) {

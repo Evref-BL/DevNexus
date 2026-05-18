@@ -10,6 +10,7 @@ import type {
   WorkTrackingConfig,
   WorkTrackingProviderName,
   WorkTrackingRepositoryConfig,
+  WorkStatus,
 } from "./workTrackingTypes.js";
 import type {
   NexusProjectSkillsConfig,
@@ -137,12 +138,35 @@ export interface NexusProjectTrackerDiscoveryPolicyConfig {
   importRequiredFirst: boolean;
   providerFilters: WorkTrackingProviderName[];
   queryLimit: number | null;
+  trackerLimits?: Record<string, number>;
+  finalLimit?: number | null;
+  statuses?: WorkStatus[];
+  labels?: string[];
+  milestones?: string[];
+  assignees?: string[];
+  providerQuery?: string | null;
   conflictWinner: NexusProjectTrackerDiscoveryConflictWinner;
   missingCredentialBehavior: NexusProjectTrackerDiscoveryMissingCredentialBehavior;
 }
 
 export interface NormalizedNexusProjectTrackerDiscoveryPolicy
-  extends NexusProjectTrackerDiscoveryPolicyConfig {
+  extends Omit<
+    NexusProjectTrackerDiscoveryPolicyConfig,
+    | "assignees"
+    | "finalLimit"
+    | "labels"
+    | "milestones"
+    | "providerQuery"
+    | "statuses"
+    | "trackerLimits"
+  > {
+  trackerLimits: Record<string, number>;
+  finalLimit: number | null;
+  statuses: WorkStatus[];
+  labels: string[];
+  milestones: string[];
+  assignees: string[];
+  providerQuery: string | null;
   defaultTrackerOnly: boolean;
 }
 
@@ -333,6 +357,13 @@ export const defaultNexusProjectTrackerDiscoveryPolicy: NexusProjectTrackerDisco
   importRequiredFirst: true,
   providerFilters: [],
   queryLimit: 50,
+  trackerLimits: {},
+  finalLimit: null,
+  statuses: [],
+  labels: [],
+  milestones: [],
+  assignees: [],
+  providerQuery: null,
   conflictWinner: "default_tracker",
   missingCredentialBehavior: "block",
 };
@@ -3054,6 +3085,121 @@ function validateTrackerDiscoveryQueryLimit(
   return value;
 }
 
+function validateTrackerDiscoveryTrackerLimits(
+  value: unknown,
+  pathName: string,
+): Record<string, number> {
+  if (value === undefined) {
+    return { ...defaultNexusProjectTrackerDiscoveryPolicy.trackerLimits };
+  }
+  const record = assertRecord(value, pathName);
+  const limits: Record<string, number> = {};
+  for (const [trackerId, limit] of Object.entries(record)) {
+    if (trackerId.trim().length === 0) {
+      throw new NexusConfigError(`${pathName} tracker id must be non-empty`);
+    }
+    if (typeof limit !== "number" || !Number.isInteger(limit) || limit <= 0) {
+      throw new NexusConfigError(
+        `${pathName}.${trackerId} must be a positive integer`,
+      );
+    }
+    limits[trackerId] = limit;
+  }
+
+  return limits;
+}
+
+function validateTrackerDiscoveryFinalLimit(
+  value: unknown,
+  pathName: string,
+): number | null {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.finalLimit ?? null;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusConfigError(`${pathName} must be a positive integer or null`);
+  }
+
+  return value;
+}
+
+function validateTrackerDiscoveryStatuses(
+  value: unknown,
+  pathName: string,
+): WorkStatus[] {
+  if (value === undefined) {
+    return [...(defaultNexusProjectTrackerDiscoveryPolicy.statuses ?? [])];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  const statuses = value.map((entry, index) =>
+    validateWorkStatus(entry, `${pathName}[${index}]`),
+  );
+  assertUniqueValues(statuses, pathName);
+
+  return statuses;
+}
+
+function validateWorkStatus(value: unknown, pathName: string): WorkStatus {
+  if (
+    value === "todo" ||
+    value === "ready" ||
+    value === "in_progress" ||
+    value === "blocked" ||
+    value === "done" ||
+    value === "wont_do"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be todo, ready, in_progress, blocked, done, or wont_do`,
+  );
+}
+
+function validateTrackerDiscoveryStringFilters(
+  value: unknown,
+  pathName: string,
+  fallback: readonly string[],
+): string[] {
+  if (value === undefined) {
+    return [...fallback];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  const values = value.map((entry, index) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new NexusConfigError(`${pathName}[${index}] must be a non-empty string`);
+    }
+    return entry.trim();
+  });
+  assertUniqueValues(values, pathName);
+
+  return values;
+}
+
+function validateTrackerDiscoveryProviderQuery(
+  value: unknown,
+  pathName: string,
+): string | null {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.providerQuery ?? null;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new NexusConfigError(`${pathName} must be a non-empty string or null`);
+  }
+
+  return value.trim();
+}
+
 function validateTrackerDiscoveryPolicy(
   value: unknown,
   pathName: string,
@@ -3085,6 +3231,37 @@ function validateTrackerDiscoveryPolicy(
     queryLimit: validateTrackerDiscoveryQueryLimit(
       record.queryLimit,
       `${pathName}.queryLimit`,
+    ),
+    trackerLimits: validateTrackerDiscoveryTrackerLimits(
+      record.trackerLimits,
+      `${pathName}.trackerLimits`,
+    ),
+    finalLimit: validateTrackerDiscoveryFinalLimit(
+      record.finalLimit,
+      `${pathName}.finalLimit`,
+    ),
+    statuses: validateTrackerDiscoveryStatuses(
+      record.statuses,
+      `${pathName}.statuses`,
+    ),
+    labels: validateTrackerDiscoveryStringFilters(
+      record.labels,
+      `${pathName}.labels`,
+      defaultNexusProjectTrackerDiscoveryPolicy.labels ?? [],
+    ),
+    milestones: validateTrackerDiscoveryStringFilters(
+      record.milestones,
+      `${pathName}.milestones`,
+      defaultNexusProjectTrackerDiscoveryPolicy.milestones ?? [],
+    ),
+    assignees: validateTrackerDiscoveryStringFilters(
+      record.assignees,
+      `${pathName}.assignees`,
+      defaultNexusProjectTrackerDiscoveryPolicy.assignees ?? [],
+    ),
+    providerQuery: validateTrackerDiscoveryProviderQuery(
+      record.providerQuery,
+      `${pathName}.providerQuery`,
     ),
     conflictWinner: validateTrackerDiscoveryConflictWinner(
       record.conflictWinner,
@@ -3119,6 +3296,13 @@ export function normalizeNexusProjectTrackerDiscoveryPolicy(
     importRequiredFirst: normalized.importRequiredFirst,
     providerFilters: [...normalized.providerFilters],
     queryLimit: normalized.queryLimit,
+    trackerLimits: { ...(normalized.trackerLimits ?? {}) },
+    finalLimit: normalized.finalLimit ?? null,
+    statuses: [...(normalized.statuses ?? [])],
+    labels: [...(normalized.labels ?? [])],
+    milestones: [...(normalized.milestones ?? [])],
+    assignees: [...(normalized.assignees ?? [])],
+    providerQuery: normalized.providerQuery ?? null,
     conflictWinner: normalized.conflictWinner,
     missingCredentialBehavior: normalized.missingCredentialBehavior,
     defaultTrackerOnly: policy === undefined,
