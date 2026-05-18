@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 280,
-  "updatedAt": "2026-05-18T23:24:55.464Z",
+  "nextCommentNumber": 282,
+  "updatedAt": "2026-05-18T23:35:13.203Z",
   "items": [
     {
       "id": "local-1",
@@ -2254,7 +2254,7 @@
       "id": "local-90",
       "title": "Surface effective authority in status reports and agent context",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the effective authority resolver exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make authority visible before agents take action by projecting effective authority into project status, target reports, coordination status, and generated worker context.\n\nUser stories covered:\n- As a worker agent, I can see whether I am expected to integrate, open a pull request, request review, or only hand off.\n- As a human maintainer, I can inspect a target report and see why an agent did or did not publish.\n\nAcceptance criteria:\n- Project status summarizes current actor identity when detectable, auth profile name, component role bindings, and key allowed actions.\n- Automation target reports and target-cycle facts can include concise authority decisions and blockers.\n- Generated worker context and briefings include component-specific publication/coordination authority and safe fallback instructions.\n- Coordination status reports authority next to branch, tracker, handoff, and integration facts.\n- Low-token summaries remain concise and do not include secrets, full tokens, private key paths, or host-local credential material.\n\nDependencies:\n- Depends on the effective authority resolver.\n\nBoundaries:\n- Reporting only; do not block commands in this slice.\n- Do not require live provider credentials.\n\nVerification:\n- Focused tests for project status, target report, coordination status, and worker context authority summaries.\n- Snapshot or text-output tests should check for concise allowed/blocked/fallback information without secrets.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2268,7 +2268,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.222Z",
-      "updatedAt": "2026-05-18T23:12:24.410Z",
+      "updatedAt": "2026-05-18T23:35:13.182Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3381,7 +3381,7 @@
       "id": "local-132",
       "title": "Deduplicate linked work items across trackers",
       "description": "Type: logical-identity implementation slice\nReadiness: todo/dependent on dev-nexus:local-129; can be implemented before or with dev-nexus:local-131\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prevent eligible-work discovery from returning duplicate assignments when the same logical work item exists in local and external trackers.\n\nUser stories covered:\n- As a worker agent, I receive one canonical assignment, not separate local and GitHub copies of the same work.\n- As a migration owner, I can see ambiguous or stale tracker links instead of DevNexus silently merging unrelated issues.\n\nAcceptance criteria:\n- Deduplication uses existing tracker links, provider external references on local items, stable provider repository/item number or key, and optional configured fingerprints where available.\n- Linked local and external items collapse to one canonical item according to discovery policy, with a deduplication reason or link id in the result.\n- Stale links, missing target items, conflicting links, and ambiguous unlinked matches are reported as warnings or blockers according to policy.\n- DevNexus does not silently collapse items when identity cannot be proven.\n- The dedupe result can be reused by eligible-work aggregation and inbound import planning.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n- Coordinates with dev-nexus:local-131 for eligible-work integration.\n\nBoundaries:\n- Do not mutate link records or tracker items in this slice.\n- Do not implement provider write-back or inbound import execution.\n\nVerification:\n- Focused tests for linked duplicates, externalRef duplicates, repository/number matching, stale links, ambiguous matches, and canonical source selection.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3395,7 +3395,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:01.952Z",
-      "updatedAt": "2026-05-18T23:24:55.464Z",
+      "updatedAt": "2026-05-18T23:35:13.203Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6353,6 +6353,17 @@
           "provider": "local",
           "itemId": "local-comment-277"
         }
+      },
+      {
+        "id": "local-comment-280",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-90-authority-summaries` on branch `codex/dev-nexus-local-90-authority-summaries`. Scope is reporting-only authority summaries; no command gating or live provider calls. Avoiding tracker dedupe files owned by `dev-nexus:local-132`.",
+        "author": null,
+        "createdAt": "2026-05-18T23:35:13.182Z",
+        "updatedAt": "2026-05-18T23:35:13.182Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-280"
+        }
       }
     ],
     "local-91": [],
@@ -7182,6 +7193,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-279"
+        }
+      },
+      {
+        "id": "local-comment-281",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-132-tracker-dedupe` on branch `codex/dev-nexus-local-132-tracker-dedupe`. Scope is read-only linked-work-item deduplication; no tracker/link mutation or provider write-back. Avoiding authority/status/agent-context files owned by `dev-nexus:local-90`.",
+        "author": null,
+        "createdAt": "2026-05-18T23:35:13.203Z",
+        "updatedAt": "2026-05-18T23:35:13.203Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-281"
         }
       }
     ],
