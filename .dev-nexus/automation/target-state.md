@@ -89,6 +89,13 @@ Immediate direction:
     workspace ids, gateway/control endpoints, image MCP ports, active/stale
     port claims, conflicting listeners, route-table state, legacy migration
     guidance, and zero-image `operational-but-idle` diagnostics.
+  - `plexus:local-20` warning/gating phase is complete and published through
+    PLexus `3326284`. Generated workspace MCP config now removes managed legacy
+    `pharo` gateway entries and normalizes requested `pharo` server names to
+    `gateway`. Legacy gateway env/surface compatibility remains available in
+    warning mode, while `PLEXUS_LEGACY_GATEWAY_COMPATIBILITY=reject` provides
+    the explicit removal-mode rejection path with migration guidance. Final
+    legacy support removal remains human-in-the-loop and was not performed.
 - The six-item parallel dogfood wave selected by
   `coordinator-loop-20260517-t220947-388-z-1` is complete:
   - `dev-nexus:local-33`, `dev-nexus:local-58`, `dev-nexus:local-59`, and
@@ -113,10 +120,9 @@ Immediate direction:
     `npm run build` passed. No live image, Docker, or gateway process was
     started.
 - Current ready `dogfood` work matching the automation selector:
-  - `plexus:local-20` legacy gateway compatibility warning/gating phase. It is
-    promoted after `plexus:local-18` and `dev-nexus-pharo:local-13` completed,
-    but final legacy support removal remains human-in-the-loop and must not be
-    performed without a separate explicit decision.
+  - None after completing `plexus:local-20`. Final legacy support removal
+    remains human-in-the-loop and must not be performed without a separate
+    explicit decision.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

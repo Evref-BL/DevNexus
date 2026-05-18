@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 48,
-  "updatedAt": "2026-05-18T01:31:27.761Z",
+  "nextCommentNumber": 53,
+  "updatedAt": "2026-05-18T02:20:16.828Z",
   "items": [
     {
       "id": "local-1",
@@ -470,7 +470,7 @@
       "id": "local-20",
       "title": "Gate and remove legacy gateway compatibility",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-18, dev-nexus-pharo:local-13.\n\nGoal:\nRemove the old PLexus gateway compatibility surface deliberately, after the new project-scoped gateway setup is in place and current projects have migration guidance.\n\nAcceptance criteria:\n- New generated configs no longer emit legacy pharo or combined gateway server names.\n- The compatibility phase emits warnings with exact replacement configuration names and endpoint paths.\n- The removal phase requires an explicit decision before deleting support for legacy gateway environment variables and old route paths.\n- Final removal rejects legacy config with migration guidance rather than silently falling back.\n- Tests cover warning mode, compatibility-flag behavior, and final rejection behavior.\n\nVerification:\nRun gateway config tests in warning mode and, after human approval, in removal mode.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -482,8 +482,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.289Z",
-      "updatedAt": "2026-05-18T01:31:27.761Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T02:20:16.828Z",
+      "closedAt": "2026-05-18T02:20:16.828Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1071,6 +1071,61 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-47"
+        }
+      },
+      {
+        "id": "local-comment-48",
+        "body": "Coordinator selected this item for the compatibility warning/gating phase only. Implementation runs in isolated PLexus worktree local-20-legacy-gateway-gating on branch codex/plexus/local-20-legacy-gateway-gating. Final legacy support removal remains human-in-the-loop and will not be performed in this cycle without a separate explicit decision.",
+        "author": null,
+        "createdAt": "2026-05-18T02:12:18.684Z",
+        "updatedAt": "2026-05-18T02:12:18.684Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-48"
+        }
+      },
+      {
+        "id": "local-comment-49",
+        "body": "Implementation and verification complete in PLexus worktree local-20-legacy-gateway-gating. Scope stayed to warning/gating: generated MCP config removes managed legacy pharo gateway entries and normalizes requested pharo names to gateway; PLEXUS_LEGACY_GATEWAY_COMPATIBILITY=reject provides the explicit removal-mode gate with migration guidance. Verification passed: focused core/gateway tests, npm run typecheck --workspaces, npm test, npm run build. Final legacy support removal remains HITL and was not performed.",
+        "author": null,
+        "createdAt": "2026-05-18T02:18:49.318Z",
+        "updatedAt": "2026-05-18T02:18:49.318Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-49"
+        }
+      },
+      {
+        "id": "local-comment-50",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/plexus/local-20-legacy-gateway-gating\nHead: 6b5958ef7a38204c7199681cd1bd60425e3bbc60\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T02:18:49.956Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-20\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\plexus\\\\local-20-legacy-gateway-gating\",\n  \"branch\": \"codex/plexus/local-20-legacy-gateway-gating\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"6b5958ef7a38204c7199681cd1bd60425e3bbc60\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/workspaceMcpConfig.ts\",\n    \"packages/plexus-core/src/projectLifecycle.ts\",\n    \"packages/plexus-gateway/src/server.ts\",\n    \"README.md\",\n    \"docs\"\n  ],\n  \"decisions\": [\n    \"Implemented warning/gating phase only: generated config drops managed legacy pharo gateway entries and normalizes requested pharo server names to gateway.\",\n    \"Added PLEXUS_LEGACY_GATEWAY_COMPATIBILITY=reject as the explicit removal-mode gate; default/explicit warn keeps compatibility.\"\n  ],\n  \"verificationSummary\": \"Focused core/gateway tests passed; npm run typecheck --workspaces passed; npm test passed; npm run build passed.\",\n  \"integrationPreference\": \"Direct integration to PLexus origin/main after final commit review.\",\n  \"note\": \"Final support removal remains HITL; no live image, Docker, gateway service, or PLexus open/close was run.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T02:18:49.975Z",
+        "updatedAt": "2026-05-18T02:18:49.975Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-50"
+        }
+      },
+      {
+        "id": "local-comment-51",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/plexus/local-20-legacy-gateway-gating\nHead: 332628419492745569209050bd7399fe920e3e6e\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T02:20:03.857Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-20\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\plexus\\\\local-20-legacy-gateway-gating\",\n  \"branch\": \"codex/plexus/local-20-legacy-gateway-gating\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"332628419492745569209050bd7399fe920e3e6e\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-core/src/workspaceMcpConfig.ts\",\n    \"packages/plexus-core/src/projectLifecycle.ts\",\n    \"packages/plexus-gateway/src/server.ts\",\n    \"README.md\",\n    \"docs\"\n  ],\n  \"decisions\": [\n    \"Published PLexus direct-integration commit 3326284 to origin/main.\",\n    \"Warning/gating phase complete; final legacy compatibility support removal remains human-in-the-loop.\"\n  ],\n  \"verificationSummary\": \"npm test -w @evref-bl/plexus-core -- src/workspaceMcpConfig.test.ts src/projectLifecycle.test.ts passed; npm test -w @evref-bl/plexus-gateway -- src/server.test.ts passed; npm run typecheck --workspaces passed; npm test passed; npm run build passed.\",\n  \"integrationPreference\": \"Already pushed to origin/main and source checkout fast-forwarded.\",\n  \"note\": \"No live image, Docker, gateway service, or PLexus open/close was run.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T02:20:03.873Z",
+        "updatedAt": "2026-05-18T02:20:03.873Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-51"
+        }
+      },
+      {
+        "id": "local-comment-52",
+        "body": "Completed and published to PLexus origin/main as 3326284. Warning/gating phase only: new generated workspace MCP config no longer keeps managed legacy pharo gateway entries or emits requested pharo server names; legacy env/surface compatibility remains available in warn mode; PLEXUS_LEGACY_GATEWAY_COMPATIBILITY=reject provides the explicit removal-mode rejection path with migration guidance. Verification passed: focused core/gateway tests, npm run typecheck --workspaces, npm test, npm run build. No live runtime was started; final support removal remains HITL.",
+        "author": null,
+        "createdAt": "2026-05-18T02:20:12.401Z",
+        "updatedAt": "2026-05-18T02:20:12.401Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-52"
         }
       }
     ],
