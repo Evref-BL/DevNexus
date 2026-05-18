@@ -332,6 +332,481 @@ describe("eligible work discovery", () => {
     });
   });
 
+  it("deduplicates linked local and external tracker representations to one canonical assignment", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary", "eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "default_tracker",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    saveWorkItemTrackerLinkStore(defaultWorkItemTrackerLinkStorePath(projectRoot), {
+      version: 1,
+      nextAuditNumber: 1,
+      updatedAt: "2026-05-18T10:00:00.000Z",
+      records: [
+        {
+          projectId: "eligible-demo",
+          componentId: "core",
+          logicalItemId: "local-7",
+          createdAt: "2026-05-18T10:00:00.000Z",
+          updatedAt: "2026-05-18T10:00:00.000Z",
+          references: [
+            trackerReference("local", "local", "local-7"),
+            trackerReference("inbox", "github", "42", 42),
+          ],
+          audit: [],
+        },
+      ],
+    });
+    const providers = providerFactory({
+      local: [
+        workItem("local-7", "Local canonical task", {
+          status: "ready",
+          labels: ["automation"],
+        }),
+      ],
+      inbox: [
+        workItem("42", "GitHub mirror task", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            provider: "github",
+            repositoryOwner: "example",
+            repositoryName: "demo",
+            itemId: "42",
+            itemNumber: 42,
+          },
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "local-7",
+        logicalItemId: "local-7",
+        canonicalTrackerRef: {
+          trackerId: "local",
+        },
+        dedupe: {
+          reason: "tracker_link",
+          linkId: "local-7",
+          collapsedCount: 2,
+        },
+      },
+    ]);
+    expect(result.importCandidateWorkItems).toEqual([]);
+  });
+
+  it("deduplicates local external references against provider-native issues", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary", "eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "default_tracker",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const externalRef = {
+      provider: "github" as const,
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      itemId: "42",
+      itemNumber: 42,
+    };
+    const providers = providerFactory({
+      local: [
+        workItem("local-42", "Imported task", {
+          status: "ready",
+          labels: ["automation"],
+          externalRef,
+        }),
+      ],
+      inbox: [
+        workItem("gh-42", "Provider task", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            ...externalRef,
+            itemId: "gh-42",
+          },
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "local-42",
+        logicalItemId: "local-42",
+        dedupe: {
+          reason: "external_ref",
+          collapsedCount: 2,
+        },
+      },
+    ]);
+    expect(result.importCandidateWorkItems).toEqual([]);
+  });
+
+  it("uses configured fingerprints when provider identity is otherwise not stable", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary", "eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "default_tracker",
+        missingCredentialBehavior: "skip",
+        fingerprints: [
+          {
+            id: "github-issue-42",
+            trackerId: "local",
+            provider: "github",
+            itemId: "local-external-42",
+          },
+          {
+            id: "github-issue-42",
+            trackerId: "inbox",
+            provider: "github",
+            itemId: "provider-issue-42",
+          },
+        ],
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const providers = providerFactory({
+      local: [
+        workItem("local-42", "Fingerprint local task", {
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            provider: "github",
+            itemId: "local-external-42",
+          },
+        }),
+      ],
+      inbox: [
+        workItem("provider-issue-42", "Fingerprint provider task", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            provider: "github",
+            itemId: "provider-issue-42",
+          },
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "local-42",
+        dedupe: {
+          reason: "configured_fingerprint",
+          key: "fingerprint:core:github-issue-42",
+          collapsedCount: 2,
+        },
+      },
+    ]);
+  });
+
+  it("reports missing canonical targets for stale tracker links", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary", "eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "default_tracker",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    saveWorkItemTrackerLinkStore(defaultWorkItemTrackerLinkStorePath(projectRoot), {
+      version: 1,
+      nextAuditNumber: 1,
+      updatedAt: "2026-05-18T10:00:00.000Z",
+      records: [
+        {
+          projectId: "eligible-demo",
+          componentId: "core",
+          logicalItemId: "local-7",
+          createdAt: "2026-05-18T10:00:00.000Z",
+          updatedAt: "2026-05-18T10:00:00.000Z",
+          references: [
+            trackerReference("local", "local", "local-7"),
+            trackerReference("inbox", "github", "42", 42),
+          ],
+          audit: [],
+        },
+      ],
+    });
+    const providers = providerFactory({
+      local: [],
+      inbox: [
+        workItem("42", "Stale linked inbox task", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            provider: "github",
+            repositoryOwner: "example",
+            repositoryName: "demo",
+            itemId: "42",
+            itemNumber: 42,
+          },
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.warnings).toEqual([
+      expect.stringContaining(
+        'Linked canonical tracker item "local-7" from tracker "local" was not returned',
+      ),
+    ]);
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "local-7",
+        warnings: [
+          expect.stringContaining("Linked canonical tracker item"),
+        ],
+      },
+    ]);
+  });
+
+  it("blocks conflicting link records without silently selecting a canonical item", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "block",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    saveWorkItemTrackerLinkStore(defaultWorkItemTrackerLinkStorePath(projectRoot), {
+      version: 1,
+      nextAuditNumber: 1,
+      updatedAt: "2026-05-18T10:00:00.000Z",
+      records: [
+        {
+          projectId: "eligible-demo",
+          componentId: "core",
+          logicalItemId: "local-7",
+          createdAt: "2026-05-18T10:00:00.000Z",
+          updatedAt: "2026-05-18T10:00:00.000Z",
+          references: [trackerReference("inbox", "github", "42", 42)],
+          audit: [],
+        },
+        {
+          projectId: "eligible-demo",
+          componentId: "core",
+          logicalItemId: "local-8",
+          createdAt: "2026-05-18T10:00:00.000Z",
+          updatedAt: "2026-05-18T10:00:00.000Z",
+          references: [trackerReference("inbox", "github", "42", 42)],
+          audit: [],
+        },
+      ],
+    });
+    const providers = providerFactory({
+      inbox: [
+        workItem("42", "Conflicting link task", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: {
+            provider: "github",
+            repositoryOwner: "example",
+            repositoryName: "demo",
+            itemId: "42",
+            itemNumber: 42,
+          },
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.blockers).toEqual([
+      expect.stringContaining("matches conflicting link records"),
+    ]);
+    expect(result.eligibleWorkItems).toEqual([]);
+    expect(result.importCandidateWorkItems).toMatchObject([
+      {
+        id: "42",
+        logicalItemId: null,
+        warnings: expect.arrayContaining([
+          expect.stringContaining("matches conflicting link records"),
+        ]),
+      },
+    ]);
+  });
+
+  it("does not collapse ambiguous unlinked provider matches", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary", "eligible_source"],
+        directExternalSelection: "disabled",
+        importRequiredFirst: true,
+        providerFilters: [],
+        queryLimit: 10,
+        conflictWinner: "block",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const duplicateRef = {
+      provider: "github" as const,
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      itemId: "42",
+      itemNumber: 42,
+    };
+    const providers = providerFactory({
+      local: [
+        workItem("local-7", "First possible import", {
+          status: "ready",
+          labels: ["automation"],
+          externalRef: duplicateRef,
+        }),
+        workItem("local-8", "Second possible import", {
+          status: "ready",
+          labels: ["automation"],
+          externalRef: duplicateRef,
+        }),
+      ],
+      inbox: [
+        workItem("42", "Provider source", {
+          provider: "github",
+          status: "ready",
+          labels: ["automation"],
+          externalRef: duplicateRef,
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      selectorQuery: buildNexusAutomationWorkItemQuery(automationConfig()),
+      mode: "discovery",
+      providerFactory: providers.factory,
+      credentialResolver: () => ({
+        status: "available",
+        required: true,
+        message: "credentials available",
+      }),
+    });
+
+    expect(result.blockers).toEqual([
+      expect.stringContaining("Ambiguous unlinked provider identity"),
+    ]);
+    expect(result.eligibleWorkItems.map((item) => item.id)).toEqual([
+      "local-7",
+      "local-8",
+    ]);
+    expect(result.importCandidateWorkItems.map((item) => item.id)).toEqual([
+      "42",
+    ]);
+  });
+
   it("reports disabled trackers, capability gaps, missing credentials, and provider read errors without crashing", async () => {
     const projectRoot = makeTempDir("dev-nexus-eligible-work-");
     const config = projectConfig({

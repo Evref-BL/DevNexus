@@ -14,6 +14,7 @@ import {
   type NexusAutomationWorkTrackerSummary,
 } from "./nexusAutomationWorkTrackerSummary.js";
 import type {
+  NexusEligibleWorkDedupeInfo,
   NexusEligibleWorkItem,
   NexusEligibleWorkMode,
   NexusEligibleWorkTrackerQueryResult,
@@ -41,6 +42,7 @@ export interface NexusEligibleWorkItemSummary {
   trackerRef: WorkTrackerRef | null;
   canonicalTrackerRef: WorkTrackerRef | null;
   sourceTrackerRef: WorkTrackerRef | null;
+  dedupe: NexusEligibleWorkDedupeInfo | null;
   warnings: string[];
   selectable: boolean;
   importOnly: boolean;
@@ -176,6 +178,7 @@ export async function getNexusEligibleWorkSummary(
       trackerRef,
       canonicalTrackerRef: trackerRef,
       sourceTrackerRef: trackerRef,
+      dedupe: null,
       warnings: [],
       selectable: true,
       importOnly: false,
@@ -253,6 +256,7 @@ function summarizeEligibleWorkItem(
     sourceTrackerRef: Object.hasOwn(eligible, "sourceTrackerRef")
       ? eligible.sourceTrackerRef ?? null
       : item.trackerRef ?? null,
+    dedupe: eligible.dedupe ?? null,
     warnings: eligible.warnings ?? [],
     selectable: eligible.selectable ?? true,
     importOnly: eligible.importOnly ?? false,

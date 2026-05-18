@@ -178,6 +178,7 @@ describe("project registry helpers", () => {
             milestones: [],
             assignees: [],
             providerQuery: null,
+            fingerprints: [],
             conflictWinner: "default_tracker",
             missingCredentialBehavior: "block",
             defaultTrackerOnly: true,
