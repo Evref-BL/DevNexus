@@ -1752,6 +1752,90 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints coordination cleanup dry-run plans through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-cleanup-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+    const gitRunner: GitRunner = (args: readonly string[]): GitCommandResult => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "worktree list --porcelain") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (joined === "for-each-ref --format=%(refname:short) refs/heads/codex") {
+        return {
+          args: argsArray,
+          stdout: "codex/primary/local-7\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (joined === "rev-parse --verify main") {
+        return { args: argsArray, stdout: "target123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "rev-parse codex/primary/local-7") {
+        return { args: argsArray, stdout: "branch123\n", stderr: "", exitCode: 0 };
+      }
+      if (joined === "merge-base --is-ancestor codex/primary/local-7 main") {
+        return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+      }
+      if (
+        joined ===
+        "rev-parse --abbrev-ref --symbolic-full-name codex/primary/local-7@{u}"
+      ) {
+        return {
+          args: argsArray,
+          stdout: "origin/codex/primary/local-7\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      if (
+        joined ===
+        "rev-list --left-right --count codex/primary/local-7...origin/codex/primary/local-7"
+      ) {
+        return { args: argsArray, stdout: "0\t0\n", stderr: "", exitCode: 0 };
+      }
+
+      return { args: argsArray, stdout: "", stderr: "", exitCode: 0 };
+    };
+
+    await main(
+      [
+        "coordination",
+        "cleanup-plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        gitRunner,
+        now: fixedClock("2026-05-18T10:00:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      plan: {
+        mutatesSource: false,
+        summary: {
+          total: 1,
+          safe: 1,
+        },
+        candidates: [
+          {
+            branch: "codex/primary/local-7",
+            classifications: ["merged", "safe"],
+          },
+        ],
+      },
+    });
+  });
+
   it("returns actionable JSON when coordination integration cannot parse a local tracker store", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-61");

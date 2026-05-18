@@ -90,6 +90,10 @@ import {
   type NexusCoordinationRequestStatus,
 } from "./nexusCoordinationRequest.js";
 import {
+  buildNexusCleanupPlan,
+  type NexusCleanupPlan,
+} from "./nexusCleanupPlan.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -511,6 +515,14 @@ interface ParsedCoordinationIntegrateCommand {
   json?: boolean;
 }
 
+interface ParsedCoordinationCleanupPlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  includeProjectMeta?: boolean;
+  targetBranch?: string;
+  json?: boolean;
+}
+
 interface ParsedCoordinationRequestCommand {
   projectRoot: string;
   componentId?: string;
@@ -612,6 +624,7 @@ export function usage(): string {
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
+    "  dev-nexus coordination cleanup-plan <project-root> [options]",
     "  dev-nexus coordination request <project-root> --intent <intent> (--question <text>|--note <text>) [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
@@ -720,6 +733,12 @@ export function usage(): string {
     "  --target-branch <branch>  defaults to component or automation publication target",
     "  --fetch                   fetch configured remote when automation safety allows host mutation",
     "  --worktree <path>         git worktree or source checkout used for planning",
+    "  --json",
+    "",
+    "Options for coordination cleanup-plan:",
+    "  --component <id>          defaults to the primary component",
+    "  --include-project-meta    also scan project-meta worktrees and branches",
+    "  --target-branch <branch>  defaults to component or project publication target",
     "  --json",
     "",
     "Options for coordination request:",
@@ -1308,6 +1327,24 @@ async function handleCoordinationCommand(
     }
   }
 
+  if (command === "cleanup-plan") {
+    const parsed = parseCoordinationCleanupPlanCommand(argv);
+    const plan = buildNexusCleanupPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      includeProjectMeta: parsed.includeProjectMeta,
+      targetBranch: parsed.targetBranch,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printCoordinationCleanupPlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (command === "request") {
     const parsed = parseCoordinationRequestCommand(argv);
     const result = await createNexusCoordinationRequest({
@@ -1338,7 +1375,7 @@ async function handleCoordinationCommand(
     return 0;
   }
 
-  throw new Error("coordination requires status, handoff, integrate, or request");
+  throw new Error("coordination requires status, handoff, integrate, cleanup-plan, or request");
 }
 
 async function handleWorktreeCommand(
@@ -2874,6 +2911,47 @@ function parseCoordinationIntegrateCommand(
         break;
       default:
         throw new Error(`Unknown coordination integrate option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseCoordinationCleanupPlanCommand(
+  argv: string[],
+): ParsedCoordinationCleanupPlanCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("coordination cleanup-plan requires a project root");
+  }
+
+  const parsed: ParsedCoordinationCleanupPlanCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--include-project-meta":
+        parsed.includeProjectMeta = true;
+        break;
+      case "--target-branch":
+        parsed.targetBranch = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown coordination cleanup-plan option: ${arg}`);
     }
   }
 
@@ -4737,6 +4815,33 @@ function printCoordinationIntegrationError(
     }
     writeLine(stderr, `  Stage: ${diagnostic.operation}/${diagnostic.stage}`);
     writeLine(stderr, `  Recovery: ${diagnostic.recovery}`);
+  }
+}
+
+function printCoordinationCleanupPlan(
+  plan: NexusCleanupPlan,
+  parsed: ParsedCoordinationCleanupPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus coordination cleanup plan.");
+  writeLine(stdout, `  Project: ${plan.project.id}`);
+  writeLine(stdout, `  Candidates: ${plan.summary.total}`);
+  writeLine(stdout, `  Safe: ${plan.summary.safe}`);
+  writeLine(stdout, `  Blocked: ${plan.summary.blocked}`);
+  writeLine(stdout, `  Needs rescue: ${plan.summary.needsRescue}`);
+  for (const candidate of plan.candidates) {
+    writeLine(
+      stdout,
+      `    ${candidate.id}: ${candidate.classifications.join(", ")} - ${
+        candidate.safeToDelete ? "safe" : "blocked"
+      }`,
+    );
   }
 }
 
