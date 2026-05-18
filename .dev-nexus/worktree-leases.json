@@ -1,7 +1,178 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T23:02:13.332Z",
+  "updatedAt": "2026-05-18T23:24:34.777Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-8eb3a1516c812d2c",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-131",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusEligibleWork.ts",
+        "src/nexusEligibleWork.test.ts",
+        "src/nexusEligibleWorkSummary.ts",
+        "src/nexusAutomationStatus.ts",
+        "src/nexusAutomationAgentLaunch.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts",
+        "src/nexusProjectRegistry.test.ts",
+        "src/nexusWorkItemDiscoveryStatus.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T23:24:34.777Z",
+      "lastSeenAt": "2026-05-18T23:24:34.777Z",
+      "updatedAt": "2026-05-18T23:24:34.777Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Parallel integration of local-131 worker commit 1292ecf was detected already published; coordinator verified c7928f18 rather than replaying the merge.",
+        "Verification: Integrated verification passed: focused local-131 suite with 8 files/144 tests; npm run build; npm run check with 63 files and 540 tests.",
+        "Integration preference: Published direct integration to DevNexus bot/main as c7928f18."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-15f444d1466825fc",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-131",
+      "branchName": "codex/dev-nexus-dogfood/local-131",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-131"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        ".dev-nexus/automation/target-state.md",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-18T23:23:22.414Z",
+      "lastSeenAt": "2026-05-18T23:23:22.414Z",
+      "updatedAt": "2026-05-18T23:23:22.414Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e47d8d9edd572697c34947b64a892593f08b238c",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-131"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-7cf72ae5c09fc645",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-89",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusAuthority.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T23:12:06.029Z",
+      "lastSeenAt": "2026-05-18T23:12:06.029Z",
+      "updatedAt": "2026-05-18T23:12:06.029Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "0bc80d933c3eff434c518f62affa8e85b8181080",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged local-89 worker commit 3d307dd into DevNexus main through bot remote.",
+        "Verification: Integrated focused verification passed: npm test -- src/nexusAuthority.test.ts src/nexusAutomationStatus.test.ts src/nexusProjectConfig.test.ts; npm run build; git diff --check HEAD~1..HEAD.",
+        "Integration preference: Published direct integration to DevNexus bot/main as 0bc80d9."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

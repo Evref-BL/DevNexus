@@ -93,10 +93,10 @@ target-cycle facts, commits, and the target report.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
   `dev-nexus:local-129` is complete for tracker roles and discovery-policy
   defaults, and `local-130` is complete for read-only discovery status.
-  `local-131` eligible-work aggregation is ready next; promote `local-132`
-  through `local-136` as dependencies land. `local-137` is the blocked HITL
-  policy decision for direct external selection, provider comments, scheduler
-  import, and ordering.
+  `local-131` is complete for opt-in eligible-work aggregation. `local-132`
+  deduplication is ready next, then promote `local-133` through `local-136` as
+  dependencies land. `local-137` is the blocked HITL policy decision for direct
+  external selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and

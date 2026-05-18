@@ -46,10 +46,12 @@ and ready for coordinator-driven work across its components.
   policy, `dev-nexus:local-114` as `0d871d7` for Codex app-server notification
   and server-request routing, `dev-nexus:local-115` as `f98bede` for safe
   Codex app-server initialize probes, and `dev-nexus:local-106` as `c73f347`
-  for active agent target projection filtering. The newest DevNexus source
-  integration published `dev-nexus:local-88` and `dev-nexus:local-130`
+  for active agent target projection filtering. The next DevNexus source
+  integrations published `dev-nexus:local-88` and `dev-nexus:local-130`
   together as `e946039` for current-actor authority resolution and read-only
-  tracker discovery status.
+  tracker discovery status, `dev-nexus:local-89` as `0bc80d9` for the
+  effective authority resolver, and `dev-nexus:local-131` as `c7928f1` for
+  opt-in eligible-work discovery aggregation.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -98,9 +100,10 @@ and ready for coordinator-driven work across its components.
   local dogfood work. The PRD has been sliced: start with
   `dev-nexus:local-129` for tracker roles and discovery-policy defaults, which
   is now complete. `local-130` is complete for read-only discovery status, and
-  `local-131` is now ready for eligible-work aggregation from configured
-  discovery sources. Promote `local-132` through `local-136` as prerequisites
-  land. `local-137` is the blocked HITL policy decision for direct external
+  `local-131` is complete for opt-in eligible-work aggregation from configured
+  discovery sources. `local-132` is ready next for richer reusable
+  deduplication; promote `local-133` through `local-136` as prerequisites land.
+  `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
@@ -135,8 +138,9 @@ and ready for coordinator-driven work across its components.
   DevNexus comment.
 - The authority PRD has been sliced: `dev-nexus:local-87` is complete for the
   actor/role/action configuration model, `local-88` is complete for host-local
-  current-actor resolution, and `local-89` is now ready for the pure effective
-  authority resolver. Promote `local-90` through `local-94` as their
+  current-actor resolution, and `local-89` is complete for the pure effective
+  authority resolver. `local-90` is ready next for authority status and agent
+  context reporting; promote `local-91` through `local-94` as their
   prerequisites land. `local-95` is a blocked HITL decision item for
   self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
@@ -195,18 +199,14 @@ and ready for coordinator-driven work across its components.
 - No active implementation worktrees are expected for the completed source
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
-  `local-106`, `local-88`, and `local-130` were removed after publication.
-- Active Windows implementation worktrees are `dev-nexus:local-89` on
-  `codex/dev-nexus-local-89-effective-authority` for the pure authority
-  resolver and `dev-nexus:local-131` on
-  `codex/dev-nexus-local-131-eligible-discovery` for opt-in eligible-work
-  discovery aggregation. Their write scopes are intentionally disjoint.
+  `local-106`, `local-88`, `local-130`, `local-89`, and `local-131` were
+  removed after publication.
 
 ## Near-Term Direction
 
-- Continue the active `dev-nexus:local-89` and `local-131` implementation
-  branches, then return to ready follow-on work such as `local-107`,
-  `local-109`, and `local-147`, subject to dependency and concurrency limits.
+- Return to ready follow-on work such as `dev-nexus:local-90`,
+  `dev-nexus:local-132`, `local-107`, `local-109`, and `local-147`, subject to
+  dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.

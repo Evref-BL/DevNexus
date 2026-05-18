@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 276,
-  "updatedAt": "2026-05-18T23:02:25.856Z",
+  "nextCommentNumber": 280,
+  "updatedAt": "2026-05-18T23:24:55.464Z",
   "items": [
     {
       "id": "local-1",
@@ -2228,7 +2228,7 @@
       "id": "local-89",
       "title": "Add effective authority resolver",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after authority config and current-actor resolution exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add a pure effective-authority resolver that answers whether a requested action is allowed, blocked, or waiting on provider state.\n\nUser stories covered:\n- As a coordinator agent, I can know whether I may merge verified DevNexus work directly or must open a pull request.\n- As a worker agent, I can choose a safe fallback such as request review or record a handoff when authority is missing.\n\nAcceptance criteria:\n- Resolver inputs include actor, auth profile, project, component, provider/tracker/remote/repository scope, target branch, requested action, component publication policy, automation safety profile, and provider state when available.\n- Resolver output includes allowed or blocked status, matched actor/role/rule, required missing actions or provider signals, recommended fallback action, and concise explanation.\n- Scope precedence is deterministic across project default, component override, provider override, tracker override, branch override, and environment/runtime override.\n- Direct integration requires both component publication policy and actor authority.\n- Pull request review approval and issue-level design approval remain distinct concepts.\n- Assignment, casual comments, and silence are not treated as approval by default.\n\nDependencies:\n- Depends on authority configuration and actor resolution.\n\nBoundaries:\n- Keep resolver pure and unit-testable.\n- Do not perform command gating or live provider calls in this slice.\n\nVerification:\n- Focused resolver tests for maintainer direct integration, contributor pull-request-only, reviewer approval-only, observer read-only, runtime operator without merge authority, and release operator without implementation authority.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2241,8 +2241,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.990Z",
-      "updatedAt": "2026-05-18T23:02:20.523Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T23:12:15.802Z",
+      "closedAt": "2026-05-18T23:12:15.802Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2254,7 +2254,7 @@
       "id": "local-90",
       "title": "Surface effective authority in status reports and agent context",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the effective authority resolver exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make authority visible before agents take action by projecting effective authority into project status, target reports, coordination status, and generated worker context.\n\nUser stories covered:\n- As a worker agent, I can see whether I am expected to integrate, open a pull request, request review, or only hand off.\n- As a human maintainer, I can inspect a target report and see why an agent did or did not publish.\n\nAcceptance criteria:\n- Project status summarizes current actor identity when detectable, auth profile name, component role bindings, and key allowed actions.\n- Automation target reports and target-cycle facts can include concise authority decisions and blockers.\n- Generated worker context and briefings include component-specific publication/coordination authority and safe fallback instructions.\n- Coordination status reports authority next to branch, tracker, handoff, and integration facts.\n- Low-token summaries remain concise and do not include secrets, full tokens, private key paths, or host-local credential material.\n\nDependencies:\n- Depends on the effective authority resolver.\n\nBoundaries:\n- Reporting only; do not block commands in this slice.\n- Do not require live provider credentials.\n\nVerification:\n- Focused tests for project status, target report, coordination status, and worker context authority summaries.\n- Snapshot or text-output tests should check for concise allowed/blocked/fallback information without secrets.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2268,7 +2268,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.222Z",
-      "updatedAt": "2026-05-18T13:08:01.222Z",
+      "updatedAt": "2026-05-18T23:12:24.410Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3354,7 +3354,7 @@
       "id": "local-131",
       "title": "Aggregate eligible work from configured discovery sources",
       "description": "Type: eligible-work implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-130\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: let eligible-work and coordinator surfaces opt into scanning configured discovery sources while preserving current default-tracker behavior by default.\n\nUser stories covered:\n- As a coordinator agent, I can list eligible work across configured discovery sources when policy asks for it.\n- As a maintainer, I can keep default-tracker-only selection unless the project explicitly opts into discovery mode.\n\nAcceptance criteria:\n- Default eligible-work mode remains behaviorally unchanged and lists the component default tracker only.\n- Discovery mode queries trackers whose roles and policy mark them as discovery sources, applying configured statuses, labels, milestones, assignees, provider query filters, per-tracker limits, and final limits.\n- Returned items include component id, logical item id when known, canonical assignment tracker reference, discovered source tracker reference, warnings, and whether the item is selectable or import-only.\n- When policy requires import first, unimported external items are reported as import candidates and are not assigned as local work.\n- Missing provider access, disabled trackers, unsupported list capability, and provider read errors are reported according to discovery policy without crashing the whole eligible-work call.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-130.\n\nBoundaries:\n- Do not implement inbound import mutation in this slice.\n- Do not make every configured tracker an eligible source by default.\n\nVerification:\n- Focused tests for default mode preservation, opt-in discovery aggregation, per-tracker filters, import-only candidates, provider warnings/blockers, and final ordering/limits.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3368,8 +3368,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:54.443Z",
-      "updatedAt": "2026-05-18T23:02:25.856Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T23:24:44.363Z",
+      "closedAt": "2026-05-18T23:24:44.363Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3381,7 +3381,7 @@
       "id": "local-132",
       "title": "Deduplicate linked work items across trackers",
       "description": "Type: logical-identity implementation slice\nReadiness: todo/dependent on dev-nexus:local-129; can be implemented before or with dev-nexus:local-131\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prevent eligible-work discovery from returning duplicate assignments when the same logical work item exists in local and external trackers.\n\nUser stories covered:\n- As a worker agent, I receive one canonical assignment, not separate local and GitHub copies of the same work.\n- As a migration owner, I can see ambiguous or stale tracker links instead of DevNexus silently merging unrelated issues.\n\nAcceptance criteria:\n- Deduplication uses existing tracker links, provider external references on local items, stable provider repository/item number or key, and optional configured fingerprints where available.\n- Linked local and external items collapse to one canonical item according to discovery policy, with a deduplication reason or link id in the result.\n- Stale links, missing target items, conflicting links, and ambiguous unlinked matches are reported as warnings or blockers according to policy.\n- DevNexus does not silently collapse items when identity cannot be proven.\n- The dedupe result can be reused by eligible-work aggregation and inbound import planning.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n- Coordinates with dev-nexus:local-131 for eligible-work integration.\n\nBoundaries:\n- Do not mutate link records or tracker items in this slice.\n- Do not implement provider write-back or inbound import execution.\n\nVerification:\n- Focused tests for linked duplicates, externalRef duplicates, repository/number matching, stale links, ambiguous matches, and canonical source selection.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3395,7 +3395,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:01.952Z",
-      "updatedAt": "2026-05-18T19:39:01.952Z",
+      "updatedAt": "2026-05-18T23:24:55.464Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6329,9 +6329,32 @@
           "provider": "local",
           "itemId": "local-comment-274"
         }
+      },
+      {
+        "id": "local-comment-276",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 0bc80d933c3eff434c518f62affa8e85b8181080\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T23:12:06.029Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-89\",\n  \"logicalItemId\": \"local-89\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-89\",\n    \"itemNumber\": 89,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-89\",\n      \"itemNumber\": 89\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-89\",\n    \"itemNumber\": 89,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-89\",\n      \"itemNumber\": 89\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-89\",\n      \"itemNumber\": 89,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-89\",\n        \"itemNumber\": 89\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-7cf72ae5c09fc645\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"0bc80d933c3eff434c518f62affa8e85b8181080\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusAuthority.test.ts\"\n  ],\n  \"decisions\": [\n    \"Implemented pure effective-authority resolver with deterministic scope precedence and provider waiting/blocking signals.\",\n    \"Direct target-branch push now requires both direct-integration publication policy and actor authority.\",\n    \"Issue design approval actions are distinct from pull-request review approval.\"\n  ],\n  \"verificationSummary\": \"Integrated focused verification passed: npm test -- src/nexusAuthority.test.ts src/nexusAutomationStatus.test.ts src/nexusProjectConfig.test.ts; npm run build; git diff --check HEAD~1..HEAD.\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as 0bc80d9.\",\n  \"note\": \"Merged local-89 worker commit 3d307dd into DevNexus main through bot remote.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T23:12:06.044Z",
+        "updatedAt": "2026-05-18T23:12:06.044Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-276"
+        }
       }
     ],
-    "local-90": [],
+    "local-90": [
+      {
+        "id": "local-comment-277",
+        "body": "Promoted to ready after `dev-nexus:local-89` landed in DevNexus main as `0bc80d9`. Effective authority resolver dependency is now satisfied.",
+        "author": null,
+        "createdAt": "2026-05-18T23:12:24.410Z",
+        "updatedAt": "2026-05-18T23:12:24.410Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-277"
+        }
+      }
+    ],
     "local-91": [],
     "local-92": [],
     "local-93": [],
@@ -7136,9 +7159,32 @@
           "provider": "local",
           "itemId": "local-comment-275"
         }
+      },
+      {
+        "id": "local-comment-278",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T23:24:34.777Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-131\",\n  \"logicalItemId\": \"local-131\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-131\",\n    \"itemNumber\": 131,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-131\",\n      \"itemNumber\": 131\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-131\",\n    \"itemNumber\": 131,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-131\",\n      \"itemNumber\": 131\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-131\",\n      \"itemNumber\": 131,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-131\",\n        \"itemNumber\": 131\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-8eb3a1516c812d2c\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusEligibleWork.ts\",\n    \"src/nexusEligibleWork.test.ts\",\n    \"src/nexusEligibleWorkSummary.ts\",\n    \"src/nexusAutomationStatus.ts\",\n    \"src/nexusAutomationAgentLaunch.ts\",\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusProjectConfig.test.ts\",\n    \"src/nexusProjectRegistry.test.ts\",\n    \"src/nexusWorkItemDiscoveryStatus.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Default eligible-work mode remains default-tracker-only.\",\n    \"Discovery mode opt-in scans configured discovery sources, applies policy filters and limits, and separates selectable work from import-only candidates.\",\n    \"Provider access, capability, and read issues are reported as discovery warnings or blockers without crashing the whole eligible-work call.\"\n  ],\n  \"verificationSummary\": \"Integrated verification passed: focused local-131 suite with 8 files/144 tests; npm run build; npm run check with 63 files and 540 tests.\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as c7928f18.\",\n  \"note\": \"Parallel integration of local-131 worker commit 1292ecf was detected already published; coordinator verified c7928f18 rather than replaying the merge.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T23:24:34.789Z",
+        "updatedAt": "2026-05-18T23:24:34.789Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-278"
+        }
       }
     ],
-    "local-132": [],
+    "local-132": [
+      {
+        "id": "local-comment-279",
+        "body": "Promoted to ready after `dev-nexus:local-131` landed in DevNexus main as `c7928f18`. Basic linked-item handling exists in eligible-work aggregation, but this slice still owns the deeper reusable deduplication model and stale/ambiguous-link diagnostics.",
+        "author": null,
+        "createdAt": "2026-05-18T23:24:55.464Z",
+        "updatedAt": "2026-05-18T23:24:55.464Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-279"
+        }
+      }
+    ],
     "local-133": [],
     "local-134": [],
     "local-135": [],
