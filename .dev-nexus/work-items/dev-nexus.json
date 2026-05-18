@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 138,
-  "nextCommentNumber": 221,
-  "updatedAt": "2026-05-18T19:47:06.509Z",
+  "nextCommentNumber": 222,
+  "updatedAt": "2026-05-18T19:52:15.224Z",
   "items": [
     {
       "id": "local-1",
@@ -2969,7 +2969,7 @@
       "id": "local-117",
       "title": "Slice hosting provisioning PRD into implementation work items",
       "description": "Source PRD: docs/project-hosting-provisioning-prd.md\n\nTurn the hosting provisioning PRD into independently verifiable implementation work items for DevNexus.\n\nExpected slices should cover:\n- hosting access declarations in project config validation/defaulting\n- hosting status/plan/apply command and MCP surfaces\n- provider-neutral planner actions and idempotent apply behavior\n- GitHub adapter support for repository creation, collaborator permission repair, pending invitation detection, and invitee-profile invitation acceptance\n- setup/status integration and documentation updates\n- mocked provider tests before any live GitHub mutation path\n\nBoundary: do not manually repair collaborators as part of this item. The goal is to slice the declared DevNexus tooling work, keeping the user-facing API dumb and obvious while the hosting tool owns provider complexity.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2984,8 +2984,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:09:45.129Z",
-      "updatedAt": "2026-05-18T16:17:05.555Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T19:52:15.224Z",
+      "closedAt": "2026-05-18T19:52:15.224Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -6153,6 +6153,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-198"
+        }
+      },
+      {
+        "id": "local-comment-221",
+        "body": "Closing as done: docs/project-hosting-provisioning-prd.md has been sliced into implementation items local-118 through local-127; local-118 is the next ready slice.",
+        "author": null,
+        "createdAt": "2026-05-18T19:52:15.194Z",
+        "updatedAt": "2026-05-18T19:52:15.194Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-221"
         }
       }
     ],
