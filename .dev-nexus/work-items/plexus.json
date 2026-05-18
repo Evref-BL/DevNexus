@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 22,
-  "nextCommentNumber": 53,
-  "updatedAt": "2026-05-18T02:20:16.828Z",
+  "nextNumber": 23,
+  "nextCommentNumber": 56,
+  "updatedAt": "2026-05-18T06:24:33.519Z",
   "items": [
     {
       "id": "local-1",
@@ -514,6 +514,31 @@
         "provider": "local",
         "itemId": "local-21",
         "itemNumber": 21
+      }
+    },
+    {
+      "id": "local-22",
+      "title": "Remove PLexus legacy gateway compatibility",
+      "description": "Type: legacy cleanup implementation slice\nReadiness: autonomous agent-ready (AFK) with explicit human authorization recorded in chat on 2026-05-18.\nSource: user authorization: completely remove legacy concepts from PLexus without caring about compatibility; follows plexus:local-20 warning/gating phase.\n\nGoal: remove the old PLexus gateway compatibility concepts instead of keeping warn/reject gates or compatibility aliases.\n\nAcceptance criteria:\n- Remove legacy pharo gateway surface aliases, combined default/compatibility behavior, and PLEXUS_LEGACY_GATEWAY_COMPATIBILITY warn/reject gating from PLexus source and tests.\n- Agent-facing gateway defaults are clean: /mcp exposes the Pharo proxy surface, route-control uses /control-mcp, and raw plexus_route_to_image remains hidden unless an explicit develop/debug option keeps it.\n- Core lifecycle config no longer treats PLEXUS_GATEWAY_MCP_URL / PLEXUS_GATEWAY_MCP_PATH as supported compatibility inputs; route-control names are the supported inputs.\n- Docs stop describing temporary compatibility or migration phases and instead state the clean current surface.\n- Tests are updated to assert removal instead of warning/reject compatibility behavior.\n\nBoundaries:\n- No live Pharo images, gateway service startup, Docker, or launcher mutation is required.\n- Preserve the route-control/debug raw routing option only if it is not a user-facing legacy compatibility surface.\n\nVerification:\n- Run focused PLexus core/gateway tests for server, project lifecycle, and workspace MCP config.\n- Run npm run typecheck --workspaces, npm test, and npm run build when feasible.\n\nPublication notes:\n- Direct integration to PLexus origin/main after verification passes.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "legacy-cleanup",
+        "gateway",
+        "route-control",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T06:13:18.731Z",
+      "updatedAt": "2026-05-18T06:24:33.519Z",
+      "closedAt": "2026-05-18T06:23:54.731Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-22",
+        "itemNumber": 22
       }
     }
   ],
@@ -1129,6 +1154,41 @@
         }
       }
     ],
-    "local-21": []
+    "local-21": [],
+    "local-22": [
+      {
+        "id": "local-comment-53",
+        "body": "Starting authorized final removal in isolated PLexus worktree local-22-remove-legacy-gateway on branch codex/plexus/remove-legacy-gateway. Scope: remove legacy gateway compatibility aliases/gates/docs/tests; no live image, gateway process, Docker, or launcher mutation.",
+        "author": null,
+        "createdAt": "2026-05-18T06:13:57.047Z",
+        "updatedAt": "2026-05-18T06:13:57.047Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-53"
+        }
+      },
+      {
+        "id": "local-comment-54",
+        "body": "Completed and published to PLexus origin/main as 6d75f4f. Removed compatibility-gated gateway behavior: source no longer supports pharo/combined/admin gateway surfaces, PLEXUS_LEGACY_GATEWAY_COMPATIBILITY, or PLEXUS_GATEWAY_MCP_URL/PATH environment compatibility; default gateway server creation is agent-facing. Docs now describe only gateway plus route-control surfaces. Verification passed: focused core/gateway tests, npm run typecheck --workspaces, npm test, npm run build, npm run test:smoke-policy, git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-18T06:23:54.697Z",
+        "updatedAt": "2026-05-18T06:23:54.697Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-54"
+        }
+      },
+      {
+        "id": "local-comment-55",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/plexus/remove-legacy-gateway\nHead: 6d75f4f4bd53bd0c895e4085148852d78adf428f\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T06:24:33.503Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"plexus\",\n  \"componentName\": \"PLexus\",\n  \"workItemId\": \"local-22\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\plexus\\\\local-22-remove-legacy-gateway\",\n  \"branch\": \"codex/plexus/remove-legacy-gateway\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"6d75f4f4bd53bd0c895e4085148852d78adf428f\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"packages/plexus-gateway/src/server.ts\",\n    \"packages/plexus-core/src/projectLifecycle.ts\",\n    \"packages/plexus-core/src/workspaceMcpConfig.ts\",\n    \"docs\",\n    \"README.md\"\n  ],\n  \"decisions\": [\n    \"Removed compatibility-gated PLexus gateway surfaces and kept only gateway and route-control surfaces.\",\n    \"Retired PLEXUS_GATEWAY_MCP_URL, PLEXUS_GATEWAY_MCP_PATH, PLEXUS_LEGACY_GATEWAY_COMPATIBILITY, pharo, combined, and admin gateway surface handling from source behavior.\"\n  ],\n  \"verificationSummary\": \"Focused core/gateway tests passed; npm run typecheck --workspaces passed; npm test passed; npm run build passed; npm run test:smoke-policy passed.\",\n  \"integrationPreference\": \"Published direct integration to PLexus origin/main as 6d75f4f.\",\n  \"note\": \"No live image, Docker, gateway service, PLexus open/close, or launcher mutation was run.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T06:24:33.519Z",
+        "updatedAt": "2026-05-18T06:24:33.519Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-55"
+        }
+      }
+    ]
   }
 }

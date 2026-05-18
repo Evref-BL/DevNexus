@@ -20,6 +20,10 @@ Current cycle:
   said it completed. The local tracker was reconciled to `done`, and
   `dev-nexus:local-65` now tracks hardening coordinator completion/status
   reconciliation.
+- User-authorized PLexus cleanup `plexus:local-22` completed on 2026-05-18.
+  PLexus commit `6d75f4f` was published to `origin/main`, removing legacy
+  gateway compatibility concepts and leaving the clean `gateway` plus
+  `route-control` surfaces.
 
 Verification for this cycle:
 
@@ -35,6 +39,9 @@ Verification for this cycle:
   and 382 tests.
 - `git diff --check origin/main..HEAD` passed in
   `C:\dev\code\sources\dev-nexus` before publication.
+- PLexus cleanup verification passed: focused core/gateway tests,
+  `npm run typecheck --workspaces`, `npm test`, `npm run build`,
+  `npm run test:smoke-policy`, and `git diff --check`.
 
 Near-term direction:
 
@@ -50,8 +57,8 @@ Near-term direction:
   `dev-nexus:local-47` lands. Keep `dev-nexus:local-51` parked until the sync
   and status/reporting shape is stable. Live sync policy remains blocked on
   `dev-nexus:local-52`.
-- Final PLexus legacy gateway support removal remains human-in-the-loop and
-  must not be performed without a separate explicit decision.
+- Final PLexus legacy gateway support removal is no longer blocked; the
+  authorized cleanup is complete and tracked by `plexus:local-22`.
 
 Active boundaries:
 
