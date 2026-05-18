@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 71,
-  "nextCommentNumber": 165,
-  "updatedAt": "2026-05-18T11:33:02.464Z",
+  "nextNumber": 76,
+  "nextCommentNumber": 166,
+  "updatedAt": "2026-05-18T11:58:11.055Z",
   "items": [
     {
       "id": "local-1",
@@ -1715,8 +1715,8 @@
     },
     {
       "id": "local-69",
-      "title": "Make project-local component clones the default layout",
-      "description": "Type: setup design and dogfood migration\nReadiness: todo; implementation can be AFK after the layout policy is accepted, but do not delete old checkout locations without explicit human approval.\nSource: dogfood cleanup audit found that this Windows host resolves several component source roots through `C:\\dev\\code\\sources\\...` junctions pointing to older external checkout locations such as `dev-nexus-control`, `C:\\dev\\code\\git`, and a Pharo image Iceberg checkout. User clarified the desired clean design: a DevNexus project should normally clone its component sources inside the project root so project work does not overlap unrelated host activity.\n\nGoal: make project-local component clones the default DevNexus project layout, then migrate this dogfood project to that model.\n\nPreferred layout:\n```text\nmy-dev-nexus-project/\n  dev-nexus.project.json\n  AGENTS.md\n  CONTEXT.md\n  PLAN.md\n  .agents/\n  .dev-nexus/\n    work-items/\n    automation/\n    skills/\n    runtime/\n  components/\n    <component-id>/\n  worktrees/\n    <component-id>/\n```\n\nDesign direction:\n- Use `components/<component-id>` for normal source checkouts, not `git/` and not `.dev-nexus/git/`.\n- Keep `.dev-nexus/` for project metadata, generated setup, runtime state, skills, ledgers, and internal caches rather than primary editable source clones.\n- Keep `worktrees/<component-id>/<work-item-or-run>` for generated isolated worktrees.\n- Support external source roots only through explicit host-local overrides or advanced configuration, not as the default shared project model.\n- Setup/preflight should warn when a source root points outside the DevNexus project unless that escape hatch is explicitly configured.\n\nAcceptance criteria:\n- Update DevNexus setup/onboarding design so `join-existing-project` can clone missing components into `components/<component-id>` by default.\n- Add or update project config/source-root resolution so `componentsRoot:<id>` or equivalent portable shorthand can represent project-local component clones cleanly.\n- Add host-local override support or documentation for advanced external source roots without making shared `dev-nexus.project.json` machine-specific.\n- Add setup/preflight diagnostics that distinguish project-local components, explicit host-local overrides, missing clones, and accidental external junctions/symlinks.\n- Migrate this dogfood project away from current external junction targets after the setup behavior is ready: clone or move all six component source roots under the project-local `components/` tree, preserve remotes/branches, and verify clean status.\n- Keep generated worktrees under `worktrees/`, separate from stable component source checkouts.\n- Update Mac onboarding instructions so a fresh clone of the dogfood meta project can create the same local `components/` layout without manual sibling-directory guessing.\n\nBoundaries:\n- Do not delete old checkout locations until every component has a verified project-local replacement and the user approves removal.\n- Do not mutate the MCP-Pharo Pharo image Iceberg checkout as part of migration; create a normal project-local clone instead.\n- Do not store absolute host paths in shared project config.\n- Do not put primary source checkouts under `.dev-nexus/`.\n\nVerification:\n- Unit/fixture tests for source-root shorthand resolution and setup/preflight diagnostics.\n- Setup check on Windows after dogfood migration.\n- `git status --short --branch` for each component under `components/`.\n- DevNexus MCP/config refresh still works after migration.\n\nPublication notes:\n- DevNexus source changes go through normal direct integration.\n- Dogfood meta-project config/state changes should be committed and pushed after local migration succeeds.",
+      "title": "Umbrella: Make project-local component clones the default layout",
+      "description": "Type: umbrella / setup design and dogfood migration\nReadiness: todo; do not assign this umbrella directly for implementation. Use the sliced child work items below.\nSource: dogfood cleanup audit found that this Windows host resolves several component source roots through `C:\\dev\\code\\sources\\...` junctions pointing to older external checkout locations. User decision: a DevNexus project should normally clone its component sources inside the project root so project work does not overlap unrelated host activity.\n\nGoal: make project-local component clones the default DevNexus project layout, then migrate this dogfood project to that model.\n\nDefault layout decision:\n```text\nmy-dev-nexus-project/\n  dev-nexus.project.json\n  AGENTS.md\n  CONTEXT.md\n  PLAN.md\n  .agents/\n  .dev-nexus/\n    work-items/\n    automation/\n    skills/\n    runtime/\n  components/\n    <component-id>/        # stable component source checkouts\n  worktrees/\n    <component-id>/        # generated isolated implementation worktrees\n```\n\nDesign direction:\n- Use `components/<component-id>` for normal stable source checkouts, not `git/` and not `.dev-nexus/git/`.\n- Keep `.dev-nexus/` for project metadata, generated setup, runtime state, skills, ledgers, and internal caches rather than primary editable source clones.\n- Keep generated implementation worktrees under `worktrees/<component-id>/<work-item-or-run>`.\n- Support external source roots only through explicit advanced configuration or host-local overrides, not as the default shared project model.\n- Setup/preflight should warn when a source root points outside the DevNexus project unless that escape hatch is explicit.\n\nSliced work items:\n- `dev-nexus:local-71` ready: add `componentsRoot:` portable path base and preferred docs/examples for project-local component clones.\n- `dev-nexus:local-72` todo/dependent: make `join-existing-project` prepare and verify project-local component checkouts by default.\n- `dev-nexus:local-73` todo/dependent: classify source-root topology in setup diagnostics, including external roots and symlink/junction escapes.\n- `dev-nexus:local-74` todo/dependent: document project-local component layout and onboarding defaults after behavior lands.\n- `dev-nexus:local-75` todo/HITL/dependent: migrate this dogfood project to project-local `components/` checkouts after the setup behavior is published.\n\nCompletion criteria for this umbrella:\n- The default DevNexus setup/onboarding path creates or verifies component source roots under `components/<component-id>`.\n- Shared config can express project-local components without absolute host paths.\n- Setup/preflight can distinguish project-local clones, advanced external roots, missing clones, incompatible paths, and suspicious symlink/junction escapes.\n- This dogfood project is migrated to project-local component clones and verified on Windows, with a Mac verification handoff.\n- Old external checkout locations are left untouched until the user explicitly approves cleanup.\n\nBoundaries:\n- Do not delete old checkout locations from this umbrella or its source/setup slices.\n- Do not mutate the MCP-Pharo Pharo image Iceberg checkout as part of migration; create a normal project-local Git clone instead.\n- Do not store absolute host paths in shared project config.\n- Do not put primary source checkouts under `.dev-nexus/`.",
       "status": "todo",
       "provider": "local",
       "labels": [
@@ -1729,7 +1729,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T10:01:32.077Z",
-      "updatedAt": "2026-05-18T11:22:48.642Z",
+      "updatedAt": "2026-05-18T11:58:11.055Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1757,6 +1757,133 @@
         "provider": "local",
         "itemId": "local-70",
         "itemNumber": 70
+      }
+    },
+    {
+      "id": "local-71",
+      "title": "Add componentsRoot portable path base for project-local component clones",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: add a first-class project-local component path base so shared DevNexus config can express stable source checkouts under the meta project root without absolute host paths or sibling-directory guessing.\n\nAcceptance criteria:\n- The central path resolver accepts `componentsRoot:<component-id-or-path>` and resolves it to `<projectRoot>/components/<component-id-or-path>` on Windows, macOS, and Linux path styles.\n- Existing project-relative paths, `projectRoot:`, `projectParent:`, `sourcesRoot:`, and compatible absolute legacy paths continue to work.\n- Agent profile/path-expression detection and setup/status surfaces that validate portable paths recognize `componentsRoot:` as portable.\n- User docs and examples state that `componentsRoot:<component-id>` is the preferred sourceRoot for normal project-local component clones; `sourcesRoot:` remains an advanced external-layout option.\n- Focused tests cover Windows and POSIX resolution, empty/tail normalization, compatibility with existing bases, and setup/status path analysis where relevant.\n\nBoundaries:\n- Do not migrate this dogfood project's component source roots in this slice.\n- Do not remove `sourcesRoot:` compatibility.\n- Do not introduce host-local secrets or absolute paths into shared config.\n\nVerification:\n- Focused path resolver and setup/status tests.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "source-roots",
+        "setup",
+        "path-resolver",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:56:51.724Z",
+      "updatedAt": "2026-05-18T11:56:51.724Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-71",
+        "itemNumber": 71
+      }
+    },
+    {
+      "id": "local-72",
+      "title": "Make join-existing-project prepare project-local component checkouts",
+      "description": "Type: implementation slice\nReadiness: todo/dependent on dev-nexus:local-71\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: make `join-existing-project` guide and verify project-local component checkouts under `components/<component-id>` by default, instead of sending users to sibling `sources/` directories unless the project explicitly chooses that layout.\n\nAcceptance criteria:\n- Setup plan text and generated clone commands prefer `componentsRoot:<component-id>` or the resolved `<projectRoot>/components/<component-id>` destination for normal component source checkouts.\n- Missing component clone checks give actionable clone/fetch commands using each component `remoteUrl` and `defaultBranch` when available.\n- Existing dirty component checkouts are detected before fetch/pull guidance and the next action tells agents to preserve local changes.\n- Incompatible or absent legacy `sourceRoot` values fall back to project-local `components/<component-id>` in the setup plan, not `$HOME/dev-nexus/sources`.\n- Fixture tests cover Windows and macOS join-existing-project plans/checks for fresh meta clones, missing component directories, existing clean component checkouts, and dirty checkout blockers.\n\nBoundaries:\n- Do not auto-delete, move, or overwrite any existing source checkout.\n- Do not run live provider writes, package installs, Pharo images, Docker, or PLexus runtime services.\n- Keep this generic in DevNexus core; no Pharo-specific setup logic.\n\nVerification:\n- Focused setup assistant tests.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "source-roots",
+        "setup",
+        "onboarding",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:57:02.574Z",
+      "updatedAt": "2026-05-18T11:57:02.574Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-72",
+        "itemNumber": 72
+      }
+    },
+    {
+      "id": "local-73",
+      "title": "Classify component source-root topology in setup diagnostics",
+      "description": "Type: implementation/design slice\nReadiness: todo/dependent on dev-nexus:local-71 and dev-nexus:local-72\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: make setup/preflight explicitly classify component source-root topology so agents can tell project-local clones from intentional external checkouts, missing clones, and accidental symlink/junction escapes.\n\nAcceptance criteria:\n- Setup check reports whether each component source root is project-local, explicit external/advanced, legacy external, missing, or incompatible with the current host platform.\n- Realpath/symlink/junction analysis warns when a configured project-local-looking path resolves outside the DevNexus project root, with Windows junction and POSIX symlink fixture coverage where feasible.\n- The warning language distinguishes intentional external layouts from accidental old checkout reuse and points to the project-local migration path.\n- If a host-local override mechanism already exists, setup check recognizes it; if not, this item documents the minimal config shape needed and creates a follow-up rather than baking machine-specific paths into shared config.\n- Project/status or setup JSON includes enough structured fields for agents to make non-interactive decisions without scraping prose.\n\nBoundaries:\n- Do not delete or rewrite external source roots.\n- Do not require all existing projects to migrate immediately.\n- Do not store absolute host paths in shared project config as the normal solution.\n\nVerification:\n- Focused setup/status tests for project-local, `sourcesRoot:`, absolute, missing, junction/symlink, and incompatible path cases.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "source-roots",
+        "setup",
+        "diagnostics",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:57:14.962Z",
+      "updatedAt": "2026-05-18T11:57:14.962Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-73",
+        "itemNumber": 73
+      }
+    },
+    {
+      "id": "local-74",
+      "title": "Document project-local component layout and onboarding defaults",
+      "description": "Type: documentation/onboarding slice\nReadiness: todo/dependent on dev-nexus:local-71 and dev-nexus:local-72\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: update user-facing DevNexus setup guidance so new users and new machines understand the project-local component layout as the default and know when external roots are an advanced exception.\n\nAcceptance criteria:\n- Getting-started and setup docs show the preferred layout with `components/<component-id>` stable source checkouts and `worktrees/<component-id>/<run-or-item>` generated implementation worktrees.\n- The docs explain why `.dev-nexus/` is internal support state and should not contain primary editable component clones.\n- Mac/Windows onboarding examples use a fresh meta project root and project-local component clones without sibling-directory guessing.\n- External roots are documented as explicit advanced overrides, with warnings about overlap with unrelated host activity.\n- Agent-facing guidance tells workers to treat generated worktrees as writable implementation checkouts and stable `components/` clones as canonical component source roots.\n\nBoundaries:\n- Do not document behavior as available until corresponding setup/path support exists.\n- Do not include this dogfood host's absolute paths as generic examples.\n\nVerification:\n- Static documentation review.\n- `npm run check` if docs are included in repository checks.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "source-roots",
+        "docs",
+        "onboarding",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:57:26.455Z",
+      "updatedAt": "2026-05-18T11:57:26.455Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-74",
+        "itemNumber": 74
+      }
+    },
+    {
+      "id": "local-75",
+      "title": "Migrate dogfood sources to project-local components layout",
+      "description": "Type: dogfood migration slice\nReadiness: todo/HITL after dev-nexus:local-71, dev-nexus:local-72, and dev-nexus:local-73 are completed and published\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: migrate this clean dogfood meta project from external `sourcesRoot:` junction-backed component roots to project-local component clones under `components/<component-id>` once DevNexus setup support is ready.\n\nAcceptance criteria:\n- Clone or otherwise prepare all six configured components under this meta project root: DevNexus, DevNexus-Pharo, DevNexus-TypeScript, PLexus, pharo-launcher-mcp, and MCP-Pharo.\n- Preserve each component's remote, default branch, unpushed work, and dirty-state safety; stop and report if a component has unresolved local work that would be lost or ambiguous.\n- Update shared dogfood config to use `componentsRoot:<component-id>` or the accepted project-local expression for each component sourceRoot.\n- Refresh DevNexus MCP/skills/config as needed after the config migration.\n- Run setup check on Windows and, if available, provide the exact Mac check command for the Mac agent to run against the same shared config.\n- Verify `git status --short --branch` for every project-local component checkout and the meta project.\n- Leave old external checkout locations untouched until the user separately approves cleanup.\n\nBoundaries:\n- Do not delete old `C:\\dev\\code\\sources` junction targets or older checkouts in this slice.\n- Do not mutate MCP-Pharo through a live Pharo image or Iceberg checkout; use a normal Git clone for the project-local component source.\n- Do not store host-specific absolute paths in shared config.\n\nVerification:\n- `dev-nexus setup check . join-existing-project --platform windows --json` passes or reports only expected active-session warnings.\n- `dev-nexus project status . --json` and `dev-nexus automation eligible-work . --json` work after migration.\n- Component Git status summary is recorded in the work item.\n\nPublication notes:\n- Commit and push dogfood meta-project config/state changes through the configured bot remote after migration succeeds.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "source-roots",
+        "migration",
+        "cleanup",
+        "hitl",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:57:40.483Z",
+      "updatedAt": "2026-05-18T11:57:40.483Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-75",
+        "itemNumber": 75
       }
     }
   ],
@@ -3665,6 +3792,17 @@
           "provider": "local",
           "itemId": "local-comment-158"
         }
+      },
+      {
+        "id": "local-comment-165",
+        "body": "Deepened and split for execution. `dev-nexus:local-69` is now an umbrella. Created `dev-nexus:local-71` through `dev-nexus:local-75` as bounded slices:\n- `local-71` ready: `componentsRoot:` portable path base.\n- `local-72` todo/dependent: project-local component checkout setup.\n- `local-73` todo/dependent: topology diagnostics for external roots and symlink/junction escapes.\n- `local-74` todo/dependent: docs/onboarding after behavior lands.\n- `local-75` todo/HITL/dependent: dogfood migration to `components/` after support is ready.\n\nOnly `local-71` is ready now to avoid concurrent agents editing the same setup/path resolver surfaces before the base expression exists.",
+        "author": null,
+        "createdAt": "2026-05-18T11:58:11.055Z",
+        "updatedAt": "2026-05-18T11:58:11.055Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-165"
+        }
       }
     ],
     "local-70": [
@@ -3701,6 +3839,11 @@
           "itemId": "local-comment-164"
         }
       }
-    ]
+    ],
+    "local-71": [],
+    "local-72": [],
+    "local-73": [],
+    "local-74": [],
+    "local-75": []
   }
 }
