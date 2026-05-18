@@ -2,6 +2,8 @@ export const devNexusCoreMcpServerName = "dev_nexus" as const;
 
 export const devNexusCoreMcpToolNames = [
   "project_status",
+  "project_hosting_status",
+  "project_hosting_plan",
   "automation_status",
   "eligible_work",
   "agent_profiles",

@@ -137,6 +137,14 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  planNexusProjectHosting,
+  statusNexusProjectHosting,
+  type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingLocalRemoteRecord,
+  type NexusProjectHostingPlanResult,
+  type NexusProjectHostingStatusResult,
+} from "./nexusProjectHosting.js";
+import {
   configureNexusProjectTracker,
   createNexusProject,
   getNexusProjectStatus,
@@ -187,7 +195,7 @@ import {
   type ShowWorkItemTrackerLinksResult,
   type UnlinkWorkItemTrackerReferenceResult,
 } from "./workItemTrackerLinks.js";
-import type { GitRunner } from "./gitWorktreeService.js";
+import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
 import type {
   WorkComment,
@@ -209,6 +217,19 @@ export interface DevNexusCliDependencies {
   now?: () => Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
+}
+
+interface ProjectHostingStatusCliResult {
+  projectRoot: string;
+  project: {
+    id: string;
+    name: string;
+  };
+  status: NexusProjectHostingStatusResult;
+}
+
+interface ProjectHostingPlanCliResult extends ProjectHostingStatusCliResult {
+  plan: NexusProjectHostingPlanResult;
 }
 
 interface ParsedHomeInitCommand {
@@ -245,6 +266,13 @@ interface ParsedProjectListCommand {
 interface ParsedProjectStatusCommand {
   homePath?: string;
   project: string;
+  json?: boolean;
+}
+
+interface ParsedProjectHostingCommand {
+  command: "status" | "plan";
+  projectRoot: string;
+  homePath?: string;
   json?: boolean;
 }
 
@@ -623,6 +651,8 @@ export function usage(): string {
     "  dev-nexus project import <source-root> [options]",
     "  dev-nexus project list [options]",
     "  dev-nexus project status <project-id-or-root> [options]",
+    "  dev-nexus project hosting status <project-root> [options]",
+    "  dev-nexus project hosting plan <project-root> [options]",
     "  dev-nexus project mcp refresh <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
@@ -667,6 +697,10 @@ export function usage(): string {
     "",
     "Options for project commands:",
     "  --home <path>             defaults to DEV_NEXUS_HOME or ~/.dev-nexus",
+    "  --json",
+    "",
+    "Options for project hosting commands:",
+    "  --home <path>",
     "  --json",
     "",
     "Options for project create:",
@@ -1115,6 +1149,10 @@ async function handleProjectCommand(
     return 0;
   }
 
+  if (command === "hosting") {
+    return await handleProjectHostingCommand(argv, dependencies);
+  }
+
   if (command === "mcp") {
     return handleProjectMcpCommand(argv, dependencies);
   }
@@ -1123,7 +1161,38 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, import, list, status, mcp, or tracker");
+  throw new Error("project requires create, import, list, status, hosting, mcp, or tracker");
+}
+
+async function handleProjectHostingCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const parsed = parseProjectHostingCommand(argv);
+  const statusResult = await resolveProjectHostingStatusForCli(parsed, dependencies);
+  if (parsed.command === "status") {
+    printProjectHostingStatusResult(
+      statusResult,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  const projectConfig = loadProjectConfig(statusResult.projectRoot);
+  const plan = planNexusProjectHosting({
+    hosting: projectConfig.hosting,
+    status: statusResult.status,
+  });
+  printProjectHostingPlanResult(
+    {
+      ...statusResult,
+      plan,
+    },
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
+  return 0;
 }
 
 async function handleProjectMcpCommand(
@@ -2568,6 +2637,42 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
         break;
       default:
         throw new Error(`Unknown project status option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectHostingCommand(argv: string[]): ParsedProjectHostingCommand {
+  const [, , command, projectRoot, ...rest] = argv;
+  if (command !== "status" && command !== "plan") {
+    throw new Error("project hosting requires status or plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error(`project hosting ${command} requires a project root`);
+  }
+
+  const parsed: ParsedProjectHostingCommand = { command, projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project hosting ${command} option: ${arg}`);
     }
   }
 
@@ -4641,6 +4746,118 @@ function printProjectStatusResult(
   writeLine(stdout, `  Worktrees root: ${project.worktreesRoot}`);
 }
 
+function printProjectHostingStatusResult(
+  result: ProjectHostingStatusCliResult,
+  parsed: ParsedProjectHostingCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, projectRoot: result.projectRoot, status: result.status };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus project hosting status: ${result.status.status}.`);
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(stdout, `  Root: ${result.projectRoot}`);
+  writeLine(
+    stdout,
+    `  Repository: ${hostingRepositoryText(result.status)}`,
+  );
+  writeLine(stdout, `  Remotes: ${result.status.remotes.length}`);
+  for (const remote of result.status.remotes) {
+    writeLine(
+      stdout,
+      `    ${remote.name} [${remote.role}] ${remote.status} expected=${remote.expectedUrl} current=${remote.currentUrl ?? "unknown"}`,
+    );
+  }
+  writeLine(stdout, `  Auth profiles: ${result.status.authProfiles.length}`);
+  for (const profile of result.status.authProfiles) {
+    writeLine(
+      stdout,
+      `    ${profile.id} ${profile.status} expected=${profile.expectedAccount ?? "unknown"} observed=${profile.observedAccount ?? "unknown"}`,
+    );
+  }
+  writeLine(stdout, `  Access declarations: ${result.status.access.length}`);
+  for (const access of result.status.access) {
+    writeLine(
+      stdout,
+      `    ${access.kind}:${access.providerIdentity} ${access.status} required=${access.requiredPermission} effective=${access.effectivePermission ?? "unknown"}`,
+    );
+  }
+  printHostingIssues(result.status.issues, stdout);
+}
+
+function printProjectHostingPlanResult(
+  result: ProjectHostingPlanCliResult,
+  parsed: ParsedProjectHostingCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    projectRoot: result.projectRoot,
+    status: result.status,
+    plan: result.plan,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus project hosting plan: ${result.plan.status}.`);
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(
+    stdout,
+    `  Repository: ${result.plan.namespace ?? "not configured"}/${result.plan.repositoryName ?? "not configured"}`,
+  );
+  writeLine(stdout, `  Actions: ${result.plan.actions.length}`);
+  for (const action of result.plan.actions) {
+    writeLine(
+      stdout,
+      `    ${action.disposition} ${action.kind} ${hostingActionTargetText(action.target)} auth=${action.authProfile ?? "none"}`,
+    );
+    writeLine(stdout, `      ${action.reason}`);
+  }
+  if (result.plan.actions.length === 0) {
+    writeLine(stdout, "    none");
+  }
+}
+
+function hostingRepositoryText(status: NexusProjectHostingStatusResult): string {
+  if (!status.configured) {
+    return "not configured";
+  }
+
+  return (
+    `${status.namespace ?? "unknown"}/${status.repositoryName ?? "unknown"} ` +
+    `exists=${status.repository.exists ?? "unknown"} ` +
+    `visibility=${status.repository.visibility ?? "unknown"} ` +
+    `defaultBranch=${status.repository.defaultBranch ?? "unknown"}`
+  );
+}
+
+function hostingActionTargetText(
+  target: NexusProjectHostingPlanResult["actions"][number]["target"],
+): string {
+  if (target.kind && target.providerIdentity) {
+    return `${target.type}:${target.kind}:${target.providerIdentity}`;
+  }
+  if (target.name) {
+    return `${target.type}:${target.name}`;
+  }
+  return target.type;
+}
+
+function printHostingIssues(
+  issues: NexusProjectHostingStatusResult["issues"],
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  Issues: ${issues.length}`);
+  for (const issue of issues) {
+    writeLine(stdout, `    [${issue.severity}] ${issue.code}: ${issue.message}`);
+  }
+}
+
 function printProjectMcpRefreshResult(
   result: MaterializeNexusProjectAgentMcpConfigResult,
   parsed: ParsedProjectMcpRefreshCommand,
@@ -5848,6 +6065,77 @@ function resolveProjectStatusForCli(
       throw pathError;
     }
   }
+}
+
+async function resolveProjectHostingStatusForCli(
+  parsed: ParsedProjectHostingCommand,
+  dependencies: DevNexusCliDependencies,
+): Promise<ProjectHostingStatusCliResult> {
+  const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const authProfiles = hostingAuthProfilesForCli(projectConfig, parsed.homePath);
+  const localRemotes = hostingLocalGitRemotes(projectRoot, dependencies.gitRunner);
+  const status = await statusNexusProjectHosting({
+    project: {
+      id: projectConfig.id,
+      name: projectConfig.name,
+    },
+    hosting: projectConfig.hosting,
+    ...(authProfiles.length > 0 ? { authProfiles } : {}),
+    ...(localRemotes ? { localRemotes } : {}),
+  });
+
+  return {
+    projectRoot,
+    project: {
+      id: projectConfig.id,
+      name: projectConfig.name,
+    },
+    status,
+  };
+}
+
+function hostingAuthProfilesForCli(
+  projectConfig: NexusProjectConfig,
+  homePath: string | undefined,
+): NexusHostingAuthProfileConfig[] {
+  const homeConfig = optionalCommandHomeConfig(homePath ?? projectConfig.home ?? undefined);
+  return homeConfig?.authProfiles ?? [];
+}
+
+function hostingLocalGitRemotes(
+  projectRoot: string,
+  gitRunner: GitRunner | undefined,
+): NexusProjectHostingLocalRemoteRecord[] | undefined {
+  const runner = gitRunner ?? defaultGitRunner;
+  const result = runner(["remote", "-v"], projectRoot);
+  if (result.exitCode !== 0) {
+    return undefined;
+  }
+
+  return parseGitRemoteVerboseOutput(result.stdout);
+}
+
+function parseGitRemoteVerboseOutput(
+  stdout: string,
+): NexusProjectHostingLocalRemoteRecord[] {
+  const remotes = new Map<string, string | null>();
+  for (const line of stdout.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)$/u.exec(trimmed);
+    if (!match) {
+      continue;
+    }
+    const [, name, url, direction] = match;
+    if (direction === "fetch" || !remotes.has(name!)) {
+      remotes.set(name!, url!);
+    }
+  }
+
+  return [...remotes.entries()].map(([name, url]) => ({ name, url }));
 }
 
 function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefined {

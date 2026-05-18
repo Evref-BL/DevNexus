@@ -192,6 +192,8 @@ describe("DevNexus MCP server", () => {
   it("lists generic project, automation, and work-item tools", () => {
     expect(listDevNexusMcpTools().map((tool) => tool.name)).toEqual([
       "project_status",
+      "project_hosting_status",
+      "project_hosting_plan",
       "automation_status",
       "eligible_work",
       "agent_profiles",
@@ -226,6 +228,84 @@ describe("DevNexus MCP server", () => {
   it("keeps the core MCP ownership list aligned with the advertised tools", () => {
     expect(devNexusCoreMcpToolNames).toEqual(
       listDevNexusMcpTools().map((tool) => tool.name),
+    );
+  });
+
+  it("returns project hosting status and plan through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-hosting-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "mcp-demo",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "origin",
+              role: "human",
+              protocol: "ssh",
+              authProfile: "human-github",
+            },
+          ],
+          access: [],
+          provisioning: {
+            allowCreate: false,
+            allowLocalRemoteRepair: true,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+          },
+        },
+      }),
+    );
+    const gitRunner: GitRunner = (args: readonly string[]): GitCommandResult => {
+      const argsArray = [...args];
+      if (argsArray.join(" ") === "remote -v") {
+        return ok(
+          argsArray,
+          "origin\tgit@github.com:WrongOrg/mcp-demo.git (fetch)\n" +
+            "origin\tgit@github.com:WrongOrg/mcp-demo.git (push)\n",
+        );
+      }
+
+      return ok(argsArray, "");
+    };
+
+    const status = toolJson(
+      await callDevNexusMcpTool(
+        "project_hosting_status",
+        { projectRoot },
+        { gitRunner },
+      ),
+    );
+    expect(status.status.remotes).toMatchObject([
+      {
+        name: "origin",
+        status: "mismatch",
+        expectedUrl: "git@github.com:ExampleOrg/mcp-demo.git",
+      },
+    ]);
+
+    const plan = toolJson(
+      await callDevNexusMcpTool(
+        "project_hosting_plan",
+        { projectRoot },
+        { gitRunner },
+      ),
+    );
+    expect(plan.plan.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "update_local_remote",
+          disposition: "allowed",
+        }),
+      ]),
     );
   });
 

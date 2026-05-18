@@ -14,6 +14,13 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  planNexusProjectHosting,
+  statusNexusProjectHosting,
+  type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingLocalRemoteRecord,
+  type NexusProjectHostingStatusResult,
+} from "./nexusProjectHosting.js";
+import {
   getNexusProjectStatus,
   type NexusProjectHomeStore,
 } from "./nexusProjectHomeService.js";
@@ -98,7 +105,7 @@ import {
   createWorkItemTrackerLinkService,
 } from "./workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
-import type { GitRunner } from "./gitWorktreeService.js";
+import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type {
   WorkItemPatch,
   WorkItemRef,
@@ -146,6 +153,32 @@ const tools: McpTool[] = [
         project: { type: "string" },
       },
       required: ["project"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_hosting_status",
+    description: "Report read-only DevNexus project hosting status without mutating local remotes or provider state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_hosting_plan",
+    description: "Build a deterministic dry-run DevNexus project hosting plan without applying repairs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
       additionalProperties: false,
     },
   },
@@ -854,6 +887,23 @@ export async function callDevNexusMcpTool(
           ok: true,
           project: projectStatusFromArgs(args),
         });
+      case "project_hosting_status":
+        return toolResult({
+          ok: true,
+          ...(await projectHostingStatusFromArgs(args, context)),
+        });
+      case "project_hosting_plan": {
+        const hostingStatus = await projectHostingStatusFromArgs(args, context);
+        const config = loadProjectConfig(hostingStatus.projectRoot);
+        return toolResult({
+          ok: true,
+          ...hostingStatus,
+          plan: planNexusProjectHosting({
+            hosting: config.hosting,
+            status: hostingStatus.status,
+          }),
+        });
+      }
       case "automation_status":
         return toolResult({
           ok: true,
@@ -1732,6 +1782,39 @@ function projectRootFromArgs(args: Record<string, unknown>): string {
   return projectStatusFromArgs(args).projectRoot;
 }
 
+async function projectHostingStatusFromArgs(
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+): Promise<{
+  projectRoot: string;
+  status: NexusProjectHostingStatusResult;
+}> {
+  const projectRoot = projectRootFromArgs(args);
+  const config = loadProjectConfig(projectRoot);
+  const authProfiles = projectHostingAuthProfiles(
+    config,
+    optionalString(args, "homePath", "arguments"),
+  );
+  const localRemotes = projectHostingLocalGitRemotes(
+    projectRoot,
+    context.gitRunner,
+  );
+  const status = await statusNexusProjectHosting({
+    project: {
+      id: config.id,
+      name: config.name,
+    },
+    hosting: config.hosting,
+    ...(authProfiles.length > 0 ? { authProfiles } : {}),
+    ...(localRemotes ? { localRemotes } : {}),
+  });
+
+  return {
+    projectRoot,
+    status,
+  };
+}
+
 function projectStatusFromArgs(args: Record<string, unknown>): NexusProjectStatusBase {
   const project = requiredString(args, "project", "arguments");
   const homePath = optionalString(args, "homePath", "arguments");
@@ -1766,6 +1849,55 @@ function fileProjectHomeStore(): NexusProjectHomeStore<NexusHomeConfigBase> {
     saveHomeConfig: (homePath, registry) =>
       saveNexusHomeConfigFile(homePath, registry, validateNexusHomeConfigBase),
   };
+}
+
+function projectHostingAuthProfiles(
+  projectConfig: NexusProjectConfig,
+  homePath: string | undefined,
+): NexusHostingAuthProfileConfig[] {
+  try {
+    return loadNexusHomeConfigFile(
+      homePath ?? projectConfig.home ?? defaultNexusHomePath(),
+      validateNexusHomeConfigBase,
+    ).authProfiles ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function projectHostingLocalGitRemotes(
+  projectRoot: string,
+  gitRunner: GitRunner | undefined,
+): NexusProjectHostingLocalRemoteRecord[] | undefined {
+  const runner = gitRunner ?? defaultGitRunner;
+  const result = runner(["remote", "-v"], projectRoot);
+  if (result.exitCode !== 0) {
+    return undefined;
+  }
+
+  return parseGitRemoteVerboseOutput(result.stdout);
+}
+
+function parseGitRemoteVerboseOutput(
+  stdout: string,
+): NexusProjectHostingLocalRemoteRecord[] {
+  const remotes = new Map<string, string | null>();
+  for (const line of stdout.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)$/u.exec(trimmed);
+    if (!match) {
+      continue;
+    }
+    const [, name, url, direction] = match;
+    if (direction === "fetch" || !remotes.has(name!)) {
+      remotes.set(name!, url!);
+    }
+  }
+
+  return [...remotes.entries()].map(([name, url]) => ({ name, url }));
 }
 
 function homePathFromArgs(args: Record<string, unknown>): string {

@@ -252,6 +252,8 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
+    expect(output.output()).toContain("dev-nexus project hosting status");
+    expect(output.output()).toContain("dev-nexus project hosting plan");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus coordination status");
@@ -264,6 +266,111 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("prints project hosting status and plan through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-hosting-");
+    const homePath = path.join(makeTempDir("dev-nexus-cli-hosting-home-"), "missing-home");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "demo-project",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "origin",
+              role: "human",
+              protocol: "ssh",
+              authProfile: "human-github",
+            },
+          ],
+          access: [
+            {
+              kind: "machine_user",
+              providerIdentity: "ExampleBot",
+              role: "automation",
+              requiredPermission: "write",
+              authProfile: "bot-github",
+              invitationPolicy: "require_accepted",
+            },
+          ],
+          provisioning: {
+            allowCreate: false,
+            allowLocalRemoteRepair: true,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+          },
+        },
+      }),
+    );
+    const gitRunner: GitRunner = (args: readonly string[]): GitCommandResult => {
+      const argsArray = [...args];
+      if (argsArray.join(" ") === "remote -v") {
+        return ok(
+          argsArray,
+          "origin\tgit@github.com:WrongOrg/demo-project.git (fetch)\n" +
+            "origin\tgit@github.com:WrongOrg/demo-project.git (push)\n",
+        );
+      }
+
+      return ok(argsArray, "", 1);
+    };
+
+    const statusOutput = captureOutput();
+    await expect(
+      main(["project", "hosting", "status", projectRoot, "--home", homePath, "--json"], {
+        stdout: statusOutput.writer,
+        gitRunner,
+      }),
+    ).resolves.toBe(0);
+    const statusPayload = JSON.parse(statusOutput.output());
+    expect(statusPayload.status.remotes).toMatchObject([
+      {
+        name: "origin",
+        status: "mismatch",
+        expectedUrl: "git@github.com:ExampleOrg/demo-project.git",
+        currentUrl: "git@github.com:WrongOrg/demo-project.git",
+      },
+    ]);
+    expect(statusPayload.status.authProfiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "human-github", status: "missing" }),
+        expect.objectContaining({ id: "bot-github", status: "missing" }),
+      ]),
+    );
+    expect(statusPayload.status.issues.map((issue: any) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "local_remote_url_mismatch",
+        "auth_profile_missing",
+        "provider_unavailable",
+      ]),
+    );
+
+    const planOutput = captureOutput();
+    await expect(
+      main(["project", "hosting", "plan", projectRoot, "--home", homePath, "--json"], {
+        stdout: planOutput.writer,
+        gitRunner,
+      }),
+    ).resolves.toBe(0);
+    const planPayload = JSON.parse(planOutput.output());
+    expect(planPayload.plan.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "update_local_remote",
+          disposition: "allowed",
+          authProfile: "human-github",
+        }),
+      ]),
+    );
   });
 
   it("fails shared-checkout work-item mutations before writing local state", async () => {
