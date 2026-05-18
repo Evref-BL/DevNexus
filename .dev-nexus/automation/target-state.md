@@ -92,8 +92,13 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector: none after
-  closing `dev-nexus:local-61`.
+- Current ready `dogfood` work matching the automation selector:
+  - `dev-nexus-pharo:local-13` project-scoped Codex setup generation. Promoted
+    after PLexus runtime dependencies `plexus:local-15` and `plexus:local-18`
+    completed.
+  - `plexus:local-19` runtime diagnostics/status reporting. Promoted after
+    PLexus runtime dependencies `plexus:local-16`, `plexus:local-17`, and
+    `plexus:local-18` completed.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

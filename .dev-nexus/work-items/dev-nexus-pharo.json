@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 14,
-  "nextCommentNumber": 28,
-  "updatedAt": "2026-05-17T20:56:34.452Z",
+  "nextCommentNumber": 29,
+  "updatedAt": "2026-05-18T00:30:34.037Z",
   "items": [
     {
       "id": "local-1",
@@ -300,7 +300,7 @@
       "id": "local-13",
       "title": "Generate clean DevNexus-Pharo Codex setup per project",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-15, plexus:local-18.\n\nGoal:\nUpdate the DevNexus-Pharo setup path so each managed Codex project receives clean project-scoped PLexus configuration, project-local gateway settings, and the expected Pharo skills and Model Context Protocol (MCP) tools without deleting fresh zero-image PLexus projects.\n\nAcceptance criteria:\n- Generated Codex configuration preserves unrelated MCP entries while adding or updating the PLexus project, Pharo Launcher, route-control, and gateway entries needed for the project.\n- Generated project-local gateway ports are unique by policy and validated before being written.\n- Existing project images and image execution settings are preserved during config regeneration.\n- A fresh project with no images keeps its PLexus files and reports as ready for future Pharo work.\n- Tests cover config merge behavior, unique gateway port assignment, zero-image preservation, and migration from the current home-scoped DevNexus-Pharo config shape.\n\nVerification:\nRun the DevNexus-Pharo unit tests that exercise Codex/MCP config generation and extension install/update flows.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -313,7 +313,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.193Z",
-      "updatedAt": "2026-05-17T20:31:19.193Z",
+      "updatedAt": "2026-05-18T00:30:34.037Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -645,6 +645,18 @@
         }
       }
     ],
-    "local-13": []
+    "local-13": [
+      {
+        "id": "local-comment-28",
+        "body": "Heartbeat reflection promoted this item to ready. Evidence: dependencies plexus:local-15 and plexus:local-18 are complete and published through PLexus runtime foundation/gateway work, and this item is a configuration/test slice that does not require live image mutation. Keep live PLexus/Pharo runtime work behind approved runtime profiles.",
+        "author": null,
+        "createdAt": "2026-05-18T00:30:34.037Z",
+        "updatedAt": "2026-05-18T00:30:34.037Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-28"
+        }
+      }
+    ]
   }
 }

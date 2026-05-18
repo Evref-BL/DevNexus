@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 43,
-  "updatedAt": "2026-05-17T22:41:35.218Z",
+  "nextCommentNumber": 44,
+  "updatedAt": "2026-05-18T00:30:34.108Z",
   "items": [
     {
       "id": "local-1",
@@ -445,7 +445,7 @@
       "id": "local-19",
       "title": "Improve PLexus runtime diagnostics",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-16, plexus:local-17, plexus:local-18.\n\nGoal:\nMake split-brain and mixed-state situations visible from PLexus status, and report fresh no-image projects as healthy idle runtime scopes.\n\nAcceptance criteria:\n- Project status reports state root, target id, workspace id, gateway endpoint, control endpoint, image MCP ports, and active port claims.\n- Diagnostics identify conflicting listeners and stale claims separately.\n- Route table state is visible enough to tell whether the gateway can route a configured image.\n- Legacy gateway or legacy MCP configuration is called out with migration guidance.\n- Zero-image projects report operational-but-idle when their runtime policy and gateway state are valid.\n\nVerification:\nRun status/diagnostics tests and capture one local status sample for a zero-image project.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -457,7 +457,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.095Z",
-      "updatedAt": "2026-05-17T20:31:19.095Z",
+      "updatedAt": "2026-05-18T00:30:34.108Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1015,7 +1015,19 @@
         }
       }
     ],
-    "local-19": [],
+    "local-19": [
+      {
+        "id": "local-comment-43",
+        "body": "Heartbeat reflection promoted this item to ready. Evidence: dependencies plexus:local-16, plexus:local-17, and plexus:local-18 are complete and published through the project-scoped runtime wave. This is diagnostics/status work; any live status sample must stay within the recorded runtime policy and avoid destructive cleanup.",
+        "author": null,
+        "createdAt": "2026-05-18T00:30:34.108Z",
+        "updatedAt": "2026-05-18T00:30:34.108Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-43"
+        }
+      }
+    ],
     "local-20": [],
     "local-21": []
   }
