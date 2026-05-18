@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 138,
-  "nextCommentNumber": 224,
-  "updatedAt": "2026-05-18T19:59:02.127Z",
+  "nextCommentNumber": 226,
+  "updatedAt": "2026-05-18T20:05:16.467Z",
   "items": [
     {
       "id": "local-1",
@@ -3024,7 +3024,7 @@
       "id": "local-119",
       "title": "Build read-only hosting status model",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: build a read-only hosting status model that answers what is true right now without mutating local Git remotes or provider state.\n\nUser stories covered:\n- As a coordinator agent, I can report missing repository access as a setup blocker instead of inventing provider commands.\n- As a new host joining a project, I can validate local human and bot auth profiles against shared hosting intent.\n\nAcceptance criteria:\n- Hosting status reports configured provider, namespace, resolved repository name, repository existence, visibility, default branch, expected remotes, local remote matches, auth profiles, observed actors, required access, pending invitations, warnings, and blockers.\n- Status distinguishes missing hosting config, missing auth profiles, wrong observed actor, provider mismatch, repository missing, access missing, insufficient access, and pending invitation states.\n- Status never creates repositories, invites collaborators, accepts invitations, updates remotes, or writes provider state.\n- Provider reads are abstracted so tests can use mocked provider responses.\n- Output is structured enough for later CLI/MCP presentation and setup checks.\n\nDependencies:\n- Depends on dev-nexus:local-118 hosting access declarations and provisioning gates.\n\nBoundaries:\n- Do not implement apply/mutation behavior in this slice.\n- Do not run live GitHub calls in default tests.\n\nVerification:\n- Focused hosting status tests for healthy, missing repository, missing local remote, wrong remote URL, missing auth profile, wrong actor, missing access, insufficient access, pending invite, and unsupported provider cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3038,8 +3038,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:15:46.399Z",
-      "updatedAt": "2026-05-18T19:59:02.127Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T20:05:15.203Z",
+      "closedAt": "2026-05-18T20:05:15.203Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3051,7 +3051,7 @@
       "id": "local-120",
       "title": "Build deterministic hosting plan actions",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118 and dev-nexus:local-119\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: turn hosting status into deterministic dry-run plan actions that explain what DevNexus would do and what remains blocked.\n\nUser stories covered:\n- As a project owner, I can run a dry-run and see exactly what exists, what is missing, and what would change.\n- As a coordinator agent, I can paste a stable provisioning plan into a work-item comment.\n\nAcceptance criteria:\n- Planner emits ordered structured actions for repository creation, local remote add/update, collaborator add, collaborator permission update, collaborator invite, pending invitation acceptance, wait/manual invitation, default branch repair, visibility mismatch, and unsupported provider operations.\n- Every action includes provider, target repository, target principal or remote, current state, desired state, mutation class, allowed/blocked/manual state, reason, and auth profile that would perform the action.\n- Plans are stable across repeated runs with identical status input.\n- Planner honors provisioning gates from project configuration and never performs mutations.\n- Unsafe visibility changes and unsupported provider operations are declined with actionable reasons.\n\nDependencies:\n- Depends on dev-nexus:local-118 and dev-nexus:local-119.\n\nBoundaries:\n- Do not implement apply execution in this slice.\n- Do not contact live providers outside the read-only status inputs already modeled.\n\nVerification:\n- Focused planner snapshot or structural tests for each action class, blocked gate, manual wait state, action ordering, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3065,7 +3065,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:15:53.773Z",
-      "updatedAt": "2026-05-18T16:15:53.773Z",
+      "updatedAt": "2026-05-18T20:05:16.467Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6191,9 +6191,32 @@
           "provider": "local",
           "itemId": "local-comment-223"
         }
+      },
+      {
+        "id": "local-comment-224",
+        "body": "Completed and published to DevNexus main as 7f53a03. Added a pure read-only hosting status model covering repository facts, expected/local remote match state, auth profile actor observations, required access, pending invitations, and structured warnings/blockers. Verification: npm test -- src/nexusProjectHosting.test.ts passed; npm run check passed with 57 files and 454 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T20:05:14.534Z",
+        "updatedAt": "2026-05-18T20:05:14.534Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-224"
+        }
       }
     ],
-    "local-120": [],
+    "local-120": [
+      {
+        "id": "local-comment-225",
+        "body": "Promoted to ready after dev-nexus:local-118 and dev-nexus:local-119 landed as 180955f and 7f53a03. The status input needed for deterministic dry-run plan actions is now available.",
+        "author": null,
+        "createdAt": "2026-05-18T20:05:15.848Z",
+        "updatedAt": "2026-05-18T20:05:15.848Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-225"
+        }
+      }
+    ],
     "local-121": [],
     "local-122": [],
     "local-123": [],
