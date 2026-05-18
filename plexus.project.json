@@ -1,9 +1,6 @@
 {
+  "id": "dev-nexus-dogfood",
   "name": "DevNexus Dogfood",
-  "kanban": {
-    "provider": "vibe-kanban",
-    "projectId": "dev-nexus-dogfood"
-  },
   "images": [],
   "imageExecution": {
     "mode": "disabled",
