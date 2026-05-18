@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 117,
-  "nextCommentNumber": 197,
-  "updatedAt": "2026-05-18T15:52:01.747Z",
+  "nextNumber": 118,
+  "nextCommentNumber": 198,
+  "updatedAt": "2026-05-18T16:09:48.588Z",
   "items": [
     {
       "id": "local-1",
@@ -2965,6 +2965,34 @@
         "itemId": "local-116",
         "itemNumber": 116
       }
+    },
+    {
+      "id": "local-117",
+      "title": "Slice hosting provisioning PRD into implementation work items",
+      "description": "Source PRD: docs/project-hosting-provisioning-prd.md\n\nTurn the hosting provisioning PRD into independently verifiable implementation work items for DevNexus.\n\nExpected slices should cover:\n- hosting access declarations in project config validation/defaulting\n- hosting status/plan/apply command and MCP surfaces\n- provider-neutral planner actions and idempotent apply behavior\n- GitHub adapter support for repository creation, collaborator permission repair, pending invitation detection, and invitee-profile invitation acceptance\n- setup/status integration and documentation updates\n- mocked provider tests before any live GitHub mutation path\n\nBoundary: do not manually repair collaborators as part of this item. The goal is to slice the declared DevNexus tooling work, keeping the user-facing API dumb and obvious while the hosting tool owns provider complexity.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "hosting",
+        "github",
+        "provisioning",
+        "access",
+        "to-issues",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:09:45.129Z",
+      "updatedAt": "2026-05-18T16:09:48.588Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-117",
+        "itemNumber": 117
+      }
     }
   ],
   "comments": {
@@ -5318,6 +5346,19 @@
     "local-113": [],
     "local-114": [],
     "local-115": [],
-    "local-116": []
+    "local-116": [],
+    "local-117": [
+      {
+        "id": "local-comment-197",
+        "body": "PRD created at `docs/project-hosting-provisioning-prd.md`. Key product decision: keep the declared API minimal (repository, remotes, required access, provisioning gates) while provider adapters own repository creation, collaborator repair, pending invitation detection, and invitee-profile invitation acceptance. Ready for `$to-issues` slicing.",
+        "author": null,
+        "createdAt": "2026-05-18T16:09:48.588Z",
+        "updatedAt": "2026-05-18T16:09:48.588Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-197"
+        }
+      }
+    ]
   }
 }
