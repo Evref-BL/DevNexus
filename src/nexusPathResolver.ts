@@ -6,6 +6,7 @@ export type NexusPathHostPlatform = "auto" | "macos" | "windows" | "linux";
 export type NexusPathStyle = "posix" | "windows";
 export type NexusProjectPathBase =
   | "absolute"
+  | "componentsRoot"
   | "projectRoot"
   | "projectParent"
   | "home"
@@ -15,6 +16,7 @@ export interface AnalyzeNexusProjectPathOptions {
   projectRoot: string;
   value: string;
   platform?: NexusPathHostPlatform | NexusPathStyle;
+  componentsRoot?: string;
   homePath?: string;
   sourcesRoot?: string;
 }
@@ -30,6 +32,7 @@ export interface NexusProjectPathAnalysis {
 }
 
 const portableBaseNames = new Set([
+  "componentsRoot",
   "projectRoot",
   "projectParent",
   "home",
@@ -115,6 +118,16 @@ function resolvePortableBase(
   }
   if (base === "home") {
     return normalizePortableSegment(options.homePath ?? os.homedir(), platform);
+  }
+  if (base === "componentsRoot") {
+    return normalizePortableSegment(
+      options.componentsRoot ??
+        pathApi.join(
+          normalizePortableSegment(options.projectRoot, platform),
+          "components",
+        ),
+      platform,
+    );
   }
   if (base === "sourcesRoot") {
     return normalizePortableSegment(

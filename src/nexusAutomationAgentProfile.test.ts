@@ -130,6 +130,8 @@ describe("nexus automation agent profile command resolution", () => {
                 "--add-dir",
                 "sourcesRoot:dev-nexus",
                 "--add-dir",
+                "componentsRoot:dev-nexus-typescript",
+                "--add-dir",
                 "projectParent:sources/plexus",
                 "Use DEV_NEXUS_AGENT_CONTEXT_FILE.",
               ],
@@ -141,7 +143,7 @@ describe("nexus automation agent profile command resolution", () => {
     });
 
     expect(resolved.command).toBe(
-      'codex exec --cd /Users/me/dev-nexus/dogfood --add-dir /Users/me/dev-nexus/sources/dev-nexus --add-dir /Users/me/dev-nexus/sources/plexus "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
+      'codex exec --cd /Users/me/dev-nexus/dogfood --add-dir /Users/me/dev-nexus/sources/dev-nexus --add-dir /Users/me/dev-nexus/dogfood/components/dev-nexus-typescript --add-dir /Users/me/dev-nexus/sources/plexus "Use DEV_NEXUS_AGENT_CONTEXT_FILE."',
     );
   });
 

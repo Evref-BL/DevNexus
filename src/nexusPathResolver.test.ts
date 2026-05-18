@@ -6,6 +6,49 @@ import {
 } from "./index.js";
 
 describe("nexus project path resolver", () => {
+  it("resolves componentsRoot paths inside the project on each host style", () => {
+    expect(
+      resolveNexusProjectPath({
+        projectRoot: "C:\\Users\\me\\dev-nexus\\dogfood",
+        value: "componentsRoot:dev-nexus",
+        platform: "windows",
+      }),
+    ).toBe(
+      path.win32.join(
+        "C:\\Users\\me\\dev-nexus\\dogfood",
+        "components",
+        "dev-nexus",
+      ),
+    );
+
+    expect(
+      resolveNexusProjectPath({
+        projectRoot: "/Users/me/dev-nexus/dogfood",
+        value: "componentsRoot:dev-nexus/plugins/core",
+        platform: "macos",
+      }),
+    ).toBe("/Users/me/dev-nexus/dogfood/components/dev-nexus/plugins/core");
+  });
+
+  it("reports componentsRoot as a portable project-local base", () => {
+    expect(
+      analyzeNexusProjectPath({
+        projectRoot: "C:\\Users\\me\\dev-nexus\\dogfood",
+        value: "componentsRoot:dev-nexus",
+        platform: "windows",
+      }),
+    ).toMatchObject({
+      path: path.win32.join(
+        "C:\\Users\\me\\dev-nexus\\dogfood",
+        "components",
+        "dev-nexus",
+      ),
+      compatible: true,
+      portable: true,
+      base: "componentsRoot",
+    });
+  });
+
   it("resolves sourcesRoot paths from the project parent on each host style", () => {
     expect(
       resolveNexusProjectPath({
