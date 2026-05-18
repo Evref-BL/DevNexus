@@ -1097,6 +1097,7 @@ export async function callDevNexusMcpTool(
           ok: true,
           ...(await getNexusAutomationStatus({
             projectRoot: projectRootFromArgs(args),
+            homePath: optionalString(args, "homePath", "arguments"),
             now: context.now,
           })),
         });

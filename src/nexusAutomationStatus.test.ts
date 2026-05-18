@@ -563,12 +563,32 @@ describe("nexus automation status", () => {
               kind: "machine_user",
               provider: "github",
               handle: "example-bot",
-              id: null,
+              id: "example-bot-actor",
             },
             commandEnvironment: {
               GH_CONFIG_DIR: "home:.config/gh-example-bot",
             },
           },
+        },
+        authority: {
+          actors: [
+            {
+              id: "example-bot-actor",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "example-bot",
+              displayName: "Example Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "example-bot-actor",
+              roles: ["maintainer"],
+              scope: {
+                component: "primary",
+              },
+            },
+          ],
         },
       }),
     );
@@ -585,6 +605,18 @@ describe("nexus automation status", () => {
 
     const result = await getNexusAutomationStatus({
       projectRoot,
+      authProfiles: [
+        {
+          id: "bot-github",
+          actorId: "example-bot-actor",
+          provider: "github",
+          kind: "automation",
+          account: "example-bot",
+          sshHost: "github.com-bot",
+          githubCliConfigDir: "home:.config/gh-example-bot",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        },
+      ],
       gitRunner: publicationGitRunner(sourceRoot),
       publicationActorRunner: actorRunnerWithHandle("example-human"),
       now: fixedClock("2026-05-16T10:00:00.000Z"),
@@ -604,6 +636,15 @@ describe("nexus automation status", () => {
               handle: "example-human",
             },
           },
+        },
+      ],
+      currentActors: [
+        {
+          componentId: "primary",
+          status: "matched",
+          expectedActorId: "example-bot-actor",
+          profileId: "bot-github",
+          roles: ["maintainer"],
         },
       ],
     });

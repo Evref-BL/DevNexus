@@ -492,6 +492,7 @@ interface ParsedAutomationRunOnceCommand {
 
 interface ParsedAutomationStatusCommand {
   projectRoot: string;
+  homePath?: string;
   json?: boolean;
 }
 
@@ -1039,6 +1040,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation status:",
+    "  --home <path>             host-local home config for auth profiles",
     "  --json",
     "",
     "Options for automation eligible-work:",
@@ -2087,6 +2089,9 @@ async function handleAutomationCommand(
     const parsed = parseAutomationStatusCommand(argv);
     const result = await getNexusAutomationStatus({
       projectRoot: parsed.projectRoot,
+      ...(parsed.homePath !== undefined
+        ? { homePath: resolvedCommandHomePath(parsed.homePath) }
+        : {}),
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -4745,10 +4750,22 @@ function parseAutomationStatusCommand(
   }
 
   const parsed: ParsedAutomationStatusCommand = { projectRoot };
-  for (const arg of rest) {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      const value = rest[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error(`${arg} requires a value`);
+      }
+      index += 1;
+      return value;
+    };
     switch (arg) {
       case "--json":
         parsed.json = true;
+        break;
+      case "--home":
+        parsed.homePath = next();
         break;
       default:
         throw new Error(`Unknown automation status option: ${arg}`);
@@ -6428,6 +6445,18 @@ function printAutomationStatusResult(
     writeLine(stdout, `  Publication policies: ${result.publication.length}`);
     for (const publication of result.publication) {
       writeLine(stdout, `    ${formatPublicationStatus(publication)}`);
+    }
+  }
+  if (result.currentActors.length > 0) {
+    writeLine(stdout, `  Current actors: ${result.currentActors.length}`);
+    for (const actor of result.currentActors) {
+      writeLine(
+        stdout,
+        `    ${actor.componentId}: ${actor.status} actor=${actor.expectedActorId ?? "unknown"} profile=${actor.profileId ?? "none"} roles=${actor.roles.length > 0 ? actor.roles.join(",") : "none"}`,
+      );
+      for (const warning of actor.warnings) {
+        writeLine(stdout, `      Warning: ${warning}`);
+      }
     }
   }
   if (result.selectedWorkItem) {

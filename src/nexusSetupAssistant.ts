@@ -1915,10 +1915,14 @@ function hostingAuthProfileChecks(
     }
 
     const details = [
+      profile.actorId ? `actor=${profile.actorId}` : null,
       profile.account ? `account=${profile.account}` : null,
       profile.sshHost ? `sshHost=${profile.sshHost}` : null,
       profile.githubCliConfigDir ? "ghConfigDir=set" : null,
       profile.command ? "command=set" : null,
+      profile.environmentKeys && profile.environmentKeys.length > 0
+        ? `envKeys=${profile.environmentKeys.join(",")}`
+        : null,
     ].filter((detail): detail is string => Boolean(detail));
     return {
       id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,

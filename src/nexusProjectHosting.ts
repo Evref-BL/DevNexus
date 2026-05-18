@@ -87,6 +87,7 @@ export type NexusHostingAuthProfileKind = "human" | "automation" | "app";
 
 export interface NexusHostingAuthProfileConfig {
   id: string;
+  actorId?: string;
   provider: NexusProjectHostingProviderName;
   kind?: NexusHostingAuthProfileKind;
   account?: string;
@@ -94,6 +95,7 @@ export interface NexusHostingAuthProfileConfig {
   sshHost?: string;
   githubCliConfigDir?: string;
   command?: string;
+  environmentKeys?: string[];
 }
 
 export interface NexusProjectHostingProjectIdentity {

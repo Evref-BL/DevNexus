@@ -106,12 +106,14 @@ describe("home config primitives", () => {
           },
           {
             id: "bot-github",
+            actorId: "example-bot-actor",
             provider: "github",
             kind: "automation",
             account: "example-bot",
             sshHost: "github.com-example-bot",
             githubCliConfigDir: path.join(homePath, "gh-example-bot"),
             command: "gh-example-bot",
+            environmentKeys: ["GH_CONFIG_DIR"],
           },
         ],
       }).authProfiles,
@@ -125,12 +127,14 @@ describe("home config primitives", () => {
       },
       {
         id: "bot-github",
+        actorId: "example-bot-actor",
         provider: "github",
         kind: "automation",
         account: "example-bot",
         sshHost: "github.com-example-bot",
         githubCliConfigDir: path.join(homePath, "gh-example-bot"),
         command: "gh-example-bot",
+        environmentKeys: ["GH_CONFIG_DIR"],
       },
     ]);
 
