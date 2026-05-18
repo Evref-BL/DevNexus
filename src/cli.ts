@@ -149,6 +149,12 @@ import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
+import {
+  createWorkItemTrackerLinkService,
+  type LinkWorkItemTrackerReferenceResult,
+  type ShowWorkItemTrackerLinksResult,
+  type UnlinkWorkItemTrackerReferenceResult,
+} from "./workItemTrackerLinks.js";
 import type { GitRunner } from "./gitWorktreeService.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
 import type {
@@ -319,6 +325,44 @@ interface ParsedWorkItemSetStatusCommand {
   trackerId?: string;
   itemId: string;
   status: WorkStatus;
+  json?: boolean;
+}
+
+interface ParsedWorkItemLinkCommand {
+  projectRoot: string;
+  componentId?: string;
+  logicalItemId: string;
+  trackerId: string;
+  provider?: string;
+  host?: string | null;
+  repositoryId?: string | null;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
+  projectId?: string | null;
+  boardId?: string | null;
+  itemId: string;
+  itemNumber?: number | null;
+  itemKey?: string | null;
+  nodeId?: string | null;
+  webUrl?: string | null;
+  observedAt?: string | null;
+  json?: boolean;
+}
+
+interface ParsedWorkItemShowLinksCommand {
+  projectRoot: string;
+  componentId?: string;
+  logicalItemId: string;
+  json?: boolean;
+}
+
+interface ParsedWorkItemUnlinkCommand {
+  projectRoot: string;
+  componentId?: string;
+  logicalItemId: string;
+  trackerId: string;
+  itemId: string;
+  reason?: string | null;
   json?: boolean;
 }
 
@@ -520,6 +564,9 @@ export function usage(): string {
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
     "  dev-nexus work-item set-status <project-root> <work-item-id> --status <status> [options]",
+    "  dev-nexus work-item link <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
+    "  dev-nexus work-item show-links <project-root> <logical-item-id> [options]",
+    "  dev-nexus work-item unlink <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation eligible-work <project-root> [options]",
     "  dev-nexus automation agent-profiles <project-root> [options]",
@@ -690,6 +737,35 @@ export function usage(): string {
     "  --component <id>          defaults to the primary component",
     "  --tracker <id>            defaults to the component default tracker",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>",
+    "  --json",
+    "",
+    "Options for work-item link:",
+    "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            configured tracker binding id",
+    "  --provider <provider>",
+    "  --host <host>",
+    "  --repository-id <id>",
+    "  --repository-owner <owner>",
+    "  --repository-name <name>",
+    "  --project-id <id>",
+    "  --board-id <id>",
+    "  --item-id <id>",
+    "  --item-number <number>",
+    "  --item-key <key>",
+    "  --node-id <id>",
+    "  --web-url <url>",
+    "  --observed-at <iso-timestamp>",
+    "  --json",
+    "",
+    "Options for work-item show-links:",
+    "  --component <id>          defaults to the primary component",
+    "  --json",
+    "",
+    "Options for work-item unlink:",
+    "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            configured tracker binding id",
+    "  --item-id <id>",
+    "  --reason <text>",
     "  --json",
     "",
     "Options for automation status:",
@@ -1343,7 +1419,87 @@ async function handleWorkItemCommand(
     return 0;
   }
 
-  throw new Error("work-item requires create, list, get, update, comment, or set-status");
+  if (command === "link") {
+    const parsed = parseWorkItemLinkCommand(argv);
+    const logical = resolveCliLogicalWorkItemId(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.logicalItemId,
+    );
+    const result = await workItemTrackerLinkService(
+      parsed.projectRoot,
+      dependencies,
+    ).linkReference({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: logical.componentId,
+      logicalItemId: logical.logicalItemId,
+      trackerId: parsed.trackerId,
+      provider: parsed.provider,
+      host: parsed.host,
+      repositoryId: parsed.repositoryId,
+      repositoryOwner: parsed.repositoryOwner,
+      repositoryName: parsed.repositoryName,
+      projectId: parsed.projectId,
+      boardId: parsed.boardId,
+      itemId: parsed.itemId,
+      itemNumber: parsed.itemNumber,
+      itemKey: parsed.itemKey,
+      nodeId: parsed.nodeId,
+      webUrl: parsed.webUrl,
+      observedAt: parsed.observedAt,
+    });
+    printWorkItemLinkResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  if (command === "show-links") {
+    const parsed = parseWorkItemShowLinksCommand(argv);
+    const logical = resolveCliLogicalWorkItemId(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.logicalItemId,
+    );
+    const result = await workItemTrackerLinkService(
+      parsed.projectRoot,
+      dependencies,
+    ).showLinks({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: logical.componentId,
+      logicalItemId: logical.logicalItemId,
+    });
+    printWorkItemShowLinksResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "unlink") {
+    const parsed = parseWorkItemUnlinkCommand(argv);
+    const logical = resolveCliLogicalWorkItemId(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.logicalItemId,
+    );
+    const result = await workItemTrackerLinkService(
+      parsed.projectRoot,
+      dependencies,
+    ).unlinkReference({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: logical.componentId,
+      logicalItemId: logical.logicalItemId,
+      trackerId: parsed.trackerId,
+      itemId: parsed.itemId,
+      reason: parsed.reason,
+    });
+    printWorkItemUnlinkResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  throw new Error(
+    "work-item requires create, list, get, update, comment, set-status, link, show-links, or unlink",
+  );
 }
 
 async function handleAutomationCommand(
@@ -1761,6 +1917,17 @@ function workItemService(
   });
 }
 
+function workItemTrackerLinkService(
+  projectRoot: string,
+  dependencies: DevNexusCliDependencies,
+) {
+  return createWorkItemTrackerLinkService({
+    resolveProject: (selector) =>
+      resolveDirectProject(projectRoot, selector.componentId),
+    now: dependencies.now,
+  });
+}
+
 function resolveDirectProject(
   projectRoot: string,
   componentId?: string,
@@ -1845,6 +2012,31 @@ function resolveCliWorkItemReference(
     ...(resolvedComponentId ? { componentId: resolvedComponentId } : {}),
     trackerId: trackerQualified.trackerId,
     itemId: trackerQualified.itemId,
+  };
+}
+
+function resolveCliLogicalWorkItemId(
+  projectRoot: string,
+  componentId: string | undefined,
+  logicalItemId: string,
+): { componentId?: string; logicalItemId: string } {
+  const qualified = componentQualifiedWorkItemId(projectRoot, logicalItemId);
+  if (!qualified) {
+    return {
+      ...(componentId ? { componentId } : {}),
+      logicalItemId,
+    };
+  }
+
+  if (componentId && componentId !== qualified.componentId) {
+    throw new Error(
+      `Work item id component "${qualified.componentId}" conflicts with --component "${componentId}"`,
+    );
+  }
+
+  return {
+    componentId: qualified.componentId,
+    logicalItemId: qualified.itemId,
   };
 }
 
@@ -3031,6 +3223,192 @@ function parseWorkItemSetStatusCommand(
   return parsed as ParsedWorkItemSetStatusCommand;
 }
 
+function parseWorkItemLinkCommand(argv: string[]): ParsedWorkItemLinkCommand {
+  const [, , projectRoot, logicalItemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item link requires a project root");
+  }
+  if (!logicalItemId || logicalItemId.startsWith("--")) {
+    throw new Error("work-item link requires a logical work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemLinkCommand> = {
+    projectRoot,
+    logicalItemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--provider":
+        parsed.provider = next();
+        break;
+      case "--host":
+        parsed.host = next();
+        break;
+      case "--repository-id":
+        parsed.repositoryId = next();
+        break;
+      case "--repository-owner":
+        parsed.repositoryOwner = next();
+        break;
+      case "--repository-name":
+        parsed.repositoryName = next();
+        break;
+      case "--project-id":
+        parsed.projectId = next();
+        break;
+      case "--board-id":
+        parsed.boardId = next();
+        break;
+      case "--item-id":
+        parsed.itemId = next();
+        break;
+      case "--item-number":
+        parsed.itemNumber = parsePositiveInteger(next(), arg);
+        break;
+      case "--item-key":
+        parsed.itemKey = next();
+        break;
+      case "--node-id":
+        parsed.nodeId = next();
+        break;
+      case "--web-url":
+        parsed.webUrl = next();
+        break;
+      case "--observed-at":
+        parsed.observedAt = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item link option: ${arg}`);
+    }
+  }
+
+  if (!parsed.trackerId) {
+    throw new Error("work-item link requires --tracker");
+  }
+  if (!parsed.itemId) {
+    throw new Error("work-item link requires --item-id");
+  }
+
+  return parsed as ParsedWorkItemLinkCommand;
+}
+
+function parseWorkItemShowLinksCommand(
+  argv: string[],
+): ParsedWorkItemShowLinksCommand {
+  const [, , projectRoot, logicalItemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item show-links requires a project root");
+  }
+  if (!logicalItemId || logicalItemId.startsWith("--")) {
+    throw new Error("work-item show-links requires a logical work item id");
+  }
+
+  const parsed: ParsedWorkItemShowLinksCommand = {
+    projectRoot,
+    logicalItemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item show-links option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseWorkItemUnlinkCommand(
+  argv: string[],
+): ParsedWorkItemUnlinkCommand {
+  const [, , projectRoot, logicalItemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item unlink requires a project root");
+  }
+  if (!logicalItemId || logicalItemId.startsWith("--")) {
+    throw new Error("work-item unlink requires a logical work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemUnlinkCommand> = {
+    projectRoot,
+    logicalItemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--item-id":
+        parsed.itemId = next();
+        break;
+      case "--reason":
+        parsed.reason = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item unlink option: ${arg}`);
+    }
+  }
+
+  if (!parsed.trackerId) {
+    throw new Error("work-item unlink requires --tracker");
+  }
+  if (!parsed.itemId) {
+    throw new Error("work-item unlink requires --item-id");
+  }
+
+  return parsed as ParsedWorkItemUnlinkCommand;
+}
+
 function parseAutomationEnqueueCommand(
   argv: string[],
 ): ParsedAutomationEnqueueCommand {
@@ -4153,6 +4531,70 @@ function printWorkItemCommentResult(
 
   writeLine(stdout, "DevNexus work item comment added.");
   writeLine(stdout, `  Id: ${comment.id}`);
+}
+
+function printWorkItemLinkResult(
+  result: LinkWorkItemTrackerReferenceResult,
+  parsed: ParsedWorkItemLinkCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item tracker reference linked.");
+  writeLine(stdout, `  Logical item: ${result.componentId}:${result.logicalItemId}`);
+  writeLine(stdout, `  Tracker: ${result.reference.trackerId}`);
+  writeLine(stdout, `  Item id: ${result.reference.itemId}`);
+  writeLine(stdout, `  Action: ${result.action}`);
+}
+
+function printWorkItemShowLinksResult(
+  result: ShowWorkItemTrackerLinksResult,
+  parsed: ParsedWorkItemShowLinksCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(
+    stdout,
+    `DevNexus work item tracker links: ${result.references.length}`,
+  );
+  writeLine(stdout, `  Logical item: ${result.componentId}:${result.logicalItemId}`);
+  for (const reference of result.references) {
+    const numberOrKey =
+      reference.itemKey ?? reference.itemNumber?.toString() ?? reference.itemId;
+    writeLine(
+      stdout,
+      `  ${reference.trackerId} [${reference.provider}] ${numberOrKey} ${reference.webUrl ?? ""}`.trimEnd(),
+    );
+  }
+}
+
+function printWorkItemUnlinkResult(
+  result: UnlinkWorkItemTrackerReferenceResult,
+  parsed: ParsedWorkItemUnlinkCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item tracker reference unlinked.");
+  writeLine(stdout, `  Logical item: ${result.componentId}:${result.logicalItemId}`);
+  writeLine(stdout, `  Tracker: ${result.removedReference.trackerId}`);
+  writeLine(stdout, `  Item id: ${result.removedReference.itemId}`);
+  if (result.audit.reason) {
+    writeLine(stdout, `  Reason: ${result.audit.reason}`);
+  }
 }
 
 function printAutomationScheduleTick(

@@ -1002,6 +1002,189 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("links, shows, and unlinks work-item tracker references through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-primary.json",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "github",
+                  host: "github.com",
+                  repository: {
+                    owner: "example",
+                    name: "project",
+                    id: "repo-1",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const firstLinkOutput = captureOutput();
+    const secondLinkOutput = captureOutput();
+    const showOutput = captureOutput();
+    const unlinkOutput = captureOutput();
+    const finalShowOutput = captureOutput();
+
+    await main(
+      [
+        "work-item",
+        "link",
+        projectRoot,
+        "local-46",
+        "--tracker",
+        "github",
+        "--item-id",
+        "github-issue-42",
+        "--item-number",
+        "42",
+        "--web-url",
+        "https://github.com/example/project/issues/42",
+        "--json",
+      ],
+      {
+        stdout: firstLinkOutput.writer,
+        now: fixedClock("2026-05-18T08:00:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "work-item",
+        "link",
+        projectRoot,
+        "local-46",
+        "--tracker",
+        "github",
+        "--item-id",
+        "github-issue-42",
+        "--item-number",
+        "42",
+        "--node-id",
+        "I_kwDOUpdated",
+        "--web-url",
+        "https://github.com/example/project/issues/42#updated",
+        "--json",
+      ],
+      {
+        stdout: secondLinkOutput.writer,
+        now: fixedClock("2026-05-18T08:01:00.000Z"),
+      },
+    );
+    await main(["work-item", "show-links", projectRoot, "local-46", "--json"], {
+      stdout: showOutput.writer,
+    });
+    await main(
+      [
+        "work-item",
+        "unlink",
+        projectRoot,
+        "local-46",
+        "--tracker",
+        "github",
+        "--item-id",
+        "github-issue-42",
+        "--reason",
+        "Wrong external issue",
+        "--json",
+      ],
+      {
+        stdout: unlinkOutput.writer,
+        now: fixedClock("2026-05-18T08:05:00.000Z"),
+      },
+    );
+    await main(["work-item", "show-links", projectRoot, "local-46", "--json"], {
+      stdout: finalShowOutput.writer,
+    });
+
+    expect(JSON.parse(firstLinkOutput.output())).toMatchObject({
+      ok: true,
+      action: "linked",
+      reference: {
+        trackerId: "github",
+        provider: "github",
+        repositoryOwner: "example",
+        repositoryName: "project",
+        itemId: "github-issue-42",
+        itemNumber: 42,
+      },
+    });
+    expect(JSON.parse(secondLinkOutput.output())).toMatchObject({
+      ok: true,
+      action: "updated",
+      record: {
+        references: [
+          {
+            itemId: "github-issue-42",
+            nodeId: "I_kwDOUpdated",
+          },
+        ],
+      },
+    });
+    expect(JSON.parse(showOutput.output())).toMatchObject({
+      ok: true,
+      references: [
+        {
+          trackerId: "github",
+          itemId: "github-issue-42",
+          webUrl: "https://github.com/example/project/issues/42#updated",
+        },
+      ],
+    });
+    expect(JSON.parse(unlinkOutput.output())).toMatchObject({
+      ok: true,
+      removedReference: {
+        trackerId: "github",
+        itemId: "github-issue-42",
+      },
+      audit: {
+        action: "unlinked",
+        reason: "Wrong external issue",
+      },
+    });
+    expect(JSON.parse(finalShowOutput.output())).toMatchObject({
+      ok: true,
+      references: [],
+      record: {
+        audit: [
+          { action: "linked" },
+          { action: "updated" },
+          { action: "unlinked" },
+        ],
+      },
+    });
+  });
+
   it("gets, updates, and comments on local work items", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

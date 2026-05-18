@@ -214,6 +214,9 @@ describe("DevNexus MCP server", () => {
       "work_item_update",
       "work_item_comment",
       "work_item_set_status",
+      "work_item_link",
+      "work_item_show_links",
+      "work_item_unlink",
     ]);
   });
 
@@ -1541,6 +1544,161 @@ describe("DevNexus MCP server", () => {
       trackerRef: {
         trackerId: "mirror",
       },
+    });
+  });
+
+  it("links, shows, and unlinks work-item tracker references through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-primary.json",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["mirror", "coordination"],
+                workTracking: {
+                  provider: "github",
+                  host: "github.com",
+                  repository: {
+                    owner: "example",
+                    name: "mcp-demo",
+                    id: "repo-1",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const linked = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_link",
+        {
+          projectRoot,
+          logicalItemId: "local-46",
+          trackerId: "github",
+          itemId: "github-issue-42",
+          itemNumber: 42,
+          webUrl: "https://github.com/example/mcp-demo/issues/42",
+        },
+        { now: fixedClock("2026-05-18T08:00:00.000Z") },
+      ),
+    );
+    const updated = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_link",
+        {
+          projectRoot,
+          logicalItemId: "local-46",
+          trackerId: "github",
+          itemId: "github-issue-42",
+          itemNumber: 42,
+          nodeId: "I_kwDOMcpUpdated",
+          webUrl: "https://github.com/example/mcp-demo/issues/42#updated",
+        },
+        { now: fixedClock("2026-05-18T08:01:00.000Z") },
+      ),
+    );
+    const shown = toolJson(
+      await callDevNexusMcpTool("work_item_show_links", {
+        projectRoot,
+        logicalItemId: "local-46",
+      }),
+    );
+    const unlinked = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_unlink",
+        {
+          projectRoot,
+          logicalItemId: "local-46",
+          trackerId: "github",
+          itemId: "github-issue-42",
+          reason: "Wrong external issue",
+        },
+        { now: fixedClock("2026-05-18T08:05:00.000Z") },
+      ),
+    );
+    const afterUnlink = toolJson(
+      await callDevNexusMcpTool("work_item_show_links", {
+        projectRoot,
+        logicalItemId: "local-46",
+      }),
+    );
+
+    expect(linked).toMatchObject({
+      ok: true,
+      action: "linked",
+      reference: {
+        trackerId: "github",
+        provider: "github",
+        repositoryOwner: "example",
+        repositoryName: "mcp-demo",
+        itemId: "github-issue-42",
+      },
+    });
+    expect(updated).toMatchObject({
+      ok: true,
+      action: "updated",
+      record: {
+        references: [
+          {
+            itemId: "github-issue-42",
+            nodeId: "I_kwDOMcpUpdated",
+          },
+        ],
+      },
+    });
+    expect(shown).toMatchObject({
+      ok: true,
+      references: [
+        {
+          trackerId: "github",
+          itemId: "github-issue-42",
+          webUrl: "https://github.com/example/mcp-demo/issues/42#updated",
+        },
+      ],
+    });
+    expect(unlinked).toMatchObject({
+      ok: true,
+      removedReference: {
+        trackerId: "github",
+        itemId: "github-issue-42",
+      },
+      audit: {
+        action: "unlinked",
+        reason: "Wrong external issue",
+      },
+    });
+    expect(afterUnlink).toMatchObject({
+      ok: true,
+      references: [],
     });
   });
 

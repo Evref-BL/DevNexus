@@ -76,6 +76,9 @@ import {
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
 } from "./workItemService.js";
+import {
+  createWorkItemTrackerLinkService,
+} from "./workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import type { GitRunner } from "./gitWorktreeService.js";
 import type {
@@ -654,6 +657,71 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "work_item_link",
+    description: "Link a logical work item to a configured tracker reference.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        logicalItemId: { type: "string" },
+        trackerId: { type: "string" },
+        provider: { type: "string" },
+        host: { type: ["string", "null"] },
+        repositoryId: { type: ["string", "null"] },
+        repositoryOwner: { type: ["string", "null"] },
+        repositoryName: { type: ["string", "null"] },
+        projectId: { type: ["string", "null"] },
+        boardId: { type: ["string", "null"] },
+        itemId: { type: "string" },
+        itemNumber: { type: ["number", "null"] },
+        itemKey: { type: ["string", "null"] },
+        nodeId: { type: ["string", "null"] },
+        webUrl: { type: ["string", "null"] },
+        observedAt: { type: ["string", "null"] },
+      },
+      required: ["logicalItemId", "trackerId", "itemId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "work_item_show_links",
+    description: "Show tracker references linked to one logical work item.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        logicalItemId: { type: "string" },
+      },
+      required: ["logicalItemId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "work_item_unlink",
+    description: "Unlink a tracker reference from one logical work item and record audit metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        logicalItemId: { type: "string" },
+        trackerId: { type: "string" },
+        itemId: { type: "string" },
+        reason: { type: ["string", "null"] },
+      },
+      required: ["logicalItemId", "trackerId", "itemId"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export function listDevNexusMcpTools(): McpTool[] {
@@ -998,6 +1066,75 @@ export async function callDevNexusMcpTool(
           }),
         });
       }
+      case "work_item_link": {
+        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+        return toolResult({
+          ok: true,
+          ...(await workItemTrackerLinkServiceFromArgs(
+            args,
+            context,
+          ).linkReference({
+            ...selector,
+            logicalItemId,
+            trackerId: requiredString(args, "trackerId", "arguments"),
+            provider: optionalString(args, "provider", "arguments"),
+            host: optionalNullableString(args, "host", "arguments"),
+            repositoryId: optionalNullableString(
+              args,
+              "repositoryId",
+              "arguments",
+            ),
+            repositoryOwner: optionalNullableString(
+              args,
+              "repositoryOwner",
+              "arguments",
+            ),
+            repositoryName: optionalNullableString(
+              args,
+              "repositoryName",
+              "arguments",
+            ),
+            projectId: optionalNullableString(args, "projectId", "arguments"),
+            boardId: optionalNullableString(args, "boardId", "arguments"),
+            itemId: requiredString(args, "itemId", "arguments"),
+            itemNumber:
+              optionalPositiveInteger(args, "itemNumber", "arguments") ?? null,
+            itemKey: optionalNullableString(args, "itemKey", "arguments"),
+            nodeId: optionalNullableString(args, "nodeId", "arguments"),
+            webUrl: optionalNullableString(args, "webUrl", "arguments"),
+            observedAt: optionalNullableString(args, "observedAt", "arguments"),
+          })),
+        });
+      }
+      case "work_item_show_links": {
+        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+        return toolResult({
+          ok: true,
+          ...(await workItemTrackerLinkServiceFromArgs(
+            args,
+            context,
+          ).showLinks({
+            ...selector,
+            logicalItemId,
+          })),
+        });
+      }
+      case "work_item_unlink": {
+        const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+        return toolResult({
+          ok: true,
+          ...(await workItemTrackerLinkServiceFromArgs(
+            args,
+            context,
+          ).unlinkReference({
+            ...selector,
+            logicalItemId,
+            trackerId: requiredString(args, "trackerId", "arguments"),
+            itemId: requiredString(args, "itemId", "arguments"),
+            reason: optionalNullableString(args, "reason", "arguments"),
+          })),
+        });
+      }
       default:
         return toolResult(
           {
@@ -1069,6 +1206,42 @@ function workItemServiceFromArgs(
     resolveProject: (selector) => resolveWorkItemProject(selector, homePath),
     now: context.now,
   });
+}
+
+function workItemTrackerLinkServiceFromArgs(
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+) {
+  const homePath = homePathFromArgs(args);
+  return createWorkItemTrackerLinkService({
+    resolveProject: (selector) => resolveWorkItemProject(selector, homePath),
+    now: context.now,
+  });
+}
+
+function logicalWorkItemFromArgs(args: Record<string, unknown>): {
+  selector: WorkItemProjectSelector;
+  logicalItemId: string;
+} {
+  const selector = projectSelectorFromArgs(args);
+  const logicalItemId = requiredString(args, "logicalItemId", "arguments");
+  const qualified = qualifiedWorkItemId(args, logicalItemId);
+  if (!qualified) {
+    return { selector, logicalItemId };
+  }
+  if (selector.componentId && selector.componentId !== qualified.componentId) {
+    throw new Error(
+      `Work item id component "${qualified.componentId}" conflicts with componentId "${selector.componentId}"`,
+    );
+  }
+
+  return {
+    selector: {
+      ...selector,
+      componentId: qualified.componentId,
+    },
+    logicalItemId: qualified.id,
+  };
 }
 
 function targetCycleLedgerFromArgs(args: Record<string, unknown>): {
