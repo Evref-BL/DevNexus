@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 138,
-  "nextCommentNumber": 226,
-  "updatedAt": "2026-05-18T20:05:16.467Z",
+  "nextCommentNumber": 228,
+  "updatedAt": "2026-05-18T20:12:51.569Z",
   "items": [
     {
       "id": "local-1",
@@ -3051,7 +3051,7 @@
       "id": "local-120",
       "title": "Build deterministic hosting plan actions",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118 and dev-nexus:local-119\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: turn hosting status into deterministic dry-run plan actions that explain what DevNexus would do and what remains blocked.\n\nUser stories covered:\n- As a project owner, I can run a dry-run and see exactly what exists, what is missing, and what would change.\n- As a coordinator agent, I can paste a stable provisioning plan into a work-item comment.\n\nAcceptance criteria:\n- Planner emits ordered structured actions for repository creation, local remote add/update, collaborator add, collaborator permission update, collaborator invite, pending invitation acceptance, wait/manual invitation, default branch repair, visibility mismatch, and unsupported provider operations.\n- Every action includes provider, target repository, target principal or remote, current state, desired state, mutation class, allowed/blocked/manual state, reason, and auth profile that would perform the action.\n- Plans are stable across repeated runs with identical status input.\n- Planner honors provisioning gates from project configuration and never performs mutations.\n- Unsafe visibility changes and unsupported provider operations are declined with actionable reasons.\n\nDependencies:\n- Depends on dev-nexus:local-118 and dev-nexus:local-119.\n\nBoundaries:\n- Do not implement apply execution in this slice.\n- Do not contact live providers outside the read-only status inputs already modeled.\n\nVerification:\n- Focused planner snapshot or structural tests for each action class, blocked gate, manual wait state, action ordering, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3065,8 +3065,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:15:53.773Z",
-      "updatedAt": "2026-05-18T20:05:16.467Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T20:12:42.268Z",
+      "closedAt": "2026-05-18T20:12:42.268Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3078,7 +3078,7 @@
       "id": "local-121",
       "title": "Expose project hosting status and plan in CLI and MCP",
       "description": "Type: user-surface implementation slice\nReadiness: todo/dependent on dev-nexus:local-119 and dev-nexus:local-120\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: expose the read-only hosting status and plan through small, obvious CLI and MCP surfaces.\n\nUser stories covered:\n- As a coordinator agent, I can ask DevNexus for hosting facts without provider-specific tools.\n- As a project owner, I can run one command to see current hosting state and one command to see planned repairs.\n\nAcceptance criteria:\n- CLI supports `dev-nexus project hosting status <project-root> [--json]` and `dev-nexus project hosting plan <project-root> [--json]` or an equivalently obvious command shape that fits existing CLI conventions.\n- MCP exposes matching structured tools for hosting status and plan.\n- Text output is compact and readable; JSON output preserves full structured status and plan details.\n- Missing hosting config, missing auth profiles, missing provider support, and blocked actions produce non-crashing actionable output.\n- Status and plan commands do not mutate local Git remotes or provider state.\n\nDependencies:\n- Depends on dev-nexus:local-119 and dev-nexus:local-120.\n\nBoundaries:\n- Do not expose apply/mutation commands in this slice.\n- Do not require live GitHub credentials for normal unit tests.\n\nVerification:\n- Focused CLI and MCP tests for status, plan, JSON/text output, missing config, missing auth profile, and blocked plan action cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3093,7 +3093,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:01.143Z",
-      "updatedAt": "2026-05-18T16:16:01.143Z",
+      "updatedAt": "2026-05-18T20:12:51.569Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6215,9 +6215,32 @@
           "provider": "local",
           "itemId": "local-comment-225"
         }
+      },
+      {
+        "id": "local-comment-226",
+        "body": "Completed and published to DevNexus main as 4fa962f. Added deterministic hosting plan actions over the read-only status model, including repository creation, local remote repair, collaborator add/update/invite, invitation acceptance or manual wait, default-branch repair, visibility repair safety, and unsupported-provider blockers. Verification: npm test -- src/nexusProjectHosting.test.ts passed; npm run build passed; npm run check passed with 57 files and 457 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T20:12:38.379Z",
+        "updatedAt": "2026-05-18T20:12:38.379Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-226"
+        }
       }
     ],
-    "local-121": [],
+    "local-121": [
+      {
+        "id": "local-comment-227",
+        "body": "Promoted to ready after dev-nexus:local-119 and dev-nexus:local-120 landed as 7f53a03 and 4fa962f. The read-only status model and deterministic plan model are now available for CLI/MCP exposure.",
+        "author": null,
+        "createdAt": "2026-05-18T20:12:46.423Z",
+        "updatedAt": "2026-05-18T20:12:46.423Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-227"
+        }
+      }
+    ],
     "local-122": [],
     "local-123": [],
     "local-124": [],

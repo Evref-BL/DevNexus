@@ -25,7 +25,8 @@ and ready for coordinator-driven work across its components.
   shared-checkout mutation guardrails. `dev-nexus:local-118` is published as
   `180955f` for hosting access declarations and provisioning gates, and
   `dev-nexus:local-119` is published as `7f53a03` for the read-only hosting
-  status model.
+  status model, and `dev-nexus:local-120` is published as `4fa962f` for
+  deterministic dry-run hosting plan actions.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -37,8 +38,9 @@ and ready for coordinator-driven work across its components.
   invitee-profile invitation acceptance. The PRD has been sliced:
   `dev-nexus:local-118` is complete for access declarations and provisioning
   gates; `dev-nexus:local-119` is complete for the read-only hosting status
-  model; `local-120` is ready for deterministic dry-run plan actions, then
-  `local-121` through `local-126` should be promoted as prerequisites land.
+  model; `local-120` is complete for deterministic dry-run plan actions, and
+  `local-121` is ready for CLI/MCP status and plan surfaces. `local-122`
+  through `local-126` should be promoted as prerequisites land.
   `local-127` is an opt-in fake-project GitHub integration test and must not
   depend on `dev-nexus-plexus` or any other active project.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
@@ -77,7 +79,7 @@ and ready for coordinator-driven work across its components.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
 - Default `npm run check` now passes on the integrated DevNexus main with 57
-  test files and 451 tests after the latest DevNexus batch.
+  test files and 457 tests after the latest DevNexus batch.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -135,7 +137,7 @@ and ready for coordinator-driven work across its components.
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-120`, and
+  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-121`, and
   `dev-nexus:local-129`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
