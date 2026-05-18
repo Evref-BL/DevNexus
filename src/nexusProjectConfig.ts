@@ -132,6 +132,22 @@ export type NexusProjectTrackerDiscoveryMissingCredentialBehavior =
   | "block"
   | "skip";
 
+export interface NexusProjectTrackerDiscoveryFingerprintConfig {
+  id: string;
+  trackerId?: string;
+  provider?: WorkTrackingProviderName;
+  host?: string | null;
+  repositoryId?: string | null;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
+  projectId?: string | null;
+  boardId?: string | null;
+  itemId?: string;
+  itemNumber?: number;
+  itemKey?: string;
+  nodeId?: string;
+}
+
 export interface NexusProjectTrackerDiscoveryPolicyConfig {
   scannedRoles: NexusProjectWorkTrackerRole[];
   directExternalSelection: NexusProjectTrackerDiscoveryDirectExternalSelection;
@@ -145,6 +161,7 @@ export interface NexusProjectTrackerDiscoveryPolicyConfig {
   milestones?: string[];
   assignees?: string[];
   providerQuery?: string | null;
+  fingerprints?: NexusProjectTrackerDiscoveryFingerprintConfig[];
   conflictWinner: NexusProjectTrackerDiscoveryConflictWinner;
   missingCredentialBehavior: NexusProjectTrackerDiscoveryMissingCredentialBehavior;
 }
@@ -158,6 +175,7 @@ export interface NormalizedNexusProjectTrackerDiscoveryPolicy
     | "milestones"
     | "providerQuery"
     | "statuses"
+    | "fingerprints"
     | "trackerLimits"
   > {
   trackerLimits: Record<string, number>;
@@ -167,6 +185,7 @@ export interface NormalizedNexusProjectTrackerDiscoveryPolicy
   milestones: string[];
   assignees: string[];
   providerQuery: string | null;
+  fingerprints: NexusProjectTrackerDiscoveryFingerprintConfig[];
   defaultTrackerOnly: boolean;
 }
 
@@ -364,6 +383,7 @@ export const defaultNexusProjectTrackerDiscoveryPolicy: NexusProjectTrackerDisco
   milestones: [],
   assignees: [],
   providerQuery: null,
+  fingerprints: [],
   conflictWinner: "default_tracker",
   missingCredentialBehavior: "block",
 };
@@ -3200,6 +3220,93 @@ function validateTrackerDiscoveryProviderQuery(
   return value.trim();
 }
 
+function validateTrackerDiscoveryFingerprints(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerDiscoveryFingerprintConfig[] {
+  if (value === undefined) {
+    return [...(defaultNexusProjectTrackerDiscoveryPolicy.fingerprints ?? [])];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+
+  const fingerprints = value.map((entry, index) => {
+    const entryPath = `${pathName}[${index}]`;
+    const record = assertRecord(entry, entryPath);
+    const fingerprint: NexusProjectTrackerDiscoveryFingerprintConfig = {
+      id: requiredString(record, "id", entryPath).trim(),
+      ...(record.trackerId !== undefined
+        ? { trackerId: requiredString(record, "trackerId", entryPath).trim() }
+        : {}),
+      ...(record.provider !== undefined
+        ? {
+            provider: validateWorkTrackingProviderName(
+              record.provider,
+              `${entryPath}.provider`,
+            ),
+          }
+        : {}),
+      ...(record.host !== undefined
+        ? { host: nullableString(record, "host", entryPath) }
+        : {}),
+      ...(record.repositoryId !== undefined
+        ? { repositoryId: nullableString(record, "repositoryId", entryPath) }
+        : {}),
+      ...(record.repositoryOwner !== undefined
+        ? { repositoryOwner: nullableString(record, "repositoryOwner", entryPath) }
+        : {}),
+      ...(record.repositoryName !== undefined
+        ? { repositoryName: nullableString(record, "repositoryName", entryPath) }
+        : {}),
+      ...(record.projectId !== undefined
+        ? { projectId: nullableString(record, "projectId", entryPath) }
+        : {}),
+      ...(record.boardId !== undefined
+        ? { boardId: nullableString(record, "boardId", entryPath) }
+        : {}),
+      ...(record.itemId !== undefined
+        ? { itemId: requiredString(record, "itemId", entryPath).trim() }
+        : {}),
+      ...(record.itemNumber !== undefined
+        ? {
+            itemNumber: validatePositiveInteger(
+              record.itemNumber,
+              `${entryPath}.itemNumber`,
+            ),
+          }
+        : {}),
+      ...(record.itemKey !== undefined
+        ? { itemKey: requiredString(record, "itemKey", entryPath).trim() }
+        : {}),
+      ...(record.nodeId !== undefined
+        ? { nodeId: requiredString(record, "nodeId", entryPath).trim() }
+        : {}),
+    };
+    if (
+      fingerprint.itemId === undefined &&
+      fingerprint.itemNumber === undefined &&
+      fingerprint.itemKey === undefined &&
+      fingerprint.nodeId === undefined
+    ) {
+      throw new NexusConfigError(
+        `${entryPath} must include itemId, itemNumber, itemKey, or nodeId`,
+      );
+    }
+
+    return fingerprint;
+  });
+  return fingerprints;
+}
+
+function validatePositiveInteger(value: unknown, pathName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusConfigError(`${pathName} must be a positive integer`);
+  }
+
+  return value;
+}
+
 function validateTrackerDiscoveryPolicy(
   value: unknown,
   pathName: string,
@@ -3263,6 +3370,10 @@ function validateTrackerDiscoveryPolicy(
       record.providerQuery,
       `${pathName}.providerQuery`,
     ),
+    fingerprints: validateTrackerDiscoveryFingerprints(
+      record.fingerprints,
+      `${pathName}.fingerprints`,
+    ),
     conflictWinner: validateTrackerDiscoveryConflictWinner(
       record.conflictWinner,
       `${pathName}.conflictWinner`,
@@ -3303,6 +3414,7 @@ export function normalizeNexusProjectTrackerDiscoveryPolicy(
     milestones: [...(normalized.milestones ?? [])],
     assignees: [...(normalized.assignees ?? [])],
     providerQuery: normalized.providerQuery ?? null,
+    fingerprints: [...(normalized.fingerprints ?? [])],
     conflictWinner: normalized.conflictWinner,
     missingCredentialBehavior: normalized.missingCredentialBehavior,
     defaultTrackerOnly: policy === undefined,

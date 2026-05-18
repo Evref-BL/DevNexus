@@ -1,7 +1,10 @@
 import path from "node:path";
 import { eligibleNexusAutomationWorkItems } from "./nexusAutomation.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
-import type { NexusProjectConfig } from "./nexusProjectConfig.js";
+import type {
+  NexusProjectConfig,
+  NexusProjectTrackerDiscoveryFingerprintConfig,
+} from "./nexusProjectConfig.js";
 import type {
   ResolvedNexusProjectComponent,
   ResolvedNexusProjectWorkTracker,
@@ -72,11 +75,26 @@ export interface NexusEligibleWorkTrackerQueryResult {
   blockers: string[];
 }
 
+export type NexusEligibleWorkDedupeReason =
+  | "tracker_link"
+  | "external_ref"
+  | "provider_identity"
+  | "configured_fingerprint";
+
+export interface NexusEligibleWorkDedupeInfo {
+  reason: NexusEligibleWorkDedupeReason;
+  key: string;
+  collapsedCount: number;
+  linkId?: string;
+  logicalItemId?: string;
+}
+
 export interface NexusEligibleWorkItem extends WorkItem {
   componentId: string;
   logicalItemId: string | null;
   canonicalTrackerRef: WorkTrackerRef | null;
   sourceTrackerRef: WorkTrackerRef | null;
+  dedupe: NexusEligibleWorkDedupeInfo | null;
   warnings: string[];
   selectable: boolean;
   importOnly: boolean;
@@ -101,18 +119,31 @@ export interface NexusEligibleWorkResult {
   blockers: string[];
 }
 
-interface CandidateRecord {
+interface CandidateIdentityKey {
   key: string;
+  reason: NexusEligibleWorkDedupeReason;
+  linkId?: string;
+  logicalItemId?: string;
+}
+
+interface CandidateRecord {
   order: number;
   item: NexusEligibleWorkItem;
   sourceIsDefault: boolean;
   hasCanonicalDefault: boolean;
+  identityKeys: CandidateIdentityKey[];
+  linkRecords: WorkItemTrackerLinkRecord[];
+  defaultReference: WorkItemTrackerReference | null;
+  dedupeIssues: string[];
 }
 
 interface ComponentScanState {
   component: ResolvedNexusProjectComponent;
   result: NexusEligibleWorkComponentResult;
-  candidatesByKey: Map<string, CandidateRecord[]>;
+  candidates: CandidateRecord[];
+  successfulTrackerIds: Set<string>;
+  observedReferenceKeys: Set<string>;
+  reportedDedupeIssues: Set<string>;
   order: number;
 }
 
@@ -158,6 +189,7 @@ async function listDefaultEligibleWork(
         logicalItemId: item.externalRef?.itemId ?? item.id,
         selectable: true,
         importOnly: false,
+        dedupe: null,
         warnings: [],
       }),
     );
@@ -196,6 +228,9 @@ async function listDiscoveryEligibleWork(
     defaultWorkItemTrackerLinkStorePath(options.projectRoot),
     currentIso(options.now),
   );
+  const projectLinkRecords = linkStore.records.filter(
+    (record) => record.projectId === options.projectConfig.id,
+  );
   const componentResults: NexusEligibleWorkComponentResult[] = [];
 
   for (const component of options.components) {
@@ -210,7 +245,10 @@ async function listDiscoveryEligibleWork(
         blockers: [],
         trackerResults: [],
       },
-      candidatesByKey: new Map(),
+      candidates: [],
+      successfulTrackerIds: new Set(),
+      observedReferenceKeys: new Set(),
+      reportedDedupeIssues: new Set(),
       order: 0,
     };
 
@@ -220,7 +258,7 @@ async function listDiscoveryEligibleWork(
         component,
         tracker,
         credentialResolver,
-        linkRecords: linkStore.records,
+        linkRecords: projectLinkRecords,
         state,
       });
     }
@@ -319,7 +357,11 @@ async function scanDiscoveryTracker(options: {
       options.component.trackerDiscovery,
     ),
   );
+  options.state.successfulTrackerIds.add(options.tracker.id);
   for (const item of matchingItems) {
+    for (const key of observedReferenceKeys(options.tracker, item)) {
+      options.state.observedReferenceKeys.add(key);
+    }
     const candidate = candidateFromItem({
       component: options.component,
       tracker: options.tracker,
@@ -328,9 +370,7 @@ async function scanDiscoveryTracker(options: {
       order: options.state.order,
     });
     options.state.order += 1;
-    const existing = options.state.candidatesByKey.get(candidate.key) ?? [];
-    existing.push(candidate);
-    options.state.candidatesByKey.set(candidate.key, existing);
+    options.state.candidates.push(candidate);
     if (candidate.item.selectable) {
       trackerResult.selectableCount += 1;
     } else {
@@ -348,12 +388,13 @@ function candidateFromItem(options: {
 }): CandidateRecord {
   const sourceTrackerRef = trackerRef(options.component, options.tracker);
   const sourceIsDefault = options.tracker.default;
-  const linkRecord = findLinkRecordForItem(
+  const linkRecords = findLinkRecordsForItem(
     options.linkRecords,
     options.component,
     options.tracker,
     options.item,
   );
+  const linkRecord = linkRecords.length === 1 ? linkRecords[0]! : null;
   const defaultTrackerId = options.component.defaultTrackerId;
   const defaultTrackerRef = defaultTrackerId
     ? trackerRefById(options.component, defaultTrackerId)
@@ -365,14 +406,31 @@ function candidateFromItem(options: {
     : null;
   const hasCanonicalDefault = sourceIsDefault || Boolean(defaultReference);
   const linkedLogicalItemId = linkRecord?.logicalItemId ?? null;
+  const dedupeIssues =
+    linkRecords.length > 1
+      ? [
+          `Work item "${options.item.id}" from tracker "${options.tracker.id}" matches conflicting link records: ${linkRecords
+            .map((record) => record.logicalItemId)
+            .join(", ")}.`,
+        ]
+      : [];
+  const identityKeys = candidateIdentityKeys({
+    component: options.component,
+    tracker: options.tracker,
+    item: options.item,
+    linkRecord,
+  });
 
   if (sourceIsDefault) {
-    const logicalItemId = linkedLogicalItemId ?? options.item.externalRef?.itemId ?? options.item.id;
+    const logicalItemId = linkedLogicalItemId ?? defaultLogicalItemId(options.item);
     return {
-      key: `logical:${options.component.id}:${logicalItemId}`,
       order: options.order,
       sourceIsDefault,
       hasCanonicalDefault,
+      identityKeys,
+      linkRecords,
+      defaultReference,
+      dedupeIssues,
       item: eligibleItem({
         component: options.component,
         item: options.item,
@@ -382,18 +440,22 @@ function candidateFromItem(options: {
         logicalItemId,
         selectable: true,
         importOnly: false,
+        dedupe: null,
         warnings: [],
       }),
     };
   }
 
-  if (defaultReference && defaultTrackerRef) {
+  if (defaultReference && defaultTrackerRef && linkRecords.length <= 1) {
     const logicalItemId = linkedLogicalItemId ?? defaultReference.itemId;
     return {
-      key: `logical:${options.component.id}:${logicalItemId}`,
       order: options.order,
       sourceIsDefault,
       hasCanonicalDefault,
+      identityKeys,
+      linkRecords,
+      defaultReference,
+      dedupeIssues,
       item: eligibleItem({
         component: options.component,
         item: {
@@ -414,6 +476,7 @@ function candidateFromItem(options: {
         logicalItemId,
         selectable: true,
         importOnly: false,
+        dedupe: null,
         warnings: [],
       }),
     };
@@ -429,10 +492,13 @@ function candidateFromItem(options: {
     : ["External work item must be imported before local assignment."];
 
   return {
-    key: `external:${options.component.id}:${options.tracker.id}:${externalItemKey(options.item)}`,
     order: options.order,
     sourceIsDefault,
     hasCanonicalDefault,
+    identityKeys,
+    linkRecords,
+    defaultReference,
+    dedupeIssues,
     item: eligibleItem({
       component: options.component,
       item: options.item,
@@ -442,17 +508,19 @@ function candidateFromItem(options: {
       logicalItemId,
       selectable,
       importOnly: !selectable,
+      dedupe: null,
       warnings,
     }),
   };
 }
 
 function materializeComponentCandidates(state: ComponentScanState): void {
-  const candidates = [...state.candidatesByKey.values()]
-    .map((group) => chooseCandidate(state.component, group))
+  reportCandidateDedupeIssues(state);
+  const groups = dedupeCandidateGroups(state)
+    .map((group) => chooseCandidate(state, group))
     .sort((left, right) => left.order - right.order);
 
-  for (const candidate of candidates) {
+  for (const candidate of groups) {
     if (candidate.item.selectable) {
       state.result.workItems.push(candidate.item);
     } else {
@@ -462,26 +530,194 @@ function materializeComponentCandidates(state: ComponentScanState): void {
 }
 
 function chooseCandidate(
-  component: ResolvedNexusProjectComponent,
+  state: ComponentScanState,
   candidates: CandidateRecord[],
 ): CandidateRecord {
   const sorted = [...candidates].sort((left, right) => left.order - right.order);
-  const duplicateWarning =
-    sorted.length > 1
-      ? [`Discovered ${sorted.length} linked tracker representations for this work item.`]
-      : [];
+  const duplicateDedupe = sorted.length > 1
+    ? dedupeInfoForGroup(sorted)
+    : null;
   const selectable = sorted.filter((candidate) => candidate.item.selectable);
   const preferred =
-    chooseByConflictPolicy(component, selectable.length ? selectable : sorted) ??
+    chooseByConflictPolicy(state.component, selectable.length ? selectable : sorted) ??
     sorted[0]!;
+  const staleWarnings = staleCanonicalWarnings(state, preferred);
+  for (const warning of staleWarnings) {
+    addDedupeIssue(state, warning);
+  }
 
   return {
     ...preferred,
     item: {
       ...preferred.item,
-      warnings: [...preferred.item.warnings, ...duplicateWarning],
+      dedupe: duplicateDedupe,
+      warnings: [
+        ...preferred.item.warnings,
+        ...preferred.dedupeIssues,
+        ...staleWarnings,
+      ],
     },
   };
+}
+
+function dedupeCandidateGroups(state: ComponentScanState): CandidateRecord[][] {
+  const candidates = state.candidates;
+  const parents = candidates.map((_candidate, index) => index);
+  const identityGroups = candidateIndexesByIdentityKey(candidates);
+
+  const find = (index: number): number => {
+    let parent = parents[index]!;
+    while (parent !== parents[parent]) {
+      parents[parent] = parents[parents[parent]!]!;
+      parent = parents[parent]!;
+    }
+    return parent;
+  };
+  const union = (left: number, right: number): void => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) {
+      parents[rightRoot] = leftRoot;
+    }
+  };
+
+  for (const [key, indexes] of identityGroups.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    const grouped = indexes.map((index) => candidates[index]!);
+    const issue = ambiguousIdentityIssue(key, grouped);
+    if (issue) {
+      for (const candidate of grouped) {
+        candidate.dedupeIssues.push(issue);
+      }
+      addDedupeIssue(state, issue);
+      continue;
+    }
+
+    const [first, ...rest] = indexes;
+    for (const index of rest) {
+      union(first!, index);
+    }
+  }
+
+  const groups = new Map<number, CandidateRecord[]>();
+  for (const [index, candidate] of candidates.entries()) {
+    const root = find(index);
+    const group = groups.get(root) ?? [];
+    group.push(candidate);
+    groups.set(root, group);
+  }
+
+  return [...groups.values()];
+}
+
+function candidateIndexesByIdentityKey(
+  candidates: CandidateRecord[],
+): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  for (const [index, candidate] of candidates.entries()) {
+    for (const identity of candidate.identityKeys) {
+      const indexes = groups.get(identity.key) ?? [];
+      indexes.push(index);
+      groups.set(identity.key, indexes);
+    }
+  }
+
+  return groups;
+}
+
+function ambiguousIdentityIssue(
+  key: string,
+  candidates: CandidateRecord[],
+): string | null {
+  const linkIds = uniqueStrings(
+    candidates.flatMap((candidate) =>
+      candidate.linkRecords.map((record) => record.logicalItemId),
+    ),
+  );
+  if (linkIds.length > 1) {
+    return `Provider identity "${key}" is linked to conflicting logical work items: ${linkIds.join(", ")}.`;
+  }
+
+  const canonicalIds = uniqueStrings(
+    candidates
+      .filter((candidate) => candidate.item.canonicalTrackerRef?.default)
+      .map((candidate) => candidate.item.id),
+  );
+  const keyReason = candidates
+    .flatMap((candidate) => candidate.identityKeys)
+    .find((identity) => identity.key === key)?.reason;
+  if (
+    canonicalIds.length > 1 &&
+    keyReason !== "tracker_link" &&
+    keyReason !== "configured_fingerprint"
+  ) {
+    return `Ambiguous unlinked provider identity "${key}" matches multiple canonical work items: ${canonicalIds.join(", ")}.`;
+  }
+
+  return null;
+}
+
+function dedupeInfoForGroup(
+  candidates: CandidateRecord[],
+): NexusEligibleWorkDedupeInfo {
+  const identities = candidates.flatMap((candidate) => candidate.identityKeys);
+  const chosen =
+    identities.find((identity) => identity.reason === "tracker_link") ??
+    identities.find((identity) => identity.reason === "configured_fingerprint") ??
+    identities.find((identity) => identity.reason === "external_ref") ??
+    identities.find((identity) => identity.reason === "provider_identity") ??
+    identities[0]!;
+
+  return {
+    reason: chosen.reason,
+    key: chosen.key,
+    collapsedCount: candidates.length,
+    ...(chosen.linkId ? { linkId: chosen.linkId } : {}),
+    ...(chosen.logicalItemId ? { logicalItemId: chosen.logicalItemId } : {}),
+  };
+}
+
+function reportCandidateDedupeIssues(state: ComponentScanState): void {
+  for (const candidate of state.candidates) {
+    for (const issue of candidate.dedupeIssues) {
+      addDedupeIssue(state, issue);
+    }
+  }
+}
+
+function staleCanonicalWarnings(
+  state: ComponentScanState,
+  candidate: CandidateRecord,
+): string[] {
+  const reference = candidate.defaultReference;
+  if (!reference || !state.successfulTrackerIds.has(reference.trackerId)) {
+    return [];
+  }
+  if (state.observedReferenceKeys.has(referenceObservedKey(reference))) {
+    return [];
+  }
+
+  return [
+    `Linked canonical tracker item "${reference.itemId}" from tracker "${reference.trackerId}" was not returned by discovery; the link may be stale, filtered, or missing.`,
+  ];
+}
+
+function addDedupeIssue(
+  state: ComponentScanState,
+  message: string,
+): void {
+  if (state.reportedDedupeIssues.has(message)) {
+    return;
+  }
+  state.reportedDedupeIssues.add(message);
+  const decorated = `Component ${state.component.id} dedupe: ${message}`;
+  if (state.component.trackerDiscovery.conflictWinner === "block") {
+    state.result.blockers.push(decorated);
+  } else {
+    state.result.warnings.push(decorated);
+  }
 }
 
 function chooseByConflictPolicy(
@@ -762,6 +998,7 @@ function eligibleItem(options: {
   logicalItemId: string | null;
   selectable: boolean;
   importOnly: boolean;
+  dedupe: NexusEligibleWorkDedupeInfo | null;
   warnings: string[];
 }): NexusEligibleWorkItem {
   return {
@@ -771,6 +1008,7 @@ function eligibleItem(options: {
     trackerRef: options.canonicalTrackerRef ?? options.sourceTrackerRef,
     canonicalTrackerRef: options.canonicalTrackerRef,
     sourceTrackerRef: options.sourceTrackerRef,
+    dedupe: options.dedupe,
     warnings: options.warnings,
     selectable: options.selectable,
     importOnly: options.importOnly,
@@ -812,20 +1050,308 @@ function trackerRef(
   };
 }
 
-function findLinkRecordForItem(
+function candidateIdentityKeys(options: {
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  item: WorkItem;
+  linkRecord: WorkItemTrackerLinkRecord | null;
+}): CandidateIdentityKey[] {
+  const keys: CandidateIdentityKey[] = [];
+  if (options.linkRecord) {
+    keys.push({
+      key: `link:${options.component.id}:${options.linkRecord.logicalItemId}`,
+      reason: "tracker_link",
+      linkId: options.linkRecord.logicalItemId,
+      logicalItemId: options.linkRecord.logicalItemId,
+    });
+  }
+
+  for (const identity of providerIdentityKeys(options.tracker, options.item)) {
+    keys.push(identity);
+  }
+  for (const identity of configuredFingerprintKeys(options)) {
+    keys.push(identity);
+  }
+
+  return dedupeIdentityKeys(keys);
+}
+
+function providerIdentityKeys(
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+): CandidateIdentityKey[] {
+  return identityRefsForItem(tracker, item).flatMap(({ ref, reason }) =>
+    stableExternalRefKeys(ref).map((key) => ({
+      key,
+      reason,
+    })),
+  );
+}
+
+function identityRefsForItem(
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+): Array<{ ref: ExternalRef; reason: "external_ref" | "provider_identity" }> {
+  const refs: Array<{ ref: ExternalRef; reason: "external_ref" | "provider_identity" }> = [];
+  if (item.externalRef) {
+    refs.push({
+      ref: item.externalRef,
+      reason:
+        item.provider === "local" && item.externalRef.provider !== "local"
+          ? "external_ref"
+          : "provider_identity",
+    });
+  }
+  if (item.provider === tracker.provider) {
+    refs.push({
+      ref: providerExternalRefForItem(tracker, item),
+      reason: "provider_identity",
+    });
+  }
+
+  return dedupeIdentityRefs(refs);
+}
+
+function providerExternalRefForItem(
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+): ExternalRef {
+  const externalRef =
+    item.externalRef?.provider === tracker.provider ? item.externalRef : undefined;
+  const config = tracker.workTracking;
+  return {
+    provider: tracker.provider,
+    host: externalRef?.host ?? config.host ?? null,
+    repositoryId: externalRef?.repositoryId ?? config.repository?.id ?? null,
+    repositoryOwner:
+      externalRef?.repositoryOwner ?? config.repository?.owner ?? null,
+    repositoryName:
+      externalRef?.repositoryName ?? config.repository?.name ?? null,
+    projectId:
+      externalRef?.projectId ?? configuredProjectIdentity(config) ?? null,
+    boardId: externalRef?.boardId ?? config.board?.id ?? null,
+    itemId: externalRef?.itemId ?? item.id,
+    itemNumber: externalRef?.itemNumber ?? null,
+    itemKey: externalRef?.itemKey ?? null,
+    nodeId: externalRef?.nodeId ?? null,
+    webUrl: externalRef?.webUrl ?? item.webUrl ?? null,
+  };
+}
+
+function stableExternalRefKeys(ref: ExternalRef): string[] {
+  const provider = normalizedIdentityPart(ref.provider);
+  const host = normalizedNullableIdentityPart(ref.host);
+  const scope = externalRefScope(ref);
+  if (ref.nodeId) {
+    return [`provider:${provider}:host:${host}:node:${normalizedIdentityPart(ref.nodeId)}`];
+  }
+  if (ref.itemKey) {
+    return [`provider:${provider}:host:${host}:key:${normalizedIdentityPart(ref.itemKey)}`];
+  }
+  if (scope && ref.itemNumber !== undefined && ref.itemNumber !== null) {
+    return [`provider:${provider}:host:${host}:${scope}:number:${ref.itemNumber}`];
+  }
+  if (scope && ref.itemId) {
+    return [`provider:${provider}:host:${host}:${scope}:item:${normalizedIdentityPart(ref.itemId)}`];
+  }
+
+  return [];
+}
+
+function externalRefScope(ref: ExternalRef): string | null {
+  if (ref.repositoryId) {
+    return `repo-id:${normalizedIdentityPart(ref.repositoryId)}`;
+  }
+  if (ref.repositoryOwner && ref.repositoryName) {
+    return `repo:${normalizedIdentityPart(ref.repositoryOwner)}/${normalizedIdentityPart(ref.repositoryName)}`;
+  }
+  if (ref.projectId) {
+    return `project:${normalizedIdentityPart(ref.projectId)}`;
+  }
+  if (ref.boardId) {
+    return `board:${normalizedIdentityPart(ref.boardId)}`;
+  }
+
+  return null;
+}
+
+function configuredFingerprintKeys(options: {
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  item: WorkItem;
+}): CandidateIdentityKey[] {
+  return options.component.trackerDiscovery.fingerprints
+    .filter((fingerprint) =>
+      fingerprintMatchesItem(fingerprint, options.tracker, options.item),
+    )
+    .map((fingerprint) => ({
+      key: `fingerprint:${options.component.id}:${fingerprint.id}`,
+      reason: "configured_fingerprint",
+    }));
+}
+
+function fingerprintMatchesItem(
+  fingerprint: NexusProjectTrackerDiscoveryFingerprintConfig,
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+): boolean {
+  if (fingerprint.trackerId && fingerprint.trackerId !== tracker.id) {
+    return false;
+  }
+
+  return identityRefsForItem(tracker, item).some(({ ref }) =>
+    fingerprintMatchesExternalRef(fingerprint, ref, item),
+  );
+}
+
+function fingerprintMatchesExternalRef(
+  fingerprint: NexusProjectTrackerDiscoveryFingerprintConfig,
+  ref: ExternalRef,
+  item: WorkItem,
+): boolean {
+  return (
+    optionalMatch(fingerprint.provider, ref.provider) &&
+    optionalMatch(fingerprint.host, ref.host ?? null) &&
+    optionalMatch(fingerprint.repositoryId, ref.repositoryId ?? null) &&
+    optionalMatch(fingerprint.repositoryOwner, ref.repositoryOwner ?? null) &&
+    optionalMatch(fingerprint.repositoryName, ref.repositoryName ?? null) &&
+    optionalMatch(fingerprint.projectId, ref.projectId ?? null) &&
+    optionalMatch(fingerprint.boardId, ref.boardId ?? null) &&
+    optionalItemIdMatch(fingerprint.itemId, ref.itemId, item.id) &&
+    optionalMatch(fingerprint.itemNumber, ref.itemNumber ?? null) &&
+    optionalMatch(fingerprint.itemKey, ref.itemKey ?? null) &&
+    optionalMatch(fingerprint.nodeId, ref.nodeId ?? null)
+  );
+}
+
+function optionalMatch<T>(expected: T | null | undefined, actual: T | null): boolean {
+  return expected === undefined || expected === actual;
+}
+
+function optionalItemIdMatch(
+  expected: string | undefined,
+  refItemId: string,
+  itemId: string,
+): boolean {
+  return expected === undefined || expected === refItemId || expected === itemId;
+}
+
+function dedupeIdentityKeys(
+  keys: CandidateIdentityKey[],
+): CandidateIdentityKey[] {
+  const seen = new Set<string>();
+  const result: CandidateIdentityKey[] = [];
+  for (const key of keys) {
+    if (seen.has(key.key)) {
+      continue;
+    }
+    seen.add(key.key);
+    result.push(key);
+  }
+
+  return result;
+}
+
+function dedupeIdentityRefs(
+  refs: Array<{ ref: ExternalRef; reason: "external_ref" | "provider_identity" }>,
+): Array<{ ref: ExternalRef; reason: "external_ref" | "provider_identity" }> {
+  const seen = new Set<string>();
+  const result: Array<{ ref: ExternalRef; reason: "external_ref" | "provider_identity" }> = [];
+  for (const ref of refs) {
+    const key = [
+      ref.ref.provider,
+      ref.ref.host ?? "",
+      ref.ref.repositoryId ?? "",
+      ref.ref.repositoryOwner ?? "",
+      ref.ref.repositoryName ?? "",
+      ref.ref.projectId ?? "",
+      ref.ref.boardId ?? "",
+      ref.ref.itemId,
+      ref.ref.itemNumber ?? "",
+      ref.ref.itemKey ?? "",
+      ref.ref.nodeId ?? "",
+    ].join("\u0000");
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(ref);
+  }
+
+  return result;
+}
+
+function observedReferenceKeys(
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+): string[] {
+  return uniqueStrings([
+    referenceObservedKey({
+      trackerId: tracker.id,
+      provider: tracker.provider,
+      itemId: item.id,
+    }),
+    ...(item.externalRef?.provider === tracker.provider
+      ? [
+          referenceObservedKey({
+            trackerId: tracker.id,
+            provider: tracker.provider,
+            itemId: item.externalRef.itemId,
+          }),
+        ]
+      : []),
+  ]);
+}
+
+function referenceObservedKey(
+  reference: Pick<WorkItemTrackerReference, "trackerId" | "provider" | "itemId">,
+): string {
+  return [
+    reference.trackerId,
+    normalizedIdentityPart(reference.provider),
+    reference.itemId,
+  ].join("\u0000");
+}
+
+function defaultLogicalItemId(item: WorkItem): string {
+  return item.provider === "local"
+    ? item.id
+    : item.externalRef?.itemId ?? item.id;
+}
+
+function configuredProjectIdentity(
+  config: WorkTrackingConfig,
+): string | null | undefined {
+  if (config.provider === "vibe-kanban") {
+    return config.projectId;
+  }
+  if (config.provider === "jira") {
+    return config.projectKey;
+  }
+
+  return undefined;
+}
+
+function normalizedIdentityPart(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizedNullableIdentityPart(value: string | null | undefined): string {
+  return value ? normalizedIdentityPart(value) : "";
+}
+
+function findLinkRecordsForItem(
   records: WorkItemTrackerLinkRecord[],
   component: ResolvedNexusProjectComponent,
   tracker: ResolvedNexusProjectWorkTracker,
   item: WorkItem,
-): WorkItemTrackerLinkRecord | null {
-  return (
-    records.find(
-      (record) =>
-        record.componentId === component.id &&
-        record.references.some((reference) =>
-          referenceMatchesItem(reference, tracker, item),
-        ),
-    ) ?? null
+): WorkItemTrackerLinkRecord[] {
+  return records.filter(
+    (record) =>
+      record.componentId === component.id &&
+      record.references.some((reference) =>
+        referenceMatchesItem(reference, tracker, item),
+      ),
   );
 }
 
@@ -873,19 +1399,6 @@ function externalRefMatchesReference(
   }
 
   return false;
-}
-
-function externalItemKey(item: WorkItem): string {
-  const externalRef = item.externalRef;
-  return [
-    externalRef?.provider ?? item.provider,
-    externalRef?.repositoryId ??
-      `${externalRef?.repositoryOwner ?? ""}/${externalRef?.repositoryName ?? ""}`,
-    externalRef?.itemId ?? item.id,
-    externalRef?.itemNumber ?? "",
-    externalRef?.itemKey ?? "",
-    externalRef?.nodeId ?? "",
-  ].join(":");
 }
 
 function uniqueStrings(values: readonly string[]): string[] {

@@ -1296,6 +1296,7 @@ describe("project config", () => {
       milestones: [],
       assignees: [],
       providerQuery: null,
+      fingerprints: [],
       conflictWinner: "scanned_tracker",
       missingCredentialBehavior: "skip",
     });
@@ -1312,6 +1313,7 @@ describe("project config", () => {
       milestones: [],
       assignees: [],
       providerQuery: null,
+      fingerprints: [],
       conflictWinner: "scanned_tracker",
       missingCredentialBehavior: "skip",
       defaultTrackerOnly: false,
@@ -1351,6 +1353,7 @@ describe("project config", () => {
       milestones: [],
       assignees: [],
       providerQuery: null,
+      fingerprints: [],
       conflictWinner: "default_tracker",
       missingCredentialBehavior: "block",
       defaultTrackerOnly: true,
