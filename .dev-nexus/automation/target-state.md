@@ -43,8 +43,10 @@ and ready for coordinator-driven work across its components.
   config model, durable remote execution request/result records, and the
   opt-in disposable hosting fixture. The latest Windows batch published
   `dev-nexus:local-129` as `3de4635` for tracker discovery roles and default
-  policy, then `dev-nexus:local-114` as `0d871d7` for Codex app-server
-  notification and server-request routing.
+  policy, `dev-nexus:local-114` as `0d871d7` for Codex app-server notification
+  and server-request routing, `dev-nexus:local-115` as `f98bede` for safe
+  Codex app-server initialize probes, and `dev-nexus:local-106` as `c73f347`
+  for active agent target projection filtering.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -119,18 +121,18 @@ and ready for coordinator-driven work across its components.
   `npm test -- src/nexusProjectHosting.test.ts src/nexusProjectHostingIntegrationFixture.test.ts`,
   `npm run build`, `npm test -- --exclude src/nexusSetupAssistant.test.ts`,
   and `git diff --check`.
-- `dev-nexus:local-78` tracks the policy layer behind the user's integration
-  decision: project/component/provider-specific agent roles such as maintainer,
-  contributor, reviewer, and observer should determine whether an agent may
-  push, open PRs, approve, merge, or only hand off.
+- `dev-nexus:local-78` is complete as the authority-policy planning umbrella.
+  Project/component/provider-specific agent roles such as maintainer,
+  contributor, reviewer, and observer determine whether an agent may push, open
+  PRs, approve, merge, or only hand off.
 - `docs/coordination-roles-authority-prd.md` now captures the PRD for
   `dev-nexus:local-78` and is attached to the work item through a local
   DevNexus comment.
-- The authority PRD has been sliced: start with `dev-nexus:local-87` for the
-  actor/role/action configuration model, which is now complete. Promote
-  dependent slices `local-88` through `local-94` as their prerequisites land.
-  `local-95` is a blocked HITL decision item for self-approval, temporary
-  elevation, and advanced role-policy questions.
+- The authority PRD has been sliced: `dev-nexus:local-87` is complete for the
+  actor/role/action configuration model, and `local-88` is now ready for
+  host-local current-actor resolution. Promote `local-89` through `local-94`
+  as their prerequisites land. `local-95` is a blocked HITL decision item for
+  self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
   `local-103`. `local-97`, `local-98`, `local-99`, and `local-102` are
@@ -143,13 +145,16 @@ and ready for coordinator-driven work across its components.
   `local-92`.
 - `docs/agent-target-projection-opt-in-prd.md` records the decision that
   provider-native MCP, skills, plugin, and worker projections should be
-  generated only for active agent targets. `dev-nexus:local-104` tracks slicing
-  and implementation. Current dogfood evidence: MCP is Codex-only, but
+  generated only for active agent targets. `dev-nexus:local-104` is complete as
+  the planning umbrella. Current dogfood evidence: MCP is Codex-only, but
   `skills.agentTargets` still includes Claude, so `.claude/skills` is stale
   ignored support state for this Codex-only workflow.
 - Agent-target projection opt-in has been sliced. `dev-nexus:local-105` is
-  complete for active target policy and compatibility normalization; promote
-  `local-106` through `local-111` as prerequisites land. Do not remove
+  complete for active target policy and compatibility normalization, and
+  `local-106` is complete for active-target projection filtering. Promote
+  `local-107` stale projection diagnostics and `local-109` worker context
+  propagation next; keep `local-108`, `local-110`, and `local-111` ordered
+  behind the diagnostics and cleanup behavior they require. Do not remove
   `.claude/skills` until stale-projection diagnostics and cleanup safety
   behavior are available, unless a separate manual cleanup is explicitly
   approved.
@@ -169,8 +174,8 @@ and ready for coordinator-driven work across its components.
 - The Codex app-server audit has been sliced into corrective DevNexus work.
   `dev-nexus:local-113` is complete, fixing stdio wire protocol compatibility.
   `local-114` is complete for notification and server-request routing.
-  `local-115` is ready for safe capability probes; `local-116` should wait
-  until event routing lands.
+  `local-115` is complete for safe capability probes; `local-116` should wait
+  until the remaining app-server event and capability facts are stable.
 - `docs/dev-nexus-research-plugin-prd.md` records the first planned
   non-engineering DevNexus domain plugin direction. DevNexus-Research should
   support academic research and paper-writing workflows through additive
@@ -181,15 +186,16 @@ and ready for coordinator-driven work across its components.
   `local-151` cover projected research skills, artifact/setup conventions,
   optional external ARS Codex skill integration, and a dogfood paper-project
   smoke.
-- No active implementation subagents are expected, and the merged worktrees and
-  local branches for `local-126`, `local-127`, `local-81`, `local-87`,
-  `local-129`, and `local-114` were removed after publication.
+- No active implementation worktrees are expected for the completed source
+  batches. The merged worktrees and local branches for `local-126`,
+  `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
+  and `local-106` were removed after publication.
 
 ## Near-Term Direction
 
-- Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
-  `dev-nexus:local-104`, `dev-nexus:local-115`, `dev-nexus:local-130`, and
-  `dev-nexus:local-147`, subject to dependency and concurrency limits.
+- Continue ready follow-on work such as `dev-nexus:local-88`, `local-107`,
+  `local-109`, `local-130`, and `local-147`, subject to dependency and
+  concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
@@ -197,25 +203,25 @@ and ready for coordinator-driven work across its components.
   shared-checkout mutation enforcement (`local-98`) and read-only cleanup
   classification (`local-102`) before cleanup execution, and keep status
   expansion/start-adopt slices behind their authority dependencies.
-- Continue agent-target projection planning at `dev-nexus:local-104`; `local-111`
-  is the dogfood Codex-only migration and should wait for active target
-  filtering plus stale cleanup safety.
+- Continue agent-target projection through stale projection diagnostics and
+  worker context filtering; `local-111` is the dogfood Codex-only migration and
+  should wait for active target filtering plus stale cleanup safety.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
   runner approval is explicit.
 - Promote `local-73` through `local-75` only after their prerequisites are
   satisfied; resolve the full `local-69` umbrella before relying on Windows
   source roots as clean onboarding examples.
-- Continue Codex app-server correction with `dev-nexus:local-115` before
-  worker-thread orchestration, MCP relay expansion, or provider-native subagent
-  features.
+- Continue Codex app-server correction after completed `dev-nexus:local-115`
+  before worker-thread orchestration, MCP relay expansion, or provider-native
+  subagent features.
 - Start DevNexus-Research with `dev-nexus:local-147` using original
   DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
-- Keep cross-tracker discovery ordered: implement `dev-nexus:local-129`
-  before read-only discovery status, eligible-work aggregation, deduplication,
-  inbound import planning, or guarded inbound import execution. Use fake or
-  disposable provider fixtures for validation, not active projects.
+- Keep cross-tracker discovery ordered after completed `dev-nexus:local-129`:
+  proceed through read-only discovery status, eligible-work aggregation,
+  deduplication, inbound import planning, and guarded inbound import execution.
+  Use fake or disposable provider fixtures for validation, not active projects.
 
 ## Boundaries
 

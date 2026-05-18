@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 255,
-  "updatedAt": "2026-05-18T22:14:08.308Z",
+  "nextCommentNumber": 266,
+  "updatedAt": "2026-05-18T22:41:36.206Z",
   "items": [
     {
       "id": "local-1",
@@ -1940,7 +1940,7 @@
       "id": "local-78",
       "title": "Model coordination roles for merge and approval authority",
       "description": "Type: coordination/publication policy slice. Readiness: autonomous agent-ready (AFK). Source: user clarified that integration behavior is a coordination role decision: an agent may be a maintainer that can merge verified work, a contributor that opens PRs and waits for approval, a reviewer that can approve but not merge, or an observer that only reports. Goal: add explicit project/component/provider role policy for agent authority instead of encoding this only as informal target-state text. Acceptance: config can declare role/authority for automation actors per component or provider; agent context/status reports whether the current actor may push, open PRs, approve, merge, request review, or only hand off; publication/coordination commands block when the role does not allow the requested action; GitHub PR and direct-push examples are documented without hard-coding dogfood account names; tests cover maintainer direct merge, contributor PR-only, reviewer approval-only, and observer read-only behavior with mocked providers. Boundaries: do not make DevNexus choose implementation work; do not infer approval from assignment or comments; do not require live GitHub credentials. Dependencies: builds on dev-nexus:local-38 actor/remote guardrails and dev-nexus:local-50 coordination tracker roles. Verification: focused config/status/publication policy tests and npm run check when feasible. Publication: direct integration to DevNexus main after verification.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1953,8 +1953,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T12:35:06.278Z",
-      "updatedAt": "2026-05-18T13:22:29.611Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:20:45.695Z",
+      "closedAt": "2026-05-18T22:20:45.695Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2202,7 +2202,7 @@
       "id": "local-88",
       "title": "Resolve current actor from host-local auth profiles",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority configuration model exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: detect or report the current actor from configured host-local auth profiles so agents know whether they are acting as a human, bot, machine user, service account, external agent, or local observer.\n\nUser stories covered:\n- As a worker agent, I can know whether my Git and provider actions are using the intended bot profile.\n- As a human maintainer, I can see account mismatches before automation publishes as the wrong account.\n\nAcceptance criteria:\n- Host-local auth profile metadata can bind a logical actor id to non-secret credential mechanisms such as GitHub CLI profile names, SSH host aliases, wrapper command names, or environment keys.\n- Actor resolution can identify the configured automation actor for a component or report unknown, ambiguous, missing, or mismatched actor state.\n- Human/manual profiles and automation/bot profiles remain distinct and do not silently fall back to each other.\n- Status output includes concise warnings for missing auth profile, ambiguous account, mismatched remote, or missing provider capability.\n- Resolution is safe when no live provider credentials are available.\n\nDependencies:\n- Depends on the actor/role/authority configuration model.\n- Builds on existing publication identity and remote guardrail behavior.\n\nBoundaries:\n- Do not require live GitHub, GitLab, or Jira credentials for normal tests.\n- Do not mutate credentials, SSH config, or provider profiles.\n\nVerification:\n- Focused tests for expected actor, missing actor, ambiguous actor, human-vs-bot mismatch, and unknown local process fallback.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2215,7 +2215,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.771Z",
-      "updatedAt": "2026-05-18T13:08:00.771Z",
+      "updatedAt": "2026-05-18T22:20:45.732Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2626,7 +2626,7 @@
       "id": "local-104",
       "title": "Make agent-native projections opt-in by active target",
       "description": "Type: projection policy / setup UX PRD follow-up\nReadiness: autonomous agent-ready (AFK) for issue slicing and first implementation planning\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make agent-native MCP, skills, plugin, and worker support projections opt-in by active agent target so Codex-only projects do not receive Claude artifacts and vice versa.\n\nCurrent dogfood finding:\n- The dogfood project MCP target is Codex-only.\n- The dogfood project skills targets currently include Codex and Claude, so DevNexus generated ignored `.claude/skills` support state.\n- This is not tracked source, but it is root clutter and a misleading active-provider signal for a Codex-only project.\n\nAcceptance criteria:\n- Use the PRD to slice implementation-ready DevNexus work items.\n- The design distinguishes supported providers from active agent targets.\n- MCP, skills, plugin capability projection, setup checks, and worker context generation consume one active target policy.\n- Setup reports stale generated provider projections and can safely clean generated support state when no longer selected.\n- Codex-only projects do not receive `.claude` support directories by default.\n- Multi-provider projects can still explicitly opt into Codex plus Claude or other provider combinations.\n\nBoundaries:\n- Do not remove provider support.\n- Do not delete manually authored or source-controlled provider files automatically.\n- Do not edit provider-global credentials or user-global skill directories.\n- Keep this generic; do not hard-code Codex-only behavior into DevNexus core.\n\nVerification:\n- After slicing, implementation issues should cover config normalization, projection filtering, setup diagnostics, cleanup dry-run/execution, worker context behavior, and docs.\n\nPublication notes:\n- Direct integration to DevNexus main for source changes after focused and full checks pass under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2640,8 +2640,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:30:34.960Z",
-      "updatedAt": "2026-05-18T13:34:31.534Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:20:45.716Z",
+      "closedAt": "2026-05-18T22:20:45.716Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2678,7 +2678,7 @@
       "id": "local-106",
       "title": "Filter MCP skills and plugin projections by active agent targets",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active agent target policy exists\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make MCP config refresh, skill projection, plugin projected skills, plugin MCP entries, and setup fragments materialize only for active compatible agent targets.\n\nUser stories covered:\n- As a Codex-only project owner, I do not receive Claude-native support directories.\n- As a plugin author, I can declare target-compatible capabilities without forcing every compatible provider to be materialized.\n\nAcceptance criteria:\n- MCP refresh defaults to the active target set unless the command explicitly names a provider target.\n- Skill refresh defaults to the active target set and does not create target directories outside that set.\n- Plugin capabilities declare compatible target agents, not mandatory target agents, and are materialized only when compatible with an active target.\n- Explicit command-line target selection can refresh a selected provider without mutating unrelated provider directories.\n- Codex-only fixture tests prove no `.claude` support directory is created; Claude-only fixture tests prove no Codex-native support is created unless selected; multi-provider tests still create both.\n\nDependencies:\n- Depends on dev-nexus:local-105 active target policy.\n\nBoundaries:\n- Do not delete existing stale directories in this slice; only stop creating newly unselected projections.\n- Do not weaken provider trust or approval settings.\n\nVerification:\n- Focused MCP config, skill materialization, plugin capability, and setup assistant tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2693,8 +2693,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.583Z",
-      "updatedAt": "2026-05-18T13:34:17.583Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:38:13.085Z",
+      "closedAt": "2026-05-18T22:38:13.085Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2706,7 +2706,7 @@
       "id": "local-107",
       "title": "Report stale and unexpected provider projections in setup and status",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make setup checks and project status distinguish expected, missing, stale generated, manual, and unsupported provider-native projections.\n\nUser stories covered:\n- As a coordinator agent, I can see whether a provider-native directory is expected, stale generated support, or manually authored.\n- As a new-machine setup user, I can avoid misreading stale provider support as an active workflow.\n\nAcceptance criteria:\n- Project status summarizes active agent targets, expected MCP config files, expected skill directories, selected plugin capabilities, unsupported/manual targets, and stale generated provider directories.\n- Setup check reports expected-present, expected-missing, present-stale-generated, present-manual, unsupported-provider, and locally-selected-but-not-allowed states.\n- Stale generated support is detected using generated markers, projection manifests, known ignored paths, or another safe evidence source.\n- Manual or source-controlled provider files are reported without being classified as cleanup-safe.\n- Output remains concise enough for agent consumption and does not include secrets or provider-global credentials.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Reporting only; do not remove files in this slice.\n- Do not inspect provider-global app databases or credentials.\n\nVerification:\n- Focused status/setup tests for expected, missing, stale generated, manual, unsupported, and host-local override cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2720,7 +2720,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.844Z",
-      "updatedAt": "2026-05-18T13:34:17.844Z",
+      "updatedAt": "2026-05-18T22:41:22.804Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2759,7 +2759,7 @@
       "id": "local-109",
       "title": "Propagate active agent targets into worker context preparation",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: ensure generated worker context and prepared worktree support files describe and materialize only the provider-native projections relevant to the worker agent target.\n\nUser stories covered:\n- As a worker agent, I receive the skill and MCP context for the provider I am actually using.\n- As a coordinator agent, I can prepare a Codex worker without also creating Claude-native support state.\n\nAcceptance criteria:\n- Worker context records the project active target policy and the assigned worker provider target.\n- Worker-local skill projections and plugin fragments are filtered by the assigned provider target.\n- Worker briefing describes only relevant provider-native directories plus shared project-managed skill roots.\n- Preparing a worktree for a provider not active in project policy fails or produces a clear manual-target warning according to configuration.\n- Multi-provider projects can prepare distinct worker contexts for different active providers without cross-contaminating support files.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Do not create nested execution workspaces or change the Git worktree model.\n- Do not install global skills or write to user-global provider directories.\n\nVerification:\n- Focused worker context and worktree prepare tests for Codex-only, Claude-only, multi-provider, unsupported provider, and plugin fragment filtering cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2773,7 +2773,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:18.350Z",
-      "updatedAt": "2026-05-18T13:34:18.350Z",
+      "updatedAt": "2026-05-18T22:41:28.664Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2917,7 +2917,7 @@
       "id": "local-115",
       "title": "Add safe Codex app-server initialize probe and capability report",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113; can use dev-nexus:local-114 if the probe consumes notifications or server requests\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nAdd a safe readiness diagnostic that starts or connects to Codex app-server, calls initialize with a DevNexus client identity, reports available methods/capabilities, and exits without creating a durable user chat.\n\nUser stories covered:\n- As a DevNexus user, I can check whether my installed Codex app-server supports the capabilities required by a configured profile.\n- As a coordinator, I can distinguish auth, transport, protocol, missing-method, and policy blockers before dispatching worker turns.\n\nAcceptance criteria:\n- A CLI/MCP-accessible diagnostic reports Codex version when available, transport mode, endpoint scope, advertised methods, required capability status, optional capability status, and blocker summary.\n- The probe does not submit user prompts and does not create visible durable worker chats.\n- Capability groups include at least thread control, turn control, event stream readiness, MCP status, MCP tool call, schema generation, and remote-control disabled/blocked state.\n- Non-loopback endpoints remain blocked unless host-local policy explicitly allows them.\n- Tests use mocked app-server responses and cover all-good, missing required method, unsupported wire protocol, auth failure, and blocked non-loopback endpoint.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 for current wire compatibility.\n- May depend on dev-nexus:local-114 if initialize or capability discovery needs bidirectional request handling.\n\nBoundaries:\n- Do not create Codex heartbeats or cron automations.\n- Do not mutate Codex private storage.\n- Do not make app-server mandatory for projects that use `codex exec`.\n\nVerification:\n- Focused capability diagnostic tests.\n- `npm run check` when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2930,8 +2930,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T15:39:22.591Z",
-      "updatedAt": "2026-05-18T16:16:22.741Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:28:42.396Z",
+      "closedAt": "2026-05-18T22:28:42.396Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3326,7 +3326,7 @@
       "id": "local-130",
       "title": "Report read-only tracker discovery status",
       "description": "Type: read-only status implementation slice\nReadiness: todo/dependent on dev-nexus:local-129\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only discovery status surface that tells maintainers and agents exactly which configured trackers are visible, eligible, optional, blocked, or import-only.\n\nUser stories covered:\n- As a maintainer, I can ask whether a GitHub inbox will be ignored, listed directly, or imported before selection.\n- As a worker on another host, I can see whether provider credentials are required for discovery and whether missing access is a warning or blocker.\n\nAcceptance criteria:\n- DevNexus exposes a read-only discovery status service and a small CLI/MCP surface such as work_item_discovery_status or an equivalent naming convention that fits the codebase.\n- Output includes each component's default tracker, configured tracker bindings, roles, effective discovery policy, provider capability report, and whether each tracker is readable by the current actor.\n- Missing optional credentials are warnings or skipped trackers according to policy; required credentials are blockers.\n- The command never mutates local tracker files, Git state, provider issues, or link records.\n- Mocked local and GitHub tracker cases cover readable, missing credentials, unsupported capability, disabled tracker, and policy-blocked tracker states.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n\nBoundaries:\n- Do not aggregate eligible work or create local imported items in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused service, CLI, and MCP tests for status output, JSON/text shape, provider capability reporting, optional/required credential behavior, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3341,7 +3341,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:46.510Z",
-      "updatedAt": "2026-05-18T19:38:46.510Z",
+      "updatedAt": "2026-05-18T22:41:36.206Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6114,6 +6114,17 @@
           "provider": "local",
           "itemId": "local-comment-172"
         }
+      },
+      {
+        "id": "local-comment-255",
+        "body": "Reclassifying this umbrella planning item as complete. Evidence: docs/coordination-roles-authority-prd.md is drafted and attached; it has been sliced into local-87 through local-95; local-87 has landed the first authority configuration model. Keeping this umbrella item ready would keep eligible-work selecting planning work that is already represented by child items.",
+        "author": null,
+        "createdAt": "2026-05-18T22:20:39.148Z",
+        "updatedAt": "2026-05-18T22:20:39.148Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-255"
+        }
       }
     ],
     "local-79": [
@@ -6250,7 +6261,19 @@
         }
       }
     ],
-    "local-88": [],
+    "local-88": [
+      {
+        "id": "local-comment-257",
+        "body": "Promoting to ready because dependency local-87, the actor/role/action authority configuration model, is complete. This slice should resolve the current actor from host-local auth profiles without mutating credentials or requiring live provider access for normal tests.",
+        "author": null,
+        "createdAt": "2026-05-18T22:20:39.182Z",
+        "updatedAt": "2026-05-18T22:20:39.182Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-257"
+        }
+      }
+    ],
     "local-89": [],
     "local-90": [],
     "local-91": [],
@@ -6402,6 +6425,17 @@
           "provider": "local",
           "itemId": "local-comment-173"
         }
+      },
+      {
+        "id": "local-comment-256",
+        "body": "Reclassifying this umbrella planning item as complete. Evidence: docs/agent-target-projection-opt-in-prd.md is drafted and sliced into local-105 through local-111; local-105 has landed active target policy normalization. Keeping this umbrella item ready would keep eligible-work selecting planning work that is already represented by child items.",
+        "author": null,
+        "createdAt": "2026-05-18T22:20:39.168Z",
+        "updatedAt": "2026-05-18T22:20:39.168Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-256"
+        }
       }
     ],
     "local-105": [
@@ -6428,10 +6462,68 @@
         }
       }
     ],
-    "local-106": [],
-    "local-107": [],
+    "local-106": [
+      {
+        "id": "local-comment-258",
+        "body": "Promoting to ready because dependency local-105, active agent target policy normalization, is complete. This slice should implement projection filtering against the normalized active target policy without deleting manually authored or source-controlled provider files.",
+        "author": null,
+        "createdAt": "2026-05-18T22:20:39.200Z",
+        "updatedAt": "2026-05-18T22:20:39.200Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-258"
+        }
+      },
+      {
+        "id": "local-comment-261",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: c73f3471526d353a29508acca61639ea8a19a3ab\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:38:13.033Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-106\",\n  \"logicalItemId\": \"local-106\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-106\",\n    \"itemNumber\": 106,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-106\",\n      \"itemNumber\": 106\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-106\",\n    \"itemNumber\": 106,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-106\",\n      \"itemNumber\": 106\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-106\",\n      \"itemNumber\": 106,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-106\",\n        \"itemNumber\": 106\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-eba46b840dde9696\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c73f3471526d353a29508acca61639ea8a19a3ab\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusSkills.ts\",\n    \"src/nexusPluginCapabilities.ts\",\n    \"src/nexusProjectScaffold.ts\",\n    \"src/nexusProjectTemplate.ts\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusAutomationRunOnce.ts\",\n    \"src/nexusManualWorktree.ts\",\n    \"src/cli.ts\",\n    \"focused tests\"\n  ],\n  \"decisions\": [\n    \"MCP refresh, skills, scaffold/template/setup projections now default to active target sets.\",\n    \"Explicit CLI --agent MCP refresh still targets the selected provider without mutating unrelated provider directories.\",\n    \"Plugin targetAgents are compatibility metadata and plugin fragments/dependency projections filter by active compatible agents.\"\n  ],\n  \"verificationSummary\": \"Passed focused projection suite, git diff --cached --check, npm run build, and npm test before publishing.\",\n  \"integrationPreference\": \"Merged to DevNexus main as c73f347 and pushed through bot/main.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:38:13.043Z",
+        "updatedAt": "2026-05-18T22:38:13.043Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-261"
+        }
+      },
+      {
+        "id": "local-comment-262",
+        "body": "Completed and published through the automation bot path. Source branch codex/dev-nexus-local-106-active-target-projections was merged to DevNexus main as c73f347 after rebasing over local-115/f98bede. Verification before publication: focused projection/config/skills/scaffold/setup/plugin/CLI/launch suite passed, git diff --cached --check passed, npm run build passed, and npm test passed with 60 files / 514 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T22:38:13.066Z",
+        "updatedAt": "2026-05-18T22:38:13.066Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-262"
+        }
+      }
+    ],
+    "local-107": [
+      {
+        "id": "local-comment-263",
+        "body": "Promoted to ready after `dev-nexus:local-106` completed active-target projection filtering in source commit `c73f347`.",
+        "author": null,
+        "createdAt": "2026-05-18T22:41:22.804Z",
+        "updatedAt": "2026-05-18T22:41:22.804Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-263"
+        }
+      }
+    ],
     "local-108": [],
-    "local-109": [],
+    "local-109": [
+      {
+        "id": "local-comment-264",
+        "body": "Promoted to ready after `dev-nexus:local-106` completed active-target projection filtering in source commit `c73f347`.",
+        "author": null,
+        "createdAt": "2026-05-18T22:41:28.664Z",
+        "updatedAt": "2026-05-18T22:41:28.664Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-264"
+        }
+      }
+    ],
     "local-110": [],
     "local-111": [],
     "local-112": [
@@ -6560,6 +6652,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-208"
+        }
+      },
+      {
+        "id": "local-comment-259",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: f98bede94860cef83776a0f0618388f299236aae\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:28:42.351Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-115\",\n  \"logicalItemId\": \"local-115\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-115\",\n    \"itemNumber\": 115,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-115\",\n      \"itemNumber\": 115\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-115\",\n    \"itemNumber\": 115,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-115\",\n      \"itemNumber\": 115\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-115\",\n      \"itemNumber\": 115,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-115\",\n        \"itemNumber\": 115\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-7c1a08be15150f8f\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"f98bede94860cef83776a0f0618388f299236aae\",\n  \"dirty\": false,\n  \"ahead\": 2,\n  \"behind\": 0,\n  \"pushed\": false,\n  \"changedAreas\": [\n    \"src/codexAppServerInitializeProbe.ts\",\n    \"src/codexAppServerInitializeProbe.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Added a safe initialize-only Codex app-server probe with CLI and MCP access.\",\n    \"Probe reports advertised methods, required/optional capability status, endpoint scope, version, and blocker kind without creating threads or turns.\"\n  ],\n  \"verificationSummary\": \"Passed integrated focused app-server tests, CLI/MCP tests, git diff --cached --check, and npm run build before publishing.\",\n  \"integrationPreference\": \"Merged to DevNexus main as f98bede and pushed through bot/main.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:28:42.363Z",
+        "updatedAt": "2026-05-18T22:28:42.363Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-259"
+        }
+      },
+      {
+        "id": "local-comment-260",
+        "body": "Completed and published through the automation bot path. Source branch codex/dev-nexus-local-115-app-server-probe was merged to DevNexus main as f98bede. Verification before publication: focused app-server probe/capability/JSON-RPC/launch tests passed, CLI/MCP tests passed, git diff --cached --check passed, and npm run build passed. Worker also ran npm test -- --exclude src/nexusSetupAssistant.test.ts successfully; full npm run check still fails only the known Windows setup-assistant path assertions.",
+        "author": null,
+        "createdAt": "2026-05-18T22:28:42.379Z",
+        "updatedAt": "2026-05-18T22:28:42.379Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-260"
         }
       }
     ],
@@ -6898,7 +7012,19 @@
         }
       }
     ],
-    "local-130": [],
+    "local-130": [
+      {
+        "id": "local-comment-265",
+        "body": "Promoted to ready after `dev-nexus:local-129` completed tracker discovery roles and default discovery policy in source commit `3de4635`.",
+        "author": null,
+        "createdAt": "2026-05-18T22:41:36.206Z",
+        "updatedAt": "2026-05-18T22:41:36.206Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-265"
+        }
+      }
+    ],
     "local-131": [],
     "local-132": [],
     "local-133": [],

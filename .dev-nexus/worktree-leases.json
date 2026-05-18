@@ -1,7 +1,255 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T22:14:08.298Z",
+  "updatedAt": "2026-05-18T22:40:00.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-eba46b840dde9696",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-106",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusProjectConfig.ts",
+        "src/nexusSkills.ts",
+        "src/nexusPluginCapabilities.ts",
+        "src/nexusProjectScaffold.ts",
+        "src/nexusProjectTemplate.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/nexusAutomationRunOnce.ts",
+        "src/nexusManualWorktree.ts",
+        "src/cli.ts",
+        "focused tests"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:38:13.033Z",
+      "lastSeenAt": "2026-05-18T22:38:13.033Z",
+      "updatedAt": "2026-05-18T22:38:13.033Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c73f3471526d353a29508acca61639ea8a19a3ab",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: Passed focused projection suite, git diff --cached --check, npm run build, and npm test before publishing.",
+        "Integration preference: Merged to DevNexus main as c73f347 and pushed through bot/main."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-bdb98ef84fdc8e2e",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-115",
+      "branchName": "codex/dev-nexus-local-115-app-server-probe",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-115-app-server-probe"
+      },
+      "writeScope": [
+        "src/codexAppServer*.ts",
+        "src/codexAppServer*.test.ts",
+        "src/nexusAutomationCodexAppServer*.ts",
+        "src/nexusAutomationCodexAppServer*.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:18:27.395Z",
+      "lastSeenAt": "2026-05-18T22:32:00.000Z",
+      "updatedAt": "2026-05-18T22:32:00.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f98bede94860cef83776a0f0618388f299236aae",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-115-app-server-probe"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 1,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Implement safe Codex app-server initialize/capability probe only.",
+        "Do not create durable chats, heartbeats, or cron automations.",
+        "Use mocked app-server tests; no live Codex requirement.",
+        "Worker branch was merged to DevNexus main as f98bede and published through bot/main.",
+        "Generated worktree and local branch were removed after preserving the merge commit."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-7c1a08be15150f8f",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-115",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/codexAppServerInitializeProbe.ts",
+        "src/codexAppServerInitializeProbe.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:28:42.351Z",
+      "lastSeenAt": "2026-05-18T22:28:42.351Z",
+      "updatedAt": "2026-05-18T22:28:42.351Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f98bede94860cef83776a0f0618388f299236aae",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: Passed integrated focused app-server tests, CLI/MCP tests, git diff --cached --check, and npm run build before publishing.",
+        "Integration preference: Merged to DevNexus main as f98bede and pushed through bot/main."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-9e877877ad34c163",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-106",
+      "branchName": "codex/dev-nexus-local-106-active-target-projections",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-106-active-target-projections"
+      },
+      "writeScope": [
+        "src/nexusAgentMcpConfig.ts",
+        "src/nexusAgentMcpConfig.test.ts",
+        "src/nexusSkills.ts",
+        "src/nexusSkills.test.ts",
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts",
+        "src/nexusWorkerContextBundle.ts",
+        "src/nexusWorkerContextBundle.test.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/nexusSetupAssistant.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusProjectOperations*.ts",
+        "src/nexusProjectTemplate*.ts",
+        "src/nexusProjectLifecycle*.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:21:11.129Z",
+      "lastSeenAt": "2026-05-18T22:40:00.000Z",
+      "updatedAt": "2026-05-18T22:40:00.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c73f3471526d353a29508acca61639ea8a19a3ab",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-106-active-target-projections"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 1,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Implement active-agent-target projection filtering only.",
+        "Do not delete stale directories in this slice.",
+        "Avoid app-server diagnostic files owned by local-115.",
+        "Worker branch was merged to DevNexus main as c73f347 and published through bot/main.",
+        "Generated worktree and local branch were removed after preserving the merge commit."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
