@@ -152,6 +152,35 @@ function optionalStringRecord(
   return stringRecord;
 }
 
+function optionalStringArray(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName}.${key} must be an array`);
+  }
+
+  const values = value.map((entry, index) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new NexusConfigError(
+        `${pathName}.${key}[${index}] must be a non-empty string`,
+      );
+    }
+    return entry;
+  });
+  const uniqueValues = new Set(values);
+  if (uniqueValues.size !== values.length) {
+    throw new NexusConfigError(`${pathName}.${key} contains duplicate values`);
+  }
+
+  return values;
+}
+
 function validateHomeHostTransportKind(
   value: unknown,
   pathName: string,
@@ -194,6 +223,7 @@ function validateHostingAuthProfile(
 ): NexusHostingAuthProfileConfig {
   const pathName = `authProfiles[${index}]`;
   const record = assertRecord(value, pathName);
+  const actorId = optionalString(record, "actorId", pathName);
   const kind = validateHostingAuthProfileKind(record.kind, `${pathName}.kind`);
   const account = optionalString(record, "account", pathName);
   const host = optionalString(record, "host", pathName);
@@ -204,9 +234,15 @@ function validateHostingAuthProfile(
     pathName,
   );
   const command = optionalString(record, "command", pathName);
+  const environmentKeys = optionalStringArray(
+    record,
+    "environmentKeys",
+    pathName,
+  );
 
   return {
     id: requiredString(record, "id", pathName),
+    ...(actorId !== undefined ? { actorId } : {}),
     provider: validateHostingProviderName(record.provider, `${pathName}.provider`),
     ...(kind !== undefined ? { kind } : {}),
     ...(account !== undefined ? { account } : {}),
@@ -214,6 +250,7 @@ function validateHostingAuthProfile(
     ...(sshHost !== undefined ? { sshHost } : {}),
     ...(githubCliConfigDir !== undefined ? { githubCliConfigDir } : {}),
     ...(command !== undefined ? { command } : {}),
+    ...(environmentKeys !== undefined ? { environmentKeys } : {}),
   };
 }
 

@@ -10,7 +10,10 @@ import {
   type NexusAutomationBackoffDecision,
   type NexusAutomationRunLedger,
 } from "./nexusAutomation.js";
-import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import type {
+  NexusAutomationConfig,
+  NexusAutomationPublicationConfig,
+} from "./nexusAutomationConfig.js";
 import {
   preflightNexusAutomationAgentLaunch,
   type NexusAutomationAgentLaunchComponentProvider,
@@ -22,9 +25,19 @@ import {
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
 import {
+  resolveNexusCurrentAutomationActor,
+  type NexusCurrentActorResolution,
+} from "./nexusAuthority.js";
+import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import {
   buildNexusRunnerProfileStatuses,
   type NexusRunnerProfileStatus,
@@ -59,6 +72,7 @@ import {
   type NexusPublicationActorRunner,
   type NexusPublicationStatus,
 } from "./nexusPublicationPolicy.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type {
   WorkItem,
   WorkItemQuery,
@@ -91,6 +105,8 @@ export interface NexusAutomationStatusLock {
 
 export interface GetNexusAutomationStatusOptions {
   projectRoot: string;
+  homePath?: string;
+  authProfiles?: NexusHostingAuthProfileConfig[];
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
@@ -116,6 +132,7 @@ export interface NexusAutomationStatus {
   agent: NexusAutomationAgentPolicy | null;
   runnerProfiles: NexusRunnerProfileStatus[];
   publication: NexusPublicationStatus[];
+  currentActors: NexusCurrentActorResolution[];
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkItems: WorkItem[] | null;
@@ -267,6 +284,13 @@ export async function getNexusAutomationStatus(
       gitRunner: options.gitRunner,
       actorRunner: options.publicationActorRunner,
     });
+    const currentActors = currentAutomationActors({
+      projectRoot,
+      projectConfig,
+      components,
+      publication,
+      options,
+    });
     const preflight = [
       ...preflightNexusAutomationAgentLaunch({
         components,
@@ -294,6 +318,7 @@ export async function getNexusAutomationStatus(
         eligibleWorkItems: null,
         selectedWorkItem: null,
         publication,
+        currentActors,
       });
     }
 
@@ -332,6 +357,7 @@ export async function getNexusAutomationStatus(
       componentEligibleWorkItems,
       selectedWorkItem: null,
       publication,
+      currentActors,
     });
   }
 
@@ -378,6 +404,13 @@ export async function getNexusAutomationStatus(
     gitRunner: options.gitRunner,
     actorRunner: options.publicationActorRunner,
   });
+  const currentActors = currentAutomationActors({
+    projectRoot,
+    projectConfig,
+    components,
+    publication,
+    options,
+  });
   const preflight = preflightNexusAutomationRunOnce({
     projectRoot,
     sourceRoot,
@@ -407,6 +440,7 @@ export async function getNexusAutomationStatus(
       eligibleWorkItems: null,
       selectedWorkItem: null,
       publication,
+      currentActors,
     });
   }
 
@@ -439,6 +473,7 @@ export async function getNexusAutomationStatus(
     eligibleWorkItems: null,
     selectedWorkItem,
     publication,
+    currentActors,
   });
 }
 
@@ -619,6 +654,7 @@ type AutomationStatusInput = Omit<
   | "agent"
   | "componentEligibleWorkItems"
   | "components"
+  | "currentActors"
   | "publication"
   | "runnerProfiles"
   | "target"
@@ -630,6 +666,7 @@ type AutomationStatusInput = Omit<
       | "agent"
       | "componentEligibleWorkItems"
       | "components"
+      | "currentActors"
       | "publication"
       | "runnerProfiles"
       | "target"
@@ -670,10 +707,85 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
       buildNexusRunnerProfileStatuses(
         result.projectConfig.runnerProfiles,
         result.projectConfig.hosts,
-      ),
+    ),
     publication: result.publication ?? [],
+    currentActors: result.currentActors ?? [],
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
+  };
+}
+
+function currentAutomationActors(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  components: ResolvedNexusProjectComponent[];
+  publication: NexusPublicationStatus[];
+  options: GetNexusAutomationStatusOptions;
+}): NexusCurrentActorResolution[] {
+  const authProfiles = automationStatusAuthProfiles({
+    projectRoot: options.projectRoot,
+    projectConfig: options.projectConfig,
+    statusOptions: options.options,
+  });
+  const publicationByComponent = new Map(
+    options.publication.map((publication) => [
+      publication.componentId,
+      publication,
+    ]),
+  );
+
+  return options.components.map((component) =>
+    resolveNexusCurrentAutomationActor({
+      authority: options.projectConfig.authority,
+      componentId: component.id,
+      publication:
+        publicationByComponent.get(component.id)?.policy ??
+        localOnlyPublicationPolicy(),
+      authProfiles,
+    })
+  );
+}
+
+function automationStatusAuthProfiles(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  statusOptions: GetNexusAutomationStatusOptions;
+}): NexusHostingAuthProfileConfig[] {
+  if (options.statusOptions.authProfiles) {
+    return options.statusOptions.authProfiles;
+  }
+
+  const homePath = options.statusOptions.homePath
+    ? path.resolve(options.statusOptions.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+  try {
+    return loadNexusHomeConfigFile(
+      homePath,
+      validateNexusHomeConfigBase,
+    ).authProfiles ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function localOnlyPublicationPolicy(): NexusAutomationPublicationConfig {
+  return {
+    strategy: "local_only",
+    remote: null,
+    targetBranch: null,
+    push: false,
+    remoteUrl: null,
+    pushUrl: null,
+    sshHostAlias: null,
+    actor: null,
+    manualRemote: null,
+    manualActor: null,
+    commandEnvironment: {},
   };
 }
 

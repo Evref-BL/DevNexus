@@ -188,13 +188,13 @@ describe("project config", () => {
       authority: {
         actors: [
           {
-            id: "gabot",
+            id: "example-bot-actor",
             kind: "machine_user" as const,
             provider: "github",
-            providerIdentity: "Gabot-Darbot",
-            displayName: "Gabot-Darbot",
+            providerIdentity: "Example-Bot",
+            displayName: "Example Bot",
             handles: {
-              github: "Gabot-Darbot",
+              github: "Example-Bot",
             },
           },
         ],
@@ -207,7 +207,7 @@ describe("project config", () => {
         ],
         roleBindings: [
           {
-            actorId: "gabot",
+            actorId: "example-bot-actor",
             roles: ["maintainer", "docs_operator"],
             scope: {
               project: "my-project",
@@ -285,20 +285,20 @@ describe("project config", () => {
       authority: {
         actors: [
           {
-            id: "gabot",
+            id: "example-bot-actor",
             kind: "machine_user",
             provider: "github",
-            providerIdentity: "Gabot-Darbot",
-            displayName: "Gabot-Darbot",
+            providerIdentity: "Example-Bot",
+            displayName: "Example Bot",
             handles: {
-              github: "Gabot-Darbot",
-              git: "gabot@example.invalid",
+              github: "Example-Bot",
+              git: "example-bot@example.invalid",
             },
           },
         ],
         roleBindings: [
           {
-            actorId: "gabot",
+            actorId: "example-bot-actor",
             roles: ["maintainer", "release_operator"],
             scope: {
               project: "authority-project",
@@ -328,7 +328,7 @@ describe("project config", () => {
       expect.arrayContaining(recommendedNexusAuthorityRoleIds),
     );
     expect(policy.roleBindings[0]).toMatchObject({
-      actorId: "gabot",
+      actorId: "example-bot-actor",
       roles: ["maintainer", "release_operator"],
       scope: {
         project: "authority-project",
@@ -341,16 +341,16 @@ describe("project config", () => {
       },
     });
 
-    const gabotAuthority = resolveNexusAuthorityForActor(
+    const exampleBotAuthority = resolveNexusAuthorityForActor(
       config.authority,
-      "gabot",
+      "example-bot-actor",
     );
-    expect(gabotAuthority).toMatchObject({
-      actorId: "gabot",
+    expect(exampleBotAuthority).toMatchObject({
+      actorId: "example-bot-actor",
       knownActor: true,
       roles: ["maintainer", "release_operator"],
     });
-    expect(gabotAuthority.actions).toEqual(
+    expect(exampleBotAuthority.actions).toEqual(
       expect.arrayContaining([
         "git.push_target_branch",
         "provider.pull_request.merge",
@@ -405,21 +405,21 @@ describe("project config", () => {
         configWithAuthority({
           actors: [
             {
-              id: "gabot",
+              id: "example-bot-actor",
               kind: "machine_user",
-              providerIdentity: "Gabot-Darbot",
-              displayName: "Gabot-Darbot",
+              providerIdentity: "Example-Bot",
+              displayName: "Example Bot",
             },
             {
-              id: "gabot",
+              id: "example-bot-actor",
               kind: "machine_user",
-              providerIdentity: "Gabot-Darbot",
-              displayName: "Gabot-Darbot Duplicate",
+              providerIdentity: "Example-Bot",
+              displayName: "Example Bot Duplicate",
             },
           ],
         }),
       ),
-    ).toThrow(/authority\.actors contains duplicate id: gabot/);
+    ).toThrow(/authority\.actors contains duplicate id: example-bot-actor/);
 
     expect(() =>
       validateProjectConfig(
@@ -443,7 +443,7 @@ describe("project config", () => {
         configWithAuthority({
           roleBindings: [
             {
-              actorId: "gabot",
+              actorId: "example-bot-actor",
               roles: ["unknown_role"],
               scope: {
                 project: "invalid-authority-project",
@@ -472,7 +472,7 @@ describe("project config", () => {
         configWithAuthority({
           roleBindings: [
             {
-              actorId: "gabot",
+              actorId: "example-bot-actor",
               roles: ["observer"],
               scope: {},
             },
