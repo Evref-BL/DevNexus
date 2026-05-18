@@ -22,6 +22,9 @@ coordinator agent chooses and supervises implementation work.
 
 - Component work is tracked through local component-owned work-item stores under
   `.dev-nexus/work-items/`.
+- Current eligible-work discovery uses each component's default tracker. New
+  GitHub Issues do not become local dogfood work unless GitHub is explicitly
+  queried, selected as the default tracker, or imported into the local tracker.
 - PLexus, pharo-launcher-mcp, and MCP-Pharo work moved to the sibling
   `/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus` DevNexus project.
 - The dogfood meta repository records explicit GitHub hosting metadata:
@@ -66,6 +69,9 @@ coordinator agent chooses and supervises implementation work.
 - External coordination should use provider-native systems such as GitHub
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.
+- Cross-tracker discovery and inbound provider issue import are planned in
+  `docs/tracker-discovery-inbound-sync-prd.md`; keep discovery read-only and
+  inbound import policy-gated because it mutates local tracker state.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
 

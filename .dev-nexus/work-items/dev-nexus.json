@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 128,
-  "nextCommentNumber": 219,
-  "updatedAt": "2026-05-18T19:25:40.641Z",
+  "nextNumber": 129,
+  "nextCommentNumber": 220,
+  "updatedAt": "2026-05-18T19:34:28.306Z",
   "items": [
     {
       "id": "local-1",
@@ -3266,6 +3266,35 @@
         "itemId": "local-127",
         "itemNumber": 127
       }
+    },
+    {
+      "id": "local-128",
+      "title": "Define cross-tracker discovery and inbound issue sync PRD",
+      "description": "Type: Product Requirements Document (PRD) planning slice\nReadiness: ready for PRD attachment, then issue slicing\n\nGoal: capture the product behavior for DevNexus issue discovery across configured work trackers, including whether GitHub Issues created on one host become visible to workers on another host without manual prompting.\n\nContext:\n- Current eligible-work and coordinator selection use component default work tracking, not every configured tracker.\n- Current work-item sync execution supports local source trackers to GitHub target trackers, not GitHub inbound import into local.\n- Cross-machine workers only see local tracker additions after the meta-project repository is synchronized.\n\nAcceptance criteria:\n- PRD states present behavior accurately.\n- PRD defines desired tracker roles, discovery aggregation, deduplication, inbound import, and cross-host visibility behavior.\n- PRD separates read-only discovery from mutating sync/import operations.\n- PRD calls out permission, credential, conflict, and fail-closed behavior.\n- PRD is attached to this work item and ready for issue slicing.\n\nVerification:\n- Static document review.\n- JSON tracker store parses.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "planning",
+        "trackers",
+        "github",
+        "sync",
+        "discovery",
+        "to-prd",
+        "to-issues",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:33:04.512Z",
+      "updatedAt": "2026-05-18T19:34:28.306Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-128",
+        "itemNumber": 128
+      }
     }
   ],
   "comments": {
@@ -5869,6 +5898,19 @@
     "local-124": [],
     "local-125": [],
     "local-126": [],
-    "local-127": []
+    "local-127": [],
+    "local-128": [
+      {
+        "id": "local-comment-219",
+        "body": "Product Requirements Document (PRD) created at `docs/tracker-discovery-inbound-sync-prd.md`.\n\nKey decision: preserve local-default eligible-work behavior by default, but add explicit discovery sources and policy-gated inbound import so provider-native GitHub Issues can become canonical local work before cross-host workers select them. Ready for `$to-issues` slicing.",
+        "author": null,
+        "createdAt": "2026-05-18T19:34:28.306Z",
+        "updatedAt": "2026-05-18T19:34:28.306Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-219"
+        }
+      }
+    ]
   }
 }

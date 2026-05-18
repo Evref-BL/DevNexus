@@ -23,8 +23,8 @@ target-cycle facts, commits, and the target report.
 ## Active Themes
 
 - Multi-tracker work tracking: local primary trackers, optional shared or
-  mirrored trackers, neutral link records, dry-run sync planning, and
-  policy-gated one-way sync.
+  mirrored trackers, neutral link records, dry-run sync planning, policy-gated
+  one-way sync, explicit discovery sources, and inbound provider issue import.
 - Shared multi-host coordination: Mac and Windows agents coordinate through
   work-item intent, Git branches, structured handoffs, integration planning, and
   provider-backed approval or feedback requests.
@@ -76,6 +76,8 @@ target-cycle facts, commits, and the target report.
 - Continue agent-target projection planning at `dev-nexus:local-104`; active
   target policy normalization is complete in `local-105`, so promote the next
   dependent projection slices as prerequisites land.
+- Slice `dev-nexus:local-128` into implementation issues for cross-tracker
+  discovery and inbound GitHub-to-local issue import.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and
