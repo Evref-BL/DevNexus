@@ -1390,6 +1390,160 @@ describe("DevNexus MCP server", () => {
     expect(primaryList.workItems).toEqual([]);
   });
 
+  it("targets explicit and tracker-qualified work trackers through MCP tool arguments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-primary.json",
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const defaultCreated = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_create",
+        {
+          projectRoot,
+          title: "Default MCP task",
+        },
+        { now: fixedClock("2026-05-16T10:00:00.000Z") },
+      ),
+    );
+    const mirrorCreated = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_create",
+        {
+          projectRoot,
+          trackerId: "mirror",
+          title: "Mirror MCP task",
+        },
+        { now: fixedClock("2026-05-16T10:01:00.000Z") },
+      ),
+    );
+    const defaultList = toolJson(
+      await callDevNexusMcpTool("work_item_list", {
+        projectRoot,
+      }),
+    );
+    const mirrorList = toolJson(
+      await callDevNexusMcpTool("work_item_list", {
+        projectRoot,
+        trackerId: "mirror",
+      }),
+    );
+    const qualifiedGet = toolJson(
+      await callDevNexusMcpTool("work_item_get", {
+        projectRoot,
+        id: "mirror:local-1",
+      }),
+    );
+    const explicitUpdate = toolJson(
+      await callDevNexusMcpTool("work_item_update", {
+        projectRoot,
+        trackerId: "mirror",
+        id: "local-1",
+        title: "Updated mirror MCP task",
+      }),
+    );
+    const externalRefStatus = toolJson(
+      await callDevNexusMcpTool("work_item_set_status", {
+        projectRoot,
+        trackerId: "mirror",
+        externalRef: {
+          provider: "local",
+          itemId: "local-1",
+        },
+        status: "done",
+      }),
+    );
+
+    expect(defaultCreated.workItem).toMatchObject({
+      title: "Default MCP task",
+      trackerRef: {
+        trackerId: "primary",
+        default: true,
+      },
+    });
+    expect(mirrorCreated.workItem).toMatchObject({
+      title: "Mirror MCP task",
+      trackerRef: {
+        trackerId: "mirror",
+        default: false,
+      },
+    });
+    expect(defaultList.workItems).toMatchObject([
+      {
+        title: "Default MCP task",
+        trackerRef: {
+          trackerId: "primary",
+        },
+      },
+    ]);
+    expect(mirrorList.workItems).toMatchObject([
+      {
+        title: "Mirror MCP task",
+        trackerRef: {
+          trackerId: "mirror",
+        },
+      },
+    ]);
+    expect(qualifiedGet.workItem).toMatchObject({
+      title: "Mirror MCP task",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+    expect(explicitUpdate.workItem).toMatchObject({
+      title: "Updated mirror MCP task",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+    expect(externalRefStatus.workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+  });
+
   it("handles MCP JSON-RPC initialize, tools/list, and tools/call", async () => {
     const initialized = await handleDevNexusMcpJsonRpcMessage({
       jsonrpc: "2.0",

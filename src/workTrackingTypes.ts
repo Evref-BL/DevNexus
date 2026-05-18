@@ -107,6 +107,17 @@ export interface WorkComment {
   createdAt?: string | null;
   updatedAt?: string | null;
   externalRef?: ExternalRef;
+  trackerRef?: WorkTrackerRef;
+}
+
+export interface WorkTrackerRef {
+  componentId?: string;
+  componentName?: string;
+  trackerId: string;
+  trackerName?: string;
+  provider: WorkTrackingProviderName | string;
+  roles?: string[];
+  default?: boolean;
 }
 
 export interface WorkItem {
@@ -123,6 +134,7 @@ export interface WorkItem {
   closedAt?: string | null;
   webUrl?: string | null;
   externalRef?: ExternalRef;
+  trackerRef?: WorkTrackerRef;
 }
 
 export interface WorkItemRef {
@@ -238,7 +250,20 @@ export interface NexusProjectContext {
   componentId?: string;
   componentName?: string;
   sourceRoot?: string;
+  defaultTrackerId?: string | null;
+  trackerId?: string | null;
+  trackerName?: string | null;
+  trackerRoles?: string[];
+  workTrackers?: NexusProjectWorkTrackerContext[];
   workTracking?: WorkTrackingConfig;
+}
+
+export interface NexusProjectWorkTrackerContext {
+  id: string;
+  name?: string | null;
+  enabled?: boolean;
+  roles?: string[];
+  workTracking: WorkTrackingConfig;
 }
 
 export interface WorkTrackerProvider {

@@ -6,13 +6,16 @@ import {
 } from "./workTrackingProviderService.js";
 import type {
   CreateWorkItemInput,
+  ExternalRef,
   NexusProjectContext,
+  NexusProjectWorkTrackerContext,
   WorkComment,
   WorkItem,
   WorkItemPatch,
   WorkItemQuery,
   WorkItemRef,
   WorkStatus,
+  WorkTrackerRef,
   WorkTrackerProvider,
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
@@ -21,6 +24,7 @@ export interface WorkItemProjectSelector {
   project?: string;
   projectRoot?: string;
   componentId?: string;
+  trackerId?: string;
 }
 
 export interface ResolvedWorkItemProjectContext
@@ -32,6 +36,11 @@ export interface ResolvedWorkItemProviderContext {
   projectContext: ResolvedWorkItemProjectContext;
   projectRoot: string;
   workTracking: WorkTrackingConfig;
+  trackerId: string;
+  trackerName: string;
+  trackerRoles: string[];
+  defaultTrackerId: string | null;
+  resolvedRef?: WorkItemRef;
   provider: WorkTrackerProvider;
 }
 
@@ -104,22 +113,45 @@ export class WorkItemService {
 
   async resolveProviderContext(
     selector: WorkItemProjectSelector,
+    ref?: WorkItemRef,
   ): Promise<ResolvedWorkItemProviderContext> {
     const normalizedSelector = normalizeProjectSelectorObject(selector);
     const projectContext = await this.resolveProject(normalizedSelector);
-    const workTracking = projectContext.workTracking;
+    const selectedTracker = resolveWorkTrackerSelection({
+      projectContext,
+      selector: normalizedSelector,
+      ref,
+    });
+    const selectedProjectContext = {
+      ...projectContext,
+      defaultTrackerId: selectedTracker.defaultTrackerId,
+      trackerId: selectedTracker.tracker.id,
+      trackerName: selectedTracker.tracker.name ?? selectedTracker.tracker.id,
+      trackerRoles: selectedTracker.tracker.roles ?? [],
+      workTracking: selectedTracker.tracker.workTracking,
+    };
+    const workTracking = selectedProjectContext.workTracking;
 
     try {
       return {
-        projectContext,
-        projectRoot: projectContext.projectRoot,
+        projectContext: selectedProjectContext,
+        projectRoot: selectedProjectContext.projectRoot,
         workTracking,
-        provider: this.createProvider(projectContext),
+        trackerId: selectedTracker.tracker.id,
+        trackerName: selectedTracker.tracker.name ?? selectedTracker.tracker.id,
+        trackerRoles: selectedTracker.tracker.roles ?? [],
+        defaultTrackerId: selectedTracker.defaultTrackerId,
+        ...(selectedTracker.resolvedRef
+          ? { resolvedRef: selectedTracker.resolvedRef }
+          : {}),
+        provider: this.createProvider(selectedProjectContext),
       };
     } catch (error) {
       if (error instanceof WorkTrackingProviderServiceError) {
         throw new WorkItemServiceError(
-          `Project "${projectContext.projectId}" uses work tracking provider ` +
+          `Project "${projectContext.projectId}" component ` +
+            `"${projectContext.componentId ?? "primary"}" tracker ` +
+            `"${selectedTracker.tracker.id}" uses work tracking provider ` +
             `"${workTracking.provider}", but it is not available: ${error.message}`,
         );
       }
@@ -133,6 +165,7 @@ export class WorkItemService {
       project: _project,
       projectRoot: _projectRoot,
       componentId: _componentId,
+      trackerId: _trackerId,
       ...item
     } = input;
     const context = await this.resolveProviderContext(input);
@@ -142,10 +175,13 @@ export class WorkItemService {
       "create work items",
     );
     assertCreateFieldCapabilities(context.provider, item);
-    return context.provider.createWorkItem({
-      ...item,
-      projectRoot: context.projectRoot,
-    });
+    return annotateWorkItem(
+      await context.provider.createWorkItem({
+        ...item,
+        projectRoot: context.projectRoot,
+      }),
+      context,
+    );
   }
 
   async listWorkItems(input: ListProjectWorkItemsInput): Promise<WorkItem[]> {
@@ -153,6 +189,7 @@ export class WorkItemService {
       project: _project,
       projectRoot: _projectRoot,
       componentId: _componentId,
+      trackerId: _trackerId,
       ...query
     } = input;
     const context = await this.resolveProviderContext(input);
@@ -161,10 +198,12 @@ export class WorkItemService {
       "list",
       "list work items",
     );
-    return context.provider.listWorkItems({
-      ...query,
-      projectRoot: context.projectRoot,
-    });
+    return (
+      await context.provider.listWorkItems({
+        ...query,
+        projectRoot: context.projectRoot,
+      })
+    ).map((item) => annotateWorkItem(item, context));
   }
 
   async getWorkItem(input: GetProjectWorkItemInput): Promise<WorkItem> {
@@ -172,57 +211,85 @@ export class WorkItemService {
       project: _project,
       projectRoot: _projectRoot,
       componentId: _componentId,
+      trackerId: _trackerId,
       ...ref
     } = input;
-    const context = await this.resolveProviderContext(input);
+    const context = await this.resolveProviderContext(input, ref);
     assertWorkTrackerCapability(context.provider, "get", "get work items");
-    return context.provider.getWorkItem(
-      normalizeWorkItemRef(ref, context.provider.provider),
+    return annotateWorkItem(
+      await context.provider.getWorkItem(
+        normalizeWorkItemRef(
+          context.resolvedRef ?? ref,
+          context.provider.provider,
+        ),
+      ),
+      context,
     );
   }
 
   async updateWorkItem(input: UpdateProjectWorkItemInput): Promise<WorkItem> {
-    const context = await this.resolveProviderContext(input);
+    const context = await this.resolveProviderContext(input, input.ref);
     assertWorkTrackerCapability(
       context.provider,
       "update",
       "update work items",
     );
     assertPatchFieldCapabilities(context.provider, input.patch);
-    return context.provider.updateWorkItem(
-      normalizeWorkItemRef(input.ref, context.provider.provider),
-      input.patch,
+    return annotateWorkItem(
+      await context.provider.updateWorkItem(
+        normalizeWorkItemRef(
+          context.resolvedRef ?? input.ref,
+          context.provider.provider,
+        ),
+        input.patch,
+      ),
+      context,
     );
   }
 
   async addComment(
     input: AddProjectWorkItemCommentInput,
   ): Promise<WorkComment> {
-    const context = await this.resolveProviderContext(input);
+    const context = await this.resolveProviderContext(input, input.ref);
     assertWorkTrackerCapability(
       context.provider,
       "comment",
       "add comments",
     );
-    return context.provider.addComment(
-      normalizeWorkItemRef(input.ref, context.provider.provider),
-      input.body,
+    return annotateWorkComment(
+      await context.provider.addComment(
+        normalizeWorkItemRef(
+          context.resolvedRef ?? input.ref,
+          context.provider.provider,
+        ),
+        input.body,
+      ),
+      context,
     );
   }
 
   async setStatus(input: SetProjectWorkItemStatusInput): Promise<WorkItem> {
-    const context = await this.resolveProviderContext(input);
+    const context = await this.resolveProviderContext(input, input.ref);
     assertWorkTrackerCapability(
       context.provider,
       "update",
       "set work item status",
     );
-    const ref = normalizeWorkItemRef(input.ref, context.provider.provider);
+    const ref = normalizeWorkItemRef(
+      context.resolvedRef ?? input.ref,
+      context.provider.provider,
+    );
     if (context.provider.setStatus) {
-      return context.provider.setStatus(ref, input.status);
+      return annotateWorkItem(
+        await context.provider.setStatus(ref, input.status),
+        context,
+      );
     }
 
-    return context.provider.updateWorkItem(ref, { status: input.status });
+    return annotateWorkItem(
+      await context.provider.updateWorkItem(ref, { status: input.status }),
+      context,
+    );
   }
 
   private createProvider(
@@ -273,6 +340,7 @@ function normalizeProjectSelectorObject(
   const project = optionalNonEmptyString(selector.project, "project");
   const projectRoot = optionalNonEmptyString(selector.projectRoot, "projectRoot");
   const componentId = optionalNonEmptyString(selector.componentId, "componentId");
+  const trackerId = optionalNonEmptyString(selector.trackerId, "trackerId");
   if (project && projectRoot) {
     throw new WorkItemServiceError("Provide either project or projectRoot, not both");
   }
@@ -283,6 +351,259 @@ function normalizeProjectSelectorObject(
   return {
     ...(project ? { project } : { projectRoot }),
     ...(componentId ? { componentId } : {}),
+    ...(trackerId ? { trackerId } : {}),
+  };
+}
+
+interface WorkTrackerSelection {
+  tracker: Required<NexusProjectWorkTrackerContext>;
+  defaultTrackerId: string | null;
+  resolvedRef?: WorkItemRef;
+}
+
+function resolveWorkTrackerSelection(options: {
+  projectContext: ResolvedWorkItemProjectContext;
+  selector: WorkItemProjectSelector;
+  ref?: WorkItemRef;
+}): WorkTrackerSelection {
+  const trackers = normalizedProjectContextTrackers(options.projectContext);
+  const componentLabel = options.projectContext.componentId ?? "primary";
+  if (trackers.length === 0) {
+    throw new WorkItemServiceError(
+      `Component "${componentLabel}" work tracking is not configured`,
+    );
+  }
+
+  const defaultTrackerId =
+    options.projectContext.defaultTrackerId ??
+    options.projectContext.trackerId ??
+    trackers.find((tracker) => tracker.enabled)?.id ??
+    null;
+  const qualifiedRef = trackerQualifiedRef(trackers, options.ref);
+  if (
+    options.selector.trackerId &&
+    qualifiedRef &&
+    options.selector.trackerId !== qualifiedRef.trackerId
+  ) {
+    throw new WorkItemServiceError(
+      `Work item id tracker "${qualifiedRef.trackerId}" conflicts with requested tracker "${options.selector.trackerId}"`,
+    );
+  }
+
+  const selectedTrackerId =
+    options.selector.trackerId ??
+    qualifiedRef?.trackerId ??
+    externalRefTrackerId({
+      trackers,
+      defaultTrackerId,
+      externalRef: options.ref?.externalRef,
+      componentId: componentLabel,
+    }) ??
+    defaultTrackerId;
+
+  if (!selectedTrackerId) {
+    throw new WorkItemServiceError(
+      `Component "${componentLabel}" default work tracker is not configured`,
+    );
+  }
+
+  const tracker = trackers.find((candidate) => candidate.id === selectedTrackerId);
+  if (!tracker) {
+    throw new WorkItemServiceError(
+      `Component "${componentLabel}" work tracker is not configured: ${selectedTrackerId}`,
+    );
+  }
+  if (!tracker.enabled) {
+    throw new WorkItemServiceError(
+      `Component "${componentLabel}" work tracker "${tracker.id}" is disabled`,
+    );
+  }
+
+  return {
+    tracker,
+    defaultTrackerId,
+    ...(qualifiedRef
+      ? {
+          resolvedRef: {
+            ...options.ref,
+            id: qualifiedRef.itemId,
+          },
+        }
+      : {}),
+  };
+}
+
+function normalizedProjectContextTrackers(
+  projectContext: ResolvedWorkItemProjectContext,
+): Array<Required<NexusProjectWorkTrackerContext>> {
+  const configured = projectContext.workTrackers ?? [];
+  if (configured.length > 0) {
+    return configured.map((tracker) => ({
+      id: requiredNonEmptyString(tracker.id, "tracker.id"),
+      name: tracker.name ?? tracker.id,
+      enabled: tracker.enabled ?? true,
+      roles: tracker.roles ?? [],
+      workTracking: tracker.workTracking,
+    }));
+  }
+
+  return [
+    {
+      id:
+        projectContext.trackerId ??
+        projectContext.defaultTrackerId ??
+        "default",
+      name:
+        projectContext.trackerName ??
+        projectContext.trackerId ??
+        projectContext.defaultTrackerId ??
+        "Default",
+      enabled: true,
+      roles: projectContext.trackerRoles ?? ["primary"],
+      workTracking: projectContext.workTracking,
+    },
+  ];
+}
+
+function trackerQualifiedRef(
+  trackers: Array<Required<NexusProjectWorkTrackerContext>>,
+  ref: WorkItemRef | undefined,
+): { trackerId: string; itemId: string } | null {
+  const id = ref?.id;
+  if (!id) {
+    return null;
+  }
+
+  const split = id.match(/^([A-Za-z0-9][A-Za-z0-9_.-]*):(.+)$/u);
+  if (!split) {
+    return null;
+  }
+
+  const trackerId = split[1]!;
+  if (!trackers.some((tracker) => tracker.id === trackerId)) {
+    return null;
+  }
+
+  const itemId = split[2]!.trim();
+  if (!itemId) {
+    throw new WorkItemServiceError(
+      `Tracker-qualified work item id for tracker "${trackerId}" must include a provider-local id.`,
+    );
+  }
+
+  return { trackerId, itemId };
+}
+
+function externalRefTrackerId(options: {
+  trackers: Array<Required<NexusProjectWorkTrackerContext>>;
+  defaultTrackerId: string | null;
+  externalRef: ExternalRef | undefined;
+  componentId: string;
+}): string | null {
+  if (!options.externalRef) {
+    return null;
+  }
+
+  const defaultTracker = options.trackers.find(
+    (tracker) => tracker.id === options.defaultTrackerId,
+  );
+  if (defaultTracker && externalRefMatchesTracker(options.externalRef, defaultTracker)) {
+    return defaultTracker.id;
+  }
+
+  const matches = options.trackers.filter(
+    (tracker) =>
+      tracker.enabled && externalRefMatchesTracker(options.externalRef!, tracker),
+  );
+  if (matches.length === 0) {
+    return null;
+  }
+  if (matches.length > 1) {
+    throw new WorkItemServiceError(
+      `External ref provider "${options.externalRef.provider}" is ambiguous across component "${options.componentId}" trackers: ` +
+        matches.map((tracker) => tracker.id).join(", "),
+    );
+  }
+
+  return matches[0]!.id;
+}
+
+function externalRefMatchesTracker(
+  externalRef: ExternalRef,
+  tracker: Pick<NexusProjectWorkTrackerContext, "workTracking">,
+): boolean {
+  const config = tracker.workTracking;
+  if (externalRef.provider !== config.provider) {
+    return false;
+  }
+  if (externalRef.host && config.host && externalRef.host !== config.host) {
+    return false;
+  }
+
+  const repository = config.repository;
+  if (externalRef.repositoryId && repository?.id) {
+    return externalRef.repositoryId === repository.id;
+  }
+  if (externalRef.repositoryOwner && repository?.owner) {
+    if (externalRef.repositoryOwner !== repository.owner) {
+      return false;
+    }
+  }
+  if (externalRef.repositoryName && repository?.name) {
+    if (externalRef.repositoryName !== repository.name) {
+      return false;
+    }
+  }
+  if (externalRef.projectId) {
+    if (config.provider === "vibe-kanban") {
+      return !config.projectId || externalRef.projectId === config.projectId;
+    }
+    if (config.provider === "jira") {
+      return externalRef.projectId === config.projectKey;
+    }
+  }
+  if (externalRef.boardId && config.board?.id) {
+    return externalRef.boardId === config.board.id;
+  }
+
+  return true;
+}
+
+function annotateWorkItem(
+  item: WorkItem,
+  context: ResolvedWorkItemProviderContext,
+): WorkItem {
+  return {
+    ...item,
+    trackerRef: trackerRefForContext(context),
+  };
+}
+
+function annotateWorkComment(
+  comment: WorkComment,
+  context: ResolvedWorkItemProviderContext,
+): WorkComment {
+  return {
+    ...comment,
+    trackerRef: trackerRefForContext(context),
+  };
+}
+
+function trackerRefForContext(
+  context: ResolvedWorkItemProviderContext,
+): WorkTrackerRef {
+  return {
+    ...(context.projectContext.componentId
+      ? { componentId: context.projectContext.componentId }
+      : {}),
+    ...(context.projectContext.componentName
+      ? { componentName: context.projectContext.componentName }
+      : {}),
+    trackerId: context.trackerId,
+    trackerName: context.trackerName,
+    provider: context.workTracking.provider,
+    roles: context.trackerRoles,
+    default: context.defaultTrackerId === context.trackerId,
   };
 }
 

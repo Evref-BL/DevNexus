@@ -531,6 +531,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         title: { type: "string" },
         description: { type: ["string", "null"] },
         status: { type: "string" },
@@ -552,6 +553,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         status: {
           oneOf: [
             { type: "string" },
@@ -576,6 +578,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -594,6 +597,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -618,6 +622,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -638,6 +643,7 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         componentId: { type: "string" },
+        trackerId: { type: "string" },
         id: { type: "string" },
         provider: { type: "string" },
         externalRef: { type: "object" },
@@ -1286,6 +1292,14 @@ function resolveWorkItemProject(
     componentId: component.id,
     componentName: component.name,
     sourceRoot: component.sourceRoot,
+    defaultTrackerId: component.defaultTrackerId,
+    workTrackers: component.workTrackers.map((tracker) => ({
+      id: tracker.id,
+      name: tracker.name,
+      enabled: tracker.enabled,
+      roles: tracker.roles,
+      workTracking: tracker.workTracking,
+    })),
     workTracking: component.workTracking,
   };
 }
@@ -1343,10 +1357,12 @@ function projectSelectorFromArgs(args: Record<string, unknown>): WorkItemProject
   const project = optionalString(args, "project", "arguments");
   const projectRoot = optionalString(args, "projectRoot", "arguments");
   const componentId = optionalString(args, "componentId", "arguments");
+  const trackerId = optionalString(args, "trackerId", "arguments");
   return {
     ...(project ? { project } : {}),
     ...(projectRoot ? { projectRoot } : {}),
     ...(componentId ? { componentId } : {}),
+    ...(trackerId ? { trackerId } : {}),
   };
 }
 
@@ -1358,7 +1374,33 @@ function workItemSelectorRefFromArgs(args: Record<string, unknown>): {
   const ref = workItemRefFromArgs(args);
   const qualified = qualifiedWorkItemId(args, ref.id);
   if (!qualified) {
-    return { selector, ref };
+    const trackerQualified = trackerQualifiedWorkItemId(
+      args,
+      selector.componentId,
+      ref.id,
+    );
+    if (!trackerQualified) {
+      return { selector, ref };
+    }
+    if (
+      selector.trackerId &&
+      selector.trackerId !== trackerQualified.trackerId
+    ) {
+      throw new Error(
+        `Work item id tracker "${trackerQualified.trackerId}" conflicts with trackerId "${selector.trackerId}"`,
+      );
+    }
+
+    return {
+      selector: {
+        ...selector,
+        trackerId: trackerQualified.trackerId,
+      },
+      ref: {
+        ...ref,
+        id: trackerQualified.id,
+      },
+    };
   }
 
   if (selector.componentId && selector.componentId !== qualified.componentId) {
@@ -1367,14 +1409,41 @@ function workItemSelectorRefFromArgs(args: Record<string, unknown>): {
     );
   }
 
+  const componentSelector = {
+    ...selector,
+    componentId: qualified.componentId,
+  };
+  const trackerQualified = trackerQualifiedWorkItemId(
+    args,
+    componentSelector.componentId,
+    qualified.id,
+  );
+  if (!trackerQualified) {
+    return {
+      selector: componentSelector,
+      ref: {
+        ...ref,
+        id: qualified.id,
+      },
+    };
+  }
+  if (
+    componentSelector.trackerId &&
+    componentSelector.trackerId !== trackerQualified.trackerId
+  ) {
+    throw new Error(
+      `Work item id tracker "${trackerQualified.trackerId}" conflicts with trackerId "${componentSelector.trackerId}"`,
+    );
+  }
+
   return {
     selector: {
-      ...selector,
-      componentId: qualified.componentId,
+      ...componentSelector,
+      trackerId: trackerQualified.trackerId,
     },
     ref: {
       ...ref,
-      id: qualified.id,
+      id: trackerQualified.id,
     },
   };
 }
@@ -1409,6 +1478,40 @@ function qualifiedWorkItemId(
   }
 
   return { componentId, id: itemId };
+}
+
+function trackerQualifiedWorkItemId(
+  args: Record<string, unknown>,
+  componentId: string | undefined,
+  id: string | undefined,
+): { trackerId: string; id: string } | null {
+  if (!id) {
+    return null;
+  }
+
+  const split = id.match(/^([A-Za-z0-9][A-Za-z0-9_.-]*):(.+)$/);
+  if (!split) {
+    return null;
+  }
+
+  const trackerId = split[1]!;
+  const itemId = split[2]!.trim();
+  if (!itemId) {
+    return null;
+  }
+
+  const projectRoot = projectRootFromArgs(args);
+  const config = loadProjectConfig(projectRoot);
+  const component = componentId
+    ? resolveProjectComponents(projectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(projectRoot, config);
+  if (!component?.workTrackers.some((tracker) => tracker.id === trackerId)) {
+    return null;
+  }
+
+  return { trackerId, id: itemId };
 }
 
 function workItemRefFromArgs(args: Record<string, unknown>): WorkItemRef {

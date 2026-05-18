@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { createLocalWorkTrackerProvider } from "./workTrackingLocalProvider.js";
 import {
   createWorkItemService,
   normalizeProjectSelector,
@@ -10,6 +11,7 @@ import {
   WorkItemServiceError,
 } from "./workItemService.js";
 import type {
+  LocalWorkTrackingConfig,
   TrackerCapabilities,
   WorkComment,
   WorkItem,
@@ -198,6 +200,263 @@ describe("work item service", () => {
     ).resolves.toMatchObject({
       id: "local-1",
     });
+  });
+
+  it("resolves default, explicit, and tracker-qualified component tracker bindings", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      componentId: "core",
+      componentName: "Core",
+      workTracking: {
+        provider: "local",
+        storePath: path.join(".tracker", "primary-items.json"),
+      },
+      defaultTrackerId: "primary",
+      workTrackers: [
+        {
+          id: "primary",
+          name: "Primary",
+          enabled: true,
+          roles: ["primary"],
+          workTracking: {
+            provider: "local",
+            storePath: path.join(".tracker", "primary-items.json"),
+          },
+        },
+        {
+          id: "mirror",
+          name: "Mirror",
+          enabled: true,
+          roles: ["mirror"],
+          workTracking: {
+            provider: "local",
+            storePath: path.join(".tracker", "mirror-items.json"),
+          },
+        },
+      ],
+    });
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      now: fixedClock(
+        "2026-05-15T10:00:00.000Z",
+        "2026-05-15T10:01:00.000Z",
+        "2026-05-15T10:02:00.000Z",
+        "2026-05-15T10:03:00.000Z",
+      ),
+    });
+
+    const defaultItem = await service.createWorkItem({
+      project: "tracked-project",
+      title: "Default tracker item",
+    });
+    const mirrorItem = await service.createWorkItem({
+      project: "tracked-project",
+      trackerId: "mirror",
+      title: "Mirror tracker item",
+    });
+    const mirrorByQualifiedId = await service.getWorkItem({
+      project: "tracked-project",
+      id: "mirror:local-1",
+    });
+    const updatedMirror = await service.setStatus({
+      project: "tracked-project",
+      ref: { id: "mirror:local-1" },
+      status: "done",
+    });
+
+    expect(defaultItem).toMatchObject({
+      id: "local-1",
+      title: "Default tracker item",
+      trackerRef: {
+        componentId: "core",
+        trackerId: "primary",
+        provider: "local",
+        default: true,
+      },
+    });
+    expect(mirrorItem).toMatchObject({
+      id: "local-1",
+      title: "Mirror tracker item",
+      trackerRef: {
+        componentId: "core",
+        trackerId: "mirror",
+        provider: "local",
+        default: false,
+      },
+    });
+    await expect(
+      service.listWorkItems({ project: "tracked-project" }),
+    ).resolves.toMatchObject([{ title: "Default tracker item" }]);
+    await expect(
+      service.listWorkItems({ project: "tracked-project", trackerId: "mirror" }),
+    ).resolves.toMatchObject([{ title: "Mirror tracker item" }]);
+    expect(mirrorByQualifiedId).toMatchObject({
+      id: "local-1",
+      title: "Mirror tracker item",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+    expect(updatedMirror).toMatchObject({
+      id: "local-1",
+      status: "done",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+  });
+
+  it("routes external references to the matching enabled tracker", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      componentId: "core",
+      componentName: "Core",
+      workTracking: {
+        provider: "local",
+        storePath: path.join(".tracker", "primary-items.json"),
+      },
+      defaultTrackerId: "primary",
+      workTrackers: [
+        {
+          id: "primary",
+          name: "Primary",
+          enabled: true,
+          roles: ["primary"],
+          workTracking: {
+            provider: "local",
+            storePath: path.join(".tracker", "primary-items.json"),
+          },
+        },
+        {
+          id: "github",
+          name: "GitHub",
+          enabled: true,
+          roles: ["coordination"],
+          workTracking: {
+            provider: "github",
+            repository: {
+              owner: "example",
+              name: "tracked-project",
+            },
+          },
+        },
+      ],
+    });
+    let selectedTrackerId: string | undefined;
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      providerFactory: (context) => {
+        selectedTrackerId = context.trackerId;
+        if (context.workTracking.provider === "local") {
+          return createLocalWorkTrackerProvider({
+            projectRoot: context.projectRoot,
+            config: context.workTracking as LocalWorkTrackingConfig,
+          });
+        }
+
+        return {
+          provider: "github",
+          capabilities: {
+            ...noWorkItemCapabilities,
+            getItem: true,
+          },
+          createWorkItem: async (): Promise<WorkItem> => {
+            throw new Error("create should not run");
+          },
+          listWorkItems: async (): Promise<WorkItem[]> => {
+            throw new Error("list should not run");
+          },
+          getWorkItem: async (ref): Promise<WorkItem> => ({
+            id: String(ref.externalRef?.itemNumber ?? ref.externalRef?.itemId),
+            title: "External issue",
+            status: "ready",
+            provider: "github",
+            externalRef: ref.externalRef,
+          }),
+          updateWorkItem: async (): Promise<WorkItem> => {
+            throw new Error("update should not run");
+          },
+          addComment: async (): Promise<WorkComment> => {
+            throw new Error("comment should not run");
+          },
+        };
+      },
+    });
+
+    const item = await service.getWorkItem({
+      project: "tracked-project",
+      externalRef: {
+        provider: "github",
+        repositoryOwner: "example",
+        repositoryName: "tracked-project",
+        itemId: "42",
+        itemNumber: 42,
+      },
+    });
+
+    expect(selectedTrackerId).toBe("github");
+    expect(item).toMatchObject({
+      id: "42",
+      trackerRef: {
+        trackerId: "github",
+        provider: "github",
+      },
+    });
+  });
+
+  it("distinguishes unknown, disabled, and conflicting tracker selections", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      componentId: "core",
+      workTracking: {
+        provider: "local",
+        storePath: path.join(".tracker", "primary-items.json"),
+      },
+      defaultTrackerId: "primary",
+      workTrackers: [
+        {
+          id: "primary",
+          name: "Primary",
+          enabled: true,
+          roles: ["primary"],
+          workTracking: {
+            provider: "local",
+            storePath: path.join(".tracker", "primary-items.json"),
+          },
+        },
+        {
+          id: "archive",
+          name: "Archive",
+          enabled: false,
+          roles: ["archive"],
+          workTracking: {
+            provider: "local",
+            storePath: path.join(".tracker", "archive-items.json"),
+          },
+        },
+      ],
+    });
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+    });
+
+    await expect(
+      service.listWorkItems({ project: "tracked-project", trackerId: "missing" }),
+    ).rejects.toThrow(
+      /Component "core" work tracker is not configured: missing/,
+    );
+    await expect(
+      service.listWorkItems({ project: "tracked-project", trackerId: "archive" }),
+    ).rejects.toThrow(/Component "core" work tracker "archive" is disabled/);
+    await expect(
+      service.getWorkItem({
+        project: "tracked-project",
+        trackerId: "primary",
+        id: "archive:local-1",
+      }),
+    ).rejects.toThrow(
+      /Work item id tracker "archive" conflicts with requested tracker "primary"/,
+    );
   });
 
   it("normalizes project selectors and item refs with clear errors", () => {

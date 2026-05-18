@@ -265,6 +265,7 @@ interface ParsedSetupRecordCommand {
 interface ParsedWorkItemCreateCommand {
   projectRoot: string;
   componentId?: string;
+  trackerId?: string;
   title: string;
   description?: string | null;
   status?: WorkStatus;
@@ -277,6 +278,7 @@ interface ParsedWorkItemCreateCommand {
 interface ParsedWorkItemListCommand {
   projectRoot: string;
   componentId?: string;
+  trackerId?: string;
   statuses: WorkStatus[];
   labels: string[];
   assignees: string[];
@@ -288,6 +290,7 @@ interface ParsedWorkItemListCommand {
 interface ParsedWorkItemGetCommand {
   projectRoot: string;
   componentId?: string;
+  trackerId?: string;
   itemId: string;
   json?: boolean;
 }
@@ -295,6 +298,7 @@ interface ParsedWorkItemGetCommand {
 interface ParsedWorkItemUpdateCommand {
   projectRoot: string;
   componentId?: string;
+  trackerId?: string;
   itemId: string;
   patch: WorkItemPatch;
   json?: boolean;
@@ -303,8 +307,18 @@ interface ParsedWorkItemUpdateCommand {
 interface ParsedWorkItemCommentCommand {
   projectRoot: string;
   componentId?: string;
+  trackerId?: string;
   itemId: string;
   body: string;
+  json?: boolean;
+}
+
+interface ParsedWorkItemSetStatusCommand {
+  projectRoot: string;
+  componentId?: string;
+  trackerId?: string;
+  itemId: string;
+  status: WorkStatus;
   json?: boolean;
 }
 
@@ -505,6 +519,7 @@ export function usage(): string {
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
     "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
+    "  dev-nexus work-item set-status <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation eligible-work <project-root> [options]",
     "  dev-nexus automation agent-profiles <project-root> [options]",
@@ -626,6 +641,7 @@ export function usage(): string {
     "",
     "Options for work-item create:",
     "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
     "  --title <title>",
     "  --description <text>",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>",
@@ -636,6 +652,7 @@ export function usage(): string {
     "",
     "Options for work-item list:",
     "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>  repeatable",
     "  --label <label>            repeatable",
     "  --assignee <assignee>      repeatable",
@@ -645,10 +662,12 @@ export function usage(): string {
     "",
     "Options for work-item get:",
     "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
     "  --json",
     "",
     "Options for work-item update:",
     "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
     "  --title <title>",
     "  --description <text>",
     "  --clear-description",
@@ -663,7 +682,14 @@ export function usage(): string {
     "",
     "Options for work-item comment:",
     "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
     "  --body <text>",
+    "  --json",
+    "",
+    "Options for work-item set-status:",
+    "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
+    "  --status <todo|ready|in_progress|blocked|done|wont_do>",
     "  --json",
     "",
     "Options for automation status:",
@@ -1205,6 +1231,7 @@ async function handleWorkItemCommand(
       .createWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
         componentId: parsed.componentId,
+        trackerId: parsed.trackerId,
         title: parsed.title,
         description: parsed.description,
         status: parsed.status,
@@ -1222,6 +1249,7 @@ async function handleWorkItemCommand(
       .listWorkItems({
         projectRoot: path.resolve(parsed.projectRoot),
         componentId: parsed.componentId,
+        trackerId: parsed.trackerId,
         status: statusQuery(parsed.statuses),
         labels: parsed.labels,
         assignees: parsed.assignees,
@@ -1237,12 +1265,14 @@ async function handleWorkItemCommand(
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
+      parsed.trackerId,
       parsed.itemId,
     );
     const item = await workItemService(parsed.projectRoot, dependencies)
       .getWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
         componentId: reference.componentId,
+        trackerId: reference.trackerId,
         id: reference.itemId,
       });
     printWorkItemGetResult(item, parsed, dependencies.stdout ?? process.stdout);
@@ -1254,12 +1284,14 @@ async function handleWorkItemCommand(
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
+      parsed.trackerId,
       parsed.itemId,
     );
     const item = await workItemService(parsed.projectRoot, dependencies)
       .updateWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
         componentId: reference.componentId,
+        trackerId: reference.trackerId,
         ref: { id: reference.itemId },
         patch: parsed.patch,
       });
@@ -1272,12 +1304,14 @@ async function handleWorkItemCommand(
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
+      parsed.trackerId,
       parsed.itemId,
     );
     const comment = await workItemService(parsed.projectRoot, dependencies)
       .addComment({
         projectRoot: path.resolve(parsed.projectRoot),
         componentId: reference.componentId,
+        trackerId: reference.trackerId,
         ref: { id: reference.itemId },
         body: parsed.body,
       });
@@ -1289,7 +1323,27 @@ async function handleWorkItemCommand(
     return 0;
   }
 
-  throw new Error("work-item requires create, list, get, update, or comment");
+  if (command === "set-status") {
+    const parsed = parseWorkItemSetStatusCommand(argv);
+    const reference = resolveCliWorkItemReference(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+      parsed.itemId,
+    );
+    const item = await workItemService(parsed.projectRoot, dependencies)
+      .setStatus({
+        projectRoot: path.resolve(parsed.projectRoot),
+        componentId: reference.componentId,
+        trackerId: reference.trackerId,
+        ref: { id: reference.itemId },
+        status: parsed.status,
+      });
+    printWorkItemUpdateResult(item, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  throw new Error("work-item requires create, list, get, update, comment, or set-status");
 }
 
 async function handleAutomationCommand(
@@ -1733,6 +1787,14 @@ function resolveDirectProject(
     componentId: component.id,
     componentName: component.name,
     sourceRoot: component.sourceRoot,
+    defaultTrackerId: component.defaultTrackerId,
+    workTrackers: component.workTrackers.map((tracker) => ({
+      id: tracker.id,
+      name: tracker.name,
+      enabled: tracker.enabled,
+      roles: tracker.roles,
+      workTracking: tracker.workTracking,
+    })),
     workTracking: component.workTracking,
   };
 }
@@ -1740,23 +1802,50 @@ function resolveDirectProject(
 function resolveCliWorkItemReference(
   projectRoot: string,
   componentId: string | undefined,
+  trackerId: string | undefined,
   itemId: string,
-): { componentId?: string; itemId: string } {
+): { componentId?: string; trackerId?: string; itemId: string } {
   const qualified = componentQualifiedWorkItemId(projectRoot, itemId);
-  if (!qualified) {
-    return {
-      ...(componentId ? { componentId } : {}),
-      itemId,
-    };
+  let resolvedComponentId = componentId;
+  let resolvedItemId = itemId;
+  if (qualified) {
+    if (componentId && componentId !== qualified.componentId) {
+      throw new Error(
+        `Work item id component "${qualified.componentId}" conflicts with --component "${componentId}"`,
+      );
+    }
+    resolvedComponentId = qualified.componentId;
+    resolvedItemId = qualified.itemId;
   }
 
-  if (componentId && componentId !== qualified.componentId) {
+  const trackerQualified = trackerQualifiedWorkItemId(
+    projectRoot,
+    resolvedComponentId,
+    resolvedItemId,
+  );
+  if (
+    trackerId &&
+    trackerQualified &&
+    trackerId !== trackerQualified.trackerId
+  ) {
     throw new Error(
-      `Work item id component "${qualified.componentId}" conflicts with --component "${componentId}"`,
+      `Work item id tracker "${trackerQualified.trackerId}" conflicts with --tracker "${trackerId}"`,
     );
   }
 
-  return qualified;
+  if (!trackerQualified) {
+    return {
+      ...(resolvedComponentId ? { componentId: resolvedComponentId } : {}),
+      ...(trackerId ? { trackerId } : {}),
+      itemId: resolvedItemId,
+    };
+  }
+
+  return {
+    ...(resolvedComponentId ? { componentId: resolvedComponentId } : {}),
+    trackerId: trackerQualified.trackerId,
+    itemId: trackerQualified.itemId,
+  };
 }
 
 function componentQualifiedWorkItemId(
@@ -1786,6 +1875,36 @@ function componentQualifiedWorkItemId(
   }
 
   return { componentId, itemId: qualifiedItemId };
+}
+
+function trackerQualifiedWorkItemId(
+  projectRoot: string,
+  componentId: string | undefined,
+  itemId: string,
+): { trackerId: string; itemId: string } | null {
+  const split = itemId.match(/^([A-Za-z0-9][A-Za-z0-9_.-]*):(.+)$/);
+  if (!split) {
+    return null;
+  }
+
+  const trackerId = split[1]!;
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const config = loadProjectConfig(resolvedProjectRoot);
+  const component = componentId
+    ? resolveProjectComponents(resolvedProjectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
+  if (!component?.workTrackers.some((tracker) => tracker.id === trackerId)) {
+    return null;
+  }
+
+  const qualifiedItemId = split[2]!.trim();
+  if (!qualifiedItemId) {
+    return null;
+  }
+
+  return { trackerId, itemId: qualifiedItemId };
 }
 
 function parseHomeInitCommand(argv: string[]): ParsedHomeInitCommand {
@@ -2572,6 +2691,9 @@ function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand
       case "--component":
         parsed.componentId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
       case "--title":
         parsed.title = next();
         break;
@@ -2632,6 +2754,9 @@ function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
       case "--component":
         parsed.componentId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
       case "--status":
         parsed.statuses.push(parseWorkStatus(next(), arg));
         break;
@@ -2683,6 +2808,9 @@ function parseWorkItemGetCommand(argv: string[]): ParsedWorkItemGetCommand {
       case "--component":
         parsed.componentId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
       case "--json":
         parsed.json = true;
         break;
@@ -2724,6 +2852,9 @@ function parseWorkItemUpdateCommand(argv: string[]): ParsedWorkItemUpdateCommand
     switch (arg) {
       case "--component":
         parsed.componentId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
         break;
       case "--title":
         parsed.patch.title = next();
@@ -2828,6 +2959,9 @@ function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentComma
       case "--component":
         parsed.componentId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
       case "--body":
         parsed.body = next();
         break;
@@ -2844,6 +2978,57 @@ function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentComma
   }
 
   return parsed as ParsedWorkItemCommentCommand;
+}
+
+function parseWorkItemSetStatusCommand(
+  argv: string[],
+): ParsedWorkItemSetStatusCommand {
+  const [, , projectRoot, itemId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item set-status requires a project root");
+  }
+  if (!itemId || itemId.startsWith("--")) {
+    throw new Error("work-item set-status requires a work item id");
+  }
+
+  const parsed: Partial<ParsedWorkItemSetStatusCommand> = {
+    projectRoot,
+    itemId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--status":
+        parsed.status = parseWorkStatus(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item set-status option: ${arg}`);
+    }
+  }
+
+  if (!parsed.status) {
+    throw new Error("work-item set-status requires --status");
+  }
+
+  return parsed as ParsedWorkItemSetStatusCommand;
 }
 
 function parseAutomationEnqueueCommand(
@@ -3940,7 +4125,7 @@ function printWorkItemGetResult(
 
 function printWorkItemUpdateResult(
   item: WorkItem,
-  parsed: ParsedWorkItemUpdateCommand,
+  parsed: ParsedWorkItemUpdateCommand | ParsedWorkItemSetStatusCommand,
   stdout: TextWriter,
 ): void {
   const payload = { ok: true, workItem: item };

@@ -849,6 +849,159 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("targets explicit and tracker-qualified work trackers through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-primary.json",
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const defaultCreateOutput = captureOutput();
+    const mirrorCreateOutput = captureOutput();
+    const defaultListOutput = captureOutput();
+    const mirrorListOutput = captureOutput();
+    const qualifiedGetOutput = captureOutput();
+    const statusOutput = captureOutput();
+
+    await main(
+      [
+        "work-item",
+        "create",
+        projectRoot,
+        "--title",
+        "Default tracker task",
+        "--json",
+      ],
+      {
+        stdout: defaultCreateOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "work-item",
+        "create",
+        projectRoot,
+        "--tracker",
+        "mirror",
+        "--title",
+        "Mirror tracker task",
+        "--json",
+      ],
+      {
+        stdout: mirrorCreateOutput.writer,
+        now: fixedClock("2026-05-16T10:01:00.000Z"),
+      },
+    );
+    await main(["work-item", "list", projectRoot, "--json"], {
+      stdout: defaultListOutput.writer,
+    });
+    await main(
+      ["work-item", "list", projectRoot, "--tracker", "mirror", "--json"],
+      {
+        stdout: mirrorListOutput.writer,
+      },
+    );
+    await main(["work-item", "get", projectRoot, "mirror:local-1", "--json"], {
+      stdout: qualifiedGetOutput.writer,
+    });
+    await main(
+      [
+        "work-item",
+        "set-status",
+        projectRoot,
+        "mirror:local-1",
+        "--status",
+        "done",
+        "--json",
+      ],
+      {
+        stdout: statusOutput.writer,
+      },
+    );
+
+    expect(JSON.parse(defaultCreateOutput.output()).workItem).toMatchObject({
+      title: "Default tracker task",
+      trackerRef: {
+        trackerId: "primary",
+        default: true,
+      },
+    });
+    expect(JSON.parse(mirrorCreateOutput.output()).workItem).toMatchObject({
+      title: "Mirror tracker task",
+      trackerRef: {
+        trackerId: "mirror",
+        default: false,
+      },
+    });
+    expect(JSON.parse(defaultListOutput.output()).workItems).toMatchObject([
+      {
+        title: "Default tracker task",
+        trackerRef: {
+          trackerId: "primary",
+        },
+      },
+    ]);
+    expect(JSON.parse(mirrorListOutput.output()).workItems).toMatchObject([
+      {
+        title: "Mirror tracker task",
+        trackerRef: {
+          trackerId: "mirror",
+        },
+      },
+    ]);
+    expect(JSON.parse(qualifiedGetOutput.output()).workItem).toMatchObject({
+      title: "Mirror tracker task",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+    expect(JSON.parse(statusOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
+      trackerRef: {
+        trackerId: "mirror",
+      },
+    });
+  });
+
   it("gets, updates, and comments on local work items", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
