@@ -76,8 +76,11 @@ target-cycle facts, commits, and the target report.
 - Continue agent-target projection planning at `dev-nexus:local-104`; active
   target policy normalization is complete in `local-105`, so promote the next
   dependent projection slices as prerequisites land.
-- Slice `dev-nexus:local-128` into implementation issues for cross-tracker
-  discovery and inbound GitHub-to-local issue import.
+- Cross-tracker discovery and inbound GitHub-to-local import are sliced:
+  start with `dev-nexus:local-129` for tracker roles and discovery-policy
+  defaults, then promote `local-130` through `local-136` as dependencies land.
+  `local-137` is the blocked HITL policy decision for direct external
+  selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and

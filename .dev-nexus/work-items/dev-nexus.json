@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 129,
-  "nextCommentNumber": 220,
-  "updatedAt": "2026-05-18T19:34:28.306Z",
+  "nextNumber": 138,
+  "nextCommentNumber": 221,
+  "updatedAt": "2026-05-18T19:39:46.570Z",
   "items": [
     {
       "id": "local-1",
@@ -3287,13 +3287,258 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:33:04.512Z",
-      "updatedAt": "2026-05-18T19:34:28.306Z",
+      "updatedAt": "2026-05-18T19:39:46.570Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-128",
         "itemNumber": 128
+      }
+    },
+    {
+      "id": "local-129",
+      "title": "Add tracker discovery roles and policy defaults",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: ready\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: extend the existing multi-tracker configuration model so projects can declare tracker discovery roles and default discovery policy without changing current default-tracker behavior.\n\nUser stories covered:\n- As a maintainer, I can declare which trackers are primary, eligible sources, external inboxes, mirrors, coordination trackers, or archives.\n- As a coordinator agent, I can inspect discovery policy without inferring behavior from provider type.\n\nAcceptance criteria:\n- Tracker bindings can declare explicit roles such as primary, eligible_source, external_inbox, mirror, coordination, and archive.\n- Component discovery policy can declare scanned roles, whether direct external selection is allowed, whether import is required first, provider filters, query limits, conflict winner policy, and missing-credential behavior.\n- Existing project configs continue to behave as default-tracker-only when no discovery policy is declared.\n- Invalid roles and invalid discovery-policy combinations produce clear validation errors.\n- Normalized component status exposes tracker roles and the effective default discovery policy compactly.\n\nBoundaries:\n- Do not implement provider reads, eligible-work aggregation, or import execution in this slice.\n- Do not store host-local credentials or auth paths in shared project config.\n\nVerification:\n- Focused tests for role normalization, default policy preservation, invalid role rejection, invalid policy rejection, and status normalization.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "discovery",
+        "config",
+        "policy",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:38:38.943Z",
+      "updatedAt": "2026-05-18T19:38:38.943Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-129",
+        "itemNumber": 129
+      }
+    },
+    {
+      "id": "local-130",
+      "title": "Report read-only tracker discovery status",
+      "description": "Type: read-only status implementation slice\nReadiness: todo/dependent on dev-nexus:local-129\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only discovery status surface that tells maintainers and agents exactly which configured trackers are visible, eligible, optional, blocked, or import-only.\n\nUser stories covered:\n- As a maintainer, I can ask whether a GitHub inbox will be ignored, listed directly, or imported before selection.\n- As a worker on another host, I can see whether provider credentials are required for discovery and whether missing access is a warning or blocker.\n\nAcceptance criteria:\n- DevNexus exposes a read-only discovery status service and a small CLI/MCP surface such as work_item_discovery_status or an equivalent naming convention that fits the codebase.\n- Output includes each component's default tracker, configured tracker bindings, roles, effective discovery policy, provider capability report, and whether each tracker is readable by the current actor.\n- Missing optional credentials are warnings or skipped trackers according to policy; required credentials are blockers.\n- The command never mutates local tracker files, Git state, provider issues, or link records.\n- Mocked local and GitHub tracker cases cover readable, missing credentials, unsupported capability, disabled tracker, and policy-blocked tracker states.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n\nBoundaries:\n- Do not aggregate eligible work or create local imported items in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused service, CLI, and MCP tests for status output, JSON/text shape, provider capability reporting, optional/required credential behavior, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "discovery",
+        "status",
+        "cli",
+        "mcp",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:38:46.510Z",
+      "updatedAt": "2026-05-18T19:38:46.510Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-130",
+        "itemNumber": 130
+      }
+    },
+    {
+      "id": "local-131",
+      "title": "Aggregate eligible work from configured discovery sources",
+      "description": "Type: eligible-work implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-130\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: let eligible-work and coordinator surfaces opt into scanning configured discovery sources while preserving current default-tracker behavior by default.\n\nUser stories covered:\n- As a coordinator agent, I can list eligible work across configured discovery sources when policy asks for it.\n- As a maintainer, I can keep default-tracker-only selection unless the project explicitly opts into discovery mode.\n\nAcceptance criteria:\n- Default eligible-work mode remains behaviorally unchanged and lists the component default tracker only.\n- Discovery mode queries trackers whose roles and policy mark them as discovery sources, applying configured statuses, labels, milestones, assignees, provider query filters, per-tracker limits, and final limits.\n- Returned items include component id, logical item id when known, canonical assignment tracker reference, discovered source tracker reference, warnings, and whether the item is selectable or import-only.\n- When policy requires import first, unimported external items are reported as import candidates and are not assigned as local work.\n- Missing provider access, disabled trackers, unsupported list capability, and provider read errors are reported according to discovery policy without crashing the whole eligible-work call.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-130.\n\nBoundaries:\n- Do not implement inbound import mutation in this slice.\n- Do not make every configured tracker an eligible source by default.\n\nVerification:\n- Focused tests for default mode preservation, opt-in discovery aggregation, per-tracker filters, import-only candidates, provider warnings/blockers, and final ordering/limits.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "eligible-work",
+        "discovery",
+        "automation",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:38:54.443Z",
+      "updatedAt": "2026-05-18T19:38:54.443Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-131",
+        "itemNumber": 131
+      }
+    },
+    {
+      "id": "local-132",
+      "title": "Deduplicate linked work items across trackers",
+      "description": "Type: logical-identity implementation slice\nReadiness: todo/dependent on dev-nexus:local-129; can be implemented before or with dev-nexus:local-131\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prevent eligible-work discovery from returning duplicate assignments when the same logical work item exists in local and external trackers.\n\nUser stories covered:\n- As a worker agent, I receive one canonical assignment, not separate local and GitHub copies of the same work.\n- As a migration owner, I can see ambiguous or stale tracker links instead of DevNexus silently merging unrelated issues.\n\nAcceptance criteria:\n- Deduplication uses existing tracker links, provider external references on local items, stable provider repository/item number or key, and optional configured fingerprints where available.\n- Linked local and external items collapse to one canonical item according to discovery policy, with a deduplication reason or link id in the result.\n- Stale links, missing target items, conflicting links, and ambiguous unlinked matches are reported as warnings or blockers according to policy.\n- DevNexus does not silently collapse items when identity cannot be proven.\n- The dedupe result can be reused by eligible-work aggregation and inbound import planning.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n- Coordinates with dev-nexus:local-131 for eligible-work integration.\n\nBoundaries:\n- Do not mutate link records or tracker items in this slice.\n- Do not implement provider write-back or inbound import execution.\n\nVerification:\n- Focused tests for linked duplicates, externalRef duplicates, repository/number matching, stale links, ambiguous matches, and canonical source selection.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "dedupe",
+        "eligible-work",
+        "links",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:01.952Z",
+      "updatedAt": "2026-05-18T19:39:01.952Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-132",
+        "itemNumber": 132
+      }
+    },
+    {
+      "id": "local-133",
+      "title": "Plan inbound GitHub-to-local issue import",
+      "description": "Type: dry-run inbound import implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-132\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only inbound import plan from a configured external tracker such as GitHub Issues into the canonical local tracker.\n\nUser stories covered:\n- As a maintainer, I can dry-run GitHub-to-local import and review creates, updates, skips, conflicts, and missing links before any local files change.\n- As a Windows worker, I can know which provider-native issues would become local work once import is executed.\n\nAcceptance criteria:\n- DevNexus exposes a small planning surface such as work_item_inbound_sync_plan or an equivalent command shape that fits existing sync conventions.\n- The plan supports external-to-local direction starting with GitHub source and local target trackers.\n- Planning reports creates, updates, skips, conflicts, ambiguous duplicates, stale links, missing credentials, unsupported capabilities, provider filters, field/status mappings, and exact local files that would change.\n- Planning is idempotent: linked items and configured fingerprints map back to the same local logical item on repeated runs.\n- The plan is strictly read-only and does not create local items, update link records, comment on provider issues, or mutate Git state.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-132.\n\nBoundaries:\n- Do not implement apply/execution in this slice.\n- Do not add provider-native writes or comments in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused tests for create/update/skip/conflict plans, ambiguous duplicate plans, stale link plans, missing credential behavior, exact local-file reporting, and no-mutation behavior with mocked GitHub provider data.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "github",
+        "sync",
+        "import",
+        "planning",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:09.878Z",
+      "updatedAt": "2026-05-18T19:39:09.878Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-133",
+        "itemNumber": 133
+      }
+    },
+    {
+      "id": "local-134",
+      "title": "Execute policy-gated inbound import to local tracker",
+      "description": "Type: guarded mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-98 and dev-nexus:local-133\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: execute a reviewed inbound import plan by creating or updating canonical local work items and tracker links from external provider issues, with fail-closed mutation safety.\n\nUser stories covered:\n- As a project owner, I can keep local work items canonical while importing selected GitHub Issues.\n- As a bot account, I can read a GitHub inbox and write local tracker state only when authority, policy, and checkout safety allow it.\n\nAcceptance criteria:\n- Execution requires explicit source and target tracker ids, external-to-local direction, a write policy allowing local tracker mutation, and effective actor authority for local work-item writes and provider reads.\n- Execution recomputes or validates the import plan immediately before mutation and refuses blocked, stale, or ambiguous plans.\n- Execution creates or updates local canonical work items and link records idempotently; rerunning against the same provider items does not create duplicates.\n- Execution writes only local tracker/link files for the owning DevNexus project and does not write provider issues in the first implementation.\n- Execution fails closed in shared checkouts unless the path is classified as an owned project-meta worktree or explicit integration context.\n- Execution records a concise import summary through the work-item service or run result without leaking secrets.\n\nDependencies:\n- Depends on dev-nexus:local-98 for shared-checkout mutation enforcement.\n- Depends on dev-nexus:local-133 for inbound import planning.\n\nBoundaries:\n- Do not implement provider-native issue comments or provider writes in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not import from unconfigured repositories.\n\nVerification:\n- Focused tests for allowed local import, idempotent rerun, blocked policy, missing authority, shared-checkout refusal, stale plan refusal, ambiguous conflict refusal, and no provider writes.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "github",
+        "sync",
+        "import",
+        "apply",
+        "mutation-guard",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:18.171Z",
+      "updatedAt": "2026-05-18T19:39:18.171Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-134",
+        "itemNumber": 134
+      }
+    },
+    {
+      "id": "local-135",
+      "title": "Summarize external issue visibility in agent and target surfaces",
+      "description": "Type: agent-facing reporting slice\nReadiness: todo/dependent on dev-nexus:local-130 and dev-nexus:local-131; refresh after dev-nexus:local-133 when import planning lands\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: make external issue visibility explicit in automation status, eligible-work output, agent launch context, and target reports.\n\nUser stories covered:\n- As a coordinator agent, I can answer whether provider-native GitHub Issues are ignored, directly selectable, or import candidates.\n- As a cross-host worker, I can tell whether I need to fetch the meta-project, query a provider, run import, or wait for scheduled sync.\n\nAcceptance criteria:\n- Automation status and eligible-work summaries include concise discovery mode, configured source roles, selected/ignored/import-only tracker counts, and provider access warnings.\n- Agent launch context states whether external issues are automatically visible, import-required, direct-selectable, or explicitly ignored for each component.\n- Target report includes last discovery/import status when available without duplicating long provider payloads.\n- The summaries remain compact enough for coordinator prompts and do not leak tokens, secrets, or host-local auth paths.\n- Default-tracker-only projects continue to produce simple output without noisy empty discovery sections.\n\nDependencies:\n- Depends on dev-nexus:local-130 and dev-nexus:local-131.\n- Should be refreshed after dev-nexus:local-133 adds import planning facts.\n\nBoundaries:\n- Do not implement new provider reads or import execution in this slice.\n- Do not make summaries the source of truth for tracker policy.\n\nVerification:\n- Focused tests for automation status, eligible-work, agent context, and target report summaries in default-only, discovery, import-required, missing-credential, and no-eligible-work cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "discovery",
+        "target-report",
+        "agent-context",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:26.098Z",
+      "updatedAt": "2026-05-18T19:39:26.098Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-135",
+        "itemNumber": 135
+      }
+    },
+    {
+      "id": "local-136",
+      "title": "Add fake GitHub inbox discovery and import smoke test",
+      "description": "Type: opt-in integration testing slice\nReadiness: todo/dependent on dev-nexus:local-133 and dev-nexus:local-134\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prove the external-inbox path against a fake or disposable GitHub-like source, not against an active DevNexus project.\n\nUser stories covered:\n- As a maintainer, I can validate that a provider-native issue can become a canonical local work item without risking active project state.\n- As an agent, I can run normal checks without live provider mutation or hidden dependency on another project.\n\nAcceptance criteria:\n- Test coverage uses a mocked provider or disposable fake-project fixture that represents a configured GitHub issue inbox and canonical local tracker.\n- The smoke proves discovery status, import planning, and guarded import execution can take a provider-native issue to a canonical local item and link record.\n- Default verification does not require live GitHub credentials and does not mutate live provider issues.\n- Optional live validation, if added, is opt-in only and constrained to a disposable repository/project fixture with strict naming and cleanup policy.\n- The test does not depend on dev-nexus-plexus, this dogfood project as a live provider target, or any other active project.\n- Missing live credentials, wrong actor, provider policy block, and cleanup refusal produce skipped or blocked results rather than unsafe fallback.\n\nDependencies:\n- Depends on dev-nexus:local-133 for import planning.\n- Depends on dev-nexus:local-134 for guarded import execution.\n\nBoundaries:\n- Do not use active DevNexus projects as integration fixtures.\n- Do not run live provider mutation in default tests.\n- Do not delete arbitrary repositories or issues.\n\nVerification:\n- Mocked smoke tests for discovery-to-plan-to-import, duplicate rerun, missing credentials, wrong source filter, and no-live-provider default behavior.\n- Optional live smoke only when explicitly configured.\n- npm run check must pass without live credentials.\n\nPublication notes:\n- Direct integration to DevNexus main after mocked verification passes; live integration evidence can be recorded separately when explicitly run.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "github",
+        "integration-test",
+        "fake-project",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:34.378Z",
+      "updatedAt": "2026-05-18T19:39:34.378Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-136",
+        "itemNumber": 136
+      }
+    },
+    {
+      "id": "local-137",
+      "title": "Decide dogfood external issue selection policy",
+      "description": "Type: human-in-the-loop decision slice\nReadiness: blocked on product/authority decision\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: record the dogfood policy choices that should not be guessed by an implementation agent.\n\nQuestions to decide:\n- Should dogfood ever allow direct assignment of external GitHub Issues, or should every external issue become a local canonical item first?\n- Should imported GitHub Issues receive a provider comment linking back to the local DevNexus item, or should the first inbound implementation avoid provider writes entirely?\n- Should scheduled automation run inbound import before every coordinator cycle, or should import remain a separate explicit step until authority and mutation guards are fully landed?\n- How should imported external issues be ordered relative to locally authored ready items when both match the automation selector?\n\nAcceptance criteria:\n- The selected dogfood policy is recorded in project documentation or target state.\n- Implementation issues that need the decision are updated or unblocked with the chosen policy.\n- The decision states whether provider writes are forbidden, optional, or explicitly gated for the first inbound path.\n- The decision states whether inbound import is manually invoked or scheduler-integrated during the first rollout.\n\nBoundaries:\n- Do not implement code in this item.\n- Do not grant broader provider write authority as part of the decision record.\n\nVerification:\n- Static review of the recorded decision and affected work items.\n\nPublication notes:\n- Meta-project update only, using the configured bot/automation profile when published.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "github",
+        "decision",
+        "blocked",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T19:39:40.994Z",
+      "updatedAt": "2026-05-18T19:39:40.994Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-137",
+        "itemNumber": 137
       }
     }
   ],
@@ -5910,7 +6155,27 @@
           "provider": "local",
           "itemId": "local-comment-219"
         }
+      },
+      {
+        "id": "local-comment-220",
+        "body": "Sliced the cross-tracker discovery and inbound issue sync PRD into `dev-nexus:local-129` through `dev-nexus:local-137`.\n\nOrder:\n- `local-129` tracker discovery roles and policy defaults\n- `local-130` read-only tracker discovery status\n- `local-131` eligible-work aggregation from configured discovery sources\n- `local-132` linked work-item deduplication across trackers\n- `local-133` inbound GitHub-to-local import planning\n- `local-134` policy-gated inbound import execution to the local tracker\n- `local-135` external issue visibility summaries for agent and target surfaces\n- `local-136` fake GitHub inbox discovery/import smoke coverage\n- `local-137` blocked HITL decision for dogfood external selection/provider-write/scheduler policy\n\nImportant correction from review: live validation must use a mocked or disposable fake project/provider fixture, not `dev-nexus-plexus`, this dogfood project as a live provider target, or any other active project.",
+        "author": null,
+        "createdAt": "2026-05-18T19:39:46.570Z",
+        "updatedAt": "2026-05-18T19:39:46.570Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-220"
+        }
       }
-    ]
+    ],
+    "local-129": [],
+    "local-130": [],
+    "local-131": [],
+    "local-132": [],
+    "local-133": [],
+    "local-134": [],
+    "local-135": [],
+    "local-136": [],
+    "local-137": []
   }
 }

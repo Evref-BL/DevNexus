@@ -59,7 +59,11 @@ and ready for coordinator-driven work across its components.
 - `docs/tracker-discovery-inbound-sync-prd.md` records the current gap that
   eligible-work scans component default trackers, while provider-native GitHub
   Issues require explicit tracker queries or inbound import before they become
-  local dogfood work. `dev-nexus:local-128` is ready for issue slicing.
+  local dogfood work. The PRD has been sliced: start with
+  `dev-nexus:local-129` for tracker roles and discovery-policy defaults, then
+  promote `local-130` through `local-136` as prerequisites land. `local-137`
+  is the blocked HITL policy decision for direct external selection, provider
+  comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
@@ -124,7 +128,7 @@ and ready for coordinator-driven work across its components.
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-98`,
   `dev-nexus:local-104`, `dev-nexus:local-114`, `dev-nexus:local-115`,
-  `dev-nexus:local-118`, and `dev-nexus:local-128`, subject to dependency and
+  `dev-nexus:local-118`, and `dev-nexus:local-129`, subject to dependency and
   concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
@@ -144,6 +148,10 @@ and ready for coordinator-driven work across its components.
 - Continue Codex app-server correction with `dev-nexus:local-114` and
   `dev-nexus:local-115` before worker-thread orchestration, MCP relay
   expansion, or provider-native subagent features.
+- Keep cross-tracker discovery ordered: implement `dev-nexus:local-129`
+  before read-only discovery status, eligible-work aggregation, deduplication,
+  inbound import planning, or guarded inbound import execution. Use fake or
+  disposable provider fixtures for validation, not active projects.
 
 ## Boundaries
 

@@ -70,7 +70,8 @@ coordinator agent chooses and supervises implementation work.
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.
 - Cross-tracker discovery and inbound provider issue import are planned in
-  `docs/tracker-discovery-inbound-sync-prd.md`; keep discovery read-only and
+  `docs/tracker-discovery-inbound-sync-prd.md` and sliced into
+  `dev-nexus:local-129` through `local-137`; keep discovery read-only and
   inbound import policy-gated because it mutates local tracker state.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
