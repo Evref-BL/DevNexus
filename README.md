@@ -205,6 +205,28 @@ GitHub responses for repository existence, visibility/default-branch mismatch,
 actor permissions, and missing host-local auth profiles. Live repository
 creation remains policy-gated and is not part of the default check path.
 
+The guided GitHub meta-project setup flow makes that boundary concrete:
+
+```bash
+dev-nexus setup plan . github-meta-project --platform macos
+dev-nexus setup check . github-meta-project --json
+```
+
+The flow recommends names such as `<user>-bot` for a machine user and
+`<user>-dev-nexus` for an organization, but it treats GitHub account creation,
+email verification, browser/device login, and organization creation as manual
+steps. It generates non-secret commands for isolated `GH_CONFIG_DIR` auth,
+SSH host alias validation, `gh repo view`, approval-required `gh repo create`
+proposals when `hosting.provisioning.allowCreate` is true, and separate
+`origin` and `bot` Git remotes. The final report is written under
+`.dev-nexus/host-setup/` as host-local handoff state.
+
+Onboarding feeds later publication guardrails. `origin` should normally remain
+the human/manual remote, while `bot` or another configured automation remote
+uses the machine-user or app actor. Shared config may name actor handles,
+remote names, SSH host aliases, and non-secret command environment keys; tokens,
+private keys, app keys, and GitHub CLI state stay host-local.
+
 ## Project Template Shape
 
 The generic project scaffold separates project-owned support state from
@@ -689,6 +711,10 @@ observed GitHub actor when the configured auth profile can be checked. Before a
 DevNexus-owned push or live provider mutation, mismatched configured remotes,
 SSH aliases, push URLs, or actors become blocking preflight failures with the
 observed value in the message.
+
+For a new shared meta project, run `dev-nexus setup plan . github-meta-project`
+first so hosting metadata, auth profiles, and publication remotes are
+configured from one onboarding report.
 
 The agent context includes `components` and `componentEligibleWorkItems`.
 DevNexus groups eligible work items by component and does not collapse that

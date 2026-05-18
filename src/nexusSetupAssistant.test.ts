@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import childProcess from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildNexusSetupCheck,
@@ -54,6 +55,33 @@ function writeProject(root: string, overrides: Partial<NexusProjectConfig> = {})
   );
 }
 
+function writeHome(root: string, authProfiles: unknown[] = []) {
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "dev-nexus.home.json"),
+    `${JSON.stringify({
+      version: 1,
+      paths: {
+        projectsRoot: path.join(root, "projects"),
+        workspacesRoot: path.join(root, "workspaces"),
+      },
+      authProfiles,
+      projects: [],
+    }, null, 2)}\n`,
+  );
+}
+
+function createComponentGitCheckout(projectRoot: string) {
+  const componentRoot = path.join(projectRoot, "components", "DevNexus");
+  fs.mkdirSync(componentRoot, { recursive: true });
+  childProcess.execFileSync("git", ["init"], { cwd: componentRoot });
+  childProcess.execFileSync(
+    "git",
+    ["remote", "add", "origin", "git@github.com:Evref-BL/DevNexus.git"],
+    { cwd: componentRoot },
+  );
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -68,6 +96,126 @@ describe("nexus setup assistant", () => {
         title: "Join an existing DevNexus project on this machine",
       }),
     );
+  });
+
+  it("builds a GitHub meta-project setup plan without automatic creation or secrets", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-meta-");
+    writeProject(projectRoot, {
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          nameTemplate: "{projectNameSlug}-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        authProfile: "human-github",
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "bot",
+            role: "automation",
+            protocol: "ssh",
+            authProfile: "bot-github",
+            sshHost: "github.com-example-bot",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "github-meta-project",
+      platform: "macos",
+    });
+
+    expect(plan.steps.map((step) => step.id)).toEqual([
+      "choose-hosting-namespace",
+      "configure-auth-profile",
+      "connect-meta-repository",
+      "configure-publication-guardrails",
+      "write-setup-report",
+    ]);
+    const namespaceStep = plan.steps.find(
+      (step) => step.id === "choose-hosting-namespace",
+    )!;
+    expect(namespaceStep.summary).toContain("recommended organization namespace");
+    expect(namespaceStep.manualInstructions.join("\n")).toContain(
+      "DevNexus must not automate account or organization creation",
+    );
+    const authStep = plan.steps.find((step) => step.id === "configure-auth-profile")!;
+    expect(authStep.commands).toContain(
+      'GH_CONFIG_DIR="$HOME/.config/gh-bot-github" gh auth login --hostname github.com --git-protocol ssh --web',
+    );
+    expect(authStep.checks).toContain("ssh -T git@github.com-example-bot");
+    const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
+    expect(connectStep.commands).toContain("gh repo view ExampleOrg/mac-demo-meta");
+    expect(connectStep.commands.some((command) => command.includes("gh repo create")))
+      .toBe(false);
+    expect(connectStep.commands).not.toContain("git push bot main");
+    expect(connectStep.commands).toContain(
+      "git remote set-url origin git@github.com:ExampleOrg/mac-demo-meta.git",
+    );
+    expect(connectStep.commands).toContain(
+      "git remote get-url bot >/dev/null 2>&1 && git remote set-url bot git@github.com-example-bot:ExampleOrg/mac-demo-meta.git || git remote add bot git@github.com-example-bot:ExampleOrg/mac-demo-meta.git",
+    );
+    expect(JSON.stringify(plan)).not.toContain("gho_");
+    expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
+  });
+
+  it("marks GitHub meta-project repository creation as approval-required when policy allows creation", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-create-");
+    writeProject(projectRoot, {
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "shared-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+            authProfile: "human-github",
+          },
+          {
+            name: "bot",
+            role: "automation",
+            protocol: "ssh",
+            authProfile: "bot-github",
+          },
+        ],
+        provisioning: {
+          allowCreate: true,
+        },
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "github-meta-project",
+      platform: "macos",
+    });
+    const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
+
+    expect(connectStep.commands).toContain(
+      'GH_CONFIG_DIR="$HOME/.config/gh-bot-github" gh repo create ExampleOrg/shared-meta --private --disable-wiki --disable-issues',
+    );
+    expect(connectStep.summary).toContain("requires explicit approval");
+    expect(connectStep.manualInstructions.join("\n")).toContain(
+      "approval-required proposal",
+    );
+    expect(connectStep.commands).not.toContain("git push bot main");
   });
 
   it("builds a Mac setup plan from project metadata without secrets", () => {
@@ -207,6 +355,170 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("reports GitHub meta-project remote and host-local auth profile readiness", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-check-");
+    const homeRoot = path.join(projectRoot, "home");
+    writeHome(homeRoot, [
+      {
+        id: "human-github",
+        provider: "github",
+        kind: "human",
+        account: "alice",
+        host: "github.com",
+      },
+    ]);
+    writeProject(projectRoot, {
+      home: homeRoot,
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "mac-demo",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        authProfile: "human-github",
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "bot",
+            role: "automation",
+            protocol: "ssh",
+            authProfile: "bot-github",
+            sshHost: "github.com-example-bot",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+    childProcess.execFileSync("git", ["init"], { cwd: projectRoot });
+    childProcess.execFileSync(
+      "git",
+      ["remote", "add", "origin", "git@github.com:WrongOrg/mac-demo.git"],
+      { cwd: projectRoot },
+    );
+    childProcess.execFileSync(
+      "git",
+      ["remote", "add", "bot", "git@github.com-example-bot:ExampleOrg/mac-demo.git"],
+      { cwd: projectRoot },
+    );
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "github-meta-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "meta-remote-origin",
+        status: "blocked",
+        summary: expect.stringContaining("WrongOrg"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "meta-remote-bot",
+        status: "passed",
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-auth-profile-human-github",
+        status: "passed",
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-auth-profile-bot-github",
+        status: "blocked",
+        summary: expect.stringContaining("does not define auth profile bot-github"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-provider-live-preflight",
+        status: "warning",
+      }),
+    );
+  });
+
+  it("blocks setup when an existing component source root is not a clean expected Git checkout", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-component-git-");
+    writeProject(projectRoot);
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    const componentRoot = path.join(projectRoot, "components", "DevNexus");
+    fs.mkdirSync(componentRoot, { recursive: true });
+
+    const notGitCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(notGitCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-git-checkout",
+        status: "blocked",
+        summary: expect.stringContaining("not a Git checkout"),
+      }),
+    );
+
+    fs.rmSync(componentRoot, { recursive: true, force: true });
+    fs.mkdirSync(componentRoot, { recursive: true });
+    childProcess.execFileSync("git", ["init"], { cwd: componentRoot });
+    childProcess.execFileSync(
+      "git",
+      ["remote", "add", "origin", "git@github.com:WrongOrg/DevNexus.git"],
+      { cwd: componentRoot },
+    );
+    const wrongRemoteCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(wrongRemoteCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-origin-remote",
+        status: "blocked",
+        summary: expect.stringContaining("WrongOrg"),
+      }),
+    );
+
+    childProcess.execFileSync(
+      "git",
+      ["remote", "set-url", "origin", "git@github.com:Evref-BL/DevNexus.git"],
+      { cwd: componentRoot },
+    );
+    fs.writeFileSync(path.join(componentRoot, "local-change.txt"), "dirty\n");
+
+    const dirtyCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(dirtyCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-dirty-state",
+        status: "blocked",
+        summary: expect.stringContaining("dirty local changes"),
+      }),
+    );
+  });
+
   it("keeps OS-local Windows component paths out of Mac setup commands", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-mac-paths-");
     writeProject(projectRoot, {
@@ -330,9 +642,7 @@ describe("nexus setup assistant", () => {
     fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
     fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), "");
     fs.writeFileSync(path.join(projectRoot, ".mcp.json"), "{}");
-    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
-      recursive: true,
-    });
+    createComponentGitCheckout(projectRoot);
 
     const check = buildNexusSetupCheck({
       projectRoot,
@@ -382,9 +692,7 @@ describe("nexus setup assistant", () => {
       path.join(projectRoot, ".codex", "config.toml"),
       "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
     );
-    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
-      recursive: true,
-    });
+    createComponentGitCheckout(projectRoot);
 
     const check = buildNexusSetupCheck({
       projectRoot,
@@ -450,9 +758,7 @@ describe("nexus setup assistant", () => {
         },
       }, null, 2)}\n`,
     );
-    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
-      recursive: true,
-    });
+    createComponentGitCheckout(projectRoot);
 
     const check = buildNexusSetupCheck({
       projectRoot,
@@ -513,9 +819,7 @@ describe("nexus setup assistant", () => {
       path.join(projectRoot, ".codex", "config.toml"),
       "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
     );
-    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
-      recursive: true,
-    });
+    createComponentGitCheckout(projectRoot);
     recordNexusSetupStep({
       projectRoot,
       flowId: "join-existing-project",
@@ -641,9 +945,7 @@ describe("nexus setup assistant", () => {
       path.join(projectRoot, ".codex", "config.toml"),
       "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
     );
-    fs.mkdirSync(path.join(projectRoot, "components", "DevNexus"), {
-      recursive: true,
-    });
+    createComponentGitCheckout(projectRoot);
 
     const warningCheck = buildNexusSetupCheck({
       projectRoot,

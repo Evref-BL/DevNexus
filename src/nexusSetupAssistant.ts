@@ -1,3 +1,4 @@
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -5,9 +6,18 @@ import {
   resolveNexusProjectAgentMcpTargets,
   type MaterializedNexusAgentMcpTarget,
 } from "./nexusAgentMcpConfig.js";
+import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
 import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
-import { expectedNexusProjectHostingRemotes } from "./nexusProjectHosting.js";
-import { analyzeNexusProjectPath } from "./nexusPathResolver.js";
+import {
+  deriveNexusProjectHostingRepositoryName,
+  expectedNexusProjectHostingRemotes,
+  type NexusHostingAuthProfileConfig,
+} from "./nexusProjectHosting.js";
+import { analyzeNexusProjectPath, resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type {
   NexusPluginMcpServerCapability,
   NexusPluginProjectedSkillCapability,
@@ -246,6 +256,10 @@ export function buildNexusSetupCheck(options: {
     checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
   }
 
+  if (flow.id === "github-meta-project" && projectConfig) {
+    checks.push(...githubMetaProjectChecks(projectRoot, projectConfig, setupState));
+  }
+
   if (flow.id === "join-existing-project" && agentMcpTargets.length > 0) {
     const flowState = setupState.flows[flow.id];
     checks.push(recordedStepCheck({
@@ -308,6 +322,7 @@ export function buildNexusSetupCheck(options: {
           : `Create or configure ${sourceRootAnalysis.path}.`,
         missingStatus: "blocked",
       }));
+      checks.push(...componentGitSafetyChecks(component, sourceRootAnalysis.path));
     }
   }
 
@@ -405,6 +420,17 @@ interface MetaProjectRemotePlan {
   automationSshHost: string;
 }
 
+interface MetaProjectHostingGuide {
+  namespace: string;
+  repositoryName: string;
+  visibility: "public" | "private" | "internal";
+  defaultBranch: string;
+  allowCreate: boolean;
+  recommendedBotAccount: string;
+  recommendedOrgNamespace: string;
+  configuredHosting: boolean;
+}
+
 function metaProjectRemotePlan(
   projectConfig: NexusProjectConfig,
 ): MetaProjectRemotePlan {
@@ -443,6 +469,40 @@ function metaProjectRemotePlan(
   };
 }
 
+function metaProjectHostingGuide(
+  projectConfig: NexusProjectConfig,
+): MetaProjectHostingGuide {
+  const parsedRemote = parseGitHubRemote(projectConfig.repo.remoteUrl ?? "");
+  const configuredHosting = projectConfig.hosting;
+  const namespace =
+    configuredHosting?.namespace ??
+    parsedRemote?.namespace ??
+    "<github-user-or-org>";
+  const repositoryName = configuredHosting
+    ? deriveNexusProjectHostingRepositoryName({
+        project: projectConfig,
+        hosting: configuredHosting,
+      })
+    : parsedRemote?.repository ?? projectConfig.id;
+  const namingSeed = setupNameSlug(
+    namespace.startsWith("<") ? projectConfig.id : namespace,
+  );
+
+  return {
+    namespace,
+    repositoryName,
+    visibility: configuredHosting?.repository.visibility ?? "private",
+    defaultBranch:
+      configuredHosting?.repository.defaultBranch ??
+      projectConfig.repo.defaultBranch ??
+      "main",
+    allowCreate: configuredHosting?.provisioning.allowCreate ?? false,
+    recommendedBotAccount: `${namingSeed}-bot`,
+    recommendedOrgNamespace: `${namingSeed}-dev-nexus`,
+    configuredHosting: Boolean(configuredHosting),
+  };
+}
+
 function authProfileConfigDirectory(authProfile: string | null): string {
   const safeProfile = (authProfile ?? "automation-github")
     .trim()
@@ -454,6 +514,37 @@ function authProfileConfigDirectory(authProfile: string | null): string {
 function sshHostFromGitRemote(remoteUrl: string): string | null {
   const match = /^git@([^:]+):/u.exec(remoteUrl);
   return match?.[1] ?? null;
+}
+
+function parseGitHubRemote(
+  remoteUrl: string,
+): { namespace: string; repository: string } | null {
+  const sshRemote = /^git@[^:]+:([^/]+)\/(.+?)(?:\.git)?$/u.exec(remoteUrl);
+  if (sshRemote) {
+    return {
+      namespace: sshRemote[1]!,
+      repository: sshRemote[2]!,
+    };
+  }
+
+  const httpsRemote =
+    /^https:\/\/[^/]+\/([^/]+)\/(.+?)(?:\.git)?$/u.exec(remoteUrl);
+  if (httpsRemote) {
+    return {
+      namespace: httpsRemote[1]!,
+      repository: httpsRemote[2]!,
+    };
+  }
+
+  return null;
+}
+
+function setupNameSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "") || "dev-nexus";
 }
 
 function joinExistingProjectSteps(options: {
@@ -674,14 +765,18 @@ function joinExistingProjectSteps(options: {
       scope: "host-local",
       summary: "Confirm the new machine is ready for supervised DevNexus work.",
       commands: [
+        makeDirectoryCommand(setupCommandPath(".dev-nexus/host-setup", options.platform), options.platform),
         `${devNexusCommand} setup check . join-existing-project --platform ${options.platform} --json`,
+        `${devNexusCommand} setup check . join-existing-project --platform ${options.platform} --json > .dev-nexus/host-setup/join-existing-project-report.json`,
         "git status --short --branch",
       ],
       manualInstructions: [
         "Do not launch live runtime services from baseline setup; use approved runtime profiles only.",
+        "Keep the saved setup report under .dev-nexus/host-setup on this machine; it is host-local handoff state and must not contain secrets.",
       ],
       checks: [
         `${devNexusCommand} setup check . join-existing-project --platform ${options.platform} --json`,
+        "test -f .dev-nexus/host-setup/join-existing-project-report.json",
       ],
     },
   ];
@@ -693,20 +788,34 @@ function githubMetaProjectSteps(options: {
   platform: NexusSetupPlatform;
 }): NexusSetupStep[] {
   const {
+    humanRemote,
     botRemote,
     automationAuthProfileDirectory,
     automationSshHost,
   } = metaProjectRemotePlan(options.projectConfig);
+  const guide = metaProjectHostingGuide(options.projectConfig);
+  const repoVisibilityFlag =
+    guide.visibility === "public"
+      ? "--public"
+      : guide.visibility === "internal"
+        ? "--internal"
+        : "--private";
+  const createCommand =
+    `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh repo create ${guide.namespace}/${guide.repositoryName} ${repoVisibilityFlag} --disable-wiki --disable-issues`;
   return [
     {
       id: "choose-hosting-namespace",
       title: "Choose meta-project hosting namespace",
       kind: "manual",
       scope: "shared",
-      summary: "Choose a machine-user account repository or private organization namespace for shared meta projects.",
+      summary:
+        `Choose where the shared meta repository lives. Recommended bot account: ${guide.recommendedBotAccount}; recommended organization namespace: ${guide.recommendedOrgNamespace}; repository: ${guide.repositoryName}.`,
       commands: [],
       manualInstructions: [
-        "Use a clearly named bot or app actor for automation activity.",
+        `Use a clearly named machine-user or app actor for automation activity, for example ${guide.recommendedBotAccount}; custom names such as Gabot-Darbot are fine when recorded in hosting/auth profile metadata.`,
+        `Use a private organization namespace such as ${guide.recommendedOrgNamespace} when team ownership is more important than machine-user simplicity.`,
+        "Create GitHub accounts, verify email addresses, complete browser/device login, and create organizations manually; DevNexus must not automate account or organization creation.",
+        `Record only portable hosting intent in dev-nexus.project.json: provider=github, namespace=${guide.namespace}, repository=${guide.repositoryName}, visibility=${guide.visibility}, defaultBranch=${guide.defaultBranch}.`,
         "Keep source project repositories separate from DevNexus meta-project repositories when needed.",
       ],
       checks: [],
@@ -735,24 +844,87 @@ function githubMetaProjectSteps(options: {
         ],
       }),
       manualInstructions: [
+        "Create an SSH host alias such as github.com-<bot> in ~/.ssh/config or the Windows user SSH config before validating the bot remote.",
         "Do not commit tokens, private keys, or gh config directories.",
+        "Keep GH_CONFIG_DIR, SSH key paths, GitHub App private keys, and wrapper commands in host-local DevNexus home config or shell state, not in the shared meta repository.",
       ],
-      checks: ["gh auth status --hostname github.com"],
+      checks: [
+        "gh auth status --hostname github.com",
+        `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth status --hostname github.com`,
+        `ssh -T git@${automationSshHost}`,
+      ],
     },
     {
       id: "connect-meta-repository",
       title: "Connect meta repository",
-      kind: "automated",
+      kind: "manual",
       scope: "host-local",
-      summary: "Create or connect the shared private meta repository according to project policy.",
+      summary:
+        guide.allowCreate
+          ? "Propose creating or connecting the shared meta repository; live creation still requires explicit approval and configured credentials."
+          : "Connect the shared meta repository; automatic GitHub repository creation is disabled by project policy.",
       commands: [
+        `gh repo view ${guide.namespace}/${guide.repositoryName}`,
+        ...(guide.allowCreate ? [createCommand] : []),
+        `git remote set-url origin ${humanRemote}`,
         `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
-        "git push bot main",
+        "git remote -v",
+        "git fetch --dry-run origin",
+        "git fetch --dry-run bot",
       ],
       manualInstructions: [
-        "Only create or push the remote when project policy allows the configured automation actor to do so.",
+        guide.allowCreate
+          ? "Treat the gh repo create command as an approval-required proposal; run it only after confirming the selected namespace, actor permissions, and no-secret boundary."
+          : "If gh repo view fails, create the repository manually in GitHub or update hosting metadata; do not let setup create it automatically while allowCreate is false.",
+        "Use origin for human/manual access and bot for the automation actor remote so later publication guardrails can distinguish actors.",
+        "Do not push until repository existence, remotes, and actor permissions are verified.",
       ],
-      checks: [`git ls-remote ${botRemote} HEAD`],
+      checks: [
+        `gh repo view ${guide.namespace}/${guide.repositoryName}`,
+        `git ls-remote ${humanRemote} HEAD`,
+        `git ls-remote ${botRemote} HEAD`,
+        "git remote -v",
+        "git fetch --dry-run origin",
+        "git fetch --dry-run bot",
+      ],
+    },
+    {
+      id: "configure-publication-guardrails",
+      title: "Configure publication guardrails",
+      kind: "manual",
+      scope: "shared",
+      summary:
+        "Confirm DevNexus hosting and publication metadata identify the intended human and automation actors before agents publish.",
+      commands: [
+        "dev-nexus automation status . --json",
+        "dev-nexus setup check . github-meta-project --json",
+      ],
+      manualInstructions: [
+        "Project hosting metadata should describe expected remotes; component or automation publication policy should name the remote future agents may push.",
+        "Do not store secrets in shared publication guardrails. Store only actor kind/provider/handle, remote names, SSH host aliases, and non-secret command environment keys.",
+      ],
+      checks: [
+        "dev-nexus automation status . --json",
+        "dev-nexus setup check . github-meta-project --json",
+      ],
+    },
+    {
+      id: "write-setup-report",
+      title: "Write host-local setup report",
+      kind: "verification",
+      scope: "host-local",
+      summary: "Save a final non-secret setup report that another machine or agent can read before continuing.",
+      commands: [
+        makeDirectoryCommand(setupCommandPath(".dev-nexus/host-setup", options.platform), options.platform),
+        "dev-nexus setup check . github-meta-project --json > .dev-nexus/host-setup/github-meta-project-report.json",
+        "git status --short --branch",
+      ],
+      manualInstructions: [
+        "Keep the report host-local under .dev-nexus/host-setup; it may mention local paths or auth profile ids but must not contain tokens, private keys, or gh config contents.",
+      ],
+      checks: [
+        "test -f .dev-nexus/host-setup/github-meta-project-report.json",
+      ],
     },
   ];
 }
@@ -1223,6 +1395,327 @@ function pathCheck(options: {
   };
 }
 
+function componentGitSafetyChecks(
+  component: NexusProjectConfig["components"][number],
+  sourceRoot: string,
+): NexusSetupCheckResult[] {
+  if (!fs.existsSync(path.join(sourceRoot, ".git"))) {
+    return [{
+      id: `component-${component.id}-git-checkout`,
+      title: `${component.name} Git checkout`,
+      status: "blocked",
+      summary:
+        `Component source root exists but is not a Git checkout: ${sourceRoot}`,
+      nextAction:
+        component.remoteUrl
+          ? `Clone ${component.remoteUrl} into ${sourceRoot} or configure this component sourceRoot to a valid checkout.`
+          : `Configure ${component.id} sourceRoot to a valid Git checkout.`,
+    }];
+  }
+
+  const checks: NexusSetupCheckResult[] = [];
+  checks.push({
+    id: `component-${component.id}-git-checkout`,
+    title: `${component.name} Git checkout`,
+    status: "passed",
+    summary: `Component source root is a Git checkout: ${sourceRoot}`,
+    nextAction: null,
+  });
+
+  if (component.remoteUrl) {
+    const actualOrigin = gitRemoteUrl(sourceRoot, "origin");
+    if (actualOrigin === null) {
+      checks.push({
+        id: `component-${component.id}-origin-remote`,
+        title: `${component.name} origin remote`,
+        status: "warning",
+        summary:
+          `Component source root has no origin remote; expected ${component.remoteUrl}.`,
+        nextAction:
+          `Run git -C ${shellPathPlaceholder(sourceRoot)} remote add origin ${component.remoteUrl} or confirm this checkout uses a different remote policy.`,
+      });
+    } else if (actualOrigin !== component.remoteUrl) {
+      checks.push({
+        id: `component-${component.id}-origin-remote`,
+        title: `${component.name} origin remote`,
+        status: "blocked",
+        summary:
+          `Component origin remote is ${actualOrigin}, expected ${component.remoteUrl}.`,
+        nextAction:
+          `Confirm the intended remote before running git -C ${shellPathPlaceholder(sourceRoot)} remote set-url origin ${component.remoteUrl}.`,
+      });
+    } else {
+      checks.push({
+        id: `component-${component.id}-origin-remote`,
+        title: `${component.name} origin remote`,
+        status: "passed",
+        summary: `Component origin remote matches expected URL for ${component.id}.`,
+        nextAction: null,
+      });
+    }
+  }
+
+  const dirtyStatus = gitStatusPorcelain(sourceRoot);
+  if (dirtyStatus === null) {
+    return [...checks, {
+      id: `component-${component.id}-dirty-state`,
+      title: `${component.name} dirty state`,
+      status: "warning",
+      summary:
+        `Could not inspect Git dirty state for component source root: ${sourceRoot}`,
+      nextAction:
+        `Run git -C ${shellPathPlaceholder(sourceRoot)} status --short before fetching, pulling, or assigning work.`,
+    }];
+  }
+
+  if (dirtyStatus.trim().length > 0) {
+    return [...checks, {
+      id: `component-${component.id}-dirty-state`,
+      title: `${component.name} dirty state`,
+      status: "blocked",
+      summary:
+        `Component source root has dirty local changes that setup must preserve: ${sourceRoot}`,
+      nextAction:
+        `Review git -C ${shellPathPlaceholder(sourceRoot)} status --short and commit, stash, or choose another host-local source root before setup fetches or pulls.`,
+    }];
+  }
+
+  return [...checks, {
+    id: `component-${component.id}-dirty-state`,
+    title: `${component.name} dirty state`,
+    status: "passed",
+    summary: `Component source root has no Git working tree changes: ${sourceRoot}`,
+    nextAction: null,
+  }];
+}
+
+function githubMetaProjectChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  setupState: NexusSetupState,
+): NexusSetupCheckResult[] {
+  const checks: NexusSetupCheckResult[] = [];
+  const hosting = projectConfig.hosting;
+  const remotePlan = metaProjectRemotePlan(projectConfig);
+  const hostingGuide = metaProjectHostingGuide(projectConfig);
+
+  checks.push(...metaRepositoryRemoteChecks({
+    projectRoot,
+    expectedRemotes: [
+      ["origin", remotePlan.humanRemote],
+      ["bot", remotePlan.botRemote],
+    ],
+  }));
+
+  if (hosting) {
+    checks.push(...hostingAuthProfileChecks(projectRoot, projectConfig));
+    checks.push({
+      id: "github-hosting-provider-live-preflight",
+      title: "GitHub hosting live preflight",
+      status: "warning",
+      summary:
+        `GitHub repository ${hosting.namespace}/${hostingGuide.repositoryName} must be verified through gh or a provider adapter before live provisioning.`,
+      nextAction:
+        `Run gh repo view ${hosting.namespace}/${hostingGuide.repositoryName} with the configured human and automation profiles, then record the ${hosting.provisioning.allowCreate ? "approval to create or connect" : "connect-only"} outcome in setup state.`,
+    });
+  } else {
+    checks.push({
+      id: "github-hosting-config",
+      title: "GitHub hosting config",
+      status: "warning",
+      summary:
+        "No shared hosting record is configured; setup is falling back to repo.remoteUrl for meta-project remotes.",
+      nextAction:
+        "Add a dev-nexus.project.json hosting record before relying on automation publication guardrails from this setup flow.",
+    });
+  }
+
+  const flowState = setupState.flows["github-meta-project"];
+  checks.push(recordedStepCheck({
+    id: "github-meta-final-report",
+    title: "GitHub meta-project setup report",
+    record: flowState?.steps["write-setup-report"],
+    passedSummary:
+      "A host-local GitHub meta-project setup report was recorded for this machine.",
+    pendingSummary:
+      "A host-local GitHub meta-project setup report has not been recorded yet.",
+    blockedSummary:
+      "The host-local GitHub meta-project setup report was recorded as blocked.",
+    nextAction:
+      "Run the final setup check command and save the JSON report under .dev-nexus/host-setup before handoff.",
+  }));
+
+  return checks;
+}
+
+function metaRepositoryRemoteChecks(options: {
+  projectRoot: string;
+  expectedRemotes: Array<[string, string]>;
+}): NexusSetupCheckResult[] {
+  return options.expectedRemotes.map(([remoteName, expectedUrl]) => {
+    const actualUrl = gitRemoteUrl(options.projectRoot, remoteName);
+    if (actualUrl === null) {
+      return {
+        id: `meta-remote-${setupCheckIdPart(remoteName)}`,
+        title: `Meta remote ${remoteName}`,
+        status: "blocked",
+        summary: `Meta repository remote ${remoteName} is not configured.`,
+        nextAction:
+          `Run git remote add ${remoteName} ${expectedUrl} from the DevNexus meta-project root.`,
+      };
+    }
+
+    if (actualUrl.trim() !== expectedUrl) {
+      return {
+        id: `meta-remote-${setupCheckIdPart(remoteName)}`,
+        title: `Meta remote ${remoteName}`,
+        status: "blocked",
+        summary:
+          `Meta repository remote ${remoteName} points to ${actualUrl}, expected ${expectedUrl}.`,
+        nextAction:
+          `Run git remote set-url ${remoteName} ${expectedUrl} after confirming this machine should use that actor/remote.`,
+      };
+    }
+
+    return {
+      id: `meta-remote-${setupCheckIdPart(remoteName)}`,
+      title: `Meta remote ${remoteName}`,
+      status: "passed",
+      summary: `Meta repository remote ${remoteName} matches expected URL.`,
+      nextAction: null,
+    };
+  });
+}
+
+function hostingAuthProfileChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  if (!projectConfig.hosting) {
+    return [];
+  }
+
+  const requiredProfileIds = Array.from(new Set(
+    expectedNexusProjectHostingRemotes({
+      project: projectConfig,
+      hosting: projectConfig.hosting,
+    })
+      .map((remote) => remote.authProfile)
+      .filter((authProfile): authProfile is string => Boolean(authProfile)),
+  ));
+  if (requiredProfileIds.length === 0) {
+    return [{
+      id: "github-hosting-auth-profile",
+      title: "GitHub hosting auth profiles",
+      status: "blocked",
+      summary:
+        "Hosting remotes do not reference host-local auth profiles, so actor permissions cannot be checked.",
+      nextAction:
+        "Add authProfile references to hosting remotes and configure matching host-local DevNexus home authProfiles.",
+    }];
+  }
+
+  const home = loadSetupHomeAuthProfiles(projectRoot, projectConfig);
+  if (!home.ok) {
+    return requiredProfileIds.map((profileId) => ({
+      id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
+      title: `GitHub auth profile ${profileId}`,
+      status: "blocked",
+      summary: home.summary,
+      nextAction:
+        `Create host-local DevNexus home auth profile ${profileId}; do not store tokens, private keys, or gh config contents in the shared meta repo.`,
+    }));
+  }
+
+  const profileById = new Map(home.authProfiles.map((profile) => [
+    profile.id,
+    profile,
+  ]));
+  return requiredProfileIds.map((profileId) => {
+    const profile = profileById.get(profileId);
+    if (!profile) {
+      return {
+        id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
+        title: `GitHub auth profile ${profileId}`,
+        status: "blocked",
+        summary:
+          `Host-local DevNexus home config does not define auth profile ${profileId}.`,
+        nextAction:
+          `Add auth profile ${profileId} to the host-local DevNexus home config; keep credentials and private key material outside the shared meta repo.`,
+      };
+    }
+
+    const details = [
+      profile.account ? `account=${profile.account}` : null,
+      profile.sshHost ? `sshHost=${profile.sshHost}` : null,
+      profile.githubCliConfigDir ? "ghConfigDir=set" : null,
+      profile.command ? "command=set" : null,
+    ].filter((detail): detail is string => Boolean(detail));
+    return {
+      id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
+      title: `GitHub auth profile ${profileId}`,
+      status: "passed",
+      summary:
+        `Host-local GitHub auth profile ${profileId} is configured${details.length > 0 ? ` (${details.join(", ")})` : ""}.`,
+      nextAction: null,
+    };
+  });
+}
+
+function loadSetupHomeAuthProfiles(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): { ok: true; authProfiles: NexusHostingAuthProfileConfig[] } | {
+  ok: false;
+  summary: string;
+} {
+  const homePath = projectConfig.home
+    ? resolveNexusProjectPath({ projectRoot, value: projectConfig.home })
+    : defaultNexusHomePath();
+  try {
+    return {
+      ok: true,
+      authProfiles:
+        loadNexusHomeConfigFile(
+          homePath,
+          validateNexusHomeConfigBase,
+        ).authProfiles ?? [],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      summary:
+        error instanceof Error
+          ? `Host-local DevNexus home config could not be loaded from ${homePath}: ${error.message}`
+          : `Host-local DevNexus home config could not be loaded from ${homePath}.`,
+    };
+  }
+}
+
+function gitRemoteUrl(sourceRoot: string, remoteName: string): string | null {
+  try {
+    return childProcess.execFileSync(
+      "git",
+      ["-C", sourceRoot, "remote", "get-url", remoteName],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+function gitStatusPorcelain(sourceRoot: string): string | null {
+  try {
+    return childProcess.execFileSync(
+      "git",
+      ["-C", sourceRoot, "status", "--porcelain"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+  } catch {
+    return null;
+  }
+}
+
 function recordedStepCheck(options: {
   id: string;
   title: string;
@@ -1419,6 +1912,7 @@ function componentCloneCommands(
     }
     return [
       `test -d ${shellPathPlaceholder(sourceRoot)} || git clone ${component.remoteUrl} ${shellPathPlaceholder(sourceRoot)}`,
+      `git -C ${shellPathPlaceholder(sourceRoot)} status --short`,
       `git -C ${shellPathPlaceholder(sourceRoot)} fetch --all --prune`,
     ];
   });
