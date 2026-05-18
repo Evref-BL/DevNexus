@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T23:28:00.000Z",
+  "updatedAt": "2026-05-18T23:31:07.141Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -95,10 +95,10 @@
       ],
       "status": "merged",
       "createdAt": "2026-05-18T23:23:22.414Z",
-      "lastSeenAt": "2026-05-18T23:28:00.000Z",
-      "updatedAt": "2026-05-18T23:28:00.000Z",
+      "lastSeenAt": "2026-05-18T23:31:07.141Z",
+      "updatedAt": "2026-05-18T23:31:07.141Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "e47d8d9edd572697c34947b64a892593f08b238c",
+      "lastObservedHeadCommit": "da3061df85f0644056e00f2d90daad6ee98f57b3",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -108,18 +108,16 @@
           "componentId": null,
           "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-131"
         },
-        "upstream": null,
-        "ahead": null,
-        "behind": null,
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
         "stagedCount": 0,
         "unstagedCount": 0,
         "untrackedCount": 0,
-        "warnings": [
-          "Current branch has no upstream configured."
-        ]
+        "warnings": []
       },
       "notes": [
-        "Project-meta updates for local-89/local-131 completion were preserved in main, published through bot/main, then the auxiliary project-meta worktree and local branch were removed."
+        "Project-meta updates for local-89/local-131 completion were preserved in main as da3061d, published through bot/main, then the auxiliary project-meta worktree and local branch were removed."
       ]
     },
     {
