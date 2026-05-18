@@ -181,6 +181,7 @@ export function appendNexusAutomationTargetCycleRecord(
     options.projectRoot,
     options.config,
   );
+  assertTargetCycleIdIsAvailable(existing, record.id);
   const cycles = [...existing.cycles, record].slice(
     -options.config.ledger.retention,
   );
@@ -196,6 +197,19 @@ export function appendNexusAutomationTargetCycleRecord(
   );
 
   return ledger;
+}
+
+function assertTargetCycleIdIsAvailable(
+  ledger: NexusAutomationTargetCycleLedger,
+  cycleId: string,
+): void {
+  if (!ledger.cycles.some((cycle) => cycle.id === cycleId)) {
+    return;
+  }
+
+  throw new NexusAutomationTargetCycleError(
+    `target cycle id already exists: ${cycleId}. Choose a new --cycle-id or inspect the existing record with automation target-cycle list before retrying.`,
+  );
 }
 
 export function recordNexusAutomationTargetCycleRecord(

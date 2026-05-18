@@ -159,6 +159,46 @@ describe("nexus automation target cycles", () => {
     ).toThrow(/target cycle\.workItems\[0\]\.notes must be at most/);
   });
 
+  it("rejects duplicate explicit target cycle ids before writing", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-cycles-");
+    const config = automationConfig();
+
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "cycle-1",
+        projectId: "demo",
+        status: "started",
+      },
+    });
+
+    expect(() =>
+      appendNexusAutomationTargetCycleRecord({
+        projectRoot,
+        config,
+        now: "2026-05-16T10:10:00.000Z",
+        record: {
+          id: "cycle-1",
+          projectId: "demo",
+          status: "completed",
+        },
+      }),
+    ).toThrow(
+      /target cycle id already exists: cycle-1\. Choose a new --cycle-id or inspect the existing record/,
+    );
+    expect(readNexusAutomationTargetCycleLedger(projectRoot, config)).toMatchObject({
+      updatedAt: "2026-05-16T10:00:00.000Z",
+      cycles: [
+        {
+          id: "cycle-1",
+          status: "started",
+        },
+      ],
+    });
+  });
+
   it("records target cycle facts with retention inside the project root", () => {
     const projectRoot = makeTempDir("dev-nexus-target-cycles-");
     const config = automationConfig({

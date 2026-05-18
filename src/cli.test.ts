@@ -2390,6 +2390,64 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(listOutput.output()).ledger.cycles).toHaveLength(1);
   });
 
+  it("rejects duplicate explicit target cycle ids through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const firstOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "target-cycle",
+        "record",
+        projectRoot,
+        "--cycle-id",
+        "cycle-1",
+        "--status",
+        "started",
+        "--json",
+      ],
+      {
+        stdout: firstOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+
+    await expect(
+      main(
+        [
+          "automation",
+          "target-cycle",
+          "record",
+          projectRoot,
+          "--cycle-id",
+          "cycle-1",
+          "--status",
+          "completed",
+          "--json",
+        ],
+        {
+          stdout: captureOutput().writer,
+          now: fixedClock("2026-05-16T10:10:00.000Z"),
+        },
+      ),
+    ).rejects.toThrow(
+      /target cycle id already exists: cycle-1\. Choose a new --cycle-id or inspect the existing record/,
+    );
+    expect(
+      readNexusAutomationTargetCycleLedger(
+        projectRoot,
+        projectConfig().automation!,
+      ).cycles,
+    ).toMatchObject([
+      {
+        id: "cycle-1",
+        status: "started",
+      },
+    ]);
+  });
+
   it("records coordinator subagent dispatch progress through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

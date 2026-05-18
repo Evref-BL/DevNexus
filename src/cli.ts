@@ -869,7 +869,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for automation target-cycle record:",
-    "  --cycle-id <id>",
+    "  --cycle-id <id>             explicit id; must be unique in the target-cycle ledger",
     "  --run-id <id>",
     "  --status <started|dispatched|completed|blocked|failed|skipped>",
     "  --summary <text>",
