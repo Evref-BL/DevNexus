@@ -44,8 +44,11 @@ import {
 } from "./nexusAutomationStatus.js";
 import {
   getNexusAutomationAgentProfileSummary,
-  getNexusAutomationEligibleWorkSummary,
 } from "./nexusAutomationAgentSurface.js";
+import {
+  getNexusEligibleWorkSummary,
+  type NexusEligibleWorkMode,
+} from "./nexusEligibleWorkSummary.js";
 import {
   probeCodexAppServerInitialize,
 } from "./codexAppServerInitializeProbe.js";
@@ -181,6 +184,7 @@ const tools: McpTool[] = [
       type: "object",
       properties: {
         homePath: { type: "string" },
+        mode: { enum: ["default", "discovery"] },
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
@@ -1120,8 +1124,9 @@ export async function callDevNexusMcpTool(
       case "eligible_work":
         return toolResult({
           ok: true,
-          ...(await getNexusAutomationEligibleWorkSummary({
+          ...(await getNexusEligibleWorkSummary({
             projectRoot: projectRootFromArgs(args),
+            eligibleWorkMode: optionalEligibleWorkMode(args, "mode", "arguments"),
             now: context.now,
           })),
         });
@@ -2885,6 +2890,22 @@ function optionalString(
   }
 
   return value.trim();
+}
+
+function optionalEligibleWorkMode(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusEligibleWorkMode | undefined {
+  const value = optionalString(record, key, pathName);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "default" || value === "discovery") {
+    return value;
+  }
+
+  throw new Error(`${pathName}.${key} must be default or discovery`);
 }
 
 function optionalNullableString(

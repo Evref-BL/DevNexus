@@ -42,6 +42,11 @@ export type NexusWorkItemDiscoveryCredentialResolver = (
   input: NexusWorkItemDiscoveryCredentialCheckInput,
 ) => NexusWorkItemDiscoveryCredentialCheck;
 
+export interface NexusWorkItemDiscoveryTrackerSelection {
+  selected: boolean;
+  reasons: string[];
+}
+
 export interface GetNexusWorkItemDiscoveryStatusOptions {
   projectRoot: string;
   env?: NodeJS.ProcessEnv;
@@ -101,7 +106,8 @@ export function getNexusWorkItemDiscoveryStatus(
   const projectConfig = loadProjectConfig(projectRoot);
   const components = resolveProjectComponents(projectRoot, projectConfig);
   const credentialResolver =
-    options.credentialResolver ?? defaultCredentialResolver(options.env ?? process.env);
+    options.credentialResolver ??
+    defaultNexusWorkItemDiscoveryCredentialResolver(options.env ?? process.env);
   const componentStatuses = components.map((component) =>
     componentDiscoveryStatus(component, credentialResolver),
   );
@@ -209,7 +215,14 @@ function trackerDiscoveryStatus(
 function trackerDiscoverySelection(
   component: ResolvedNexusProjectComponent,
   tracker: ResolvedNexusProjectWorkTracker,
-): { selected: boolean; reasons: string[] } {
+): NexusWorkItemDiscoveryTrackerSelection {
+  return nexusWorkItemDiscoveryTrackerSelection(component, tracker);
+}
+
+export function nexusWorkItemDiscoveryTrackerSelection(
+  component: ResolvedNexusProjectComponent,
+  tracker: ResolvedNexusProjectWorkTracker,
+): NexusWorkItemDiscoveryTrackerSelection {
   const policy = component.trackerDiscovery;
   const reasons: string[] = [];
   if (!tracker.enabled) {
@@ -281,7 +294,7 @@ function trackerReadableStatus(options: {
   };
 }
 
-function defaultCredentialResolver(
+export function defaultNexusWorkItemDiscoveryCredentialResolver(
   env: NodeJS.ProcessEnv,
 ): NexusWorkItemDiscoveryCredentialResolver {
   return (input) => {

@@ -2598,6 +2598,133 @@ describe("dev-nexus cli", () => {
     expect(payload.projectConfig).toBeUndefined();
   });
 
+  it("prints opt-in discovery eligible work with import candidates", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const inboxStorePath = ".dev-nexus/work-items-inbox.json";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "disabled",
+              importRequiredFirst: true,
+              providerFilters: ["local"],
+              queryLimit: 10,
+              conflictWinner: "default_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: primaryStorePath,
+                },
+              },
+              {
+                id: "inbox",
+                name: "Inbox",
+                enabled: true,
+                roles: ["eligible_source"],
+                workTracking: {
+                  provider: "local",
+                  storePath: inboxStorePath,
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: inboxStorePath },
+      now: fixedClock("2026-05-16T09:05:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Inbox task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const output = captureOutput();
+
+    await main(
+      ["automation", "eligible-work", projectRoot, "--discovery", "--json"],
+      {
+        stdout: output.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      mode: "discovery",
+      eligibleWorkItemCount: 1,
+      importCandidateWorkItemCount: 1,
+      components: [
+        {
+          componentId: "primary",
+          workItems: [
+            {
+              id: "local-1",
+              selectable: true,
+              importOnly: false,
+              canonicalTrackerRef: {
+                trackerId: "primary",
+              },
+              sourceTrackerRef: {
+                trackerId: "primary",
+              },
+            },
+          ],
+          importCandidateWorkItems: [
+            {
+              id: "local-1",
+              selectable: false,
+              importOnly: true,
+              canonicalTrackerRef: null,
+              sourceTrackerRef: {
+                trackerId: "inbox",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("prints read-only work item discovery status as json", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     saveProjectConfig(

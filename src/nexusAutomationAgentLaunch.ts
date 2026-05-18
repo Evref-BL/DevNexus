@@ -4,7 +4,6 @@ import process from "node:process";
 import {
   appendNexusAutomationRunRecord,
   buildNexusAutomationWorkItemQuery,
-  eligibleNexusAutomationWorkItems,
   evaluateNexusAutomationLedgerBackoff,
   readNexusAutomationRunLedger,
   releaseNexusAutomationRunLock,
@@ -55,10 +54,19 @@ import {
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
 import {
-  annotateDefaultTrackerWorkItems,
   summarizeNexusAutomationWorkTrackers,
   type NexusAutomationWorkTrackerSummary,
 } from "./nexusAutomationWorkTrackerSummary.js";
+import {
+  listNexusEligibleWorkByComponent,
+  type NexusEligibleWorkItem,
+  type NexusEligibleWorkMode,
+  type NexusEligibleWorkProviderFactory,
+  type NexusEligibleWorkTrackerQueryResult,
+} from "./nexusEligibleWork.js";
+import type {
+  NexusWorkItemDiscoveryCredentialResolver,
+} from "./nexusWorkItemDiscoveryStatus.js";
 import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
@@ -130,6 +138,10 @@ export interface NexusAutomationAgentLaunchComponentContext {
 export interface NexusAutomationComponentEligibleWorkItems {
   componentId: string;
   workItems: WorkItem[];
+  importCandidateWorkItems?: NexusEligibleWorkItem[];
+  warnings?: string[];
+  blockers?: string[];
+  trackerResults?: NexusEligibleWorkTrackerQueryResult[];
 }
 
 export interface NexusAutomationAgentLaunchContext {
@@ -161,6 +173,9 @@ export interface NexusAutomationAgentLaunchContext {
   pluginCapabilities: NexusPluginCapabilityProjection[];
   result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
+  importCandidateWorkItems: NexusEligibleWorkItem[];
+  eligibleWorkWarnings: string[];
+  eligibleWorkBlockers: string[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
@@ -186,6 +201,9 @@ export interface NexusAutomationAgentLaunchInput {
   automationConfig: NexusAutomationConfig;
   selectorQuery: WorkItemQuery;
   eligibleWorkItems: WorkItem[];
+  importCandidateWorkItems: NexusEligibleWorkItem[];
+  eligibleWorkWarnings: string[];
+  eligibleWorkBlockers: string[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   contextFile: string;
   resultFile: string;
@@ -239,6 +257,9 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   homePath?: string;
   runId?: string;
   owner?: string | null;
+  eligibleWorkMode?: NexusEligibleWorkMode;
+  env?: NodeJS.ProcessEnv;
+  credentialResolver?: NexusWorkItemDiscoveryCredentialResolver;
   provider?: WorkTrackerProvider;
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
@@ -262,6 +283,9 @@ export interface RunNexusAutomationAgentLaunchOnceResult {
   preflight: NexusAutomationPreflightCheck[];
   selectorQuery: WorkItemQuery | null;
   eligibleWorkItems: WorkItem[];
+  importCandidateWorkItems: NexusEligibleWorkItem[];
+  eligibleWorkWarnings: string[];
+  eligibleWorkBlockers: string[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   components: ResolvedNexusProjectComponent[];
   contextFile: string | null;
@@ -303,6 +327,9 @@ export async function runNexusAutomationAgentLaunchOnce(
   let preflight: NexusAutomationPreflightCheck[] = [];
   let selectorQuery: WorkItemQuery | null = null;
   let eligibleWorkItems: WorkItem[] = [];
+  let importCandidateWorkItems: NexusEligibleWorkItem[] = [];
+  let eligibleWorkWarnings: string[] = [];
+  let eligibleWorkBlockers: string[] = [];
   let componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] = [];
   let contextFile: string | null = null;
   let resultFile: string | null = null;
@@ -516,15 +543,76 @@ export async function runNexusAutomationAgentLaunchOnce(
     }
 
     selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
-    componentEligibleWorkItems = await listEligibleWorkItemsByComponent(
-      componentProviders,
-      selectorQuery,
-      automationConfig,
+    const eligibleWork = await listNexusEligibleWorkByComponent({
       projectRoot,
-    );
-    eligibleWorkItems = componentEligibleWorkItems.flatMap(
-      (component) => component.workItems,
-    );
+      projectConfig,
+      components,
+      automationConfig,
+      selectorQuery,
+      mode: options.eligibleWorkMode ?? "default",
+      provider: options.provider,
+      providerFactory: agentLaunchEligibleWorkProviderFactory({
+        options,
+        projectRoot,
+        projectConfig,
+      }),
+      providerOptions: options.providerOptions,
+      credentialResolver: options.credentialResolver,
+      env: options.env,
+      now: options.now,
+    });
+    componentEligibleWorkItems = eligibleWork.componentEligibleWorkItems;
+    eligibleWorkItems = eligibleWork.eligibleWorkItems;
+    importCandidateWorkItems = eligibleWork.importCandidateWorkItems;
+    eligibleWorkWarnings = eligibleWork.warnings;
+    eligibleWorkBlockers = eligibleWork.blockers;
+    if (eligibleWorkBlockers.length > 0) {
+      const summary = eligibleWorkBlockers.join("; ");
+      ledger = appendNexusAutomationRunRecord({
+        projectRoot,
+        config: automationConfig,
+        now: startedAt,
+        record: {
+          id: runId,
+          projectId: projectConfig.id,
+          status: "blocked",
+          startedAt,
+          finishedAt: startedAt,
+          sourceRoot,
+          summary,
+          error: summary,
+        },
+      });
+      return launchResult({
+        runId,
+        projectRoot,
+        sourceRoot,
+        projectConfig,
+        automationConfig,
+        status: "blocked",
+        summary,
+        ledger,
+        lock,
+        preflight: [
+          ...preflight,
+          {
+            name: "eligibleWorkDiscovery",
+            status: "failed",
+            message: summary,
+          },
+        ],
+        selectorQuery,
+        eligibleWorkItems,
+        importCandidateWorkItems,
+        eligibleWorkWarnings,
+        eligibleWorkBlockers,
+        componentEligibleWorkItems,
+        components,
+        contextFile,
+        resultFile,
+        launch: null,
+      });
+    }
     if (eligibleWorkItems.length === 0) {
       const summary = "No eligible work item matched the automation selector";
       const finishedAt = currentIso(options.now);
@@ -555,6 +643,9 @@ export async function runNexusAutomationAgentLaunchOnce(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        importCandidateWorkItems,
+        eligibleWorkWarnings,
+        eligibleWorkBlockers,
         componentEligibleWorkItems,
         components,
         contextFile,
@@ -579,6 +670,9 @@ export async function runNexusAutomationAgentLaunchOnce(
         automationConfig,
         selectorQuery,
         eligibleWorkItems,
+        importCandidateWorkItems,
+        eligibleWorkWarnings,
+        eligibleWorkBlockers,
         componentEligibleWorkItems,
         resultFile: launchFiles.resultFile,
       }),
@@ -596,6 +690,9 @@ export async function runNexusAutomationAgentLaunchOnce(
       automationConfig,
       selectorQuery,
       eligibleWorkItems,
+      importCandidateWorkItems,
+      eligibleWorkWarnings,
+      eligibleWorkBlockers,
       componentEligibleWorkItems,
       contextFile,
       resultFile,
@@ -639,6 +736,9 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      importCandidateWorkItems,
+      eligibleWorkWarnings,
+      eligibleWorkBlockers,
       componentEligibleWorkItems,
       components,
       contextFile,
@@ -680,6 +780,9 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      importCandidateWorkItems,
+      eligibleWorkWarnings,
+      eligibleWorkBlockers,
       componentEligibleWorkItems,
       components,
       contextFile,
@@ -934,32 +1037,6 @@ function createAgentLaunchProvider(options: {
   });
 }
 
-async function listEligibleWorkItemsByComponent(
-  componentProviders: NexusAutomationAgentLaunchComponentProvider[],
-  selectorQuery: WorkItemQuery,
-  automationConfig: NexusAutomationConfig,
-  projectRoot: string,
-): Promise<NexusAutomationComponentEligibleWorkItems[]> {
-  const grouped: NexusAutomationComponentEligibleWorkItems[] = [];
-  for (const { component, provider } of componentProviders) {
-    grouped.push({
-      componentId: component.id,
-      workItems: annotateDefaultTrackerWorkItems(
-        component,
-        eligibleNexusAutomationWorkItems(
-          await provider.listWorkItems({
-            ...selectorQuery,
-            projectRoot,
-          }),
-          automationConfig,
-        ),
-      ),
-    });
-  }
-
-  return grouped;
-}
-
 function buildAgentLaunchContext(
   input: Omit<
     NexusAutomationAgentLaunchInput,
@@ -997,6 +1074,9 @@ function buildAgentLaunchContext(
     pluginCapabilities: projectPluginCapabilityProjections(input.projectConfig),
     result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
+    importCandidateWorkItems: input.importCandidateWorkItems,
+    eligibleWorkWarnings: input.eligibleWorkWarnings,
+    eligibleWorkBlockers: input.eligibleWorkBlockers,
     componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
     publication: input.automationConfig.publication,
@@ -1133,6 +1213,25 @@ function agentLaunchEnvironment(
       .map((item) => item.id)
       .join(","),
   };
+}
+
+function agentLaunchEligibleWorkProviderFactory(options: {
+  options: RunNexusAutomationAgentLaunchOnceOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+}): NexusEligibleWorkProviderFactory | undefined {
+  if (!options.options.providerFactory) {
+    return undefined;
+  }
+
+  return (context) =>
+    options.options.providerFactory!({
+      projectRoot: options.projectRoot,
+      sourceRoot: context.component.sourceRoot,
+      projectConfig: options.projectConfig,
+      component: context.component,
+      workTracking: context.tracker.workTracking,
+    });
 }
 
 export function readNexusAutomationAgentResultFile(
@@ -1440,12 +1539,20 @@ function check(
 
 type AgentLaunchResultInput = Omit<
   RunNexusAutomationAgentLaunchOnceResult,
-  "componentEligibleWorkItems" | "components"
+  | "componentEligibleWorkItems"
+  | "components"
+  | "eligibleWorkBlockers"
+  | "eligibleWorkWarnings"
+  | "importCandidateWorkItems"
 > &
   Partial<
     Pick<
       RunNexusAutomationAgentLaunchOnceResult,
-      "componentEligibleWorkItems" | "components"
+      | "componentEligibleWorkItems"
+      | "components"
+      | "eligibleWorkBlockers"
+      | "eligibleWorkWarnings"
+      | "importCandidateWorkItems"
     >
   >;
 
@@ -1454,6 +1561,9 @@ function launchResult(
 ): RunNexusAutomationAgentLaunchOnceResult {
   return {
     ...result,
+    importCandidateWorkItems: result.importCandidateWorkItems ?? [],
+    eligibleWorkWarnings: result.eligibleWorkWarnings ?? [],
+    eligibleWorkBlockers: result.eligibleWorkBlockers ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? [],
     components: result.components ?? [],
   };
