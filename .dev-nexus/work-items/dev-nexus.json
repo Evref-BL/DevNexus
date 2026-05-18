@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 274,
-  "updatedAt": "2026-05-18T22:58:11.207Z",
+  "nextCommentNumber": 276,
+  "updatedAt": "2026-05-18T23:02:25.856Z",
   "items": [
     {
       "id": "local-1",
@@ -2228,7 +2228,7 @@
       "id": "local-89",
       "title": "Add effective authority resolver",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after authority config and current-actor resolution exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add a pure effective-authority resolver that answers whether a requested action is allowed, blocked, or waiting on provider state.\n\nUser stories covered:\n- As a coordinator agent, I can know whether I may merge verified DevNexus work directly or must open a pull request.\n- As a worker agent, I can choose a safe fallback such as request review or record a handoff when authority is missing.\n\nAcceptance criteria:\n- Resolver inputs include actor, auth profile, project, component, provider/tracker/remote/repository scope, target branch, requested action, component publication policy, automation safety profile, and provider state when available.\n- Resolver output includes allowed or blocked status, matched actor/role/rule, required missing actions or provider signals, recommended fallback action, and concise explanation.\n- Scope precedence is deterministic across project default, component override, provider override, tracker override, branch override, and environment/runtime override.\n- Direct integration requires both component publication policy and actor authority.\n- Pull request review approval and issue-level design approval remain distinct concepts.\n- Assignment, casual comments, and silence are not treated as approval by default.\n\nDependencies:\n- Depends on authority configuration and actor resolution.\n\nBoundaries:\n- Keep resolver pure and unit-testable.\n- Do not perform command gating or live provider calls in this slice.\n\nVerification:\n- Focused resolver tests for maintainer direct integration, contributor pull-request-only, reviewer approval-only, observer read-only, runtime operator without merge authority, and release operator without implementation authority.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2241,7 +2241,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.990Z",
-      "updatedAt": "2026-05-18T22:58:11.164Z",
+      "updatedAt": "2026-05-18T23:02:20.523Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3354,7 +3354,7 @@
       "id": "local-131",
       "title": "Aggregate eligible work from configured discovery sources",
       "description": "Type: eligible-work implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-130\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: let eligible-work and coordinator surfaces opt into scanning configured discovery sources while preserving current default-tracker behavior by default.\n\nUser stories covered:\n- As a coordinator agent, I can list eligible work across configured discovery sources when policy asks for it.\n- As a maintainer, I can keep default-tracker-only selection unless the project explicitly opts into discovery mode.\n\nAcceptance criteria:\n- Default eligible-work mode remains behaviorally unchanged and lists the component default tracker only.\n- Discovery mode queries trackers whose roles and policy mark them as discovery sources, applying configured statuses, labels, milestones, assignees, provider query filters, per-tracker limits, and final limits.\n- Returned items include component id, logical item id when known, canonical assignment tracker reference, discovered source tracker reference, warnings, and whether the item is selectable or import-only.\n- When policy requires import first, unimported external items are reported as import candidates and are not assigned as local work.\n- Missing provider access, disabled trackers, unsupported list capability, and provider read errors are reported according to discovery policy without crashing the whole eligible-work call.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-130.\n\nBoundaries:\n- Do not implement inbound import mutation in this slice.\n- Do not make every configured tracker an eligible source by default.\n\nVerification:\n- Focused tests for default mode preservation, opt-in discovery aggregation, per-tracker filters, import-only candidates, provider warnings/blockers, and final ordering/limits.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3368,7 +3368,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:54.443Z",
-      "updatedAt": "2026-05-18T22:58:11.206Z",
+      "updatedAt": "2026-05-18T23:02:25.856Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6318,6 +6318,17 @@
           "provider": "local",
           "itemId": "local-comment-272"
         }
+      },
+      {
+        "id": "local-comment-274",
+        "body": "Started on Windows in isolated worktree `worktrees/dev-nexus/local-89-effective-authority` on branch `codex/dev-nexus-local-89-effective-authority`. Scope: pure effective-authority resolver and tests; avoid tracker/eligible-work files owned by local-131.",
+        "author": null,
+        "createdAt": "2026-05-18T23:02:20.523Z",
+        "updatedAt": "2026-05-18T23:02:20.523Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-274"
+        }
       }
     ],
     "local-90": [],
@@ -7113,6 +7124,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-273"
+        }
+      },
+      {
+        "id": "local-comment-275",
+        "body": "Started on Windows in isolated worktree `worktrees/dev-nexus/local-131-eligible-discovery` on branch `codex/dev-nexus-local-131-eligible-discovery`. Scope: opt-in eligible-work discovery aggregation and tests; preserve default-tracker-only behavior and avoid authority resolver files owned by local-89.",
+        "author": null,
+        "createdAt": "2026-05-18T23:02:25.856Z",
+        "updatedAt": "2026-05-18T23:02:25.856Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-275"
         }
       }
     ],

@@ -196,12 +196,17 @@ and ready for coordinator-driven work across its components.
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
   `local-106`, `local-88`, and `local-130` were removed after publication.
+- Active Windows implementation worktrees are `dev-nexus:local-89` on
+  `codex/dev-nexus-local-89-effective-authority` for the pure authority
+  resolver and `dev-nexus:local-131` on
+  `codex/dev-nexus-local-131-eligible-discovery` for opt-in eligible-work
+  discovery aggregation. Their write scopes are intentionally disjoint.
 
 ## Near-Term Direction
 
-- Continue ready follow-on work such as `dev-nexus:local-89`, `local-107`,
-  `local-109`, `local-131`, and `local-147`, subject to dependency and
-  concurrency limits.
+- Continue the active `dev-nexus:local-89` and `local-131` implementation
+  branches, then return to ready follow-on work such as `local-107`,
+  `local-109`, and `local-147`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
