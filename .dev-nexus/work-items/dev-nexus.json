@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 66,
+  "nextNumber": 67,
   "nextCommentNumber": 154,
-  "updatedAt": "2026-05-18T09:12:48.649Z",
+  "updatedAt": "2026-05-18T09:20:36.534Z",
   "items": [
     {
       "id": "local-1",
@@ -1636,6 +1636,31 @@
         "provider": "local",
         "itemId": "local-65",
         "itemNumber": 65
+      }
+    },
+    {
+      "id": "local-66",
+      "title": "Stream coordinator-loop progress feedback",
+      "description": "Type: dogfood UX/infrastructure improvement.\\nSource: user observed that running 'dev-nexus automation coordinator-loop . --max-ticks 1 --max-runs 1 --json' gives no visible feedback in the Codex app while the nested coordinator is running, making it look stuck.\\n\\nProblem: --json suppresses tick output until the end, and non-json tick output is only emitted after a coordinator launch finishes. Long nested Codex runs therefore have no lightweight heartbeat/progress signal in the invoking chat or terminal.\\n\\nAcceptance criteria:\\n- Add a low-overhead coordinator-loop progress surface that can be consumed while a run is active.\\n- Preserve final JSON compatibility for automation callers.\\n- Support at least one machine-readable streaming mode, preferably JSON Lines events on stderr or stdout with a documented flag.\\n- Emit meaningful events at coordinator-loop start, decision, launch dispatched, run started, run completed/blocked/failed, and final stop.\\n- Avoid forwarding high-volume nested Codex output by default; progress events should be small and throttled or event-based.\\n- Document the recommended command for Codex chat use and for automation use.\\n\\nVerification:\\n- Add focused tests for streaming/progress behavior and final JSON compatibility.\\n- Run relevant CLI/coordinator-loop tests and npm run check.\\n\\nPublication: direct integration to DevNexus origin/main after verification.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "coordinator-loop",
+        "ux",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T09:20:36.534Z",
+      "updatedAt": "2026-05-18T09:20:36.534Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-66",
+        "itemNumber": 66
       }
     }
   ],
@@ -3448,6 +3473,7 @@
           "itemId": "local-comment-153"
         }
       }
-    ]
+    ],
+    "local-66": []
   }
 }

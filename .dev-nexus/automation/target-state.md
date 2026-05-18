@@ -36,7 +36,9 @@ Verification for this cycle:
 
 Near-term direction:
 
-- No ready `dev-nexus` dogfood work items remain after this cycle.
+- New dogfood feedback issue `dev-nexus:local-66` is ready after observing that
+  `automation coordinator-loop ... --json` stays silent while a nested
+  coordinator is running.
 - Re-triage parked sync follow-ups before promotion:
   `dev-nexus:local-48`, `dev-nexus:local-51`, and `dev-nexus:local-52`.
   The dry-run planner has landed, but live sync remains policy-gated.
