@@ -310,6 +310,14 @@ describe("dev-nexus cli", () => {
         "local-42",
         "--topic",
         "Parallel chat isolation",
+        "--host",
+        "windows-devbox",
+        "--agent",
+        "codex",
+        "--write-scope",
+        "src",
+        "--lease-note",
+        "Preparing component worktree.",
         "--json",
       ],
       {
@@ -333,6 +341,20 @@ describe("dev-nexus cli", () => {
         workItem: {
           id: "local-42",
         },
+      },
+      lease: {
+        projectId: "demo-project",
+        hostId: "windows-devbox",
+        agentId: "codex",
+        workItemId: "local-42",
+        branchName: "codex/primary/local-42",
+        status: "working",
+        worktree: {
+          kind: "component_worktree",
+          relativePath: "codex-primary-local-42",
+        },
+        writeScope: ["src"],
+        notes: ["Preparing component worktree."],
       },
       setup: {
         dependencyProjections: [
@@ -399,6 +421,19 @@ describe("dev-nexus cli", () => {
         branchName: "codex/demo-project/project-state-cleanup",
         baseRef: "main",
         workItem: null,
+      },
+      lease: {
+        projectId: "demo-project",
+        scope: {
+          kind: "project_meta",
+          componentId: null,
+        },
+        branchName: "codex/demo-project/project-state-cleanup",
+        status: "working",
+        worktree: {
+          kind: "project_meta_worktree",
+          relativePath: "demo-project/project-state-cleanup",
+        },
       },
     });
     expect(metaPayload.worktree.worktreePath).toBe(

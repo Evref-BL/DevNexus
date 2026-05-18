@@ -18,6 +18,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  createOrRefreshNexusWorktreeLease,
+  type NexusWorktreeLeaseRecord,
+} from "./nexusWorktreeLease.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -50,6 +54,10 @@ export interface PrepareNexusManualWorktreeOptions {
   workItemId?: string | null;
   workItemTitle?: string | null;
   workItemDescription?: string | null;
+  hostId?: string | null;
+  agentId?: string | null;
+  writeScope?: string[];
+  leaseNotes?: string[];
   gitRunner?: GitRunner;
   now?: () => Date | string;
 }
@@ -61,6 +69,7 @@ export interface PrepareNexusManualWorktreeResult {
   projectName: string;
   component: ResolvedNexusProjectComponent | null;
   worktree: PrepareGitWorktreeResult;
+  lease: NexusWorktreeLeaseRecord;
   setup: NexusAutomationWorktreeSetupResult;
   nextActions: string[];
 }
@@ -237,6 +246,22 @@ export function prepareNexusManualWorktree(
     },
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
+  const lease = createOrRefreshNexusWorktreeLease({
+    projectRoot,
+    componentId: target.scope === "component" ? target.ownerId : null,
+    projectMeta: target.scope === "project",
+    hostId: options.hostId,
+    agentId: options.agentId,
+    workItemId,
+    branchName: worktree.branchName,
+    baseRef: worktree.baseRef,
+    worktreePath: worktree.worktreePath,
+    writeScope: options.writeScope,
+    status: "working",
+    notes: options.leaseNotes,
+    gitRunner: options.gitRunner,
+    now: options.now,
+  });
 
   return {
     scope: target.scope,
@@ -245,6 +270,7 @@ export function prepareNexusManualWorktree(
     projectName: projectConfig.name,
     component: target.component,
     worktree,
+    lease,
     setup,
     nextActions: nextActions(target.scope, worktree),
   };

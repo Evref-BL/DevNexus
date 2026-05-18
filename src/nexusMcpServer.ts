@@ -430,6 +430,10 @@ const tools: McpTool[] = [
         branchName: { type: "string" },
         worktreeName: { type: "string" },
         baseRef: { type: ["string", "null"] },
+        hostId: { type: ["string", "null"] },
+        agentId: { type: ["string", "null"] },
+        writeScope: { type: "array", items: { type: "string" } },
+        leaseNotes: { type: "array", items: { type: "string" } },
       },
       additionalProperties: false,
     },
@@ -986,6 +990,12 @@ export async function callDevNexusMcpTool(
             branchName: optionalString(args, "branchName", "arguments"),
             worktreeName: optionalString(args, "worktreeName", "arguments"),
             baseRef: optionalNullableString(args, "baseRef", "arguments"),
+            hostId: optionalNullableString(args, "hostId", "arguments"),
+            agentId: optionalNullableString(args, "agentId", "arguments"),
+            writeScope:
+              optionalStringArray(args, "writeScope", "arguments") ?? [],
+            leaseNotes:
+              optionalStringArray(args, "leaseNotes", "arguments") ?? [],
             gitRunner: context.gitRunner,
             now: context.now,
           }),

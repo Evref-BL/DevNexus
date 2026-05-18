@@ -541,6 +541,10 @@ interface ParsedWorktreePrepareCommand {
   topic?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
+  hostId?: string | null;
+  agentId?: string | null;
+  writeScope: string[];
+  leaseNotes: string[];
   json?: boolean;
 }
 
@@ -746,6 +750,10 @@ export function usage(): string {
     "  --worktree-name <name>    directory name under the configured worktrees root",
     "  --base-ref <ref>          defaults to the component or project default branch",
     "  --no-base-ref             create the branch from the source checkout HEAD",
+    "  --host <id>               lease host id; defaults to local hostname",
+    "  --agent <id>              optional lease agent/chat id",
+    "  --write-scope <path>      intended lease write scope; repeatable",
+    "  --lease-note <text>       lease note; repeatable",
     "  --json",
     "",
     "Options for work-item create:",
@@ -1356,6 +1364,10 @@ async function handleWorktreeCommand(
       workItemTitle:
         parsed.workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
       workItemDescription: resolvedWorkItem.workItem?.description ?? null,
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      writeScope: parsed.writeScope,
+      leaseNotes: parsed.leaseNotes,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -2963,7 +2975,11 @@ function parseWorktreePrepareCommand(
     throw new Error("worktree prepare requires a project root");
   }
 
-  const parsed: ParsedWorktreePrepareCommand = { projectRoot };
+  const parsed: ParsedWorktreePrepareCommand = {
+    projectRoot,
+    writeScope: [],
+    leaseNotes: [],
+  };
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index]!;
     const next = (): string => {
@@ -3002,6 +3018,18 @@ function parseWorktreePrepareCommand(
         break;
       case "--no-base-ref":
         parsed.baseRef = null;
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--write-scope":
+        parsed.writeScope.push(next());
+        break;
+      case "--lease-note":
+        parsed.leaseNotes.push(next());
         break;
       case "--json":
         parsed.json = true;
@@ -4616,6 +4644,7 @@ function printCoordinationStatusResult(
     stdout,
     `  Pushed: ${status.git.pushed === null ? "unknown" : String(status.git.pushed)}`,
   );
+  writeLine(stdout, `  Active leases: ${status.leases.activeCount}`);
   writeLine(stdout, `  Handoffs: ${status.handoffs.records.length}`);
   writeLine(stdout, `  Next action: ${status.nextAction}`);
 }
@@ -4643,6 +4672,7 @@ function printCoordinationHandoffResult(
   }
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
+  writeLine(stdout, `  Lease: ${result.lease.id}`);
   writeLine(stdout, `  Comment: ${result.comment.id}`);
 }
 
@@ -4764,6 +4794,7 @@ function printWorktreePrepareResult(
   }
   writeLine(stdout, `  Worktree: ${result.worktree.worktreePath}`);
   writeLine(stdout, `  Branch: ${result.worktree.branchName}`);
+  writeLine(stdout, `  Lease: ${result.lease.id}`);
   if (result.worktree.baseRef) {
     writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
   }

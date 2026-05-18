@@ -11,6 +11,12 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  createOrRefreshNexusWorktreeLease,
+  listNexusWorktreeLeases,
+  type NexusWorktreeLeaseCollection,
+  type NexusWorktreeLeaseRecord,
+} from "./nexusWorktreeLease.js";
+import {
   type ResolvedNexusProjectWorkTracker,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
@@ -104,6 +110,7 @@ export interface NexusCoordinationHandoffRecord {
   hostId: string;
   agentId: string | null;
   status: NexusCoordinationHandoffStatus;
+  leaseId: string | null;
   repositoryPath: string | null;
   branch: string | null;
   upstream: string | null;
@@ -305,6 +312,7 @@ export interface NexusCoordinationStatus {
   workItem: WorkItem | null;
   coordinationTracker: NexusCoordinationTrackerSummary;
   git: NexusCoordinationGitStatus;
+  leases: NexusWorktreeLeaseCollection;
   handoffs: NexusCoordinationHandoffCollection;
   nextAction: string;
   blocking: boolean;
@@ -321,6 +329,7 @@ export interface NexusCoordinationStatusOptions {
   gitRunner?: GitRunner;
   now?: () => Date | string;
   maxHandoffAgeMs?: number;
+  maxLeaseAgeMs?: number;
 }
 
 export interface NexusCoordinationHandoffOptions
@@ -348,6 +357,7 @@ export interface NexusCoordinationHandoffResult {
   record: NexusCoordinationHandoffRecord;
   comment: WorkComment;
   git: NexusCoordinationGitStatus;
+  lease: NexusWorktreeLeaseRecord;
 }
 
 interface ResolvedCoordinationContext {
@@ -408,7 +418,14 @@ export async function getNexusCoordinationStatus(
     maxHandoffAgeMs:
       options.maxHandoffAgeMs ?? defaultCoordinationHandoffStaleAfterMs,
   });
-  const warnings = [...git.warnings, ...handoffs.warnings];
+  const leases = listNexusWorktreeLeases({
+    projectRoot: context.projectRoot,
+    componentId: context.component.id,
+    workItemId,
+    now,
+    staleAfterMs: options.maxLeaseAgeMs,
+  });
+  const warnings = [...git.warnings, ...handoffs.warnings, ...leases.warnings];
 
   return {
     project: projectSummary(context),
@@ -416,6 +433,7 @@ export async function getNexusCoordinationStatus(
     workItem,
     coordinationTracker: coordinationTracker.summary,
     git,
+    leases,
     handoffs,
     nextAction: coordinationNextAction(git),
     blocking: false,
@@ -459,6 +477,35 @@ export async function createNexusCoordinationHandoff(
         `${context.component.id}:${logicalItemId}; link the logical work item to that tracker first.`,
     );
   }
+  const hostId = optionalTrimmedString(options.hostId) ?? os.hostname();
+  const agentId = optionalTrimmedString(options.agentId) ?? null;
+  const lease = createOrRefreshNexusWorktreeLease({
+    projectRoot: context.projectRoot,
+    componentId: context.component.id,
+    hostId,
+    agentId,
+    workItemId: logicalItemId,
+    branchName: git.branch,
+    baseRef: git.baseRef,
+    worktreePath: git.repositoryPath ?? context.currentPath,
+    writeScope: options.changedAreas,
+    status,
+    notes: coordinationLeaseNotes(options),
+    gitFacts: {
+      repositoryPath: git.repositoryPath,
+      upstream: git.upstream,
+      headCommit: git.headCommit,
+      dirty: git.dirty,
+      stagedCount: git.stagedCount,
+      unstagedCount: git.unstagedCount,
+      untrackedCount: git.untrackedCount,
+      ahead: git.ahead,
+      behind: git.behind,
+      pushed: git.pushed,
+      warnings: git.warnings,
+    },
+    now: timestamp,
+  });
   const record: NexusCoordinationHandoffRecord = {
     kind: coordinationHandoffKind,
     version: 1,
@@ -479,9 +526,10 @@ export async function createNexusCoordinationHandoff(
       workItem,
       linkReferences,
     }),
-    hostId: optionalTrimmedString(options.hostId) ?? os.hostname(),
-    agentId: optionalTrimmedString(options.agentId) ?? null,
+    hostId,
+    agentId,
     status,
+    leaseId: lease.id,
     repositoryPath: git.repositoryPath,
     branch: git.branch,
     upstream: git.upstream,
@@ -523,6 +571,7 @@ export async function createNexusCoordinationHandoff(
     record,
     comment,
     git,
+    lease,
   };
 }
 
@@ -2183,6 +2232,7 @@ function handoffRecordFromUnknown(
       requiredRecordString(record, "status"),
       "handoff.status",
     ),
+    leaseId: nullableRecordString(record, "leaseId"),
     repositoryPath: nullableRecordString(record, "repositoryPath"),
     branch: nullableRecordString(record, "branch"),
     upstream: nullableRecordString(record, "upstream"),
@@ -2218,6 +2268,24 @@ function coordinationNextAction(git: NexusCoordinationGitStatus): string {
   }
 
   return "Ready for review or integration.";
+}
+
+function coordinationLeaseNotes(
+  options: NexusCoordinationHandoffOptions,
+): string[] {
+  const note = optionalNullableTrimmedString(options.note) ?? null;
+  const verification =
+    optionalNullableTrimmedString(options.verificationSummary) ?? null;
+  const integrationPreference =
+    optionalNullableTrimmedString(options.integrationPreference) ?? null;
+
+  return [
+    note,
+    verification ? `Verification: ${verification}` : null,
+    integrationPreference
+      ? `Integration preference: ${integrationPreference}`
+      : null,
+  ].filter((entry): entry is string => entry !== null);
 }
 
 function projectSummary(

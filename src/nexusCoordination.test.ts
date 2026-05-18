@@ -690,12 +690,28 @@ describe("nexus coordination", () => {
       hostId: "windows-devbox",
       agentId: "codex",
       status: "ready",
+      leaseId: handoff.lease.id,
       branch: "codex/shared-coordination",
       upstream: "origin/codex/shared-coordination",
       headCommit: "abc123def456",
       dirty: false,
       pushed: true,
       changedAreas: ["src/nexusCoordination.ts"],
+    });
+    expect(handoff.lease).toMatchObject({
+      projectId: "coordination-demo",
+      hostId: "windows-devbox",
+      agentId: "codex",
+      workItemId: "local-1",
+      status: "ready",
+      lastObservedHeadCommit: "abc123def456",
+      dirty: false,
+      pushed: true,
+      worktree: {
+        kind: "component_worktree",
+        relativePath: "local-14",
+      },
+      writeScope: ["src/nexusCoordination.ts"],
     });
     expect(handoff.comment.body).toContain(coordinationHandoffCommentMarker);
     const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
@@ -730,6 +746,17 @@ describe("nexus coordination", () => {
         behind: 0,
         dirty: false,
         pushed: true,
+      },
+      leases: {
+        activeCount: 1,
+        blocking: false,
+        records: [
+          {
+            id: handoff.lease.id,
+            status: "ready",
+            stale: false,
+          },
+        ],
       },
       handoffs: {
         available: true,

@@ -44,6 +44,7 @@ export * from "./workItemService.js";
 export * from "./workItemSyncPlanner.js";
 export * from "./workItemTrackerLinks.js";
 export * from "./worktreeExecutionMetadata.js";
+export * from "./nexusWorktreeLease.js";
 export * from "./nexusExtension.js";
 export * from "./nexusHomeConfig.js";
 export * from "./nexusHostRegistry.js";
