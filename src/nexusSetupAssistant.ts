@@ -294,48 +294,26 @@ export function buildNexusSetupCheck(options: {
 
   if (projectConfig) {
     for (const component of projectConfig.components) {
-      if (!component.sourceRoot) {
-        checks.push({
-          id: `component-${component.id}-source-root`,
-          title: `${component.name} source root`,
-          status: "warning",
-          summary: "No host-local sourceRoot is configured for this component.",
-          nextAction:
-            "Add a host-local component source root or clone the component according to project policy.",
-        });
-        continue;
-      }
-
-      const sourceRootAnalysis = analyzeNexusProjectPath({
-        projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
-        value: component.sourceRoot,
+      const sourceRootPlan = componentSetupSourceRoot(
+        component,
         platform,
-      });
-
-      if (!sourceRootAnalysis.compatible) {
-        checks.push({
-          id: `component-${component.id}-source-root`,
-          title: `${component.name} source root`,
-          status: "blocked",
-          summary: `Component sourceRoot is configured for another OS: ${component.sourceRoot}`,
-          nextAction:
-            `Configure a ${platform} host-local source root for ${component.id} before running component work on this machine.`,
-        });
-        continue;
-      }
+        projectRoot,
+        projectConfig,
+      );
 
       checks.push(pathCheck({
         id: `component-${component.id}-source-root`,
         title: `${component.name} source root`,
-        pathName: sourceRootAnalysis.path,
-        passedSummary: `Component source root exists: ${sourceRootAnalysis.path}`,
-        blockedSummary: `Component source root is missing: ${sourceRootAnalysis.path}`,
+        pathName: sourceRootPlan.path,
+        passedSummary: `Component source root exists: ${sourceRootPlan.path}`,
+        blockedSummary:
+          `${sourceRootPlan.reason} Component source root is missing: ${sourceRootPlan.path}`,
         nextAction: component.remoteUrl
-          ? `Clone or fetch ${component.remoteUrl} into ${sourceRootAnalysis.path}.`
-          : `Create or configure ${sourceRootAnalysis.path}.`,
+          ? `Clone or fetch ${component.remoteUrl} into ${sourceRootPlan.path}.`
+          : `Create or configure ${sourceRootPlan.path}.`,
         missingStatus: "blocked",
       }));
-      checks.push(...componentGitSafetyChecks(component, sourceRootAnalysis.path));
+      checks.push(...componentGitSafetyChecks(component, sourceRootPlan.path));
     }
   }
 
@@ -1999,23 +1977,65 @@ function componentPlanSourceRoot(
   projectRoot: string,
   projectConfig: NexusProjectConfig,
 ): string | null {
+  return componentSetupSourceRoot(component, platform, projectRoot, projectConfig).path;
+}
+
+function componentSetupSourceRoot(
+  component: NexusProjectConfig["components"][number],
+  platform: NexusSetupPlatform,
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): { path: string; reason: string } {
+  const resolutionRoot = componentResolutionProjectRoot(
+    projectRoot,
+    projectConfig,
+    platform,
+  );
+  const projectLocalPath = componentProjectLocalSourceRoot(
+    component,
+    platform,
+    projectRoot,
+    projectConfig,
+  );
+
   if (!component.sourceRoot) {
-    return null;
+    return {
+      path: projectLocalPath,
+      reason:
+        `No sourceRoot is configured for ${component.id}; using the project-local components root.`,
+    };
   }
+
   const analysis = analyzeNexusProjectPath({
-    projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
+    projectRoot: resolutionRoot,
     value: component.sourceRoot,
     platform,
   });
   if (analysis.compatible) {
-    return analysis.path;
+    return {
+      path: analysis.path,
+      reason: `Using configured sourceRoot for ${component.id}.`,
+    };
   }
 
-  if (platform === "windows") {
-    return `$env:USERPROFILE\\dev-nexus\\sources\\${component.id}`;
-  }
+  return {
+    path: projectLocalPath,
+    reason:
+      `Configured sourceRoot ${component.sourceRoot} is not compatible with ${platform}; using the project-local components root.`,
+  };
+}
 
-  return `$HOME/dev-nexus/sources/${component.id}`;
+function componentProjectLocalSourceRoot(
+  component: NexusProjectConfig["components"][number],
+  platform: NexusSetupPlatform,
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): string {
+  return resolveNexusProjectPath({
+    projectRoot: componentResolutionProjectRoot(projectRoot, projectConfig, platform),
+    value: `componentsRoot:${component.id}`,
+    platform,
+  });
 }
 
 function makeDirectoryCommand(
@@ -2067,10 +2087,16 @@ function componentCloneCommands(
     if (!sourceRoot || !component.remoteUrl) {
       return [];
     }
+    const cloneArgs = component.defaultBranch
+      ? `--branch ${component.defaultBranch} ${component.remoteUrl}`
+      : component.remoteUrl;
+    const fetchArgs = component.defaultBranch
+      ? `origin ${component.defaultBranch} --prune`
+      : "--all --prune";
     return [
-      `test -d ${shellPathPlaceholder(sourceRoot)} || git clone ${component.remoteUrl} ${shellPathPlaceholder(sourceRoot)}`,
+      `test -d ${shellPathPlaceholder(sourceRoot)} || git clone ${cloneArgs} ${shellPathPlaceholder(sourceRoot)}`,
       `git -C ${shellPathPlaceholder(sourceRoot)} status --short`,
-      `git -C ${shellPathPlaceholder(sourceRoot)} fetch --all --prune`,
+      `git -C ${shellPathPlaceholder(sourceRoot)} fetch ${fetchArgs}`,
     ];
   });
 }

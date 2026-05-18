@@ -576,14 +576,59 @@ describe("nexus setup assistant", () => {
     });
 
     expect(prepareStep.commands.join("\n")).toContain(
-      "$HOME/dev-nexus/sources/dev-nexus",
+      "$HOME/dev-nexus/mac-demo/components/dev-nexus",
     );
     expect(prepareStep.commands.join("\n")).not.toContain("C:\\dev\\code\\DevNexus");
+    expect(prepareStep.commands.join("\n")).toContain(
+      "git clone --branch main git@github.com:Evref-BL/DevNexus.git $HOME/dev-nexus/mac-demo/components/dev-nexus",
+    );
     expect(check.checks).toContainEqual(
       expect.objectContaining({
         id: "component-dev-nexus-source-root",
         status: "blocked",
-        summary: expect.stringContaining("another OS"),
+        summary: expect.stringContaining("components/dev-nexus"),
+      }),
+    );
+  });
+
+  it("falls back to project-local components when sourceRoot is absent", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-missing-source-root-");
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "dev-nexus",
+          name: "DevNexus",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          relationships: [],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const prepareStep = plan.steps.find(
+      (step) => step.id === "prepare-component-checkouts",
+    )!;
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(prepareStep.commands.join("\n")).toContain(
+      "$HOME/dev-nexus/mac-demo/components/dev-nexus",
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        status: "blocked",
+        summary: expect.stringContaining("components/dev-nexus"),
       }),
     );
   });
