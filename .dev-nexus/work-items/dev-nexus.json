@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 137,
-  "updatedAt": "2026-05-18T04:35:53.995Z",
+  "nextCommentNumber": 142,
+  "updatedAt": "2026-05-18T05:26:31.209Z",
   "items": [
     {
       "id": "local-1",
@@ -836,7 +836,7 @@
       "id": "local-35",
       "title": "Optionally relay MCP tool calls through Codex app-server",
       "description": "Type: implementation follow-up\nReadiness: autonomous agent-ready (AFK) after basic Codex app-server thread/turn launch and target-cycle recording are stable.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: optionally let DevNexus call Codex-managed MCP tools through app-server when a coordinator or worker needs a Codex-owned MCP server surface.\n\nUser stories covered:\n- As a coordinator, I can use Codex app-server to call a configured MCP tool in the context of a managed thread when that is safer than direct process-level wiring.\n- As a DevNexus user, I get clear MCP capability and approval failures instead of silent blocked automation.\n\nAcceptance criteria:\n- DevNexus can list or check MCP server status for an app-server thread when the protocol supports it.\n- DevNexus can relay a bounded MCP tool call through Codex app-server with structured arguments and receive structured content/error results.\n- Approval, permission, missing server, missing tool, and protocol errors are reported as infrastructure failures with actionable summaries.\n- The relay is optional and not required for basic app-server execution.\n- Tests use mocked app-server MCP responses and do not require live MCP servers.\n\nBlockers and sequencing:\n- Depends on stable Codex app-server launch and target-cycle recording.\n\nBoundaries:\n- Do not bypass Codex MCP trust or approval policy.\n- Do not hard-code DevNexus-Pharo, PLexus, or Pharo MCP server names in generic core.\n\nVerification:\n- Run focused app-server MCP relay tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "codex-app-server",
@@ -849,8 +849,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T10:38:29.366Z",
-      "updatedAt": "2026-05-18T04:35:24.563Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T05:26:25.577Z",
+      "closedAt": "2026-05-18T05:26:17.544Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1124,7 +1124,7 @@
       "id": "local-46",
       "title": "Add neutral work-item tracker link records",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add a neutral link model so DevNexus can represent one logical work item across local, GitHub, GitLab, Jira, or other tracker references.\n\nUser stories covered:\n- As a migration owner, I can link an existing GitHub issue to a local work item before enabling sync.\n- As a coordinator, I can see all provider references for one logical item.\n\nAcceptance criteria:\n- DevNexus persists work-item link records keyed by project id, component id, neutral logical item id, and tracker references.\n- Link references capture tracker id, provider, host, repository/project identity, item id, item number or key, node id, and web URL when available.\n- CLI and MCP surfaces can link, show, and unlink tracker references for a logical work item.\n- Link writes are idempotent and can update observed metadata without duplicating references.\n- Unlink records enough audit metadata to explain what was removed.\n- Tests cover link creation, duplicate/idempotent updates, invalid tracker refs, unlink, and show operations.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n\nBoundaries:\n- Do not auto-link likely matches without explicit policy.\n- Do not sync fields or comments in this slice.\n\nVerification:\n- Focused link-store/model tests plus CLI/MCP tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1138,8 +1138,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.676Z",
-      "updatedAt": "2026-05-18T04:35:38.980Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T05:26:31.209Z",
+      "closedAt": "2026-05-18T05:26:21.596Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1244,7 +1244,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.423Z",
-      "updatedAt": "2026-05-18T04:35:53.995Z",
+      "updatedAt": "2026-05-18T05:12:24.888Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2525,6 +2525,28 @@
           "provider": "local",
           "itemId": "local-comment-134"
         }
+      },
+      {
+        "id": "local-comment-137",
+        "body": "Coordinator selected this item for run coordinator-loop-20260518-t051011-392-z-1. Implementation will run in a dedicated DevNexus component worktree with mocked app-server MCP responses only; no live MCP trust or approval bypass.",
+        "author": null,
+        "createdAt": "2026-05-18T05:12:17.470Z",
+        "updatedAt": "2026-05-18T05:12:17.470Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-137"
+        }
+      },
+      {
+        "id": "local-comment-140",
+        "body": "Completed in run coordinator-loop-20260518-t051011-392-z-1. Published DevNexus commit 5aa008f to origin/main. Verification passed: focused app-server MCP relay suite, git diff --check origin/main..HEAD, and npm run check (52 files / 379 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T05:26:25.577Z",
+        "updatedAt": "2026-05-18T05:26:25.577Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-140"
+        }
       }
     ],
     "local-36": [
@@ -2899,6 +2921,28 @@
           "provider": "local",
           "itemId": "local-comment-135"
         }
+      },
+      {
+        "id": "local-comment-138",
+        "body": "Coordinator selected this item for run coordinator-loop-20260518-t051011-392-z-1. Implementation will run in a dedicated DevNexus component worktree and is scoped to neutral link/show/unlink records without field sync or live provider writes.",
+        "author": null,
+        "createdAt": "2026-05-18T05:12:20.821Z",
+        "updatedAt": "2026-05-18T05:12:20.821Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-138"
+        }
+      },
+      {
+        "id": "local-comment-141",
+        "body": "Completed in run coordinator-loop-20260518-t051011-392-z-1. Published DevNexus commit 9ae0a41 to origin/main. Verification passed: focused tracker-link/CLI/MCP suite, git diff --check origin/main..HEAD, and npm run check (52 files / 379 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T05:26:31.209Z",
+        "updatedAt": "2026-05-18T05:26:31.209Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-141"
+        }
       }
     ],
     "local-47": [],
@@ -2914,6 +2958,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-136"
+        }
+      },
+      {
+        "id": "local-comment-139",
+        "body": "Coordinator considered this item for run coordinator-loop-20260518-t051011-392-z-1 but is sequencing it after dev-nexus:local-46 because coordination tracker-role targeting needs the neutral link-record model and overlaps coordination/CLI/MCP write surfaces. Leaving ready for the next bounded cycle.",
+        "author": null,
+        "createdAt": "2026-05-18T05:12:24.888Z",
+        "updatedAt": "2026-05-18T05:12:24.888Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-139"
         }
       }
     ],
