@@ -58,6 +58,8 @@ target-cycle facts, commits, and the target report.
 - `dev-nexus-typescript` may know about DevNexus and JavaScript/TypeScript
   setup policy.
 - `dev-nexus` remains generic and must not contain plugin-specific behavior.
+- Direct PLexus, pharo-launcher-mcp, and MCP-Pharo work items are owned by the
+  sibling `dev-nexus-plexus` DevNexus project, not this dogfood root.
 
 ## Next Work Candidates
 
@@ -73,8 +75,8 @@ target-cycle facts, commits, and the target report.
   implement the active target policy slices beginning with `local-105`.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
-- Keep live-runtime Pharo and PLexus work blocked until an isolated runner
-  profile is current and explicit.
+- Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and
+  blocked there until an isolated runner profile is current and explicit.
 
 ## Boundaries
 

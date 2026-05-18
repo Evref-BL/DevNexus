@@ -17,14 +17,13 @@ coordinator agent chooses and supervises implementation work.
 - `dev-nexus`: generic core and primary component.
 - `dev-nexus-pharo`: Pharo plugin for DevNexus.
 - `dev-nexus-typescript`: TypeScript/JavaScript plugin for DevNexus.
-- `plexus`: project-scoped Pharo runtime and gateway dependency.
-- `pharo-launcher-mcp`: launcher-side MCP dependency.
-- `mcp-pharo`: in-image Pharo MCP dependency.
 
 ## Current Operating State
 
 - Component work is tracked through local component-owned work-item stores under
   `.dev-nexus/work-items/`.
+- PLexus, pharo-launcher-mcp, and MCP-Pharo work moved to the sibling
+  `/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus` DevNexus project.
 - The dogfood meta repository records explicit GitHub hosting metadata:
   `origin` is the human remote and `bot` is the automation remote through the
   generic `github.com-bot` SSH alias.
@@ -82,10 +81,8 @@ coordinator agent chooses and supervises implementation work.
   `Gabot-Darbot`; keep agent-created Git/GitHub activity on the configured
   automation remotes and profile to prevent human-account fallback.
 - Fresh Mac onboarding proved generic `dev_nexus` and `dev_nexus_pharo` stdio
-  MCP servers can list tools, but PLexus-backed MCP was unavailable because
-  `plexus` was not on `PATH` and direct Pharo HTTP MCP was not live. Treat that
-  Mac as ready for non-live DevNexus coordination only until runtime tooling is
-  explicitly enabled.
+  MCP servers can list tools. PLexus-backed runtime work now belongs in the
+  sibling `dev-nexus-plexus` project.
 - DevNexus main now includes the latest aggressive source batches:
   `ce9b7d2` rejects duplicate explicit target-cycle ids, `ff981bc` documents
   worktree-first parallel chat workflow, `4ca4362` adds host-local and

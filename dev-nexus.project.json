@@ -90,10 +90,6 @@
         {
           "kind": "extends",
           "componentId": "dev-nexus"
-        },
-        {
-          "kind": "depends_on",
-          "componentId": "plexus"
         }
       ]
     },
@@ -129,79 +125,6 @@
         {
           "kind": "extends",
           "componentId": "dev-nexus"
-        }
-      ]
-    },
-    {
-      "id": "plexus",
-      "name": "PLexus",
-      "kind": "git",
-      "role": "dependency",
-      "remoteUrl": "git@github.com:Evref-BL/PLexus.git",
-      "defaultBranch": "main",
-      "sourceRoot": "sourcesRoot:plexus",
-      "worktreesRoot": "worktrees/plexus",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/plexus.json"
-      },
-      "publication": {
-        "strategy": "direct_integration",
-        "remote": "bot",
-        "targetBranch": "main",
-        "push": true
-      },
-      "relationships": []
-    },
-    {
-      "id": "pharo-launcher-mcp",
-      "name": "pharo-launcher-mcp",
-      "kind": "git",
-      "role": "dependency",
-      "remoteUrl": "git@github.com:Evref-BL/pharo-launcher-mcp.git",
-      "defaultBranch": "main",
-      "sourceRoot": "sourcesRoot:pharo-launcher-mcp",
-      "worktreesRoot": "worktrees/pharo-launcher-mcp",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/pharo-launcher-mcp.json"
-      },
-      "publication": {
-        "strategy": "direct_integration",
-        "remote": "bot",
-        "targetBranch": "main",
-        "push": true
-      },
-      "relationships": [
-        {
-          "kind": "related",
-          "componentId": "plexus"
-        }
-      ]
-    },
-    {
-      "id": "mcp-pharo",
-      "name": "MCP-Pharo",
-      "kind": "git",
-      "role": "dependency",
-      "remoteUrl": "https://github.com/Evref-BL/MCP.git",
-      "defaultBranch": "main",
-      "sourceRoot": "sourcesRoot:mcp-pharo",
-      "worktreesRoot": "worktrees/mcp-pharo",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/mcp-pharo.json"
-      },
-      "publication": {
-        "strategy": "review_handoff",
-        "remote": "origin",
-        "targetBranch": "main",
-        "push": false
-      },
-      "relationships": [
-        {
-          "kind": "related",
-          "componentId": "dev-nexus-pharo"
         }
       ]
     }
@@ -464,8 +387,7 @@
           ],
           "provenance": "DevNexus dogfood Pharo plugin plan",
           "targetComponents": [
-            "dev-nexus-pharo",
-            "mcp-pharo"
+            "dev-nexus-pharo"
           ]
         },
         {
@@ -479,8 +401,7 @@
           ],
           "provenance": "DevNexus dogfood Pharo plugin plan",
           "targetComponents": [
-            "dev-nexus-pharo",
-            "mcp-pharo"
+            "dev-nexus-pharo"
           ]
         }
       ]
@@ -502,9 +423,7 @@
           "targetComponents": [
             "dev-nexus",
             "dev-nexus-pharo",
-            "dev-nexus-typescript",
-            "plexus",
-            "pharo-launcher-mcp"
+            "dev-nexus-typescript"
           ],
           "reason": "Resolve local package binaries such as tsc and test runners from prepared worktrees."
         },
@@ -520,9 +439,7 @@
           "targetComponents": [
             "dev-nexus",
             "dev-nexus-pharo",
-            "dev-nexus-typescript",
-            "plexus",
-            "pharo-launcher-mcp"
+            "dev-nexus-typescript"
           ],
           "provenance": "DevNexus TypeScript plugin"
         },
@@ -538,9 +455,7 @@
           "targetComponents": [
             "dev-nexus",
             "dev-nexus-pharo",
-            "dev-nexus-typescript",
-            "plexus",
-            "pharo-launcher-mcp"
+            "dev-nexus-typescript"
           ],
           "provenance": "DevNexus TypeScript plugin"
         }
@@ -625,12 +540,6 @@
               "sourcesRoot:dev-nexus-pharo",
               "--add-dir",
               "sourcesRoot:dev-nexus-typescript",
-              "--add-dir",
-              "sourcesRoot:plexus",
-              "--add-dir",
-              "sourcesRoot:pharo-launcher-mcp",
-              "--add-dir",
-              "sourcesRoot:mcp-pharo",
               "--output-last-message",
               "projectRoot:.dev-nexus/automation/last-codex-message.md",
             "Use the DevNexus dogfood coordinator instructions in AGENTS.md. Read DEV_NEXUS_AGENT_CONTEXT_FILE, inspect DevNexus eligible work and agent profiles, choose the largest safe bounded batch from eligible work items, and use parallel subagents for independent items when useful, respecting DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS and disjoint component/worktree write scopes. Update work items and target cycle records, supervise subagent results, verify and publish according to component policy, and write JSON to DEV_NEXUS_AGENT_RESULT_FILE before exiting."

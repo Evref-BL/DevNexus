@@ -32,23 +32,21 @@ and ready for coordinator-driven work across its components.
 - Windows and Mac bot publication paths are authenticated for the current
   dogfood flow. Agent-created Git/GitHub activity must continue to use the
   configured `bot` remotes and `Gabot-Darbot` automation profile.
-- Fresh Mac onboarding has been remediated for the advertised MCP surface.
-  Local source-linked CLIs expose `dev-nexus`, `dev-nexus-pharo`, and `plexus`;
-  direct `tools/list` probes pass for `dev_nexus`, `dev_nexus_pharo`,
-  `plexus_project`, `pharo_launcher`, `route_control`, and `gateway`. The
-  project-local PLexus gateway is pinned to `127.0.0.1:17576` and reports
-  operational-but-idle because no Pharo images are declared for this project.
+- Fresh Mac onboarding has been remediated for the advertised generic MCP
+  surface. Local source-linked CLIs expose `dev-nexus` and
+  `dev-nexus-pharo`; direct PLexus and Pharo runtime work now belongs in the
+  sibling `dev-nexus-plexus` project.
 - Cleanup work `dev-nexus:local-68` is complete.
-- Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
-  been pruned after verifying they were merged or superseded by completed work
-  items.
+- Local stale `codex/*` branches in DevNexus and DevNexus-Pharo have been
+  pruned after verifying they were merged or superseded by completed work items.
 - Mocked one-way local-to-GitHub sync execution is complete in
   `dev-nexus:local-48`; `dev-nexus:local-51` is ready for multi-tracker
   migration/configuration documentation.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
-  `dev-nexus:local-79` through `local-86`, `dev-nexus-pharo:local-14`, and
-  `plexus:local-23`; `local-79` and `local-80` are complete, and `local-81` is
-  ready for durable request/result records.
+  `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
+  corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
+  `local-79` and `local-80` are complete, and `local-81` is ready for durable
+  request/result records.
 - Default `npm run check` now passes on the integrated DevNexus main with 53
   test files and 418 tests after `dev-nexus:local-76` replaced slow
   coordination Git-fixture tests and stabilized the Windows process shim wait.
