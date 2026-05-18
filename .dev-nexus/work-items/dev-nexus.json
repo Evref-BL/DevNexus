@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 117,
-  "nextCommentNumber": 183,
-  "updatedAt": "2026-05-18T15:39:30.783Z",
+  "nextCommentNumber": 197,
+  "updatedAt": "2026-05-18T15:52:01.747Z",
   "items": [
     {
       "id": "local-1",
@@ -1179,7 +1179,7 @@
       "id": "local-48",
       "title": "Execute one-way local-to-GitHub work-item sync with mocked providers",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dry-run sync planning lands; live external writes remain policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add idempotent one-way sync execution for the first narrow provider path: local primary tracker to GitHub mirror or coordination tracker, covered by mocked provider tests.\n\nUser stories covered:\n- As a project maintainer, I can mirror selected local items to GitHub without duplicating issues on rerun.\n- As a worker, canonical local status can be reflected into an approved GitHub mirror when policy allows.\n\nAcceptance criteria:\n- Sync execution consumes a prior plan or rebuilds an equivalent plan immediately before mutation.\n- Execution can create missing target GitHub issues when policy and provider capabilities allow it.\n- Execution can update only configured fields owned by the source policy.\n- Created or updated target items are linked to the logical work item immediately and idempotently.\n- DevNexus-generated comments include stable markers or fingerprints to prevent duplicate/echo comments.\n- Execution records a sync run summary with created, updated, skipped, conflicted, and blocked counts plus provider links.\n- Live external writes require explicit provider write policy and configured auth identity; default tests use mocked providers only.\n\nDependencies:\n- Depends on `dev-nexus:local-47`.\n- Composes with `dev-nexus:local-38` publication identity guardrails and `dev-nexus:local-39` meta-project hosting config before live dogfood writes.\n\nBoundaries:\n- Do not implement unrestricted two-way sync.\n- Do not propagate deletes.\n- Do not enable live GitHub sync in the dogfood project without explicit policy approval.\n\nVerification:\n- Mocked GitHub/local provider execution tests for idempotent create, update, link, comment marker, skipped capability, and blocked policy cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1193,8 +1193,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.018Z",
-      "updatedAt": "2026-05-18T11:25:09.503Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:51:59.354Z",
+      "closedAt": "2026-05-18T15:51:59.354Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1260,9 +1260,10 @@
       "id": "local-51",
       "title": "Document multi-tracker configuration and migration guidance",
       "description": "Type: documentation and migration slice\nReadiness: autonomous agent-ready (AFK) after the core multi-tracker shape stabilizes.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: document how users configure multiple component trackers, preserve default tracker compatibility, link existing external items, dry-run sync, and migrate safely from local to shared providers.\n\nUser stories covered:\n- As a maintainer, I can migrate a component from local work items to GitHub or Jira without losing history.\n- As a project maintainer, I can choose which items are mirrored externally and which remain local.\n\nAcceptance criteria:\n- README or docs explain tracker bindings, default tracker behavior, roles, link records, sync policy, dry-run planning, and one-way sync limitations.\n- Documentation includes examples for local primary plus GitHub mirror/coordination tracker.\n- Migration guidance covers linking existing external issues before enabling sync.\n- Safety notes cover dry-run-first behavior, no delete propagation, no two-way sync by default, and provider identity guardrails.\n- Agent-facing guidance explains how coordinators should treat canonical versus mirrored work items.\n\nDependencies:\n- Depends on the implemented shape from `dev-nexus:local-44` through the relevant sync/coordination slices.\n\nBoundaries:\n- Do not document unsupported two-way sync or live external writes as available.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if docs are covered by repository checks.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
+        "dogfood",
         "work-tracking",
         "multi-tracker",
         "docs",
@@ -1273,7 +1274,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.589Z",
-      "updatedAt": "2026-05-17T13:59:51.589Z",
+      "updatedAt": "2026-05-18T15:52:01.071Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1889,7 +1890,7 @@
       "id": "local-76",
       "title": "Stabilize full-suite coordination test timeout",
       "description": "Default npm run check repeatedly times out in nexusCoordination clean-handoff test under full-suite load; isolated test and serialized full suite pass. Make default check deterministic without weakening coverage.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1901,8 +1902,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T12:21:15.591Z",
-      "updatedAt": "2026-05-18T12:26:59.163Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:51:59.752Z",
+      "closedAt": "2026-05-18T15:51:59.752Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1990,7 +1991,7 @@
       "id": "local-80",
       "title": "Add runner profile schema with safety classes and approval gates",
       "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: model generic runner profiles that constrain what a local or remote host may execute for a DevNexus project.\n\nUser stories covered:\n- As a human, I can approve one live-runtime runner profile without granting broad arbitrary shell access.\n- As a maintainer, I can see whether a requested remote action is read-only, project-local mutation, live-runtime, or destructive before it runs.\n\nAcceptance criteria:\n- Project config can declare runner profiles with required capabilities, allowed operation classes, command profile references, timeout/output limits, artifact retention policy, credential identity policy, mutation class, and approval requirement.\n- Validation rejects runner profiles that allow live-runtime or destructive work without explicit approval metadata or policy gates.\n- Status surfaces show each profile's required capabilities, mutation class, approval state, and missing host capability warnings.\n- Agent-facing context summarizes runner profile policy without exposing host-local secrets, paths, SSH targets, or tokens.\n- Tests cover read-only, verification-only, project-local mutation, live-runtime, destructive, and invalid profile combinations.\n\nBoundaries:\n- Do not execute runner profiles in this slice.\n- Do not introduce plugin-specific runner fields into DevNexus core; plugins can contribute generic capabilities and profile templates later.\n\nVerification:\n- Focused profile schema/status/agent-context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2003,8 +2004,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:04:29.601Z",
-      "updatedAt": "2026-05-18T15:28:37.239Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:52:00.168Z",
+      "closedAt": "2026-05-18T15:52:00.168Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2016,7 +2017,7 @@
       "id": "local-81",
       "title": "Record remote execution requests and results",
       "description": "Type: remote host execution implementation slice\nReadiness: todo/dependent on dev-nexus:local-79 and dev-nexus:local-80\nSource PRD: docs/remote-host-execution-prd.md\nParent: dev-nexus:local-77\n\nGoal: add durable request/result records for bounded remote host work while keeping DevNexus coordination state separate from the eventual execution transport.\n\nUser stories covered:\n- As a Windows agent, I can request Mac-specific verification and later read a structured result without relying on terminal chat.\n- As a Mac agent, I can record a Windows-specific verification result with command, commit, exit code, and output tail.\n\nAcceptance criteria:\n- DevNexus can create an execution request with project, component, optional work item, requesting host/agent, required capabilities or target host, runner profile, repository/ref, command profile, timeout, expected artifacts, mutation class, and initial status.\n- DevNexus can record a result with host id, runner profile id, actual commit/ref, commands run, exit code, verification outcome, output tail, artifact references, cleanup status, and blocker/safety reason when applicable.\n- Request statuses include queued, accepted, running, completed, failed, blocked, timed_out, and cancelled.\n- CLI and MCP expose request creation and result read/record operations in draft/local form with no remote execution.\n- Request/result records can be attached to work items or coordination records without duplicating source-of-truth fields.\n\nBoundaries:\n- Do not run local or remote commands in this slice.\n- Do not post to live external providers unless an existing provider policy explicitly allows it; local tracker coverage is sufficient.\n\nVerification:\n- Focused CLI/MCP/service tests for request creation, status transitions, result recording, malformed output tails, and component/work-item references.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2029,7 +2030,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:04:30.003Z",
-      "updatedAt": "2026-05-18T13:04:30.003Z",
+      "updatedAt": "2026-05-18T15:52:01.747Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2839,7 +2840,7 @@
       "id": "local-112",
       "title": "Reject plugin MCP tool overlap with DevNexus core tools",
       "description": "Type: core guardrail slice\nReadiness: todo/dependent after DevNexus-Pharo default MCP overlap is removed\nDepends on: dev-nexus-pharo:local-18\nSource: user direction on 2026-05-18: plugins are additive and must not re-expose DevNexus core tools.\n\nGoal:\nAdd a generic DevNexus guardrail that detects plugin-projected MCP tool names overlapping DevNexus core MCP tools so future plugins cannot recreate a replacement/specialization surface accidentally.\n\nAcceptance criteria:\n- DevNexus has a generic additive-plugin validation or setup/status diagnostic for plugin MCP server capabilities whose declared tool names duplicate DevNexus core MCP tool names.\n- The diagnostic names the plugin id, server name, duplicate tool names, and replacement owner: use dev_nexus for generic DevNexus operations.\n- The guardrail is blocking for generated setup/status or project validation once current plugin surfaces are cleaned; there is no compatibility allow-list for old DevNexus-Pharo names.\n- Tests cover a clean additive plugin, a plugin duplicating work_item_list, a plugin duplicating project_status, and multiple plugin MCP servers.\n- Documentation states that plugin MCP servers are additive domain surfaces, not alternate generic DevNexus servers.\n\nBoundaries:\n- Keep DevNexus core generic; do not hardcode Pharo-specific plugin behavior.\n- Do not inspect live external MCP servers or run plugin commands; use declared capability metadata and the DevNexus core tool list.\n\nVerification:\n- Run focused DevNexus plugin capability/config/setup tests.\n- Run npm run check in DevNexus when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2853,8 +2854,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:06.795Z",
-      "updatedAt": "2026-05-18T15:28:37.256Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T15:52:00.595Z",
+      "closedAt": "2026-05-18T15:52:00.595Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4347,6 +4348,39 @@
           "provider": "local",
           "itemId": "local-comment-159"
         }
+      },
+      {
+        "id": "local-comment-183",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-48\nHead: 4ca43622dbf5267157dd149b74cd9f69115e8dc4\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:33:55.088Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-48\",\n  \"logicalItemId\": \"local-48\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-48\",\n    \"itemNumber\": 48,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-48\",\n    \"itemNumber\": 48,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-48\",\n        \"itemNumber\": 48\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-48\",\n  \"branch\": \"codex/dev-nexus/local-48\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ca43622dbf5267157dd149b74cd9f69115e8dc4\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns mocked one-way local-to-GitHub sync execution; no live provider writes.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:33:55.119Z",
+        "updatedAt": "2026-05-18T15:33:55.119Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-183"
+        }
+      },
+      {
+        "id": "local-comment-188",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-48\nHead: 66f4f77afbca15e945490b6bcf15ed5d03b76d6d\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:47:59.932Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-48\",\n  \"logicalItemId\": \"local-48\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-48\",\n    \"itemNumber\": 48,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-48\",\n    \"itemNumber\": 48,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-48\",\n      \"itemNumber\": 48,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-48\",\n        \"itemNumber\": 48\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-48\",\n  \"branch\": \"codex/dev-nexus/local-48\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"66f4f77afbca15e945490b6bcf15ed5d03b76d6d\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused sync planner, CLI, MCP tests and build passed; full check hit known timeout before local-76 integration.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worker committed 66f4f77. One-way local-to-GitHub sync executor with CLI/MCP surfaces; full check timeout expected to be covered by local-76.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:47:59.962Z",
+        "updatedAt": "2026-05-18T15:47:59.962Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-188"
+        }
+      },
+      {
+        "id": "local-comment-191",
+        "body": "Completed and published to DevNexus main as dfaf1ca. Added one-way local-to-GitHub sync execution with explicit execute policy, credential gating, idempotent links, stable generated comment fingerprints, CLI sync-execute, and MCP work_item_sync_execute. Integrated verification passed: focused affected tests, process supervisor test, and npm run check with 53 files / 418 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T15:51:59.131Z",
+        "updatedAt": "2026-05-18T15:51:59.131Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-191"
+        }
       }
     ],
     "local-49": [
@@ -4452,7 +4486,19 @@
         }
       }
     ],
-    "local-51": [],
+    "local-51": [
+      {
+        "id": "local-comment-195",
+        "body": "Promoted to ready after dev-nexus:local-48 landed one-way sync execution on DevNexus main as dfaf1ca. The multi-tracker implementation shape is now stable enough for migration/configuration documentation.",
+        "author": null,
+        "createdAt": "2026-05-18T15:52:00.811Z",
+        "updatedAt": "2026-05-18T15:52:00.811Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-195"
+        }
+      }
+    ],
     "local-52": [],
     "local-53": [
       {
@@ -4992,7 +5038,41 @@
     "local-73": [],
     "local-74": [],
     "local-75": [],
-    "local-76": [],
+    "local-76": [
+      {
+        "id": "local-comment-184",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-76\nHead: 4ca43622dbf5267157dd149b74cd9f69115e8dc4\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:33:56.314Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-76\",\n  \"logicalItemId\": \"local-76\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-76\",\n    \"itemNumber\": 76,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-76\",\n    \"itemNumber\": 76,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-76\",\n        \"itemNumber\": 76\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-76\",\n  \"branch\": \"codex/dev-nexus/local-76\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ca43622dbf5267157dd149b74cd9f69115e8dc4\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Main agent owns full-suite coordination test timeout stabilization.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:33:56.342Z",
+        "updatedAt": "2026-05-18T15:33:56.342Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-184"
+        }
+      },
+      {
+        "id": "local-comment-187",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-76\nHead: 7d09fc53b78b6eeee0bf51b48bba2377120a740b\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:42:51.709Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-76\",\n  \"logicalItemId\": \"local-76\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-76\",\n    \"itemNumber\": 76,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-76\",\n    \"itemNumber\": 76,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-76\",\n      \"itemNumber\": 76,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-76\",\n        \"itemNumber\": 76\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-76\",\n  \"branch\": \"codex/dev-nexus/local-76\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"7d09fc53b78b6eeee0bf51b48bba2377120a740b\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm test -- src/nexusCoordination.test.ts --reporter=verbose passed; npm run check passed: 53 files / 404 tests.\",\n  \"integrationPreference\": null,\n  \"note\": \"Committed 7d09fc5. Replaced slow real-git integration planner tests with deterministic Git-runner fakes and set Vitest project timeout to 30000ms for Windows/process-heavy full-suite tests.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:42:51.753Z",
+        "updatedAt": "2026-05-18T15:42:51.753Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-187"
+        }
+      },
+      {
+        "id": "local-comment-192",
+        "body": "Completed and published to DevNexus main as 90e1b18 plus follow-up baace6a. Replaced slow real-git coordination integration tests with deterministic Git-runner fakes, set Vitest project timeout to 30000ms, and lengthened the Windows .cmd shim readiness wait. Verification passed: focused coordination/process tests and npm run check with 53 files / 418 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T15:51:59.554Z",
+        "updatedAt": "2026-05-18T15:51:59.554Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-192"
+        }
+      }
+    ],
     "local-77": [
       {
         "id": "local-comment-169",
@@ -5076,9 +5156,54 @@
           "provider": "local",
           "itemId": "local-comment-181"
         }
+      },
+      {
+        "id": "local-comment-185",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-80\nHead: 4ca43622dbf5267157dd149b74cd9f69115e8dc4\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:33:57.506Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-80\",\n  \"logicalItemId\": \"local-80\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-80\",\n    \"itemNumber\": 80,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-80\",\n    \"itemNumber\": 80,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-80\",\n        \"itemNumber\": 80\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-80\",\n  \"branch\": \"codex/dev-nexus/local-80\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ca43622dbf5267157dd149b74cd9f69115e8dc4\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns runner profile schema, safety gates, status, and agent-context summaries.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:33:57.527Z",
+        "updatedAt": "2026-05-18T15:33:57.527Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-185"
+        }
+      },
+      {
+        "id": "local-comment-189",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-80\nHead: cd061ffb155ffe36f480a48c58e2064673daf7f2\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:48:01.180Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-80\",\n  \"logicalItemId\": \"local-80\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-80\",\n    \"itemNumber\": 80,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-80\",\n    \"itemNumber\": 80,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-80\",\n      \"itemNumber\": 80,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-80\",\n        \"itemNumber\": 80\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-80\",\n  \"branch\": \"codex/dev-nexus/local-80\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"cd061ffb155ffe36f480a48c58e2064673daf7f2\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused runner profile/status/agent-context tests, build, and non-coordination suite passed; full check hit known coordination timeout before local-76 integration.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worker committed cd061ff. Runner profile schema and safety gates; full check timeout expected to be covered by local-76.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:48:01.208Z",
+        "updatedAt": "2026-05-18T15:48:01.208Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-189"
+        }
+      },
+      {
+        "id": "local-comment-193",
+        "body": "Completed and published to DevNexus main as 69fad6f. Added generic runner profile schema, safety classes, approval gates, status reporting, and agent/worktree context summaries without executing profiles. Integrated verification passed: focused affected tests and npm run check with 53 files / 418 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T15:51:59.954Z",
+        "updatedAt": "2026-05-18T15:51:59.954Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-193"
+        }
       }
     ],
-    "local-81": [],
+    "local-81": [
+      {
+        "id": "local-comment-196",
+        "body": "Promoted to ready after dev-nexus:local-79 and dev-nexus:local-80 landed host registry overlays and runner profile policy on DevNexus main. Request/result records can now build on that foundation.",
+        "author": null,
+        "createdAt": "2026-05-18T15:52:01.372Z",
+        "updatedAt": "2026-05-18T15:52:01.372Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-196"
+        }
+      }
+    ],
     "local-82": [],
     "local-83": [],
     "local-84": [],
@@ -5154,6 +5279,39 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-182"
+        }
+      },
+      {
+        "id": "local-comment-186",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-112\nHead: 4ca43622dbf5267157dd149b74cd9f69115e8dc4\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:33:58.644Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-112\",\n  \"logicalItemId\": \"local-112\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-112\",\n    \"itemNumber\": 112,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-112\",\n    \"itemNumber\": 112,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-112\",\n        \"itemNumber\": 112\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-112\",\n  \"branch\": \"codex/dev-nexus/local-112\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ca43622dbf5267157dd149b74cd9f69115e8dc4\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns generic plugin MCP overlap guardrail; no live MCP probing.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:33:58.666Z",
+        "updatedAt": "2026-05-18T15:33:58.666Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-186"
+        }
+      },
+      {
+        "id": "local-comment-190",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-112\nHead: 92a7e69cf46fe798a0313b982f4ea63607e31052\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T15:48:02.379Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-112\",\n  \"logicalItemId\": \"local-112\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-112\",\n    \"itemNumber\": 112,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-112\",\n    \"itemNumber\": 112,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-112\",\n      \"itemNumber\": 112,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-112\",\n        \"itemNumber\": 112\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-112\",\n  \"branch\": \"codex/dev-nexus/local-112\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"92a7e69cf46fe798a0313b982f4ea63607e31052\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused plugin/config/setup/MCP tests and build passed; full check hit known timeout before local-76 integration.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worker committed 92a7e69. Generic plugin MCP core-tool overlap guardrail; full check timeout expected to be covered by local-76.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T15:48:02.405Z",
+        "updatedAt": "2026-05-18T15:48:02.405Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-190"
+        }
+      },
+      {
+        "id": "local-comment-194",
+        "body": "Completed and published to DevNexus main as 0cf0571. Added generic core MCP tool ownership metadata and plugin MCP overlap validation/setup/status diagnostics with no legacy allow-list. Integrated verification passed: focused plugin/config/setup/MCP tests and npm run check with 53 files / 418 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T15:52:00.368Z",
+        "updatedAt": "2026-05-18T15:52:00.368Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-194"
         }
       }
     ],

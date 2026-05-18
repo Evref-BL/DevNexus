@@ -42,8 +42,8 @@ target-cycle facts, commits, and the target report.
   DevNexus core.
 - DevNexus-Pharo MCP cleanup: delegated generic DevNexus MCP tools, generic
   tracker wrappers, generic worktree compatibility tools, remaining MCP naming
-  overlap, and old config migration paths have been removed. Continue with the
-  generic DevNexus guardrail slice `dev-nexus:local-112`.
+  overlap, and old config migration paths have been removed. DevNexus core now
+  rejects plugin MCP tool names that overlap core `dev_nexus` tools.
 - Project hygiene: keep this dogfood root free of old staging artifacts,
   obsolete local runtime profiles, and stale completed-cycle narration.
 
@@ -61,21 +61,16 @@ target-cycle facts, commits, and the target report.
 
 ## Next Work Candidates
 
-- Implement `dev-nexus:local-48` while one-way local-to-GitHub sync execution
-  can stay mocked and policy-gated.
-- Stabilize `dev-nexus:local-76` to remove the remaining full-suite
-  coordination timeout under parallel load.
-- Continue remote-host execution with `dev-nexus:local-80` after the host
-  registry overlay foundation in `local-79`.
+- Document multi-tracker setup and migration through `dev-nexus:local-51`,
+  now that mocked one-way sync execution has landed.
+- Continue remote-host execution with `dev-nexus:local-81` for durable
+  request/result records after host registry and runner profile policy landed.
 - Continue parallel-agent workflow with ready advisory/read-only slices
   `dev-nexus:local-99` and `dev-nexus:local-102`.
-- Start generic MCP overlap guardrails with `dev-nexus:local-112`, now that the
-  DevNexus-Pharo side has removed legacy overlap.
 - Continue authority configuration at `dev-nexus:local-87` before promoting
   dependent authority slices.
-- Continue agent-target projection at `dev-nexus:local-105`.
-- Promote `dev-nexus:local-51` after the multi-tracker implementation shape is
-  stable enough for user-facing migration documentation.
+- Continue agent-target projection planning at `dev-nexus:local-104`, then
+  implement the active target policy slices beginning with `local-105`.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work blocked until an isolated runner

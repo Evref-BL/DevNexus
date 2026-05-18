@@ -86,11 +86,14 @@ coordinator agent chooses and supervises implementation work.
   `plexus` was not on `PATH` and direct Pharo HTTP MCP was not live. Treat that
   Mac as ready for non-live DevNexus coordination only until runtime tooling is
   explicitly enabled.
-- DevNexus main now includes the latest aggressive source batch:
+- DevNexus main now includes the latest aggressive source batches:
   `ce9b7d2` rejects duplicate explicit target-cycle ids, `ff981bc` documents
-  the worktree-first parallel chat workflow, and `4ca4362` adds host-local and
-  remote-host registry overlays. Follow-up slices `dev-nexus:local-80` and
-  `dev-nexus:local-112` are promoted to `ready`.
+  worktree-first parallel chat workflow, `4ca4362` adds host-local and
+  remote-host registry overlays, `90e1b18`/`baace6a` stabilize full-suite
+  Windows verification, `69fad6f` adds runner profile safety policy,
+  `0cf0571` adds plugin MCP overlap guardrails, and `dfaf1ca` adds mocked
+  one-way work-item sync execution. Follow-up slices `dev-nexus:local-51` and
+  `dev-nexus:local-81` are promoted to `ready`.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.
