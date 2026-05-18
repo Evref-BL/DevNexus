@@ -229,6 +229,37 @@ describe("DevNexus MCP server", () => {
     );
   });
 
+  it("returns guard details for guarded shared-checkout MCP mutations", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const result = await callDevNexusMcpTool(
+      "work_item_set_status",
+      {
+        projectRoot,
+        id: "local-1",
+        status: "done",
+      },
+      {
+        gitRunner: fakeGitRunner(projectRoot),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).toBe(true);
+    expect(payload).toMatchObject({
+      ok: false,
+      guard: {
+        ok: false,
+        classification: "shared_project_checkout",
+        mutationClass: "local_tracker",
+      },
+    });
+    expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
   it("lists provider-compatible tool input schemas", () => {
     const issues = listDevNexusMcpTools().flatMap((tool) =>
       listMcpInputSchemaProviderIssues(tool.inputSchema).map((issue) => ({

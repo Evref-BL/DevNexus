@@ -72,6 +72,12 @@ import {
   resolveNexusManualWorktreeWorkItem,
 } from "./nexusManualWorktree.js";
 import {
+  assertNexusSharedCheckoutMutationAllowed,
+  NexusSharedCheckoutGuardError,
+  type NexusCheckoutMutationClass,
+  type NexusSharedCheckoutGuardOverride,
+} from "./nexusSharedCheckoutGuard.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
   type WorkItemProjectSelector,
@@ -120,6 +126,8 @@ export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
   currentPath?: string;
+  sharedCheckoutGuard?: "enforce" | "disabled";
+  sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
 }
 
 export interface DevNexusMcpToolResult {
@@ -891,6 +899,10 @@ export async function callDevNexusMcpTool(
           }),
         });
       case "setup_record":
+        assertMcpMutationAllowed(args, context, {
+          command: "setup_record",
+          mutationClass: "project_state",
+        });
         return toolResult({
           ok: true,
           ...recordNexusSetupStep({
@@ -911,6 +923,10 @@ export async function callDevNexusMcpTool(
           ...targetCycleLedgerFromArgs(args),
         });
       case "target_cycle_record":
+        assertMcpMutationAllowed(args, context, {
+          command: "target_cycle_record",
+          mutationClass: "target_state",
+        });
         return toolResult({
           ok: true,
           ...appendTargetCycleFromArgs(args, context),
@@ -943,6 +959,10 @@ export async function callDevNexusMcpTool(
         });
       }
       case "current_agent_record":
+        assertMcpMutationAllowed(args, context, {
+          command: "current_agent_record",
+          mutationClass: "target_state",
+        });
         return toolResult({
           ok: true,
           ...recordNexusAutomationCurrentAgentAdoptionResult({
@@ -955,6 +975,11 @@ export async function callDevNexusMcpTool(
       case "worktree_prepare": {
         const projectRoot = projectRootFromArgs(args);
         const componentId = optionalString(args, "componentId", "arguments");
+        assertMcpMutationAllowed(args, context, {
+          command: "worktree_prepare",
+          mutationClass: "worktree_bootstrap",
+          componentId,
+        });
         const projectMeta = optionalBoolean(args, "projectMeta", "arguments");
         const workItemId = optionalNullableString(
           args,
@@ -1019,6 +1044,11 @@ export async function callDevNexusMcpTool(
           }),
         });
       case "coordination_handoff":
+        assertMcpMutationAllowed(args, context, {
+          command: "coordination_handoff",
+          mutationClass: "coordination_record",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
         return toolResult({
           ok: true,
           ...(await createNexusCoordinationHandoff({
@@ -1075,6 +1105,11 @@ export async function callDevNexusMcpTool(
           }),
         });
       case "coordination_request":
+        assertMcpMutationAllowed(args, context, {
+          command: "coordination_request",
+          mutationClass: "coordination_record",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
         return toolResult({
           ok: true,
           ...(await createNexusCoordinationRequest({
@@ -1115,6 +1150,11 @@ export async function callDevNexusMcpTool(
           })),
         });
       case "work_item_create":
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_create",
+          mutationClass: "local_tracker",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).createWorkItem({
@@ -1151,6 +1191,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_update": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_update",
+          mutationClass: "local_tracker",
+          componentId: selector.componentId,
+        });
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).updateWorkItem({
@@ -1162,6 +1207,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_comment": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_comment",
+          mutationClass: "local_tracker",
+          componentId: selector.componentId,
+        });
         return toolResult({
           ok: true,
           comment: await workItemServiceFromArgs(args, context).addComment({
@@ -1173,6 +1223,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_set_status": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_set_status",
+          mutationClass: "local_tracker",
+          componentId: selector.componentId,
+        });
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).setStatus({
@@ -1187,6 +1242,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_link": {
         const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_link",
+          mutationClass: "local_tracker",
+          componentId: selector.componentId,
+        });
         return toolResult({
           ok: true,
           ...(await workItemTrackerLinkServiceFromArgs(
@@ -1240,6 +1300,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_unlink": {
         const { selector, logicalItemId } = logicalWorkItemFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_unlink",
+          mutationClass: "local_tracker",
+          componentId: selector.componentId,
+        });
         return toolResult({
           ok: true,
           ...(await workItemTrackerLinkServiceFromArgs(
@@ -1269,6 +1334,11 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_sync_execute": {
         const homePath = homePathFromArgs(args);
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_sync_execute",
+          mutationClass: "provider_sync",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
         return toolResult({
           ok: true,
           run: await executeWorkItemSync({
@@ -1295,10 +1365,38 @@ export async function callDevNexusMcpTool(
       {
         ok: false,
         ...nexusCoordinationErrorPayload(error),
+        ...(error instanceof NexusSharedCheckoutGuardError
+          ? { guard: error.decision }
+          : {}),
       },
       true,
     );
   }
+}
+
+function assertMcpMutationAllowed(
+  args: Record<string, unknown>,
+  context: DevNexusMcpToolContext,
+  options: {
+    command: string;
+    mutationClass: NexusCheckoutMutationClass;
+    targetPath?: string | null;
+    componentId?: string | null;
+  },
+): void {
+  if (context.sharedCheckoutGuard !== "enforce") {
+    return;
+  }
+
+  assertNexusSharedCheckoutMutationAllowed({
+    projectRoot: projectRootFromArgs(args),
+    command: options.command,
+    mutationClass: options.mutationClass,
+    targetPath: options.targetPath,
+    componentId: options.componentId,
+    gitRunner: context.gitRunner,
+    override: context.sharedCheckoutGuardOverride,
+  });
 }
 
 export async function handleDevNexusMcpJsonRpcMessage(
@@ -1326,7 +1424,9 @@ export async function handleDevNexusMcpJsonRpcMessage(
       const params = parseToolCallParams(message.params);
       return jsonRpcResult(
         message.id,
-        await callDevNexusMcpTool(params.name, params.arguments),
+        await callDevNexusMcpTool(params.name, params.arguments, {
+          sharedCheckoutGuard: "enforce",
+        }),
       );
     }
     default:

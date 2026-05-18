@@ -111,6 +111,13 @@ import {
 } from "./nexusAgentMcpConfig.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
+  assertNexusSharedCheckoutMutationAllowed,
+  parseNexusSharedCheckoutGuardOverride,
+  NexusSharedCheckoutGuardError,
+  type NexusCheckoutMutationClass,
+  type NexusSharedCheckoutGuardOverride,
+} from "./nexusSharedCheckoutGuard.js";
+import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
   type PrepareNexusManualWorktreeResult,
@@ -200,6 +207,8 @@ export interface DevNexusCliDependencies {
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;
   now?: () => Date | string;
+  sharedCheckoutGuard?: "enforce" | "disabled";
+  sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
 }
 
 interface ParsedHomeInitCommand {
@@ -1128,6 +1137,11 @@ async function handleProjectMcpCommand(
 
   const parsed = parseProjectMcpRefreshCommand(argv);
   const projectRoot = path.resolve(parsed.projectRoot);
+  assertCliMutationAllowed(dependencies, {
+    projectRoot,
+    command: "project mcp refresh",
+    mutationClass: "skill_mcp_projection",
+  });
   const projectConfig = loadProjectConfig(projectRoot);
   const result = materializeNexusProjectAgentMcpConfig({
     projectRoot,
@@ -1227,6 +1241,11 @@ async function handleSetupCommand(
 
   if (command === "record") {
     const parsed = parseSetupRecordCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "setup record",
+      mutationClass: "project_state",
+    });
     const result = recordNexusSetupStep({
       projectRoot: parsed.projectRoot,
       flowId: parsed.flowId,
@@ -1269,6 +1288,11 @@ async function handleCoordinationCommand(
 
   if (command === "handoff") {
     const parsed = parseCoordinationHandoffCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "coordination handoff",
+      mutationClass: "coordination_record",
+    });
     const result = await createNexusCoordinationHandoff({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
@@ -1297,6 +1321,15 @@ async function handleCoordinationCommand(
 
   if (command === "integrate") {
     const parsed = parseCoordinationIntegrateCommand(argv);
+    if (parsed.fetch) {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "coordination integrate --fetch",
+        mutationClass: "publication_integration",
+        targetPath: parsed.currentPath ?? process.cwd(),
+        componentId: parsed.componentId,
+      });
+    }
     try {
       const plan = await getNexusCoordinationIntegrationPlan({
         projectRoot: parsed.projectRoot,
@@ -1347,6 +1380,11 @@ async function handleCoordinationCommand(
 
   if (command === "request") {
     const parsed = parseCoordinationRequestCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "coordination request",
+      mutationClass: "coordination_record",
+    });
     const result = await createNexusCoordinationRequest({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
@@ -1385,6 +1423,12 @@ async function handleWorktreeCommand(
   const command = argv[1];
   if (command === "prepare") {
     const parsed = parseWorktreePrepareCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "worktree prepare",
+      mutationClass: "worktree_bootstrap",
+      componentId: parsed.componentId,
+    });
     const resolvedWorkItem = await resolveWorktreePrepareWorkItem(
       parsed,
       dependencies,
@@ -1445,6 +1489,12 @@ async function handleWorkItemCommand(
   const command = argv[1];
   if (command === "create") {
     const parsed = parseWorkItemCreateCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item create",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const item = await workItemService(parsed.projectRoot, dependencies)
       .createWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
@@ -1499,6 +1549,12 @@ async function handleWorkItemCommand(
 
   if (command === "update") {
     const parsed = parseWorkItemUpdateCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item update",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
@@ -1519,6 +1575,12 @@ async function handleWorkItemCommand(
 
   if (command === "comment") {
     const parsed = parseWorkItemCommentCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item comment",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
@@ -1543,6 +1605,12 @@ async function handleWorkItemCommand(
 
   if (command === "set-status") {
     const parsed = parseWorkItemSetStatusCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item set-status",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const reference = resolveCliWorkItemReference(
       parsed.projectRoot,
       parsed.componentId,
@@ -1563,6 +1631,12 @@ async function handleWorkItemCommand(
 
   if (command === "link") {
     const parsed = parseWorkItemLinkCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item link",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const logical = resolveCliLogicalWorkItemId(
       parsed.projectRoot,
       parsed.componentId,
@@ -1619,6 +1693,12 @@ async function handleWorkItemCommand(
 
   if (command === "unlink") {
     const parsed = parseWorkItemUnlinkCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item unlink",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
     const logical = resolveCliLogicalWorkItemId(
       parsed.projectRoot,
       parsed.componentId,
@@ -1659,6 +1739,12 @@ async function handleWorkItemCommand(
 
   if (command === "sync-execute") {
     const parsed = parseWorkItemSyncPlanCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item sync-execute",
+      mutationClass: "provider_sync",
+      componentId: parsed.componentId,
+    });
     const run = await executeWorkItemSync({
       projectRoot: path.resolve(parsed.projectRoot),
       componentId: parsed.componentId,
@@ -1726,6 +1812,11 @@ async function handleAutomationCommand(
 
   if (argv[1] === "enqueue") {
     const parsed = parseAutomationEnqueueCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "automation enqueue",
+      mutationClass: "local_tracker",
+    });
     const result = await enqueueNexusAutomationWorkItem({
       projectRoot: parsed.projectRoot,
       title: parsed.title,
@@ -1935,6 +2026,11 @@ async function handleAutomationTargetCycleCommand(
 
   if (command === "record") {
     const parsed = parseAutomationTargetCycleRecordCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "automation target-cycle record",
+      mutationClass: "target_state",
+    });
     const { projectConfig, automationConfig } = automationConfigForProjectRoot(
       parsed.projectRoot,
     );
@@ -1992,6 +2088,11 @@ async function handleAutomationCurrentAgentCommand(
 
   if (command === "record") {
     const parsed = parseAutomationCurrentAgentRecordCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "automation current-agent record",
+      mutationClass: "target_state",
+    });
     const result = recordNexusAutomationCurrentAgentAdoptionResult({
       projectRoot: parsed.projectRoot,
       runId: parsed.runId,
@@ -6024,6 +6125,88 @@ function writeLine(stdout: TextWriter, line = ""): void {
 
 function writeJson(stdout: TextWriter, value: unknown): void {
   stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function assertCliMutationAllowed(
+  dependencies: DevNexusCliDependencies,
+  options: {
+    projectRoot: string;
+    command: string;
+    mutationClass: NexusCheckoutMutationClass;
+    targetPath?: string | null;
+    componentId?: string | null;
+  },
+): void {
+  if (!shouldEnforceCliSharedCheckoutGuard(dependencies)) {
+    return;
+  }
+
+  try {
+    assertNexusSharedCheckoutMutationAllowed({
+      projectRoot: options.projectRoot,
+      command: options.command,
+      mutationClass: options.mutationClass,
+      targetPath: options.targetPath,
+      componentId: options.componentId,
+      gitRunner: dependencies.gitRunner,
+      override: cliSharedCheckoutGuardOverride(dependencies),
+    });
+  } catch (error) {
+    if (error instanceof NexusSharedCheckoutGuardError) {
+      throw new Error(
+        JSON.stringify(
+          {
+            ok: false,
+            error: "shared_checkout_mutation_refused",
+            guard: error.decision,
+          },
+          null,
+          2,
+        ),
+      );
+    }
+    throw error;
+  }
+}
+
+function shouldEnforceCliSharedCheckoutGuard(
+  dependencies: DevNexusCliDependencies,
+): boolean {
+  const envMode = process.env.DEV_NEXUS_SHARED_CHECKOUT_GUARD?.trim().toLowerCase();
+  if (envMode === "off" || envMode === "disabled") {
+    return false;
+  }
+  if (dependencies.sharedCheckoutGuard === "disabled") {
+    return false;
+  }
+  if (dependencies.sharedCheckoutGuard === "enforce" || envMode === "enforce") {
+    return true;
+  }
+
+  return !hasInjectedCliDependency(dependencies);
+}
+
+function hasInjectedCliDependency(dependencies: DevNexusCliDependencies): boolean {
+  return Boolean(
+    dependencies.stdout ||
+      dependencies.stderr ||
+      dependencies.commandRunner ||
+      dependencies.gitRunner ||
+      dependencies.projectGitRunner ||
+      dependencies.now,
+  );
+}
+
+function cliSharedCheckoutGuardOverride(
+  dependencies: DevNexusCliDependencies,
+): NexusSharedCheckoutGuardOverride | null {
+  if (dependencies.sharedCheckoutGuardOverride !== undefined) {
+    return dependencies.sharedCheckoutGuardOverride;
+  }
+
+  return parseNexusSharedCheckoutGuardOverride(
+    process.env.DEV_NEXUS_SHARED_CHECKOUT_GUARD_OVERRIDE,
+  );
 }
 
 function isCliEntrypoint(): boolean {

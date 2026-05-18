@@ -266,6 +266,53 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
+  it("fails shared-checkout work-item mutations before writing local state", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${path.resolve(cwd ?? projectRoot)}\n`);
+      }
+      if (joined === "worktree list --porcelain") {
+        return ok(argsArray, `worktree ${projectRoot}\nHEAD abc123\nbranch refs/heads/main\n`);
+      }
+
+      return ok(argsArray, "");
+    };
+
+    await expect(
+      main(
+        ["work-item", "set-status", projectRoot, "local-1", "--status", "done"],
+        {
+          gitRunner,
+          sharedCheckoutGuard: "enforce",
+        },
+      ),
+    ).rejects.toThrow(/shared_checkout_mutation_refused/u);
+    expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
+  it("allows guarded bootstrap worktree preparation", async () => {
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await expect(
+      main(["worktree", "prepare", projectRoot, "--topic", "guard bootstrap", "--json"], {
+        stdout: output.writer,
+        gitRunner: fakeGitRunner(calls),
+        sharedCheckoutGuard: "enforce",
+      }),
+    ).resolves.toBe(0);
+
+    const payload = JSON.parse(output.output());
+    expect(payload.worktree.branchName).toBe("codex/primary/guard-bootstrap");
+  });
+
   it("prepares manual component and project-meta worktrees through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-worktree-");
     const sourceRoot = path.join(projectRoot, "source");
