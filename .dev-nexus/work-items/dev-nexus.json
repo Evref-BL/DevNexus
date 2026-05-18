@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 146,
+  "nextNumber": 152,
   "nextCommentNumber": 248,
-  "updatedAt": "2026-05-18T21:52:57.960Z",
+  "updatedAt": "2026-05-18T21:56:38.705Z",
   "items": [
     {
       "id": "local-1",
@@ -3746,6 +3746,165 @@
         "itemId": "local-145",
         "itemNumber": 145
       }
+    },
+    {
+      "id": "local-146",
+      "title": "Decide DevNexus-Research license and ARS integration posture",
+      "description": "Type: human-in-the-loop product and licensing decision\nReadiness: blocked until the user/project owner decides the desired upstream integration posture.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\nInspiration source: Imbad0202/academic-research-skills and Imbad0202/academic-research-skills-codex.\n\nGoal: decide how DevNexus-Research may use Academic Research Skills (ARS) material before any ARS-derived content is bundled, adapted, or redistributed.\n\nDecision options:\n- Inspiration only: use ARS as an attributed product reference and write DevNexus-Research content independently.\n- Optional external integration: detect or document the user-installed ARS Codex academic-research-suite skill and project DevNexus context around it.\n- Bundled/adapted content: vendor or adapt ARS material, requiring explicit acceptance of CC BY-NC 4.0 constraints or separate permission for broader/commercial redistribution.\n\nAcceptance criteria:\n- The chosen integration posture is recorded in target state or a follow-up Architecture Decision Record.\n- Commercial/noncommercial expectations are explicit.\n- Attribution requirements are documented for any ARS-inspired or ARS-derived material.\n- Implementation slices state whether they may use ARS content directly or only reference it.\n- No DevNexus-Research package publication depends on ambiguous license status.\n\nBoundaries:\n- Do not copy ARS prompts, agents, examples, schemas, or documentation into DevNexus source until this decision is resolved.\n- Do not present DevNexus-Research as endorsed by ARS upstream.\n\nVerification:\n- Static review of docs and package metadata for license posture and attribution notes.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "plugin",
+        "license",
+        "decision",
+        "blocked",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:12.366Z",
+      "updatedAt": "2026-05-18T21:54:12.366Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-146",
+        "itemNumber": 146
+      }
+    },
+    {
+      "id": "local-147",
+      "title": "Scaffold DevNexus-Research plugin component",
+      "description": "Type: plugin scaffold tracer-bullet\nReadiness: autonomous agent-ready if implemented with original DevNexus-owned content only.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\nRelated blocker: dev-nexus:local-146 blocks ARS-derived or bundled content, but not an original plugin skeleton.\n\nGoal: create the initial DevNexus-Research plugin package or component skeleton that proves research can be modeled as an additive DevNexus plugin.\n\nAcceptance criteria:\n- A DevNexus-Research package/component exists with package metadata, README, tests, and a minimal exported plugin capability config.\n- The plugin declares only generic DevNexus plugin capability records such as projected_skill, setup_obligation, environment_hint, worker_context_fragment, and worker_briefing_fragment.\n- The skeleton uses original placeholder skills and guidance, with no copied ARS content.\n- The plugin can be referenced from a DevNexus project config without adding research-specific behavior to DevNexus core.\n- Documentation states that the plugin is a domain add-on and that DevNexus still owns generic project, tracker, worktree, and coordination behavior.\n\nBoundaries:\n- Do not vendor ARS or adapt ARS prompt text in this slice.\n- Do not add live external API calls, document rendering, Zotero integration, or citation-provider clients.\n- Do not add the plugin to the dogfood root as enabled until setup and projection behavior is tested.\n\nVerification:\n- Package build/test for the new component.\n- Static project-config fixture proving the plugin capability shape validates.\n- npm run check for the component when feasible.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "plugin",
+        "scaffold",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:19.630Z",
+      "updatedAt": "2026-05-18T21:56:38.705Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-147",
+        "itemNumber": 147
+      }
+    },
+    {
+      "id": "local-148",
+      "title": "Project baseline research workflow skills",
+      "description": "Type: projected skill implementation slice\nReadiness: dependent on dev-nexus:local-147 plugin skeleton; autonomous if content is original and not ARS-derived.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\n\nGoal: add DevNexus-Research projected skills for baseline academic workflows with progressive disclosure and human-in-the-loop guidance.\n\nUser stories covered:\n- As a researcher with a broad topic, I can route to research-question scoping before drafting.\n- As an author, I can request paper planning, revision, citation-integrity, or manuscript-review support without loading every workflow.\n- As a coordinator, I can see which research skills are available in worker context.\n\nAcceptance criteria:\n- The plugin exposes a small router skill plus workflow-specific skills or references for research-question scoping, literature review, systematic-review protocol, paper planning, revision, manuscript review, citation integrity, research artifact handoff, and experiment planning.\n- Skills use original DevNexus-Research text unless dev-nexus:local-146 explicitly permits ARS adaptation.\n- Skill metadata names intended agent targets and supports active-target filtering.\n- Worker context lists available research workflows without overwhelming unrelated workers.\n- Review-oriented guidance is read-only unless the user explicitly enters a revision workflow.\n\nBoundaries:\n- Do not copy ARS prompt text or agent files while local-146 is unresolved.\n- Do not create native slash commands or agent-provider-specific command registries in this slice.\n\nVerification:\n- Focused skill projection tests for active target filtering and worker context summaries.\n- Static lint/check of projected skill metadata.\n- Component check command when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "skills",
+        "projection",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:26.558Z",
+      "updatedAt": "2026-05-18T21:54:26.558Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-148",
+        "itemNumber": 148
+      }
+    },
+    {
+      "id": "local-149",
+      "title": "Add research artifact conventions and setup checks",
+      "description": "Type: setup and artifact model slice\nReadiness: dependent on dev-nexus:local-147 plugin skeleton.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\n\nGoal: let DevNexus-Research projects declare and report research artifacts, optional tool readiness, and provenance-oriented setup state.\n\nUser stories covered:\n- As a researcher, I can see expected research artifacts such as research brief, source manifest, material passport, claim register, review package, revision matrix, and export decision.\n- As a coordinator, I can detect missing optional tools before assigning citation, document-export, or source-verification work.\n- As a project owner, I can keep API keys and secret paths out of portable project state.\n\nAcceptance criteria:\n- The plugin defines configurable artifact conventions for research brief, source manifest, material passport, claim register, review package, revision matrix, and export decision.\n- Setup checks report optional availability for bibliography/source tooling, document export tooling, PDF text extraction, and external index/API profiles without requiring them in baseline mode.\n- Worker briefing explains which artifacts are expected, present, missing, generated, or user-owned.\n- Environment hints carry path/profile names only and never secret values.\n- Missing optional tools degrade into explicit setup warnings, not silent runtime failures.\n\nBoundaries:\n- Do not run live provider/API calls in default tests.\n- Do not require Pandoc, LaTeX, Zotero, or network access for the baseline plugin.\n- Do not impose fixed file paths on every research project.\n\nVerification:\n- Fixture tests for artifact path rendering and setup readiness output.\n- Tests for no-network/no-optional-tool baseline behavior.\n- Component check command when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "artifacts",
+        "setup",
+        "provenance",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:33.717Z",
+      "updatedAt": "2026-05-18T21:54:33.717Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-149",
+        "itemNumber": 149
+      }
+    },
+    {
+      "id": "local-150",
+      "title": "Integrate optional external ARS Codex skill projection",
+      "description": "Type: optional integration slice\nReadiness: dependent on dev-nexus:local-147 and the dev-nexus:local-146 license posture for any behavior beyond detection/documentation.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\nUpstream candidate: Imbad0202/academic-research-skills-codex academic-research-suite skill.\n\nGoal: let DevNexus-Research optionally detect or guide installation of the ARS Codex academic-research-suite skill and project DevNexus artifact/context hints around it.\n\nAcceptance criteria:\n- The plugin can report whether the external ARS Codex skill is installed or expected for the active agent target.\n- Setup guidance explains how to install or update the external skill without vendoring it into DevNexus-Research.\n- Worker context can reference the external skill only when configured and present, with attribution and license notes.\n- Missing external ARS skill is an optional setup warning unless the research project explicitly requires it.\n- The integration does not copy ARS content into DevNexus-Research source.\n\nBoundaries:\n- Do not make ARS a hard dependency for baseline DevNexus-Research.\n- Do not invoke package installers automatically unless an explicit setup flow owns that action.\n- Do not claim feature parity with ARS; this is an optional bridge.\n\nVerification:\n- Mocked installed/missing skill detection tests.\n- Static docs checks for attribution and optionality.\n- Component check command when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "ars",
+        "codex",
+        "skills",
+        "integration",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:42.148Z",
+      "updatedAt": "2026-05-18T21:54:42.148Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-150",
+        "itemNumber": 150
+      }
+    },
+    {
+      "id": "local-151",
+      "title": "Add DevNexus-Research dogfood paper-project smoke",
+      "description": "Type: dogfood smoke slice\nReadiness: dependent on dev-nexus:local-147, local-148, and local-149.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\n\nGoal: create a minimal research-project fixture or dogfood example proving DevNexus can support non-engineering academic work without source-code assumptions.\n\nAcceptance criteria:\n- A minimal DevNexus research project can enable DevNexus-Research and render worker context without a software component verification command.\n- The project can declare a research brief, source manifest, material passport, and output artifact paths.\n- Setup status reports optional research tools as present, missing, or not configured without failing the baseline project.\n- A smoke workflow demonstrates research-question scoping or artifact handoff using original placeholder materials.\n- The smoke does not require network APIs, paid model APIs, Zotero, Pandoc, LaTeX, or a real unpublished paper.\n\nBoundaries:\n- Use a synthetic fixture or explicitly approved public/open research note; do not commit private paper materials.\n- Do not publish or represent generated fixture text as real scholarship.\n- Do not include ARS-derived content unless dev-nexus:local-146 permits it.\n\nVerification:\n- Fixture smoke command or test that renders project status/setup/worker context.\n- git diff --check.\n- Component check command when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "research-plugin",
+        "smoke-test",
+        "fake-project",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T21:54:48.636Z",
+      "updatedAt": "2026-05-18T21:54:48.636Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-151",
+        "itemNumber": 151
+      }
     }
   ],
   "comments": {
@@ -6847,6 +7006,24 @@
           "itemId": "local-comment-238"
         }
       }
-    ]
+    ],
+    "local-146": [],
+    "local-147": [
+      {
+        "id": "local-comment-243",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: Host-001.lan\nBranch: codex/dev-nexus-dogfood/dev-nexus-research-plugin\nHead: 4ea331576598f4722b115b38c9dc95d324874e19\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:56:38.701Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus-dogfood/codex-dev-nexus-dogfood-dev-nexus-research-plugin\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-147\",\n  \"logicalItemId\": \"local-147\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-147\",\n        \"itemNumber\": 147\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus-dogfood/codex-dev-nexus-dogfood-dev-nexus-research-plugin\",\n  \"branch\": \"codex/dev-nexus-dogfood/dev-nexus-research-plugin\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ea331576598f4722b115b38c9dc95d324874e19\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"docs/dev-nexus-research-plugin-prd.md\",\n    \"PLAN.md\",\n    \".dev-nexus/automation/target-state.md\",\n    \".dev-nexus/work-items/dev-nexus.json\"\n  ],\n  \"decisions\": [\n    \"Treat DevNexus-Research as an additive non-engineering domain plugin, not a DevNexus core feature.\",\n    \"Use ARS as inspiration and optional external integration until license posture is explicitly decided.\",\n    \"Allow original DevNexus-owned plugin skeleton work to proceed before ARS license decision.\"\n  ],\n  \"verificationSummary\": \"JSON work item store parsed successfully; git diff --check passed; trailing whitespace scan found no matches.\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"Published dogfood meta commit 4ea3315 to bot/main with PRD and local-146 through local-151 slices.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:56:38.705Z",
+        "updatedAt": "2026-05-18T21:56:38.705Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-243"
+        }
+      }
+    ],
+    "local-148": [],
+    "local-149": [],
+    "local-150": [],
+    "local-151": []
   }
 }

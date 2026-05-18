@@ -15,6 +15,11 @@ separate from the older staging root.
   when a component is explicitly configured for it.
 - Prefer local DevNexus MCP/CLI tools for project, automation, target, and
   work-item operations.
+- Do not mutate another DevNexus project's local metadata or local work-item
+  stores unless the user explicitly authorizes that project for the current
+  task. If the target is not a local component of this project, use the
+  configured provider-native tracker, such as GitHub Issues, or leave a
+  provider-backed coordination request instead.
 - Human account defaults are for manual human actions only. Agent-created Git
   and GitHub activity, including pushes, issues, comments, and bridge messages,
   must use the configured bot/automation profile unless the user explicitly

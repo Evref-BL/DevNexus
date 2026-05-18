@@ -40,6 +40,10 @@ target-cycle facts, commits, and the target report.
 - Plugin projection: DevNexus-Pharo and DevNexus-TypeScript should set up
   workers with domain tools and skills without leaking plugin concepts into
   DevNexus core.
+- Non-engineering plugin expansion: DevNexus-Research should prove DevNexus can
+  support academic research and writing workflows through additive skills,
+  setup checks, artifact conventions, integrity gates, and human checkpoints,
+  without making DevNexus core academic-domain-specific.
 - DevNexus-Pharo MCP cleanup: delegated generic DevNexus MCP tools, generic
   tracker wrappers, generic worktree compatibility tools, remaining MCP naming
   overlap, and old config migration paths have been removed. DevNexus core now
@@ -76,6 +80,11 @@ target-cycle facts, commits, and the target report.
 - Continue agent-target projection planning at `dev-nexus:local-104`; active
   target policy normalization is complete in `local-105`, so promote the next
   dependent projection slices as prerequisites land.
+- Continue DevNexus-Research from `docs/dev-nexus-research-plugin-prd.md`.
+  `dev-nexus:local-146` is the blocked human-in-the-loop license and upstream
+  ARS integration posture decision; `local-147` is ready for an original
+  DevNexus-Research plugin skeleton. Promote `local-148` through `local-151`
+  after the skeleton and relevant setup/artifact prerequisites land.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
   start with `dev-nexus:local-129` for tracker roles and discovery-policy
   defaults, then promote `local-130` through `local-136` as dependencies land.

@@ -167,6 +167,16 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-113` is complete, fixing stdio wire protocol compatibility.
   `local-114` and `local-115` are ready for notification/server-request routing
   and safe capability probes; `local-116` should wait until event routing lands.
+- `docs/dev-nexus-research-plugin-prd.md` records the first planned
+  non-engineering DevNexus domain plugin direction. DevNexus-Research should
+  support academic research and paper-writing workflows through additive
+  skills, setup checks, artifact conventions, integrity gates, and human
+  checkpoints. The PRD is sliced: `dev-nexus:local-146` is the blocked
+  human-in-the-loop license and upstream ARS integration posture decision;
+  `local-147` is ready for an original plugin skeleton; `local-148` through
+  `local-151` cover projected research skills, artifact/setup conventions,
+  optional external ARS Codex skill integration, and a dogfood paper-project
+  smoke.
 - No active implementation subagents are expected, and the merged worktrees and
   local branches for `local-126`, `local-127`, `local-81`, and `local-87` were
   removed after publication.
@@ -195,6 +205,10 @@ and ready for coordinator-driven work across its components.
 - Continue Codex app-server correction with `dev-nexus:local-114` and
   `dev-nexus:local-115` before worker-thread orchestration, MCP relay
   expansion, or provider-native subagent features.
+- Start DevNexus-Research with `dev-nexus:local-147` using original
+  DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
+  user decides whether ARS is inspiration-only, optional external integration,
+  or bundled/adapted content under an explicit license posture.
 - Keep cross-tracker discovery ordered: implement `dev-nexus:local-129`
   before read-only discovery status, eligible-work aggregation, deduplication,
   inbound import planning, or guarded inbound import execution. Use fake or
