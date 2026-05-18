@@ -89,8 +89,11 @@ coordinator agent chooses and supervises implementation work.
   remote-host registry overlays, `90e1b18`/`baace6a` stabilize full-suite
   Windows verification, `69fad6f` adds runner profile safety policy,
   `0cf0571` adds plugin MCP overlap guardrails, and `dfaf1ca` adds mocked
-  one-way work-item sync execution. Follow-up slices `dev-nexus:local-51` and
-  `dev-nexus:local-81` are promoted to `ready`.
+  one-way work-item sync execution. The newest batch added multi-tracker
+  migration docs as `b748694`, advisory worktree leases as `2e8b64f`, and
+  Codex app-server JSONL/JSON-RPC-lite compatibility as `7898d11`. Follow-up
+  slices `dev-nexus:local-81`, `local-102`, `local-114`, and `local-115` are
+  ready candidates.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

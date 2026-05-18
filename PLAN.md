@@ -63,12 +63,13 @@ target-cycle facts, commits, and the target report.
 
 ## Next Work Candidates
 
-- Document multi-tracker setup and migration through `dev-nexus:local-51`,
-  now that mocked one-way sync execution has landed.
 - Continue remote-host execution with `dev-nexus:local-81` for durable
   request/result records after host registry and runner profile policy landed.
-- Continue parallel-agent workflow with ready advisory/read-only slices
-  `dev-nexus:local-99` and `dev-nexus:local-102`.
+- Continue parallel-agent workflow with ready cleanup/read-only slice
+  `dev-nexus:local-102`; keep status expansion `local-100` dependent until
+  authority status summaries exist.
+- Continue Codex app-server correction with `dev-nexus:local-114` notification
+  and server-request routing or `dev-nexus:local-115` safe initialize probes.
 - Continue authority configuration at `dev-nexus:local-87` before promoting
   dependent authority slices.
 - Continue agent-target projection planning at `dev-nexus:local-104`, then

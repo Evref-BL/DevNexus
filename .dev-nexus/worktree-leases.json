@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-18T16:17:57.030Z",
+  "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-45925ebcba2ae65e",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": "codex",
+      "workItemId": "local-99",
+      "branchName": "codex/dev-nexus/local-99",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-99"
+      },
+      "writeScope": [
+        "src/nexusWorktreeLease.ts",
+        "src/nexusCoordination.ts",
+        "src/nexusManualWorktree.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T16:12:24.232Z",
+      "lastSeenAt": "2026-05-18T16:17:57.030Z",
+      "updatedAt": "2026-05-18T16:17:57.030Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "2e8b64fd7f86b72f68d7c7dc0fd6f3e53f74d0be",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-99"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published to DevNexus main as 2e8b64f and integrated in batch3."
+      ]
+    }
+  ]
+}

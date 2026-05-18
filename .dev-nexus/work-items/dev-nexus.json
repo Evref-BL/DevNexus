@@ -1,7 +1,7 @@
 {
   "version": 1,
   "nextNumber": 128,
-  "nextCommentNumber": 199,
+  "nextCommentNumber": 212,
   "updatedAt": "2026-05-18T16:17:05.555Z",
   "items": [
     {
@@ -1260,7 +1260,7 @@
       "id": "local-51",
       "title": "Document multi-tracker configuration and migration guidance",
       "description": "Type: documentation and migration slice\nReadiness: autonomous agent-ready (AFK) after the core multi-tracker shape stabilizes.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: document how users configure multiple component trackers, preserve default tracker compatibility, link existing external items, dry-run sync, and migrate safely from local to shared providers.\n\nUser stories covered:\n- As a maintainer, I can migrate a component from local work items to GitHub or Jira without losing history.\n- As a project maintainer, I can choose which items are mirrored externally and which remain local.\n\nAcceptance criteria:\n- README or docs explain tracker bindings, default tracker behavior, roles, link records, sync policy, dry-run planning, and one-way sync limitations.\n- Documentation includes examples for local primary plus GitHub mirror/coordination tracker.\n- Migration guidance covers linking existing external issues before enabling sync.\n- Safety notes cover dry-run-first behavior, no delete propagation, no two-way sync by default, and provider identity guardrails.\n- Agent-facing guidance explains how coordinators should treat canonical versus mirrored work items.\n\nDependencies:\n- Depends on the implemented shape from `dev-nexus:local-44` through the relevant sync/coordination slices.\n\nBoundaries:\n- Do not document unsupported two-way sync or live external writes as available.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if docs are covered by repository checks.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1274,8 +1274,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.589Z",
-      "updatedAt": "2026-05-18T15:52:01.071Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T16:15:45.474Z",
+      "closedAt": "2026-05-18T16:15:45.474Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2494,7 +2494,7 @@
       "id": "local-99",
       "title": "Record advisory worktree leases for active agent work",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: add advisory worktree lease records so parallel chats and multi-host agents can see active ownership intent without introducing mandatory hard locks.\n\nUser stories covered:\n- As a Mac agent, I can see that a Windows agent is already working on a related component surface before I start editing.\n- As a maintainer, I can inspect one coordination surface and understand what is working, ready, blocked, merged, stale, or abandoned.\n\nAcceptance criteria:\n- DevNexus can create or refresh a lease for component or project-meta work with project id, host id, optional agent/chat id, component or meta scope, optional work item, branch, base ref, intended write scope, status, timestamps, and notes.\n- Lease status supports working, ready, blocked, integrating, merged, abandoned, and stale.\n- Lease records include last observed head commit, dirty state, and pushed state when Git facts are available.\n- Leases are advisory freshness signals; stale or conflicting leases warn but do not become hard locks by default.\n- Worktree prepare and coordination handoff can attach or update lease information when policy allows.\n- Tests cover lease creation, refresh, stale detection, status transitions, component and project-meta scopes, and missing host or agent ids.\n\nDependencies:\n- Builds on existing worktree prepare and coordination handoff behavior from dev-nexus:local-14, dev-nexus:local-15, and dev-nexus:local-19.\n- Can later include current actor details from dev-nexus:local-88 without blocking the first lease model.\n\nBoundaries:\n- Do not block work solely because a lease exists.\n- Do not store absolute personal paths in shared lease records; use project-relative or classified paths where possible.\n- Do not require a shared external provider in the first implementation.\n\nVerification:\n- Focused lease model, lifecycle, and coordination integration tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2507,8 +2507,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:22:17.248Z",
-      "updatedAt": "2026-05-18T13:22:17.248Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T16:15:45.522Z",
+      "closedAt": "2026-05-18T16:15:45.522Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2867,7 +2867,7 @@
       "id": "local-113",
       "title": "Fix Codex app-server stdio wire protocol compatibility",
       "description": "Type: implementation defect slice\nReadiness: autonomous agent-ready (AFK)\nSource: docs/codex-architecture-design-audit-prd.md; follow-up to completed Codex app-server adapter work local-31 through local-35.\n\nProblem:\nThe current DevNexus Codex app-server transport was added under an incompatible protocol assumption. Current Codex app-server stdio speaks newline-delimited JSON-RPC-lite messages and omits the `jsonrpc` field, while DevNexus currently writes LSP-style `Content-Length` frames and requires `jsonrpc: \"2.0\"` in responses.\n\nGoal:\nMake the existing Codex app-server client and stdio transport compatible with the installed/current Codex app-server wire protocol before any higher-level worker orchestration is treated as operational.\n\nUser stories covered:\n- As a DevNexus user, I can run an app-server readiness path against the installed Codex binary without failing on framing or JSON-RPC envelope shape.\n- As a coordinator, I get a clear protocol compatibility error when a configured Codex binary speaks an unsupported protocol.\n\nAcceptance criteria:\n- Codex app-server stdio transport writes one JSON object per line and reads one JSON object per line.\n- Requests, responses, notifications, and errors are accepted without requiring a `jsonrpc` member.\n- Existing mocked transport tests are updated so they no longer require or assert `jsonrpc: \"2.0\"` for Codex app-server messages.\n- A regression test proves the Codex app-server stdio transport does not emit `Content-Length` frames.\n- A malformed line or unsupported response shape produces an actionable infrastructure failure.\n- Generic DevNexus MCP stdio behavior remains unchanged; this change is scoped to Codex app-server transport.\n\nBoundaries:\n- Do not add worker orchestration, MCP relay expansion, provider-native subagents, or Desktop automation in this slice.\n- Do not read or write Codex private Desktop storage.\n- Do not require a live Codex app-server for normal test runs.\n\nVerification:\n- Focused Codex app-server JSON-RPC/transport tests.\n- Focused launch-provider tests that exercise the updated mock message shape.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under the configured bot publication policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2879,8 +2879,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T15:39:05.012Z",
-      "updatedAt": "2026-05-18T15:39:05.012Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T16:15:45.506Z",
+      "closedAt": "2026-05-18T16:15:45.506Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2892,7 +2892,7 @@
       "id": "local-114",
       "title": "Route Codex app-server notifications and server requests",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nExtend the Codex app-server client from single request/response handling into a bidirectional message loop that can route responses, server notifications, and server-initiated requests without losing early turn events or hanging approval requests.\n\nUser stories covered:\n- As a coordinator, I can start a Codex app-server turn and receive terminal completion or failure facts from notifications rather than relying only on result-file polling.\n- As a DevNexus user, provider-side approval or permission requests become visible infrastructure blockers instead of silent hangs.\n\nAcceptance criteria:\n- The app-server client has separate routing for request responses, notifications, and server requests.\n- Notifications scoped to a turn can be buffered when they arrive before the caller registers a waiter.\n- Server requests for approvals, tool/user input, or permission decisions are either surfaced through a supported DevNexus path or fail fast as explicit infrastructure blockers.\n- Transport closure wakes pending response and notification waiters with clear errors.\n- Tests cover early notification buffering, turn completion notification routing, server request rejection/blocking behavior, and transport failure cleanup.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 because routing should be built on the current Codex app-server JSONL/JSON-RPC-lite transport.\n\nBoundaries:\n- Do not implement provider-native subagent supervision.\n- Do not store full transcript streams in DevNexus records.\n- Do not require live Codex for normal tests.\n\nVerification:\n- Focused app-server client routing tests.\n- Focused app-server launch tests.\n- `npm run check` when feasible.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2905,7 +2905,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T15:39:12.695Z",
-      "updatedAt": "2026-05-18T15:39:12.695Z",
+      "updatedAt": "2026-05-18T16:16:22.708Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2918,7 +2918,7 @@
       "id": "local-115",
       "title": "Add safe Codex app-server initialize probe and capability report",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113; can use dev-nexus:local-114 if the probe consumes notifications or server requests\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nAdd a safe readiness diagnostic that starts or connects to Codex app-server, calls initialize with a DevNexus client identity, reports available methods/capabilities, and exits without creating a durable user chat.\n\nUser stories covered:\n- As a DevNexus user, I can check whether my installed Codex app-server supports the capabilities required by a configured profile.\n- As a coordinator, I can distinguish auth, transport, protocol, missing-method, and policy blockers before dispatching worker turns.\n\nAcceptance criteria:\n- A CLI/MCP-accessible diagnostic reports Codex version when available, transport mode, endpoint scope, advertised methods, required capability status, optional capability status, and blocker summary.\n- The probe does not submit user prompts and does not create visible durable worker chats.\n- Capability groups include at least thread control, turn control, event stream readiness, MCP status, MCP tool call, schema generation, and remote-control disabled/blocked state.\n- Non-loopback endpoints remain blocked unless host-local policy explicitly allows them.\n- Tests use mocked app-server responses and cover all-good, missing required method, unsupported wire protocol, auth failure, and blocked non-loopback endpoint.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 for current wire compatibility.\n- May depend on dev-nexus:local-114 if initialize or capability discovery needs bidirectional request handling.\n\nBoundaries:\n- Do not create Codex heartbeats or cron automations.\n- Do not mutate Codex private storage.\n- Do not make app-server mandatory for projects that use `codex exec`.\n\nVerification:\n- Focused capability diagnostic tests.\n- `npm run check` when feasible.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2931,7 +2931,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T15:39:22.591Z",
-      "updatedAt": "2026-05-18T15:39:22.591Z",
+      "updatedAt": "2026-05-18T16:16:22.741Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -4799,6 +4799,39 @@
           "provider": "local",
           "itemId": "local-comment-195"
         }
+      },
+      {
+        "id": "local-comment-199",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-51\nHead: baace6a6800a7ec9629184e6651ed349b5917ccc\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:00:09.330Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-51\",\n  \"logicalItemId\": \"local-51\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-51\",\n    \"itemNumber\": 51,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-51\",\n    \"itemNumber\": 51,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-51\",\n        \"itemNumber\": 51\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-51\",\n  \"branch\": \"codex/dev-nexus/local-51\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"baace6a6800a7ec9629184e6651ed349b5917ccc\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns multi-tracker configuration and migration docs only.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:00:09.395Z",
+        "updatedAt": "2026-05-18T16:00:09.395Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-199"
+        }
+      },
+      {
+        "id": "local-comment-201",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-51\nHead: 6527d25b8300fee33e0e2f15f6417589a0df47fd\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:06:13.168Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-51\",\n  \"logicalItemId\": \"local-51\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-51\",\n    \"itemNumber\": 51,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-51\",\n    \"itemNumber\": 51,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-51\",\n      \"itemNumber\": 51,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-51\",\n        \"itemNumber\": 51\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-51\",\n  \"branch\": \"codex/dev-nexus/local-51\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"6527d25b8300fee33e0e2f15f6417589a0df47fd\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"README.md\",\n    \"docs/user/getting-started.md\",\n    \"docs/user/agent-workflows.md\",\n    \"docs/user/multi-tracker.md\"\n  ],\n  \"decisions\": [\n    \"Documented local primary plus GitHub mirror/coordination tracker setup.\",\n    \"Kept sync execution guidance dry-run-first, one-way, and policy-gated.\"\n  ],\n  \"verificationSummary\": \"git diff --check passed; npm run check passed (53 test files, 418 tests).\",\n  \"integrationPreference\": \"Ready for direct integration; do not push from this handoff.\",\n  \"note\": \"Committed documentation slice for dev-nexus:local-51 as 6527d25b8300fee33e0e2f15f6417589a0df47fd.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:06:13.192Z",
+        "updatedAt": "2026-05-18T16:06:13.192Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-201"
+        }
+      },
+      {
+        "id": "local-comment-206",
+        "body": "Completed and published to DevNexus main as b748694. Added user-facing multi-tracker configuration and migration guidance for local primary trackers, GitHub mirrors/coordination trackers, link records, dry-run planning, one-way sync execution limits, no delete propagation, and agent treatment of canonical versus mirrored items. Verification passed: docs worker npm run check and integrated npm run check with 55 files / 426 tests after batch integration.",
+        "author": null,
+        "createdAt": "2026-05-18T16:15:38.348Z",
+        "updatedAt": "2026-05-18T16:15:38.348Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-206"
+        }
       }
     ],
     "local-52": [],
@@ -5546,7 +5579,52 @@
       }
     ],
     "local-98": [],
-    "local-99": [],
+    "local-99": [
+      {
+        "id": "local-comment-210",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-99\nHead: baace6a6800a7ec9629184e6651ed349b5917ccc\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:00:09.074Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-99\",\n  \"logicalItemId\": \"local-99\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-99\",\n        \"itemNumber\": 99\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-99\",\n  \"branch\": \"codex/dev-nexus/local-99\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"baace6a6800a7ec9629184e6651ed349b5917ccc\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker owns advisory lease records; no hard locks and no cleanup execution.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:00:09.109Z",
+        "updatedAt": "2026-05-18T16:00:09.109Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-210"
+        }
+      },
+      {
+        "id": "local-comment-202",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-99\nHead: 2378986b5a6983592178f0d270169ab0384fab31\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:12:24.232Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-99\",\n  \"logicalItemId\": \"local-99\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-99\",\n        \"itemNumber\": 99\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": \"codex\",\n  \"status\": \"ready\",\n  \"leaseId\": \"lease-45925ebcba2ae65e\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-99\",\n  \"branch\": \"codex/dev-nexus/local-99\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"2378986b5a6983592178f0d270169ab0384fab31\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusWorktreeLease.ts\",\n    \"src/nexusCoordination.ts\",\n    \"src/nexusManualWorktree.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npx vitest run src/nexusWorktreeLease.test.ts src/nexusCoordination.test.ts src/cli.test.ts src/nexusMcpServer.test.ts; npm run build; npm run check passed\",\n  \"integrationPreference\": \"Ready for direct integration by policy; branch committed locally and not pushed.\",\n  \"note\": \"Commit 2378986b5a6983592178f0d270169ab0384fab31 implements advisory worktree lease records for active agent work.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:12:24.263Z",
+        "updatedAt": "2026-05-18T16:12:24.263Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-202"
+        }
+      },
+      {
+        "id": "local-comment-203",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-99\nHead: 2378986b5a6983592178f0d270169ab0384fab31\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:14:00.749Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-99\",\n  \"logicalItemId\": \"local-99\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-99\",\n    \"itemNumber\": 99,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-99\",\n      \"itemNumber\": 99,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-99\",\n        \"itemNumber\": 99\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-99\",\n  \"branch\": \"codex/dev-nexus/local-99\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"2378986b5a6983592178f0d270169ab0384fab31\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusWorktreeLease.ts\",\n    \"src/nexusWorktreeLease.test.ts\",\n    \"src/nexusCoordination.ts\",\n    \"src/nexusManualWorktree.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\"\n  ],\n  \"decisions\": [\n    \"Advisory leases warn on overlap and staleness but do not block work.\",\n    \"Lease records classify component and project-meta scopes without storing absolute personal worktree paths in shared records.\"\n  ],\n  \"verificationSummary\": \"Focused lease/coordination/CLI tests passed: 3 files / 51 tests. git diff --check passed.\",\n  \"integrationPreference\": null,\n  \"note\": \"Committed 2378986. Handoff recorded by coordinator after worker branch became clean but did not return promptly.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:14:00.774Z",
+        "updatedAt": "2026-05-18T16:14:00.774Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-203"
+        }
+      },
+      {
+        "id": "local-comment-205",
+        "body": "Completed and published to DevNexus main as 2e8b64f. Added advisory worktree lease records for active agent work, including lease creation/refresh, stale detection, status transitions, component and project-meta scopes, overlap warnings, and coordination/worktree surfaces. Leases warn but do not hard-lock work. Verification passed: focused lease/coordination/CLI tests and integrated npm run check with 55 files / 426 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T16:15:38.310Z",
+        "updatedAt": "2026-05-18T16:15:38.310Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-205"
+        }
+      }
+    ],
     "local-100": [],
     "local-101": [],
     "local-102": [],
@@ -5617,9 +5695,67 @@
         }
       }
     ],
-    "local-113": [],
-    "local-114": [],
-    "local-115": [],
+    "local-113": [
+      {
+        "id": "local-comment-211",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-113\nHead: baace6a6800a7ec9629184e6651ed349b5917ccc\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:00:09.170Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-113\",\n  \"logicalItemId\": \"local-113\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-113\",\n    \"itemNumber\": 113,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-113\",\n    \"itemNumber\": 113,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-113\",\n        \"itemNumber\": 113\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-113\",\n  \"branch\": \"codex/dev-nexus/local-113\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"baace6a6800a7ec9629184e6651ed349b5917ccc\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Main agent owns Codex app-server stdio wire protocol compatibility; no live Codex app-server required.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:00:09.212Z",
+        "updatedAt": "2026-05-18T16:00:09.212Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-211"
+        }
+      },
+      {
+        "id": "local-comment-200",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-113\nHead: 78aef870c5564079b2dffd5e112bbab662699f26\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T16:04:23.136Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-113\",\n  \"logicalItemId\": \"local-113\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-113\",\n    \"itemNumber\": 113,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-113\",\n    \"itemNumber\": 113,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-113\",\n      \"itemNumber\": 113,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-113\",\n        \"itemNumber\": 113\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-113\",\n  \"branch\": \"codex/dev-nexus/local-113\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"78aef870c5564079b2dffd5e112bbab662699f26\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused app-server tests passed: 4 files / 24 tests. Full npm run check passed: 54 files / 421 tests.\",\n  \"integrationPreference\": null,\n  \"note\": \"Committed 78aef87. Codex app-server stdio now uses newline-delimited JSON and accepts JSON-RPC-lite responses without jsonrpc; generic DevNexus MCP stdio remains unchanged.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T16:04:23.161Z",
+        "updatedAt": "2026-05-18T16:04:23.161Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-200"
+        }
+      },
+      {
+        "id": "local-comment-204",
+        "body": "Completed and published to DevNexus main as 7898d11. Codex app-server stdio now uses newline-delimited JSON, accepts JSON-RPC-lite responses without jsonrpc, rejects malformed JSON lines with actionable transport errors, and leaves generic DevNexus MCP stdio framing unchanged. Verification passed: focused app-server tests and integrated npm run check with 55 files / 426 tests after batch integration.",
+        "author": null,
+        "createdAt": "2026-05-18T16:15:38.286Z",
+        "updatedAt": "2026-05-18T16:15:38.286Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-204"
+        }
+      }
+    ],
+    "local-114": [
+      {
+        "id": "local-comment-207",
+        "body": "Promoted to ready after dev-nexus:local-113 landed Codex app-server newline-delimited JSON-RPC-lite protocol compatibility on DevNexus main as 7898d11. Notification and server-request routing can now build on the corrected transport.",
+        "author": null,
+        "createdAt": "2026-05-18T16:16:16.359Z",
+        "updatedAt": "2026-05-18T16:16:16.359Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-207"
+        }
+      }
+    ],
+    "local-115": [
+      {
+        "id": "local-comment-208",
+        "body": "Promoted to ready after dev-nexus:local-113 landed Codex app-server newline-delimited JSON-RPC-lite protocol compatibility on DevNexus main as 7898d11. The safe initialize probe can use mocked app-server responses and does not need live Codex app-server access.",
+        "author": null,
+        "createdAt": "2026-05-18T16:16:16.381Z",
+        "updatedAt": "2026-05-18T16:16:16.381Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-208"
+        }
+      }
+    ],
     "local-116": [],
     "local-117": [
       {

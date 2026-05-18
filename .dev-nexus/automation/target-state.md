@@ -14,7 +14,11 @@ and ready for coordinator-driven work across its components.
   full-suite Windows verification, `dev-nexus:local-80` as `69fad6f` for runner
   profile safety policy, `dev-nexus:local-112` as `0cf0571` for plugin MCP
   overlap guardrails, and `dev-nexus:local-48` as `dfaf1ca` for mocked
-  one-way work-item sync execution.
+  one-way work-item sync execution. The newest DevNexus batch published
+  `dev-nexus:local-113` as `7898d11` for Codex app-server JSONL/JSON-RPC-lite
+  protocol compatibility, `dev-nexus:local-51` as `b748694` for multi-tracker
+  configuration and migration docs, and `dev-nexus:local-99` as `2e8b64f` for
+  advisory worktree leases.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -48,16 +52,15 @@ and ready for coordinator-driven work across its components.
 - Local stale `codex/*` branches in DevNexus and DevNexus-Pharo have been
   pruned after verifying they were merged or superseded by completed work items.
 - Mocked one-way local-to-GitHub sync execution is complete in
-  `dev-nexus:local-48`; `dev-nexus:local-51` is ready for multi-tracker
-  migration/configuration documentation.
+  `dev-nexus:local-48`; multi-tracker migration/configuration documentation is
+  complete in `dev-nexus:local-51`.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
-- Default `npm run check` now passes on the integrated DevNexus main with 53
-  test files and 418 tests after `dev-nexus:local-76` replaced slow
-  coordination Git-fixture tests and stabilized the Windows process shim wait.
+- Default `npm run check` now passes on the integrated DevNexus main with 55
+  test files and 426 tests after the latest DevNexus batch.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -72,10 +75,10 @@ and ready for coordinator-driven work across its components.
   advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
-  `local-103`. `local-97` is complete; ready slices are `local-99` for
-  advisory worktree leases and `local-102` for cleanup dry-run safety
-  classification. Publication and provider mutation gating stay with the
-  authority items `local-91` and `local-92`.
+  `local-103`. `local-97` and `local-99` are complete; `local-102` is ready
+  for cleanup dry-run safety classification. `local-100` should wait for
+  authority status summaries before status expansion. Publication and provider
+  mutation gating stay with the authority items `local-91` and `local-92`.
 - `docs/agent-target-projection-opt-in-prd.md` records the decision that
   provider-native MCP, skills, plugin, and worker projections should be
   generated only for active agent targets. `dev-nexus:local-104` tracks slicing
@@ -101,26 +104,24 @@ and ready for coordinator-driven work across its components.
   audit. It keeps `codex exec` as the practical default while app-server
   support starts with current JSONL JSON-RPC-lite protocol compatibility,
   capability discovery, event routing, and provider session facts.
-- The Codex app-server audit has been sliced into corrective DevNexus work:
-  start with ready defect `dev-nexus:local-113` for stdio wire protocol
-  compatibility, then follow with `local-114` through `local-116` for
-  notification/server-request routing, safe capability probes, and provider
-  session/turn facts.
+- The Codex app-server audit has been sliced into corrective DevNexus work.
+  `dev-nexus:local-113` is complete, fixing stdio wire protocol compatibility.
+  `local-114` and `local-115` are ready for notification/server-request routing
+  and safe capability probes; `local-116` should wait until event routing lands.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
 
-- Run the next coordinator cycle on ready work such as `dev-nexus:local-51`,
-  `dev-nexus:local-72`, `dev-nexus:local-78`, `dev-nexus:local-81`,
-  `dev-nexus:local-87`, `dev-nexus:local-99`, `dev-nexus:local-102`,
-  `dev-nexus:local-104`, `dev-nexus:local-113`, and `dev-nexus:local-118`,
-  subject to dependency and concurrency limits.
+- Run the next coordinator cycle on ready work such as `dev-nexus:local-72`,
+  `dev-nexus:local-78`, `dev-nexus:local-81`, `dev-nexus:local-87`,
+  `dev-nexus:local-102`, `dev-nexus:local-104`, `dev-nexus:local-114`,
+  `dev-nexus:local-115`, and `dev-nexus:local-118`, subject to dependency and
+  concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
-- Keep parallel-agent workflow ordered: implement documentation and read-only
-  or advisory slices first (`local-97`, `local-99`, `local-102`), then promote
-  shared-checkout enforcement, status expansion, start/adopt, and cleanup
-  execution as their authority and lease dependencies land.
+- Keep parallel-agent workflow ordered: implement read-only cleanup
+  classification (`local-102`) before cleanup execution, and keep status
+  expansion/start-adopt slices behind their authority dependencies.
 - Continue agent-target projection planning at `dev-nexus:local-104`; `local-111`
   is the dogfood Codex-only migration and should wait for active target
   filtering plus stale cleanup safety.
@@ -129,9 +130,9 @@ and ready for coordinator-driven work across its components.
 - Complete `dev-nexus:local-72` before promoting `local-73` through
   `local-75`; resolve the full `local-69` umbrella before relying on Windows
   source roots as clean onboarding examples.
-- Start Codex app-server correction with `dev-nexus:local-113` before any
-  worker-thread orchestration, MCP relay expansion, or provider-native subagent
-  features.
+- Continue Codex app-server correction with `dev-nexus:local-114` and
+  `dev-nexus:local-115` before worker-thread orchestration, MCP relay
+  expansion, or provider-native subagent features.
 
 ## Boundaries
 
