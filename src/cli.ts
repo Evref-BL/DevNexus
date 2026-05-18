@@ -873,6 +873,8 @@ export function usage(): string {
     "  --summary <text>",
     "  --eligible-work-items <count>",
     "  --work-item <component-id:id>  repeatable",
+    "  --work-item-logical-id <id>",
+    "  --work-item-tracker <id>",
     "  --work-item-status <selected|dispatched|in_progress|completed|blocked|failed|skipped>",
     "  --work-item-agent-profile <id>",
     "  --work-item-note <text>",
@@ -3758,6 +3760,12 @@ function parseAutomationTargetCycleRecordCommand(
         break;
       case "--work-item":
         parsed.workItems?.push(parseTargetCycleWorkItem(next(), arg));
+        break;
+      case "--work-item-logical-id":
+        lastParsedTargetCycleWorkItem(parsed, arg).logicalItemId = next();
+        break;
+      case "--work-item-tracker":
+        lastParsedTargetCycleWorkItem(parsed, arg).trackerId = next();
         break;
       case "--work-item-status":
         lastParsedTargetCycleWorkItem(parsed, arg).cycleStatus =

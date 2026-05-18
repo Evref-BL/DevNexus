@@ -24,8 +24,10 @@ import type {
 export interface ResolvedNexusProjectWorkTracker {
   id: string;
   name: string;
+  provider: string;
   enabled: boolean;
   roles: NexusProjectWorkTrackerBindingConfig["roles"];
+  default: boolean;
   workTracking: NexusProjectWorkTrackerBindingConfig["workTracking"];
   workTrackingCapabilities: TrackerCapabilities;
   workTrackingCapabilityReport: WorkTrackerCapabilityReport;
@@ -202,7 +204,7 @@ export function resolveProjectComponent(
   );
   const normalizedWorkTrackers = normalizeComponentWorkTrackers(component);
   const workTrackers = normalizedWorkTrackers.trackers.map((tracker) =>
-    resolveProjectWorkTracker(tracker),
+    resolveProjectWorkTracker(tracker, normalizedWorkTrackers.defaultTrackerId),
   );
   const defaultWorkTracking =
     normalizedWorkTrackers.defaultTracker?.workTracking ?? null;
@@ -235,12 +237,15 @@ export function resolveProjectComponent(
 
 function resolveProjectWorkTracker(
   tracker: NexusProjectWorkTrackerBindingConfig,
+  defaultTrackerId: string | null,
 ): ResolvedNexusProjectWorkTracker {
   return {
     id: tracker.id,
     name: tracker.name,
+    provider: tracker.workTracking.provider,
     enabled: tracker.enabled,
     roles: tracker.roles,
+    default: defaultTrackerId === tracker.id,
     workTracking: tracker.workTracking,
     workTrackingCapabilities: workTrackerCapabilitiesForConfig(
       tracker.workTracking,

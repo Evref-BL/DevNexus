@@ -28,6 +28,7 @@ export interface NexusAutomationTargetCycleWorkItem {
   trackerId: string | null;
   trackerProvider: string | null;
   id: string;
+  logicalItemId: string | null;
   title: string | null;
   status: WorkStatus | null;
   cycleStatus: NexusAutomationTargetCycleWorkItemStatus | null;
@@ -74,6 +75,7 @@ export interface NexusAutomationTargetCycleWorkItemInput {
   trackerId?: string | null;
   trackerProvider?: string | null;
   id: string;
+  logicalItemId?: string | null;
   title?: string | null;
   status?: WorkStatus | null;
   cycleStatus?: NexusAutomationTargetCycleWorkItemStatus | null;
@@ -391,6 +393,7 @@ function normalizeWorkItem(
     trackerId: optionalNullableString(record.trackerId) ?? null,
     trackerProvider: optionalNullableString(record.trackerProvider) ?? null,
     id: requiredNonEmptyString(record.id, `${pathName}.id`),
+    logicalItemId: optionalNullableString(record.logicalItemId) ?? null,
     title: optionalNullableString(record.title) ?? null,
     status: optionalWorkStatus(record.status, `${pathName}.status`),
     cycleStatus: optionalCycleWorkItemStatus(

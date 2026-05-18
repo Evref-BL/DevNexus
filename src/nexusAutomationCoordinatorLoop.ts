@@ -837,6 +837,7 @@ async function reconcileSelectedWorkItem(options: {
       trackerId: options.selected.trackerId,
       trackerProvider: options.selected.trackerProvider,
       id: options.selected.id,
+      logicalItemId: options.selected.logicalItemId ?? options.selected.id,
       title: current?.title ?? options.selected.title ?? null,
       status: current?.status ?? options.selected.status ?? null,
       cycleStatus,
@@ -1166,6 +1167,7 @@ function targetCycleWorkItems(
           item.provider ??
           null,
         id: item.id,
+        logicalItemId: item.externalRef?.itemId ?? item.id,
         title: item.title,
         status: item.status,
         cycleStatus: "eligible" as const,

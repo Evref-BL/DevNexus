@@ -14,11 +14,15 @@ import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  summarizeNexusAutomationWorkTrackers,
+  type NexusAutomationWorkTrackerSummary,
+} from "./nexusAutomationWorkTrackerSummary.js";
+import {
   projectPluginCapabilityProjections,
   type NexusPluginCapabilityProjection,
 } from "./nexusPluginCapabilities.js";
 import { loadProjectConfig } from "./nexusProjectConfig.js";
-import type { WorkItem } from "./workTrackingTypes.js";
+import type { WorkItem, WorkTrackerRef } from "./workTrackingTypes.js";
 
 export interface NexusAutomationProjectSummary {
   id: string;
@@ -28,6 +32,7 @@ export interface NexusAutomationProjectSummary {
 export interface NexusAutomationEligibleWorkItemSummary {
   componentId: string;
   id: string;
+  logicalItemId: string;
   title: string;
   status: WorkItem["status"];
   labels: string[];
@@ -35,6 +40,7 @@ export interface NexusAutomationEligibleWorkItemSummary {
   milestone: string | null;
   updatedAt: string | null;
   webUrl: string | null;
+  trackerRef: WorkTrackerRef | null;
 }
 
 export interface NexusAutomationEligibleWorkComponentSummary {
@@ -43,6 +49,8 @@ export interface NexusAutomationEligibleWorkComponentSummary {
   role: string;
   sourceRoot: string | null;
   workTrackingProvider: string | null;
+  defaultTrackerId: string | null;
+  workTrackers: NexusAutomationWorkTrackerSummary[];
   workItems: NexusAutomationEligibleWorkItemSummary[];
   staleInProgressWorkItems: NexusAutomationEligibleWorkItemSummary[];
 }
@@ -137,6 +145,10 @@ export async function getNexusAutomationEligibleWorkSummary(
       role: resolved?.role ?? "primary",
       sourceRoot: resolved?.sourceRoot ?? null,
       workTrackingProvider: resolved?.workTracking?.provider ?? null,
+      defaultTrackerId: resolved?.defaultTrackerId ?? null,
+      workTrackers: resolved
+        ? summarizeNexusAutomationWorkTrackers(resolved)
+        : [],
       workItems: [],
       staleInProgressWorkItems: [],
     };
@@ -167,6 +179,14 @@ export async function getNexusAutomationEligibleWorkSummary(
       milestone: null,
       updatedAt: null,
       webUrl: null,
+      logicalItemId: item.id,
+      trackerRef:
+        item.trackerId && item.trackerProvider
+          ? {
+              trackerId: item.trackerId,
+              provider: item.trackerProvider,
+            }
+          : null,
     });
   }
 
@@ -270,6 +290,7 @@ function summarizeEligibleWorkItem(
   return {
     componentId,
     id: item.id,
+    logicalItemId: item.externalRef?.itemId ?? item.id,
     title: item.title,
     status: item.status,
     labels: item.labels ?? [],
@@ -277,5 +298,6 @@ function summarizeEligibleWorkItem(
     milestone: item.milestone ?? null,
     updatedAt: item.updatedAt ?? null,
     webUrl: item.webUrl ?? null,
+    trackerRef: item.trackerRef ?? null,
   };
 }

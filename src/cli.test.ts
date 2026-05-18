@@ -1937,10 +1937,29 @@ describe("dev-nexus cli", () => {
             remoteUrl: "git@example.invalid:demo/project.git",
             defaultBranch: "main",
             sourceRoot: "source",
-            workTracking: {
-              provider: "local",
-              storePath: primaryStorePath,
-            },
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: primaryStorePath,
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
             relationships: [],
           },
           {
@@ -2009,12 +2028,43 @@ describe("dev-nexus cli", () => {
         {
           componentId: "primary",
           componentName: "Primary",
+          defaultTrackerId: "primary",
+          workTrackers: [
+            {
+              id: "primary",
+              provider: "local",
+              enabled: true,
+              roles: ["primary"],
+              default: true,
+              capabilityReport: {
+                provider: "local",
+                capabilities: {
+                  list: true,
+                  update: true,
+                },
+              },
+            },
+            {
+              id: "mirror",
+              provider: "local",
+              enabled: true,
+              roles: ["mirror"],
+              default: false,
+            },
+          ],
           workItems: [
             {
               componentId: "primary",
               id: "local-1",
+              logicalItemId: "local-1",
               title: "Primary task",
               status: "ready",
+              trackerRef: {
+                componentId: "primary",
+                trackerId: "primary",
+                provider: "local",
+                default: true,
+              },
             },
           ],
         },
@@ -2296,6 +2346,10 @@ describe("dev-nexus cli", () => {
         "1",
         "--work-item",
         "primary:local-1",
+        "--work-item-tracker",
+        "primary",
+        "--work-item-logical-id",
+        "local-1",
         "--note",
         "Coordinator selected the work item.",
         "--json",
@@ -2326,6 +2380,8 @@ describe("dev-nexus cli", () => {
           {
             componentId: "primary",
             id: "local-1",
+            logicalItemId: "local-1",
+            trackerId: "primary",
             cycleStatus: "selected",
           },
         ],

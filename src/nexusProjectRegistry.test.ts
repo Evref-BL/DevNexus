@@ -169,8 +169,10 @@ describe("project registry helpers", () => {
             {
               id: "default",
               name: "Default",
+              provider: "local",
               enabled: true,
               roles: ["primary"],
+              default: true,
               workTracking: {
                 provider: "local",
               },
@@ -193,8 +195,10 @@ describe("project registry helpers", () => {
         {
           id: "default",
           name: "Default",
+          provider: "local",
           enabled: true,
           roles: ["primary"],
+          default: true,
           workTracking: {
             provider: "local",
           },

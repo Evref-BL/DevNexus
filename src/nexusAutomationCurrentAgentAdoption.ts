@@ -37,6 +37,9 @@ import {
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  summarizeNexusAutomationWorkTrackers,
+} from "./nexusAutomationWorkTrackerSummary.js";
+import {
   readNexusAutomationTargetContext,
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
@@ -1192,6 +1195,8 @@ function componentContext(
       provider: component.workTracking?.provider ?? null,
       configured: Boolean(component.workTracking),
     },
+    defaultTrackerId: component.defaultTrackerId,
+    workTrackers: summarizeNexusAutomationWorkTrackers(component),
     publication: resolveNexusPublicationPolicy(projectConfig, component),
     relationships: component.relationships,
   };

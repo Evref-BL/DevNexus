@@ -16,6 +16,7 @@ import {
   type NexusAutomationAgentLaunchComponentProvider,
   type NexusAutomationComponentEligibleWorkItems,
 } from "./nexusAutomationAgentLaunch.js";
+import { annotateDefaultTrackerWorkItems } from "./nexusAutomationWorkTrackerSummary.js";
 import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
@@ -592,12 +593,15 @@ async function listStatusEligibleWorkItemsByComponent(
   for (const { component, provider } of componentProviders) {
     grouped.push({
       componentId: component.id,
-      workItems: eligibleNexusAutomationWorkItems(
-        await provider.listWorkItems({
-          ...selectorQuery,
-          projectRoot,
-        }),
-        automationConfig,
+      workItems: annotateDefaultTrackerWorkItems(
+        component,
+        eligibleNexusAutomationWorkItems(
+          await provider.listWorkItems({
+            ...selectorQuery,
+            projectRoot,
+          }),
+          automationConfig,
+        ),
       ),
     });
   }

@@ -288,6 +288,8 @@ describe("nexus automation coordinator loop", () => {
               {
                 componentId: "primary",
                 id: "local-1",
+                logicalItemId: "local-1",
+                trackerId: "default",
                 title: "Coordinator-selectable task",
                 status: "done",
                 cycleStatus: "completed",

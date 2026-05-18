@@ -210,10 +210,29 @@ describe("nexus automation status", () => {
             remoteUrl: "git@example.invalid:demo/project.git",
             defaultBranch: "main",
             sourceRoot: "source",
-            workTracking: {
-              provider: "local",
-              storePath: primaryStorePath,
-            },
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: primaryStorePath,
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
             relationships: [],
           },
           {
@@ -276,6 +295,28 @@ describe("nexus automation status", () => {
         {
           id: "primary",
           role: "primary",
+          defaultTrackerId: "primary",
+          workTrackers: [
+            {
+              id: "primary",
+              provider: "local",
+              enabled: true,
+              roles: ["primary"],
+              workTrackingCapabilityReport: {
+                provider: "local",
+                capabilities: {
+                  list: true,
+                  update: true,
+                },
+              },
+            },
+            {
+              id: "mirror",
+              provider: "local",
+              enabled: true,
+              roles: ["mirror"],
+            },
+          ],
           workTracking: {
             provider: "local",
           },
@@ -307,6 +348,12 @@ describe("nexus automation status", () => {
           workItems: [
             {
               title: "Primary work",
+              trackerRef: {
+                componentId: "primary",
+                trackerId: "primary",
+                provider: "local",
+                default: true,
+              },
             },
           ],
         },

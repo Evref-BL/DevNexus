@@ -845,10 +845,29 @@ describe("nexus automation agent launch", () => {
             remoteUrl: "git@example.invalid:demo/project.git",
             defaultBranch: "main",
             sourceRoot: "source",
-            workTracking: {
-              provider: "local",
-              storePath: primaryStorePath,
-            },
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: primaryStorePath,
+                },
+              },
+              {
+                id: "mirror",
+                name: "Mirror",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "local",
+                  storePath: ".dev-nexus/work-items-mirror.json",
+                },
+              },
+            ],
             relationships: [],
           },
           {
@@ -909,6 +928,30 @@ describe("nexus automation agent launch", () => {
         {
           id: "primary",
           role: "primary",
+          defaultTrackerId: "primary",
+          workTrackers: [
+            {
+              id: "primary",
+              provider: "local",
+              enabled: true,
+              roles: ["primary"],
+              default: true,
+              capabilityReport: {
+                provider: "local",
+                capabilities: {
+                  list: true,
+                  update: true,
+                },
+              },
+            },
+            {
+              id: "mirror",
+              provider: "local",
+              enabled: true,
+              roles: ["mirror"],
+              default: false,
+            },
+          ],
           workTracker: {
             provider: "local",
             configured: true,
@@ -932,6 +975,12 @@ describe("nexus automation agent launch", () => {
             {
               id: "local-1",
               title: "Primary work",
+              trackerRef: {
+                componentId: "primary",
+                trackerId: "primary",
+                provider: "local",
+                default: true,
+              },
             },
           ],
         },

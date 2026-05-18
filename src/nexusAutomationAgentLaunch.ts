@@ -51,6 +51,11 @@ import {
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
 import {
+  annotateDefaultTrackerWorkItems,
+  summarizeNexusAutomationWorkTrackers,
+  type NexusAutomationWorkTrackerSummary,
+} from "./nexusAutomationWorkTrackerSummary.js";
+import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -112,6 +117,8 @@ export interface NexusAutomationAgentLaunchComponentContext {
     provider: string | null;
     configured: boolean;
   };
+  defaultTrackerId: string | null;
+  workTrackers: NexusAutomationWorkTrackerSummary[];
   publication: NexusAutomationConfig["publication"];
   relationships: ResolvedNexusProjectComponent["relationships"];
 }
@@ -932,12 +939,15 @@ async function listEligibleWorkItemsByComponent(
   for (const { component, provider } of componentProviders) {
     grouped.push({
       componentId: component.id,
-      workItems: eligibleNexusAutomationWorkItems(
-        await provider.listWorkItems({
-          ...selectorQuery,
-          projectRoot,
-        }),
-        automationConfig,
+      workItems: annotateDefaultTrackerWorkItems(
+        component,
+        eligibleNexusAutomationWorkItems(
+          await provider.listWorkItems({
+            ...selectorQuery,
+            projectRoot,
+          }),
+          automationConfig,
+        ),
       ),
     });
   }
@@ -1003,6 +1013,8 @@ function componentContext(
       provider: component.workTracking?.provider ?? null,
       configured: Boolean(component.workTracking),
     },
+    defaultTrackerId: component.defaultTrackerId,
+    workTrackers: summarizeNexusAutomationWorkTrackers(component),
     publication: resolveNexusPublicationPolicy(projectConfig, component),
     relationships: component.relationships,
   };
