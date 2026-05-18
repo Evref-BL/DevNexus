@@ -22,7 +22,8 @@ and ready for coordinator-driven work across its components.
   for cleanup dry-run safety classification, `dev-nexus:local-105` is
   published as `3b6b755` for active agent target config normalization, and
   `dev-nexus:local-98` is published as `e3ab2de` for fail-closed
-  shared-checkout mutation guardrails.
+  shared-checkout mutation guardrails. `dev-nexus:local-118` is published as
+  `180955f` for hosting access declarations and provisioning gates.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -31,11 +32,12 @@ and ready for coordinator-driven work across its components.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
-  invitee-profile invitation acceptance. The PRD has been sliced: start with
-  `dev-nexus:local-118` for access declarations and provisioning gates, then
-  promote `local-119` through `local-126` as prerequisites land. `local-127`
-  is an opt-in fake-project GitHub integration test and must not depend on
-  `dev-nexus-plexus` or any other active project.
+  invitee-profile invitation acceptance. The PRD has been sliced:
+  `dev-nexus:local-118` is complete for access declarations and provisioning
+  gates; `local-119` is ready for the read-only hosting status model, then
+  `local-120` through `local-126` should be promoted as prerequisites land.
+  `local-127` is an opt-in fake-project GitHub integration test and must not
+  depend on `dev-nexus-plexus` or any other active project.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
   component work into main without waiting for manual human review, using the
   configured bot/automation profile when permissions allow. Components that
@@ -130,7 +132,7 @@ and ready for coordinator-driven work across its components.
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-118`, and
+  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-119`, and
   `dev-nexus:local-129`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.

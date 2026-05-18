@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 138,
-  "nextCommentNumber": 222,
-  "updatedAt": "2026-05-18T19:52:15.224Z",
+  "nextCommentNumber": 224,
+  "updatedAt": "2026-05-18T19:59:02.127Z",
   "items": [
     {
       "id": "local-1",
@@ -2997,7 +2997,7 @@
       "id": "local-118",
       "title": "Add hosting access declarations and provisioning gates",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: extend DevNexus hosting configuration so projects can declare required repository access and explicit provisioning gates with a minimal, obvious API.\n\nUser stories covered:\n- As a project owner, I can declare that a meta-project repository should exist under a bot account and grant my human account access.\n- As a maintainer reviewing project configuration, I can tell the intended repository access model by reading a short configuration block.\n\nAcceptance criteria:\n- Project config validates hosting access principals with kind, provider identity, intended role, required permission, optional auth profile, and invitation policy.\n- Provisioning config supports explicit gates for repository creation, local remote repair, access repair, invitation acceptance, default-branch repair, and visibility repair.\n- Existing hosting configs without access declarations remain valid through defaults or compatibility normalization.\n- Invalid duplicate principals, unsupported permission values, unknown principal kinds, and malformed policy values fail with actionable errors.\n- Shared project config does not store tokens, private keys, GitHub CLI state, or browser/session material.\n\nBoundaries:\n- Do not add provider mutation in this slice.\n- Do not contact GitHub or other live providers in tests.\n- Do not make GitHub mandatory for all DevNexus projects.\n\nVerification:\n- Focused project config tests for old configs, minimal access declarations, multi-principal access, invalid values, and provisioning defaults.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3011,8 +3011,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:15:38.823Z",
-      "updatedAt": "2026-05-18T16:15:38.823Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T19:58:37.284Z",
+      "closedAt": "2026-05-18T19:58:37.254Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3024,7 +3024,7 @@
       "id": "local-119",
       "title": "Build read-only hosting status model",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: build a read-only hosting status model that answers what is true right now without mutating local Git remotes or provider state.\n\nUser stories covered:\n- As a coordinator agent, I can report missing repository access as a setup blocker instead of inventing provider commands.\n- As a new host joining a project, I can validate local human and bot auth profiles against shared hosting intent.\n\nAcceptance criteria:\n- Hosting status reports configured provider, namespace, resolved repository name, repository existence, visibility, default branch, expected remotes, local remote matches, auth profiles, observed actors, required access, pending invitations, warnings, and blockers.\n- Status distinguishes missing hosting config, missing auth profiles, wrong observed actor, provider mismatch, repository missing, access missing, insufficient access, and pending invitation states.\n- Status never creates repositories, invites collaborators, accepts invitations, updates remotes, or writes provider state.\n- Provider reads are abstracted so tests can use mocked provider responses.\n- Output is structured enough for later CLI/MCP presentation and setup checks.\n\nDependencies:\n- Depends on dev-nexus:local-118 hosting access declarations and provisioning gates.\n\nBoundaries:\n- Do not implement apply/mutation behavior in this slice.\n- Do not run live GitHub calls in default tests.\n\nVerification:\n- Focused hosting status tests for healthy, missing repository, missing local remote, wrong remote URL, missing auth profile, wrong actor, missing access, insufficient access, pending invite, and unsupported provider cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3038,7 +3038,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:15:46.399Z",
-      "updatedAt": "2026-05-18T16:15:46.399Z",
+      "updatedAt": "2026-05-18T19:59:02.127Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6167,8 +6167,32 @@
         }
       }
     ],
-    "local-118": [],
-    "local-119": [],
+    "local-118": [
+      {
+        "id": "local-comment-222",
+        "body": "Completed and published to DevNexus main as 180955f. Added hosting access principal declarations, explicit provisioning gates, validation for duplicate/invalid principals, and shared-config secret field rejection. Verification: npm test -- src/nexusProjectHosting.test.ts src/nexusProjectConfig.test.ts src/nexusSetupAssistant.test.ts passed; npm run check passed with 57 files and 451 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T19:58:37.284Z",
+        "updatedAt": "2026-05-18T19:58:37.284Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-222"
+        }
+      }
+    ],
+    "local-119": [
+      {
+        "id": "local-comment-223",
+        "body": "Promoted to ready after dev-nexus:local-118 landed as 180955f. The hosting config model now has access declarations and provisioning gates, so this read-only status-model slice can proceed.",
+        "author": null,
+        "createdAt": "2026-05-18T19:59:02.107Z",
+        "updatedAt": "2026-05-18T19:59:02.107Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-223"
+        }
+      }
+    ],
     "local-120": [],
     "local-121": [],
     "local-122": [],
