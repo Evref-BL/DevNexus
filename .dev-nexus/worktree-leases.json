@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T23:24:34.777Z",
+  "updatedAt": "2026-05-18T23:28:00.000Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -93,14 +93,14 @@
         "CONTEXT.md",
         "PLAN.md"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T23:23:22.414Z",
-      "lastSeenAt": "2026-05-18T23:23:22.414Z",
-      "updatedAt": "2026-05-18T23:23:22.414Z",
+      "lastSeenAt": "2026-05-18T23:28:00.000Z",
+      "updatedAt": "2026-05-18T23:28:00.000Z",
       "refreshCount": 0,
       "lastObservedHeadCommit": "e47d8d9edd572697c34947b64a892593f08b238c",
       "dirty": false,
-      "pushed": null,
+      "pushed": true,
       "git": {
         "repository": {
           "kind": "project_meta_worktree",
@@ -118,7 +118,9 @@
           "Current branch has no upstream configured."
         ]
       },
-      "notes": []
+      "notes": [
+        "Project-meta updates for local-89/local-131 completion were preserved in main, published through bot/main, then the auxiliary project-meta worktree and local branch were removed."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",
@@ -206,12 +208,12 @@
         "src/nexusCoreMcpTools.ts",
         "src/index.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T23:02:13.332Z",
-      "lastSeenAt": "2026-05-18T23:02:13.332Z",
-      "updatedAt": "2026-05-18T23:02:13.332Z",
+      "lastSeenAt": "2026-05-18T23:28:00.000Z",
+      "updatedAt": "2026-05-18T23:28:00.000Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "lastObservedHeadCommit": "c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -230,10 +232,8 @@
         "warnings": []
       },
       "notes": [
-        "Implement opt-in eligible-work aggregation from configured discovery sources after local-129 and local-130.",
-        "Default eligible-work behavior must remain unchanged.",
-        "Do not implement inbound import mutation in this slice.",
-        "Avoid authority resolver files owned by local-89."
+        "Worker branch codex/dev-nexus-local-131-eligible-discovery was merged into DevNexus main at c7928f18, pushed through bot/main, then its worktree and local branch were removed.",
+        "Verification: focused local-131 suite with 8 files/144 tests passed; npm run build passed; npm run check passed with 63 files and 540 tests."
       ]
     },
     {
@@ -263,12 +263,12 @@
         "src/nexusAutomationStatus.test.ts",
         "src/index.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T23:02:06.794Z",
-      "lastSeenAt": "2026-05-18T23:02:06.794Z",
-      "updatedAt": "2026-05-18T23:02:06.794Z",
+      "lastSeenAt": "2026-05-18T23:28:00.000Z",
+      "updatedAt": "2026-05-18T23:28:00.000Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "lastObservedHeadCommit": "0bc80d933c3eff434c518f62affa8e85b8181080",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -287,9 +287,8 @@
         "warnings": []
       },
       "notes": [
-        "Implement pure effective-authority resolver after local-88 current actor resolution.",
-        "Keep resolver pure and unit-testable; do not add command gating or live provider calls.",
-        "Avoid tracker/eligible-work files owned by local-131."
+        "Worker branch codex/dev-nexus-local-89-effective-authority was merged into DevNexus main at 0bc80d9, pushed through bot/main, then its worktree and local branch were removed.",
+        "Verification: focused authority suite passed; npm run build passed; git diff --check HEAD~1..HEAD passed."
       ]
     },
     {
