@@ -1542,6 +1542,404 @@ describe("project hosting", () => {
     });
   });
 
+  it("accepts pending invitations through invitee auth profiles", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "auto_accept",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: true,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let accessRecord: NexusProjectHostingProviderAccessRecord = {
+      effectivePermission: null,
+      pendingInvitation: true,
+    };
+    const listInputs: unknown[] = [];
+    const acceptInputs: unknown[] = [];
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async getAccess() {
+        return accessRecord;
+      },
+      async listInvitations(input) {
+        listInputs.push(input);
+        return [
+          {
+            id: "invite-1",
+            namespace: "ExampleOrg",
+            repositoryName: "example-suite-meta",
+            permission: "admin",
+          },
+        ];
+      },
+      async acceptInvitation(input) {
+        acceptInputs.push(input);
+        accessRecord = {
+          effectivePermission: "admin",
+          pendingInvitation: false,
+        };
+        return {
+          status: "accepted",
+          access: accessRecord,
+        };
+      },
+    };
+    const initialStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    const result = await applyNexusProjectHosting({
+      hosting: config,
+      status: initialStatus,
+      authProfiles,
+      provider: hostingProvider,
+      refreshStatus: () =>
+        statusNexusProjectHosting({
+          project,
+          hosting: config,
+          authProfiles,
+          provider: hostingProvider,
+        }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.actions).toEqual([
+      expect.objectContaining({
+        actionId: "access:human:alice:accept-invitation",
+        kind: "accept_invitation",
+        disposition: "applied",
+        providerResult: expect.objectContaining({
+          status: "accepted",
+        }),
+      }),
+    ]);
+    expect(listInputs).toEqual([
+      expect.objectContaining({
+        namespace: "ExampleOrg",
+        repositoryName: "example-suite-meta",
+        principal: expect.objectContaining({
+          kind: "human",
+          providerIdentity: "alice",
+        }),
+        authProfile: expect.objectContaining({ id: "human-github" }),
+      }),
+    ]);
+    expect(acceptInputs).toEqual([
+      expect.objectContaining({
+        namespace: "ExampleOrg",
+        repositoryName: "example-suite-meta",
+        invitationId: "invite-1",
+        principal: expect.objectContaining({
+          kind: "human",
+          providerIdentity: "alice",
+        }),
+        authProfile: expect.objectContaining({ id: "human-github" }),
+      }),
+    ]);
+    expect(result.finalStatus?.access).toEqual([
+      expect.objectContaining({
+        providerIdentity: "alice",
+        status: "satisfied",
+        effectivePermission: "admin",
+        pendingInvitation: false,
+      }),
+    ]);
+    expect(result.finalPlan?.actions).toEqual([]);
+
+    const rerun = await applyNexusProjectHosting({
+      hosting: config,
+      status: result.finalStatus!,
+      authProfiles,
+      provider: hostingProvider,
+    });
+    expect(rerun.actions).toEqual([]);
+    expect(acceptInputs).toHaveLength(1);
+  });
+
+  it("blocks invitation acceptance before provider mutation when invitee auth is missing or mismatched", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "auto_accept",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: true,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let acceptCalls = 0;
+    const baseProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAccess() {
+        return {
+          effectivePermission: null,
+          pendingInvitation: true,
+          invitationId: "invite-1",
+        };
+      },
+      async acceptInvitation() {
+        acceptCalls += 1;
+        return {
+          status: "accepted",
+        };
+      },
+    };
+
+    const missingAuthStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      provider: baseProvider,
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: missingAuthStatus,
+        provider: baseProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:accept-invitation",
+          disposition: "blocked",
+          reason:
+            "Skipped invitation acceptance: host-local auth profile is missing: human-github.",
+        },
+      ],
+    });
+
+    const wrongActorProvider: NexusProjectHostingProviderAdapter = {
+      ...baseProvider,
+      async getAuthenticatedAccount() {
+        return "mallory";
+      },
+    };
+    const wrongActorStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: wrongActorProvider,
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: wrongActorStatus,
+        authProfiles,
+        provider: wrongActorProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:accept-invitation",
+          disposition: "blocked",
+          reason:
+            "Skipped invitation acceptance: auth profile human-github is authenticated as mallory; expected alice.",
+        },
+      ],
+    });
+    expect(acceptCalls).toBe(0);
+  });
+
+  it("reports missing and provider-blocked invitation acceptance", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "auto_accept",
+        },
+      ],
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: true,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let acceptCalls = 0;
+    const missingInvitationProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async getAccess() {
+        return {
+          effectivePermission: null,
+          pendingInvitation: true,
+        };
+      },
+      async listInvitations() {
+        return [];
+      },
+      async acceptInvitation() {
+        acceptCalls += 1;
+        return {
+          status: "accepted",
+        };
+      },
+    };
+    const missingInvitationStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: missingInvitationProvider,
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: missingInvitationStatus,
+        authProfiles,
+        provider: missingInvitationProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:accept-invitation",
+          disposition: "blocked",
+          reason:
+            "Skipped invitation acceptance: pending invitation was not found for human:alice.",
+        },
+      ],
+    });
+    expect(acceptCalls).toBe(0);
+
+    const providerBlockedStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: {
+        ...missingInvitationProvider,
+        async getAccess() {
+          return {
+            effectivePermission: null,
+            pendingInvitation: true,
+            invitationId: "invite-1",
+          };
+        },
+      },
+    });
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status: providerBlockedStatus,
+        authProfiles,
+        provider: {
+          ...missingInvitationProvider,
+          async acceptInvitation() {
+            return {
+              status: "blocked",
+              code: "expired_invitation",
+              message: "GitHub reports that invite-1 has expired.",
+            };
+          },
+        },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "access:human:alice:accept-invitation",
+          disposition: "blocked",
+          providerResult: {
+            code: "expired_invitation",
+          },
+          reason: "GitHub reports that invite-1 has expired.",
+        },
+      ],
+    });
+  });
+
   it("blocks repository creation before provider mutation when auth is missing or mismatched", async () => {
     const config = hosting({
       provisioning: {

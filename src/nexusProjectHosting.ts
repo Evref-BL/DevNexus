@@ -170,6 +170,24 @@ export interface NexusProjectHostingProviderAccessRepairInput
   mutationAuthProfile: NexusHostingAuthProfileConfig;
 }
 
+export interface NexusProjectHostingProviderInvitationRecord {
+  id: string;
+  namespace: string;
+  repositoryName: string;
+  permission?: NexusProjectHostingRequiredPermission | null;
+}
+
+export interface NexusProjectHostingProviderInvitationInput
+  extends NexusProjectHostingProviderRepositoryInput {
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  authProfile: NexusHostingAuthProfileConfig;
+}
+
+export interface NexusProjectHostingProviderAcceptInvitationInput
+  extends NexusProjectHostingProviderInvitationInput {
+  invitationId: string;
+}
+
 export interface NexusProjectHostingProviderCreateRepositoryInput
   extends NexusProjectHostingProviderRepositoryInput {
   visibility: NexusProjectHostingRepositoryVisibility;
@@ -181,6 +199,7 @@ export type NexusProjectHostingProviderMutationStatus =
   | "created"
   | "invited"
   | "updated"
+  | "accepted"
   | "already_exists"
   | "already_satisfied"
   | "blocked"
@@ -215,6 +234,12 @@ export interface NexusProjectHostingProviderAdapter {
   ): Promise<NexusProjectHostingProviderMutationResult>;
   repairAccess?(
     input: NexusProjectHostingProviderAccessRepairInput,
+  ): Promise<NexusProjectHostingProviderMutationResult>;
+  listInvitations?(
+    input: NexusProjectHostingProviderInvitationInput,
+  ): Promise<NexusProjectHostingProviderInvitationRecord[]>;
+  acceptInvitation?(
+    input: NexusProjectHostingProviderAcceptInvitationInput,
   ): Promise<NexusProjectHostingProviderMutationResult>;
 }
 
@@ -324,6 +349,7 @@ export interface NexusProjectHostingAccessStatusRecord {
   invitationPolicy: NexusProjectHostingInvitationPolicy;
   effectivePermission: NexusProjectHostingRequiredPermission | null;
   pendingInvitation: boolean | null;
+  invitationId: string | null;
   status: NexusProjectHostingAccessStatus;
 }
 
@@ -898,6 +924,7 @@ async function applyNexusProjectHostingActions(
       "repository_create",
       "local_remote_repair",
       "access_repair",
+      "invitation_acceptance",
     ],
   );
 
@@ -931,6 +958,11 @@ async function applyNexusProjectHostingActions(
 
     if (action.mutationClass === "access_repair") {
       actions.push(await applyAccessRepairAction(options, action));
+      continue;
+    }
+
+    if (action.mutationClass === "invitation_acceptance") {
+      actions.push(await applyInvitationAcceptanceAction(options, action));
     }
   }
 
@@ -1244,6 +1276,150 @@ async function applyAccessRepairAction(
   }
 }
 
+async function applyInvitationAcceptanceAction(
+  options: NexusProjectHostingApplyOptions,
+  action: NexusProjectHostingPlanAction,
+): Promise<NexusProjectHostingApplyActionResult> {
+  const repository = action.repository;
+  if (!repository || !options.hosting) {
+    return blockedApplyAction(
+      action,
+      "Skipped invitation acceptance: hosting repository intent is unavailable.",
+    );
+  }
+  if (!options.provider) {
+    return blockedApplyAction(
+      action,
+      "Skipped invitation acceptance: no hosting provider adapter was supplied.",
+    );
+  }
+  if (options.provider.provider !== options.hosting.provider) {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: hosting provider ${options.hosting.provider} ` +
+        `cannot be mutated with ${options.provider.provider} adapter.`,
+    );
+  }
+  if (!options.provider.acceptInvitation) {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: provider ${options.provider.provider} ` +
+        "does not expose invitation acceptance.",
+    );
+  }
+  if (!action.authProfile) {
+    return blockedApplyAction(
+      action,
+      "Skipped invitation acceptance: no invitee auth profile is configured.",
+    );
+  }
+
+  const authProfile = options.authProfiles?.find(
+    (profile) => profile.id === action.authProfile,
+  );
+  if (!authProfile) {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: host-local auth profile is missing: ${action.authProfile}.`,
+    );
+  }
+
+  const authProfileStatus = options.status.authProfiles.find(
+    (status) => status.id === action.authProfile,
+  );
+  if (authProfileStatus?.status === "mismatch") {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: auth profile ${action.authProfile} is ` +
+        `authenticated as ${authProfileStatus.observedAccount ?? "unknown"}; ` +
+        `expected ${authProfileStatus.expectedAccount ?? "unknown"}.`,
+    );
+  }
+  if (authProfileStatus?.status === "missing") {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: host-local auth profile is missing: ${action.authProfile}.`,
+    );
+  }
+
+  const principal = accessPrincipalForAction(options.hosting, action);
+  if (!principal) {
+    return blockedApplyAction(
+      action,
+      "Skipped invitation acceptance: declared target principal is unavailable.",
+    );
+  }
+
+  const invitationId = await invitationIdForAcceptance({
+    action,
+    authProfile,
+    principal,
+    provider: options.provider,
+    repository,
+  });
+  if (!invitationId) {
+    return blockedApplyAction(
+      action,
+      `Skipped invitation acceptance: pending invitation was not found for ${principalLabelFromConfig(principal)}.`,
+    );
+  }
+
+  try {
+    const providerResult = await options.provider.acceptInvitation({
+      namespace: repository.namespace,
+      repositoryName: repository.name,
+      principal,
+      invitationId,
+      authProfile,
+    });
+
+    if (providerResult.status === "blocked") {
+      return {
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "blocked",
+        reason:
+          providerResult.message ?? "Provider blocked invitation acceptance.",
+        providerResult,
+      };
+    }
+    if (providerResult.status === "failed") {
+      return {
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "failed",
+        reason:
+          providerResult.message ?? "Provider failed invitation acceptance.",
+        providerResult,
+      };
+    }
+
+    return {
+      actionId: action.id,
+      kind: action.kind,
+      mutationClass: action.mutationClass,
+      disposition: providerAccessRepairWasAlreadySatisfied(providerResult)
+        ? "skipped"
+        : "applied",
+      reason: providerResult.message ?? action.reason,
+      providerResult,
+    };
+  } catch (error) {
+    return {
+      actionId: action.id,
+      kind: action.kind,
+      mutationClass: action.mutationClass,
+      disposition: "failed",
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Provider failed invitation acceptance.",
+    };
+  }
+}
+
 async function applyLocalRemoteRepairAction(
   options: NexusProjectHostingApplyOptions,
   action: NexusProjectHostingPlanAction,
@@ -1412,6 +1588,48 @@ function providerAccessRepairWasAlreadySatisfied(
 ): boolean {
   return (
     result.status === "already_satisfied" || result.status === "already_exists"
+  );
+}
+
+async function invitationIdForAcceptance(options: {
+  action: NexusProjectHostingPlanAction;
+  authProfile: NexusHostingAuthProfileConfig;
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  provider: NexusProjectHostingProviderAdapter;
+  repository: NexusProjectHostingPlanActionRepository;
+}): Promise<string | null> {
+  const actionInvitationId = options.action.current.invitationId;
+  if (
+    typeof actionInvitationId === "string" &&
+    actionInvitationId.trim().length > 0
+  ) {
+    return actionInvitationId;
+  }
+
+  if (!options.provider.listInvitations) {
+    return null;
+  }
+
+  const invitations = await options.provider.listInvitations({
+    namespace: options.repository.namespace,
+    repositoryName: options.repository.name,
+    principal: options.principal,
+    authProfile: options.authProfile,
+  });
+  return (
+    invitations.find((invitation) =>
+      invitationMatchesRepository(invitation, options.repository),
+    )?.id ?? null
+  );
+}
+
+function invitationMatchesRepository(
+  invitation: NexusProjectHostingProviderInvitationRecord,
+  repository: NexusProjectHostingPlanActionRepository,
+): boolean {
+  return (
+    invitation.namespace === repository.namespace &&
+    invitation.repositoryName === repository.name
   );
 }
 
@@ -1893,6 +2111,7 @@ function hostingAccessStatusRecord(options: {
     return accessStatusRecord(options.principal, {
       effectivePermission: options.access.effectivePermission,
       pendingInvitation,
+      invitationId: options.access.invitationId ?? null,
       status: "pending",
     });
   }
@@ -1911,6 +2130,7 @@ function hostingAccessStatusRecord(options: {
     return accessStatusRecord(options.principal, {
       effectivePermission: null,
       pendingInvitation,
+      invitationId: null,
       status: "missing",
     });
   }
@@ -1936,6 +2156,7 @@ function hostingAccessStatusRecord(options: {
     return accessStatusRecord(options.principal, {
       effectivePermission: options.access.effectivePermission,
       pendingInvitation,
+      invitationId: null,
       status: "insufficient",
     });
   }
@@ -1943,6 +2164,7 @@ function hostingAccessStatusRecord(options: {
   return accessStatusRecord(options.principal, {
     effectivePermission: options.access.effectivePermission,
     pendingInvitation,
+    invitationId: null,
     status: "satisfied",
   });
 }
@@ -1962,6 +2184,7 @@ function uncheckedHostingAccessRecord(
   return accessStatusRecord(principal, {
     effectivePermission: null,
     pendingInvitation: null,
+    invitationId: null,
     status,
   });
 }
@@ -1971,6 +2194,7 @@ function accessStatusRecord(
   status: {
     effectivePermission: NexusProjectHostingRequiredPermission | null;
     pendingInvitation: boolean | null;
+    invitationId: string | null;
     status: NexusProjectHostingAccessStatus;
   },
 ): NexusProjectHostingAccessStatusRecord {
@@ -1983,6 +2207,7 @@ function accessStatusRecord(
     invitationPolicy: principal.invitationPolicy,
     effectivePermission: status.effectivePermission,
     pendingInvitation: status.pendingInvitation,
+    invitationId: status.invitationId,
     status: status.status,
   };
 }
@@ -2196,6 +2421,7 @@ function pendingInvitationPlanAction(options: {
       target: principalTarget(options.access),
       current: {
         pendingInvitation: true,
+        invitationId: options.access.invitationId,
       },
       desired: {
         pendingInvitation: false,
@@ -2220,6 +2446,7 @@ function pendingInvitationPlanAction(options: {
     target: principalTarget(options.access),
     current: {
       pendingInvitation: true,
+      invitationId: options.access.invitationId,
     },
     desired: {
       pendingInvitation: false,
@@ -2357,6 +2584,12 @@ function principalTarget(
 
 function principalLabel(access: NexusProjectHostingAccessStatusRecord): string {
   return `${access.kind}:${access.providerIdentity}`;
+}
+
+function principalLabelFromConfig(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+): string {
+  return `${principal.kind}:${principal.providerIdentity}`;
 }
 
 function principalIdPart(access: NexusProjectHostingAccessStatusRecord): string {
