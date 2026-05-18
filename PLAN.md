@@ -40,6 +40,9 @@ target-cycle facts, commits, and the target report.
 - Plugin projection: DevNexus-Pharo and DevNexus-TypeScript should set up
   workers with domain tools and skills without leaking plugin concepts into
   DevNexus core.
+- DevNexus-Pharo MCP cleanup: delegated generic DevNexus MCP tools, generic
+  tracker wrappers, and generic worktree compatibility tools have been removed;
+  next remove the remaining MCP naming overlap and old config migration paths.
 - Project hygiene: keep this dogfood root free of old staging artifacts,
   obsolete local runtime profiles, and stale completed-cycle narration.
 
@@ -64,6 +67,8 @@ target-cycle facts, commits, and the target report.
 - Implement `dev-nexus:local-79` as the first remote-host execution slice before
   runner profiles, request/result records, SSH transport, or live dogfood
   smokes.
+- Implement `dev-nexus-pharo:local-18` and `local-19` to finish the
+  no-overlap/no-legacy DevNexus-Pharo cleanup before `dev-nexus:local-112`.
 - Promote `dev-nexus:local-51` after the multi-tracker implementation shape is
   stable enough for user-facing migration documentation.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

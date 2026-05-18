@@ -23,9 +23,9 @@ and ready for coordinator-driven work across its components.
   `GH_CONFIG_DIR` resolution is proposed as
   https://github.com/Evref-BL/DevNexus/pull/1 because the bot account has read
   but not direct write access to `Evref-BL/DevNexus`.
-- Windows automation publication is intentionally blocked until the host-local
-  bot GitHub CLI profile is authenticated at
-  `home:.config/gh-automation-github`; the Mac bot profile is authenticated.
+- Windows and Mac bot publication paths are authenticated for the current
+  dogfood flow. Agent-created Git/GitHub activity must continue to use the
+  configured `bot` remotes and `Gabot-Darbot` automation profile.
 - Fresh Mac onboarding has been remediated for the advertised MCP surface.
   Local source-linked CLIs expose `dev-nexus`, `dev-nexus-pharo`, and `plexus`;
   direct `tools/list` probes pass for `dev_nexus`, `dev_nexus_pharo`,
@@ -77,12 +77,13 @@ and ready for coordinator-driven work across its components.
   land. Do not remove `.claude/skills` until stale-projection diagnostics and
   cleanup safety behavior are available, unless a separate manual cleanup is
   explicitly approved.
-- DevNexus-Pharo MCP/plugin cleanup has been re-sliced with an explicit
-  no-legacy/no-compatibility direction. Start with ready source deletions
-  `dev-nexus-pharo:local-15` through `local-17`; then complete dependent
-  cleanup `local-18` and `local-19`. Core guardrail work
-  `dev-nexus:local-112` should follow once DevNexus-Pharo has zero default
-  MCP tool overlap with `dev_nexus`.
+- DevNexus-Pharo MCP/plugin cleanup has completed source deletions
+  `dev-nexus-pharo:local-15` through `local-17` and published commits
+  `1ef5709`, `eb55b9c`, and `c5f7a90` to DevNexus-Pharo main through the bot
+  remote. `dev_nexus_pharo` now lists only six project/skill tools. Follow-up
+  cleanup `local-18` and `local-19` are ready; core guardrail work
+  `dev-nexus:local-112` should follow once DevNexus-Pharo has zero default MCP
+  tool overlap with `dev_nexus`.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
@@ -100,10 +101,10 @@ and ready for coordinator-driven work across its components.
 - Start agent-target projection work at `dev-nexus:local-105`; `local-111`
   is the dogfood Codex-only migration and should wait for active target
   filtering plus stale cleanup safety.
-- Start DevNexus-Pharo additive MCP cleanup at ready items
-  `dev-nexus-pharo:local-15`, `local-16`, and `local-17`. These supersede the
-  older deprecation/compatibility posture: remove obsolete wrappers and
-  delegated surfaces instead of preserving migration aliases.
+- Continue DevNexus-Pharo additive MCP cleanup with ready items
+  `dev-nexus-pharo:local-18` and `local-19`. These continue the
+  no-legacy/no-compatibility posture: rename remaining MCP tools to
+  Pharo-owned names, then remove old config migration paths.
 - Revisit `dev-nexus:local-51` after the sync execution shape from
   `dev-nexus:local-48` lands.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or

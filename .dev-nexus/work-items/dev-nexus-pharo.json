@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 20,
-  "nextCommentNumber": 32,
-  "updatedAt": "2026-05-18T13:56:06.592Z",
+  "nextCommentNumber": 46,
+  "updatedAt": "2026-05-18T14:34:31.850Z",
   "items": [
     {
       "id": "local-1",
@@ -353,7 +353,7 @@
       "id": "local-15",
       "title": "Remove delegated DevNexus core MCP tools from DevNexus-Pharo",
       "description": "Type: MCP boundary cleanup slice\nReadiness: autonomous agent-ready (AFK)\nSource: user direction on 2026-05-18: no legacy, no compatibility; DevNexus-Pharo is an additive Pharo plugin, not a replacement DevNexus MCP surface.\n\nCurrent finding:\nDevNexus-Pharo currently imports/list-delegates generic DevNexus MCP tools such as automation_status, target_cycle_list, target_cycle_record, target_report, and work_item_* through its own MCP server.\n\nGoal:\nMake dev_nexus_pharo tools/list expose only DevNexus-Pharo-owned tools. Generic work-item, automation, and target-cycle tools must be available only from dev_nexus.\n\nAcceptance criteria:\n- Remove the delegated DevNexus MCP tool set and call-through path from DevNexus-Pharo.\n- dev_nexus_pharo no longer lists or calls automation_status, target_cycle_list, target_cycle_record, target_report, work_item_create, work_item_list, work_item_get, work_item_update, work_item_comment, or work_item_set_status.\n- Calling a removed generic tool through dev_nexus_pharo fails as an unknown DevNexus-Pharo tool; there is no deprecation or compatibility response.\n- README, architecture docs, MCP docs, and setup guidance tell agents to use dev_nexus for generic project/work-item/automation/target operations.\n- Focused MCP tests assert the delegated generic tool names are absent from dev_nexus_pharo.\n\nBoundaries:\n- Keep DevNexus-Pharo Pharo/plugin-owned setup and skill behavior intact.\n- Do not run live images, PLexus open/close, Docker, or gateway routes.\n\nVerification:\n- Run focused DevNexus-Pharo MCP tests.\n- Run npm run check in DevNexus-Pharo when feasible.\n- Probe tools/list for dev_nexus and dev_nexus_pharo and record the remaining overlap.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -365,8 +365,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:05.649Z",
-      "updatedAt": "2026-05-18T13:56:05.649Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T14:33:43.911Z",
+      "closedAt": "2026-05-18T14:32:29.956Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -378,7 +378,7 @@
       "id": "local-16",
       "title": "Delete DevNexus-Pharo generic tracker wrapper commands",
       "description": "Type: old-code deletion slice\nReadiness: autonomous agent-ready (AFK)\nSource: user direction on 2026-05-18: no legacy, no compatibility.\n\nCurrent finding:\nDevNexus-Pharo still exposes generic tracker compatibility wrappers: CLI commands configure-tracker, link-tracker, sync-tracker; MCP tools project_configure_tracker, project_link_tracker, project_sync_tracker; deprecation helpers; service/test paths that keep the wrappers alive.\n\nGoal:\nDelete the generic tracker wrapper surface from DevNexus-Pharo. Generic tracker configuration/linking/sync belongs to DevNexus core only.\n\nAcceptance criteria:\n- Remove DevNexus-Pharo CLI commands for project configure-tracker, project link-tracker, and project sync-tracker.\n- Remove MCP tools project_configure_tracker, project_link_tracker, and project_sync_tracker from tools/list and tool dispatch.\n- Remove wrapper/deprecation helper code and tests that assert deprecated compatibility behavior.\n- Remove docs and help text describing legacy Vibe Kanban or generic tracker wrappers as available DevNexus-Pharo behavior.\n- Any remaining project creation/import options that only exist for old tracker compatibility are deleted rather than retained as aliases.\n- Generic tracker setup examples point to dev-nexus core commands only.\n\nBoundaries:\n- Keep provider-neutral tracker support in DevNexus core.\n- Do not create Vibe workspaces, sessions, or executions.\n- Do not call live external tracker APIs.\n\nVerification:\n- Run focused DevNexus-Pharo CLI, MCP, and project-service tests.\n- Run npm run check in DevNexus-Pharo when feasible.\n- Grep DevNexus-Pharo source/docs for removed wrapper names and legacy tracker deprecation text.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -390,8 +390,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:05.975Z",
-      "updatedAt": "2026-05-18T13:56:05.975Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T14:34:01.117Z",
+      "closedAt": "2026-05-18T14:32:40.189Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -403,7 +403,7 @@
       "id": "local-17",
       "title": "Delete DevNexus-Pharo worktree compatibility surface",
       "description": "Type: old-code deletion slice\nReadiness: autonomous agent-ready (AFK)\nSource: user direction on 2026-05-18: no legacy, no compatibility.\n\nCurrent finding:\nDevNexus-Pharo still exposes local Codex/worktree compatibility tools such as worktree_prepare, worktree_guide, worktree_list, worktree_status, worktree_record_execution, and worktree_archive. Generic worktree preparation and coordination now belong to DevNexus core.\n\nGoal:\nDelete DevNexus-Pharo's generic/local worktree compatibility surface. Agents should use dev_nexus worktree and coordination tools for generic worktree behavior.\n\nAcceptance criteria:\n- Remove DevNexus-Pharo MCP tools worktree_prepare, worktree_guide, worktree_list, worktree_status, worktree_record_execution, and worktree_archive from tools/list and dispatch.\n- Remove DevNexus-Pharo CLI/help/docs/tests that present those generic worktree operations as plugin behavior.\n- Remove local compatibility metadata code if it is only used by the deleted worktree surface.\n- Generated Codex/setup expected-tool checks no longer expect DevNexus-Pharo worktree tools.\n- There are no compatibility aliases, deprecation shims, or old-name fallbacks for the removed tools.\n- Docs point generic worktree preparation, status, handoff, and cleanup to DevNexus core.\n\nBoundaries:\n- Keep Pharo-specific setup, skill, PLexus, and gateway projection intact.\n- Do not remove DevNexus core worktree functionality.\n- Do not delete existing generated worktrees or branches as part of this source change.\n\nVerification:\n- Run focused DevNexus-Pharo MCP/config/worktree-related tests.\n- Run npm run check in DevNexus-Pharo when feasible.\n- Grep tools/list expectations and docs for the removed worktree tool names.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -416,8 +416,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:06.191Z",
-      "updatedAt": "2026-05-18T13:56:06.191Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T14:34:09.878Z",
+      "closedAt": "2026-05-18T14:32:50.106Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -429,7 +429,7 @@
       "id": "local-18",
       "title": "Rename remaining DevNexus-Pharo MCP project tools to Pharo-owned names",
       "description": "Type: MCP naming/boundary cleanup slice\nReadiness: todo/dependent after delegated generic tools and worktree compatibility tools are removed\nDepends on: dev-nexus-pharo:local-15 and dev-nexus-pharo:local-17\nSource: user direction on 2026-05-18: DevNexus-Pharo should bring new Pharo development tools only, with no overlap against dev_nexus.\n\nCurrent finding:\nAfter generic delegation is removed, DevNexus-Pharo still has unqualified project_* MCP tool names, including project_status, that read as generic DevNexus project operations and overlap core names.\n\nGoal:\nMake the remaining DevNexus-Pharo MCP tool names explicitly Pharo/plugin-owned and assert zero default overlap with DevNexus core tools.\n\nAcceptance criteria:\n- Rename remaining DevNexus-Pharo-owned MCP project tools to Pharo/plugin-specific names, for example pharo_project_create, pharo_project_import, pharo_project_list, pharo_project_status, pharo_project_skill_status, and pharo_project_skill_refresh, or an equivalent consistently Pharo-owned naming scheme.\n- Remove the old unqualified MCP tool names completely; no aliases, no deprecation shims, no compatibility mode.\n- Update DevNexus-Pharo plugin capability metadata, generated Codex expected-tool checks, README/docs, and focused tests to use the new names.\n- dev_nexus_pharo tools/list has zero intersection with dev_nexus tools/list in the default project setup.\n- Docs describe dev_nexus as the only generic project/work-item/worktree/automation/target MCP server and dev_nexus_pharo as the Pharo plugin surface.\n\nBoundaries:\n- CLI command names may remain user-facing if they do not create MCP overlap, but docs must not present them as generic DevNexus replacements.\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n\nVerification:\n- Run focused DevNexus-Pharo MCP/config/plugin tests.\n- Run npm run check in DevNexus-Pharo when feasible.\n- Run a tools/list overlap check proving the default overlap count is zero.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -442,7 +442,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:06.395Z",
-      "updatedAt": "2026-05-18T13:56:06.395Z",
+      "updatedAt": "2026-05-18T14:34:22.568Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -455,7 +455,7 @@
       "id": "local-19",
       "title": "Remove DevNexus-Pharo legacy config migration paths",
       "description": "Type: old-code deletion slice\nReadiness: todo/dependent after wrapper/tool removal clarifies the supported configuration surface\nDepends on: dev-nexus-pharo:local-16 and dev-nexus-pharo:local-17\nSource: user direction on 2026-05-18: no legacy, no compatibility.\n\nCurrent finding:\nDevNexus-Pharo still contains legacy home/project config migration paths and old Vibe/kanban compatibility helpers, including legacy control project root migration, legacy kanban conversion, legacy command resolution, and tests that preserve old config shapes.\n\nGoal:\nRemove DevNexus-Pharo old-config migration code that exists only to keep obsolete home/project layouts or Vibe Kanban shapes working.\n\nAcceptance criteria:\n- Delete legacy control-project root migration behavior and tests that move old home-scoped roots into the current layout.\n- Delete legacy kanban-to-workTracking conversion helpers and tests from DevNexus-Pharo; current project configs must use the supported explicit shape or fail with an actionable error.\n- Delete legacy bare dev-nexus-pharo command resolution if it exists only for old generated MCP config.\n- Remove README/docs guidance that says old Vibe Kanban or old home-scoped config shapes are still supported.\n- Validation errors for obsolete config are direct and non-interactive; they tell users to regenerate setup through the current DevNexus/DevNexus-Pharo flow rather than silently migrating.\n- Grep for legacy/compatibility/deprecated text in DevNexus-Pharo returns only unrelated domain uses such as PharoCompatibility skill content, not product compatibility shims.\n\nBoundaries:\n- Do not remove PharoCompatibility domain skill content; that is about Pharo version compatibility, not DevNexus-Pharo product legacy support.\n- Do not mutate user home directories or runtime state in this slice.\n- Do not run live images, PLexus services, Docker, or gateway routes.\n\nVerification:\n- Run focused DevNexus-Pharo config/runtime/setup tests.\n- Run npm run check in DevNexus-Pharo when feasible.\n- Run a targeted grep audit for old DevNexus-Pharo product compatibility terms.\n\nPublication notes:\n- Direct integration to DevNexus-Pharo main through the configured automation account after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -468,7 +468,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:56:06.592Z",
-      "updatedAt": "2026-05-18T13:56:06.592Z",
+      "updatedAt": "2026-05-18T14:34:31.850Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -847,10 +847,169 @@
       }
     ],
     "local-14": [],
-    "local-15": [],
-    "local-16": [],
-    "local-17": [],
-    "local-18": [],
-    "local-19": []
+    "local-15": [
+      {
+        "id": "local-comment-32",
+        "body": "Starting isolated implementation worktree for delegated DevNexus core MCP tool removal.",
+        "author": null,
+        "createdAt": "2026-05-18T13:58:06.881Z",
+        "updatedAt": "2026-05-18T13:58:06.881Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-32"
+        }
+      },
+      {
+        "id": "local-comment-35",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus-pharo/local-15\nHead: 5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T13:59:24.237Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-15\",\n  \"logicalItemId\": \"local-15\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-15\",\n    \"itemNumber\": 15,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-15\",\n    \"itemNumber\": 15,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-15\",\n        \"itemNumber\": 15\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-pharo\\\\local-15-remove-delegated-core-mcp-tools\",\n  \"branch\": \"codex/dev-nexus-pharo/local-15\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/mcpServer.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker A editing delegated generic MCP removal.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T13:59:24.258Z",
+        "updatedAt": "2026-05-18T13:59:24.258Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-35"
+        }
+      },
+      {
+        "id": "local-comment-38",
+        "body": "Completed in DevNexus-Pharo commit 1ef5709. Removed delegated generic DevNexus MCP tools from dev_nexus_pharo; generic work_item_*, automation_status, target_cycle_*, and target_report calls now remain on dev_nexus only. Verification: npm run check passed (18 files, 160 tests); MCP tool-list probe reports only project_create, project_import, project_list, project_status, project_skill_status, project_skill_refresh. Published to main through bot remote.",
+        "author": null,
+        "createdAt": "2026-05-18T14:32:25.298Z",
+        "updatedAt": "2026-05-18T14:32:25.298Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-38"
+        }
+      },
+      {
+        "id": "local-comment-41",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T14:33:43.873Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-15\",\n  \"logicalItemId\": \"local-15\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-15\",\n    \"itemNumber\": 15,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-15\",\n    \"itemNumber\": 15,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-15\",\n      \"itemNumber\": 15,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-15\",\n        \"itemNumber\": 15\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\MetaPharoNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\",\n  \"dirty\": false,\n  \"ahead\": 3,\n  \"behind\": 0,\n  \"pushed\": false,\n  \"changedAreas\": [\n    \"src/mcpServer.ts\",\n    \"src/mcpServer.test.ts\",\n    \"README.md\",\n    \"docs/architecture.md\",\n    \"docs/development.md\"\n  ],\n  \"decisions\": [\n    \"Published source commit 1ef5709 to DevNexus-Pharo main through bot remote.\"\n  ],\n  \"verificationSummary\": \"npm run check passed; dev_nexus_pharo tools/list now has six project/skill tools.\",\n  \"integrationPreference\": \"Direct integration to main completed.\",\n  \"note\": \"Completed local-15; no live images, PLexus routes, Docker, or gateway mutation.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T14:33:43.911Z",
+        "updatedAt": "2026-05-18T14:33:43.911Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-41"
+        }
+      }
+    ],
+    "local-16": [
+      {
+        "id": "local-comment-33",
+        "body": "Starting isolated implementation worktree for generic tracker wrapper deletion.",
+        "author": null,
+        "createdAt": "2026-05-18T13:58:07.512Z",
+        "updatedAt": "2026-05-18T13:58:07.512Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-33"
+        }
+      },
+      {
+        "id": "local-comment-36",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus-pharo/local-16\nHead: 5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T13:59:25.211Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-16\",\n  \"logicalItemId\": \"local-16\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-16\",\n    \"itemNumber\": 16,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-16\",\n    \"itemNumber\": 16,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-16\",\n        \"itemNumber\": 16\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-pharo\\\\local-16-delete-tracker-wrappers\",\n  \"branch\": \"codex/dev-nexus-pharo/local-16\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/cli.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker B editing generic tracker wrapper deletion.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T13:59:25.231Z",
+        "updatedAt": "2026-05-18T13:59:25.231Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-36"
+        }
+      },
+      {
+        "id": "local-comment-39",
+        "body": "Completed in DevNexus-Pharo commit eb55b9c with follow-up test cleanup in c5f7a90. Removed generic tracker wrapper commands/tools and deprecation helper paths from DevNexus-Pharo; generic tracker setup remains a DevNexus core responsibility. Verification: npm run check passed (18 files, 160 tests); grep only finds removed tracker names in negative CLI/MCP assertions or DevNexus-core examples.",
+        "author": null,
+        "createdAt": "2026-05-18T14:32:35.705Z",
+        "updatedAt": "2026-05-18T14:32:35.705Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-39"
+        }
+      },
+      {
+        "id": "local-comment-42",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T14:34:01.077Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-16\",\n  \"logicalItemId\": \"local-16\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-16\",\n    \"itemNumber\": 16,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-16\",\n    \"itemNumber\": 16,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-16\",\n      \"itemNumber\": 16,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-16\",\n        \"itemNumber\": 16\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\MetaPharoNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/projectService.test.ts\",\n    \"src/mcpServer.ts\",\n    \"src/mcpServer.test.ts\"\n  ],\n  \"decisions\": [\n    \"Published source commit eb55b9c to DevNexus-Pharo main through bot remote.\"\n  ],\n  \"verificationSummary\": \"npm run check passed; removed tracker wrapper names remain only in negative assertions or DevNexus core examples.\",\n  \"integrationPreference\": \"Direct integration to main completed.\",\n  \"note\": \"Completed local-16; no live tracker API, Vibe workspace, session, or execution was used.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T14:34:01.117Z",
+        "updatedAt": "2026-05-18T14:34:01.117Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-42"
+        }
+      }
+    ],
+    "local-17": [
+      {
+        "id": "local-comment-34",
+        "body": "Starting isolated implementation worktree for DevNexus-Pharo worktree compatibility surface deletion.",
+        "author": null,
+        "createdAt": "2026-05-18T13:58:08.124Z",
+        "updatedAt": "2026-05-18T13:58:08.124Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-34"
+        }
+      },
+      {
+        "id": "local-comment-37",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus-pharo/local-17\nHead: 5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T13:59:26.166Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-17\",\n  \"logicalItemId\": \"local-17\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-17\",\n    \"itemNumber\": 17,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-17\",\n    \"itemNumber\": 17,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-17\",\n        \"itemNumber\": 17\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-pharo\\\\local-17-delete-worktree-compat-surface\",\n  \"branch\": \"codex/dev-nexus-pharo/local-17\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"5a9460d3506e3e91da3bb92ddd292e1f3415d5b9\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/mcpServer.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": null,\n  \"integrationPreference\": null,\n  \"note\": \"Worker C editing worktree compatibility surface deletion.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T13:59:26.188Z",
+        "updatedAt": "2026-05-18T13:59:26.188Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-37"
+        }
+      },
+      {
+        "id": "local-comment-40",
+        "body": "Completed in DevNexus-Pharo commit c5f7a90. Removed DevNexus-Pharo worktree MCP tools, Codex worktree compatibility service/guide/handoff files, generated expected-tool checks for that surface, and docs that presented generic worktree operations as plugin behavior. Verification: npm run check passed (18 files, 160 tests); MCP tool-list probe reports only the six Pharo project/skill tools.",
+        "author": null,
+        "createdAt": "2026-05-18T14:32:45.720Z",
+        "updatedAt": "2026-05-18T14:32:45.720Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-40"
+        }
+      },
+      {
+        "id": "local-comment-43",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T14:34:09.814Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-17\",\n  \"logicalItemId\": \"local-17\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-17\",\n    \"itemNumber\": 17,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-17\",\n    \"itemNumber\": 17,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-17\",\n      \"itemNumber\": 17,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-17\",\n        \"itemNumber\": 17\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\MetaPharoNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"c5f7a90a895c0a36c3aba9c1fcac6a4030fafb00\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/mcpServer.ts\",\n    \"src/mcpServer.test.ts\",\n    \"src/codexWorktreeService.ts\",\n    \"src/codexWorktreeGuide.ts\",\n    \"src/codexWorktreeTrackerHandoff.ts\"\n  ],\n  \"decisions\": [\n    \"Published source commit c5f7a90 to DevNexus-Pharo main through bot remote.\"\n  ],\n  \"verificationSummary\": \"npm run check passed; dev_nexus_pharo tools/list now has only six Pharo project/skill tools.\",\n  \"integrationPreference\": \"Direct integration to main completed.\",\n  \"note\": \"Completed local-17; no generated worktrees or branches were deleted.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T14:34:09.878Z",
+        "updatedAt": "2026-05-18T14:34:09.878Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-43"
+        }
+      }
+    ],
+    "local-18": [
+      {
+        "id": "local-comment-44",
+        "body": "Dependency update: local-15 and local-17 are done and published to DevNexus-Pharo main. This item is now ready for the next autonomous slice.",
+        "author": null,
+        "createdAt": "2026-05-18T14:34:15.943Z",
+        "updatedAt": "2026-05-18T14:34:15.943Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-44"
+        }
+      }
+    ],
+    "local-19": [
+      {
+        "id": "local-comment-45",
+        "body": "Dependency update: local-16 and local-17 are done and published to DevNexus-Pharo main. This item is now ready for the next autonomous slice.",
+        "author": null,
+        "createdAt": "2026-05-18T14:34:27.390Z",
+        "updatedAt": "2026-05-18T14:34:27.390Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-45"
+        }
+      }
+    ]
   }
 }

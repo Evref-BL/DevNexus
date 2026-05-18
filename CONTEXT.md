@@ -77,11 +77,16 @@ coordinator agent chooses and supervises implementation work.
 - The active Codex session may still lack visible generic DevNexus MCP tools
   even when config and stdio probes work. Use the project-local DevNexus CLI for
   project operations until provider-session visibility is fixed.
-- Windows automation publication currently blocks until the host-local
-  `GH_CONFIG_DIR=home:.config/gh-automation-github` profile is authenticated as
-  `Gabot-Darbot`; this is intentional to prevent human-account fallback.
+- Windows automation publication has a host-local
+  `GH_CONFIG_DIR=home:.config/gh-automation-github` profile authenticated as
+  `Gabot-Darbot`; keep agent-created Git/GitHub activity on the configured
+  automation remotes and profile to prevent human-account fallback.
 - Fresh Mac onboarding proved generic `dev_nexus` and `dev_nexus_pharo` stdio
   MCP servers can list tools, but PLexus-backed MCP was unavailable because
   `plexus` was not on `PATH` and direct Pharo HTTP MCP was not live. Treat that
   Mac as ready for non-live DevNexus coordination only until runtime tooling is
   explicitly enabled.
+- DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
+  generic tracker wrappers, or generic worktree compatibility tools. Follow-up
+  `dev-nexus-pharo:local-18` and `local-19` are ready to remove the remaining
+  MCP naming overlap and old config migration paths.
