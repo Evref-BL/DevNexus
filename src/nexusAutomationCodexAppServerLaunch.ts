@@ -63,6 +63,7 @@ export interface CreateNexusAutomationCodexAppServerLauncherOptions {
   adapterFactory?: (
     input: NexusAutomationCodexAppServerAdapterFactoryInput,
   ) => CodexAppServerCapabilityAdapter | Promise<CodexAppServerCapabilityAdapter>;
+  turnCompletionNotificationTimeoutMs?: number;
 }
 
 interface ResolvedCodexAppServerAdapter {
@@ -76,6 +77,8 @@ interface CodexLaunchPolicy {
   permissionProfile: string;
   mcpDefaultToolsApprovalMode: string | null;
 }
+
+const defaultTurnCompletionNotificationTimeoutMs = 120_000;
 
 export class NexusAutomationCodexAppServerLaunchError extends Error {
   constructor(message: string) {
@@ -163,6 +166,15 @@ export function createNexusAutomationCodexAppServerLauncher(
           "turn.id",
         ], "turn id");
 
+        await waitForCodexAppServerTurnCompletionNotification({
+          client: adapter.client,
+          threadId,
+          turnId,
+          timeoutMs:
+            options.turnCompletionNotificationTimeoutMs ??
+            defaultTurnCompletionNotificationTimeoutMs,
+        });
+
         const reported = readNexusAutomationAgentResultFile(input.resultFile);
         if (reported.status !== "loaded") {
           return {
@@ -240,6 +252,99 @@ export function createNexusAutomationCodexAppServerLauncher(
       };
     }
   };
+}
+
+async function waitForCodexAppServerTurnCompletionNotification(options: {
+  client: CodexAppServerJsonRpcClient;
+  threadId: string;
+  turnId: string;
+  timeoutMs: number;
+}): Promise<void> {
+  if (!options.client.supportsNotifications()) {
+    return;
+  }
+
+  const notification = options.client.waitForNotification((candidate) =>
+    isTerminalCodexAppServerTurnNotification(candidate, {
+      threadId: options.threadId,
+      turnId: options.turnId,
+    }),
+  );
+  if (options.timeoutMs <= 0) {
+    await notification;
+    return;
+  }
+
+  let timeout: NodeJS.Timeout | null = null;
+  try {
+    await Promise.race([
+      notification,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(
+          () =>
+            reject(
+              new NexusAutomationCodexAppServerLaunchError(
+                `Timed out waiting for Codex app-server terminal notification for turn ${options.turnId}`,
+              ),
+            ),
+          options.timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+function isTerminalCodexAppServerTurnNotification(
+  notification: { method: string; params?: unknown },
+  expected: { threadId: string; turnId: string },
+): boolean {
+  const method = notification.method.toLowerCase();
+  if (!method.includes("turn")) {
+    return false;
+  }
+
+  const params = isRecord(notification.params)
+    ? notification.params
+    : {};
+  const turnId = firstStringAtPath(params, [
+    "turnId",
+    "turn_id",
+    "turn.id",
+    "turn.turnId",
+    "turn.turn_id",
+  ]);
+  if (turnId !== expected.turnId) {
+    return false;
+  }
+
+  const threadId = firstStringAtPath(params, [
+    "threadId",
+    "thread_id",
+    "thread.id",
+    "thread.threadId",
+    "thread.thread_id",
+  ]);
+  if (threadId && threadId !== expected.threadId) {
+    return false;
+  }
+
+  if (/completed|complete|finished|finish|failed|failure|cancelled|canceled|done/.test(method)) {
+    return true;
+  }
+
+  const status = firstStringAtPath(params, [
+    "status",
+    "state",
+    "turn.status",
+    "turn.state",
+  ])?.toLowerCase();
+  return status
+    ? ["completed", "failed", "blocked", "cancelled", "canceled", "done"].includes(status)
+    : false;
 }
 
 async function resolveCodexAppServerAdapter(options: {
@@ -659,6 +764,24 @@ function valueAtPath(value: unknown, dottedPath: string): unknown {
   }
 
   return current;
+}
+
+function firstStringAtPath(
+  value: Record<string, unknown>,
+  paths: readonly string[],
+): string | null {
+  for (const path of paths) {
+    const candidate = valueAtPath(value, path);
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function compactRecord(
