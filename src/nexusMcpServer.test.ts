@@ -430,7 +430,7 @@ describe("DevNexus MCP server", () => {
         name: "Mac Demo",
         repo: {
           kind: "git",
-          remoteUrl: "git@github.com-gabot:Gabot-Darbot/mac-demo.git",
+          remoteUrl: "git@github.com-bot:ExampleOrg/mac-demo.git",
           defaultBranch: "main",
         },
       }),

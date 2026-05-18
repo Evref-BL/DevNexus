@@ -27,7 +27,7 @@ function writeProject(root: string, overrides: Partial<NexusProjectConfig> = {})
     home: null,
     repo: {
       kind: "git",
-      remoteUrl: "git@github.com-gabot:Gabot-Darbot/mac-demo.git",
+      remoteUrl: "git@github.com-bot:ExampleOrg/mac-demo.git",
       defaultBranch: "main",
     },
     worktreesRoot: "worktrees",
@@ -257,7 +257,7 @@ describe("nexus setup assistant", () => {
     expect(cloneStep.summary).toContain("not a component source checkout");
     expect(cloneStep.commands).toContain("mkdir -p $HOME/dev-nexus");
     expect(cloneStep.commands).toContain(
-      "git clone git@github.com:Gabot-Darbot/mac-demo.git $HOME/dev-nexus/mac-demo",
+      "git clone git@github.com:ExampleOrg/mac-demo.git $HOME/dev-nexus/mac-demo",
     );
     expect(cloneStep.manualInstructions).toContain(
       "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",

@@ -812,7 +812,7 @@ function githubMetaProjectSteps(options: {
         `Choose where the shared meta repository lives. Recommended bot account: ${guide.recommendedBotAccount}; recommended organization namespace: ${guide.recommendedOrgNamespace}; repository: ${guide.repositoryName}.`,
       commands: [],
       manualInstructions: [
-        `Use a clearly named machine-user or app actor for automation activity, for example ${guide.recommendedBotAccount}; custom names such as Gabot-Darbot are fine when recorded in hosting/auth profile metadata.`,
+        `Use a clearly named machine-user or app actor for automation activity, for example ${guide.recommendedBotAccount}; custom names are fine when recorded in hosting/auth profile metadata.`,
         `Use a private organization namespace such as ${guide.recommendedOrgNamespace} when team ownership is more important than machine-user simplicity.`,
         "Create GitHub accounts, verify email addresses, complete browser/device login, and create organizations manually; DevNexus must not automate account or organization creation.",
         `Record only portable hosting intent in dev-nexus.project.json: provider=github, namespace=${guide.namespace}, repository=${guide.repositoryName}, visibility=${guide.visibility}, defaultBranch=${guide.defaultBranch}.`,
