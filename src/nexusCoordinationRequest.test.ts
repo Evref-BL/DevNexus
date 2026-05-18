@@ -63,6 +63,78 @@ function projectConfig(
   };
 }
 
+function externalFeedbackTrackerProjectConfig(options: {
+  sourceRoot: string;
+  worktreesRoot: string;
+  primaryStorePath: string;
+  feedbackStorePath?: string;
+  feedbackProvider?: "local" | "github";
+}): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "coordination-request-demo",
+    name: "Coordination Request Demo",
+    home: null,
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    worktreesRoot: "worktrees",
+    kanban: {
+      provider: "vibe-kanban",
+      projectId: null,
+    },
+    components: [
+      {
+        id: "dev-nexus",
+        name: "DevNexus",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/dev-nexus.git",
+        defaultBranch: "main",
+        sourceRoot: options.sourceRoot,
+        worktreesRoot: options.worktreesRoot,
+        defaultWorkTrackerId: "primary",
+        workTrackers: [
+          {
+            id: "primary",
+            name: "Primary",
+            enabled: true,
+            roles: ["primary"],
+            workTracking: {
+              provider: "local",
+              storePath: options.primaryStorePath,
+            },
+          },
+          {
+            id: "feedback",
+            name: "External Feedback",
+            enabled: true,
+            roles: ["external_feedback"],
+            workTracking:
+              options.feedbackProvider === "github"
+                ? {
+                    provider: "github",
+                    repository: {
+                      owner: "example",
+                      name: "coordination",
+                    },
+                  }
+                : {
+                    provider: "local",
+                    storePath:
+                      options.feedbackStorePath ??
+                      ".dev-nexus/work-items-feedback.json",
+                  },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  };
+}
+
 function fakeGitRunner(repositoryPath: string): GitRunner {
   return (args: readonly string[]): GitCommandResult => {
     const argsArray = [...args];
@@ -97,6 +169,63 @@ function ok(args: string[], stdout: string): GitCommandResult {
     stderr: "",
     exitCode: 0,
   };
+}
+
+function writeText(filePath: string, text: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, text, "utf8");
+}
+
+function writeTrackerLink(options: {
+  projectRoot: string;
+  logicalItemId: string;
+  trackerId: string;
+  trackerName: string;
+  itemId: string;
+  timestamp: string;
+}): void {
+  writeText(
+    path.join(options.projectRoot, ".dev-nexus", "work-item-links.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: options.timestamp,
+        records: [
+          {
+            projectId: "coordination-request-demo",
+            componentId: "dev-nexus",
+            logicalItemId: options.logicalItemId,
+            createdAt: options.timestamp,
+            updatedAt: options.timestamp,
+            references: [
+              {
+                trackerId: options.trackerId,
+                trackerName: options.trackerName,
+                provider: "local",
+                host: null,
+                repositoryId: null,
+                repositoryOwner: null,
+                repositoryName: null,
+                projectId: null,
+                boardId: null,
+                itemId: options.itemId,
+                itemNumber: null,
+                itemKey: null,
+                nodeId: null,
+                webUrl: null,
+                firstObservedAt: options.timestamp,
+                lastObservedAt: options.timestamp,
+              },
+            ],
+            audit: [],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 async function createFixture(): Promise<{
@@ -197,6 +326,192 @@ describe("nexus coordination requests", () => {
     const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
     expect(store.comments["local-1"]?.[0]?.body).toContain(
       "DevNexus coordination request",
+    );
+  });
+
+  it("records request comments on a linked external-feedback tracker", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-request-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus",
+      "local-50",
+    );
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const feedbackStorePath = ".dev-nexus/work-items-feedback.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      externalFeedbackTrackerProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+        feedbackStorePath,
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-18T08:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary feedback item",
+      status: "in_progress",
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: feedbackStorePath },
+      now: () => "2026-05-18T08:01:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Unrelated feedback item",
+      status: "ready",
+    });
+    const feedbackItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: feedbackStorePath },
+      now: () => "2026-05-18T08:02:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Feedback mirror item",
+      status: "in_progress",
+    });
+    writeTrackerLink({
+      projectRoot,
+      logicalItemId: primaryItem.id,
+      trackerId: "feedback",
+      trackerName: "External Feedback",
+      itemId: feedbackItem.id,
+      timestamp: "2026-05-18T08:03:00.000Z",
+    });
+
+    const result = await createNexusCoordinationRequest({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      intent: "feedback",
+      question: "Can this request use the feedback tracker?",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath),
+      now: () => "2026-05-18T08:10:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      requestTracker: {
+        trackerId: "feedback",
+        selection: "role",
+      },
+      workItem: {
+        id: primaryItem.id,
+        title: "Primary feedback item",
+        trackerRef: {
+          trackerId: "primary",
+        },
+      },
+      record: {
+        logicalItemId: primaryItem.id,
+        selectedWorkItemRef: {
+          trackerId: "primary",
+          itemId: primaryItem.id,
+        },
+        requestRecordTargetRef: {
+          trackerId: "feedback",
+          itemId: feedbackItem.id,
+        },
+      },
+      comment: {
+        trackerRef: {
+          trackerId: "feedback",
+          default: false,
+        },
+      },
+    });
+    expect(
+      loadLocalWorkTrackingStore(path.join(projectRoot, primaryStorePath))
+        .comments[primaryItem.id],
+    ).toEqual([]);
+    expect(
+      loadLocalWorkTrackingStore(path.join(projectRoot, feedbackStorePath))
+        .comments[feedbackItem.id],
+    ).toHaveLength(1);
+  });
+
+  it("keeps live external-feedback posting as a mocked draft", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-request-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus",
+      "local-51",
+    );
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      externalFeedbackTrackerProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+        feedbackProvider: "github",
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-18T08:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary GitHub feedback item",
+      status: "in_progress",
+    });
+
+    const result = await createNexusCoordinationRequest({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-1",
+      intent: "review",
+      question: "Review the external-feedback draft?",
+      target: "github-issue:17",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath),
+      now: () => "2026-05-18T08:10:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      requestTracker: {
+        trackerId: "feedback",
+        provider: "github",
+      },
+      record: {
+        target: {
+          kind: "github_issue",
+          provider: "github",
+          value: "17",
+          externalRef: {
+            repositoryOwner: "example",
+            repositoryName: "coordination",
+            itemNumber: 17,
+            webUrl: "https://github.com/example/coordination/issues/17",
+          },
+        },
+        provider: {
+          provider: "github",
+          surface: "issue",
+          mode: "draft",
+          posted: false,
+          credentialsUsed: false,
+        },
+      },
+      comment: null,
+    });
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("live external provider posting is disabled"),
+      ]),
     );
   });
 

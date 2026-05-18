@@ -65,6 +65,66 @@ function projectConfig(
   };
 }
 
+function coordinationTrackerProjectConfig(options: {
+  sourceRoot: string;
+  worktreesRoot: string;
+  primaryStorePath: string;
+  coordinationStorePath: string;
+}): NexusProjectConfig {
+  return {
+    version: 1,
+    id: "coordination-demo",
+    name: "Coordination Demo",
+    home: null,
+    repo: {
+      kind: "local",
+      remoteUrl: null,
+      defaultBranch: "main",
+    },
+    worktreesRoot: "worktrees",
+    kanban: {
+      provider: "vibe-kanban",
+      projectId: null,
+    },
+    components: [
+      {
+        id: "dev-nexus",
+        name: "DevNexus",
+        kind: "git",
+        role: "primary",
+        remoteUrl: "git@example.invalid:demo/dev-nexus.git",
+        defaultBranch: "main",
+        sourceRoot: options.sourceRoot,
+        worktreesRoot: options.worktreesRoot,
+        defaultWorkTrackerId: "primary",
+        workTrackers: [
+          {
+            id: "primary",
+            name: "Primary",
+            enabled: true,
+            roles: ["primary"],
+            workTracking: {
+              provider: "local",
+              storePath: options.primaryStorePath,
+            },
+          },
+          {
+            id: "coordination",
+            name: "Coordination",
+            enabled: true,
+            roles: ["coordination"],
+            workTracking: {
+              provider: "local",
+              storePath: options.coordinationStorePath,
+            },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  };
+}
+
 function multiComponentProjectConfig(options: {
   primarySourceRoot: string;
   primaryWorktreesRoot: string;
@@ -193,6 +253,60 @@ function runGit(cwd: string, args: string[]): string {
 function writeText(filePath: string, text: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, text, "utf8");
+}
+
+function writeTrackerLink(options: {
+  projectRoot: string;
+  projectId: string;
+  componentId: string;
+  logicalItemId: string;
+  trackerId: string;
+  trackerName: string;
+  itemId: string;
+  timestamp: string;
+}): void {
+  writeText(
+    path.join(options.projectRoot, ".dev-nexus", "work-item-links.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        nextAuditNumber: 1,
+        updatedAt: options.timestamp,
+        records: [
+          {
+            projectId: options.projectId,
+            componentId: options.componentId,
+            logicalItemId: options.logicalItemId,
+            createdAt: options.timestamp,
+            updatedAt: options.timestamp,
+            references: [
+              {
+                trackerId: options.trackerId,
+                trackerName: options.trackerName,
+                provider: "local",
+                host: null,
+                repositoryId: null,
+                repositoryOwner: null,
+                repositoryName: null,
+                projectId: null,
+                boardId: null,
+                itemId: options.itemId,
+                itemNumber: null,
+                itemKey: null,
+                nodeId: null,
+                webUrl: null,
+                firstObservedAt: options.timestamp,
+                lastObservedAt: options.timestamp,
+              },
+            ],
+            audit: [],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -543,6 +657,153 @@ describe("nexus coordination", () => {
       },
       nextAction: "Ready for review or integration.",
     });
+  });
+
+  it("writes and reads handoffs from a linked coordination-role tracker", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-50");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const coordinationStorePath = ".dev-nexus/work-items-coordination.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      coordinationTrackerProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+        coordinationStorePath,
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-18T08:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary selected item",
+      status: "in_progress",
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: coordinationStorePath },
+      now: () => "2026-05-18T08:01:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Unrelated coordination item",
+      status: "ready",
+    });
+    const coordinationItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: coordinationStorePath },
+      now: () => "2026-05-18T08:02:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordination mirror item",
+      status: "in_progress",
+    });
+    writeTrackerLink({
+      projectRoot,
+      projectId: "coordination-demo",
+      componentId: "dev-nexus",
+      logicalItemId: primaryItem.id,
+      trackerId: "coordination",
+      trackerName: "Coordination",
+      itemId: coordinationItem.id,
+      timestamp: "2026-05-18T08:03:00.000Z",
+    });
+
+    const handoff = await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      trackerRole: "coordination",
+      status: "ready",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:10:00.000Z",
+    });
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      trackerId: "coordination",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:15:00.000Z",
+    });
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      trackerRole: "coordination",
+      targetBranch: "main",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:20:00.000Z",
+    });
+
+    expect(handoff).toMatchObject({
+      record: {
+        workItemId: primaryItem.id,
+        logicalItemId: primaryItem.id,
+        selectedWorkItemRef: {
+          trackerId: "primary",
+          itemId: primaryItem.id,
+        },
+        coordinationTargetRef: {
+          trackerId: "coordination",
+          itemId: coordinationItem.id,
+        },
+      },
+      comment: {
+        trackerRef: {
+          trackerId: "coordination",
+          default: false,
+        },
+      },
+    });
+    expect(status).toMatchObject({
+      workItem: {
+        id: primaryItem.id,
+        title: "Primary selected item",
+        trackerRef: {
+          trackerId: "primary",
+          default: true,
+        },
+      },
+      coordinationTracker: {
+        trackerId: "coordination",
+        selection: "explicit_id",
+      },
+      handoffs: {
+        trackerId: "coordination",
+        records: [
+          {
+            workItemId: primaryItem.id,
+            coordinationTargetRef: {
+              trackerId: "coordination",
+              itemId: coordinationItem.id,
+            },
+          },
+        ],
+      },
+    });
+    expect(plan).toMatchObject({
+      handoffs: {
+        trackerId: "coordination",
+        totalCount: 1,
+      },
+    });
+    expect(
+      loadLocalWorkTrackingStore(path.join(projectRoot, primaryStorePath))
+        .comments[primaryItem.id],
+    ).toEqual([]);
+    expect(
+      loadLocalWorkTrackingStore(path.join(projectRoot, coordinationStorePath))
+        .comments[coordinationItem.id],
+    ).toHaveLength(1);
   });
 
   it("treats stale handoffs as advisory warnings, not locks", async () => {

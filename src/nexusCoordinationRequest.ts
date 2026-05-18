@@ -7,9 +7,11 @@ import {
 } from "./gitWorktreeService.js";
 import {
   loadProjectConfig,
+  type NexusProjectWorkTrackerRole,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  type ResolvedNexusProjectWorkTracker,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
@@ -21,6 +23,11 @@ import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
+import {
+  defaultWorkItemTrackerLinkStorePath,
+  loadWorkItemTrackerLinkStore,
+  type WorkItemTrackerReference,
+} from "./workItemTrackerLinks.js";
 import type {
   ExternalRef,
   GitHubWorkTrackingConfig,
@@ -29,6 +36,10 @@ import type {
   WorkComment,
   WorkItem,
 } from "./workTrackingTypes.js";
+import type {
+  NexusCoordinationTrackerSummary,
+  NexusCoordinationWorkItemTrackerReference,
+} from "./nexusCoordination.js";
 
 export const coordinationRequestCommentMarker = "DevNexus coordination request";
 export const coordinationRequestKind = "dev-nexus.coordination.request";
@@ -134,6 +145,10 @@ export interface NexusCoordinationRequestRecord {
   componentId: string;
   componentName: string;
   workItemId: string | null;
+  logicalItemId: string | null;
+  selectedWorkItemRef: NexusCoordinationWorkItemTrackerReference | null;
+  requestRecordTargetRef: NexusCoordinationWorkItemTrackerReference | null;
+  trackerReferences: NexusCoordinationWorkItemTrackerReference[];
   hostId: string;
   agentId: string | null;
   intent: NexusCoordinationRequestIntent;
@@ -150,6 +165,8 @@ export interface NexusCoordinationRequestOptions {
   projectRoot: string;
   componentId?: string;
   workItemId?: string;
+  trackerId?: string;
+  trackerRole?: string;
   intent: string;
   question?: string | null;
   note?: string | null;
@@ -180,6 +197,7 @@ export interface NexusCoordinationRequestResult {
     workTrackingProvider: string | null;
   };
   workItem: WorkItem | null;
+  requestTracker: NexusCoordinationTrackerSummary;
   record: NexusCoordinationRequestRecord;
   comment: WorkComment | null;
   warnings: string[];
@@ -191,6 +209,11 @@ interface ResolvedCoordinationRequestContext {
   component: ResolvedNexusProjectComponent;
   workItemId?: string;
   currentPath: string;
+}
+
+interface ResolvedCoordinationRequestTracker {
+  tracker: ResolvedNexusProjectWorkTracker;
+  summary: NexusCoordinationTrackerSummary;
 }
 
 const requestIntents = new Set<NexusCoordinationRequestIntent>([
@@ -213,6 +236,10 @@ export async function createNexusCoordinationRequest(
   options: NexusCoordinationRequestOptions,
 ): Promise<NexusCoordinationRequestResult> {
   let context = resolveCoordinationRequestContext(options);
+  let requestTracker = resolveCoordinationRequestTracker(context, {
+    trackerId: options.trackerId,
+    trackerRole: options.trackerRole,
+  });
   const intent = parseNexusCoordinationRequestIntent(options.intent, "intent");
   const question = optionalNullableTrimmedString(options.question) ?? null;
   const note = optionalNullableTrimmedString(options.note) ?? null;
@@ -226,6 +253,7 @@ export async function createNexusCoordinationRequest(
   let explicitTarget = parseNexusCoordinationRequestTarget(
     rawTarget,
     context,
+    requestTracker.tracker,
   );
   const rawWorkItemId =
     context.workItemId ??
@@ -237,8 +265,16 @@ export async function createNexusCoordinationRequest(
       ...options,
       workItemId: rawWorkItemId,
     });
+    requestTracker = resolveCoordinationRequestTracker(context, {
+      trackerId: options.trackerId,
+      trackerRole: options.trackerRole,
+    });
     git = getCoordinationRequestGitContext(context, options.gitRunner);
-    explicitTarget = parseNexusCoordinationRequestTarget(rawTarget, context);
+    explicitTarget = parseNexusCoordinationRequestTarget(
+      rawTarget,
+      context,
+      requestTracker.tracker,
+    );
   }
   const workItemId = context.workItemId ?? rawWorkItemId ?? null;
   const target =
@@ -248,6 +284,7 @@ export async function createNexusCoordinationRequest(
           provider: "dev-nexus",
           value: workItemId,
           context,
+          requestTracker: requestTracker.tracker,
         })
       : (explicitTarget ??
         inferCoordinationRequestTarget({
@@ -262,6 +299,19 @@ export async function createNexusCoordinationRequest(
     responder: options.responder,
     requestedChanges: options.requestedChanges,
   });
+  const workItem = await maybeGetWorkItem(context, workItemId, options.now);
+  const linkReferences = workItemId
+    ? workItemTrackerReferencesForLogicalItem(context, workItemId, timestamp)
+    : [];
+  const recordTarget = workItemId
+    ? requestRecordTargetForWorkItem({
+        context,
+        logicalItemId: workItemId,
+        workItem,
+        tracker: requestTracker.tracker,
+        linkReferences,
+      })
+    : null;
   const provider = providerRecordForTarget({
     context,
     target,
@@ -282,6 +332,21 @@ export async function createNexusCoordinationRequest(
     componentId: context.component.id,
     componentName: context.component.name,
     workItemId,
+    logicalItemId: workItemId,
+    selectedWorkItemRef: workItem
+      ? workItemTrackerReferenceFromWorkItem({
+          componentId: context.component.id,
+          workItem,
+        })
+      : null,
+    requestRecordTargetRef: recordTarget?.reference ?? null,
+    trackerReferences: workItem
+      ? coordinationTrackerReferences({
+          componentId: context.component.id,
+          workItem,
+          linkReferences,
+        })
+      : [],
     hostId: optionalTrimmedString(options.hostId) ?? os.hostname(),
     agentId: optionalTrimmedString(options.agentId) ?? null,
     intent,
@@ -294,10 +359,14 @@ export async function createNexusCoordinationRequest(
     response,
   };
 
-  const workItem = await maybeGetWorkItem(context, workItemId, options.now);
   const warnings = [...git.warnings];
+  if (recordTarget?.warning) {
+    warnings.push(recordTarget.warning);
+  }
   const comment = await maybeAddRequestComment({
     context,
+    tracker: requestTracker,
+    targetWorkItemId: recordTarget?.itemId ?? null,
     workItemId,
     body: formatCoordinationRequestComment(record),
     now: options.now,
@@ -308,6 +377,7 @@ export async function createNexusCoordinationRequest(
     project: projectSummary(context),
     component: componentSummary(context.component),
     workItem,
+    requestTracker: requestTracker.summary,
     record,
     comment,
     warnings,
@@ -483,6 +553,7 @@ function getCoordinationRequestGitContext(
 function parseNexusCoordinationRequestTarget(
   value: string | null,
   context: ResolvedCoordinationRequestContext,
+  requestTracker: ResolvedNexusProjectWorkTracker,
 ): NexusCoordinationRequestTarget | null {
   if (!value) {
     return null;
@@ -528,6 +599,7 @@ function parseNexusCoordinationRequestTarget(
         provider: spec.provider,
         value: match[1],
         context,
+        requestTracker,
       });
     }
   }
@@ -539,6 +611,7 @@ function parseNexusCoordinationRequestTarget(
       provider: "dev-nexus",
       value: workItemMatch[1],
       context,
+      requestTracker,
     });
   }
   const branchMatch = /^branch[:#,-]*(.+)$/iu.exec(target);
@@ -548,6 +621,7 @@ function parseNexusCoordinationRequestTarget(
       provider: "dev-nexus",
       value: branchMatch[1],
       context,
+      requestTracker,
     });
   }
   const reviewerMatch = /^reviewer[:#,-]*(.+)$/iu.exec(target);
@@ -557,6 +631,7 @@ function parseNexusCoordinationRequestTarget(
       provider: "dev-nexus",
       value: reviewerMatch[1],
       context,
+      requestTracker,
     });
   }
   if (/^[A-Z][A-Z0-9]+-\d+$/u.test(target)) {
@@ -565,6 +640,7 @@ function parseNexusCoordinationRequestTarget(
       provider: "jira",
       value: target,
       context,
+      requestTracker,
     });
   }
 
@@ -573,6 +649,7 @@ function parseNexusCoordinationRequestTarget(
     provider: "dev-nexus",
     value: target,
     context,
+    requestTracker,
   });
 }
 
@@ -581,6 +658,7 @@ function requestTarget(options: {
   provider: NexusCoordinationRequestProviderName;
   value: string;
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedNexusProjectWorkTracker;
 }): NexusCoordinationRequestTarget {
   const value = requiredNonEmptyString(options.value, "target");
   const externalRef = externalRefForRequestTarget({
@@ -588,6 +666,7 @@ function requestTarget(options: {
     provider: options.provider,
     value,
     context: options.context,
+    requestTracker: options.requestTracker,
   });
   return {
     kind: options.kind,
@@ -762,6 +841,7 @@ function externalRefForRequestTarget(options: {
   provider: NexusCoordinationRequestProviderName;
   value: string;
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedNexusProjectWorkTracker;
 }): ExternalRef | null {
   if (options.provider === "github") {
     return githubExternalRef(options);
@@ -786,10 +866,13 @@ function githubExternalRef(options: {
   kind: NexusCoordinationRequestTargetKind;
   value: string;
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedNexusProjectWorkTracker;
 }): ExternalRef {
   const config =
-    options.context.component.workTracking?.provider === "github"
-      ? (options.context.component.workTracking as GitHubWorkTrackingConfig)
+    options.requestTracker.workTracking.provider === "github"
+      ? (options.requestTracker.workTracking as GitHubWorkTrackingConfig)
+      : options.context.component.workTracking?.provider === "github"
+        ? (options.context.component.workTracking as GitHubWorkTrackingConfig)
       : null;
   const itemNumber = positiveIntegerOrNull(options.value);
   const issuePath =
@@ -814,10 +897,13 @@ function gitlabExternalRef(options: {
   kind: NexusCoordinationRequestTargetKind;
   value: string;
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedNexusProjectWorkTracker;
 }): ExternalRef {
   const config =
-    options.context.component.workTracking?.provider === "gitlab"
-      ? (options.context.component.workTracking as GitLabWorkTrackingConfig)
+    options.requestTracker.workTracking.provider === "gitlab"
+      ? (options.requestTracker.workTracking as GitLabWorkTrackingConfig)
+      : options.context.component.workTracking?.provider === "gitlab"
+        ? (options.context.component.workTracking as GitLabWorkTrackingConfig)
       : null;
   const itemNumber = positiveIntegerOrNull(options.value);
   const targetPath =
@@ -840,10 +926,13 @@ function gitlabExternalRef(options: {
 function jiraExternalRef(options: {
   value: string;
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedNexusProjectWorkTracker;
 }): ExternalRef {
   const config =
-    options.context.component.workTracking?.provider === "jira"
-      ? (options.context.component.workTracking as JiraWorkTrackingConfig)
+    options.requestTracker.workTracking.provider === "jira"
+      ? (options.requestTracker.workTracking as JiraWorkTrackingConfig)
+      : options.context.component.workTracking?.provider === "jira"
+        ? (options.context.component.workTracking as JiraWorkTrackingConfig)
       : null;
   const projectKey = options.value.split("-")[0] ?? config?.projectKey ?? null;
   const host = config?.host ?? null;
@@ -922,7 +1011,7 @@ async function maybeGetWorkItem(
   workItemId: string | null,
   now?: () => Date | string,
 ): Promise<WorkItem | null> {
-  if (!workItemId || context.component.workTracking?.provider !== "local") {
+  if (!workItemId) {
     return null;
   }
 
@@ -943,6 +1032,8 @@ async function maybeGetWorkItem(
 
 async function maybeAddRequestComment(options: {
   context: ResolvedCoordinationRequestContext;
+  tracker: ResolvedCoordinationRequestTracker;
+  targetWorkItemId: string | null;
   workItemId: string | null;
   body: string;
   now?: () => Date | string;
@@ -954,9 +1045,15 @@ async function maybeAddRequestComment(options: {
     );
     return null;
   }
-  if (options.context.component.workTracking?.provider !== "local") {
+  if (options.tracker.tracker.workTracking.provider !== "local") {
     options.warnings.push(
-      `Draft coordination request was not posted to ${options.context.component.workTracking?.provider ?? "unknown"}; this slice does not use live provider credentials.`,
+      `Draft coordination request was not posted to tracker "${options.tracker.tracker.id}" provider "${options.tracker.tracker.workTracking.provider}"; live external provider posting is disabled by policy.`,
+    );
+    return null;
+  }
+  if (!options.targetWorkItemId) {
+    options.warnings.push(
+      `No tracker reference links logical work item "${options.context.component.id}:${options.workItemId}" to request tracker "${options.tracker.tracker.id}", so the coordination request was returned as a neutral record only.`,
     );
     return null;
   }
@@ -965,15 +1062,16 @@ async function maybeAddRequestComment(options: {
     return await workItemServiceForContext(options.context, options.now).addComment({
       projectRoot: options.context.projectRoot,
       componentId: options.context.component.id,
-      ref: { id: options.workItemId },
+      trackerId: options.tracker.tracker.id,
+      ref: { id: options.targetWorkItemId },
       body: options.body,
     });
   } catch (error) {
-    throwWorkItemLookupFailure({
-      component: options.context.component,
-      itemId: options.workItemId,
-      cause: error,
-    });
+    throw new Error(
+      `Coordination request comment failed for component "${options.context.component.id}" ` +
+        `tracker "${options.tracker.tracker.id}" provider "${options.tracker.tracker.workTracking.provider}" ` +
+        `item "${options.targetWorkItemId}": ${errorDetail(error)}`,
+    );
   }
 }
 
@@ -1003,7 +1101,298 @@ function workItemProjectContext(
     componentId: context.component.id,
     componentName: context.component.name,
     sourceRoot: context.component.sourceRoot,
+    defaultTrackerId: context.component.defaultTrackerId,
+    workTrackers: context.component.workTrackers.map((tracker) => ({
+      id: tracker.id,
+      name: tracker.name,
+      enabled: tracker.enabled,
+      roles: tracker.roles,
+      workTracking: tracker.workTracking,
+    })),
     workTracking,
+  };
+}
+
+function resolveCoordinationRequestTracker(
+  context: ResolvedCoordinationRequestContext,
+  options: { trackerId?: string; trackerRole?: string },
+): ResolvedCoordinationRequestTracker {
+  const trackers = context.component.workTrackers.filter((tracker) => tracker.enabled);
+  if (trackers.length === 0) {
+    throw new Error(`Component ${context.component.id} work tracking is not configured`);
+  }
+
+  const explicitTrackerId = optionalTrimmedString(options.trackerId);
+  if (explicitTrackerId) {
+    const tracker = trackers.find((candidate) => candidate.id === explicitTrackerId);
+    if (!tracker) {
+      throw new Error(
+        `Component "${context.component.id}" request tracker is not configured or enabled: ${explicitTrackerId}`,
+      );
+    }
+
+    return resolvedCoordinationRequestTracker(context, tracker, "explicit_id");
+  }
+
+  const explicitRole = optionalTrimmedString(options.trackerRole);
+  if (explicitRole) {
+    return resolvedCoordinationRequestTrackerByRole(
+      context,
+      trackers,
+      parseNexusCoordinationRequestTrackerRole(explicitRole, "trackerRole"),
+      "explicit_role",
+    );
+  }
+
+  for (const role of ["external_feedback", "coordination"] as const) {
+    const matched = trackers.filter((tracker) => tracker.roles.includes(role));
+    if (matched.length === 1) {
+      return resolvedCoordinationRequestTracker(context, matched[0]!, "role");
+    }
+    if (matched.length > 1) {
+      throw new Error(
+        `Component "${context.component.id}" has multiple enabled request trackers with role "${role}": ` +
+          matched.map((tracker) => tracker.id).join(", "),
+      );
+    }
+  }
+
+  const defaultTracker =
+    trackers.find((tracker) => tracker.id === context.component.defaultTrackerId) ??
+    trackers[0]!;
+  return resolvedCoordinationRequestTracker(context, defaultTracker, "default");
+}
+
+function resolvedCoordinationRequestTrackerByRole(
+  context: ResolvedCoordinationRequestContext,
+  trackers: ResolvedNexusProjectWorkTracker[],
+  role: NexusProjectWorkTrackerRole,
+  selection: NexusCoordinationTrackerSummary["selection"],
+): ResolvedCoordinationRequestTracker {
+  const matched = trackers.filter((tracker) => tracker.roles.includes(role));
+  if (matched.length === 0) {
+    throw new Error(
+      `Component "${context.component.id}" has no enabled work tracker with role "${role}"`,
+    );
+  }
+  if (matched.length > 1) {
+    throw new Error(
+      `Component "${context.component.id}" has multiple enabled work trackers with role "${role}": ` +
+        matched.map((tracker) => tracker.id).join(", "),
+    );
+  }
+
+  return resolvedCoordinationRequestTracker(context, matched[0]!, selection);
+}
+
+function resolvedCoordinationRequestTracker(
+  context: ResolvedCoordinationRequestContext,
+  tracker: ResolvedNexusProjectWorkTracker,
+  selection: NexusCoordinationTrackerSummary["selection"],
+): ResolvedCoordinationRequestTracker {
+  return {
+    tracker,
+    summary: {
+      trackerId: tracker.id,
+      trackerName: tracker.name,
+      trackerRoles: tracker.roles,
+      provider: tracker.workTracking.provider,
+      default: context.component.defaultTrackerId === tracker.id,
+      selection,
+    },
+  };
+}
+
+function parseNexusCoordinationRequestTrackerRole(
+  value: string,
+  pathName: string,
+): NexusProjectWorkTrackerRole {
+  if (
+    value === "primary" ||
+    value === "mirror" ||
+    value === "coordination" ||
+    value === "planning" ||
+    value === "external_feedback" ||
+    value === "migration" ||
+    value === "archive"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    `${pathName} must be primary, mirror, coordination, planning, external_feedback, migration, or archive`,
+  );
+}
+
+function workItemTrackerReferencesForLogicalItem(
+  context: ResolvedCoordinationRequestContext,
+  logicalItemId: string,
+  timestamp: string,
+): WorkItemTrackerReference[] {
+  const store = loadWorkItemTrackerLinkStore(
+    defaultWorkItemTrackerLinkStorePath(context.projectRoot),
+    timestamp,
+  );
+  return (
+    store.records.find(
+      (record) =>
+        record.projectId === context.projectConfig.id &&
+        record.componentId === context.component.id &&
+        record.logicalItemId === logicalItemId,
+    )?.references ?? []
+  );
+}
+
+function requestRecordTargetForWorkItem(options: {
+  context: ResolvedCoordinationRequestContext;
+  logicalItemId: string;
+  workItem: WorkItem | null;
+  tracker: ResolvedNexusProjectWorkTracker;
+  linkReferences: WorkItemTrackerReference[];
+}): {
+  itemId: string | null;
+  reference: NexusCoordinationWorkItemTrackerReference | null;
+  warning: string | null;
+} {
+  if (options.context.component.defaultTrackerId === options.tracker.id) {
+    const reference = options.workItem
+      ? workItemTrackerReferenceFromWorkItem({
+          componentId: options.context.component.id,
+          workItem: options.workItem,
+        })
+      : trackerReferenceFromParts({
+          componentId: options.context.component.id,
+          tracker: options.tracker,
+          itemId: options.logicalItemId,
+          externalRef: null,
+        });
+    return {
+      itemId: options.logicalItemId,
+      reference,
+      warning: null,
+    };
+  }
+
+  const linked = options.linkReferences.find(
+    (reference) => reference.trackerId === options.tracker.id,
+  );
+  if (linked) {
+    return {
+      itemId: linked.itemId,
+      reference: trackerReferenceFromLink({
+        componentId: options.context.component.id,
+        reference: linked,
+      }),
+      warning: null,
+    };
+  }
+
+  return {
+    itemId: null,
+    reference: null,
+    warning:
+      `No tracker reference links logical work item "${options.context.component.id}:${options.logicalItemId}" ` +
+      `to request tracker "${options.tracker.id}".`,
+  };
+}
+
+function coordinationTrackerReferences(options: {
+  componentId: string;
+  workItem: WorkItem;
+  linkReferences: WorkItemTrackerReference[];
+}): NexusCoordinationWorkItemTrackerReference[] {
+  const references = [
+    workItemTrackerReferenceFromWorkItem({
+      componentId: options.componentId,
+      workItem: options.workItem,
+    }),
+    ...options.linkReferences.map((reference) =>
+      trackerReferenceFromLink({
+        componentId: options.componentId,
+        reference,
+      }),
+    ),
+  ];
+  const seen = new Set<string>();
+  return references.filter((reference) => {
+    const key = `${reference.trackerId}\u0000${reference.provider}\u0000${reference.itemId}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function workItemTrackerReferenceFromWorkItem(options: {
+  componentId: string;
+  workItem: WorkItem;
+}): NexusCoordinationWorkItemTrackerReference {
+  const trackerRef = options.workItem.trackerRef;
+  const externalRef = options.workItem.externalRef ?? null;
+  return {
+    componentId: options.componentId,
+    trackerId: trackerRef?.trackerId ?? "default",
+    trackerName: trackerRef?.trackerName ?? null,
+    provider:
+      trackerRef?.provider ??
+      externalRef?.provider ??
+      options.workItem.provider ??
+      "unknown",
+    itemId: externalRef?.itemId ?? options.workItem.id,
+    itemNumber: externalRef?.itemNumber ?? null,
+    itemKey: externalRef?.itemKey ?? null,
+    webUrl: externalRef?.webUrl ?? options.workItem.webUrl ?? null,
+    externalRef,
+  };
+}
+
+function trackerReferenceFromLink(options: {
+  componentId: string;
+  reference: WorkItemTrackerReference;
+}): NexusCoordinationWorkItemTrackerReference {
+  return {
+    componentId: options.componentId,
+    trackerId: options.reference.trackerId,
+    trackerName: options.reference.trackerName ?? null,
+    provider: options.reference.provider,
+    itemId: options.reference.itemId,
+    itemNumber: options.reference.itemNumber ?? null,
+    itemKey: options.reference.itemKey ?? null,
+    webUrl: options.reference.webUrl ?? null,
+    externalRef: {
+      provider: options.reference.provider,
+      host: options.reference.host,
+      repositoryId: options.reference.repositoryId,
+      repositoryOwner: options.reference.repositoryOwner,
+      repositoryName: options.reference.repositoryName,
+      projectId: options.reference.projectId,
+      boardId: options.reference.boardId,
+      itemId: options.reference.itemId,
+      itemNumber: options.reference.itemNumber,
+      itemKey: options.reference.itemKey,
+      nodeId: options.reference.nodeId,
+      webUrl: options.reference.webUrl,
+    },
+  };
+}
+
+function trackerReferenceFromParts(options: {
+  componentId: string;
+  tracker: ResolvedNexusProjectWorkTracker;
+  itemId: string;
+  externalRef: ExternalRef | null;
+}): NexusCoordinationWorkItemTrackerReference {
+  return {
+    componentId: options.componentId,
+    trackerId: options.tracker.id,
+    trackerName: options.tracker.name,
+    provider: options.tracker.workTracking.provider,
+    itemId: options.externalRef?.itemId ?? options.itemId,
+    itemNumber: options.externalRef?.itemNumber ?? null,
+    itemKey: options.externalRef?.itemKey ?? null,
+    webUrl: options.externalRef?.webUrl ?? null,
+    externalRef: options.externalRef,
   };
 }
 
@@ -1189,4 +1578,10 @@ function sanitizeIdPart(value: string): string {
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-+|-+$/gu, "")
     .slice(0, 80);
+}
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error
+    ? `${error.name}: ${error.message}`
+    : String(error);
 }

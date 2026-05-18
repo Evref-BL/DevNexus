@@ -74,6 +74,7 @@ import {
   getNexusCoordinationStatus,
   nexusCoordinationErrorPayload,
   parseNexusCoordinationHandoffStatus,
+  parseNexusCoordinationTrackerRole,
   type NexusCoordinationHandoffResult,
   type NexusCoordinationHandoffStatus,
   type NexusCoordinationIntegrationPlan,
@@ -432,6 +433,8 @@ interface ParsedCoordinationStatusCommand {
   projectRoot: string;
   componentId?: string;
   workItemId?: string;
+  trackerId?: string;
+  trackerRole?: string;
   currentPath?: string;
   json?: boolean;
 }
@@ -440,6 +443,8 @@ interface ParsedCoordinationHandoffCommand {
   projectRoot: string;
   componentId?: string;
   workItemId: string;
+  trackerId?: string;
+  trackerRole?: string;
   status: NexusCoordinationHandoffStatus;
   hostId?: string;
   agentId?: string;
@@ -456,6 +461,8 @@ interface ParsedCoordinationIntegrateCommand {
   projectRoot: string;
   componentId?: string;
   workItemId?: string;
+  trackerId?: string;
+  trackerRole?: string;
   targetBranch?: string;
   fetch?: boolean;
   currentPath?: string;
@@ -466,6 +473,8 @@ interface ParsedCoordinationRequestCommand {
   projectRoot: string;
   componentId?: string;
   workItemId?: string;
+  trackerId?: string;
+  trackerRole?: string;
   intent: NexusCoordinationRequestIntent;
   question?: string | null;
   note?: string | null;
@@ -634,12 +643,16 @@ export function usage(): string {
     "Options for coordination status:",
     "  --component <id>          defaults to component inferred from --worktree or current directory",
     "  --work-item <id>",
+    "  --tracker <id>            coordination tracker id; defaults to role coordination, then component default",
+    "  --tracker-role <role>     coordination tracker role such as coordination or external_feedback",
     "  --worktree <path>         git worktree or source checkout used for status",
     "  --json",
     "",
     "Options for coordination handoff:",
     "  --component <id>          defaults to component inferred from --worktree or current directory",
     "  --status <working|ready|blocked|merged>",
+    "  --tracker <id>            coordination tracker id; defaults to role coordination, then component default",
+    "  --tracker-role <role>     coordination tracker role such as coordination or external_feedback",
     "  --host <id>",
     "  --agent <id>",
     "  --changed-area <path>      repeatable",
@@ -653,6 +666,8 @@ export function usage(): string {
     "Options for coordination integrate:",
     "  --component <id>          defaults to component inferred from --worktree or current directory",
     "  --work-item <id>",
+    "  --tracker <id>            coordination tracker id; defaults to role coordination, then component default",
+    "  --tracker-role <role>     coordination tracker role such as coordination or external_feedback",
     "  --target-branch <branch>  defaults to component or automation publication target",
     "  --fetch                   fetch configured remote when automation safety allows host mutation",
     "  --worktree <path>         git worktree or source checkout used for planning",
@@ -661,6 +676,8 @@ export function usage(): string {
     "Options for coordination request:",
     "  --component <id>          defaults to component inferred from --worktree or current directory",
     "  --work-item <id>",
+    "  --tracker <id>            request record tracker id; defaults to role external_feedback, coordination, then component default",
+    "  --tracker-role <role>     request record tracker role such as external_feedback or coordination",
     "  --intent <approval|feedback|choice|review>",
     "  --question <text>",
     "  --note <text>",
@@ -1141,6 +1158,8 @@ async function handleCoordinationCommand(
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
       workItemId: parsed.workItemId,
+      trackerId: parsed.trackerId,
+      trackerRole: parsed.trackerRole,
       currentPath: parsed.currentPath ?? process.cwd(),
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
@@ -1159,6 +1178,8 @@ async function handleCoordinationCommand(
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
       workItemId: parsed.workItemId,
+      trackerId: parsed.trackerId,
+      trackerRole: parsed.trackerRole,
       status: parsed.status,
       hostId: parsed.hostId,
       agentId: parsed.agentId,
@@ -1186,6 +1207,8 @@ async function handleCoordinationCommand(
         projectRoot: parsed.projectRoot,
         componentId: parsed.componentId,
         workItemId: parsed.workItemId,
+        trackerId: parsed.trackerId,
+        trackerRole: parsed.trackerRole,
         targetBranch: parsed.targetBranch,
         fetch: parsed.fetch,
         currentPath: parsed.currentPath ?? process.cwd(),
@@ -1215,6 +1238,8 @@ async function handleCoordinationCommand(
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
       workItemId: parsed.workItemId,
+      trackerId: parsed.trackerId,
+      trackerRole: parsed.trackerRole,
       intent: parsed.intent,
       question: parsed.question,
       note: parsed.note,
@@ -2582,6 +2607,12 @@ function parseCoordinationStatusCommand(
       case "--work-item":
         parsed.workItemId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
+        break;
       case "--worktree":
         parsed.currentPath = next();
         break;
@@ -2630,6 +2661,12 @@ function parseCoordinationHandoffCommand(
         break;
       case "--status":
         parsed.status = parseNexusCoordinationHandoffStatus(next(), arg);
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
         break;
       case "--host":
         parsed.hostId = next();
@@ -2697,6 +2734,12 @@ function parseCoordinationIntegrateCommand(
       case "--work-item":
         parsed.workItemId = next();
         break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
+        break;
       case "--target-branch":
         parsed.targetBranch = next();
         break;
@@ -2746,6 +2789,12 @@ function parseCoordinationRequestCommand(
         break;
       case "--work-item":
         parsed.workItemId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--tracker-role":
+        parsed.trackerRole = parseNexusCoordinationTrackerRole(next(), arg);
         break;
       case "--intent":
         parsed.intent = parseNexusCoordinationRequestIntent(next(), arg);
@@ -4300,6 +4349,10 @@ function printCoordinationStatusResult(
   writeLine(stdout, "DevNexus coordination status.");
   writeLine(stdout, `  Project: ${status.project.id}`);
   writeLine(stdout, `  Component: ${status.component.id}`);
+  writeLine(
+    stdout,
+    `  Coordination tracker: ${status.coordinationTracker.trackerId} (${status.coordinationTracker.provider})`,
+  );
   if (status.workItem) {
     writeLine(stdout, `  Work item: ${status.workItem.id} ${status.workItem.title}`);
   }
@@ -4332,6 +4385,12 @@ function printCoordinationHandoffResult(
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Component: ${result.component.id}`);
   writeLine(stdout, `  Work item: ${result.record.workItemId}`);
+  if (result.comment.trackerRef) {
+    writeLine(
+      stdout,
+      `  Coordination tracker: ${result.comment.trackerRef.trackerId} (${result.comment.trackerRef.provider})`,
+    );
+  }
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
   writeLine(stdout, `  Comment: ${result.comment.id}`);
@@ -4352,6 +4411,12 @@ function printCoordinationIntegrationPlan(
   writeLine(stdout, `  Project: ${plan.project.id}`);
   writeLine(stdout, `  Component: ${plan.component.id}`);
   writeLine(stdout, `  Target: ${plan.target.ref}`);
+  if (plan.handoffs.tracker) {
+    writeLine(
+      stdout,
+      `  Coordination tracker: ${plan.handoffs.tracker.trackerId} (${plan.handoffs.tracker.provider})`,
+    );
+  }
   writeLine(stdout, `  Handoff branches: ${plan.branches.length}`);
   writeLine(
     stdout,
@@ -4419,6 +4484,12 @@ function printCoordinationRequestResult(
     stdout,
     `  Provider: ${result.record.provider.provider} ${result.record.provider.surface} draft`,
   );
+  if (result.comment?.trackerRef) {
+    writeLine(
+      stdout,
+      `  Request tracker: ${result.comment.trackerRef.trackerId} (${result.comment.trackerRef.provider})`,
+    );
+  }
   writeLine(stdout, `  Posted: ${String(result.record.provider.posted)}`);
   if (result.comment) {
     writeLine(stdout, `  Comment: ${result.comment.id}`);

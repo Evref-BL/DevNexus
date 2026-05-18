@@ -433,6 +433,8 @@ const tools: McpTool[] = [
         projectRoot: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
         currentPath: { type: "string" },
       },
       additionalProperties: false,
@@ -449,6 +451,8 @@ const tools: McpTool[] = [
         projectRoot: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
         status: {
           type: "string",
           enum: ["working", "ready", "blocked", "merged"],
@@ -477,6 +481,8 @@ const tools: McpTool[] = [
         projectRoot: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
         targetBranch: { type: "string" },
         fetch: { type: "boolean" },
         currentPath: { type: "string" },
@@ -495,6 +501,8 @@ const tools: McpTool[] = [
         projectRoot: { type: "string" },
         componentId: { type: "string" },
         workItemId: { type: "string" },
+        trackerId: { type: "string" },
+        trackerRole: { type: "string" },
         intent: {
           type: "string",
           enum: ["approval", "feedback", "choice", "review"],
@@ -897,6 +905,8 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             componentId: optionalString(args, "componentId", "arguments"),
             workItemId: optionalString(args, "workItemId", "arguments"),
+            trackerId: optionalString(args, "trackerId", "arguments"),
+            trackerRole: optionalString(args, "trackerRole", "arguments"),
             currentPath:
               optionalString(args, "currentPath", "arguments") ??
               context.currentPath ??
@@ -912,6 +922,8 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             componentId: optionalString(args, "componentId", "arguments"),
             workItemId: requiredString(args, "workItemId", "arguments"),
+            trackerId: optionalString(args, "trackerId", "arguments"),
+            trackerRole: optionalString(args, "trackerRole", "arguments"),
             status: parseNexusCoordinationHandoffStatus(
               requiredString(args, "status", "arguments"),
               "arguments.status",
@@ -947,6 +959,8 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             componentId: optionalString(args, "componentId", "arguments"),
             workItemId: optionalString(args, "workItemId", "arguments"),
+            trackerId: optionalString(args, "trackerId", "arguments"),
+            trackerRole: optionalString(args, "trackerRole", "arguments"),
             targetBranch: optionalString(args, "targetBranch", "arguments"),
             fetch: optionalBoolean(args, "fetch", "arguments"),
             currentPath:
@@ -964,6 +978,8 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
             componentId: optionalString(args, "componentId", "arguments"),
             workItemId: optionalString(args, "workItemId", "arguments"),
+            trackerId: optionalString(args, "trackerId", "arguments"),
+            trackerRole: optionalString(args, "trackerRole", "arguments"),
             intent: parseNexusCoordinationRequestIntent(
               requiredString(args, "intent", "arguments"),
               "arguments.intent",
