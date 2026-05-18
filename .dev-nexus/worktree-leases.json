@@ -1,7 +1,62 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T19:25:40.603Z",
+  "updatedAt": "2026-05-18T19:47:06.471Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-1e2e01221017d0c0",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-98",
+      "branchName": "codex/dev-nexus/local-98",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-98"
+      },
+      "writeScope": [
+        "src/nexusSharedCheckoutGuard.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T19:35:56.291Z",
+      "lastSeenAt": "2026-05-18T19:47:06.471Z",
+      "updatedAt": "2026-05-18T19:47:06.471Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "e3ab2ded22f6ba2279539f76eff85069ac66842a",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-98"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Worktree branch was fast-forward integrated into main.",
+        "Verification: npm run check passed with 57 test files and 451 tests."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

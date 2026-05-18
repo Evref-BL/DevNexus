@@ -2,7 +2,7 @@
   "version": 1,
   "nextNumber": 138,
   "nextCommentNumber": 221,
-  "updatedAt": "2026-05-18T19:39:46.570Z",
+  "updatedAt": "2026-05-18T19:47:06.509Z",
   "items": [
     {
       "id": "local-1",
@@ -2467,7 +2467,7 @@
       "id": "local-98",
       "title": "Add fail-closed shared-checkout mutation guard",
       "description": "Type: implementation fail-safe slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: make DevNexus-controlled mutating flows fail closed before they edit a shared project or component checkout. This is a tool-level guard, not an agent-instruction preference.\n\nUser stories covered:\n- As a worker agent, I am blocked before editing the shared checkout and receive the safe next action to prepare or adopt an owned worktree.\n- As a human maintainer, I can start multiple chats without relying on prompt compliance to protect the meta-project main branch.\n- As an integrator, I can still perform an explicit integration action after the tool verifies that the role/action is allowed.\n\nAcceptance criteria:\n- DevNexus can classify the target Git checkout as shared project checkout, shared component checkout, generated component worktree, generated project-meta worktree, integration worktree, bootstrap/setup operation, or unknown.\n- DevNexus-controlled write operations call the guard before mutation, including local work-item writes, target-state/project-state writes, skill/MCP projection refreshes, coordination handoffs that write project state, publication/integration operations, and cleanup execution.\n- Shared-checkout writes are refused by default with a non-interactive machine-readable result that names the target, mutation class, classification, and safer next action.\n- The guard allows read-only commands and the narrow bootstrap operations required to create/adopt an owned worktree or inspect coordination state.\n- The first implementation uses explicit command/action allowlists and explicit overrides for integrator/bootstrap cases; later authority work can replace or refine the override mechanism.\n- Branch name alone is never treated as proof of isolation; a writable worker surface requires an owned worktree or explicit integration/bootstrap classification.\n- Tests cover local tracker mutation from shared meta checkout, target-state mutation from shared meta checkout, component source mutation from shared component checkout, generated component worktree success, generated project-meta worktree success, bootstrap worktree prepare success, unknown checkout refusal, explicit override, and integration-role allowance.\n\nDependencies:\n- Should land before dev-nexus:local-99 through local-101 become the common workflow path.\n- Does not block on authority model completion; authority can be layered onto this fail-safe after dev-nexus:local-87 through local-89.\n- Complements dev-nexus:local-91 and dev-nexus:local-92; do not duplicate publication or provider mutation permission policy there.\n\nBoundaries:\n- Do not introduce hard locks between independent owned worktrees.\n- Do not block read-only status, setup check, coordination status, or integration planning.\n- Do not require live provider credentials.\n- Do not infer implementation ownership from branch name alone.\n\nVerification:\n- Focused checkout-classification and command-boundary tests.\n- Focused CLI/MCP tests proving mutating tools fail before writing shared checkout state.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2480,8 +2480,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:22:17.061Z",
-      "updatedAt": "2026-05-18T19:17:22.561Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T19:47:06.509Z",
+      "closedAt": "2026-05-18T19:46:15.629Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -5883,6 +5883,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-216"
+        }
+      },
+      {
+        "id": "local-comment-219",
+        "body": "Implemented and published fail-closed shared-checkout mutation guard as DevNexus commit e3ab2de. Added checkout classification, mutation decisions, CLI guard calls for mutating command paths, MCP guard payloads for guarded calls, bootstrap/integration/allow overrides, and focused CLI/MCP coverage. Verification: npm run check passed with 57 test files and 451 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T19:46:15.381Z",
+        "updatedAt": "2026-05-18T19:46:15.381Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-219"
+        }
+      },
+      {
+        "id": "local-comment-220",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-98\nHead: e3ab2ded22f6ba2279539f76eff85069ac66842a\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T19:47:06.471Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-98\",\n  \"logicalItemId\": \"local-98\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-98\",\n    \"itemNumber\": 98,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-98\",\n      \"itemNumber\": 98\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-98\",\n    \"itemNumber\": 98,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-98\",\n      \"itemNumber\": 98\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-98\",\n      \"itemNumber\": 98,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-98\",\n        \"itemNumber\": 98\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-1e2e01221017d0c0\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-98\",\n  \"branch\": \"codex/dev-nexus/local-98\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"e3ab2ded22f6ba2279539f76eff85069ac66842a\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusSharedCheckoutGuard.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\"\n  ],\n  \"decisions\": [\n    \"Published e3ab2de to DevNexus main via bot remote.\"\n  ],\n  \"verificationSummary\": \"npm run check passed with 57 test files and 451 tests.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worktree branch was fast-forward integrated into main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T19:47:06.509Z",
+        "updatedAt": "2026-05-18T19:47:06.509Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-220"
         }
       }
     ],
