@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 243,
-  "updatedAt": "2026-05-18T21:54:48.636Z",
+  "nextCommentNumber": 244,
+  "updatedAt": "2026-05-18T21:56:38.705Z",
   "items": [
     {
       "id": "local-1",
@@ -3790,7 +3790,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T21:54:19.630Z",
-      "updatedAt": "2026-05-18T21:54:19.630Z",
+      "updatedAt": "2026-05-18T21:56:38.705Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6919,7 +6919,19 @@
       }
     ],
     "local-146": [],
-    "local-147": [],
+    "local-147": [
+      {
+        "id": "local-comment-243",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: Host-001.lan\nBranch: codex/dev-nexus-dogfood/dev-nexus-research-plugin\nHead: 4ea331576598f4722b115b38c9dc95d324874e19\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T21:56:38.701Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus-dogfood/codex-dev-nexus-dogfood-dev-nexus-research-plugin\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-147\",\n  \"logicalItemId\": \"local-147\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-147\",\n        \"itemNumber\": 147\n      }\n    }\n  ],\n  \"hostId\": \"Host-001.lan\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood/worktrees/dev-nexus-dogfood/codex-dev-nexus-dogfood-dev-nexus-research-plugin\",\n  \"branch\": \"codex/dev-nexus-dogfood/dev-nexus-research-plugin\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ea331576598f4722b115b38c9dc95d324874e19\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"docs/dev-nexus-research-plugin-prd.md\",\n    \"PLAN.md\",\n    \".dev-nexus/automation/target-state.md\",\n    \".dev-nexus/work-items/dev-nexus.json\"\n  ],\n  \"decisions\": [\n    \"Treat DevNexus-Research as an additive non-engineering domain plugin, not a DevNexus core feature.\",\n    \"Use ARS as inspiration and optional external integration until license posture is explicitly decided.\",\n    \"Allow original DevNexus-owned plugin skeleton work to proceed before ARS license decision.\"\n  ],\n  \"verificationSummary\": \"JSON work item store parsed successfully; git diff --check passed; trailing whitespace scan found no matches.\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"Published dogfood meta commit 4ea3315 to bot/main with PRD and local-146 through local-151 slices.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T21:56:38.705Z",
+        "updatedAt": "2026-05-18T21:56:38.705Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-243"
+        }
+      }
+    ],
     "local-148": [],
     "local-149": [],
     "local-150": [],
