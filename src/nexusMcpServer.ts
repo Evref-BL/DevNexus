@@ -79,6 +79,7 @@ import {
 import {
   createWorkItemSyncPlan,
   defaultWorkItemSyncPolicy,
+  executeWorkItemSync,
   parseWorkItemSyncCommentPolicyMode,
   parseWorkItemSyncConflictPolicyMode,
   parseWorkItemSyncCredentialPolicy,
@@ -781,6 +782,47 @@ const tools: McpTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "work_item_sync_execute",
+    description: "Execute an explicitly policy-gated one-way local-to-GitHub work-item sync and record a run summary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        sourceTrackerId: { type: "string" },
+        targetTrackerId: { type: "string" },
+        direction: { type: "string", enum: ["source_to_target"] },
+        filters: { type: "object" },
+        fieldSet: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "title",
+              "description",
+              "status",
+              "labels",
+              "assignees",
+              "milestone",
+            ],
+          },
+        },
+        commentPolicy: { type: "string", enum: ["ignore", "plan"] },
+        statusMapping: { type: "object" },
+        conflictPolicy: {
+          type: "string",
+          enum: ["block", "source_wins", "target_wins"],
+        },
+        writePolicy: { type: "object" },
+        recordRun: { type: "boolean" },
+      },
+      required: ["sourceTrackerId", "targetTrackerId"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export function listDevNexusMcpTools(): McpTool[] {
@@ -1211,6 +1253,20 @@ export async function callDevNexusMcpTool(
             policy: workItemSyncPolicyFromArgs(args),
             resolveProject: (selector) =>
               resolveWorkItemProject(selector, homePath),
+            now: context.now,
+          }),
+        });
+      }
+      case "work_item_sync_execute": {
+        const homePath = homePathFromArgs(args);
+        return toolResult({
+          ok: true,
+          run: await executeWorkItemSync({
+            ...projectSelectorFromArgs(args),
+            policy: workItemSyncPolicyFromArgs(args),
+            resolveProject: (selector) =>
+              resolveWorkItemProject(selector, homePath),
+            recordRun: optionalBoolean(args, "recordRun", "arguments"),
             now: context.now,
           }),
         });

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import {
   createWorkItemService,
@@ -6,6 +8,7 @@ import {
   type WorkItemProviderFactory,
 } from "./workItemService.js";
 import {
+  createWorkItemTrackerLinkService,
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
   type WorkItemTrackerReference,
@@ -20,6 +23,7 @@ import type {
   WorkItemPatch,
   WorkItemQuery,
   WorkStatus,
+  WorkComment,
   WorkTrackerCapabilityName,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
@@ -250,11 +254,80 @@ export interface WorkItemSyncPlan {
   unlinkedTargets: WorkItemSyncItemSummary[];
 }
 
+export interface ExecuteWorkItemSyncInput extends CreateWorkItemSyncPlanInput {
+  plan?: WorkItemSyncPlan;
+  recordRun?: boolean;
+}
+
+export type WorkItemSyncRunStatus = "completed" | "blocked" | "failed";
+
+export interface WorkItemSyncProviderLink {
+  action: "created" | "updated";
+  source: WorkItemSyncItemSummary;
+  target: WorkItemSyncItemSummary;
+  linkAction: "linked" | "updated" | "unchanged";
+  reference: WorkItemTrackerReference;
+}
+
+export interface WorkItemSyncRunCounts {
+  created: number;
+  updated: number;
+  skipped: number;
+  conflicted: number;
+  blocked: number;
+  comments: number;
+  links: number;
+}
+
+export interface WorkItemSyncRunBlocker {
+  operation: string;
+  message: string;
+  source?: WorkItemSyncItemSummary;
+  target?: WorkItemSyncItemSummary;
+}
+
+export interface WorkItemSyncRunSummary {
+  id: string;
+  status: WorkItemSyncRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  projectRoot: string;
+  projectId: string;
+  componentId: string;
+  sourceTrackerId: string;
+  targetTrackerId: string;
+  planGeneratedAt: string;
+  counts: WorkItemSyncRunCounts;
+}
+
+export interface WorkItemSyncRun {
+  summary: WorkItemSyncRunSummary;
+  status: WorkItemSyncRunStatus;
+  plan: WorkItemSyncPlan;
+  providerLinks: WorkItemSyncProviderLink[];
+  comments: WorkComment[];
+  blockers: WorkItemSyncRunBlocker[];
+  skipped: WorkItemSyncSkipPlan[];
+  conflicts: WorkItemSyncConflictPlan[];
+  storePath?: string;
+}
+
+export interface WorkItemSyncRunStore {
+  version: 1;
+  updatedAt: string | null;
+  runs: Array<{
+    summary: WorkItemSyncRunSummary;
+    providerLinks: WorkItemSyncProviderLink[];
+    blockers: WorkItemSyncRunBlocker[];
+  }>;
+}
+
 interface MutableWorkItemSyncPlan extends WorkItemSyncPlan {
   counts: WorkItemSyncPlanCounts;
 }
 
 const allFields: WorkItemSyncField[] = [...workItemSyncFields];
+export const workItemSyncRunStoreFileName = "work-item-sync-runs.json";
 
 export function defaultWorkItemSyncPolicy(
   overrides: Partial<WorkItemSyncPolicyConfig> & {
@@ -442,6 +515,196 @@ export async function createWorkItemSyncPlan(
 
   refreshCounts(plan);
   return plan;
+}
+
+export async function executeWorkItemSync(
+  input: ExecuteWorkItemSyncInput,
+): Promise<WorkItemSyncRun> {
+  const startedAt = nowString(input.now);
+  const plan =
+    input.plan ??
+    (await createWorkItemSyncPlan({
+      ...input,
+      policy: plannerPolicyForExecution(input.policy),
+    }));
+  validateConsumedExecutionPlan(plan, input.policy);
+
+  const selector = executionSelector(input, plan);
+  const service = createWorkItemService({
+    resolveProject: input.resolveProject,
+    providerFactory: input.providerFactory,
+    providerOptions: input.providerOptions,
+    now: input.now,
+  });
+  const linkService = createWorkItemTrackerLinkService({
+    resolveProject: input.resolveProject,
+    now: input.now,
+  });
+  const providerLinks: WorkItemSyncProviderLink[] = [];
+  const comments: WorkComment[] = [];
+  const blockers: WorkItemSyncRunBlocker[] = [
+    ...executionPolicyBlockers(plan, input.policy),
+    ...plan.blockers.map((blocker) => ({
+      operation: blocker.operation,
+      message: blocker.message,
+    })),
+  ];
+
+  if (blockers.length === 0) {
+    for (const createPlan of plan.creates) {
+      try {
+        const target = await service.createWorkItem({
+          ...selector,
+          trackerId: plan.policy.targetTrackerId,
+          ...createInputFromPlan(createPlan),
+        });
+        const link = await linkService.linkReference({
+          ...selector,
+          logicalItemId: createPlan.source.id,
+          trackerId: plan.policy.targetTrackerId,
+          ...linkInputFromTarget(target),
+        });
+        const targetSummary = summarizeWorkItem(
+          target,
+          plan.policy.targetTrackerId,
+        );
+        providerLinks.push({
+          action: "created",
+          source: createPlan.source,
+          target: targetSummary,
+          linkAction: link.action,
+          reference: link.reference,
+        });
+        const comment = await maybeAddSyncComment({
+          service,
+          selector,
+          plan,
+          source: createPlan.source,
+          target,
+          action: "created",
+          fields: createPlan.fields.map((field) => field.field),
+        });
+        if (comment) {
+          comments.push(comment);
+        }
+      } catch (error) {
+        blockers.push({
+          operation: "create",
+          message: errorMessage(error),
+          source: createPlan.source,
+        });
+      }
+    }
+
+    for (const updatePlan of plan.updates) {
+      try {
+        const target = await service.updateWorkItem({
+          ...selector,
+          trackerId: plan.policy.targetTrackerId,
+          ref: {
+            id: updatePlan.targetReference.itemId,
+            externalRef: updatePlan.targetReference,
+          },
+          patch: patchFromChanges(updatePlan.fields),
+        });
+        const link = await linkService.linkReference({
+          ...selector,
+          logicalItemId: updatePlan.source.id,
+          trackerId: plan.policy.targetTrackerId,
+          ...linkInputFromTarget(target),
+        });
+        const targetSummary = summarizeWorkItem(
+          target,
+          plan.policy.targetTrackerId,
+        );
+        providerLinks.push({
+          action: "updated",
+          source: updatePlan.source,
+          target: targetSummary,
+          linkAction: link.action,
+          reference: link.reference,
+        });
+        const comment = await maybeAddSyncComment({
+          service,
+          selector,
+          plan,
+          source: updatePlan.source,
+          target,
+          action: "updated",
+          fields: updatePlan.fields.map((field) => field.field),
+        });
+        if (comment) {
+          comments.push(comment);
+        }
+      } catch (error) {
+        blockers.push({
+          operation: "update",
+          message: errorMessage(error),
+          source: updatePlan.source,
+          target: updatePlan.target,
+        });
+      }
+    }
+  }
+
+  const finishedAt = nowString(input.now);
+  const summary = runSummary({
+    plan,
+    status:
+      blockers.length > 0
+        ? providerLinks.length > 0
+          ? "failed"
+          : "blocked"
+        : "completed",
+    startedAt,
+    finishedAt,
+    created: providerLinks.filter((link) => link.action === "created").length,
+    updated: providerLinks.filter((link) => link.action === "updated").length,
+    skipped: plan.skips.length,
+    conflicted: plan.conflicts.length,
+    blocked: blockers.length,
+    comments: comments.length,
+    links: providerLinks.length,
+  });
+  const run: WorkItemSyncRun = {
+    summary,
+    status: summary.status,
+    plan,
+    providerLinks,
+    comments,
+    blockers,
+    skipped: plan.skips,
+    conflicts: plan.conflicts,
+  };
+
+  if (input.recordRun !== false) {
+    const storePath = appendWorkItemSyncRunRecord(plan.projectRoot, run, finishedAt);
+    return {
+      ...run,
+      storePath,
+    };
+  }
+
+  return run;
+}
+
+export function defaultWorkItemSyncRunStorePath(projectRoot: string): string {
+  return path.join(
+    path.resolve(requiredNonEmptyString(projectRoot, "projectRoot")),
+    ".dev-nexus",
+    workItemSyncRunStoreFileName,
+  );
+}
+
+export function readWorkItemSyncRunStore(projectRoot: string): WorkItemSyncRunStore {
+  const storePath = defaultWorkItemSyncRunStorePath(projectRoot);
+  if (!fs.existsSync(storePath)) {
+    return emptyWorkItemSyncRunStore();
+  }
+
+  return normalizeWorkItemSyncRunStore(
+    JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, "")),
+  );
 }
 
 export function parseWorkItemSyncField(
@@ -1295,6 +1558,340 @@ function requiredSelector(input: CreateWorkItemSyncPlanInput): string {
   }
 
   throw new Error("project or projectRoot is required");
+}
+
+function plannerPolicyForExecution(
+  policy: WorkItemSyncPolicyConfig,
+): WorkItemSyncPolicyConfig {
+  const normalized = normalizeWorkItemSyncPolicy(policy);
+  return {
+    ...normalized,
+    writePolicy: {
+      ...normalized.writePolicy,
+      mode: "dry_run",
+    },
+  };
+}
+
+function validateConsumedExecutionPlan(
+  plan: WorkItemSyncPlan,
+  policy: WorkItemSyncPolicyConfig,
+): void {
+  const normalized = normalizeWorkItemSyncPolicy(policy);
+  if (!plan.dryRun) {
+    throw new Error("work item sync execution requires a dry-run plan");
+  }
+  if (plan.policy.sourceTrackerId !== normalized.sourceTrackerId) {
+    throw new Error("work item sync plan source tracker does not match policy");
+  }
+  if (plan.policy.targetTrackerId !== normalized.targetTrackerId) {
+    throw new Error("work item sync plan target tracker does not match policy");
+  }
+  if (plan.policy.direction !== normalized.direction) {
+    throw new Error("work item sync plan direction does not match policy");
+  }
+}
+
+function executionSelector(
+  input: ExecuteWorkItemSyncInput,
+  plan: WorkItemSyncPlan,
+): { project?: string; projectRoot?: string; componentId?: string } {
+  return {
+    ...(input.project
+      ? { project: input.project }
+      : { projectRoot: path.resolve(input.projectRoot ?? plan.projectRoot) }),
+    componentId: input.componentId ?? plan.componentId,
+  };
+}
+
+function executionPolicyBlockers(
+  plan: WorkItemSyncPlan,
+  policy: WorkItemSyncPolicyConfig,
+): WorkItemSyncRunBlocker[] {
+  const normalized = normalizeWorkItemSyncPolicy(policy);
+  const blockers: WorkItemSyncRunBlocker[] = [];
+  if (normalized.direction !== "source_to_target") {
+    blockers.push({
+      operation: "direction",
+      message: `Sync direction "${normalized.direction}" is not supported for execution.`,
+    });
+  }
+  if (normalized.writePolicy.mode !== "execute") {
+    blockers.push({
+      operation: "write_policy",
+      message: `Write policy mode "${normalized.writePolicy.mode}" is not allowed for execution.`,
+    });
+  }
+  if (
+    plan.sourceTracker.provider !== "local" ||
+    plan.targetTracker.provider !== "github"
+  ) {
+    blockers.push({
+      operation: "provider_path",
+      message:
+        "Work item sync execution currently supports only local source trackers to GitHub target trackers.",
+    });
+  }
+  if (
+    plan.targetTracker.provider !== "local" &&
+    normalized.writePolicy.credentials !== "available"
+  ) {
+    blockers.push({
+      operation: "credentials",
+      message:
+        "External work item sync execution requires explicit available credentials policy.",
+    });
+  }
+
+  return blockers;
+}
+
+function createInputFromPlan(
+  createPlan: WorkItemSyncCreatePlan,
+): {
+  title: string;
+  description?: string | null;
+  status?: WorkStatus;
+  labels?: string[];
+  assignees?: string[];
+  milestone?: string | null;
+} {
+  const patch = patchFromFieldValues(createPlan.fields);
+  if (patch.title === undefined) {
+    throw new Error(
+      `Create plan for source item "${createPlan.source.id}" does not include owned title field.`,
+    );
+  }
+
+  return {
+    title: patch.title,
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.labels !== undefined ? { labels: patch.labels } : {}),
+    ...(patch.assignees !== undefined ? { assignees: patch.assignees } : {}),
+    ...(patch.milestone !== undefined ? { milestone: patch.milestone } : {}),
+  };
+}
+
+function patchFromFieldValues(fields: WorkItemSyncFieldValue[]): WorkItemPatch {
+  const patch: WorkItemPatch = {};
+  for (const field of fields) {
+    assignPatchValue(patch, field.field, field.value);
+  }
+
+  return patch;
+}
+
+function linkInputFromTarget(target: WorkItem): {
+  provider?: string;
+  host?: string | null;
+  repositoryId?: string | null;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
+  projectId?: string | null;
+  boardId?: string | null;
+  itemId: string;
+  itemNumber?: number | null;
+  itemKey?: string | null;
+  nodeId?: string | null;
+  webUrl?: string | null;
+  observedAt?: string | null;
+} {
+  const externalRef = target.externalRef;
+  return {
+    provider: externalRef?.provider ?? target.provider,
+    host: externalRef?.host ?? null,
+    repositoryId: externalRef?.repositoryId ?? null,
+    repositoryOwner: externalRef?.repositoryOwner ?? null,
+    repositoryName: externalRef?.repositoryName ?? null,
+    projectId: externalRef?.projectId ?? null,
+    boardId: externalRef?.boardId ?? null,
+    itemId: externalRef?.itemId ?? target.id,
+    itemNumber: externalRef?.itemNumber ?? null,
+    itemKey: externalRef?.itemKey ?? null,
+    nodeId: externalRef?.nodeId ?? null,
+    webUrl: externalRef?.webUrl ?? target.webUrl ?? null,
+    observedAt: target.updatedAt ?? null,
+  };
+}
+
+async function maybeAddSyncComment(options: {
+  service: ReturnType<typeof createWorkItemService>;
+  selector: { project?: string; projectRoot?: string; componentId?: string };
+  plan: WorkItemSyncPlan;
+  source: WorkItemSyncItemSummary;
+  target: WorkItem;
+  action: "created" | "updated";
+  fields: WorkItemSyncField[];
+}): Promise<WorkComment | null> {
+  if (options.plan.policy.commentPolicy.mode !== "plan") {
+    return null;
+  }
+  if (!options.plan.targetTracker.capabilities.capabilities.comment) {
+    return null;
+  }
+
+  return options.service.addComment({
+    ...options.selector,
+    trackerId: options.plan.policy.targetTrackerId,
+    ref: {
+      id: options.target.externalRef?.itemId ?? options.target.id,
+      externalRef: options.target.externalRef,
+    },
+    body: syncCommentBody(options),
+  });
+}
+
+function syncCommentBody(options: {
+  plan: WorkItemSyncPlan;
+  source: WorkItemSyncItemSummary;
+  target: WorkItem;
+  action: "created" | "updated";
+  fields: WorkItemSyncField[];
+}): string {
+  const fingerprint = syncCommentFingerprint(options);
+  return [
+    `<!-- dev-nexus-sync:${fingerprint} -->`,
+    `DevNexus sync ${options.action} this mirror from ${options.plan.sourceTracker.trackerId}/${options.source.id}.`,
+    `Owned fields: ${options.fields.join(", ") || "none"}.`,
+  ].join("\n");
+}
+
+function syncCommentFingerprint(options: {
+  plan: WorkItemSyncPlan;
+  source: WorkItemSyncItemSummary;
+  target: WorkItem;
+  action: "created" | "updated";
+  fields: WorkItemSyncField[];
+}): string {
+  return crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectId: options.plan.projectId,
+        componentId: options.plan.componentId,
+        sourceTrackerId: options.plan.sourceTracker.trackerId,
+        targetTrackerId: options.plan.targetTracker.trackerId,
+        sourceId: options.source.id,
+        targetId: options.target.externalRef?.itemId ?? options.target.id,
+        action: options.action,
+        fields: options.fields,
+      }),
+    )
+    .digest("hex")
+    .slice(0, 16);
+}
+
+function runSummary(options: {
+  plan: WorkItemSyncPlan;
+  status: WorkItemSyncRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  created: number;
+  updated: number;
+  skipped: number;
+  conflicted: number;
+  blocked: number;
+  comments: number;
+  links: number;
+}): WorkItemSyncRunSummary {
+  const id = `sync-run-${crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectId: options.plan.projectId,
+        componentId: options.plan.componentId,
+        sourceTrackerId: options.plan.sourceTracker.trackerId,
+        targetTrackerId: options.plan.targetTracker.trackerId,
+        startedAt: options.startedAt,
+      }),
+    )
+    .digest("hex")
+    .slice(0, 12)}`;
+  return {
+    id,
+    status: options.status,
+    startedAt: options.startedAt,
+    finishedAt: options.finishedAt,
+    projectRoot: options.plan.projectRoot,
+    projectId: options.plan.projectId,
+    componentId: options.plan.componentId,
+    sourceTrackerId: options.plan.sourceTracker.trackerId,
+    targetTrackerId: options.plan.targetTracker.trackerId,
+    planGeneratedAt: options.plan.generatedAt,
+    counts: {
+      created: options.created,
+      updated: options.updated,
+      skipped: options.skipped,
+      conflicted: options.conflicted,
+      blocked: options.blocked,
+      comments: options.comments,
+      links: options.links,
+    },
+  };
+}
+
+function appendWorkItemSyncRunRecord(
+  projectRoot: string,
+  run: WorkItemSyncRun,
+  timestamp: string,
+): string {
+  const storePath = defaultWorkItemSyncRunStorePath(projectRoot);
+  const existing = readWorkItemSyncRunStore(projectRoot);
+  const store: WorkItemSyncRunStore = {
+    version: 1,
+    updatedAt: timestamp,
+    runs: [
+      ...existing.runs,
+      {
+        summary: run.summary,
+        providerLinks: run.providerLinks,
+        blockers: run.blockers,
+      },
+    ].slice(-100),
+  };
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  fs.writeFileSync(
+    storePath,
+    `${JSON.stringify(normalizeWorkItemSyncRunStore(store), null, 2)}\n`,
+    "utf8",
+  );
+
+  return storePath;
+}
+
+function emptyWorkItemSyncRunStore(): WorkItemSyncRunStore {
+  return {
+    version: 1,
+    updatedAt: null,
+    runs: [],
+  };
+}
+
+function normalizeWorkItemSyncRunStore(value: unknown): WorkItemSyncRunStore {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyWorkItemSyncRunStore();
+  }
+  const record = value as Record<string, unknown>;
+  const runs = Array.isArray(record.runs) ? record.runs : [];
+  return {
+    version: 1,
+    updatedAt:
+      typeof record.updatedAt === "string" || record.updatedAt === null
+        ? record.updatedAt
+        : null,
+    runs: runs
+      .filter((run): run is WorkItemSyncRunStore["runs"][number] =>
+        Boolean(run && typeof run === "object" && "summary" in run),
+      )
+      .map((run) => ({
+        summary: run.summary,
+        providerLinks: Array.isArray(run.providerLinks)
+          ? run.providerLinks
+          : [],
+        blockers: Array.isArray(run.blockers) ? run.blockers : [],
+      })),
+  };
 }
 
 function valuesEqual(left: unknown, right: unknown): boolean {

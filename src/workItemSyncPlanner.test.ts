@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createWorkItemSyncPlan,
+  executeWorkItemSync,
+  readWorkItemSyncRunStore,
   type WorkItemSyncPolicyConfig,
 } from "./workItemSyncPlanner.js";
 import {
@@ -104,20 +106,53 @@ function createProjectResolver(project: ResolvedWorkItemProjectContext) {
 }
 
 class MemoryWorkTrackerProvider implements WorkTrackerProvider {
-  readonly provider = "local";
+  readonly provider: string;
   readonly capabilities: TrackerCapabilities;
   readonly mutations: string[] = [];
+  readonly comments = new Map<string, WorkComment[]>();
+  readonly patches: WorkItemPatch[] = [];
+  private nextNumber = 1;
 
   constructor(
     private readonly items: WorkItem[],
     capabilities: Partial<TrackerCapabilities> = {},
+    provider = "local",
   ) {
+    this.provider = provider;
     this.capabilities = { ...fullCapabilities, ...capabilities };
   }
 
-  async createWorkItem(_input: CreateWorkItemInput): Promise<WorkItem> {
+  async createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
     this.mutations.push("create");
-    throw new Error("planner must not create work items");
+    const number = this.nextNumber;
+    this.nextNumber += 1;
+    const item = workItem(`${this.provider}-${number}`, {
+      title: input.title,
+      description: input.description ?? null,
+      status: input.status ?? "todo",
+      provider: this.provider,
+      labels: input.labels ?? [],
+      assignees: input.assignees ?? [],
+      milestone: input.milestone ?? null,
+      updatedAt: "2026-05-18T09:00:00.000Z",
+      webUrl:
+        this.provider === "github"
+          ? `https://github.com/example/project/issues/${number}`
+          : null,
+      externalRef: {
+        provider: this.provider,
+        itemId: String(number),
+        itemNumber: number,
+        repositoryOwner: this.provider === "github" ? "example" : null,
+        repositoryName: this.provider === "github" ? "project" : null,
+        webUrl:
+          this.provider === "github"
+            ? `https://github.com/example/project/issues/${number}`
+            : null,
+      },
+    });
+    this.items.push(item);
+    return item;
   }
 
   async listWorkItems(query: WorkItemQuery): Promise<WorkItem[]> {
@@ -147,7 +182,10 @@ class MemoryWorkTrackerProvider implements WorkTrackerProvider {
       throw new Error("getWorkItem should not be called without capability");
     }
     const id = ref.id ?? ref.externalRef?.itemId;
-    const item = this.items.find((candidate) => candidate.id === id);
+    const item = this.items.find(
+      (candidate) =>
+        candidate.id === id || candidate.externalRef?.itemId === id,
+    );
     if (!item) {
       throw new Error(`Local work item not found: ${id}`);
     }
@@ -156,16 +194,44 @@ class MemoryWorkTrackerProvider implements WorkTrackerProvider {
   }
 
   async updateWorkItem(
-    _ref: WorkItemRef,
-    _patch: WorkItemPatch,
+    ref: WorkItemRef,
+    patch: WorkItemPatch,
   ): Promise<WorkItem> {
     this.mutations.push("update");
-    throw new Error("planner must not update work items");
+    this.patches.push(patch);
+    const id = ref.id ?? ref.externalRef?.itemId;
+    const item = this.items.find(
+      (candidate) =>
+        candidate.id === id || candidate.externalRef?.itemId === id,
+    );
+    if (!item) {
+      throw new Error(`Local work item not found: ${id}`);
+    }
+    const updated: WorkItem = {
+      ...item,
+      ...patch,
+      updatedAt: "2026-05-18T09:00:00.000Z",
+    };
+    this.items[this.items.indexOf(item)] = updated;
+    return updated;
   }
 
-  async addComment(_ref: WorkItemRef, _body: string): Promise<WorkComment> {
+  async addComment(ref: WorkItemRef, body: string): Promise<WorkComment> {
     this.mutations.push("comment");
-    throw new Error("planner must not add comments");
+    const id = ref.id ?? ref.externalRef?.itemId ?? "unknown";
+    const comment: WorkComment = {
+      id: `${this.provider}-comment-${this.comments.size + 1}`,
+      body,
+      author: "dev-nexus",
+      createdAt: "2026-05-18T09:00:00.000Z",
+      updatedAt: "2026-05-18T09:00:00.000Z",
+      externalRef: {
+        provider: this.provider,
+        itemId: `${this.comments.size + 1}`,
+      },
+    };
+    this.comments.set(id, [...(this.comments.get(id) ?? []), comment]);
+    return comment;
   }
 }
 
@@ -191,6 +257,39 @@ function workItem(
       itemId: id,
     },
     ...overrides,
+  };
+}
+
+function createGitHubMirrorProjectContext(
+  projectRoot: string,
+): ResolvedWorkItemProjectContext {
+  return {
+    ...createProjectContext(projectRoot),
+    workTrackers: [
+      {
+        id: "primary",
+        name: "Primary",
+        enabled: true,
+        roles: ["primary"],
+        workTracking: {
+          provider: "local",
+          storePath: ".dev-nexus/primary-items.json",
+        },
+      },
+      {
+        id: "github",
+        name: "GitHub",
+        enabled: true,
+        roles: ["mirror"],
+        workTracking: {
+          provider: "github",
+          repository: {
+            owner: "example",
+            name: "project",
+          },
+        },
+      },
+    ],
   };
 }
 
@@ -500,5 +599,220 @@ describe("work item sync planner", () => {
       },
     ]);
     expect(provider.mutations).toEqual([]);
+  });
+
+  it("executes idempotent local-to-github creates with linked targets and stable comments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-sync-");
+    const project = createGitHubMirrorProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider([
+      workItem("local-1", {
+        title: "Create GitHub mirror",
+        description: "Source only",
+        status: "ready",
+        labels: ["sync"],
+      }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider([], {}, "github");
+    const providers = new Map([
+      ["primary", sourceProvider],
+      ["github", targetProvider],
+    ]);
+    const providerFactory: WorkItemProviderFactory = (context) =>
+      providers.get(context.trackerId ?? "") ?? sourceProvider;
+    const policy: WorkItemSyncPolicyConfig = {
+      ...defaultPolicy,
+      targetTrackerId: "github",
+      commentPolicy: {
+        mode: "plan",
+      },
+      writePolicy: {
+        mode: "execute",
+        creates: "plan",
+        updates: "plan",
+        credentials: "available",
+      },
+    };
+
+    const firstRun = await executeWorkItemSync({
+      projectRoot,
+      componentId: "core",
+      policy,
+      resolveProject: createProjectResolver(project),
+      providerFactory,
+      now: fixedClock(
+        "2026-05-18T09:00:00.000Z",
+        "2026-05-18T09:00:01.000Z",
+      ),
+    });
+    const secondRun = await executeWorkItemSync({
+      projectRoot,
+      componentId: "core",
+      policy,
+      resolveProject: createProjectResolver(project),
+      providerFactory,
+      now: fixedClock(
+        "2026-05-18T09:05:00.000Z",
+        "2026-05-18T09:05:01.000Z",
+      ),
+    });
+
+    expect(firstRun.summary.counts).toMatchObject({
+      created: 1,
+      updated: 0,
+      skipped: 0,
+      conflicted: 0,
+      blocked: 0,
+      comments: 1,
+      links: 1,
+    });
+    expect(firstRun.providerLinks).toMatchObject([
+      {
+        action: "created",
+        source: { id: "local-1" },
+        target: {
+          provider: "github",
+          webUrl: "https://github.com/example/project/issues/1",
+        },
+        linkAction: "linked",
+      },
+    ]);
+    expect(targetProvider.mutations).toEqual(["create", "comment"]);
+    expect(targetProvider.comments.get("1")?.[0]?.body).toContain(
+      "<!-- dev-nexus-sync:",
+    );
+    expect(secondRun.summary.counts).toMatchObject({
+      created: 0,
+      updated: 0,
+      skipped: 1,
+      comments: 0,
+    });
+    expect(targetProvider.mutations).toEqual(["create", "comment"]);
+    expect(readWorkItemSyncRunStore(projectRoot).runs).toHaveLength(2);
+  });
+
+  it("executes linked updates using only configured fields", async () => {
+    const projectRoot = makeTempDir("dev-nexus-sync-");
+    const project = createGitHubMirrorProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider([
+      workItem("local-1", {
+        title: "Source title must not sync",
+        status: "in_progress",
+        labels: ["sync"],
+      }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider(
+      [
+        workItem("github-7", {
+          title: "Target title remains",
+          status: "ready",
+          provider: "github",
+          updatedAt: "2026-05-18T08:00:00.000Z",
+          externalRef: {
+            provider: "github",
+            itemId: "7",
+            itemNumber: 7,
+            repositoryOwner: "example",
+            repositoryName: "project",
+          },
+        }),
+      ],
+      {},
+      "github",
+    );
+    const providers = new Map([
+      ["primary", sourceProvider],
+      ["github", targetProvider],
+    ]);
+    const resolveProject = createProjectResolver(project);
+    await createWorkItemTrackerLinkService({
+      resolveProject,
+      now: fixedClock("2026-05-18T08:05:00.000Z"),
+    }).linkReference({
+      projectRoot,
+      logicalItemId: "local-1",
+      trackerId: "github",
+      itemId: "7",
+      itemNumber: 7,
+      observedAt: "2026-05-18T08:05:00.000Z",
+    });
+
+    const run = await executeWorkItemSync({
+      projectRoot,
+      componentId: "core",
+      policy: {
+        ...defaultPolicy,
+        targetTrackerId: "github",
+        fieldSet: ["status"],
+        writePolicy: {
+          mode: "execute",
+          creates: "plan",
+          updates: "plan",
+          credentials: "available",
+        },
+      },
+      resolveProject,
+      providerFactory: (context) =>
+        providers.get(context.trackerId ?? "") ?? sourceProvider,
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+
+    expect(run.summary.counts).toMatchObject({
+      created: 0,
+      updated: 1,
+      skipped: 0,
+      blocked: 0,
+    });
+    expect(targetProvider.patches).toEqual([{ status: "in_progress" }]);
+    expect(targetProvider.mutations).toEqual(["update"]);
+    expect(targetProvider.items[0]).toMatchObject({
+      title: "Target title remains",
+      status: "in_progress",
+    });
+  });
+
+  it("blocks execution without explicit execute policy and available external credentials", async () => {
+    const projectRoot = makeTempDir("dev-nexus-sync-");
+    const project = createGitHubMirrorProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider([
+      workItem("local-1", {
+        title: "Needs approval",
+        labels: ["sync"],
+      }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider([], {}, "github");
+    const providers = new Map([
+      ["primary", sourceProvider],
+      ["github", targetProvider],
+    ]);
+
+    const run = await executeWorkItemSync({
+      projectRoot,
+      componentId: "core",
+      policy: {
+        ...defaultPolicy,
+        targetTrackerId: "github",
+        writePolicy: {
+          mode: "dry_run",
+          creates: "plan",
+          updates: "plan",
+          credentials: "not_required",
+        },
+      },
+      resolveProject: createProjectResolver(project),
+      providerFactory: (context) =>
+        providers.get(context.trackerId ?? "") ?? sourceProvider,
+    });
+
+    expect(run.status).toBe("blocked");
+    expect(run.summary.counts).toMatchObject({
+      created: 0,
+      updated: 0,
+      blocked: 2,
+    });
+    expect(run.blockers.map((blocker) => blocker.operation)).toEqual([
+      "write_policy",
+      "credentials",
+    ]);
+    expect(targetProvider.mutations).toEqual([]);
   });
 });

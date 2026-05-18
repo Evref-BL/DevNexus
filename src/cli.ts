@@ -154,6 +154,7 @@ import {
 import {
   createWorkItemSyncPlan,
   defaultWorkItemSyncPolicy,
+  executeWorkItemSync,
   parseWorkItemSyncCommentPolicyMode,
   parseWorkItemSyncConflictPolicyMode,
   parseWorkItemSyncCredentialPolicy,
@@ -166,6 +167,7 @@ import {
   type WorkItemSyncField,
   type WorkItemSyncPlan,
   type WorkItemSyncPolicyConfig,
+  type WorkItemSyncRun,
   type WorkItemSyncWriteDisposition,
 } from "./workItemSyncPlanner.js";
 import {
@@ -618,6 +620,7 @@ export function usage(): string {
     "  dev-nexus work-item show-links <project-root> <logical-item-id> [options]",
     "  dev-nexus work-item unlink <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
     "  dev-nexus work-item sync-plan <project-root> --source-tracker <id> --target-tracker <id> [options]",
+    "  dev-nexus work-item sync-execute <project-root> --source-tracker <id> --target-tracker <id> --credentials available [options]",
     "  dev-nexus automation status <project-root> [options]",
     "  dev-nexus automation eligible-work <project-root> [options]",
     "  dev-nexus automation agent-profiles <project-root> [options]",
@@ -827,7 +830,7 @@ export function usage(): string {
     "  --reason <text>",
     "  --json",
     "",
-    "Options for work-item sync-plan:",
+    "Options for work-item sync-plan and sync-execute:",
     "  --component <id>          defaults to the primary component",
     "  --source-tracker <id>",
     "  --target-tracker <id>",
@@ -1592,7 +1595,7 @@ async function handleWorkItemCommand(
     const plan = await createWorkItemSyncPlan({
       projectRoot: path.resolve(parsed.projectRoot),
       componentId: parsed.componentId,
-      policy: workItemSyncPolicyFromParsed(parsed),
+      policy: workItemSyncPolicyFromParsed(parsed, "dry_run"),
       resolveProject: (selector) =>
         resolveDirectProject(parsed.projectRoot, selector.componentId),
       now: dependencies.now,
@@ -1605,8 +1608,26 @@ async function handleWorkItemCommand(
     return 0;
   }
 
+  if (command === "sync-execute") {
+    const parsed = parseWorkItemSyncPlanCommand(argv);
+    const run = await executeWorkItemSync({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: parsed.componentId,
+      policy: workItemSyncPolicyFromParsed(parsed, "execute"),
+      resolveProject: (selector) =>
+        resolveDirectProject(parsed.projectRoot, selector.componentId),
+      now: dependencies.now,
+    });
+    printWorkItemSyncExecuteResult(
+      run,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "work-item requires create, list, get, update, comment, set-status, link, show-links, unlink, or sync-plan",
+    "work-item requires create, list, get, update, comment, set-status, link, show-links, unlink, sync-plan, or sync-execute",
   );
 }
 
@@ -4924,6 +4945,27 @@ function printWorkItemSyncPlanResult(
   writeLine(stdout, `  Blockers: ${plan.counts.blockers}`);
 }
 
+function printWorkItemSyncExecuteResult(
+  run: WorkItemSyncRun,
+  parsed: ParsedWorkItemSyncPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, run };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item sync execution.");
+  writeLine(stdout, `  Status: ${run.status}`);
+  writeLine(stdout, `  Created: ${run.summary.counts.created}`);
+  writeLine(stdout, `  Updated: ${run.summary.counts.updated}`);
+  writeLine(stdout, `  Skipped: ${run.summary.counts.skipped}`);
+  writeLine(stdout, `  Conflicted: ${run.summary.counts.conflicted}`);
+  writeLine(stdout, `  Blocked: ${run.summary.counts.blocked}`);
+  writeLine(stdout, `  Links: ${run.summary.counts.links}`);
+}
+
 function printAutomationScheduleTick(
   tick: NexusAutomationSchedulerTick,
   stdout: TextWriter,
@@ -5581,6 +5623,7 @@ function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefi
 
 function workItemSyncPolicyFromParsed(
   parsed: ParsedWorkItemSyncPlanCommand,
+  mode: "dry_run" | "execute",
 ): WorkItemSyncPolicyConfig {
   return defaultWorkItemSyncPolicy({
     sourceTrackerId: parsed.sourceTrackerId,
@@ -5604,7 +5647,7 @@ function workItemSyncPolicyFromParsed(
       ? { conflictPolicy: { mode: parsed.conflictPolicy } }
       : {}),
     writePolicy: {
-      mode: "dry_run",
+      mode,
       ...(parsed.writeCreates ? { creates: parsed.writeCreates } : {}),
       ...(parsed.writeUpdates ? { updates: parsed.writeUpdates } : {}),
       ...(parsed.credentials ? { credentials: parsed.credentials } : {}),
