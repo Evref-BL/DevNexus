@@ -32,6 +32,8 @@ and ready for coordinator-driven work across its components.
   policy-gated local remote repair apply, and `dev-nexus:local-138`,
   `local-139`, and `local-140` are published together as `c19b493` for Mac
   setup assistant path/check fixes and quiet setup-test Git initialization.
+  `dev-nexus:local-123` is published as `3c92655` for provider-gated GitHub
+  repository creation apply.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -45,8 +47,9 @@ and ready for coordinator-driven work across its components.
   gates; `dev-nexus:local-119` is complete for the read-only hosting status
   model; `local-120` is complete for deterministic dry-run plan actions;
   `local-121` is complete for CLI/MCP status and plan surfaces; `local-122`
-  is complete for local remote repair apply; and `local-123` is ready for
-  GitHub repository creation apply. `local-124` through `local-126` should be
+  is complete for local remote repair apply; `local-123` is complete for
+  GitHub repository creation apply; and `local-124` is ready for collaborator
+  repair and pending invite detection. `local-125` and `local-126` should be
   promoted as prerequisites land.
   `local-127` is an opt-in fake-project GitHub integration test and must not
   depend on `dev-nexus-plexus` or any other active project.
@@ -92,6 +95,11 @@ and ready for coordinator-driven work across its components.
   The fix resolved `dev-nexus:local-138`, `local-139`, and `local-140`.
   DevNexus-Pharo and DevNexus-TypeScript `npm run check` also passed on this
   Mac after sync.
+- The `dev-nexus:local-123` focused hosting verification passes on Windows
+  after rebasing over the concurrent Mac setup-assistant commit: focused
+  hosting/CLI/MCP/guard suite passed with 4 files and 95 tests, and
+  `npm run build` passed. This lane did not take ownership of the Mac setup
+  work.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -149,7 +157,7 @@ and ready for coordinator-driven work across its components.
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
   `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
-  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-123`, and
+  `dev-nexus:local-114`, `dev-nexus:local-115`, `dev-nexus:local-124`, and
   `dev-nexus:local-129`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
