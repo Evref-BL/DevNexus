@@ -191,6 +191,13 @@ dev-nexus work-item set-status <project-root> local-1 --status done
 For multi-component projects, pass `--component <component-id>` to target the
 owning component work-item service.
 
+For components with more than one tracker, configure `workTrackers` and
+`defaultWorkTrackerId` on the owning component. Work-item commands use the
+default tracker when `--tracker` is omitted, and non-default trackers can be
+used for mirror, coordination, planning, feedback, migration, or archive roles.
+Read [multi-tracker work tracking](multi-tracker.md) before linking external
+issues or planning sync from local work items to a shared provider.
+
 ## Next Steps
 
 Read [agent workflows](agent-workflows.md) for automation, result files, MCP

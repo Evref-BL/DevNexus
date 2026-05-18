@@ -74,8 +74,11 @@ dev-nexus automation agent-profiles <project-root> --json
 - A **component** is a source or support unit in a project. Each component can
   have its own source root, Git defaults, generated worktree root, work-item
   service, verification hints, publication policy, and relationships.
-- A **work-item service** is the tracker configured for a component, such as a
-  local store, GitHub Issues, GitLab issues, Jira, or another provider adapter.
+- A **work tracker** is a named provider binding configured for a component,
+  such as a local store, GitHub Issues, GitLab issues, Jira, or another
+  provider adapter. One enabled tracker is the component default for ordinary
+  work-item commands; other trackers can serve mirror, coordination, planning,
+  feedback, migration, or archive roles.
 - A **target** is the user-requested outcome for an automation loop. DevNexus
   records target state and cycle facts, but it does not decide which work is
   selected.
@@ -133,6 +136,9 @@ dev-nexus automation current-agent record <project-root> --run-id current-1 --st
 
 - [Getting started](docs/user/getting-started.md) covers installation, project
   layout, setup checks, portable paths, and tracker basics.
+- [Multi-tracker work tracking](docs/user/multi-tracker.md) covers tracker
+  bindings, default tracker behavior, link records, dry-run sync planning,
+  one-way sync limits, and local-to-shared-provider migration guidance.
 - [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, work-item
   commands, worktree-first chat workflows, automation loops, result files, and
   coordination handoffs.

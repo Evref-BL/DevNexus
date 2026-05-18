@@ -39,10 +39,17 @@ work_item_get
 work_item_update
 work_item_comment
 work_item_set_status
+work_item_link
+work_item_show_links
+work_item_unlink
+work_item_sync_plan
+work_item_sync_execute
 ```
 
 Work-item tools accept a component id when a project has multiple component
-trackers. Omitting it uses the primary component for compatibility.
+trackers. Omitting it uses the primary component for compatibility. When a
+component has multiple tracker bindings, work-item tools use the component
+default tracker unless a tracker id is explicit.
 
 ## Low-Token Coordinator Cycle
 
@@ -65,6 +72,34 @@ dev-nexus automation target-cycle record <project-root> --status dispatched --wo
 Target-cycle facts are caller-reported. DevNexus stores them for durable
 continuation, reporting, and relaunch decisions, but it does not assign agents
 or supervise implementation.
+
+## Canonical And Mirrored Work Items
+
+Multi-tracker components distinguish the canonical work item from supporting
+provider records. Coordinators should select eligible work from the component
+default tracker unless the target explicitly names another tracker. Mirror,
+coordination, planning, external-feedback, migration, and archive trackers are
+supporting surfaces unless the component owner changes `defaultWorkTrackerId`.
+
+Agents can use link records to connect a canonical item to existing provider
+issues before any sync plan:
+
+```bash
+dev-nexus work-item link <project-root> local-1 --component core --tracker github --item-id 42 --item-number 42
+dev-nexus work-item show-links <project-root> local-1 --component core
+```
+
+Use dry-run sync planning as the review surface for mirrored fields:
+
+```bash
+dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker github --label dogfood --field title --field status
+```
+
+Do not update a mirror as if it were canonical unless the assignment names that
+tracker. Do not run sync execution unless the dry-run plan has been reviewed
+and the project policy explicitly allows the provider mutation and automation
+identity. See [multi-tracker work tracking](multi-tracker.md) for configuration
+and migration guidance.
 
 ## Generated Worktrees
 
