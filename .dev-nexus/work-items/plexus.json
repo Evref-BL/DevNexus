@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 47,
-  "updatedAt": "2026-05-18T01:27:47.187Z",
+  "nextCommentNumber": 48,
+  "updatedAt": "2026-05-18T01:31:27.761Z",
   "items": [
     {
       "id": "local-1",
@@ -470,7 +470,7 @@
       "id": "local-20",
       "title": "Gate and remove legacy gateway compatibility",
       "description": "Source: plexus:local-14 and docs/plexus-project-scoped-runtime-prd.md.\n\nDepends on: plexus:local-18, dev-nexus-pharo:local-13.\n\nGoal:\nRemove the old PLexus gateway compatibility surface deliberately, after the new project-scoped gateway setup is in place and current projects have migration guidance.\n\nAcceptance criteria:\n- New generated configs no longer emit legacy pharo or combined gateway server names.\n- The compatibility phase emits warnings with exact replacement configuration names and endpoint paths.\n- The removal phase requires an explicit decision before deleting support for legacy gateway environment variables and old route paths.\n- Final removal rejects legacy config with migration guidance rather than silently falling back.\n- Tests cover warning mode, compatibility-flag behavior, and final rejection behavior.\n\nVerification:\nRun gateway config tests in warning mode and, after human approval, in removal mode.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -482,7 +482,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T20:31:19.289Z",
-      "updatedAt": "2026-05-17T20:31:19.289Z",
+      "updatedAt": "2026-05-18T01:31:27.761Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1061,7 +1061,19 @@
         }
       }
     ],
-    "local-20": [],
+    "local-20": [
+      {
+        "id": "local-comment-47",
+        "body": "Heartbeat reflection promoted this item to ready for the compatibility warning/gating phase only. Evidence: dependencies plexus:local-18 and dev-nexus-pharo:local-13 are now complete and published, so new project-scoped gateway setup exists. Boundary: do not perform final legacy support removal or delete fallback behavior without a separate explicit human decision; implement warning/flag/rejection scaffolding and tests that keep final-removal mode policy-gated.",
+        "author": null,
+        "createdAt": "2026-05-18T01:31:27.761Z",
+        "updatedAt": "2026-05-18T01:31:27.761Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-47"
+        }
+      }
+    ],
     "local-21": []
   }
 }

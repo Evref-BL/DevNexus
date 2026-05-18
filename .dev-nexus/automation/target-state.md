@@ -112,8 +112,11 @@ Immediate direction:
     focused diagnostics tests, `npm test`, `npm run typecheck`, and
     `npm run build` passed. No live image, Docker, or gateway process was
     started.
-- Current ready `dogfood` work matching the automation selector: none after
-  closing `dev-nexus-pharo:local-13` and `plexus:local-19`.
+- Current ready `dogfood` work matching the automation selector:
+  - `plexus:local-20` legacy gateway compatibility warning/gating phase. It is
+    promoted after `plexus:local-18` and `dev-nexus-pharo:local-13` completed,
+    but final legacy support removal remains human-in-the-loop and must not be
+    performed without a separate explicit decision.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets
