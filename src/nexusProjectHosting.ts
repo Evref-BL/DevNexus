@@ -141,6 +141,22 @@ export interface NexusProjectHostingProviderPermissionInput
   authProfile: NexusHostingAuthProfileConfig;
 }
 
+export interface NexusProjectHostingProviderActorInput {
+  authProfile: NexusHostingAuthProfileConfig;
+}
+
+export interface NexusProjectHostingProviderAccessInput
+  extends NexusProjectHostingProviderRepositoryInput {
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  authProfile?: NexusHostingAuthProfileConfig;
+}
+
+export interface NexusProjectHostingProviderAccessRecord {
+  effectivePermission: NexusProjectHostingRequiredPermission | null;
+  pendingInvitation?: boolean;
+  invitationId?: string | null;
+}
+
 export interface NexusProjectHostingProviderAdapter {
   provider: NexusProjectHostingProviderName;
   getRepository(
@@ -149,6 +165,12 @@ export interface NexusProjectHostingProviderAdapter {
   getPermissions(
     input: NexusProjectHostingProviderPermissionInput,
   ): Promise<NexusProjectHostingPermissionSet>;
+  getAuthenticatedAccount?(
+    input: NexusProjectHostingProviderActorInput,
+  ): Promise<string | null>;
+  getAccess?(
+    input: NexusProjectHostingProviderAccessInput,
+  ): Promise<NexusProjectHostingProviderAccessRecord>;
 }
 
 export type NexusProjectHostingPreflightStatus =
@@ -162,6 +184,8 @@ export interface NexusProjectHostingPreflightIssue {
   message: string;
   remoteName?: string;
   authProfile?: string;
+  providerIdentity?: string;
+  principalKind?: NexusProjectHostingAccessPrincipalKind;
 }
 
 export interface NexusProjectHostingPreflightOptions {
@@ -179,6 +203,96 @@ export interface NexusProjectHostingPreflightResult {
   repositoryName: string;
   repositoryExists: boolean;
   expectedRemotes: NexusProjectHostingExpectedRemote[];
+  issues: NexusProjectHostingPreflightIssue[];
+}
+
+export type NexusProjectHostingStatusLevel =
+  | "not_configured"
+  | "passed"
+  | "warning"
+  | "blocked";
+
+export type NexusProjectHostingRemoteStatus =
+  | "matched"
+  | "missing"
+  | "mismatch"
+  | "unchecked";
+
+export type NexusProjectHostingAuthProfileStatus =
+  | "matched"
+  | "missing"
+  | "mismatch"
+  | "unchecked";
+
+export type NexusProjectHostingAccessStatus =
+  | "satisfied"
+  | "missing"
+  | "insufficient"
+  | "pending"
+  | "unsupported"
+  | "unchecked";
+
+export interface NexusProjectHostingLocalRemoteRecord {
+  name: string;
+  url: string | null;
+}
+
+export interface NexusProjectHostingStatusOptions {
+  project: NexusProjectHostingProjectIdentity;
+  hosting?: NexusProjectHostingConfig;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  provider?: NexusProjectHostingProviderAdapter;
+  localRemotes?: NexusProjectHostingLocalRemoteRecord[];
+}
+
+export interface NexusProjectHostingRepositoryStatus {
+  exists: boolean | null;
+  visibility: NexusProjectHostingRepositoryVisibility | null;
+  defaultBranch: string | null;
+}
+
+export interface NexusProjectHostingRemoteStatusRecord {
+  name: string;
+  role: NexusProjectHostingRemoteRole;
+  protocol: NexusProjectHostingRemoteProtocol;
+  authProfile: string | null;
+  expectedUrl: string;
+  currentUrl: string | null;
+  status: NexusProjectHostingRemoteStatus;
+}
+
+export interface NexusProjectHostingAuthProfileStatusRecord {
+  id: string;
+  configured: boolean;
+  kind: NexusHostingAuthProfileKind | null;
+  expectedAccount: string | null;
+  observedAccount: string | null;
+  status: NexusProjectHostingAuthProfileStatus;
+}
+
+export interface NexusProjectHostingAccessStatusRecord {
+  kind: NexusProjectHostingAccessPrincipalKind;
+  providerIdentity: string;
+  role: NexusProjectHostingAccessRole;
+  requiredPermission: NexusProjectHostingRequiredPermission;
+  authProfile: string | null;
+  invitationPolicy: NexusProjectHostingInvitationPolicy;
+  effectivePermission: NexusProjectHostingRequiredPermission | null;
+  pendingInvitation: boolean | null;
+  status: NexusProjectHostingAccessStatus;
+}
+
+export interface NexusProjectHostingStatusResult {
+  ok: boolean;
+  status: NexusProjectHostingStatusLevel;
+  configured: boolean;
+  provider: NexusProjectHostingProviderName | null;
+  namespace: string | null;
+  repositoryName: string | null;
+  repository: NexusProjectHostingRepositoryStatus;
+  remotes: NexusProjectHostingRemoteStatusRecord[];
+  authProfiles: NexusProjectHostingAuthProfileStatusRecord[];
+  access: NexusProjectHostingAccessStatusRecord[];
   issues: NexusProjectHostingPreflightIssue[];
 }
 
@@ -264,6 +378,122 @@ export function authProfileIdForNexusProjectHostingRemote(
   remote: NexusProjectHostingRemoteConfig,
 ): string | null {
   return remote.authProfile ?? hosting.authProfile ?? null;
+}
+
+export async function statusNexusProjectHosting(
+  options: NexusProjectHostingStatusOptions,
+): Promise<NexusProjectHostingStatusResult> {
+  if (!options.hosting) {
+    const issue: NexusProjectHostingPreflightIssue = {
+      code: "hosting_not_configured",
+      severity: "warning",
+      message: "Project hosting is not configured.",
+    };
+    return hostingStatusResult({
+      configured: false,
+      provider: null,
+      namespace: null,
+      repositoryName: null,
+      repository: {
+        exists: null,
+        visibility: null,
+        defaultBranch: null,
+      },
+      remotes: [],
+      authProfiles: [],
+      access: [],
+      issues: [issue],
+    });
+  }
+
+  const hosting = options.hosting;
+  const repositoryName = deriveNexusProjectHostingRepositoryName({
+    project: options.project,
+    hosting,
+  });
+  const expectedRemotes = expectedNexusProjectHostingRemotes({
+    project: options.project,
+    hosting,
+    authProfiles: options.authProfiles,
+  });
+  const issues: NexusProjectHostingPreflightIssue[] = [];
+  const authProfileById = new Map(
+    (options.authProfiles ?? []).map((profile) => [profile.id, profile]),
+  );
+  const localRemoteByName = options.localRemotes
+    ? new Map(options.localRemotes.map((remote) => [remote.name, remote]))
+    : null;
+
+  const remotes = expectedRemotes.map((remote) =>
+    hostingRemoteStatus({
+      remote,
+      localRemoteByName,
+      issues,
+    }),
+  );
+
+  const authProfiles = await hostingAuthProfileStatus({
+    hosting,
+    expectedRemotes,
+    authProfileById,
+    provider: options.provider,
+    issues,
+  });
+
+  let repository: NexusProjectHostingRepositoryStatus = {
+    exists: null,
+    visibility: null,
+    defaultBranch: null,
+  };
+  let access = uncheckedHostingAccessRecords(hosting);
+
+  if (!options.provider) {
+    issues.push({
+      code: "provider_unavailable",
+      severity: "warning",
+      message: "No hosting provider adapter was supplied for status checks.",
+    });
+  } else if (options.provider.provider !== hosting.provider) {
+    issues.push({
+      code: "provider_mismatch",
+      severity: "blocker",
+      message:
+        `Hosting provider ${hosting.provider} cannot be checked with ` +
+        `${options.provider.provider} adapter.`,
+    });
+  } else {
+    const repositoryRecord = await options.provider.getRepository({
+      namespace: hosting.namespace,
+      repositoryName,
+    });
+    repository = repositoryStatus({
+      hosting,
+      repository: repositoryRecord,
+      repositoryName,
+      issues,
+    });
+    access = repositoryRecord
+      ? await hostingAccessStatus({
+          hosting,
+          authProfileById,
+          provider: options.provider,
+          repositoryName,
+          issues,
+        })
+      : uncheckedHostingAccessRecords(hosting);
+  }
+
+  return hostingStatusResult({
+    configured: true,
+    provider: hosting.provider,
+    namespace: hosting.namespace,
+    repositoryName,
+    repository,
+    remotes,
+    authProfiles,
+    access,
+    issues,
+  });
 }
 
 export async function preflightNexusProjectHosting(
@@ -469,6 +699,422 @@ function permissionSetAllows(
     permissions.maintain ||
     permissions.admin
   );
+}
+
+function hostingRemoteStatus(options: {
+  remote: NexusProjectHostingExpectedRemote;
+  localRemoteByName: Map<string, NexusProjectHostingLocalRemoteRecord> | null;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingRemoteStatusRecord {
+  if (!options.localRemoteByName) {
+    return remoteStatusRecord(options.remote, null, "unchecked");
+  }
+
+  const localRemote = options.localRemoteByName.get(options.remote.name);
+  if (!localRemote) {
+    options.issues.push({
+      code: "local_remote_missing",
+      severity: "blocker",
+      message: `Local Git remote is missing: ${options.remote.name}`,
+      remoteName: options.remote.name,
+      authProfile: options.remote.authProfile ?? undefined,
+    });
+    return remoteStatusRecord(options.remote, null, "missing");
+  }
+
+  if (localRemote.url !== options.remote.url) {
+    options.issues.push({
+      code: "local_remote_url_mismatch",
+      severity: "blocker",
+      message:
+        `Local Git remote ${options.remote.name} points to ` +
+        `${localRemote.url ?? "<unset>"}; expected ${options.remote.url}.`,
+      remoteName: options.remote.name,
+      authProfile: options.remote.authProfile ?? undefined,
+    });
+    return remoteStatusRecord(options.remote, localRemote.url, "mismatch");
+  }
+
+  return remoteStatusRecord(options.remote, localRemote.url, "matched");
+}
+
+function remoteStatusRecord(
+  remote: NexusProjectHostingExpectedRemote,
+  currentUrl: string | null,
+  status: NexusProjectHostingRemoteStatus,
+): NexusProjectHostingRemoteStatusRecord {
+  return {
+    name: remote.name,
+    role: remote.role,
+    protocol: remote.protocol,
+    authProfile: remote.authProfile,
+    expectedUrl: remote.url,
+    currentUrl,
+    status,
+  };
+}
+
+async function hostingAuthProfileStatus(options: {
+  hosting: NexusProjectHostingConfig;
+  expectedRemotes: NexusProjectHostingExpectedRemote[];
+  authProfileById: Map<string, NexusHostingAuthProfileConfig>;
+  provider?: NexusProjectHostingProviderAdapter;
+  issues: NexusProjectHostingPreflightIssue[];
+}): Promise<NexusProjectHostingAuthProfileStatusRecord[]> {
+  const profileIds = new Set<string>();
+  for (const remote of options.expectedRemotes) {
+    if (remote.authProfile) {
+      profileIds.add(remote.authProfile);
+    }
+  }
+  for (const principal of options.hosting.access) {
+    if (principal.authProfile) {
+      profileIds.add(principal.authProfile);
+    }
+  }
+  if (options.hosting.provisioning.providerMutationAuthProfile) {
+    profileIds.add(options.hosting.provisioning.providerMutationAuthProfile);
+  }
+
+  const statuses: NexusProjectHostingAuthProfileStatusRecord[] = [];
+  for (const profileId of [...profileIds].sort()) {
+    const authProfile = options.authProfileById.get(profileId);
+    if (!authProfile) {
+      options.issues.push({
+        code: "auth_profile_missing",
+        severity: "blocker",
+        message: `Host-local auth profile is not configured: ${profileId}`,
+        authProfile: profileId,
+      });
+      statuses.push({
+        id: profileId,
+        configured: false,
+        kind: null,
+        expectedAccount: null,
+        observedAccount: null,
+        status: "missing",
+      });
+      continue;
+    }
+
+    const observedAccount =
+      options.provider?.getAuthenticatedAccount &&
+      options.provider.provider === options.hosting.provider
+        ? await options.provider.getAuthenticatedAccount({ authProfile })
+        : null;
+    const expectedAccount = authProfile.account ?? null;
+    const status = authProfileStatus({
+      profileId,
+      expectedAccount,
+      observedAccount,
+      issues: options.issues,
+    });
+    statuses.push({
+      id: profileId,
+      configured: true,
+      kind: authProfile.kind ?? null,
+      expectedAccount,
+      observedAccount,
+      status,
+    });
+  }
+
+  return statuses;
+}
+
+function authProfileStatus(options: {
+  profileId: string;
+  expectedAccount: string | null;
+  observedAccount: string | null;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingAuthProfileStatus {
+  if (!options.expectedAccount || !options.observedAccount) {
+    return "unchecked";
+  }
+  if (
+    options.expectedAccount.toLowerCase() ===
+    options.observedAccount.toLowerCase()
+  ) {
+    return "matched";
+  }
+
+  options.issues.push({
+    code: "auth_profile_actor_mismatch",
+    severity: "blocker",
+    message:
+      `Auth profile ${options.profileId} is authenticated as ` +
+      `${options.observedAccount}; expected ${options.expectedAccount}.`,
+    authProfile: options.profileId,
+  });
+  return "mismatch";
+}
+
+function repositoryStatus(options: {
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingRepositoryRecord | null;
+  repositoryName: string;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingRepositoryStatus {
+  if (!options.repository) {
+    options.issues.push({
+      code: "repository_missing",
+      severity: "blocker",
+      message:
+        `Remote repository ${options.hosting.namespace}/` +
+        `${options.repositoryName} does not exist.`,
+    });
+    return {
+      exists: false,
+      visibility: null,
+      defaultBranch: null,
+    };
+  }
+
+  if (
+    options.repository.visibility &&
+    options.repository.visibility !== options.hosting.repository.visibility
+  ) {
+    options.issues.push({
+      code: "repository_visibility_mismatch",
+      severity: "blocker",
+      message:
+        `Remote repository visibility is ${options.repository.visibility}; ` +
+        `project hosting expects ${options.hosting.repository.visibility}.`,
+    });
+  }
+  if (
+    options.repository.defaultBranch &&
+    options.repository.defaultBranch !== options.hosting.repository.defaultBranch
+  ) {
+    options.issues.push({
+      code: "repository_default_branch_mismatch",
+      severity: "blocker",
+      message:
+        `Remote repository default branch is ${options.repository.defaultBranch}; ` +
+        `project hosting expects ${options.hosting.repository.defaultBranch}.`,
+    });
+  }
+
+  return {
+    exists: true,
+    visibility: options.repository.visibility ?? null,
+    defaultBranch: options.repository.defaultBranch ?? null,
+  };
+}
+
+async function hostingAccessStatus(options: {
+  hosting: NexusProjectHostingConfig;
+  authProfileById: Map<string, NexusHostingAuthProfileConfig>;
+  provider: NexusProjectHostingProviderAdapter;
+  repositoryName: string;
+  issues: NexusProjectHostingPreflightIssue[];
+}): Promise<NexusProjectHostingAccessStatusRecord[]> {
+  if (!options.provider.getAccess) {
+    for (const principal of options.hosting.access) {
+      options.issues.push({
+        code: "provider_access_unsupported",
+        severity: "warning",
+        message:
+          `Hosting provider ${options.provider.provider} does not expose ` +
+          `access status for ${principal.kind}:${principal.providerIdentity}.`,
+        authProfile: principal.authProfile,
+        principalKind: principal.kind,
+        providerIdentity: principal.providerIdentity,
+      });
+    }
+    return options.hosting.access.map((principal) =>
+      uncheckedHostingAccessRecord(principal, "unsupported"),
+    );
+  }
+
+  const statuses: NexusProjectHostingAccessStatusRecord[] = [];
+  for (const principal of options.hosting.access) {
+    const authProfile = principal.authProfile
+      ? options.authProfileById.get(principal.authProfile)
+      : undefined;
+    const access = await options.provider.getAccess({
+      namespace: options.hosting.namespace,
+      repositoryName: options.repositoryName,
+      principal,
+      authProfile,
+    });
+    statuses.push(
+      hostingAccessStatusRecord({
+        principal,
+        access,
+        issues: options.issues,
+      }),
+    );
+  }
+
+  return statuses;
+}
+
+function hostingAccessStatusRecord(options: {
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  access: NexusProjectHostingProviderAccessRecord;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingAccessStatusRecord {
+  const pendingInvitation = options.access.pendingInvitation ?? false;
+  if (pendingInvitation) {
+    const severity =
+      options.principal.invitationPolicy === "require_accepted"
+        ? "blocker"
+        : "warning";
+    options.issues.push({
+      code: "access_pending_invitation",
+      severity,
+      message:
+        `Access for ${options.principal.kind}:` +
+        `${options.principal.providerIdentity} is pending invitation.`,
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return accessStatusRecord(options.principal, {
+      effectivePermission: options.access.effectivePermission,
+      pendingInvitation,
+      status: "pending",
+    });
+  }
+
+  if (!options.access.effectivePermission) {
+    options.issues.push({
+      code: "access_missing",
+      severity: "blocker",
+      message:
+        `Access is missing for ${options.principal.kind}:` +
+        `${options.principal.providerIdentity}.`,
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return accessStatusRecord(options.principal, {
+      effectivePermission: null,
+      pendingInvitation,
+      status: "missing",
+    });
+  }
+
+  if (
+    !permissionAllows(
+      options.access.effectivePermission,
+      options.principal.requiredPermission,
+    )
+  ) {
+    options.issues.push({
+      code: "access_insufficient",
+      severity: "blocker",
+      message:
+        `Access for ${options.principal.kind}:` +
+        `${options.principal.providerIdentity} is ` +
+        `${options.access.effectivePermission}; expected ` +
+        `${options.principal.requiredPermission}.`,
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return accessStatusRecord(options.principal, {
+      effectivePermission: options.access.effectivePermission,
+      pendingInvitation,
+      status: "insufficient",
+    });
+  }
+
+  return accessStatusRecord(options.principal, {
+    effectivePermission: options.access.effectivePermission,
+    pendingInvitation,
+    status: "satisfied",
+  });
+}
+
+function uncheckedHostingAccessRecords(
+  hosting: NexusProjectHostingConfig,
+): NexusProjectHostingAccessStatusRecord[] {
+  return hosting.access.map((principal) =>
+    uncheckedHostingAccessRecord(principal, "unchecked"),
+  );
+}
+
+function uncheckedHostingAccessRecord(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+  status: Extract<NexusProjectHostingAccessStatus, "unchecked" | "unsupported">,
+): NexusProjectHostingAccessStatusRecord {
+  return accessStatusRecord(principal, {
+    effectivePermission: null,
+    pendingInvitation: null,
+    status,
+  });
+}
+
+function accessStatusRecord(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+  status: {
+    effectivePermission: NexusProjectHostingRequiredPermission | null;
+    pendingInvitation: boolean | null;
+    status: NexusProjectHostingAccessStatus;
+  },
+): NexusProjectHostingAccessStatusRecord {
+  return {
+    kind: principal.kind,
+    providerIdentity: principal.providerIdentity,
+    role: principal.role,
+    requiredPermission: principal.requiredPermission,
+    authProfile: principal.authProfile ?? null,
+    invitationPolicy: principal.invitationPolicy,
+    effectivePermission: status.effectivePermission,
+    pendingInvitation: status.pendingInvitation,
+    status: status.status,
+  };
+}
+
+function permissionAllows(
+  effectivePermission: NexusProjectHostingRequiredPermission,
+  requiredPermission: NexusProjectHostingRequiredPermission,
+): boolean {
+  return (
+    permissionRank(effectivePermission) >= permissionRank(requiredPermission)
+  );
+}
+
+function permissionRank(permission: NexusProjectHostingRequiredPermission): number {
+  switch (permission) {
+    case "read":
+      return 1;
+    case "write":
+      return 2;
+    case "maintain":
+      return 3;
+    case "admin":
+      return 4;
+  }
+}
+
+function hostingStatusResult(options: {
+  configured: boolean;
+  provider: NexusProjectHostingProviderName | null;
+  namespace: string | null;
+  repositoryName: string | null;
+  repository: NexusProjectHostingRepositoryStatus;
+  remotes: NexusProjectHostingRemoteStatusRecord[];
+  authProfiles: NexusProjectHostingAuthProfileStatusRecord[];
+  access: NexusProjectHostingAccessStatusRecord[];
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingStatusResult {
+  const hasBlocker = options.issues.some(
+    (issue) => issue.severity === "blocker",
+  );
+  return {
+    ok: !hasBlocker,
+    status: !options.configured
+      ? "not_configured"
+      : hasBlocker
+        ? "blocked"
+        : options.issues.length > 0
+          ? "warning"
+          : "passed",
+    ...options,
+  };
 }
 
 function preflightResult(options: {
