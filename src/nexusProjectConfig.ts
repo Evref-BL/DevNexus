@@ -43,8 +43,12 @@ import {
 } from "./nexusAutomationConfig.js";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type {
+  NexusProjectHostingAccessPrincipalKind,
+  NexusProjectHostingAccessRole,
   NexusProjectHostingConfig,
+  NexusProjectHostingInvitationPolicy,
   NexusProjectHostingProviderName,
+  NexusProjectHostingRequiredPermission,
   NexusProjectHostingRemoteProtocol,
   NexusProjectHostingRemoteRole,
   NexusProjectHostingRepositoryVisibility,
@@ -1837,6 +1841,81 @@ function validateProjectHostingRemoteRole(
   throw new NexusConfigError(`${pathName} must be human, automation, or other`);
 }
 
+function validateProjectHostingAccessPrincipalKind(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingAccessPrincipalKind {
+  if (
+    value === "human" ||
+    value === "machine_user" ||
+    value === "team" ||
+    value === "deploy_key" ||
+    value === "app"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be human, machine_user, team, deploy_key, or app`,
+  );
+}
+
+function validateProjectHostingAccessRole(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingAccessRole {
+  if (
+    value === "human" ||
+    value === "automation" ||
+    value === "reviewer" ||
+    value === "observer" ||
+    value === "other"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be human, automation, reviewer, observer, or other`,
+  );
+}
+
+function validateProjectHostingRequiredPermission(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingRequiredPermission {
+  if (
+    value === "read" ||
+    value === "write" ||
+    value === "maintain" ||
+    value === "admin"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be read, write, maintain, or admin`);
+}
+
+function validateProjectHostingInvitationPolicy(
+  value: unknown,
+  pathName: string,
+): NexusProjectHostingInvitationPolicy {
+  if (value === undefined) {
+    return "require_accepted";
+  }
+  if (
+    value === "require_accepted" ||
+    value === "allow_pending" ||
+    value === "auto_accept" ||
+    value === "manual"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be require_accepted, allow_pending, auto_accept, or manual`,
+  );
+}
+
 function validateProjectHostingRepositoryConfig(
   value: unknown,
 ): NexusProjectHostingConfig["repository"] {
@@ -1929,16 +2008,129 @@ function validateProjectHostingRemotes(
   return remotes;
 }
 
+function validateProjectHostingAccessPrincipalConfig(
+  value: unknown,
+  index: number,
+): NexusProjectHostingConfig["access"][number] {
+  const pathName = `project config.hosting.access[${index}]`;
+  const record = assertRecord(value, pathName);
+  const authProfile = optionalString(record, "authProfile", pathName);
+
+  return {
+    kind: validateProjectHostingAccessPrincipalKind(
+      record.kind,
+      `${pathName}.kind`,
+    ),
+    providerIdentity: requiredString(record, "providerIdentity", pathName),
+    role: validateProjectHostingAccessRole(record.role, `${pathName}.role`),
+    requiredPermission: validateProjectHostingRequiredPermission(
+      record.requiredPermission,
+      `${pathName}.requiredPermission`,
+    ),
+    ...(authProfile !== undefined ? { authProfile } : {}),
+    invitationPolicy: validateProjectHostingInvitationPolicy(
+      record.invitationPolicy,
+      `${pathName}.invitationPolicy`,
+    ),
+  };
+}
+
+function validateProjectHostingAccess(
+  value: unknown,
+): NexusProjectHostingConfig["access"] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.hosting.access must be an array");
+  }
+
+  const access = value.map((principal, index) =>
+    validateProjectHostingAccessPrincipalConfig(principal, index),
+  );
+  const identities = new Set<string>();
+  for (const principal of access) {
+    const identityKey =
+      `${principal.kind}:${principal.providerIdentity}`.toLowerCase();
+    if (identities.has(identityKey)) {
+      throw new NexusConfigError(
+        `project config.hosting.access contains duplicate principal: ` +
+          `${principal.kind}:${principal.providerIdentity}`,
+      );
+    }
+    identities.add(identityKey);
+  }
+
+  return access;
+}
+
 function validateProjectHostingProvisioningConfig(
   value: unknown,
 ): NexusProjectHostingConfig["provisioning"] {
   const pathName = "project config.hosting.provisioning";
   const record =
     value === undefined ? {} : assertRecord(value, pathName);
+  const providerMutationAuthProfile = optionalString(
+    record,
+    "providerMutationAuthProfile",
+    pathName,
+  );
 
   return {
     allowCreate: optionalBoolean(record, "allowCreate", pathName) ?? false,
+    allowLocalRemoteRepair:
+      optionalBoolean(record, "allowLocalRemoteRepair", pathName) ?? false,
+    allowAccessRepair:
+      optionalBoolean(record, "allowAccessRepair", pathName) ?? false,
+    allowInvitationAcceptance:
+      optionalBoolean(record, "allowInvitationAcceptance", pathName) ?? false,
+    allowDefaultBranchRepair:
+      optionalBoolean(record, "allowDefaultBranchRepair", pathName) ?? false,
+    allowVisibilityRepair:
+      optionalBoolean(record, "allowVisibilityRepair", pathName) ?? false,
+    ...(providerMutationAuthProfile !== undefined
+      ? { providerMutationAuthProfile }
+      : {}),
   };
+}
+
+const sharedHostingSecretFieldNames = new Set([
+  "token",
+  "accessToken",
+  "privateKey",
+  "privateKeyPath",
+  "sshPrivateKey",
+  "githubCliConfigDir",
+  "ghConfigDir",
+  "browserSession",
+  "sessionCookie",
+  "credentialPath",
+  "credentials",
+]);
+
+function rejectSharedHostingSecretFields(value: unknown, pathName: string): void {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) =>
+      rejectSharedHostingSecretFields(entry, `${pathName}[${index}]`),
+    );
+    return;
+  }
+
+  for (const [key, childValue] of Object.entries(
+    value as Record<string, unknown>,
+  )) {
+    const childPath = `${pathName}.${key}`;
+    if (sharedHostingSecretFieldNames.has(key)) {
+      throw new NexusConfigError(
+        `${childPath} must not be stored in shared hosting config; ` +
+          "use a host-local auth profile reference instead",
+      );
+    }
+    rejectSharedHostingSecretFields(childValue, childPath);
+  }
 }
 
 function validateProjectHostingConfig(
@@ -1950,6 +2142,7 @@ function validateProjectHostingConfig(
 
   const pathName = "project config.hosting";
   const record = assertRecord(value, pathName);
+  rejectSharedHostingSecretFields(record, pathName);
   const authProfile = optionalString(record, "authProfile", pathName);
 
   return {
@@ -1961,6 +2154,7 @@ function validateProjectHostingConfig(
     repository: validateProjectHostingRepositoryConfig(record.repository),
     ...(authProfile !== undefined ? { authProfile } : {}),
     remotes: validateProjectHostingRemotes(record.remotes),
+    access: validateProjectHostingAccess(record.access),
     provisioning: validateProjectHostingProvisioningConfig(record.provisioning),
   };
 }

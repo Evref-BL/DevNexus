@@ -58,8 +58,14 @@ function hosting(
         authProfile: "bot-github",
       },
     ],
+    access: [],
     provisioning: {
       allowCreate: false,
+      allowLocalRemoteRepair: false,
+      allowAccessRepair: false,
+      allowInvitationAcceptance: false,
+      allowDefaultBranchRepair: false,
+      allowVisibilityRepair: false,
     },
     ...overrides,
   };
@@ -78,6 +84,7 @@ function provider(options: {
       return {
         read: false,
         write: false,
+        maintain: false,
         admin: false,
         ...(options.permissions?.[input.remoteName] ?? {}),
       };
@@ -148,6 +155,11 @@ describe("project hosting", () => {
       hosting: hosting({
         provisioning: {
           allowCreate: true,
+          allowLocalRemoteRepair: false,
+          allowAccessRepair: false,
+          allowInvitationAcceptance: false,
+          allowDefaultBranchRepair: false,
+          allowVisibilityRepair: false,
         },
       }),
       authProfiles,

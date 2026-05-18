@@ -1073,8 +1073,32 @@ describe("project config", () => {
               sshHost: "github.com-example-bot",
             },
           ],
+          access: [
+            {
+              kind: "human",
+              providerIdentity: "alice",
+              role: "human",
+              requiredPermission: "admin",
+              authProfile: "human-github",
+              invitationPolicy: "auto_accept",
+            },
+            {
+              kind: "machine_user",
+              providerIdentity: "example-bot",
+              role: "automation",
+              requiredPermission: "admin",
+              authProfile: "bot-github",
+              invitationPolicy: "require_accepted",
+            },
+          ],
           provisioning: {
             allowCreate: false,
+            allowLocalRemoteRepair: true,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: true,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+            providerMutationAuthProfile: "bot-github",
           },
         },
       }).hosting,
@@ -1101,8 +1125,32 @@ describe("project config", () => {
           sshHost: "github.com-example-bot",
         },
       ],
+      access: [
+        {
+          kind: "human",
+          providerIdentity: "alice",
+          role: "human",
+          requiredPermission: "admin",
+          authProfile: "human-github",
+          invitationPolicy: "auto_accept",
+        },
+        {
+          kind: "machine_user",
+          providerIdentity: "example-bot",
+          role: "automation",
+          requiredPermission: "admin",
+          authProfile: "bot-github",
+          invitationPolicy: "require_accepted",
+        },
+      ],
       provisioning: {
         allowCreate: false,
+        allowLocalRemoteRepair: true,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: true,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
       },
     });
 
@@ -1134,8 +1182,14 @@ describe("project config", () => {
           protocol: "ssh",
         },
       ],
+      access: [],
       provisioning: {
         allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
       },
     });
   });
@@ -2243,6 +2297,126 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/either name or nameTemplate/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-access-kind",
+        name: "Invalid Hosting Access Kind",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          access: [
+            {
+              kind: "person",
+              providerIdentity: "alice",
+              role: "human",
+              requiredPermission: "read",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/hosting\.access\[0\]\.kind/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-access-permission",
+        name: "Invalid Hosting Access Permission",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          access: [
+            {
+              kind: "human",
+              providerIdentity: "alice",
+              role: "human",
+              requiredPermission: "owner",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/hosting\.access\[0\]\.requiredPermission/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-access-policy",
+        name: "Invalid Hosting Access Policy",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          access: [
+            {
+              kind: "human",
+              providerIdentity: "alice",
+              role: "human",
+              requiredPermission: "read",
+              invitationPolicy: "maybe_later",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/hosting\.access\[0\]\.invitationPolicy/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-duplicate-access",
+        name: "Invalid Hosting Duplicate Access",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          access: [
+            {
+              kind: "human",
+              providerIdentity: "Alice",
+              role: "human",
+              requiredPermission: "read",
+            },
+            {
+              kind: "human",
+              providerIdentity: "alice",
+              role: "reviewer",
+              requiredPermission: "read",
+            },
+          ],
+        },
+      }),
+    ).toThrow(/duplicate principal: human:alice/i);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-secret",
+        name: "Invalid Hosting Secret",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          accessToken: "gho_secret",
+        },
+      }),
+    ).toThrow(/must not be stored in shared hosting config/);
 
     expect(() =>
       validateProjectConfig({

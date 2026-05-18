@@ -12,7 +12,31 @@ export type NexusProjectHostingRemoteRole =
   | "automation"
   | "other";
 
-export type NexusProjectHostingRequiredPermission = "read" | "write" | "admin";
+export type NexusProjectHostingRequiredPermission =
+  | "read"
+  | "write"
+  | "maintain"
+  | "admin";
+
+export type NexusProjectHostingAccessPrincipalKind =
+  | "human"
+  | "machine_user"
+  | "team"
+  | "deploy_key"
+  | "app";
+
+export type NexusProjectHostingAccessRole =
+  | "human"
+  | "automation"
+  | "reviewer"
+  | "observer"
+  | "other";
+
+export type NexusProjectHostingInvitationPolicy =
+  | "require_accepted"
+  | "allow_pending"
+  | "auto_accept"
+  | "manual";
 
 export interface NexusProjectHostingRepositoryConfig {
   name?: string;
@@ -30,8 +54,23 @@ export interface NexusProjectHostingRemoteConfig {
   sshHost?: string;
 }
 
+export interface NexusProjectHostingAccessPrincipalConfig {
+  kind: NexusProjectHostingAccessPrincipalKind;
+  providerIdentity: string;
+  role: NexusProjectHostingAccessRole;
+  requiredPermission: NexusProjectHostingRequiredPermission;
+  authProfile?: string;
+  invitationPolicy: NexusProjectHostingInvitationPolicy;
+}
+
 export interface NexusProjectHostingProvisioningConfig {
   allowCreate: boolean;
+  allowLocalRemoteRepair: boolean;
+  allowAccessRepair: boolean;
+  allowInvitationAcceptance: boolean;
+  allowDefaultBranchRepair: boolean;
+  allowVisibilityRepair: boolean;
+  providerMutationAuthProfile?: string;
 }
 
 export interface NexusProjectHostingConfig {
@@ -40,6 +79,7 @@ export interface NexusProjectHostingConfig {
   repository: NexusProjectHostingRepositoryConfig;
   authProfile?: string;
   remotes: NexusProjectHostingRemoteConfig[];
+  access: NexusProjectHostingAccessPrincipalConfig[];
   provisioning: NexusProjectHostingProvisioningConfig;
 }
 
@@ -85,6 +125,7 @@ export interface NexusProjectHostingRepositoryRecord {
 export interface NexusProjectHostingPermissionSet {
   read: boolean;
   write: boolean;
+  maintain: boolean;
   admin: boolean;
 }
 
@@ -415,11 +456,19 @@ function permissionSetAllows(
   if (requiredPermission === "admin") {
     return permissions.admin;
   }
+  if (requiredPermission === "maintain") {
+    return permissions.maintain || permissions.admin;
+  }
   if (requiredPermission === "write") {
-    return permissions.write || permissions.admin;
+    return permissions.write || permissions.maintain || permissions.admin;
   }
 
-  return permissions.read || permissions.write || permissions.admin;
+  return (
+    permissions.read ||
+    permissions.write ||
+    permissions.maintain ||
+    permissions.admin
+  );
 }
 
 function preflightResult(options: {
