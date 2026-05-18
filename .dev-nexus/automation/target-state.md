@@ -86,6 +86,15 @@ and ready for coordinator-driven work across its components.
   DevNexus-Pharo config migration paths.
 - DevNexus core guardrail work `dev-nexus:local-112` is ready to prevent future
   plugin MCP tool overlap.
+- `docs/codex-architecture-design-audit-prd.md` records the Codex architecture
+  audit. It keeps `codex exec` as the practical default while app-server
+  support starts with current JSONL JSON-RPC-lite protocol compatibility,
+  capability discovery, event routing, and provider session facts.
+- The Codex app-server audit has been sliced into corrective DevNexus work:
+  start with ready defect `dev-nexus:local-113` for stdio wire protocol
+  compatibility, then follow with `local-114` through `local-116` for
+  notification/server-request routing, safe capability probes, and provider
+  session/turn facts.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
@@ -115,6 +124,9 @@ and ready for coordinator-driven work across its components.
 - Complete `dev-nexus:local-72` before promoting `local-73` through
   `local-75`; resolve the full `local-69` umbrella before relying on Windows
   source roots as clean onboarding examples.
+- Start Codex app-server correction with `dev-nexus:local-113` before any
+  worker-thread orchestration, MCP relay expansion, or provider-native subagent
+  features.
 
 ## Boundaries
 

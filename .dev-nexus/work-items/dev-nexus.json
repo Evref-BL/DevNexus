@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 113,
+  "nextNumber": 117,
   "nextCommentNumber": 183,
-  "updatedAt": "2026-05-18T15:28:37.256Z",
+  "updatedAt": "2026-05-18T15:39:30.783Z",
   "items": [
     {
       "id": "local-1",
@@ -2861,6 +2861,109 @@
         "itemId": "local-112",
         "itemNumber": 112
       }
+    },
+    {
+      "id": "local-113",
+      "title": "Fix Codex app-server stdio wire protocol compatibility",
+      "description": "Type: implementation defect slice\nReadiness: autonomous agent-ready (AFK)\nSource: docs/codex-architecture-design-audit-prd.md; follow-up to completed Codex app-server adapter work local-31 through local-35.\n\nProblem:\nThe current DevNexus Codex app-server transport was added under an incompatible protocol assumption. Current Codex app-server stdio speaks newline-delimited JSON-RPC-lite messages and omits the `jsonrpc` field, while DevNexus currently writes LSP-style `Content-Length` frames and requires `jsonrpc: \"2.0\"` in responses.\n\nGoal:\nMake the existing Codex app-server client and stdio transport compatible with the installed/current Codex app-server wire protocol before any higher-level worker orchestration is treated as operational.\n\nUser stories covered:\n- As a DevNexus user, I can run an app-server readiness path against the installed Codex binary without failing on framing or JSON-RPC envelope shape.\n- As a coordinator, I get a clear protocol compatibility error when a configured Codex binary speaks an unsupported protocol.\n\nAcceptance criteria:\n- Codex app-server stdio transport writes one JSON object per line and reads one JSON object per line.\n- Requests, responses, notifications, and errors are accepted without requiring a `jsonrpc` member.\n- Existing mocked transport tests are updated so they no longer require or assert `jsonrpc: \"2.0\"` for Codex app-server messages.\n- A regression test proves the Codex app-server stdio transport does not emit `Content-Length` frames.\n- A malformed line or unsupported response shape produces an actionable infrastructure failure.\n- Generic DevNexus MCP stdio behavior remains unchanged; this change is scoped to Codex app-server transport.\n\nBoundaries:\n- Do not add worker orchestration, MCP relay expansion, provider-native subagents, or Desktop automation in this slice.\n- Do not read or write Codex private Desktop storage.\n- Do not require a live Codex app-server for normal test runs.\n\nVerification:\n- Focused Codex app-server JSON-RPC/transport tests.\n- Focused launch-provider tests that exercise the updated mock message shape.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under the configured bot publication policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "protocol",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T15:39:05.012Z",
+      "updatedAt": "2026-05-18T15:39:05.012Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-113",
+        "itemNumber": 113
+      }
+    },
+    {
+      "id": "local-114",
+      "title": "Route Codex app-server notifications and server requests",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nExtend the Codex app-server client from single request/response handling into a bidirectional message loop that can route responses, server notifications, and server-initiated requests without losing early turn events or hanging approval requests.\n\nUser stories covered:\n- As a coordinator, I can start a Codex app-server turn and receive terminal completion or failure facts from notifications rather than relying only on result-file polling.\n- As a DevNexus user, provider-side approval or permission requests become visible infrastructure blockers instead of silent hangs.\n\nAcceptance criteria:\n- The app-server client has separate routing for request responses, notifications, and server requests.\n- Notifications scoped to a turn can be buffered when they arrive before the caller registers a waiter.\n- Server requests for approvals, tool/user input, or permission decisions are either surfaced through a supported DevNexus path or fail fast as explicit infrastructure blockers.\n- Transport closure wakes pending response and notification waiters with clear errors.\n- Tests cover early notification buffering, turn completion notification routing, server request rejection/blocking behavior, and transport failure cleanup.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 because routing should be built on the current Codex app-server JSONL/JSON-RPC-lite transport.\n\nBoundaries:\n- Do not implement provider-native subagent supervision.\n- Do not store full transcript streams in DevNexus records.\n- Do not require live Codex for normal tests.\n\nVerification:\n- Focused app-server client routing tests.\n- Focused app-server launch tests.\n- `npm run check` when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "events",
+        "approval",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T15:39:12.695Z",
+      "updatedAt": "2026-05-18T15:39:12.695Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-114",
+        "itemNumber": 114
+      }
+    },
+    {
+      "id": "local-115",
+      "title": "Add safe Codex app-server initialize probe and capability report",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113; can use dev-nexus:local-114 if the probe consumes notifications or server requests\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nAdd a safe readiness diagnostic that starts or connects to Codex app-server, calls initialize with a DevNexus client identity, reports available methods/capabilities, and exits without creating a durable user chat.\n\nUser stories covered:\n- As a DevNexus user, I can check whether my installed Codex app-server supports the capabilities required by a configured profile.\n- As a coordinator, I can distinguish auth, transport, protocol, missing-method, and policy blockers before dispatching worker turns.\n\nAcceptance criteria:\n- A CLI/MCP-accessible diagnostic reports Codex version when available, transport mode, endpoint scope, advertised methods, required capability status, optional capability status, and blocker summary.\n- The probe does not submit user prompts and does not create visible durable worker chats.\n- Capability groups include at least thread control, turn control, event stream readiness, MCP status, MCP tool call, schema generation, and remote-control disabled/blocked state.\n- Non-loopback endpoints remain blocked unless host-local policy explicitly allows them.\n- Tests use mocked app-server responses and cover all-good, missing required method, unsupported wire protocol, auth failure, and blocked non-loopback endpoint.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 for current wire compatibility.\n- May depend on dev-nexus:local-114 if initialize or capability discovery needs bidirectional request handling.\n\nBoundaries:\n- Do not create Codex heartbeats or cron automations.\n- Do not mutate Codex private storage.\n- Do not make app-server mandatory for projects that use `codex exec`.\n\nVerification:\n- Focused capability diagnostic tests.\n- `npm run check` when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "diagnostics",
+        "capabilities",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T15:39:22.591Z",
+      "updatedAt": "2026-05-18T15:39:22.591Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-115",
+        "itemNumber": 115
+      }
+    },
+    {
+      "id": "local-116",
+      "title": "Record provider session and turn facts for Codex app-server runs",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113 and preferably dev-nexus:local-114\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nMake Codex app-server-backed launches observable through DevNexus records using provider-neutral session and turn facts, without storing full Codex transcripts or relying on Codex private storage.\n\nUser stories covered:\n- As a maintainer, I can inspect a target report and see which provider thread and turn correspond to a failed or completed DevNexus run.\n- As an automation operator, I can tell whether a Codex app-server run satisfied the DevNexus result contract or merely produced assistant text.\n\nAcceptance criteria:\n- Launch/run metadata can record provider id, executor mode, session id, turn id, purpose, component id, work item id, cwd/worktree id, profile id, model, reasoning effort, sandbox/approval summary, persistence mode, terminal status, and result-contract status where available.\n- `target_report` summarizes recent app-server provider sessions and failures without reading provider-private chat storage.\n- A completed provider turn without a valid DevNexus result contract remains failed or blocked.\n- Event-derived completion/failure facts from dev-nexus:local-114, when available, reconcile with result-file facts without double-counting work.\n- Tests cover completed, failed, interrupted/blocked, missing-result, and malformed-result app-server runs.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 for usable app-server communication.\n- Should follow or coordinate with dev-nexus:local-114 for event-derived terminal status.\n\nBoundaries:\n- Do not archive full transcripts.\n- Do not make DevNexus choose or supervise implementation work.\n- Do not depend on Desktop-specific storage or UI state.\n\nVerification:\n- Focused launch/result/target-report tests.\n- `npm run check` when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "codex-app-server",
+        "target-report",
+        "observability",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T15:39:30.783Z",
+      "updatedAt": "2026-05-18T15:39:30.783Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-116",
+        "itemNumber": 116
+      }
     }
   ],
   "comments": {
@@ -5053,6 +5156,10 @@
           "itemId": "local-comment-182"
         }
       }
-    ]
+    ],
+    "local-113": [],
+    "local-114": [],
+    "local-115": [],
+    "local-116": []
   }
 }
