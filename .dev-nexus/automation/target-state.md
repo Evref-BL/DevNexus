@@ -120,8 +120,14 @@ Immediate direction:
     `npm run build` passed. No live image, Docker, or gateway process was
     started.
 - Current ready `dogfood` work matching the automation selector:
-  - No ready work remains after `dev-nexus:local-41` and `dev-nexus:local-42`
-    completed in the current coordinator cycle.
+  - `dev-nexus:local-34` app-server launch/target-cycle fact recording. It is
+    ready after the app-server launch provider landed; keep it mocked and
+    provider-safe, without managing Codex heartbeat or cron automations.
+  - `dev-nexus:local-36` Codex exec/adoption/app-server operator guidance. It
+    is ready after app-server schema and launch-provider work landed.
+  - `dev-nexus:local-45` tracker registry and explicit tracker selection. It is
+    ready after component multi-tracker schema normalization landed; do not add
+    link aggregation or sync execution in this slice.
   - Final PLexus legacy gateway support removal remains human-in-the-loop and
     must not be performed without a separate explicit decision.
 - GitHub identity dogfood state:
@@ -254,8 +260,14 @@ Immediate direction:
   `dev-nexus:local-30` is `todo`/HITL and has been sliced into implementation
   items. Foundation work `dev-nexus:local-31` and `dev-nexus:local-32` is
   complete, and `dev-nexus:local-33` landed the app-server launch provider in
-  DevNexus `f6e98bc`. Dependent follow-ups `dev-nexus:local-34` through
-  `dev-nexus:local-36` remain `todo` until explicitly promoted.
+  DevNexus `f6e98bc`. `dev-nexus:local-34` and `dev-nexus:local-36` are ready;
+  `dev-nexus:local-35` remains dependent until target-cycle recording is
+  stable.
+- Component multi-tracker follow-ups are moving after schema normalization.
+  `dev-nexus:local-45` is ready for tracker registry and explicit tracker
+  selection. `dev-nexus:local-46` through `dev-nexus:local-51` remain parked
+  until the registry lands; live sync policy remains blocked on
+  `dev-nexus:local-52`.
 - The cron prompt now invokes DevNexus through the user-local Codex Node path
   instead of a fragile `node` alias or scheduler-sensitive package-manager
   runtime.

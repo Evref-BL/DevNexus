@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 125,
-  "updatedAt": "2026-05-18T03:22:59.000Z",
+  "nextCommentNumber": 128,
+  "updatedAt": "2026-05-18T03:29:07.586Z",
   "items": [
     {
       "id": "local-1",
@@ -810,19 +810,20 @@
       "id": "local-34",
       "title": "Record Codex app-server launch and target-cycle facts",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after Codex app-server worker launch is available.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: integrate Codex app-server-backed launches with DevNexus target-cycle, launch, result-file, verification, and failure recording so app-server runs are as observable as command-based runs.\n\nUser stories covered:\n- As an automation operator, I can run DevNexus coordinator-loop and see wait, launched, completed, blocked, failed, and skipped decisions recorded before and after app-server-backed work.\n- As a project maintainer, I can diagnose Codex app-server failures from DevNexus records without relying on private Codex UI state.\n\nAcceptance criteria:\n- App-server launch records include profile id, thread id, turn id, ephemeral/durable status, cwd, selected model, result path, and concise stdout/stderr or protocol failure summaries when available.\n- DevNexus does not mark an app-server-backed run successful until the configured result contract is present and valid.\n- Failed, blocked, interrupted, and timed-out app-server turns are reflected in automation run and target-cycle facts.\n- Coordinator-loop behavior remains consistent for no work, active locks, backoff, launch, completion, and failure when the selected profile uses app-server.\n- Tests cover target-cycle/report behavior for app-server run success, malformed result, failure, and timeout.\n\nBlockers and sequencing:\n- Depends on ephemeral Codex app-server worker launch.\n\nBoundaries:\n- Keep current command-based run-once/coordinator-loop behavior available.\n- Do not manage Codex heartbeat or cron automations.\n\nVerification:\n- Run focused automation run-once/coordinator-loop/target-report tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "codex-app-server",
         "automation",
         "target-loop",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T10:38:29.197Z",
-      "updatedAt": "2026-05-17T10:38:29.197Z",
+      "updatedAt": "2026-05-18T03:28:38.675Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -860,19 +861,20 @@
       "id": "local-36",
       "title": "Document Codex exec, adoption, and app-server profile choices",
       "description": "Type: documentation and operator guidance slice\nReadiness: autonomous agent-ready (AFK) after the first app-server execution path lands; can start earlier as draft documentation if useful.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: document when a DevNexus project should use codex exec, current-agent adoption, or Codex app-server profiles.\n\nUser stories covered:\n- As a DevNexus user, I can choose the simplest Codex integration mode for my host.\n- As an automation operator, I understand that Codex heartbeats are wake-up bridges and not DevNexus' long-term scheduling owner.\n\nAcceptance criteria:\n- Documentation compares command-based codex exec profiles, current-agent adoption, and Codex app-server profiles.\n- The docs explain ephemeral versus durable Codex threads and when to use each.\n- The docs state that DevNexus does not create or mutate Codex App heartbeat/cron automation records in the first version.\n- The docs cover safety defaults for loopback endpoints, non-loopback policy, tokens/socket paths as host-local config, and approval/sandbox preservation.\n- Examples avoid user-specific absolute paths except where clearly labeled as host-local placeholders.\n\nBlockers and sequencing:\n- Depends on final naming/config shape from the profile schema and launch-provider slices for non-draft docs.\n\nVerification:\n- Run documentation diff checks.\n- Run npm run check when feasible if docs are in the DevNexus package.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "codex-app-server",
         "docs",
         "automation",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T10:38:29.532Z",
-      "updatedAt": "2026-05-17T10:38:29.532Z",
+      "updatedAt": "2026-05-18T03:28:55.022Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1094,7 +1096,7 @@
       "id": "local-45",
       "title": "Add tracker registry and explicit tracker selection for work-item operations",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after `dev-nexus:local-44` lands.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: route DevNexus work-item operations through a component tracker registry so commands and MCP tools can target either the default tracker or an explicitly named tracker.\n\nUser stories covered:\n- As a worker, I can update the canonical/default tracker without specifying extra options.\n- As a maintainer, I can inspect or operate on a non-default tracker explicitly.\n\nAcceptance criteria:\n- A component tracker registry resolves `{ componentId, trackerId }` into the correct work-tracking provider config.\n- Existing work-item CLI and MCP operations continue to use the component default tracker when no tracker id is provided.\n- Work-item CLI and MCP operations accept an explicit tracker id for create, list, get, update, comment, and set-status where provider capabilities allow it.\n- Error messages distinguish unknown component, unknown tracker id, disabled tracker, unsupported provider, and provider capability gaps.\n- Work-item responses include enough tracker/provider reference metadata for agents to avoid ambiguity.\n- Tests cover omitted tracker id, explicit tracker id, component-qualified id, tracker-qualified id where supported, and externalRef routing.\n\nDependencies:\n- Depends on `dev-nexus:local-44` for normalized tracker bindings.\n\nBoundaries:\n- Do not aggregate or deduplicate linked items in this slice.\n- Do not add sync planning or sync execution.\n\nVerification:\n- Focused work-item service, CLI, and MCP tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1102,12 +1104,13 @@
         "cli",
         "mcp",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.492Z",
-      "updatedAt": "2026-05-17T13:59:50.492Z",
+      "updatedAt": "2026-05-18T03:29:07.586Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2473,9 +2476,33 @@
         }
       }
     ],
-    "local-34": [],
+    "local-34": [
+      {
+        "id": "local-comment-125",
+        "body": "Heartbeat reflection promoted this item to ready dogfood work. Evidence: dependency dev-nexus:local-33 is done and published through DevNexus f6e98bc, and the target state still lists app-server launch/target-cycle fact recording as a parked follow-up. Boundary: mocked/provider-safe work only; do not manage Codex heartbeat or cron automations and keep command-based coordinator behavior intact.",
+        "author": null,
+        "createdAt": "2026-05-18T03:28:38.675Z",
+        "updatedAt": "2026-05-18T03:28:38.675Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-125"
+        }
+      }
+    ],
     "local-35": [],
-    "local-36": [],
+    "local-36": [
+      {
+        "id": "local-comment-126",
+        "body": "Heartbeat reflection promoted this item to ready dogfood work. Evidence: Codex app-server profile schema and launch provider items dev-nexus:local-31, local-32, and local-33 are done; the target state still calls out profile-choice documentation as a parked follow-up. Boundary: documentation/operator guidance only; do not create or mutate Codex App heartbeat or cron automation records.",
+        "author": null,
+        "createdAt": "2026-05-18T03:28:55.022Z",
+        "updatedAt": "2026-05-18T03:28:55.022Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-126"
+        }
+      }
+    ],
     "local-37": [
       {
         "id": "local-comment-85",
@@ -2767,7 +2794,19 @@
         }
       }
     ],
-    "local-45": [],
+    "local-45": [
+      {
+        "id": "local-comment-127",
+        "body": "Heartbeat reflection promoted this item to ready dogfood work. Evidence: dependency dev-nexus:local-44 is done and published through DevNexus dfa7099, and component-multi-tracker work remains the next non-live path toward shared work-item hosting. Boundary: add registry/explicit selection only; do not implement link aggregation, sync planning, sync execution, or live external provider mutation in this slice.",
+        "author": null,
+        "createdAt": "2026-05-18T03:29:07.586Z",
+        "updatedAt": "2026-05-18T03:29:07.586Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-127"
+        }
+      }
+    ],
     "local-46": [],
     "local-47": [],
     "local-48": [],
