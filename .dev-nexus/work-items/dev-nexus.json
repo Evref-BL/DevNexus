@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 143,
-  "nextCommentNumber": 235,
-  "updatedAt": "2026-05-18T21:06:49.951Z",
+  "nextCommentNumber": 237,
+  "updatedAt": "2026-05-18T21:18:57.585Z",
   "items": [
     {
       "id": "local-1",
@@ -3161,7 +3161,7 @@
       "id": "local-124",
       "title": "Add GitHub collaborator repair and pending invite detection",
       "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-118 through dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: make GitHub access drift explicit and repair declared collaborators when provisioning policy allows it.\n\nUser stories covered:\n- As a project owner, I can declare required human and automation access without spelling out GitHub collaborator commands.\n- As a coordinator agent, I can report missing or insufficient account access as hosting drift.\n\nAcceptance criteria:\n- GitHub provider adapter can inspect effective collaborator permission and pending collaborator invitation state in mocked tests.\n- Hosting status and plan distinguish missing collaborator, insufficient permission, pending invitation, provider policy block, and unknown access states.\n- Apply adds or updates only declared collaborators when access repair is explicitly allowed.\n- Apply does not grant broad access to undeclared accounts or teams.\n- Pending invitations are reported separately from completed effective access.\n- Organization policy, single sign-on, missing scope, disabled collaborator invites, and unsupported principal kinds produce actionable blockers.\n\nDependencies:\n- Depends on dev-nexus:local-118, dev-nexus:local-119, dev-nexus:local-120, and dev-nexus:local-121.\n\nBoundaries:\n- Do not accept invitations as the invitee in this slice.\n- Do not create teams or manage organization membership.\n- Do not run live GitHub mutation in default tests.\n\nVerification:\n- Mocked GitHub provider tests for missing collaborator, insufficient permission, successful invite/add/update, pending invitation, organization policy rejection, and idempotent rerun.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3176,8 +3176,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:32.070Z",
-      "updatedAt": "2026-05-18T21:06:49.951Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T21:18:47.543Z",
+      "closedAt": "2026-05-18T21:18:47.543Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3189,7 +3189,7 @@
       "id": "local-125",
       "title": "Accept GitHub invitations through invitee auth profiles",
       "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-124\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: let DevNexus accept a pending GitHub repository invitation automatically when the invited principal has a configured auth profile and project policy allows it.\n\nUser stories covered:\n- As an invited maintainer, I can let DevNexus accept a pending provider invitation for me when my host-local auth profile is configured.\n- As a human maintainer, I can see when an invitation is pending and whether DevNexus can complete acceptance without browser/manual steps.\n\nAcceptance criteria:\n- GitHub provider adapter can list repository invitations for the authenticated invited user in mocked tests.\n- Apply accepts a pending repository invitation as the invited principal only when invitation acceptance is explicitly allowed and the invitee auth profile is available.\n- DevNexus verifies the invitee auth profile is authenticated as the expected provider login before accepting.\n- Pending invitation is not treated as completed access until successful acceptance and final status confirms effective access.\n- Missing invitee auth profile, wrong account, expired invitation, insufficient token scope, provider policy rejection, and invitation not found produce distinct actionable blockers.\n- Re-running apply after acceptance is idempotent.\n\nDependencies:\n- Depends on dev-nexus:local-124.\n\nBoundaries:\n- Do not require browser-based invitation acceptance.\n- Do not accept invitations for undeclared principals.\n- Do not run live GitHub mutation in default tests.\n\nVerification:\n- Mocked GitHub provider tests for successful acceptance, missing profile, wrong account, expired invitation, insufficient scope, provider rejection, no pending invitation, and final effective-access confirmation.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3204,7 +3204,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:39.749Z",
-      "updatedAt": "2026-05-18T16:16:39.749Z",
+      "updatedAt": "2026-05-18T21:18:57.585Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6434,9 +6434,32 @@
           "provider": "local",
           "itemId": "local-comment-234"
         }
+      },
+      {
+        "id": "local-comment-235",
+        "body": "Completed and published as DevNexus source commit 6e42b7f. Added provider-gated access repair apply for declared hosting principals. The generic apply path now includes access_repair actions, requires the provider mutation auth profile, rejects missing or mismatched actors before provider mutation, calls a provider repairAccess adapter with declared principal and required permission, reports provider blocked/failed results, preserves unsupported-principal blockers, and remains idempotent when final status is already satisfied.\n\nVerification passed: npm test -- src/nexusProjectHosting.test.ts; npm run build; npm test -- src/nexusProjectHosting.test.ts src/cli.test.ts src/nexusMcpServer.test.ts src/nexusSharedCheckoutGuard.test.ts (4 files, 98 tests); git diff --check. Full npm run check builds successfully but remains red in the two Mac-owned nexusSetupAssistant path tests on Windows; this lane did not touch those files.",
+        "author": null,
+        "createdAt": "2026-05-18T21:18:40.317Z",
+        "updatedAt": "2026-05-18T21:18:40.317Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-235"
+        }
       }
     ],
-    "local-125": [],
+    "local-125": [
+      {
+        "id": "local-comment-236",
+        "body": "Promoted to ready after dev-nexus:local-124 landed as source commit 6e42b7f. Invitation acceptance can now build on pending-invitation status/plan actions, declared invitee auth profiles, and the generic provider mutation apply pattern.",
+        "author": null,
+        "createdAt": "2026-05-18T21:18:57.585Z",
+        "updatedAt": "2026-05-18T21:18:57.585Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-236"
+        }
+      }
+    ],
     "local-126": [],
     "local-127": [],
     "local-128": [
