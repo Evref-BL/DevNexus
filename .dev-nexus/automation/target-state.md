@@ -18,7 +18,8 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-113` as `7898d11` for Codex app-server JSONL/JSON-RPC-lite
   protocol compatibility, `dev-nexus:local-51` as `b748694` for multi-tracker
   configuration and migration docs, and `dev-nexus:local-99` as `2e8b64f` for
-  advisory worktree leases.
+  advisory worktree leases. `dev-nexus:local-102` is published as `6d10c72`
+  for cleanup dry-run safety classification.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -59,8 +60,8 @@ and ready for coordinator-driven work across its components.
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
-- Default `npm run check` now passes on the integrated DevNexus main with 55
-  test files and 426 tests after the latest DevNexus batch.
+- Default `npm run check` now passes on the integrated DevNexus main with 56
+  test files and 434 tests after the latest DevNexus batch.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -75,8 +76,8 @@ and ready for coordinator-driven work across its components.
   advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
-  `local-103`. `local-97` and `local-99` are complete; `local-102` is ready
-  for cleanup dry-run safety classification. `local-100` should wait for
+  `local-103`. `local-97`, `local-99`, and `local-102` are complete.
+  `local-100` should wait for
   authority status summaries before status expansion. Publication and provider
   mutation gating stay with the authority items `local-91` and `local-92`.
 - `docs/agent-target-projection-opt-in-prd.md` records the decision that
@@ -112,14 +113,13 @@ and ready for coordinator-driven work across its components.
 
 ## Near-Term Direction
 
-- Run the next coordinator cycle on ready work such as `dev-nexus:local-72`,
-  `dev-nexus:local-78`, `dev-nexus:local-81`, `dev-nexus:local-87`,
-  `dev-nexus:local-102`, `dev-nexus:local-104`, `dev-nexus:local-114`,
-  `dev-nexus:local-115`, and `dev-nexus:local-118`, subject to dependency and
-  concurrency limits.
+- Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
+  `dev-nexus:local-81`, `dev-nexus:local-87`, `dev-nexus:local-104`,
+  `dev-nexus:local-114`, `dev-nexus:local-115`, and `dev-nexus:local-118`,
+  subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.
-- Keep parallel-agent workflow ordered: implement read-only cleanup
+- Keep parallel-agent workflow ordered: use completed read-only cleanup
   classification (`local-102`) before cleanup execution, and keep status
   expansion/start-adopt slices behind their authority dependencies.
 - Continue agent-target projection planning at `dev-nexus:local-104`; `local-111`
@@ -127,8 +127,8 @@ and ready for coordinator-driven work across its components.
   filtering plus stale cleanup safety.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
   runner approval is explicit.
-- Complete `dev-nexus:local-72` before promoting `local-73` through
-  `local-75`; resolve the full `local-69` umbrella before relying on Windows
+- Promote `local-73` through `local-75` only after their prerequisites are
+  satisfied; resolve the full `local-69` umbrella before relying on Windows
   source roots as clean onboarding examples.
 - Continue Codex app-server correction with `dev-nexus:local-114` and
   `dev-nexus:local-115` before worker-thread orchestration, MCP relay

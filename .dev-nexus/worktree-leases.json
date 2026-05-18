@@ -1,7 +1,64 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T19:02:10.120Z",
+  "updatedAt": "2026-05-18T19:16:31.682Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-6e2b26cbd89496bd",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-102",
+      "branchName": "codex/dev-nexus/local-102",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-102"
+      },
+      "writeScope": [
+        "src/nexusCleanupPlan.ts",
+        "src/nexusCleanupPlan.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T19:05:26.546Z",
+      "lastSeenAt": "2026-05-18T19:16:31.682Z",
+      "updatedAt": "2026-05-18T19:16:31.682Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "6d10c727fdd62cf6785bcdc42e8aa4b0081c04b5",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-102"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Verification: npm run check passed; dogfood cleanup-plan smoke succeeded with no duplicate candidate ids.",
+        "Integration preference: Merged to DevNexus main and pushed to bot/main as 6d10c72."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

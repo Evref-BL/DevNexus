@@ -65,7 +65,7 @@ target-cycle facts, commits, and the target report.
 
 - Continue remote-host execution with `dev-nexus:local-81` for durable
   request/result records after host registry and runner profile policy landed.
-- Continue parallel-agent workflow with ready cleanup/read-only slice
+- Continue parallel-agent workflow after completed cleanup/read-only slice
   `dev-nexus:local-102`; keep status expansion `local-100` dependent until
   authority status summaries exist.
 - Continue Codex app-server correction with `dev-nexus:local-114` notification

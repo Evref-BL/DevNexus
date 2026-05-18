@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 128,
-  "nextCommentNumber": 214,
-  "updatedAt": "2026-05-18T18:57:48.188Z",
+  "nextCommentNumber": 216,
+  "updatedAt": "2026-05-18T19:16:31.723Z",
   "items": [
     {
       "id": "local-1",
@@ -2574,7 +2574,7 @@
       "id": "local-102",
       "title": "Add branch and worktree cleanup dry-run safety classifier",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nSource PRD: docs/parallel-agent-git-workflow-prd.md\nParent planning item: dev-nexus:local-96\n\nGoal: provide a read-only cleanup plan that classifies generated worktrees and branches by safety before any deletion or pruning is allowed.\n\nUser stories covered:\n- As a cleanup agent, I can prune old worktrees and branches without deleting unmerged or unpushed work.\n- As an agent, I can preserve useful uncommitted work by moving it to a rescue branch instead of leaving it hidden in a dirty checkout.\n\nAcceptance criteria:\n- Cleanup dry-run scans configured component and project-meta worktree roots plus known codex/dev-nexus branches for the selected scope.\n- Each branch/worktree is classified as safe, blocked, stale, merged, superseded, dirty, unpushed, missing handoff, unknown merge state, active lease, abandoned, or needs rescue.\n- The classifier checks dirty files, untracked files, unpushed commits, upstream existence, merge-base containment, handoff status, lease status, and known publication target where available.\n- The plan explains the proof that makes a candidate safe or the missing evidence that blocks cleanup.\n- The plan is read-only and can output structured JSON for automation.\n- Tests cover clean merged branch, dirty worktree, untracked files, unpushed commits, missing upstream, stale lease, ready handoff, superseded commit, and unknown target branch.\n\nDependencies:\n- Builds on existing Git worktree and coordination handoff services.\n- Can consume lease records from dev-nexus:local-99 when available, but should report no-lease state safely before then.\n\nBoundaries:\n- Do not delete branches or worktrees in this slice.\n- Do not assume branch naming alone proves safety.\n- Do not require live provider credentials.\n\nVerification:\n- Focused cleanup classification tests with synthetic Git fixtures.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2587,8 +2587,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:22:17.914Z",
-      "updatedAt": "2026-05-18T13:22:17.914Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T19:16:31.723Z",
+      "closedAt": "2026-05-18T19:16:30.784Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -5649,7 +5649,30 @@
     ],
     "local-100": [],
     "local-101": [],
-    "local-102": [],
+    "local-102": [
+      {
+        "id": "local-comment-214",
+        "body": "Implemented cleanup dry-run safety classifier in DevNexus commit 6d10c72. Added JSON CLI plan, component/project-meta scanning, branch/worktree classification, lease/handoff evidence, dirty/untracked/unpushed/unknown-target blocking, and regression tests. Verification: npm run check passed; real dogfood cleanup-plan smoke returned ok with no duplicate candidate ids.",
+        "author": null,
+        "createdAt": "2026-05-18T19:16:30.532Z",
+        "updatedAt": "2026-05-18T19:16:30.532Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-214"
+        }
+      },
+      {
+        "id": "local-comment-215",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-102\nHead: 6d10c727fdd62cf6785bcdc42e8aa4b0081c04b5\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T19:16:31.682Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-102\",\n  \"logicalItemId\": \"local-102\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-102\",\n    \"itemNumber\": 102,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-102\",\n      \"itemNumber\": 102\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-102\",\n    \"itemNumber\": 102,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-102\",\n      \"itemNumber\": 102\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-102\",\n      \"itemNumber\": 102,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-102\",\n        \"itemNumber\": 102\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-6e2b26cbd89496bd\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-102\",\n  \"branch\": \"codex/dev-nexus/local-102\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"6d10c727fdd62cf6785bcdc42e8aa4b0081c04b5\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusCleanupPlan.ts\",\n    \"src/nexusCleanupPlan.test.ts\",\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Cleanup planning remains read-only and conservative: safe evidence can coexist with blocked reasons, but safeToDelete is false whenever blocked.\",\n    \"Worktree candidate identity is path-based so multiple generated worktrees on one branch remain distinct.\"\n  ],\n  \"verificationSummary\": \"npm run check passed; dogfood cleanup-plan smoke succeeded with no duplicate candidate ids.\",\n  \"integrationPreference\": \"Merged to DevNexus main and pushed to bot/main as 6d10c72.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T19:16:31.723Z",
+        "updatedAt": "2026-05-18T19:16:31.723Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-215"
+        }
+      }
+    ],
     "local-103": [],
     "local-104": [
       {

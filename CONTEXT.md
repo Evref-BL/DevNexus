@@ -91,9 +91,9 @@ coordinator agent chooses and supervises implementation work.
   `0cf0571` adds plugin MCP overlap guardrails, and `dfaf1ca` adds mocked
   one-way work-item sync execution. The newest batch added multi-tracker
   migration docs as `b748694`, advisory worktree leases as `2e8b64f`, and
-  Codex app-server JSONL/JSON-RPC-lite compatibility as `7898d11`. Follow-up
-  slices `dev-nexus:local-81`, `local-102`, `local-114`, and `local-115` are
-  ready candidates.
+  Codex app-server JSONL/JSON-RPC-lite compatibility as `7898d11`, and cleanup
+  dry-run safety classification as `6d10c72`. Follow-up slices
+  `dev-nexus:local-81`, `local-114`, and `local-115` are ready candidates.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.
