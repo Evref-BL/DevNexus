@@ -585,7 +585,6 @@ function joinExistingProjectSteps(options: {
   } = metaProjectRemotePlan(options.projectConfig);
   const devNexusCommand = "dev-nexus";
   const projectRootForPlatform = planProjectRootPath(
-    options.projectRoot,
     options.projectConfig,
     options.platform,
   );
@@ -1948,7 +1947,6 @@ function shellStringLiteral(value: string): string {
 }
 
 function planProjectRootPath(
-  projectRoot: string,
   projectConfig: NexusProjectConfig,
   platform: NexusSetupPlatform,
 ): string {
@@ -1968,7 +1966,7 @@ function componentPlanSourceRoot(
   return componentSetupSourceRoot({
     component,
     platform,
-    projectRoot: planProjectRootPath(projectRoot, projectConfig, platform),
+    projectRoot: planProjectRootPath(projectConfig, platform),
     pathPlatform: platform,
   }).path;
 }
