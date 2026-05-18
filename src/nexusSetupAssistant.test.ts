@@ -631,6 +631,33 @@ describe("nexus setup assistant", () => {
         summary: expect.stringContaining("components/dev-nexus"),
       }),
     );
+    expect(check.checks).not.toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-git-checkout",
+      }),
+    );
+  });
+
+  it("uses Windows-native component checkout commands and checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-windows-component-");
+    writeProject(projectRoot);
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+    const prepareStep = plan.steps.find(
+      (step) => step.id === "prepare-component-checkouts",
+    )!;
+
+    expect(prepareStep.commands.join("\n")).toContain("Test-Path -LiteralPath");
+    expect(prepareStep.commands.join("\n")).not.toContain("test -d");
+    expect(prepareStep.commands.join("\n")).toContain(
+      "git clone --branch main git@github.com:Evref-BL/DevNexus.git",
+    );
+    expect(prepareStep.checks.join("\n")).toContain("Test-Path -LiteralPath");
+    expect(prepareStep.checks.join("\n")).not.toContain("test -d");
   });
 
   it("uses portable component source roots in Mac setup commands", () => {

@@ -1514,6 +1514,10 @@ function componentGitSafetyChecks(
   component: NexusProjectConfig["components"][number],
   sourceRoot: string,
 ): NexusSetupCheckResult[] {
+  if (!fs.existsSync(sourceRoot)) {
+    return [];
+  }
+
   if (!fs.existsSync(path.join(sourceRoot, ".git"))) {
     return [{
       id: `component-${component.id}-git-checkout`,
@@ -1976,7 +1980,7 @@ function componentPlanSourceRoot(
   platform: NexusSetupPlatform,
   projectRoot: string,
   projectConfig: NexusProjectConfig,
-): string | null {
+): string {
   return componentSetupSourceRoot(component, platform, projectRoot, projectConfig).path;
 }
 
@@ -2084,7 +2088,7 @@ function componentCloneCommands(
       projectRoot,
       projectConfig,
     );
-    if (!sourceRoot || !component.remoteUrl) {
+    if (!component.remoteUrl) {
       return [];
     }
     const cloneArgs = component.defaultBranch
@@ -2093,12 +2097,27 @@ function componentCloneCommands(
     const fetchArgs = component.defaultBranch
       ? `origin ${component.defaultBranch} --prune`
       : "--all --prune";
+    const sourceRootArg = shellPathPlaceholder(sourceRoot);
+    const cloneCommand = platform === "windows"
+      ? `if (-not (${directoryExistsCommand(sourceRoot, platform)})) { git clone ${cloneArgs} ${sourceRootArg} }`
+      : `${directoryExistsCommand(sourceRoot, platform)} || git clone ${cloneArgs} ${sourceRootArg}`;
     return [
-      `test -d ${shellPathPlaceholder(sourceRoot)} || git clone ${cloneArgs} ${shellPathPlaceholder(sourceRoot)}`,
-      `git -C ${shellPathPlaceholder(sourceRoot)} status --short`,
-      `git -C ${shellPathPlaceholder(sourceRoot)} fetch ${fetchArgs}`,
+      cloneCommand,
+      `git -C ${sourceRootArg} status --short`,
+      `git -C ${sourceRootArg} fetch ${fetchArgs}`,
     ];
   });
+}
+
+function directoryExistsCommand(
+  directoryPath: string,
+  platform: NexusSetupPlatform,
+): string {
+  if (platform === "windows") {
+    return `Test-Path -LiteralPath ${shellPathPlaceholder(directoryPath)} -PathType Container`;
+  }
+
+  return `test -d ${shellPathPlaceholder(directoryPath)}`;
 }
 
 function componentSourceChecks(
@@ -2110,8 +2129,7 @@ function componentSourceChecks(
     .map((component) =>
       componentPlanSourceRoot(component, platform, projectRoot, projectConfig),
     )
-    .filter((sourceRoot): sourceRoot is string => Boolean(sourceRoot))
-    .map((sourceRoot) => `test -d ${shellPathPlaceholder(sourceRoot)}`);
+    .map((sourceRoot) => directoryExistsCommand(sourceRoot, platform));
 }
 
 function readNexusSetupState(statePath: string): NexusSetupState {
