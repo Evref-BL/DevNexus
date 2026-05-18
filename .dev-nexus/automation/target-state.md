@@ -41,7 +41,10 @@ and ready for coordinator-driven work across its components.
   integration, then published `dev-nexus:local-87`, `dev-nexus:local-81`, and
   `dev-nexus:local-127` together through `ba9976e` for the neutral authority
   config model, durable remote execution request/result records, and the
-  opt-in disposable hosting fixture.
+  opt-in disposable hosting fixture. The latest Windows batch published
+  `dev-nexus:local-129` as `3de4635` for tracker discovery roles and default
+  policy, then `dev-nexus:local-114` as `0d871d7` for Codex app-server
+  notification and server-request routing.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -88,10 +91,10 @@ and ready for coordinator-driven work across its components.
   eligible-work scans component default trackers, while provider-native GitHub
   Issues require explicit tracker queries or inbound import before they become
   local dogfood work. The PRD has been sliced: start with
-  `dev-nexus:local-129` for tracker roles and discovery-policy defaults, then
-  promote `local-130` through `local-136` as prerequisites land. `local-137`
-  is the blocked HITL policy decision for direct external selection, provider
-  comments, scheduler import, and ordering.
+  `dev-nexus:local-129` for tracker roles and discovery-policy defaults, which
+  is now complete. Promote `local-130` through `local-136` as prerequisites
+  land. `local-137` is the blocked HITL policy decision for direct external
+  selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
@@ -165,8 +168,9 @@ and ready for coordinator-driven work across its components.
   capability discovery, event routing, and provider session facts.
 - The Codex app-server audit has been sliced into corrective DevNexus work.
   `dev-nexus:local-113` is complete, fixing stdio wire protocol compatibility.
-  `local-114` and `local-115` are ready for notification/server-request routing
-  and safe capability probes; `local-116` should wait until event routing lands.
+  `local-114` is complete for notification and server-request routing.
+  `local-115` is ready for safe capability probes; `local-116` should wait
+  until event routing lands.
 - `docs/dev-nexus-research-plugin-prd.md` records the first planned
   non-engineering DevNexus domain plugin direction. DevNexus-Research should
   support academic research and paper-writing workflows through additive
@@ -178,15 +182,14 @@ and ready for coordinator-driven work across its components.
   optional external ARS Codex skill integration, and a dogfood paper-project
   smoke.
 - No active implementation subagents are expected, and the merged worktrees and
-  local branches for `local-126`, `local-127`, `local-81`, and `local-87` were
-  removed after publication.
+  local branches for `local-126`, `local-127`, `local-81`, `local-87`,
+  `local-129`, and `local-114` were removed after publication.
 
 ## Near-Term Direction
 
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-78`,
-  `dev-nexus:local-104`, `dev-nexus:local-114`, `dev-nexus:local-115`,
-  `dev-nexus:local-128`, and `dev-nexus:local-129`, subject to dependency and
-  concurrency limits.
+  `dev-nexus:local-104`, `dev-nexus:local-115`, `dev-nexus:local-130`, and
+  `dev-nexus:local-147`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
@@ -202,9 +205,9 @@ and ready for coordinator-driven work across its components.
 - Promote `local-73` through `local-75` only after their prerequisites are
   satisfied; resolve the full `local-69` umbrella before relying on Windows
   source roots as clean onboarding examples.
-- Continue Codex app-server correction with `dev-nexus:local-114` and
-  `dev-nexus:local-115` before worker-thread orchestration, MCP relay
-  expansion, or provider-native subagent features.
+- Continue Codex app-server correction with `dev-nexus:local-115` before
+  worker-thread orchestration, MCP relay expansion, or provider-native subagent
+  features.
 - Start DevNexus-Research with `dev-nexus:local-147` using original
   DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
   user decides whether ARS is inspiration-only, optional external integration,

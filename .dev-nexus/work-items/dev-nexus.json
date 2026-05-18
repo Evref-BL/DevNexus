@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 248,
-  "updatedAt": "2026-05-18T21:56:38.705Z",
+  "nextCommentNumber": 255,
+  "updatedAt": "2026-05-18T22:14:08.308Z",
   "items": [
     {
       "id": "local-1",
@@ -2891,7 +2891,7 @@
       "id": "local-114",
       "title": "Route Codex app-server notifications and server requests",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after dev-nexus:local-113\nSource: docs/codex-architecture-design-audit-prd.md.\n\nGoal:\nExtend the Codex app-server client from single request/response handling into a bidirectional message loop that can route responses, server notifications, and server-initiated requests without losing early turn events or hanging approval requests.\n\nUser stories covered:\n- As a coordinator, I can start a Codex app-server turn and receive terminal completion or failure facts from notifications rather than relying only on result-file polling.\n- As a DevNexus user, provider-side approval or permission requests become visible infrastructure blockers instead of silent hangs.\n\nAcceptance criteria:\n- The app-server client has separate routing for request responses, notifications, and server requests.\n- Notifications scoped to a turn can be buffered when they arrive before the caller registers a waiter.\n- Server requests for approvals, tool/user input, or permission decisions are either surfaced through a supported DevNexus path or fail fast as explicit infrastructure blockers.\n- Transport closure wakes pending response and notification waiters with clear errors.\n- Tests cover early notification buffering, turn completion notification routing, server request rejection/blocking behavior, and transport failure cleanup.\n\nBlockers and sequencing:\n- Depends on dev-nexus:local-113 because routing should be built on the current Codex app-server JSONL/JSON-RPC-lite transport.\n\nBoundaries:\n- Do not implement provider-native subagent supervision.\n- Do not store full transcript streams in DevNexus records.\n- Do not require live Codex for normal tests.\n\nVerification:\n- Focused app-server client routing tests.\n- Focused app-server launch tests.\n- `npm run check` when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2904,8 +2904,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T15:39:12.695Z",
-      "updatedAt": "2026-05-18T16:16:22.708Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:14:07.622Z",
+      "closedAt": "2026-05-18T22:13:35.101Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3271,7 +3271,7 @@
       "id": "local-128",
       "title": "Define cross-tracker discovery and inbound issue sync PRD",
       "description": "Type: Product Requirements Document (PRD) planning slice\nReadiness: ready for PRD attachment, then issue slicing\n\nGoal: capture the product behavior for DevNexus issue discovery across configured work trackers, including whether GitHub Issues created on one host become visible to workers on another host without manual prompting.\n\nContext:\n- Current eligible-work and coordinator selection use component default work tracking, not every configured tracker.\n- Current work-item sync execution supports local source trackers to GitHub target trackers, not GitHub inbound import into local.\n- Cross-machine workers only see local tracker additions after the meta-project repository is synchronized.\n\nAcceptance criteria:\n- PRD states present behavior accurately.\n- PRD defines desired tracker roles, discovery aggregation, deduplication, inbound import, and cross-host visibility behavior.\n- PRD separates read-only discovery from mutating sync/import operations.\n- PRD calls out permission, credential, conflict, and fail-closed behavior.\n- PRD is attached to this work item and ready for issue slicing.\n\nVerification:\n- Static document review.\n- JSON tracker store parses.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3287,8 +3287,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:33:04.512Z",
-      "updatedAt": "2026-05-18T19:39:46.570Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:03:54.000Z",
+      "closedAt": "2026-05-18T22:03:54.000Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3300,7 +3300,7 @@
       "id": "local-129",
       "title": "Add tracker discovery roles and policy defaults",
       "description": "Type: implementation tracer-bullet slice\nReadiness: ready\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: extend the existing multi-tracker configuration model so projects can declare tracker discovery roles and default discovery policy without changing current default-tracker behavior.\n\nUser stories covered:\n- As a maintainer, I can declare which trackers are primary, eligible sources, external inboxes, mirrors, coordination trackers, or archives.\n- As a coordinator agent, I can inspect discovery policy without inferring behavior from provider type.\n\nAcceptance criteria:\n- Tracker bindings can declare explicit roles such as primary, eligible_source, external_inbox, mirror, coordination, and archive.\n- Component discovery policy can declare scanned roles, whether direct external selection is allowed, whether import is required first, provider filters, query limits, conflict winner policy, and missing-credential behavior.\n- Existing project configs continue to behave as default-tracker-only when no discovery policy is declared.\n- Invalid roles and invalid discovery-policy combinations produce clear validation errors.\n- Normalized component status exposes tracker roles and the effective default discovery policy compactly.\n\nBoundaries:\n- Do not implement provider reads, eligible-work aggregation, or import execution in this slice.\n- Do not store host-local credentials or auth paths in shared project config.\n\nVerification:\n- Focused tests for role normalization, default policy preservation, invalid role rejection, invalid policy rejection, and status normalization.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3313,8 +3313,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:38.943Z",
-      "updatedAt": "2026-05-18T19:38:38.943Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:14:08.308Z",
+      "closedAt": "2026-05-18T22:13:35.079Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -6526,6 +6526,28 @@
           "provider": "local",
           "itemId": "local-comment-207"
         }
+      },
+      {
+        "id": "local-comment-250",
+        "body": "Integrated into DevNexus main as merge commit 0d871d7 (worker commit 6ee3a2f). Verification passed: npm test -- src/codexAppServerJsonRpc.test.ts src/nexusAutomationCodexAppServerLaunch.test.ts, combined focused suite with local-129, npm run build, npm test -- --exclude src/nexusSetupAssistant.test.ts, and git diff --check. Full npm run check still fails only in the known two Windows setup-assistant path assertions.",
+        "author": null,
+        "createdAt": "2026-05-18T22:13:27.690Z",
+        "updatedAt": "2026-05-18T22:13:27.690Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-250"
+        }
+      },
+      {
+        "id": "local-comment-253",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus-local-114-app-server-routing\nHead: 6ee3a2f6f411f4d188e1cebcffaac85e826daf80\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:14:07.613Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-114\",\n  \"logicalItemId\": \"local-114\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-114\",\n    \"itemNumber\": 114,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-114\",\n      \"itemNumber\": 114\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-114\",\n    \"itemNumber\": 114,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-114\",\n      \"itemNumber\": 114\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-114\",\n      \"itemNumber\": 114,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-114\",\n        \"itemNumber\": 114\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-e63d5bf2776b0044\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-114-app-server-routing\",\n  \"branch\": \"codex/dev-nexus-local-114-app-server-routing\",\n  \"upstream\": \"bot/main\",\n  \"baseRef\": \"bot/main\",\n  \"headCommit\": \"6ee3a2f6f411f4d188e1cebcffaac85e826daf80\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 3,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/codexAppServerJsonRpc.ts\",\n    \"src/codexAppServerJsonRpc.test.ts\",\n    \"src/nexusAutomationCodexAppServerLaunch.ts\",\n    \"src/nexusAutomationCodexAppServerLaunch.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused app-server transport/launch tests passed, combined focused suite passed, npm run build passed, npm test -- --exclude src/nexusSetupAssistant.test.ts passed, and full npm run check fails only the known two Windows setup-assistant path assertions.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worker branch codex/dev-nexus-local-114-app-server-routing was merged into DevNexus main as 0d871d7 and published through bot/main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:14:07.622Z",
+        "updatedAt": "2026-05-18T22:14:07.622Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-253"
+        }
       }
     ],
     "local-115": [
@@ -6839,9 +6861,43 @@
           "provider": "local",
           "itemId": "local-comment-220"
         }
+      },
+      {
+        "id": "local-comment-248",
+        "body": "Closing as completed during Windows cleanup/reconciliation. Evidence: docs/tracker-discovery-inbound-sync-prd.md exists, target state records the PRD and order, and the PRD has already been sliced into dev-nexus:local-129 through local-137 with the live-validation correction that fake/disposable provider fixtures must be used instead of active projects. Next implementation is local-129, now started in its own worktree.",
+        "author": null,
+        "createdAt": "2026-05-18T22:03:50.591Z",
+        "updatedAt": "2026-05-18T22:03:50.591Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-248"
+        }
       }
     ],
-    "local-129": [],
+    "local-129": [
+      {
+        "id": "local-comment-249",
+        "body": "Integrated into DevNexus main as merge commit 3de4635 (worker commit ee99be6). Verification passed: npm test -- src/nexusProjectConfig.test.ts src/nexusAutomationStatus.test.ts src/nexusProjectRegistry.test.ts, combined focused suite with local-114, npm run build, npm test -- --exclude src/nexusSetupAssistant.test.ts, and git diff --check. Full npm run check still fails only in the known two Windows setup-assistant path assertions.",
+        "author": null,
+        "createdAt": "2026-05-18T22:13:27.672Z",
+        "updatedAt": "2026-05-18T22:13:27.672Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-249"
+        }
+      },
+      {
+        "id": "local-comment-254",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus-local-129-tracker-discovery-policy\nHead: ee99be6a2fffbcd344e33725cd83d70439a9b3ab\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:14:08.298Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-129\",\n  \"logicalItemId\": \"local-129\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-129\",\n    \"itemNumber\": 129,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-129\",\n      \"itemNumber\": 129\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-129\",\n    \"itemNumber\": 129,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-129\",\n      \"itemNumber\": 129\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-129\",\n      \"itemNumber\": 129,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-129\",\n        \"itemNumber\": 129\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-ce32a89401fe21fe\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-129-tracker-discovery-policy\",\n  \"branch\": \"codex/dev-nexus-local-129-tracker-discovery-policy\",\n  \"upstream\": \"bot/main\",\n  \"baseRef\": \"bot/main\",\n  \"headCommit\": \"ee99be6a2fffbcd344e33725cd83d70439a9b3ab\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 3,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusProjectLifecycle.ts\",\n    \"src/nexusProjectConfig.test.ts\",\n    \"src/nexusAutomationStatus.test.ts\",\n    \"src/nexusProjectRegistry.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"Focused config/status/registry tests passed, combined focused suite passed, npm run build passed, npm test -- --exclude src/nexusSetupAssistant.test.ts passed, and full npm run check fails only the known two Windows setup-assistant path assertions.\",\n  \"integrationPreference\": null,\n  \"note\": \"Worker branch codex/dev-nexus-local-129-tracker-discovery-policy was merged into DevNexus main as 3de4635 and published through bot/main.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:14:08.308Z",
+        "updatedAt": "2026-05-18T22:14:08.308Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-254"
+        }
+      }
+    ],
     "local-130": [],
     "local-131": [],
     "local-132": [],

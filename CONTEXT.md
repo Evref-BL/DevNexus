@@ -105,7 +105,10 @@ coordinator agent chooses and supervises implementation work.
   Codex app-server JSONL/JSON-RPC-lite compatibility as `7898d11`, cleanup
   dry-run safety classification as `6d10c72`, and active agent target config
   normalization as `3b6b755`. Follow-up slices `dev-nexus:local-81`,
-  `local-114`, and `local-115` are ready candidates.
+  `local-87`, and `local-127` landed through `ba9976e`; the newest source
+  integration adds tracker discovery policy in `dev-nexus:local-129` as
+  `3de4635` and Codex app-server routing in `dev-nexus:local-114` as
+  `0d871d7`. `local-115` remains a ready Codex app-server candidate.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

@@ -73,8 +73,9 @@ target-cycle facts, commits, and the target report.
   `dev-nexus:local-98`; cleanup/read-only slice `dev-nexus:local-102` is
   complete, and status expansion `local-100` remains dependent until authority
   status summaries exist.
-- Continue Codex app-server correction with `dev-nexus:local-114` notification
-  and server-request routing or `dev-nexus:local-115` safe initialize probes.
+- Continue Codex app-server correction with `dev-nexus:local-115` safe
+  initialize probes after `local-114` landed notification and server-request
+  routing.
 - Continue authority configuration at `dev-nexus:local-87` before promoting
   dependent authority slices.
 - Continue agent-target projection planning at `dev-nexus:local-104`; active
@@ -86,8 +87,8 @@ target-cycle facts, commits, and the target report.
   DevNexus-Research plugin skeleton. Promote `local-148` through `local-151`
   after the skeleton and relevant setup/artifact prerequisites land.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
-  start with `dev-nexus:local-129` for tracker roles and discovery-policy
-  defaults, then promote `local-130` through `local-136` as dependencies land.
+  `dev-nexus:local-129` is complete for tracker roles and discovery-policy
+  defaults. Promote `local-130` through `local-136` as dependencies land.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
