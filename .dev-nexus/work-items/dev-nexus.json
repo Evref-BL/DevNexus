@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 70,
-  "nextCommentNumber": 162,
-  "updatedAt": "2026-05-18T11:25:09.983Z",
+  "nextNumber": 71,
+  "nextCommentNumber": 165,
+  "updatedAt": "2026-05-18T11:33:02.464Z",
   "items": [
     {
       "id": "local-1",
@@ -1736,6 +1736,27 @@
         "provider": "local",
         "itemId": "local-69",
         "itemNumber": 69
+      }
+    },
+    {
+      "id": "local-70",
+      "title": "Remove personal bot alias examples from setup output",
+      "description": "Reusable DevNexus setup source and tests should use generic automation identity examples instead of Gabriel-specific Gabot/gabot names. Keep real dogfood project bot aliases configurable in project metadata.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T11:26:42.718Z",
+      "updatedAt": "2026-05-18T11:33:02.464Z",
+      "closedAt": "2026-05-18T11:33:02.464Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-70",
+        "itemNumber": 70
       }
     }
   ],
@@ -3643,6 +3664,41 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-158"
+        }
+      }
+    ],
+    "local-70": [
+      {
+        "id": "local-comment-162",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/generic-automation-identity\nHead: b0f2cfdc8b8efdadb7573d0a1b4144f246158281\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T11:27:06.215Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-70\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-generic-automation-identity\",\n  \"branch\": \"codex/dev-nexus/generic-automation-identity\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"b0f2cfdc8b8efdadb7573d0a1b4144f246158281\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm test -- src/nexusSetupAssistant.test.ts src/cli.test.ts src/nexusMcpServer.test.ts passed; npm run check passed\",\n  \"integrationPreference\": null,\n  \"note\": \"Removed personal Gabot/gabot examples from reusable DevNexus setup source and tests; bot identity remains configurable through hosting remotes/auth profiles.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T11:27:06.233Z",
+        "updatedAt": "2026-05-18T11:27:06.233Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-162"
+        }
+      },
+      {
+        "id": "local-comment-163",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/generic-automation-identity\nHead: 62610fe8adbeaa6b57adfbc315ed546e7a7631c1\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T11:28:11.583Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-70\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-generic-automation-identity\",\n  \"branch\": \"codex/dev-nexus/generic-automation-identity\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"62610fe8adbeaa6b57adfbc315ed546e7a7631c1\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm test -- src/nexusSetupAssistant.test.ts src/cli.test.ts src/nexusMcpServer.test.ts passed; npm run check passed\",\n  \"integrationPreference\": null,\n  \"note\": \"Committed source cleanup as 62610fe. Reusable DevNexus setup source and tests no longer contain personal Gabot/gabot examples; bot identity remains configurable through hosting remotes/auth profiles.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T11:28:11.601Z",
+        "updatedAt": "2026-05-18T11:28:11.601Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-163"
+        }
+      },
+      {
+        "id": "local-comment-164",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 62610fe8adbeaa6b57adfbc315ed546e7a7631c1\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T11:32:58.279Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-70\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"62610fe8adbeaa6b57adfbc315ed546e7a7631c1\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusSetupAssistant.ts\",\n    \"src/nexusSetupAssistant.test.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.test.ts\"\n  ],\n  \"decisions\": [],\n  \"verificationSummary\": \"npm run check passed on DevNexus main after fast-forward merge\",\n  \"integrationPreference\": \"Published direct integration to DevNexus origin/main as 62610fe.\",\n  \"note\": \"Merged and pushed generic automation identity cleanup. Pruned stale local DevNexus and PLexus codex branches that were already merged or superseded by done work items.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T11:32:58.296Z",
+        "updatedAt": "2026-05-18T11:32:58.296Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-164"
         }
       }
     ]

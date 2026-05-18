@@ -5,9 +5,13 @@ and ready for coordinator-driven work across its components.
 
 ## Current State
 
-- The latest completed source work is `dev-nexus:local-66`, published as
-  DevNexus commit `b0f2cfd` with `automation coordinator-loop --progress-jsonl`.
+- The latest completed source work is `dev-nexus:local-70`, published as
+  DevNexus commit `62610fe` with generic automation identity examples in setup
+  guidance and tests.
 - Cleanup work `dev-nexus:local-68` is complete.
+- Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
+  been pruned after verifying they were merged or superseded by completed work
+  items.
 - Re-triage promoted `dev-nexus:local-48` and `dev-nexus:local-67` to `ready`.
   `local-48` remains mocked/local-provider only with no live external writes.
   `local-67` should reject duplicate explicit target-cycle ids with an
