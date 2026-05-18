@@ -726,6 +726,7 @@ function joinExistingProjectSteps(options: {
         "Run from the meta-project root after installing DevNexus and configuring local paths.",
         `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
         "Plugin-projected skills and plugin MCP servers may require plugin-specific setup commands; setup check reports those gaps explicitly.",
+        "A raw stdio MCP tools/list smoke test confirms the server command works, but the agent project session is not ready until the active provider exposes the tools in its own session.",
       ],
       checks: [
         ...agentMcpConfigCheckCommands(
@@ -757,6 +758,7 @@ function joinExistingProjectSteps(options: {
         "Confirm the provider is using the generated MCP config from the meta-project root.",
         "For Codex Desktop, this means opening or creating a Codex project at the meta-project root; other providers may use a different project/session model.",
         "Reload, restart, or start a fresh provider session if the DevNexus MCP tools are not visible after the MCP refresh.",
+        "Do not treat a standalone stdio tools/list probe as completion for this step; it only proves the MCP server command can start.",
         "Run the setup record command only after the active provider session can see the DevNexus MCP tools.",
         "Do not edit provider global state or app databases directly; treat project/session registration as a manual provider action until a supported API exists.",
       ],
@@ -1126,6 +1128,23 @@ function pluginMcpServerCheck(options: {
     serverName,
   });
   if (configured === true) {
+    const command = configuredMcpServerCommand({
+      provider: options.provider,
+      configPath,
+      configSchema: options.configSchema,
+      serverName,
+    });
+    if (command && !mcpCommandAvailable(command, options.projectRoot)) {
+      return {
+        ...checkBase,
+        status: "warning",
+        summary:
+          `Plugin MCP server ${serverName} is configured for ${options.provider}, but command ${command} is not available on PATH.`,
+        nextAction:
+          `Install or expose ${command} for this host, or update ${options.configPathRelative} to use the configured plugin MCP command.`,
+      };
+    }
+
     return {
       ...checkBase,
       status: "passed",
@@ -1316,6 +1335,75 @@ function mcpServerConfigured(options: {
   }
 
   return null;
+}
+
+function configuredMcpServerCommand(options: {
+  provider: string;
+  configPath: string;
+  configSchema: string;
+  serverName: string;
+}): string | null {
+  if (options.configSchema === "codex.mcp_servers") {
+    return codexMcpServerCommand(
+      fs.readFileSync(options.configPath, "utf8"),
+      options.serverName,
+    );
+  }
+
+  return null;
+}
+
+function codexMcpServerCommand(
+  content: string,
+  serverName: string,
+): string | null {
+  const lines = content.replace(/\r\n/gu, "\n").split("\n");
+  let inServerTable = false;
+  for (const line of lines) {
+    const tableName = tomlTableName(line);
+    if (tableName !== null) {
+      inServerTable =
+        tableName === `mcp_servers.${serverName}` ||
+        tableName.startsWith(`mcp_servers.${serverName}.`);
+      continue;
+    }
+
+    if (!inServerTable) {
+      continue;
+    }
+
+    const match = /^\s*command\s*=\s*"([^"]+)"\s*(?:#.*)?$/u.exec(line);
+    if (match) {
+      return match[1]!;
+    }
+  }
+
+  return null;
+}
+
+function mcpCommandAvailable(command: string, projectRoot: string): boolean {
+  const resolved = resolveNexusProjectPath({ projectRoot, value: command });
+  if (resolved !== path.resolve(projectRoot, command) || command.includes(":")) {
+    return fs.existsSync(resolved);
+  }
+  if (command.includes("/") || command.includes("\\")) {
+    return fs.existsSync(command);
+  }
+
+  const lookupCommand = process.platform === "win32" ? "where.exe" : "sh";
+  const args =
+    process.platform === "win32"
+      ? [command]
+      : ["-c", "command -v \"$1\" >/dev/null 2>&1", "sh", command];
+  try {
+    childProcess.execFileSync(lookupCommand, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function codexMcpServerConfigured(content: string, serverName: string): boolean {

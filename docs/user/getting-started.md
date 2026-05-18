@@ -158,6 +158,12 @@ Start the MCP server with:
 dev-nexus mcp-stdio
 ```
 
+For onboarding, distinguish a raw stdio smoke test from provider readiness.
+`tools/list` against `dev-nexus mcp-stdio` proves the server command can start;
+the agent session is ready only after the active provider, such as Codex
+Desktop, exposes those tools in the project session. Plugin MCP servers must
+also have their configured commands available on the host `PATH`.
+
 ## Work Tracking
 
 Configure local tracking for a project or component:

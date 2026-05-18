@@ -818,21 +818,21 @@ describe("nexus setup assistant", () => {
       },
       plugins: [
         {
-          id: "dev-nexus-pharo",
+          id: "example-runtime-plugin",
           enabled: true,
-          name: "DevNexus-Pharo",
+          name: "Example Runtime Plugin",
           version: "0.1.0-alpha.0",
           capabilities: [
             {
               kind: "projected_skill",
-              id: "skill-pharo-ci-repro",
-              skillId: "pharo-ci-repro",
+              id: "skill-example-diagnostic",
+              skillId: "example-diagnostic",
               targetAgents: ["codex"],
             },
             {
               kind: "mcp_server",
-              id: "mcp-plexus",
-              serverName: "plexus",
+              id: "mcp-example-runtime",
+              serverName: "example_runtime",
             },
           ],
         },
@@ -863,44 +863,63 @@ describe("nexus setup assistant", () => {
     expect(warningCheck.status).toBe("warning");
     expect(warningCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-managed",
+        id: "plugin-example-runtime-plugin-skill-example-diagnostic-managed",
         status: "warning",
         summary: expect.stringContaining("not materialized"),
       }),
     );
     expect(warningCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-codex",
+        id: "plugin-example-runtime-plugin-skill-example-diagnostic-codex",
         status: "warning",
         summary: expect.stringContaining("missing from the codex skill directory"),
       }),
     );
     expect(warningCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-mcp-plexus-codex",
+        id: "plugin-example-runtime-plugin-mcp-example_runtime-codex",
         status: "warning",
         summary: expect.stringContaining("not configured for codex"),
       }),
     );
 
     fs.mkdirSync(
-      path.join(projectRoot, ".dev-nexus", "skills", "pharo-ci-repro"),
+      path.join(projectRoot, ".dev-nexus", "skills", "example-diagnostic"),
       { recursive: true },
     );
     fs.writeFileSync(
-      path.join(projectRoot, ".dev-nexus", "skills", "pharo-ci-repro", "SKILL.md"),
-      "# Pharo CI Repro\n",
+      path.join(projectRoot, ".dev-nexus", "skills", "example-diagnostic", "SKILL.md"),
+      "# Example Diagnostic\n",
     );
-    fs.mkdirSync(path.join(projectRoot, ".agents", "skills", "pharo-ci-repro"), {
+    fs.mkdirSync(path.join(projectRoot, ".agents", "skills", "example-diagnostic"), {
       recursive: true,
     });
     fs.writeFileSync(
-      path.join(projectRoot, ".agents", "skills", "pharo-ci-repro", "SKILL.md"),
-      "# Pharo CI Repro\n",
+      path.join(projectRoot, ".agents", "skills", "example-diagnostic", "SKILL.md"),
+      "# Example Diagnostic\n",
     );
     fs.appendFileSync(
       path.join(projectRoot, ".codex", "config.toml"),
-      "\n[mcp_servers.plexus]\ncommand = \"plexus\"\nargs = [\"mcp-stdio\"]\n",
+      "\n[mcp_servers.example_runtime]\ncommand = \"missing-dev-nexus-mcp-command\"\nargs = [\"mcp-stdio\"]\n",
+    );
+
+    const missingCommandCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(missingCommandCheck.status).toBe("warning");
+    expect(missingCommandCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-example_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("command missing-dev-nexus-mcp-command is not available on PATH"),
+      }),
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n\n[mcp_servers.example_runtime]\ncommand = \"node\"\nargs = [\"mcp-stdio\"]\n",
     );
 
     const passedCheck = buildNexusSetupCheck({
@@ -912,19 +931,19 @@ describe("nexus setup assistant", () => {
     expect(passedCheck.status).toBe("passed");
     expect(passedCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-managed",
+        id: "plugin-example-runtime-plugin-skill-example-diagnostic-managed",
         status: "passed",
       }),
     );
     expect(passedCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-skill-pharo-ci-repro-codex",
+        id: "plugin-example-runtime-plugin-skill-example-diagnostic-codex",
         status: "passed",
       }),
     );
     expect(passedCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "plugin-dev-nexus-pharo-mcp-plexus-codex",
+        id: "plugin-example-runtime-plugin-mcp-example_runtime-codex",
         status: "passed",
       }),
     );
