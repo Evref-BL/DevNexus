@@ -1288,7 +1288,9 @@ function currentAgentAdoptionEnvironment(
   const publication = input.automationConfig.publication;
   return {
     ...baseEnv,
-    ...publicationCommandEnvironment(publication),
+    ...publicationCommandEnvironment(publication, {
+      projectRoot: input.projectRoot,
+    }),
     ...publicationEnvironmentVariables(publication),
     DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
     DEV_NEXUS_CURRENT_AGENT_ADOPTION: "true",

@@ -92,6 +92,7 @@ describe("nexus publication policy", () => {
     const config = loadProjectConfig(projectRoot);
     const component = resolveProjectComponents(projectRoot, config)[0]!;
     const actorCommands: Array<{ command: string; args: readonly string[]; env: NodeJS.ProcessEnv }> = [];
+    const githubConfigDir = path.join(os.homedir(), ".config", "gh-example-bot");
 
     const status = getNexusPublicationStatus({
       projectRoot,
@@ -127,7 +128,7 @@ describe("nexus publication policy", () => {
           handle: "example-bot",
         },
         commandEnvironment: {
-          GH_CONFIG_DIR: "home:.config/gh-example-bot",
+          GH_CONFIG_DIR: githubConfigDir,
         },
       },
     });
@@ -137,7 +138,7 @@ describe("nexus publication policy", () => {
         command: "gh",
         args: ["api", "user", "--jq", ".login", "--hostname", "github.com"],
         env: expect.objectContaining({
-          GH_CONFIG_DIR: "home:.config/gh-example-bot",
+          GH_CONFIG_DIR: githubConfigDir,
         }),
       },
     ]);

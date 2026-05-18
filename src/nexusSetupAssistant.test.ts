@@ -447,6 +447,31 @@ describe("nexus setup assistant", () => {
         status: "warning",
       }),
     );
+
+    const joinCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+    expect(joinCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "meta-remote-origin",
+        status: "blocked",
+        summary: expect.stringContaining("WrongOrg"),
+      }),
+    );
+    expect(joinCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-auth-profile-bot-github",
+        status: "blocked",
+        summary: expect.stringContaining("does not define auth profile bot-github"),
+      }),
+    );
+    expect(joinCheck.checks).not.toContainEqual(
+      expect.objectContaining({
+        id: "github-meta-final-report",
+      }),
+    );
   });
 
   it("blocks setup when an existing component source root is not a clean expected Git checkout", () => {

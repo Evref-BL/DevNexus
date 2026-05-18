@@ -1080,7 +1080,9 @@ function agentLaunchEnvironment(
   const publication = input.automationConfig.publication;
   const explicitEnv = {
     ...baseEnv,
-    ...publicationCommandEnvironment(publication),
+    ...publicationCommandEnvironment(publication, {
+      projectRoot: input.projectRoot,
+    }),
     ...publicationEnvironmentVariables(publication),
   };
   return {

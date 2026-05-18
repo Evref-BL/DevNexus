@@ -260,6 +260,13 @@ export function buildNexusSetupCheck(options: {
     checks.push(...githubMetaProjectChecks(projectRoot, projectConfig, setupState));
   }
 
+  if (flow.id === "join-existing-project" && projectConfig) {
+    checks.push(...githubMetaProjectReadinessChecks(projectRoot, projectConfig, {
+      checkFallbackRemotes: false,
+      warnWhenHostingMissing: false,
+    }));
+  }
+
   if (flow.id === "join-existing-project" && agentMcpTargets.length > 0) {
     const flowState = setupState.flows[flow.id];
     checks.push(recordedStepCheck({
@@ -1494,18 +1501,34 @@ function githubMetaProjectChecks(
   projectConfig: NexusProjectConfig,
   setupState: NexusSetupState,
 ): NexusSetupCheckResult[] {
+  return [
+    ...githubMetaProjectReadinessChecks(projectRoot, projectConfig),
+    ...githubMetaProjectSetupRecordChecks(setupState),
+  ];
+}
+
+function githubMetaProjectReadinessChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  options: {
+    checkFallbackRemotes?: boolean;
+    warnWhenHostingMissing?: boolean;
+  } = {},
+): NexusSetupCheckResult[] {
   const checks: NexusSetupCheckResult[] = [];
   const hosting = projectConfig.hosting;
   const remotePlan = metaProjectRemotePlan(projectConfig);
   const hostingGuide = metaProjectHostingGuide(projectConfig);
 
-  checks.push(...metaRepositoryRemoteChecks({
-    projectRoot,
-    expectedRemotes: [
-      ["origin", remotePlan.humanRemote],
-      ["bot", remotePlan.botRemote],
-    ],
-  }));
+  if (hosting || options.checkFallbackRemotes !== false) {
+    checks.push(...metaRepositoryRemoteChecks({
+      projectRoot,
+      expectedRemotes: [
+        ["origin", remotePlan.humanRemote],
+        ["bot", remotePlan.botRemote],
+      ],
+    }));
+  }
 
   if (hosting) {
     checks.push(...hostingAuthProfileChecks(projectRoot, projectConfig));
@@ -1518,7 +1541,7 @@ function githubMetaProjectChecks(
       nextAction:
         `Run gh repo view ${hosting.namespace}/${hostingGuide.repositoryName} with the configured human and automation profiles, then record the ${hosting.provisioning.allowCreate ? "approval to create or connect" : "connect-only"} outcome in setup state.`,
     });
-  } else {
+  } else if (options.warnWhenHostingMissing !== false) {
     checks.push({
       id: "github-hosting-config",
       title: "GitHub hosting config",
@@ -1530,8 +1553,14 @@ function githubMetaProjectChecks(
     });
   }
 
+  return checks;
+}
+
+function githubMetaProjectSetupRecordChecks(
+  setupState: NexusSetupState,
+): NexusSetupCheckResult[] {
   const flowState = setupState.flows["github-meta-project"];
-  checks.push(recordedStepCheck({
+  return [recordedStepCheck({
     id: "github-meta-final-report",
     title: "GitHub meta-project setup report",
     record: flowState?.steps["write-setup-report"],
@@ -1543,9 +1572,7 @@ function githubMetaProjectChecks(
       "The host-local GitHub meta-project setup report was recorded as blocked.",
     nextAction:
       "Run the final setup check command and save the JSON report under .dev-nexus/host-setup before handoff.",
-  }));
-
-  return checks;
+  })];
 }
 
 function metaRepositoryRemoteChecks(options: {

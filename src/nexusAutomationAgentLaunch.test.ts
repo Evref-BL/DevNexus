@@ -267,6 +267,7 @@ describe("nexus automation agent launch", () => {
       status: "ready",
       labels: ["automation", "blocked"],
     });
+    const githubConfigDir = path.join(os.homedir(), ".config", "gh-example-bot");
     const commandRunner: NexusAutomationCommandRunner = (command, options) => {
       expect(command).toBe("codex run");
       expect(options.cwd).toBe(projectRoot);
@@ -286,7 +287,7 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_AGENT_RESULT_OPTIONAL_FIELDS).toBe(
         "commitIds,verification,publicationDecision,workItems,error",
       );
-      expect(options.env.GH_CONFIG_DIR).toBe("home:.config/gh-example-bot");
+      expect(options.env.GH_CONFIG_DIR).toBe(githubConfigDir);
       expect(options.env.DEV_NEXUS_PUBLICATION_REMOTE).toBe("bot");
       expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_KIND).toBe("machine_user");
       expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_PROVIDER).toBe("github");

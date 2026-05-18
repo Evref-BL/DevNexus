@@ -127,10 +127,11 @@ dev-nexus setup check <project-root> join-existing-project --platform macos
 dev-nexus setup record <project-root> join-existing-project <step-id> --status completed
 ```
 
-Setup checks cover prerequisite tools, component paths, agent MCP projections,
-configured plugin capability projections, and host-local readiness. If a plugin
-declares projected skills or MCP servers, setup reports whether the generated
-agent-facing files and server entries are present.
+Setup checks cover prerequisite tools, meta-project remotes and hosting auth
+profiles, component paths, agent MCP projections, configured plugin capability
+projections, and host-local readiness. If a plugin declares projected skills or
+MCP servers, setup reports whether the generated agent-facing files and server
+entries are present.
 
 When setup depends on recently published npm packages, DevNexus distinguishes
 registry propagation delay, network failure, missing versions, and damaged

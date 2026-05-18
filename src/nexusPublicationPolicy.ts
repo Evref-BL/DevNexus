@@ -12,6 +12,7 @@ import {
   type NexusAutomationPublicationConfig,
   type NexusPublicationActorConfig,
 } from "./nexusAutomationConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
 
@@ -145,6 +146,7 @@ export function getNexusPublicationStatus(options: {
     gitRunner: options.gitRunner ?? defaultGitRunner,
   });
   const actor = readPublicationActorStatus({
+    projectRoot: options.projectRoot,
     component: options.component,
     policy,
     cwd: git.repositoryPath ?? options.component.sourceRoot,
@@ -220,8 +222,28 @@ export function publicationPreflightChecks(
 
 export function publicationCommandEnvironment(
   policy: NexusAutomationPublicationConfig,
+  options: { projectRoot?: string } = {},
 ): Record<string, string> {
-  return { ...policy.commandEnvironment };
+  return Object.fromEntries(
+    Object.entries(policy.commandEnvironment).map(([key, value]) => [
+      key,
+      resolvePublicationCommandEnvironmentValue(
+        value,
+        options.projectRoot ?? process.cwd(),
+      ),
+    ]),
+  );
+}
+
+function resolvePublicationCommandEnvironmentValue(
+  value: string,
+  projectRoot: string,
+): string {
+  if (/^(projectRoot|projectParent|home|sourcesRoot):/u.test(value)) {
+    return resolveNexusProjectPath({ projectRoot, value });
+  }
+
+  return value;
 }
 
 export function publicationEnvironmentVariables(
@@ -346,6 +368,7 @@ function readPublicationGitStatus(options: {
 }
 
 function readPublicationActorStatus(options: {
+  projectRoot: string;
   component: ResolvedNexusProjectComponent;
   policy: NexusAutomationPublicationConfig;
   cwd: string;
@@ -353,7 +376,9 @@ function readPublicationActorStatus(options: {
   baseEnv: NodeJS.ProcessEnv;
 }): NexusPublicationActorStatus {
   const expected = options.policy.actor;
-  const commandEnvironment = publicationCommandEnvironment(options.policy);
+  const commandEnvironment = publicationCommandEnvironment(options.policy, {
+    projectRoot: options.projectRoot,
+  });
   if (!expected) {
     return {
       status: "not_configured",
