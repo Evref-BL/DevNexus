@@ -593,6 +593,10 @@ export function authProfileIdForNexusProjectHostingRemote(
 export async function statusNexusProjectHosting(
   options: NexusProjectHostingStatusOptions,
 ): Promise<NexusProjectHostingStatusResult> {
+  if (!options.provider) {
+    return statusNexusProjectHostingLocal(options);
+  }
+
   if (!options.hosting) {
     const issue: NexusProjectHostingPreflightIssue = {
       code: "hosting_not_configured",
@@ -657,13 +661,7 @@ export async function statusNexusProjectHosting(
   };
   let access = uncheckedHostingAccessRecords(hosting);
 
-  if (!options.provider) {
-    issues.push({
-      code: "provider_unavailable",
-      severity: "warning",
-      message: "No hosting provider adapter was supplied for status checks.",
-    });
-  } else if (options.provider.provider !== hosting.provider) {
+  if (options.provider.provider !== hosting.provider) {
     issues.push({
       code: "provider_mismatch",
       severity: "blocker",
@@ -702,6 +700,86 @@ export async function statusNexusProjectHosting(
     remotes,
     authProfiles,
     access,
+    issues,
+  });
+}
+
+export function statusNexusProjectHostingLocal(
+  options: Omit<NexusProjectHostingStatusOptions, "provider">,
+): NexusProjectHostingStatusResult {
+  if (!options.hosting) {
+    const issue: NexusProjectHostingPreflightIssue = {
+      code: "hosting_not_configured",
+      severity: "warning",
+      message: "Project hosting is not configured.",
+    };
+    return hostingStatusResult({
+      configured: false,
+      provider: null,
+      namespace: null,
+      repositoryName: null,
+      repository: {
+        exists: null,
+        visibility: null,
+        defaultBranch: null,
+      },
+      remotes: [],
+      authProfiles: [],
+      access: [],
+      issues: [issue],
+    });
+  }
+
+  const hosting = options.hosting;
+  const repositoryName = deriveNexusProjectHostingRepositoryName({
+    project: options.project,
+    hosting,
+  });
+  const expectedRemotes = expectedNexusProjectHostingRemotes({
+    project: options.project,
+    hosting,
+    authProfiles: options.authProfiles,
+  });
+  const issues: NexusProjectHostingPreflightIssue[] = [];
+  const authProfileById = new Map(
+    (options.authProfiles ?? []).map((profile) => [profile.id, profile]),
+  );
+  const localRemoteByName = options.localRemotes
+    ? new Map(options.localRemotes.map((remote) => [remote.name, remote]))
+    : null;
+
+  const remotes = expectedRemotes.map((remote) =>
+    hostingRemoteStatus({
+      remote,
+      localRemoteByName,
+      issues,
+    }),
+  );
+  const authProfiles = hostingAuthProfileStatusWithoutProvider({
+    hosting,
+    expectedRemotes,
+    authProfileById,
+    issues,
+  });
+  issues.push({
+    code: "provider_unavailable",
+    severity: "warning",
+    message: "No hosting provider adapter was supplied for status checks.",
+  });
+
+  return hostingStatusResult({
+    configured: true,
+    provider: hosting.provider,
+    namespace: hosting.namespace,
+    repositoryName,
+    repository: {
+      exists: null,
+      visibility: null,
+      defaultBranch: null,
+    },
+    remotes,
+    authProfiles,
+    access: uncheckedHostingAccessRecords(hosting),
     issues,
   });
 }
@@ -1898,23 +1976,11 @@ async function hostingAuthProfileStatus(options: {
   provider?: NexusProjectHostingProviderAdapter;
   issues: NexusProjectHostingPreflightIssue[];
 }): Promise<NexusProjectHostingAuthProfileStatusRecord[]> {
-  const profileIds = new Set<string>();
-  for (const remote of options.expectedRemotes) {
-    if (remote.authProfile) {
-      profileIds.add(remote.authProfile);
-    }
-  }
-  for (const principal of options.hosting.access) {
-    if (principal.authProfile) {
-      profileIds.add(principal.authProfile);
-    }
-  }
-  if (options.hosting.provisioning.providerMutationAuthProfile) {
-    profileIds.add(options.hosting.provisioning.providerMutationAuthProfile);
-  }
-
   const statuses: NexusProjectHostingAuthProfileStatusRecord[] = [];
-  for (const profileId of [...profileIds].sort()) {
+  for (const profileId of requiredHostingAuthProfileIds({
+    hosting: options.hosting,
+    expectedRemotes: options.expectedRemotes,
+  })) {
     const authProfile = options.authProfileById.get(profileId);
     if (!authProfile) {
       options.issues.push({
@@ -1957,6 +2023,67 @@ async function hostingAuthProfileStatus(options: {
   }
 
   return statuses;
+}
+
+function hostingAuthProfileStatusWithoutProvider(options: {
+  hosting: NexusProjectHostingConfig;
+  expectedRemotes: NexusProjectHostingExpectedRemote[];
+  authProfileById: Map<string, NexusHostingAuthProfileConfig>;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingAuthProfileStatusRecord[] {
+  return requiredHostingAuthProfileIds({
+    hosting: options.hosting,
+    expectedRemotes: options.expectedRemotes,
+  }).map((profileId) => {
+    const authProfile = options.authProfileById.get(profileId);
+    if (!authProfile) {
+      options.issues.push({
+        code: "auth_profile_missing",
+        severity: "blocker",
+        message: `Host-local auth profile is not configured: ${profileId}`,
+        authProfile: profileId,
+      });
+      return {
+        id: profileId,
+        configured: false,
+        kind: null,
+        expectedAccount: null,
+        observedAccount: null,
+        status: "missing",
+      };
+    }
+
+    return {
+      id: profileId,
+      configured: true,
+      kind: authProfile.kind ?? null,
+      expectedAccount: authProfile.account ?? null,
+      observedAccount: null,
+      status: "unchecked",
+    };
+  });
+}
+
+function requiredHostingAuthProfileIds(options: {
+  hosting: NexusProjectHostingConfig;
+  expectedRemotes: NexusProjectHostingExpectedRemote[];
+}): string[] {
+  const profileIds = new Set<string>();
+  for (const remote of options.expectedRemotes) {
+    if (remote.authProfile) {
+      profileIds.add(remote.authProfile);
+    }
+  }
+  for (const principal of options.hosting.access) {
+    if (principal.authProfile) {
+      profileIds.add(principal.authProfile);
+    }
+  }
+  if (options.hosting.provisioning.providerMutationAuthProfile) {
+    profileIds.add(options.hosting.provisioning.providerMutationAuthProfile);
+  }
+
+  return [...profileIds].sort();
 }
 
 function authProfileStatus(options: {

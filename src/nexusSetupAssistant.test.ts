@@ -164,8 +164,13 @@ describe("nexus setup assistant", () => {
     );
     expect(authStep.checks).toContain("ssh -T git@github.com-example-bot");
     const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
-    expect(connectStep.commands).toContain("gh repo view ExampleOrg/mac-demo-meta");
+    expect(connectStep.commands).toContain("dev-nexus project hosting status . --json");
+    expect(connectStep.commands).toContain("dev-nexus project hosting plan . --json");
+    expect(connectStep.commands.some((command) => command.includes("gh repo view")))
+      .toBe(false);
     expect(connectStep.commands.some((command) => command.includes("gh repo create")))
+      .toBe(false);
+    expect(connectStep.commands.some((command) => command.includes("project hosting apply")))
       .toBe(false);
     expect(connectStep.commands).not.toContain("git push bot main");
     expect(connectStep.commands).toContain(
@@ -216,12 +221,14 @@ describe("nexus setup assistant", () => {
     });
     const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
 
-    expect(connectStep.commands).toContain(
-      'GH_CONFIG_DIR="$HOME/.config/gh-bot-github" gh repo create ExampleOrg/shared-meta --private --disable-wiki --disable-issues',
-    );
+    expect(connectStep.commands).toContain("dev-nexus project hosting status . --json");
+    expect(connectStep.commands).toContain("dev-nexus project hosting plan . --json");
+    expect(connectStep.commands).toContain("dev-nexus project hosting apply . --json");
+    expect(connectStep.commands.some((command) => command.includes("gh repo create")))
+      .toBe(false);
     expect(connectStep.summary).toContain("requires explicit approval");
     expect(connectStep.manualInstructions.join("\n")).toContain(
-      "approval-required proposal",
+      "approval-required operation",
     );
     expect(connectStep.commands).not.toContain("git push bot main");
   });
@@ -451,8 +458,23 @@ describe("nexus setup assistant", () => {
     );
     expect(check.checks).toContainEqual(
       expect.objectContaining({
+        id: "github-hosting-status",
+        status: "blocked",
+        summary: expect.stringContaining("repository=unchecked"),
+        nextAction: expect.stringContaining("dev-nexus project hosting status"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-plan",
+        status: "blocked",
+        summary: expect.stringContaining("blocked="),
+        nextAction: expect.stringContaining("dev-nexus project hosting plan"),
+      }),
+    );
+    expect(check.checks).not.toContainEqual(
+      expect.objectContaining({
         id: "github-hosting-provider-live-preflight",
-        status: "warning",
       }),
     );
 
@@ -473,6 +495,12 @@ describe("nexus setup assistant", () => {
         id: "github-hosting-auth-profile-bot-github",
         status: "blocked",
         summary: expect.stringContaining("does not define auth profile bot-github"),
+      }),
+    );
+    expect(joinCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "github-hosting-plan",
+        status: "blocked",
       }),
     );
     expect(joinCheck.checks).not.toContainEqual(
