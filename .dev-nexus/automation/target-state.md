@@ -19,7 +19,8 @@ and ready for coordinator-driven work across its components.
   protocol compatibility, `dev-nexus:local-51` as `b748694` for multi-tracker
   configuration and migration docs, and `dev-nexus:local-99` as `2e8b64f` for
   advisory worktree leases. `dev-nexus:local-102` is published as `6d10c72`
-  for cleanup dry-run safety classification.
+  for cleanup dry-run safety classification, and `dev-nexus:local-105` is
+  published as `3b6b755` for active agent target config normalization.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -61,7 +62,7 @@ and ready for coordinator-driven work across its components.
   `local-79` and `local-80` are complete, and `local-81` is ready for durable
   request/result records.
 - Default `npm run check` now passes on the integrated DevNexus main with 56
-  test files and 434 tests after the latest DevNexus batch.
+  test files and 439 tests after the latest DevNexus batch.
 - `dev-nexus:local-78` tracks the policy layer behind the user's integration
   decision: project/component/provider-specific agent roles such as maintainer,
   contributor, reviewer, and observer should determine whether an agent may
@@ -89,12 +90,12 @@ and ready for coordinator-driven work across its components.
   and implementation. Current dogfood evidence: MCP is Codex-only, but
   `skills.agentTargets` still includes Claude, so `.claude/skills` is stale
   ignored support state for this Codex-only workflow.
-- Agent-target projection opt-in has been sliced: start with
-  `dev-nexus:local-105` for active target policy and compatibility
-  normalization, then promote `local-106` through `local-111` as prerequisites
-  land. Do not remove `.claude/skills` until stale-projection diagnostics and
-  cleanup safety behavior are available, unless a separate manual cleanup is
-  explicitly approved.
+- Agent-target projection opt-in has been sliced. `dev-nexus:local-105` is
+  complete for active target policy and compatibility normalization; promote
+  `local-106` through `local-111` as prerequisites land. Do not remove
+  `.claude/skills` until stale-projection diagnostics and cleanup safety
+  behavior are available, unless a separate manual cleanup is explicitly
+  approved.
 - DevNexus-Pharo MCP/plugin cleanup has completed source deletions
   `dev-nexus-pharo:local-15` through `local-19` and published commits
   `1ef5709`, `eb55b9c`, `c5f7a90`, `be1f866`, and `1dd2141` to

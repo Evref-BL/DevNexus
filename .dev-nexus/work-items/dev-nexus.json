@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 128,
-  "nextCommentNumber": 217,
-  "updatedAt": "2026-05-18T19:17:22.561Z",
+  "nextCommentNumber": 219,
+  "updatedAt": "2026-05-18T19:25:40.641Z",
   "items": [
     {
       "id": "local-1",
@@ -2653,7 +2653,7 @@
       "id": "local-105",
       "title": "Add active agent target policy and compatibility normalization",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: add one explicit active-agent-target policy that distinguishes supported providers from providers selected for this project or host.\n\nUser stories covered:\n- As a Codex-only project owner, I can configure DevNexus so only Codex-native project files are generated.\n- As a multi-provider team, we can explicitly select Codex and Claude and get both projections intentionally.\n\nAcceptance criteria:\n- Project configuration accepts an active agent target policy with provider id, enabled state, optional MCP settings, optional skill projection settings, source-control policy, and setup notes.\n- Existing projects using only mcp.agentTargets and skills.agentTargets continue to load through compatibility normalization.\n- Normalization preserves intentionally configured multi-provider projects, while allowing setup/status to recommend an explicit active target set.\n- New project/setup defaults can represent the provider chosen during setup without enabling every supported provider.\n- Invalid duplicate, unknown, disabled, or unsupported active target configurations fail with actionable errors.\n\nBoundaries:\n- Do not remove Codex, Claude, OpenCode, or manual/custom provider support.\n- Do not change projection materialization behavior in this slice beyond normalized configuration surfaces.\n- Do not write provider-global state or credentials.\n\nVerification:\n- Focused project config/lifecycle tests for Codex-only, Claude-only, multi-provider, legacy MCP-only, legacy skills-only, and invalid target configs.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2665,8 +2665,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.313Z",
-      "updatedAt": "2026-05-18T13:34:17.313Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T19:25:40.641Z",
+      "closedAt": "2026-05-18T19:25:39.696Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -5698,7 +5698,30 @@
         }
       }
     ],
-    "local-105": [],
+    "local-105": [
+      {
+        "id": "local-comment-217",
+        "body": "Implemented active agent target policy normalization in DevNexus commit 3b6b755. Added explicit project config agentTargets.active, per-target MCP and skill projection settings, setup notes, legacy mcp.agentTargets/skills.agentTargets compatibility normalization, and validation for duplicate, disabled, and unknown active providers. Verification: npm run check passed with 56 files and 439 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T19:25:39.444Z",
+        "updatedAt": "2026-05-18T19:25:39.444Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-217"
+        }
+      },
+      {
+        "id": "local-comment-218",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-105\nHead: 3b6b755bd7228e27adf987e878653b30ae3e8367\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T19:25:40.603Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-105\",\n  \"logicalItemId\": \"local-105\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-105\",\n    \"itemNumber\": 105,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-105\",\n      \"itemNumber\": 105\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-105\",\n    \"itemNumber\": 105,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-105\",\n      \"itemNumber\": 105\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-105\",\n      \"itemNumber\": 105,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-105\",\n        \"itemNumber\": 105\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-2f449ce83e6b4ee4\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-105\",\n  \"branch\": \"codex/dev-nexus/local-105\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"3b6b755bd7228e27adf987e878653b30ae3e8367\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusProjectConfig.ts\",\n    \"src/nexusProjectConfig.test.ts\"\n  ],\n  \"decisions\": [\n    \"This slice adds only the shared config/normalization surface; projection materialization behavior remains legacy-compatible for follow-up slices.\",\n    \"Explicit active targets are limited to supported provider ids codex, claude, opencode, manual, and custom; legacy target lists still load through compatibility normalization.\"\n  ],\n  \"verificationSummary\": \"npm run check passed with 56 files and 439 tests.\",\n  \"integrationPreference\": \"Merged to DevNexus main and pushed to bot/main as 3b6b755.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T19:25:40.641Z",
+        "updatedAt": "2026-05-18T19:25:40.641Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-218"
+        }
+      }
+    ],
     "local-106": [],
     "local-107": [],
     "local-108": [],

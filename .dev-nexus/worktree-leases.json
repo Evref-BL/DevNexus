@@ -1,7 +1,61 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T19:16:31.682Z",
+  "updatedAt": "2026-05-18T19:25:40.603Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-2f449ce83e6b4ee4",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-105",
+      "branchName": "codex/dev-nexus/local-105",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-105"
+      },
+      "writeScope": [
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T19:19:25.803Z",
+      "lastSeenAt": "2026-05-18T19:25:40.603Z",
+      "updatedAt": "2026-05-18T19:25:40.603Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "3b6b755bd7228e27adf987e878653b30ae3e8367",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-105"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Verification: npm run check passed with 56 files and 439 tests.",
+        "Integration preference: Merged to DevNexus main and pushed to bot/main as 3b6b755."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

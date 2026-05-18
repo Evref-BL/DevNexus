@@ -73,8 +73,9 @@ target-cycle facts, commits, and the target report.
   and server-request routing or `dev-nexus:local-115` safe initialize probes.
 - Continue authority configuration at `dev-nexus:local-87` before promoting
   dependent authority slices.
-- Continue agent-target projection planning at `dev-nexus:local-104`, then
-  implement the active target policy slices beginning with `local-105`.
+- Continue agent-target projection planning at `dev-nexus:local-104`; active
+  target policy normalization is complete in `local-105`, so promote the next
+  dependent projection slices as prerequisites land.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and
