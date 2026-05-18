@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 66,
-  "nextCommentNumber": 148,
-  "updatedAt": "2026-05-18T06:08:56.107Z",
+  "nextCommentNumber": 154,
+  "updatedAt": "2026-05-18T09:12:48.649Z",
   "items": [
     {
       "id": "local-1",
@@ -1151,7 +1151,7 @@
       "id": "local-47",
       "title": "Add dry-run work-item sync planner",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker link records land.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: build a mutation-free sync planner that shows which selected source items would create, update, skip, or conflict with target tracker items.\n\nUser stories covered:\n- As a maintainer, I can dry-run sync and review planned changes before DevNexus writes to an external provider.\n- As a coordinator, I can see missing capabilities or credentials before attempting sync.\n\nAcceptance criteria:\n- Sync policy config can name source tracker, target tracker, direction, filters, field set, comment policy, status mapping, conflict policy, and write policy.\n- A dry-run planner reads source and target trackers through provider capabilities and existing link records.\n- Planner output includes creates, updates, skipped items, conflicting fields, missing provider capabilities, missing credentials, and policy blocks.\n- Planner detects linked versus unlinked target items without creating provider objects.\n- Planner treats provider capability gaps as planned skips or blockers, not silent partial success.\n- CLI and MCP expose a dry-run sync plan with concise JSON suitable for agents.\n\nDependencies:\n- Depends on `dev-nexus:local-44`, `dev-nexus:local-45`, and `dev-nexus:local-46`.\n\nBoundaries:\n- Dry-run only: no provider mutation, no link creation, and no external comments.\n- Two-way sync remains out of scope.\n\nVerification:\n- Focused sync-policy validation and dry-run planner tests with mocked providers.\n- Cases: create, update, skip, missing capability, missing credential, stale link, and conflict.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1166,8 +1166,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.856Z",
-      "updatedAt": "2026-05-18T06:08:47.137Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T09:12:47.745Z",
+      "closedAt": "2026-05-18T09:12:47.745Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1205,7 +1205,7 @@
       "id": "local-49",
       "title": "Expose multi-tracker state in agent status and automation context",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker bindings and link records are available.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: update low-token status, eligible-work, and agent-launch context so agents understand component tracker bindings, defaults, roles, and linked eligible work without reading raw project config.\n\nUser stories covered:\n- As a coordinator, I can list eligible work without seeing duplicate copies from multiple trackers.\n- As a Mac or Windows agent, I can see whether coordination is local, shared, mirrored, or blocked by policy.\n\nAcceptance criteria:\n- Project status, automation status, eligible-work summaries, and agent launch context report tracker ids, providers, roles, enabled/default state, and capability summaries per component.\n- Eligible work remains selected from the default tracker unless config explicitly says otherwise.\n- Linked provider copies are grouped under one logical work item when link records are available.\n- Run and target-cycle facts include selected tracker id and logical item id when available.\n- Status output includes sync warnings such as stale mirrors or missing coordination tracker capability without blocking unrelated local work.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-46`.\n\nBoundaries:\n- Do not change coordinator work selection semantics beyond reporting and deduping linked views.\n- Do not execute sync.\n\nVerification:\n- Focused automation status, eligible-work, target-cycle, and agent launch context tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1219,8 +1219,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.260Z",
-      "updatedAt": "2026-05-18T06:08:56.107Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T09:12:48.202Z",
+      "closedAt": "2026-05-18T09:12:48.202Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1615,7 +1615,7 @@
       "id": "local-65",
       "title": "Harden coordinator completion status reconciliation",
       "description": "Type: automation data-integrity defect\nReadiness: autonomous agent-ready (AFK)\nSource: heartbeat reflection after coordinator-loop-20260518-t054231-514-z-1. The coordinator result file, target-state, and work-item comments recorded dev-nexus:local-50 as completed and published, but the local tracker item remained in_progress until post-cycle reflection reconciled it manually. Eligible-work reported idle only because the item was no longer ready, which could hide a stale in-progress item.\n\nGoal: harden coordinator completion/status reconciliation so DevNexus detects or repairs mismatches between coordinator results, target-cycle facts, and component work-item status.\n\nAcceptance criteria:\n- Coordinator finalization validates selected work-item statuses against the result contract and target-cycle completion facts before reporting a clean completed run.\n- If a result says a selected item completed but the tracker remains in_progress or ready, DevNexus either updates it through the work-item service or records a structured reconciliation blocker with the component, tracker, and item id.\n- Multi-item runs distinguish completed, blocked, failed, and skipped items without forcing every selected item to done.\n- Target-report and eligible-work summaries surface stale in_progress coordinator-owned items instead of silently treating them as no-work.\n- Tests cover completed single-item, partial multi-item, blocked, failed, and tracker-update failure paths.\n\nBoundaries:\n- Do not infer implementation success without a valid coordinator result contract.\n- Do not perform live external tracker writes; use local and mocked providers.\n\nVerification:\n- Focused coordinator-loop, target-report, and work-item service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes; refresh dogfood runtime package if the coordinator-loop runtime needs the fix.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1629,8 +1629,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T06:08:36.212Z",
-      "updatedAt": "2026-05-18T06:08:36.212Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T09:12:48.649Z",
+      "closedAt": "2026-05-18T09:12:48.649Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2985,6 +2985,28 @@
           "provider": "local",
           "itemId": "local-comment-146"
         }
+      },
+      {
+        "id": "local-comment-148",
+        "body": "Coordinator cycle coordinator-loop-20260518-t084038-156-z-1 selected this item. Work will run in a dedicated dev-nexus worktree for a dry-run-only sync planner: no provider mutation, no link creation, no external comments.",
+        "author": null,
+        "createdAt": "2026-05-18T08:43:43.322Z",
+        "updatedAt": "2026-05-18T08:43:43.322Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-148"
+        }
+      },
+      {
+        "id": "local-comment-151",
+        "body": "Completed in coordinator-loop-20260518-t084038-156-z-1. Implemented the mutation-free dry-run sync planner plus CLI and MCP JSON surfaces. No provider mutation, link creation, or external comments were performed. Published DevNexus commit 04e4451 to origin/main. Verification passed: focused integration tests (94 tests) and npm run check (build plus 53 test files, 392 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T09:12:47.543Z",
+        "updatedAt": "2026-05-18T09:12:47.543Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-151"
+        }
       }
     ],
     "local-48": [],
@@ -2998,6 +3020,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-147"
+        }
+      },
+      {
+        "id": "local-comment-149",
+        "body": "Coordinator cycle coordinator-loop-20260518-t084038-156-z-1 selected this item. It is sequenced after the parallel planner and reconciliation work so reporting/context changes can integrate the settled surfaces; no sync execution.",
+        "author": null,
+        "createdAt": "2026-05-18T08:43:43.645Z",
+        "updatedAt": "2026-05-18T08:43:43.645Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-149"
+        }
+      },
+      {
+        "id": "local-comment-152",
+        "body": "Completed in coordinator-loop-20260518-t084038-156-z-1. Exposed multi-tracker status/context metadata, default tracker refs, logical item ids in target-cycle facts, and stale in-progress summary surfaces. Published DevNexus commit bf89471 to origin/main. Verification passed: focused integration tests (94 tests) and npm run check (build plus 53 test files, 392 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T09:12:47.983Z",
+        "updatedAt": "2026-05-18T09:12:47.983Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-152"
         }
       }
     ],
@@ -3381,6 +3425,29 @@
         }
       }
     ],
-    "local-65": []
+    "local-65": [
+      {
+        "id": "local-comment-150",
+        "body": "Coordinator cycle coordinator-loop-20260518-t084038-156-z-1 selected this item. Work will run in a dedicated dev-nexus worktree focused on coordinator completion/status reconciliation with local and mocked provider paths only.",
+        "author": null,
+        "createdAt": "2026-05-18T08:43:44.006Z",
+        "updatedAt": "2026-05-18T08:43:44.006Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-150"
+        }
+      },
+      {
+        "id": "local-comment-153",
+        "body": "Completed in coordinator-loop-20260518-t084038-156-z-1. Hardened coordinator completion reconciliation, per-item result handling, stale in-progress detection, and tracker status repair/blocker paths. Published DevNexus commit 0e1e580 to origin/main. Verification passed: focused integration tests (94 tests) and npm run check (build plus 53 test files, 392 tests).",
+        "author": null,
+        "createdAt": "2026-05-18T09:12:48.397Z",
+        "updatedAt": "2026-05-18T09:12:48.397Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-153"
+        }
+      }
+    ]
   }
 }
