@@ -6,6 +6,19 @@ work through the DevNexus agent-launch loop.
 
 Current cycle:
 
+- Follow-up issue `dev-nexus:local-66` completed on 2026-05-18.
+- Published verified DevNexus commit `b0f2cfd` to `origin/main`:
+  `Stream coordinator loop progress events`.
+- The coordinator loop now supports `--progress-jsonl`, which streams
+  low-volume progress events to `stderr` while preserving final `--json` output
+  on `stdout`.
+- Closed `dev-nexus:local-66` as `done` with tracker comments and target-cycle
+  facts.
+- `dev-nexus automation eligible-work . --json` reports `idle` with eligible
+  count `0`.
+
+Previous completed cycle:
+
 - Run `coordinator-loop-20260518-t084038-156-z-1` completed on 2026-05-18.
 - Selected the largest safe bounded batch from eligible DevNexus work:
   `dev-nexus:local-47`, `dev-nexus:local-49`, and `dev-nexus:local-65`.
@@ -24,6 +37,16 @@ Current cycle:
 
 Verification for this cycle:
 
+- `npm test -- src/nexusAutomationCoordinatorLoop.test.ts src/cli.test.ts`
+  passed in the `local-66` worktree.
+- `npm run check` passed in the `local-66` worktree with build plus 53 test
+  files and 394 tests.
+- `npm run check` passed again in `C:\dev\code\sources\dev-nexus` after
+  integration with build plus 53 test files and 394 tests.
+- `git diff --check origin/main..HEAD` passed before publication.
+
+Verification for the previous completed cycle:
+
 - Focused integration tests passed:
   `npm test -- src/workItemSyncPlanner.test.ts src/cli.test.ts src/nexusMcpServer.test.ts src/nexusAutomationStatus.test.ts src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCoordinatorLoop.test.ts src/nexusAutomationTargetReport.test.ts src/nexusAutomationTargetCycle.test.ts`
   with 94 tests.
@@ -36,15 +59,17 @@ Verification for this cycle:
 
 Near-term direction:
 
-- New dogfood feedback issue `dev-nexus:local-66` is ready after observing that
-  `automation coordinator-loop ... --json` stays silent while a nested
-  coordinator is running.
 - Re-triage parked sync follow-ups before promotion:
   `dev-nexus:local-48`, `dev-nexus:local-51`, and `dev-nexus:local-52`.
   The dry-run planner has landed, but live sync remains policy-gated.
 - Use the new coordinator completion reconciliation and stale in-progress
   reporting to catch mismatches between result files, target-cycle facts, and
   tracker state.
+- Follow-up `dev-nexus:local-67` now tracks the target-cycle ledger idempotency
+  gap: repeated `target-cycle record` calls currently append duplicate ids
+  instead of rejecting or replacing them. Historical duplicates already exist in
+  the ignored local ledger, so the item starts as `todo` pending a policy choice
+  for reject versus upsert behavior.
 
 Active boundaries:
 

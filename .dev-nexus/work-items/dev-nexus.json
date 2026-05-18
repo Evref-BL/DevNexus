@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 67,
-  "nextCommentNumber": 154,
-  "updatedAt": "2026-05-18T09:20:36.534Z",
+  "nextNumber": 68,
+  "nextCommentNumber": 157,
+  "updatedAt": "2026-05-18T09:36:22.991Z",
   "items": [
     {
       "id": "local-1",
@@ -1642,7 +1642,7 @@
       "id": "local-66",
       "title": "Stream coordinator-loop progress feedback",
       "description": "Type: dogfood UX/infrastructure improvement.\\nSource: user observed that running 'dev-nexus automation coordinator-loop . --max-ticks 1 --max-runs 1 --json' gives no visible feedback in the Codex app while the nested coordinator is running, making it look stuck.\\n\\nProblem: --json suppresses tick output until the end, and non-json tick output is only emitted after a coordinator launch finishes. Long nested Codex runs therefore have no lightweight heartbeat/progress signal in the invoking chat or terminal.\\n\\nAcceptance criteria:\\n- Add a low-overhead coordinator-loop progress surface that can be consumed while a run is active.\\n- Preserve final JSON compatibility for automation callers.\\n- Support at least one machine-readable streaming mode, preferably JSON Lines events on stderr or stdout with a documented flag.\\n- Emit meaningful events at coordinator-loop start, decision, launch dispatched, run started, run completed/blocked/failed, and final stop.\\n- Avoid forwarding high-volume nested Codex output by default; progress events should be small and throttled or event-based.\\n- Document the recommended command for Codex chat use and for automation use.\\n\\nVerification:\\n- Add focused tests for streaming/progress behavior and final JSON compatibility.\\n- Run relevant CLI/coordinator-loop tests and npm run check.\\n\\nPublication: direct integration to DevNexus origin/main after verification.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1654,13 +1654,38 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T09:20:36.534Z",
-      "updatedAt": "2026-05-18T09:20:36.534Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T09:33:34.552Z",
+      "closedAt": "2026-05-18T09:33:34.526Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-66",
         "itemNumber": 66
+      }
+    },
+    {
+      "id": "local-67",
+      "title": "Harden target-cycle record duplicate id behavior",
+      "description": "Type: implementation hardening slice\nReadiness: todo; promote after deciding whether target-cycle records should reject duplicate ids, replace existing ids, or generate unique ids automatically.\nSource observation: during dev-nexus:local-66 bookkeeping, `automation target-cycle record` accepted a repeated `--cycle-id` and appended a duplicate fact. Historical duplicate ids already exist in `.dev-nexus/automation/target-cycles.json`, so consumers cannot treat the ledger id as unique today.\n\nGoal: make target-cycle fact recording idempotent or explicitly reject duplicate cycle ids so automated coordination cannot silently create ambiguous facts.\n\nAcceptance criteria:\n- Define the desired behavior for repeated `target-cycle record --cycle-id` calls: reject with actionable error, replace/upsert, or require a generated suffix.\n- Add tests covering the chosen duplicate-id behavior.\n- Ensure coordinator-loop generated records remain unaffected and keep stable run/cycle references.\n- If rejecting duplicates, error output must explain how to recover without opening an editor or needing interactive repair.\n- Document the behavior in the automation/target-cycle command help or relevant docs.\n\nBoundaries:\n- Do not rewrite historical ignored local ledgers as part of the source change.\n- Do not change target-report semantics beyond what is required to consume the clarified ledger behavior.\n\nVerification:\n- Focused target-cycle CLI/service tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "automation",
+        "target-cycle",
+        "data-integrity",
+        "bug"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T09:36:22.991Z",
+      "updatedAt": "2026-05-18T09:36:22.991Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-67",
+        "itemNumber": 67
       }
     }
   ],
@@ -3474,6 +3499,41 @@
         }
       }
     ],
-    "local-66": []
+    "local-66": [
+      {
+        "id": "local-comment-154",
+        "body": "Starting implementation in an isolated DevNexus worktree. Scope: add low-overhead coordinator-loop progress feedback while preserving final JSON compatibility; no live runtime, Vibe workspace/session/execution, or external provider mutation.",
+        "author": null,
+        "createdAt": "2026-05-18T09:23:21.162Z",
+        "updatedAt": "2026-05-18T09:23:21.162Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-154"
+        }
+      },
+      {
+        "id": "local-comment-155",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/coordinator-loop-progress\nHead: b0f2cfdc8b8efdadb7573d0a1b4144f246158281\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T09:31:50.638Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-66\",\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-66-coordinator-loop-progress\",\n  \"branch\": \"codex/dev-nexus/coordinator-loop-progress\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"b0f2cfdc8b8efdadb7573d0a1b4144f246158281\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusAutomationCoordinatorLoop.ts\",\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusAutomationCoordinatorLoop.test.ts\",\n    \"docs/user/agent-workflows.md\"\n  ],\n  \"decisions\": [\n    \"Added event-based coordinator-loop progress hook and CLI --progress-jsonl flag.\",\n    \"Progress events are emitted as JSON Lines on stderr so --json stdout remains final-result compatible.\"\n  ],\n  \"verificationSummary\": \"npm test -- src/nexusAutomationCoordinatorLoop.test.ts src/cli.test.ts passed; npm run check passed with 53 files and 394 tests; git diff --check passed.\",\n  \"integrationPreference\": \"Direct integration to DevNexus origin/main.\",\n  \"note\": \"No live runtime, Vibe workspace/session/execution, or external provider mutation was used.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T09:31:50.655Z",
+        "updatedAt": "2026-05-18T09:31:50.655Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-155"
+        }
+      },
+      {
+        "id": "local-comment-156",
+        "body": "Completed and published to DevNexus origin/main as b0f2cfd. Added coordinator-loop --progress-jsonl, which streams low-volume JSON Lines progress events to stderr while preserving final --json output on stdout. Events include loop_started, tick_started, decision, launch_dispatched, run_started, run_finished, tick_finished, and loop_stopped. Verification passed: npm test -- src/nexusAutomationCoordinatorLoop.test.ts src/cli.test.ts; npm run check in worktree and main checkout; git diff --check origin/main..HEAD.",
+        "author": null,
+        "createdAt": "2026-05-18T09:33:34.552Z",
+        "updatedAt": "2026-05-18T09:33:34.552Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-156"
+        }
+      }
+    ],
+    "local-67": []
   }
 }
