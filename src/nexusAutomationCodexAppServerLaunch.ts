@@ -11,8 +11,12 @@ import {
 import type {
   NexusAutomationAgentLaunchInput,
   NexusAutomationAgentLaunchResult,
+  NexusAutomationAgentLaunchStatus,
   NexusAutomationAgentLauncher,
   NexusAutomationCodexAppServerLaunchMetadata,
+} from "./nexusAutomationAgentLaunch.js";
+import {
+  readNexusAutomationAgentResultFile,
 } from "./nexusAutomationAgentLaunch.js";
 import {
   normalizeNexusAutomationAgentPolicy,
@@ -159,11 +163,42 @@ export function createNexusAutomationCodexAppServerLauncher(
           "turn.id",
         ], "turn id");
 
+        const reported = readNexusAutomationAgentResultFile(input.resultFile);
+        if (reported.status !== "loaded") {
+          return {
+            status: "failed",
+            summary: reported.summary,
+            error: reported.error,
+            codexAppServer: codexAppServerMetadata({
+              status: "failed",
+              action,
+              input,
+              profile,
+              fork,
+              threadId,
+              turnId,
+              ephemeral,
+              cwd,
+              failureSummary: reported.error,
+            }),
+          };
+        }
+
+        const status = reported.result?.status ?? "completed";
+        const summary = reported.result?.summary ?? defaultAgentSummary(status);
+        const resultFailureSummary =
+          status === "completed"
+            ? null
+            : reported.result?.error ?? summary;
         return {
-          status: "completed",
-          summary: `Codex app-server ${fork ? "forked" : "started"} thread ${threadId} and turn ${turnId}`,
+          status,
+          summary,
+          commitIds: reported.result?.commitIds ?? [],
+          verification: reported.result?.verification ?? [],
+          publicationDecision: reported.result?.publicationDecision,
+          error: reported.result?.error ?? null,
           codexAppServer: codexAppServerMetadata({
-            status: "started",
+            status,
             action,
             input,
             profile,
@@ -172,7 +207,7 @@ export function createNexusAutomationCodexAppServerLauncher(
             turnId,
             ephemeral,
             cwd,
-            failureSummary: null,
+            failureSummary: resultFailureSummary,
           }),
         };
       } finally {
@@ -553,7 +588,7 @@ function codexAppServerProcessEnvironment(
 }
 
 function codexAppServerMetadata(options: {
-  status: "started" | "failed";
+  status: NexusAutomationCodexAppServerLaunchMetadata["status"];
   action: "thread_start" | "thread_fork";
   input: NexusAutomationAgentLaunchInput;
   profile: NexusAutomationAgentProfilePolicy;
@@ -575,11 +610,24 @@ function codexAppServerMetadata(options: {
     sourceThreadId: options.fork?.threadId ?? null,
     sourceTurnId: options.fork?.turnId ?? null,
     ephemeral: options.ephemeral,
+    threadPersistence: options.ephemeral ? "ephemeral" : "durable",
     cwd: options.cwd,
     model: options.profile.model,
     reasoning: options.profile.reasoning,
+    resultFile: options.input.resultFile,
     failureSummary: options.failureSummary,
   };
+}
+
+function defaultAgentSummary(status: NexusAutomationAgentLaunchStatus): string {
+  if (status === "completed") {
+    return "Agent launch completed";
+  }
+  if (status === "blocked") {
+    return "Agent launch reported a blocker";
+  }
+
+  return "Agent launch failed";
 }
 
 function extractId(

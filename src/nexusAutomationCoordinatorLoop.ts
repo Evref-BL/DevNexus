@@ -345,6 +345,7 @@ export async function runNexusAutomationCoordinatorLoop(
           "managed-loop: decision=launch",
           "managed-loop: coordinator launched",
           `managed-loop: coordinator ${run.status}`,
+          ...agentLaunchTargetCycleNotes(run),
         ],
       });
       const tick = coordinatorLoopTick({
@@ -664,6 +665,40 @@ function targetCycleWorkItems(status: NexusAutomationStatus) {
       cycleStatus: "eligible" as const,
     })),
   );
+}
+
+function agentLaunchTargetCycleNotes(
+  run: RunNexusAutomationAgentLaunchOnceResult,
+): string[] {
+  const appServer = run.launch?.codexAppServer;
+  if (!appServer) {
+    return [];
+  }
+
+  return [
+    boundedTargetCycleNote(
+      [
+        "agent-launch: provider=codex-app-server",
+        `profile=${appServer.profileId}`,
+        `status=${appServer.status}`,
+        `thread=${appServer.threadId ?? "none"}`,
+        `turn=${appServer.turnId ?? "none"}`,
+        `persistence=${appServer.threadPersistence}`,
+        `result=${appServer.resultFile}`,
+      ].join(" "),
+    ),
+    ...(appServer.failureSummary
+      ? [
+          boundedTargetCycleNote(
+            `agent-launch: failure=${appServer.failureSummary}`,
+          ),
+        ]
+      : []),
+  ];
+}
+
+function boundedTargetCycleNote(note: string): string {
+  return note.length <= 1000 ? note : `${note.slice(0, 997)}...`;
 }
 
 function eligibleWorkItemCount(status: NexusAutomationStatus): number {

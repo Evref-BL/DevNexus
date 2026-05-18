@@ -150,6 +150,22 @@ function requestParams(
   return request!.params as Record<string, unknown>;
 }
 
+function writeResultFromTurnRequest(
+  request: CodexAppServerJsonRpcRequest,
+  result: Record<string, unknown>,
+): void {
+  expect(request.params).toBeTypeOf("object");
+  const params = request.params as Record<string, unknown>;
+  expect(params.devNexus).toBeTypeOf("object");
+  const devNexus = params.devNexus as Record<string, unknown>;
+  expect(devNexus.resultFile).toBeTypeOf("string");
+  fs.writeFileSync(
+    devNexus.resultFile as string,
+    `${JSON.stringify(result)}\n`,
+    "utf8",
+  );
+}
+
 async function createReadyWork(projectRoot: string): Promise<void> {
   await createLocalWorkTrackerProvider({
     projectRoot,
@@ -188,6 +204,10 @@ describe("nexus automation Codex app-server launch", () => {
         };
       }
       if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "completed",
+          summary: "Codex app-server started thread thread-1 and turn turn-1",
+        });
         return {
           jsonrpc: "2.0",
           id: request.id,
@@ -223,10 +243,13 @@ describe("nexus automation Codex app-server launch", () => {
           profileId: "codex-app-server",
           threadId: "thread-1",
           turnId: "turn-1",
+          status: "completed",
           ephemeral: true,
+          threadPersistence: "ephemeral",
           cwd: sourceRoot,
           model: "gpt-5.5",
           reasoning: "high",
+          resultFile: result.resultFile,
           failureSummary: null,
         },
       },
@@ -309,6 +332,11 @@ describe("nexus automation Codex app-server launch", () => {
         };
       }
       if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "completed",
+          summary:
+            "Codex app-server forked thread forked-thread and turn forked-turn",
+        });
         return {
           jsonrpc: "2.0",
           id: request.id,
@@ -340,11 +368,14 @@ describe("nexus automation Codex app-server launch", () => {
       launch: {
         codexAppServer: {
           action: "thread_fork",
+          status: "completed",
           threadId: "forked-thread",
           turnId: "forked-turn",
           sourceThreadId: "existing-thread",
           sourceTurnId: "existing-turn",
           ephemeral: false,
+          threadPersistence: "durable",
+          resultFile: result.resultFile,
         },
       },
     });
@@ -357,6 +388,220 @@ describe("nexus automation Codex app-server launch", () => {
       sourceThreadId: "existing-thread",
       sourceTurnId: "existing-turn",
       ephemeral: false,
+    });
+  });
+
+  it("fails a started app-server turn until the result contract validates", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-missing-result-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request);
+      }
+      if (request.method === "thread/start") {
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { threadId: "thread-without-result" },
+        };
+      }
+      if (request.method === "turn/start") {
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { turnId: "turn-without-result" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-missing-result-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary: expect.stringContaining("Agent result file was not written"),
+      launch: {
+        error: expect.stringContaining("Agent result file was not written"),
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "failed",
+          profileId: "codex-app-server",
+          threadId: "thread-without-result",
+          turnId: "turn-without-result",
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: result.resultFile,
+          failureSummary: expect.stringContaining(
+            "Agent result file was not written",
+          ),
+        },
+      },
+    });
+    expect(
+      readNexusAutomationRunLedger(
+        projectRoot,
+        appServerProjectConfig().automation!,
+      ).runs[0],
+    ).toMatchObject({
+      id: "app-server-missing-result-run",
+      status: "failed",
+      error: expect.stringContaining("Agent result file was not written"),
+      codexAppServer: {
+        profileId: "codex-app-server",
+        threadId: "thread-without-result",
+        turnId: "turn-without-result",
+        resultFile: result.resultFile,
+        failureSummary: expect.stringContaining(
+          "Agent result file was not written",
+        ),
+      },
+    });
+  });
+
+  it("propagates blocked app-server result contracts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-blocked-result-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request);
+      }
+      if (request.method === "thread/start") {
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { threadId: "thread-blocked" },
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "blocked",
+          summary: "Human approval is required",
+          error: "approval missing",
+        });
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { turnId: "turn-blocked" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-blocked-result-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: "Human approval is required",
+      launch: {
+        error: "approval missing",
+        codexAppServer: {
+          status: "blocked",
+          threadId: "thread-blocked",
+          turnId: "turn-blocked",
+          failureSummary: "approval missing",
+        },
+      },
+    });
+    expect(
+      readNexusAutomationRunLedger(
+        projectRoot,
+        appServerProjectConfig().automation!,
+      ).runs[0],
+    ).toMatchObject({
+      status: "blocked",
+      error: "approval missing",
+      codexAppServer: {
+        status: "blocked",
+        failureSummary: "approval missing",
+      },
+    });
+  });
+
+  it("fails malformed app-server result contracts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-malformed-result-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request);
+      }
+      if (request.method === "thread/start") {
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { threadId: "thread-malformed" },
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          summary: "missing status",
+        });
+        return {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { turnId: "turn-malformed" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-malformed-result-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      summary:
+        "Agent result file is invalid: agent result.status must be a non-empty string",
+      launch: {
+        error:
+          "Agent result file is invalid: agent result.status must be a non-empty string",
+        codexAppServer: {
+          status: "failed",
+          threadId: "thread-malformed",
+          turnId: "turn-malformed",
+          failureSummary:
+            "Agent result file is invalid: agent result.status must be a non-empty string",
+        },
+      },
     });
   });
 

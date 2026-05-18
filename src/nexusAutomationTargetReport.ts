@@ -5,6 +5,9 @@ import {
   type NexusAutomationRunRecord,
   type NexusAutomationRunStatus,
 } from "./nexusAutomation.js";
+import type {
+  NexusAutomationCodexAppServerLaunchMetadata,
+} from "./nexusAutomationAgentLaunch.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -125,6 +128,7 @@ export interface NexusAutomationTargetReportExecutionRunSummary {
   commitIds: string[];
   summary: string | null;
   error: string | null;
+  codexAppServer: NexusAutomationCodexAppServerLaunchMetadata | null;
 }
 
 export interface NexusAutomationTargetReportVerificationSummary
@@ -544,6 +548,7 @@ function summarizeExecution(
       commitIds: run.commitIds,
       summary: run.summary,
       error: run.error,
+      codexAppServer: run.codexAppServer,
     } satisfies NexusAutomationTargetReportExecutionRunSummary;
   });
   const runById = new Map(runs.map((run) => [run.runId, run]));

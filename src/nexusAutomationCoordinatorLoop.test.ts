@@ -366,4 +366,143 @@ describe("nexus automation coordinator loop", () => {
       },
     });
   });
+
+  it("records app-server run facts in failed target cycles and reports", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const baseConfig = projectConfig();
+    const config = projectConfig({
+      automation: {
+        ...baseConfig.automation!,
+        agent: {
+          ...baseConfig.automation!.agent,
+          command: null,
+          coordinatorProfileId: "codex-app-server",
+          profiles: [
+            {
+              id: "codex-app-server",
+              executor: "codex",
+              executorMode: "app_server",
+              model: "gpt-5.5",
+              reasoning: "high",
+              intendedUse: "coordinator",
+              safety: {
+                profile: "isolated",
+                allowHostMutation: false,
+                allowDependencyInstall: false,
+                allowLiveServices: false,
+              },
+              command: null,
+              args: ["--sandbox", "workspace-write"],
+              appServer: {
+                mode: "spawn",
+                command: "codex",
+                args: ["app-server"],
+                endpoint: "ws://127.0.0.1:18080",
+                ephemeralThreadDefault: true,
+                localPolicy: {
+                  allowNonLoopbackEndpoint: false,
+                  hostLocalSafetyHints: ["spawns_local_process"],
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "App-server coordinator task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "app-server-loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: (input) => ({
+        status: "failed",
+        summary: "Codex app-server turn timed out",
+        error: "turn timed out after 120000 ms",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "failed",
+          action: "thread_start",
+          runId: input.runId,
+          profileId: "codex-app-server",
+          threadId: "thread-timeout",
+          turnId: "turn-timeout",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: input.sourceRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: input.resultFile,
+          failureSummary: "turn timed out after 120000 ms",
+        },
+      }),
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "failed",
+      summary: "Codex app-server turn timed out",
+      blockers: ["Codex app-server turn timed out"],
+      notes: expect.arrayContaining([
+        expect.stringContaining("agent-launch: provider=codex-app-server"),
+        "agent-launch: failure=turn timed out after 120000 ms",
+      ]),
+    });
+    expect(
+      readNexusAutomationRunLedger(projectRoot, config.automation!).runs.at(-1),
+    ).toMatchObject({
+      status: "failed",
+      codexAppServer: {
+        profileId: "codex-app-server",
+        threadId: "thread-timeout",
+        turnId: "turn-timeout",
+        resultFile: expect.stringContaining("result.json"),
+        failureSummary: "turn timed out after 120000 ms",
+      },
+    });
+    expect(
+      buildNexusAutomationTargetReport({
+        projectRoot,
+        now: "2026-05-17T10:05:00.000Z",
+      }),
+    ).toMatchObject({
+      status: "failed",
+      executionSummary: {
+        runs: [
+          {
+            status: "failed",
+            codexAppServer: {
+              profileId: "codex-app-server",
+              threadId: "thread-timeout",
+              turnId: "turn-timeout",
+              failureSummary: "turn timed out after 120000 ms",
+            },
+          },
+        ],
+      },
+      activeBlockers: [
+        {
+          source: "cycle",
+          message: "Codex app-server turn timed out",
+        },
+        {
+          source: "run",
+          message: "turn timed out after 120000 ms",
+        },
+      ],
+    });
+  });
 });

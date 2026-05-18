@@ -175,7 +175,7 @@ export interface NexusAutomationAgentLaunchResult {
 
 export interface NexusAutomationCodexAppServerLaunchMetadata {
   provider: "codex-app-server";
-  status: "started" | "failed";
+  status: "started" | NexusAutomationAgentLaunchStatus;
   action: "thread_start" | "thread_fork";
   runId: string;
   profileId: string;
@@ -184,9 +184,11 @@ export interface NexusAutomationCodexAppServerLaunchMetadata {
   sourceThreadId: string | null;
   sourceTurnId: string | null;
   ephemeral: boolean;
+  threadPersistence: "ephemeral" | "durable";
   cwd: string;
   model: string | null;
   reasoning: string | null;
+  resultFile: string;
   failureSummary: string | null;
 }
 
@@ -241,6 +243,13 @@ export interface RunNexusAutomationAgentLaunchOnceResult {
 export interface NexusAutomationAgentLaunchComponentProvider {
   component: ResolvedNexusProjectComponent;
   provider: WorkTrackerProvider;
+}
+
+export interface NexusAutomationAgentResultFileReadResult {
+  status: "missing" | "loaded" | "failed";
+  summary: string;
+  error: string | null;
+  result?: NexusAutomationAgentLaunchResult;
 }
 
 export class NexusAutomationAgentLaunchError extends Error {
@@ -584,6 +593,7 @@ export async function runNexusAutomationAgentLaunchOnce(
           finishedAt,
         ),
         error: agentResult.error ?? null,
+        codexAppServer: agentResult.codexAppServer ?? null,
       },
     });
 
@@ -671,7 +681,7 @@ export function createNexusAutomationAgentCommandLauncher(
       timeoutMs: options.timeoutMs,
     });
     const commandVerification = verificationFromCommandResult(commandResult);
-    const reported = readAgentResultFile(input.resultFile);
+    const reported = readNexusAutomationAgentResultFile(input.resultFile);
 
     if (reported.status === "failed") {
       return {
@@ -1081,12 +1091,9 @@ function agentLaunchEnvironment(
   };
 }
 
-function readAgentResultFile(resultFile: string): {
-  status: "missing" | "loaded" | "failed";
-  summary: string;
-  error: string | null;
-  result?: NexusAutomationAgentLaunchResult;
-} {
+export function readNexusAutomationAgentResultFile(
+  resultFile: string,
+): NexusAutomationAgentResultFileReadResult {
   if (!fs.existsSync(resultFile)) {
     const message = `Agent result file was not written: ${resultFile}`;
     return {

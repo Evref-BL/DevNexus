@@ -13,6 +13,9 @@ import {
   type WorktreePublicationDecision,
   type WorktreeVerificationRecord,
 } from "./worktreeExecutionMetadata.js";
+import type {
+  NexusAutomationCodexAppServerLaunchMetadata,
+} from "./nexusAutomationAgentLaunch.js";
 
 export type NexusAutomationRunStatus =
   | "started"
@@ -39,6 +42,7 @@ export interface NexusAutomationRunRecord {
   verification: WorktreeVerificationRecord[];
   publicationDecision: WorktreePublicationDecision | null;
   error: string | null;
+  codexAppServer: NexusAutomationCodexAppServerLaunchMetadata | null;
   nextRunNotBefore: string | null;
 }
 
@@ -60,6 +64,7 @@ export interface NexusAutomationRunRecordInput {
   verification?: WorktreeVerificationRecord[];
   publicationDecision?: WorktreePublicationDecision | null;
   error?: string | null;
+  codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata | null;
   nextRunNotBefore?: string | null;
 }
 
@@ -530,6 +535,7 @@ function normalizeRunRecordInput(
     verification: input.verification ?? [],
     publicationDecision: input.publicationDecision ?? null,
     error: input.error ?? null,
+    codexAppServer: input.codexAppServer ?? null,
     nextRunNotBefore: input.nextRunNotBefore ?? null,
   });
 }
@@ -558,10 +564,70 @@ function normalizeRunRecord(value: unknown): NexusAutomationRunRecord {
     verification: normalizeVerificationRecords(record.verification),
     publicationDecision: normalizePublicationDecision(record.publicationDecision),
     error: optionalNullableString(record.error) ?? null,
+    codexAppServer: normalizeCodexAppServerLaunchMetadata(record.codexAppServer),
     nextRunNotBefore: optionalIsoString(
       record.nextRunNotBefore,
       "automation run.nextRunNotBefore",
     ),
+  };
+}
+
+function normalizeCodexAppServerLaunchMetadata(
+  value: unknown,
+): NexusAutomationCodexAppServerLaunchMetadata | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusAutomationError(
+      "automation run.codexAppServer must be an object",
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  const ephemeral = requiredBoolean(
+    record.ephemeral,
+    "automation run.codexAppServer.ephemeral",
+  );
+  return {
+    provider: requiredLiteral(
+      record.provider,
+      "codex-app-server",
+      "automation run.codexAppServer.provider",
+    ),
+    status: normalizeCodexAppServerLaunchStatus(
+      record.status,
+      "automation run.codexAppServer.status",
+    ),
+    action: normalizeCodexAppServerAction(
+      record.action,
+      "automation run.codexAppServer.action",
+    ),
+    runId: requiredNonEmptyString(
+      record.runId,
+      "automation run.codexAppServer.runId",
+    ),
+    profileId: requiredNonEmptyString(
+      record.profileId,
+      "automation run.codexAppServer.profileId",
+    ),
+    threadId: optionalNullableString(record.threadId) ?? null,
+    turnId: optionalNullableString(record.turnId) ?? null,
+    sourceThreadId: optionalNullableString(record.sourceThreadId) ?? null,
+    sourceTurnId: optionalNullableString(record.sourceTurnId) ?? null,
+    ephemeral,
+    threadPersistence: normalizeCodexAppServerThreadPersistence(
+      record.threadPersistence ?? (ephemeral ? "ephemeral" : "durable"),
+      "automation run.codexAppServer.threadPersistence",
+    ),
+    cwd: requiredNonEmptyString(record.cwd, "automation run.codexAppServer.cwd"),
+    model: optionalNullableString(record.model) ?? null,
+    reasoning: optionalNullableString(record.reasoning) ?? null,
+    resultFile: requiredNonEmptyString(
+      record.resultFile,
+      "automation run.codexAppServer.resultFile",
+    ),
+    failureSummary: optionalNullableString(record.failureSummary) ?? null,
   };
 }
 
@@ -615,6 +681,68 @@ function normalizeRunStatus(
   throw new NexusAutomationError(
     `${name} must be started, completed, failed, blocked, or skipped`,
   );
+}
+
+function normalizeCodexAppServerLaunchStatus(
+  value: unknown,
+  name: string,
+): NexusAutomationCodexAppServerLaunchMetadata["status"] {
+  if (
+    value === "started" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "blocked"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be started, completed, failed, or blocked`,
+  );
+}
+
+function normalizeCodexAppServerAction(
+  value: unknown,
+  name: string,
+): NexusAutomationCodexAppServerLaunchMetadata["action"] {
+  if (value === "thread_start" || value === "thread_fork") {
+    return value;
+  }
+
+  throw new NexusAutomationError(
+    `${name} must be thread_start or thread_fork`,
+  );
+}
+
+function normalizeCodexAppServerThreadPersistence(
+  value: unknown,
+  name: string,
+): NexusAutomationCodexAppServerLaunchMetadata["threadPersistence"] {
+  if (value === "ephemeral" || value === "durable") {
+    return value;
+  }
+
+  throw new NexusAutomationError(`${name} must be ephemeral or durable`);
+}
+
+function requiredLiteral<T extends string>(
+  value: unknown,
+  expected: T,
+  name: string,
+): T {
+  if (value === expected) {
+    return expected;
+  }
+
+  throw new NexusAutomationError(`${name} must be ${expected}`);
+}
+
+function requiredBoolean(value: unknown, name: string): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  throw new NexusAutomationError(`${name} must be a boolean`);
 }
 
 function optionalIsoString(value: unknown, name: string): string | null {
