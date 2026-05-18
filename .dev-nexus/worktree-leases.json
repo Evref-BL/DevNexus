@@ -1,7 +1,245 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T22:43:21.927Z",
+  "updatedAt": "2026-05-18T22:58:30.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b0b481cc1d68d711",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-130",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusWorkItemDiscoveryStatus.ts",
+        "src/nexusWorkItemDiscoveryStatus.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:57:08.645Z",
+      "lastSeenAt": "2026-05-18T22:57:08.645Z",
+      "updatedAt": "2026-05-18T22:57:08.645Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "This supersedes the immediately previous local-130 handoff whose structured repositoryPath/head reflected the dogfood meta checkout because currentPath was omitted.",
+        "Verification: Final integrated DevNexus npm run check passed on main at e946039 (62 files, 524 tests).",
+        "Integration preference: Published direct integration to DevNexus bot/main as e946039; local-130 merge commit e946039 is the current main head."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-299bf2d926a5a595",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-88",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusAuthority.test.ts",
+        "src/nexusAutomationStatus.ts",
+        "src/nexusHomeConfig.ts",
+        "src/nexusProjectHosting.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusProjectConfig.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:57:07.655Z",
+      "lastSeenAt": "2026-05-18T22:57:07.655Z",
+      "updatedAt": "2026-05-18T22:57:07.655Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "This supersedes the immediately previous local-88 handoff whose structured repositoryPath/head reflected the dogfood meta checkout because currentPath was omitted.",
+        "Verification: Final integrated DevNexus npm run check passed on main at e946039 (62 files, 524 tests).",
+        "Integration preference: Published direct integration to DevNexus bot/main as e946039; local-88 merge commit 4f8fe37 is included."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f3da08ae395b67dd",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-130",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "project_root",
+        "base": "projectRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "."
+      },
+      "writeScope": [
+        "src/nexusWorkItemDiscoveryStatus.ts",
+        "src/nexusWorkItemDiscoveryStatus.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:56:45.217Z",
+      "lastSeenAt": "2026-05-18T22:58:30.000Z",
+      "updatedAt": "2026-05-18T22:58:30.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_root",
+          "base": "projectRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "."
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: Passed local-130 focused tests, npm run build, rebased over local-88, integrated focused suite, and final npm run check on DevNexus main (62 files, 524 tests).",
+        "Integration preference: Published direct integration to DevNexus bot/main as e946039; local-130 merge commit e946039 is the current main head.",
+        "Superseded by source-path handoff lease-b0b481cc1d68d711; this earlier handoff observed the dogfood meta checkout because currentPath was omitted."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-4f6f11478840a74a",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-88",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "project_root",
+        "base": "projectRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "."
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusAuthority.test.ts",
+        "src/nexusAutomationStatus.ts",
+        "src/nexusHomeConfig.ts",
+        "src/nexusProjectHosting.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusProjectConfig.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T22:56:44.404Z",
+      "lastSeenAt": "2026-05-18T22:58:30.000Z",
+      "updatedAt": "2026-05-18T22:58:30.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_root",
+          "base": "projectRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "."
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: Passed focused local-88 tests, npm run build, npm test -- --exclude src/nexusSetupAssistant.test.ts, npm test -- src/nexusSetupAssistant.test.ts, integrated focused suite, and final npm run check on DevNexus main (62 files, 524 tests).",
+        "Integration preference: Published direct integration to DevNexus bot/main as e946039; local-88 merge commit 4f8fe37 is included.",
+        "Superseded by source-path handoff lease-299bf2d926a5a595; this earlier handoff observed the dogfood meta checkout because currentPath was omitted."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
@@ -36,12 +274,12 @@
         "src/cli.test.ts",
         "src/nexusMcpServer.test.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T22:43:21.927Z",
-      "lastSeenAt": "2026-05-18T22:43:21.927Z",
-      "updatedAt": "2026-05-18T22:43:21.927Z",
+      "lastSeenAt": "2026-05-18T22:58:30.000Z",
+      "updatedAt": "2026-05-18T22:58:30.000Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "c73f3471526d353a29508acca61639ea8a19a3ab",
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -59,7 +297,9 @@
         "untrackedCount": 0,
         "warnings": []
       },
-      "notes": []
+      "notes": [
+        "Worker branch codex/dev-nexus-local-130-discovery-status was merged into DevNexus main at e946039, pushed through bot/main, then its worktree and local branch were removed."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",
@@ -95,12 +335,12 @@
         "src/cli.test.ts",
         "src/nexusMcpServer.test.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T22:43:15.539Z",
-      "lastSeenAt": "2026-05-18T22:43:15.539Z",
-      "updatedAt": "2026-05-18T22:43:15.539Z",
+      "lastSeenAt": "2026-05-18T22:58:30.000Z",
+      "updatedAt": "2026-05-18T22:58:30.000Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "c73f3471526d353a29508acca61639ea8a19a3ab",
+      "lastObservedHeadCommit": "e946039787014df274c6309b3ccb7862cf6c4898",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -118,7 +358,9 @@
         "untrackedCount": 0,
         "warnings": []
       },
-      "notes": []
+      "notes": [
+        "Worker branch codex/dev-nexus-local-88-current-actor was merged into DevNexus main at e946039, pushed through bot/main, then its worktree and local branch were removed."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",

@@ -77,8 +77,10 @@ target-cycle facts, commits, and the target report.
 - Continue Codex app-server correction after completed `dev-nexus:local-115`
   safe initialize probes; keep provider-native worker orchestration behind the
   remaining app-server event and capability facts.
-- Continue authority configuration with `dev-nexus:local-88` current-actor
-  resolution after `local-87` landed the neutral authority model.
+- Continue authority configuration after completed `dev-nexus:local-88`
+  current-actor resolution. `local-89` effective authority resolution is ready
+  next; later publication and provider mutation gating should consume that
+  resolver instead of duplicating role logic.
 - Continue agent-target projection after completed `dev-nexus:local-106`
   active-target filtering. `local-107` stale projection diagnostics and
   `local-109` worker context propagation are now the next independent
@@ -90,10 +92,11 @@ target-cycle facts, commits, and the target report.
   after the skeleton and relevant setup/artifact prerequisites land.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
   `dev-nexus:local-129` is complete for tracker roles and discovery-policy
-  defaults. `local-130` read-only discovery status is ready next; promote
-  `local-131` through `local-136` as dependencies land. `local-137` is the
-  blocked HITL policy decision for direct external selection, provider
-  comments, scheduler import, and ordering.
+  defaults, and `local-130` is complete for read-only discovery status.
+  `local-131` eligible-work aggregation is ready next; promote `local-132`
+  through `local-136` as dependencies land. `local-137` is the blocked HITL
+  policy decision for direct external selection, provider comments, scheduler
+  import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and

@@ -110,8 +110,10 @@ coordinator agent chooses and supervises implementation work.
   `3de4635`, Codex app-server routing in `dev-nexus:local-114` as `0d871d7`,
   safe Codex app-server initialize probes in `local-115` as `f98bede`, and
   active agent target projection filtering in `local-106` as `c73f347`. The
-  latest implementation worktrees and local branches were removed after
-  publication.
+  latest source integration publishes current-actor authority resolution in
+  `local-88` and read-only tracker discovery status in `local-130` together as
+  `e946039`. The latest implementation worktrees and local branches were
+  removed after publication.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

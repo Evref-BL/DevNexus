@@ -46,7 +46,10 @@ and ready for coordinator-driven work across its components.
   policy, `dev-nexus:local-114` as `0d871d7` for Codex app-server notification
   and server-request routing, `dev-nexus:local-115` as `f98bede` for safe
   Codex app-server initialize probes, and `dev-nexus:local-106` as `c73f347`
-  for active agent target projection filtering.
+  for active agent target projection filtering. The newest DevNexus source
+  integration published `dev-nexus:local-88` and `dev-nexus:local-130`
+  together as `e946039` for current-actor authority resolution and read-only
+  tracker discovery status.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -94,7 +97,9 @@ and ready for coordinator-driven work across its components.
   Issues require explicit tracker queries or inbound import before they become
   local dogfood work. The PRD has been sliced: start with
   `dev-nexus:local-129` for tracker roles and discovery-policy defaults, which
-  is now complete. Promote `local-130` through `local-136` as prerequisites
+  is now complete. `local-130` is complete for read-only discovery status, and
+  `local-131` is now ready for eligible-work aggregation from configured
+  discovery sources. Promote `local-132` through `local-136` as prerequisites
   land. `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
@@ -129,9 +134,10 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-78` and is attached to the work item through a local
   DevNexus comment.
 - The authority PRD has been sliced: `dev-nexus:local-87` is complete for the
-  actor/role/action configuration model, and `local-88` is now ready for
-  host-local current-actor resolution. Promote `local-89` through `local-94`
-  as their prerequisites land. `local-95` is a blocked HITL decision item for
+  actor/role/action configuration model, `local-88` is complete for host-local
+  current-actor resolution, and `local-89` is now ready for the pure effective
+  authority resolver. Promote `local-90` through `local-94` as their
+  prerequisites land. `local-95` is a blocked HITL decision item for
   self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
@@ -189,12 +195,12 @@ and ready for coordinator-driven work across its components.
 - No active implementation worktrees are expected for the completed source
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
-  and `local-106` were removed after publication.
+  `local-106`, `local-88`, and `local-130` were removed after publication.
 
 ## Near-Term Direction
 
-- Continue ready follow-on work such as `dev-nexus:local-88`, `local-107`,
-  `local-109`, `local-130`, and `local-147`, subject to dependency and
+- Continue ready follow-on work such as `dev-nexus:local-89`, `local-107`,
+  `local-109`, `local-131`, and `local-147`, subject to dependency and
   concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
@@ -218,10 +224,10 @@ and ready for coordinator-driven work across its components.
   DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
-- Keep cross-tracker discovery ordered after completed `dev-nexus:local-129`:
-  proceed through read-only discovery status, eligible-work aggregation,
-  deduplication, inbound import planning, and guarded inbound import execution.
-  Use fake or disposable provider fixtures for validation, not active projects.
+- Keep cross-tracker discovery ordered after completed `dev-nexus:local-129`
+  and `local-130`: proceed through eligible-work aggregation, deduplication,
+  inbound import planning, and guarded inbound import execution. Use fake or
+  disposable provider fixtures for validation, not active projects.
 
 ## Boundaries
 

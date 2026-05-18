@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 268,
-  "updatedAt": "2026-05-18T22:43:37.565Z",
+  "nextCommentNumber": 274,
+  "updatedAt": "2026-05-18T22:58:11.207Z",
   "items": [
     {
       "id": "local-1",
@@ -2202,7 +2202,7 @@
       "id": "local-88",
       "title": "Resolve current actor from host-local auth profiles",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority configuration model exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: detect or report the current actor from configured host-local auth profiles so agents know whether they are acting as a human, bot, machine user, service account, external agent, or local observer.\n\nUser stories covered:\n- As a worker agent, I can know whether my Git and provider actions are using the intended bot profile.\n- As a human maintainer, I can see account mismatches before automation publishes as the wrong account.\n\nAcceptance criteria:\n- Host-local auth profile metadata can bind a logical actor id to non-secret credential mechanisms such as GitHub CLI profile names, SSH host aliases, wrapper command names, or environment keys.\n- Actor resolution can identify the configured automation actor for a component or report unknown, ambiguous, missing, or mismatched actor state.\n- Human/manual profiles and automation/bot profiles remain distinct and do not silently fall back to each other.\n- Status output includes concise warnings for missing auth profile, ambiguous account, mismatched remote, or missing provider capability.\n- Resolution is safe when no live provider credentials are available.\n\nDependencies:\n- Depends on the actor/role/authority configuration model.\n- Builds on existing publication identity and remote guardrail behavior.\n\nBoundaries:\n- Do not require live GitHub, GitLab, or Jira credentials for normal tests.\n- Do not mutate credentials, SSH config, or provider profiles.\n\nVerification:\n- Focused tests for expected actor, missing actor, ambiguous actor, human-vs-bot mismatch, and unknown local process fallback.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2215,8 +2215,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.771Z",
-      "updatedAt": "2026-05-18T22:43:30.749Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:57:08.677Z",
+      "closedAt": "2026-05-18T22:57:08.677Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2228,7 +2228,7 @@
       "id": "local-89",
       "title": "Add effective authority resolver",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after authority config and current-actor resolution exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add a pure effective-authority resolver that answers whether a requested action is allowed, blocked, or waiting on provider state.\n\nUser stories covered:\n- As a coordinator agent, I can know whether I may merge verified DevNexus work directly or must open a pull request.\n- As a worker agent, I can choose a safe fallback such as request review or record a handoff when authority is missing.\n\nAcceptance criteria:\n- Resolver inputs include actor, auth profile, project, component, provider/tracker/remote/repository scope, target branch, requested action, component publication policy, automation safety profile, and provider state when available.\n- Resolver output includes allowed or blocked status, matched actor/role/rule, required missing actions or provider signals, recommended fallback action, and concise explanation.\n- Scope precedence is deterministic across project default, component override, provider override, tracker override, branch override, and environment/runtime override.\n- Direct integration requires both component publication policy and actor authority.\n- Pull request review approval and issue-level design approval remain distinct concepts.\n- Assignment, casual comments, and silence are not treated as approval by default.\n\nDependencies:\n- Depends on authority configuration and actor resolution.\n\nBoundaries:\n- Keep resolver pure and unit-testable.\n- Do not perform command gating or live provider calls in this slice.\n\nVerification:\n- Focused resolver tests for maintainer direct integration, contributor pull-request-only, reviewer approval-only, observer read-only, runtime operator without merge authority, and release operator without implementation authority.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2241,7 +2241,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:00.990Z",
-      "updatedAt": "2026-05-18T13:08:00.990Z",
+      "updatedAt": "2026-05-18T22:58:11.164Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3326,7 +3326,7 @@
       "id": "local-130",
       "title": "Report read-only tracker discovery status",
       "description": "Type: read-only status implementation slice\nReadiness: todo/dependent on dev-nexus:local-129\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only discovery status surface that tells maintainers and agents exactly which configured trackers are visible, eligible, optional, blocked, or import-only.\n\nUser stories covered:\n- As a maintainer, I can ask whether a GitHub inbox will be ignored, listed directly, or imported before selection.\n- As a worker on another host, I can see whether provider credentials are required for discovery and whether missing access is a warning or blocker.\n\nAcceptance criteria:\n- DevNexus exposes a read-only discovery status service and a small CLI/MCP surface such as work_item_discovery_status or an equivalent naming convention that fits the codebase.\n- Output includes each component's default tracker, configured tracker bindings, roles, effective discovery policy, provider capability report, and whether each tracker is readable by the current actor.\n- Missing optional credentials are warnings or skipped trackers according to policy; required credentials are blockers.\n- The command never mutates local tracker files, Git state, provider issues, or link records.\n- Mocked local and GitHub tracker cases cover readable, missing credentials, unsupported capability, disabled tracker, and policy-blocked tracker states.\n\nDependencies:\n- Depends on dev-nexus:local-129.\n\nBoundaries:\n- Do not aggregate eligible work or create local imported items in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused service, CLI, and MCP tests for status output, JSON/text shape, provider capability reporting, optional/required credential behavior, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3341,8 +3341,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:46.510Z",
-      "updatedAt": "2026-05-18T22:43:37.565Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T22:57:08.696Z",
+      "closedAt": "2026-05-18T22:57:08.696Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3354,7 +3354,7 @@
       "id": "local-131",
       "title": "Aggregate eligible work from configured discovery sources",
       "description": "Type: eligible-work implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-130\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: let eligible-work and coordinator surfaces opt into scanning configured discovery sources while preserving current default-tracker behavior by default.\n\nUser stories covered:\n- As a coordinator agent, I can list eligible work across configured discovery sources when policy asks for it.\n- As a maintainer, I can keep default-tracker-only selection unless the project explicitly opts into discovery mode.\n\nAcceptance criteria:\n- Default eligible-work mode remains behaviorally unchanged and lists the component default tracker only.\n- Discovery mode queries trackers whose roles and policy mark them as discovery sources, applying configured statuses, labels, milestones, assignees, provider query filters, per-tracker limits, and final limits.\n- Returned items include component id, logical item id when known, canonical assignment tracker reference, discovered source tracker reference, warnings, and whether the item is selectable or import-only.\n- When policy requires import first, unimported external items are reported as import candidates and are not assigned as local work.\n- Missing provider access, disabled trackers, unsupported list capability, and provider read errors are reported according to discovery policy without crashing the whole eligible-work call.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-130.\n\nBoundaries:\n- Do not implement inbound import mutation in this slice.\n- Do not make every configured tracker an eligible source by default.\n\nVerification:\n- Focused tests for default mode preservation, opt-in discovery aggregation, per-tracker filters, import-only candidates, provider warnings/blockers, and final ordering/limits.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3368,7 +3368,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:38:54.443Z",
-      "updatedAt": "2026-05-18T19:38:54.443Z",
+      "updatedAt": "2026-05-18T22:58:11.206Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6283,9 +6283,43 @@
           "provider": "local",
           "itemId": "local-comment-266"
         }
+      },
+      {
+        "id": "local-comment-268",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 335aa4f81b775f13d33927c17b648296ba100d70\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:56:44.404Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-88\",\n  \"logicalItemId\": \"local-88\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-88\",\n    \"itemNumber\": 88,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-88\",\n    \"itemNumber\": 88,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-88\",\n        \"itemNumber\": 88\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-4f6f11478840a74a\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"335aa4f81b775f13d33927c17b648296ba100d70\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusAuthority.test.ts\",\n    \"src/nexusAutomationStatus.ts\",\n    \"src/nexusHomeConfig.ts\",\n    \"src/nexusProjectHosting.ts\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusProjectConfig.test.ts\"\n  ],\n  \"decisions\": [\n    \"Host-local auth profile metadata now binds logical actor ids to non-secret mechanisms such as SSH host aliases, GitHub CLI config directories, command/environment keys, and provider account handles.\",\n    \"Automation actor resolution reports matched, missing, ambiguous, mismatched, or unknown state without silently falling back from bot to human profiles.\",\n    \"Removed personal Gabot/Gabriel examples from authority/project-config source tests while landing current-actor resolution.\"\n  ],\n  \"verificationSummary\": \"Passed focused local-88 tests, npm run build, npm test -- --exclude src/nexusSetupAssistant.test.ts, npm test -- src/nexusSetupAssistant.test.ts, integrated focused suite, and final npm run check on DevNexus main (62 files, 524 tests).\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as e946039; local-88 merge commit 4f8fe37 is included.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:56:44.416Z",
+        "updatedAt": "2026-05-18T22:56:44.416Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-268"
+        }
+      },
+      {
+        "id": "local-comment-270",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: e946039787014df274c6309b3ccb7862cf6c4898\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:57:07.655Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-88\",\n  \"logicalItemId\": \"local-88\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-88\",\n    \"itemNumber\": 88,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-88\",\n    \"itemNumber\": 88,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-88\",\n      \"itemNumber\": 88,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-88\",\n        \"itemNumber\": 88\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-299bf2d926a5a595\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"e946039787014df274c6309b3ccb7862cf6c4898\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusAuthority.test.ts\",\n    \"src/nexusAutomationStatus.ts\",\n    \"src/nexusHomeConfig.ts\",\n    \"src/nexusProjectHosting.ts\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusProjectConfig.test.ts\"\n  ],\n  \"decisions\": [\n    \"Corrected source handoff: local-88 is integrated in the DevNexus source checkout, not the dogfood meta checkout.\",\n    \"Host-local auth profile metadata now binds logical actor ids to non-secret mechanisms such as SSH host aliases, GitHub CLI config directories, command/environment keys, and provider account handles.\",\n    \"Automation actor resolution reports matched, missing, ambiguous, mismatched, or unknown state without silently falling back from bot to human profiles.\"\n  ],\n  \"verificationSummary\": \"Final integrated DevNexus npm run check passed on main at e946039 (62 files, 524 tests).\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as e946039; local-88 merge commit 4f8fe37 is included.\",\n  \"note\": \"This supersedes the immediately previous local-88 handoff whose structured repositoryPath/head reflected the dogfood meta checkout because currentPath was omitted.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:57:07.664Z",
+        "updatedAt": "2026-05-18T22:57:07.664Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-270"
+        }
       }
     ],
-    "local-89": [],
+    "local-89": [
+      {
+        "id": "local-comment-272",
+        "body": "Promoted to ready after `dev-nexus:local-88` completed current actor resolution in source commit `e946039`.",
+        "author": null,
+        "createdAt": "2026-05-18T22:58:11.164Z",
+        "updatedAt": "2026-05-18T22:58:11.164Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-272"
+        }
+      }
+    ],
     "local-90": [],
     "local-91": [],
     "local-92": [],
@@ -7045,9 +7079,43 @@
           "provider": "local",
           "itemId": "local-comment-267"
         }
+      },
+      {
+        "id": "local-comment-269",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 335aa4f81b775f13d33927c17b648296ba100d70\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:56:45.217Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-130\",\n  \"logicalItemId\": \"local-130\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-130\",\n    \"itemNumber\": 130,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-130\",\n    \"itemNumber\": 130,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-130\",\n        \"itemNumber\": 130\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-f3da08ae395b67dd\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"335aa4f81b775f13d33927c17b648296ba100d70\",\n  \"dirty\": true,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusWorkItemDiscoveryStatus.ts\",\n    \"src/nexusWorkItemDiscoveryStatus.test.ts\",\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Added a read-only work item discovery status service and CLI/MCP surfaces without aggregating eligible work or importing provider issues.\",\n    \"Discovery status reports configured trackers, default tracker, effective policy, roles, capability reports, credential/readability status, warnings, and blockers.\",\n    \"Provider credential checks are testable and default tests do not require live GitHub credentials.\"\n  ],\n  \"verificationSummary\": \"Passed local-130 focused tests, npm run build, rebased over local-88, integrated focused suite, and final npm run check on DevNexus main (62 files, 524 tests).\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as e946039; local-130 merge commit e946039 is the current main head.\",\n  \"note\": null\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:56:45.231Z",
+        "updatedAt": "2026-05-18T22:56:45.231Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-269"
+        }
+      },
+      {
+        "id": "local-comment-271",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: e946039787014df274c6309b3ccb7862cf6c4898\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-18T22:57:08.645Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-130\",\n  \"logicalItemId\": \"local-130\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-130\",\n    \"itemNumber\": 130,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-130\",\n    \"itemNumber\": 130,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-130\",\n      \"itemNumber\": 130,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-130\",\n        \"itemNumber\": 130\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-b0b481cc1d68d711\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"e946039787014df274c6309b3ccb7862cf6c4898\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusWorkItemDiscoveryStatus.ts\",\n    \"src/nexusWorkItemDiscoveryStatus.test.ts\",\n    \"src/cli.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Corrected source handoff: local-130 is integrated in the DevNexus source checkout, not the dogfood meta checkout.\",\n    \"Added a read-only work item discovery status service and CLI/MCP surfaces without aggregating eligible work or importing provider issues.\",\n    \"Discovery status reports configured trackers, default tracker, effective policy, roles, capability reports, credential/readability status, warnings, and blockers.\"\n  ],\n  \"verificationSummary\": \"Final integrated DevNexus npm run check passed on main at e946039 (62 files, 524 tests).\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as e946039; local-130 merge commit e946039 is the current main head.\",\n  \"note\": \"This supersedes the immediately previous local-130 handoff whose structured repositoryPath/head reflected the dogfood meta checkout because currentPath was omitted.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-18T22:57:08.658Z",
+        "updatedAt": "2026-05-18T22:57:08.658Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-271"
+        }
       }
     ],
-    "local-131": [],
+    "local-131": [
+      {
+        "id": "local-comment-273",
+        "body": "Promoted to ready after `dev-nexus:local-130` completed read-only tracker discovery status in source commit `e946039`.",
+        "author": null,
+        "createdAt": "2026-05-18T22:58:11.206Z",
+        "updatedAt": "2026-05-18T22:58:11.206Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-273"
+        }
+      }
+    ],
     "local-132": [],
     "local-133": [],
     "local-134": [],
