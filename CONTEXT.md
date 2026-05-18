@@ -72,3 +72,8 @@ coordinator agent chooses and supervises implementation work.
 - Windows automation publication currently blocks until the host-local
   `GH_CONFIG_DIR=home:.config/gh-automation-github` profile is authenticated as
   `Gabot-Darbot`; this is intentional to prevent human-account fallback.
+- Fresh Mac onboarding proved generic `dev_nexus` and `dev_nexus_pharo` stdio
+  MCP servers can list tools, but PLexus-backed MCP was unavailable because
+  `plexus` was not on `PATH` and direct Pharo HTTP MCP was not live. Treat that
+  Mac as ready for non-live DevNexus coordination only until runtime tooling is
+  explicitly enabled.
