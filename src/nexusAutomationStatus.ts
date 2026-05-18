@@ -33,6 +33,8 @@ import type {
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
   resolveNexusCurrentAutomationActor,
+  summarizeNexusAuthorityForProject,
+  type NexusAuthorityProjectSummary,
   type NexusCurrentActorResolution,
 } from "./nexusAuthority.js";
 import {
@@ -76,6 +78,7 @@ import type { GitRunner } from "./gitWorktreeService.js";
 import {
   getNexusPublicationStatuses,
   publicationPreflightChecks,
+  resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
   type NexusPublicationStatus,
 } from "./nexusPublicationPolicy.js";
@@ -143,6 +146,7 @@ export interface NexusAutomationStatus {
   runnerProfiles: NexusRunnerProfileStatus[];
   publication: NexusPublicationStatus[];
   currentActors: NexusCurrentActorResolution[];
+  authority: NexusAuthorityProjectSummary;
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkMode: NexusEligibleWorkMode;
@@ -700,6 +704,7 @@ type AutomationStatusInput = Omit<
   | "runnerProfiles"
   | "target"
   | "targetCycles"
+  | "authority"
 > &
   Partial<
     Pick<
@@ -716,6 +721,7 @@ type AutomationStatusInput = Omit<
       | "runnerProfiles"
       | "target"
       | "targetCycles"
+      | "authority"
     >
   >;
 
@@ -742,6 +748,31 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
         })
       : null);
 
+  const components = result.components ?? [];
+  const currentActors = result.currentActors ?? [];
+  const authority =
+    result.authority ??
+    summarizeNexusAuthorityForProject({
+      projectId: result.projectConfig.id,
+      authority: result.projectConfig.authority,
+      components: components.map((component) => ({
+        projectId: result.projectConfig.id,
+        componentId: component.id,
+        componentName: component.name,
+        authority: result.projectConfig.authority,
+        publication: resolveNexusPublicationPolicy(
+          result.projectConfig,
+          component,
+        ),
+        safety: result.automationConfig?.safety ?? null,
+        currentActor:
+          currentActors.find((actor) => actor.componentId === component.id) ??
+          null,
+        tracker: component.defaultTrackerId,
+        repository: component.remoteUrl,
+      })),
+    });
+
   return {
     ...result,
     target,
@@ -754,8 +785,9 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
         result.projectConfig.hosts,
     ),
     publication: result.publication ?? [],
-    currentActors: result.currentActors ?? [],
-    components: result.components ?? [],
+    currentActors,
+    authority,
+    components,
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
     eligibleWorkMode: result.eligibleWorkMode ?? "default",
     importCandidateWorkItems: result.importCandidateWorkItems ?? null,

@@ -284,6 +284,14 @@ describe("nexus automation coordinator loop", () => {
             status: "completed",
             eligibleWorkItemCount: 0,
             runId: "loop-20260517-t100000-000-z-1",
+            authority: {
+              projectId: "loop-demo",
+              components: [
+                {
+                  componentId: "primary",
+                },
+              ],
+            },
             workItems: [
               {
                 componentId: "primary",
@@ -322,6 +330,14 @@ describe("nexus automation coordinator loop", () => {
         id: "target-cycle-loop-20260517-t100000-000-z-1",
         status: "completed",
         runId: "loop-20260517-t100000-000-z-1",
+        authority: {
+          projectId: "loop-demo",
+          components: [
+            {
+              componentId: "primary",
+            },
+          ],
+        },
       },
     ]);
   });

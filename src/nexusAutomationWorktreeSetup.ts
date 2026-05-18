@@ -10,6 +10,7 @@ import type {
   NexusAutomationDependencyLinkConfig,
   NexusAutomationPublicationConfig,
 } from "./nexusAutomationConfig.js";
+import type { NexusAuthorityComponentSummary } from "./nexusAuthority.js";
 import {
   materializeNexusWorkerContextBundle,
   type MaterializeNexusWorkerContextBundleResult,
@@ -117,6 +118,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   targetStatePath?: string | null;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
 }
 
@@ -333,6 +335,7 @@ function materializeWorkerContext(options: {
     pluginFragments: options.context.pluginFragments,
     publication:
       options.context.publication ?? options.automationConfig.publication,
+    authority: options.context.authority ?? null,
     runnerProfiles: options.context.runnerProfiles,
   });
   addGitInfoExclude({

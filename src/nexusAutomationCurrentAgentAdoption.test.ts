@@ -267,6 +267,14 @@ describe("current-agent automation adoption", () => {
         id: "target-cycle-heartbeat-20260517-t100000-000-z-1",
         status: "dispatched",
         runId: "heartbeat-20260517-t100000-000-z-1",
+        authority: {
+          projectId: "current-agent-demo",
+          components: [
+            {
+              componentId: "primary",
+            },
+          ],
+        },
         notes: expect.arrayContaining([
           "managed-loop: decision=launch",
           "managed-loop: current agent adopted",
@@ -292,6 +300,14 @@ describe("current-agent automation adoption", () => {
         id: "target-cycle-heartbeat-20260517-t100000-000-z-1",
         status: "blocked",
         runId: "heartbeat-20260517-t100000-000-z-1",
+        authority: {
+          projectId: "current-agent-demo",
+          components: [
+            {
+              componentId: "primary",
+            },
+          ],
+        },
         blockers: ["Current coordinator needs a user decision"],
         notes: expect.arrayContaining([
           "managed-loop: current agent blocked",
@@ -306,6 +322,14 @@ describe("current-agent automation adoption", () => {
         id: "target-cycle-heartbeat-20260517-t100000-000-z-1",
         status: "blocked",
         runId: "heartbeat-20260517-t100000-000-z-1",
+        authority: {
+          projectId: "current-agent-demo",
+          components: [
+            {
+              componentId: "primary",
+            },
+          ],
+        },
       },
     ]);
   });

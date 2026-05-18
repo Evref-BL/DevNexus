@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
+import type {
+  NexusAuthorityComponentSummary,
+  NexusAuthorityScopeConfig,
+} from "./nexusAuthority.js";
 import type { NexusSkillSourceControl } from "./nexusSkills.js";
 import type {
   WorkStatus,
@@ -148,6 +152,7 @@ export interface NexusWorkerContextBundle {
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   publication: NexusAutomationPublicationConfig | null;
+  authority: NexusAuthorityComponentSummary | null;
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   projectContext: NexusWorkerProjectContextReferences;
   pluginFragments: NexusPluginWorkerFragmentsProjection;
@@ -170,6 +175,7 @@ export interface NexusWorkerContextBundleOptions {
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
 }
 
@@ -258,6 +264,7 @@ export function buildNexusWorkerContextBundle(
     options.pluginFragments,
   );
   const publication = options.publication ?? null;
+  const authority = options.authority ?? null;
   const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
   const worktree = {
     componentId,
@@ -286,6 +293,7 @@ export function buildNexusWorkerContextBundle(
     ownership: worktree,
     worktree,
     publication,
+    authority,
     runnerProfiles,
     projectContext,
     pluginFragments,
@@ -348,6 +356,8 @@ export function renderNexusWorkerBriefing(
     "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
     "",
     ...renderPublicationPolicyLines(context.publication),
+    "",
+    ...renderAuthorityPolicyLines(context.authority),
     "",
     ...renderRunnerProfilePolicyLines(context.runnerProfiles),
     "",
@@ -790,6 +800,55 @@ function publicationActorLabel(
     actor.provider ?? "unknown-provider",
     actor.handle ?? actor.id ?? "unknown-actor",
   ].join(":");
+}
+
+function renderAuthorityPolicyLines(
+  authority: NexusAuthorityComponentSummary | null,
+): string[] {
+  if (!authority) {
+    return ["Authority:", "- component authority: not configured"];
+  }
+
+  const allowed = authority.keyAllowedActions.length > 0
+    ? authority.keyAllowedActions.join(",")
+    : "none";
+  const blocked = authority.blockedActions.length > 0
+    ? authority.blockedActions.join(",")
+    : "none";
+  const waiting = authority.waitingActions.length > 0
+    ? authority.waitingActions.join(",")
+    : "none";
+  const fallback = authority.fallbackActions.length > 0
+    ? authority.fallbackActions.join(",")
+    : "none";
+  const bindings = authority.roleBindings.length > 0
+    ? authority.roleBindings
+        .map((binding) =>
+          `${binding.roles.join(",")}@${authorityScopeLabel(binding.scope)}`
+        )
+        .join("; ")
+    : "none";
+
+  return [
+    "Authority:",
+    `- current actor: ${authority.actor.actorId ?? "unknown"} status=${authority.actor.status} profile=${authority.authProfile?.id ?? "none"}`,
+    `- role bindings: ${bindings}`,
+    `- allowed actions: ${allowed}`,
+    `- blocked actions: ${blocked}`,
+    `- waiting actions: ${waiting}`,
+    `- fallback actions: ${fallback}`,
+  ];
+}
+
+function authorityScopeLabel(scope: NexusAuthorityScopeConfig): string {
+  const entries = Object.entries(scope).filter((entry): entry is [string, string] =>
+    typeof entry[1] === "string" && entry[1].length > 0
+  );
+  if (entries.length === 0) {
+    return "fallback";
+  }
+
+  return entries.map(([key, value]) => `${key}:${value}`).join(",");
 }
 
 function normalizeWorkerRunnerProfiles(

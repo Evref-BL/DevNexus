@@ -7,6 +7,7 @@ import {
   materializeNexusWorkerContextBundle,
   nexusWorkerBriefingPath,
   nexusWorkerContextJsonPath,
+  summarizeNexusAuthorityForComponent,
   type WorkItem,
 } from "./index.js";
 
@@ -38,6 +39,26 @@ describe("nexus worker context bundle", () => {
       provider: "local",
       labels: ["dogfood"],
     };
+    const publication = {
+      ...defaultNexusAutomationConfig.publication,
+      remote: "bot",
+      actor: {
+        kind: "machine_user" as const,
+        provider: "github",
+        handle: "example-bot",
+        id: "example-bot-actor",
+      },
+      manualRemote: "origin",
+      manualActor: {
+        kind: "human" as const,
+        provider: "github",
+        handle: "example-human",
+        id: null,
+      },
+      commandEnvironment: {
+        GH_CONFIG_DIR: "home:.config/gh-example-bot",
+      },
+    };
 
     const result = materializeNexusWorkerContextBundle({
       projectRoot: path.join(projectRoot, "."),
@@ -48,26 +69,44 @@ describe("nexus worker context bundle", () => {
       branchName: "codex/local-19-worker-context",
       baseRef: "origin/main",
       workItem,
-      publication: {
-        ...defaultNexusAutomationConfig.publication,
-        remote: "bot",
-        actor: {
-          kind: "machine_user",
-          provider: "github",
-          handle: "example-bot",
-          id: null,
+      publication,
+      authority: summarizeNexusAuthorityForComponent({
+        projectId: "worker-demo",
+        componentId: "dev-nexus",
+        componentName: "DevNexus",
+        publication,
+        authority: {
+          actors: [
+            {
+              id: "example-bot-actor",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "example-bot",
+              displayName: "Example Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "example-bot-actor",
+              roles: ["maintainer"],
+              scope: {
+                component: "dev-nexus",
+              },
+            },
+          ],
         },
-        manualRemote: "origin",
-        manualActor: {
-          kind: "human",
-          provider: "github",
-          handle: "example-human",
-          id: null,
-        },
-        commandEnvironment: {
-          GH_CONFIG_DIR: "home:.config/gh-example-bot",
-        },
-      },
+        authProfiles: [
+          {
+            id: "bot-github",
+            actorId: "example-bot-actor",
+            provider: "github",
+            kind: "automation",
+            account: "example-bot",
+            githubCliConfigDir: "home:.config/gh-example-bot",
+            environmentKeys: ["GH_CONFIG_DIR"],
+          },
+        ],
+      }),
       runnerProfiles: [
         {
           id: "runtime-smoke",
@@ -146,6 +185,21 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      authority: {
+        actor: {
+          actorId: "example-bot-actor",
+          status: "matched",
+        },
+        authProfile: {
+          id: "bot-github",
+        },
+        keyAllowedActions: expect.arrayContaining([
+          "git.commit",
+          "git.push_branch",
+          "provider.pull_request.open",
+        ]),
+        blockedActions: expect.arrayContaining(["git.push_target_branch"]),
+      },
       runnerProfiles: [
         {
           id: "runtime-smoke",
@@ -212,12 +266,18 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain(
       "- automation actor: machine_user:github:example-bot",
     );
+    expect(briefing).toContain("Authority:");
+    expect(briefing).toContain(
+      "- current actor: example-bot-actor status=matched profile=bot-github",
+    );
+    expect(briefing).toContain("- allowed actions:");
     expect(briefing).toContain(
       "- runtime-smoke: mutation=live_runtime approval=policy_gated capabilities=runtime missingHostCapabilities=runtime",
     );
     expect(briefing).toContain("- manual remote: origin");
     expect(briefing).toContain("- manual actor: human:github:example-human");
     expect(briefing).toContain("- command environment keys: GH_CONFIG_DIR");
+    expect(briefing).not.toContain("home:.config/gh-example-bot");
   });
 
   it("uses an explicit target state path when one is supplied", () => {

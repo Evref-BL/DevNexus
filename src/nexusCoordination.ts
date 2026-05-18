@@ -11,6 +11,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  summarizeNexusAuthorityForComponent,
+  type NexusAuthorityComponentSummary,
+} from "./nexusAuthority.js";
+import {
   createOrRefreshNexusWorktreeLease,
   listNexusWorktreeLeases,
   type NexusWorktreeLeaseCollection,
@@ -25,6 +29,9 @@ import {
   resolveComponentWorkItemRoute,
   throwWorkItemLookupFailure,
 } from "./nexusWorkItemRouting.js";
+import {
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -287,6 +294,7 @@ export interface NexusCoordinationIntegrationPlan {
     diagnostics: NexusCoordinationDiagnostic[];
     warnings: string[];
   };
+  authority: NexusAuthorityComponentSummary;
   branches: NexusCoordinationIntegrationBranchPlan[];
   decisionConflicts: NexusCoordinationDecisionConflict[];
   suggestedOrder: NexusCoordinationSuggestedMergeStep[];
@@ -312,6 +320,7 @@ export interface NexusCoordinationStatus {
   workItem: WorkItem | null;
   coordinationTracker: NexusCoordinationTrackerSummary;
   git: NexusCoordinationGitStatus;
+  authority: NexusAuthorityComponentSummary;
   leases: NexusWorktreeLeaseCollection;
   handoffs: NexusCoordinationHandoffCollection;
   nextAction: string;
@@ -433,6 +442,7 @@ export async function getNexusCoordinationStatus(
     workItem,
     coordinationTracker: coordinationTracker.summary,
     git,
+    authority: coordinationAuthoritySummary(context),
     leases,
     handoffs,
     nextAction: coordinationNextAction(git),
@@ -689,6 +699,7 @@ export async function getNexusCoordinationIntegrationPlan(
       diagnostics: handoffCollection.diagnostics,
       warnings: handoffCollection.warnings,
     },
+    authority: coordinationAuthoritySummary(context),
     branches,
     decisionConflicts,
     suggestedOrder,
@@ -2321,6 +2332,24 @@ function componentSummary(
     worktreesRoot: component.worktreesRoot,
     workTrackingProvider: component.workTracking?.provider ?? null,
   };
+}
+
+function coordinationAuthoritySummary(
+  context: ResolvedCoordinationContext,
+): NexusAuthorityComponentSummary {
+  return summarizeNexusAuthorityForComponent({
+    projectId: context.projectConfig.id,
+    componentId: context.component.id,
+    componentName: context.component.name,
+    authority: context.projectConfig.authority,
+    publication: resolveNexusPublicationPolicy(
+      context.projectConfig,
+      context.component,
+    ),
+    safety: context.projectConfig.automation?.safety ?? null,
+    tracker: context.component.defaultTrackerId,
+    repository: context.component.remoteUrl,
+  });
 }
 
 function currentTimestamp(now?: () => Date | string): string {

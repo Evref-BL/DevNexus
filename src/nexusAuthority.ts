@@ -391,6 +391,84 @@ export interface NexusEffectiveAuthorityResolution {
   explanation: string;
 }
 
+export interface NexusAuthorityRoleBindingSummary {
+  roles: string[];
+  scope: NexusAuthorityScopeConfig;
+}
+
+export interface NexusAuthorityAuthProfileSummary {
+  id: string;
+  provider: string | null;
+  kind: NexusHostingAuthProfileKind | null;
+}
+
+export interface NexusAuthorityActorIdentitySummary {
+  status: NexusCurrentActorResolutionStatus;
+  actorId: string | null;
+  knownActor: boolean;
+  kind: NexusAuthorityActorKind | null;
+  provider: string | null;
+  handle: string | null;
+  displayName: string | null;
+}
+
+export interface NexusAuthorityActionDecisionSummary {
+  key: string;
+  action: NexusAuthorityAction;
+  status: NexusEffectiveAuthorityStatus;
+  allowed: boolean;
+  fallbackAction: NexusAuthorityAction | null;
+  missingRequiredActions: NexusAuthorityAction[];
+  missingProviderSignals: NexusAuthorityRequiredProviderSignal[];
+  explanation: string;
+}
+
+export interface NexusAuthorityComponentSummary {
+  version: 1;
+  componentId: string;
+  componentName: string | null;
+  actor: NexusAuthorityActorIdentitySummary;
+  authProfile: NexusAuthorityAuthProfileSummary | null;
+  roleBindings: NexusAuthorityRoleBindingSummary[];
+  roles: string[];
+  keyAllowedActions: NexusAuthorityAction[];
+  blockedActions: NexusAuthorityAction[];
+  waitingActions: NexusAuthorityAction[];
+  fallbackActions: NexusAuthorityAction[];
+  decisions: NexusAuthorityActionDecisionSummary[];
+  warnings: string[];
+  summary: string;
+}
+
+export interface NexusAuthorityProjectSummary {
+  version: 1;
+  projectId: string;
+  components: NexusAuthorityComponentSummary[];
+  warnings: string[];
+  summary: string;
+}
+
+export interface NexusAuthorityComponentSummaryInput {
+  projectId: string;
+  componentId: string;
+  componentName?: string | null;
+  authority?: NexusAuthorityConfig;
+  publication: NexusAutomationPublicationConfig;
+  safety?: NexusAutomationSafetyConfig | null;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  currentActor?: NexusCurrentActorResolution | null;
+  provider?: string | null;
+  tracker?: string | null;
+  repository?: string | null;
+  environment?: string | null;
+}
+
+export interface NexusAuthorityProjectSummaryInput {
+  projectId: string;
+  authority?: NexusAuthorityConfig;
+  components: NexusAuthorityComponentSummaryInput[];
+}
+
 interface NexusEffectiveAuthorityRequestScope {
   project: string;
   component: string | null;
@@ -434,6 +512,17 @@ const nexusAuthorityScopePrecedence = [
   precedence: NexusEffectiveAuthorityScopePrecedence;
   rank: number;
 }>;
+
+const nexusAuthoritySummaryActionSpecs = [
+  { key: "commit", action: "git.commit" },
+  { key: "push_branch", action: "git.push_branch" },
+  { key: "direct_integration", action: "git.push_target_branch" },
+  { key: "open_pull_request", action: "provider.pull_request.open" },
+  { key: "merge_pull_request", action: "provider.pull_request.merge" },
+  { key: "request_review", action: "provider.review.request" },
+  { key: "update_work_item", action: "work_item.update" },
+  { key: "handoff", action: "coordination.handoff" },
+] as const satisfies Array<{ key: string; action: NexusAuthorityAction }>;
 
 export function normalizeNexusAuthorityPolicy(
   config?: NexusAuthorityConfig,
@@ -704,6 +793,224 @@ export function resolveNexusCurrentAutomationActor(
   });
 }
 
+export function summarizeNexusAuthorityForProject(
+  options: NexusAuthorityProjectSummaryInput,
+): NexusAuthorityProjectSummary {
+  const components = options.components.map((component) =>
+    summarizeNexusAuthorityForComponent({
+      ...component,
+      projectId: options.projectId,
+      authority: component.authority ?? options.authority,
+    })
+  );
+  const warnings = uniqueValues(
+    components.flatMap((component) => component.warnings),
+  );
+
+  return {
+    version: 1,
+    projectId: options.projectId,
+    components,
+    warnings,
+    summary: projectAuthoritySummaryText(options.projectId, components),
+  };
+}
+
+export function summarizeNexusAuthorityForComponent(
+  options: NexusAuthorityComponentSummaryInput,
+): NexusAuthorityComponentSummary {
+  const policy = normalizeNexusAuthorityPolicy(options.authority);
+  const currentActor =
+    options.currentActor ??
+    resolveNexusCurrentAutomationActor({
+      authority: options.authority,
+      componentId: options.componentId,
+      publication: options.publication,
+      authProfiles: options.authProfiles,
+    });
+  const actorId = currentActor.expectedActorId;
+  const actor = actorId
+    ? policy.actors.find((candidate) => candidate.id === actorId) ?? null
+    : null;
+  const authProfile = currentActor.profileId
+    ? (options.authProfiles ?? []).find(
+        (profile) => profile.id === currentActor.profileId,
+      ) ?? null
+    : null;
+  const currentActorProfile = currentActor.profileId
+    ? currentActor.profiles.find((profile) => profile.id === currentActor.profileId) ??
+      null
+    : null;
+  const provider =
+    optionalAuthorityString(options.provider) ??
+    currentActor.expectedProvider ??
+    options.publication.actor?.provider ??
+    options.publication.manualActor?.provider ??
+    null;
+  const requestScope = {
+    project: options.projectId,
+    component: options.componentId,
+    provider,
+    tracker: optionalAuthorityString(options.tracker),
+    repository: optionalAuthorityString(options.repository),
+    targetBranch: options.publication.targetBranch,
+    environment: optionalAuthorityString(options.environment),
+  };
+  const scopedAuthority = resolveScopedNexusAuthority({
+    config: options.authority,
+    policy,
+    actorId: actorId ?? "unknown",
+    scope: requestScope,
+  });
+  const roleBindings = scopedAuthority.matchedBindings.map((match) => ({
+    roles: [...match.binding.roles],
+    scope: { ...match.binding.scope },
+  }));
+  const decisions = nexusAuthoritySummaryActionSpecs.map((spec) => {
+    const decision = resolveNexusEffectiveAuthority({
+      authority: options.authority,
+      actor: {
+        id: actorId,
+        kind: currentActor.expectedActorKind,
+        provider: currentActor.expectedProvider,
+        providerIdentity: currentActor.expectedHandle,
+      },
+      authProfile: authProfile
+        ? {
+            id: authProfile.id,
+            actorId: authProfile.actorId ?? null,
+            kind: authProfile.kind ?? null,
+            provider: authProfile.provider,
+            account: authProfile.account ?? null,
+          }
+        : currentActorProfile
+          ? {
+              id: currentActorProfile.id,
+              actorId: currentActorProfile.actorId,
+              kind: currentActorProfile.kind,
+              provider: null,
+              account: currentActorProfile.account,
+            }
+        : null,
+      project: options.projectId,
+      component: options.componentId,
+      provider,
+      tracker: options.tracker,
+      remote: options.publication.remote,
+      repository: options.repository,
+      targetBranch: options.publication.targetBranch,
+      environment: options.environment,
+      requestedAction: spec.action,
+      publication: options.publication,
+      safety: options.safety ?? null,
+    });
+
+    return {
+      key: spec.key,
+      action: spec.action,
+      status: decision.status,
+      allowed: decision.allowed,
+      fallbackAction: decision.recommendedFallbackAction,
+      missingRequiredActions: [...decision.missingRequiredActions],
+      missingProviderSignals: [...decision.missingProviderSignals],
+      explanation: decision.explanation,
+    } satisfies NexusAuthorityActionDecisionSummary;
+  });
+  const keyAllowedActions = decisions
+    .filter((decision) => decision.allowed)
+    .map((decision) => decision.action);
+  const blockedActions = decisions
+    .filter((decision) => decision.status === "blocked")
+    .map((decision) => decision.action);
+  const waitingActions = decisions
+    .filter((decision) => decision.status === "waiting")
+    .map((decision) => decision.action);
+  const fallbackActions = uniqueValues(
+    decisions.flatMap((decision) =>
+      decision.fallbackAction ? [decision.fallbackAction] : []
+    ),
+  );
+
+  const componentSummary: NexusAuthorityComponentSummary = {
+    version: 1,
+    componentId: options.componentId,
+    componentName: options.componentName ?? null,
+    actor: {
+      status: currentActor.status,
+      actorId,
+      knownActor: scopedAuthority.knownActor,
+      kind: currentActor.expectedActorKind,
+      provider: currentActor.expectedProvider,
+      handle: currentActor.expectedHandle,
+      displayName: actor?.displayName ?? null,
+    },
+    authProfile: authProfile
+      ? {
+          id: authProfile.id,
+          provider: authProfile.provider,
+          kind: authProfile.kind ?? null,
+        }
+      : currentActorProfile
+        ? {
+            id: currentActorProfile.id,
+            provider: null,
+            kind: currentActorProfile.kind,
+          }
+      : currentActor.profileId
+        ? {
+            id: currentActor.profileId,
+            provider: null,
+            kind: null,
+          }
+        : null,
+    roleBindings,
+    roles: [...scopedAuthority.roles],
+    keyAllowedActions,
+    blockedActions,
+    waitingActions,
+    fallbackActions,
+    decisions,
+    warnings: [...currentActor.warnings],
+    summary: "",
+  };
+  componentSummary.summary = componentAuthoritySummaryText(componentSummary);
+
+  return componentSummary;
+}
+
+export function normalizeNexusAuthorityProjectSummary(
+  value: unknown,
+  pathName = "authority",
+): NexusAuthorityProjectSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  if (record.version !== 1) {
+    throw new Error(`${pathName}.version must be 1`);
+  }
+  const components = requiredAuthorityArray(
+    record.components,
+    `${pathName}.components`,
+  ).map((component, index) =>
+    normalizeNexusAuthorityComponentSummary(
+      component,
+      `${pathName}.components[${index}]`,
+    )
+  );
+
+  return {
+    version: 1,
+    projectId: requiredSummaryString(record.projectId, `${pathName}.projectId`),
+    components,
+    warnings: requiredSummaryStringArray(
+      record.warnings,
+      `${pathName}.warnings`,
+    ),
+    summary: requiredSummaryString(record.summary, `${pathName}.summary`),
+  };
+}
+
 export function expandNexusAuthorityRoles(
   roleIds: readonly string[],
   config?: NexusAuthorityConfig,
@@ -712,6 +1019,431 @@ export function expandNexusAuthorityRoles(
   return uniqueValues(
     roleIds.flatMap((roleId) => roleDefinitions.get(roleId)?.actions ?? []),
   );
+}
+
+function matchingAuthorityRoleBindingSummaries(
+  bindings: readonly NexusAuthorityRoleBindingConfig[],
+  actorId: string,
+  requestScope: NexusEffectiveAuthorityRequestScope,
+): NexusAuthorityRoleBindingSummary[] {
+  return bindings
+    .filter((binding) => binding.actorId === actorId)
+    .filter((binding) => authorityScopeMatches(binding.scope, requestScope))
+    .map((binding) => ({
+      roles: [...binding.roles],
+      scope: { ...binding.scope },
+    }));
+}
+
+function projectAuthoritySummaryText(
+  projectId: string,
+  components: readonly NexusAuthorityComponentSummary[],
+): string {
+  if (components.length === 0) {
+    return `Project ${projectId} has no component authority summaries.`;
+  }
+
+  return components
+    .map((component) => component.summary)
+    .join(" ");
+}
+
+function componentAuthoritySummaryText(
+  component: NexusAuthorityComponentSummary,
+): string {
+  const actor = component.actor.actorId ?? "unknown";
+  const profile = component.authProfile?.id ?? "none";
+  const roles = component.roles.length > 0 ? component.roles.join(",") : "none";
+  const allowed = component.keyAllowedActions.length > 0
+    ? component.keyAllowedActions.join(",")
+    : "none";
+  const blocked = component.blockedActions.length > 0
+    ? component.blockedActions.join(",")
+    : "none";
+  const waiting = component.waitingActions.length > 0
+    ? component.waitingActions.join(",")
+    : "none";
+  const fallback = component.fallbackActions.length > 0
+    ? component.fallbackActions.join(",")
+    : "none";
+
+  return `${component.componentId}: actor=${actor} profile=${profile} roles=${roles} allowed=${allowed} blocked=${blocked} waiting=${waiting} fallback=${fallback}`;
+}
+
+function normalizeNexusAuthorityComponentSummary(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityComponentSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  if (record.version !== 1) {
+    throw new Error(`${pathName}.version must be 1`);
+  }
+
+  return {
+    version: 1,
+    componentId: requiredSummaryString(record.componentId, `${pathName}.componentId`),
+    componentName: nullableSummaryString(record.componentName, `${pathName}.componentName`),
+    actor: normalizeAuthorityActorIdentitySummary(
+      record.actor,
+      `${pathName}.actor`,
+    ),
+    authProfile: nullableAuthorityAuthProfileSummary(
+      record.authProfile,
+      `${pathName}.authProfile`,
+    ),
+    roleBindings: requiredAuthorityArray(
+      record.roleBindings,
+      `${pathName}.roleBindings`,
+    ).map((binding, index) =>
+      normalizeAuthorityRoleBindingSummary(
+        binding,
+        `${pathName}.roleBindings[${index}]`,
+      )
+    ),
+    roles: requiredSummaryStringArray(record.roles, `${pathName}.roles`),
+    keyAllowedActions: authorityActionArray(
+      record.keyAllowedActions,
+      `${pathName}.keyAllowedActions`,
+    ),
+    blockedActions: authorityActionArray(
+      record.blockedActions,
+      `${pathName}.blockedActions`,
+    ),
+    waitingActions: authorityActionArray(
+      record.waitingActions,
+      `${pathName}.waitingActions`,
+    ),
+    fallbackActions: authorityActionArray(
+      record.fallbackActions,
+      `${pathName}.fallbackActions`,
+    ),
+    decisions: requiredAuthorityArray(
+      record.decisions,
+      `${pathName}.decisions`,
+    ).map((decision, index) =>
+      normalizeAuthorityActionDecisionSummary(
+        decision,
+        `${pathName}.decisions[${index}]`,
+      )
+    ),
+    warnings: requiredSummaryStringArray(
+      record.warnings,
+      `${pathName}.warnings`,
+    ),
+    summary: requiredSummaryString(record.summary, `${pathName}.summary`),
+  };
+}
+
+function normalizeAuthorityActorIdentitySummary(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityActorIdentitySummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+
+  return {
+    status: authorityActorStatus(record.status, `${pathName}.status`),
+    actorId: nullableSummaryString(record.actorId, `${pathName}.actorId`),
+    knownActor: requiredAuthorityBoolean(
+      record.knownActor,
+      `${pathName}.knownActor`,
+    ),
+    kind: nullableAuthorityActorKind(record.kind, `${pathName}.kind`),
+    provider: nullableSummaryString(record.provider, `${pathName}.provider`),
+    handle: nullableSummaryString(record.handle, `${pathName}.handle`),
+    displayName: nullableSummaryString(
+      record.displayName,
+      `${pathName}.displayName`,
+    ),
+  };
+}
+
+function nullableAuthorityAuthProfileSummary(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAuthProfileSummary | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object or null`);
+  }
+  const record = value as Record<string, unknown>;
+
+  return {
+    id: requiredSummaryString(record.id, `${pathName}.id`),
+    provider: nullableSummaryString(record.provider, `${pathName}.provider`),
+    kind: nullableAuthProfileKind(record.kind, `${pathName}.kind`),
+  };
+}
+
+function normalizeAuthorityRoleBindingSummary(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityRoleBindingSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+
+  return {
+    roles: requiredSummaryStringArray(record.roles, `${pathName}.roles`),
+    scope: authorityScopeFromUnknown(record.scope, `${pathName}.scope`),
+  };
+}
+
+function normalizeAuthorityActionDecisionSummary(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityActionDecisionSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+
+  return {
+    key: requiredSummaryString(record.key, `${pathName}.key`),
+    action: authorityAction(record.action, `${pathName}.action`),
+    status: effectiveAuthorityStatus(record.status, `${pathName}.status`),
+    allowed: requiredAuthorityBoolean(record.allowed, `${pathName}.allowed`),
+    fallbackAction:
+      nullableAuthorityAction(record.fallbackAction, `${pathName}.fallbackAction`),
+    missingRequiredActions: authorityActionArray(
+      record.missingRequiredActions,
+      `${pathName}.missingRequiredActions`,
+    ),
+    missingProviderSignals: authorityProviderSignalArray(
+      record.missingProviderSignals,
+      `${pathName}.missingProviderSignals`,
+    ),
+    explanation: requiredSummaryString(
+      record.explanation,
+      `${pathName}.explanation`,
+    ),
+  };
+}
+
+function authorityScopeFromUnknown(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityScopeConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    ...(record.project !== undefined
+      ? { project: requiredSummaryString(record.project, `${pathName}.project`) }
+      : {}),
+    ...(record.component !== undefined
+      ? {
+          component: requiredSummaryString(
+            record.component,
+            `${pathName}.component`,
+          ),
+        }
+      : {}),
+    ...(record.provider !== undefined
+      ? {
+          provider: requiredSummaryString(record.provider, `${pathName}.provider`),
+        }
+      : {}),
+    ...(record.tracker !== undefined
+      ? { tracker: requiredSummaryString(record.tracker, `${pathName}.tracker`) }
+      : {}),
+    ...(record.repository !== undefined
+      ? {
+          repository: requiredSummaryString(
+            record.repository,
+            `${pathName}.repository`,
+          ),
+        }
+      : {}),
+    ...(record.targetBranch !== undefined
+      ? {
+          targetBranch: requiredSummaryString(
+            record.targetBranch,
+            `${pathName}.targetBranch`,
+          ),
+        }
+      : {}),
+    ...(record.environment !== undefined
+      ? {
+          environment: requiredSummaryString(
+            record.environment,
+            `${pathName}.environment`,
+          ),
+        }
+      : {}),
+  };
+}
+
+function requiredAuthorityArray(value: unknown, pathName: string): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${pathName} must be an array`);
+  }
+  return value;
+}
+
+function requiredSummaryStringArray(
+  value: unknown,
+  pathName: string,
+): string[] {
+  return requiredAuthorityArray(value, pathName).map((item, index) =>
+    requiredSummaryString(item, `${pathName}[${index}]`)
+  );
+}
+
+function authorityActionArray(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAction[] {
+  return requiredAuthorityArray(value, pathName).map((item, index) =>
+    authorityAction(item, `${pathName}[${index}]`)
+  );
+}
+
+function authorityProviderSignalArray(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityRequiredProviderSignal[] {
+  return requiredAuthorityArray(value, pathName).map((item, index) =>
+    authorityProviderSignal(item, `${pathName}[${index}]`)
+  );
+}
+
+function requiredSummaryString(value: unknown, pathName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${pathName} must be a non-empty string`);
+  }
+
+  return value.trim();
+}
+
+function nullableSummaryString(value: unknown, pathName: string): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return requiredSummaryString(value, pathName);
+}
+
+function requiredAuthorityBoolean(value: unknown, pathName: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${pathName} must be a boolean`);
+  }
+
+  return value;
+}
+
+function authorityActorStatus(
+  value: unknown,
+  pathName: string,
+): NexusCurrentActorResolutionStatus {
+  if (
+    value === "matched" ||
+    value === "missing" ||
+    value === "ambiguous" ||
+    value === "mismatched" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a current actor status`);
+}
+
+function effectiveAuthorityStatus(
+  value: unknown,
+  pathName: string,
+): NexusEffectiveAuthorityStatus {
+  if (value === "allowed" || value === "blocked" || value === "waiting") {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be allowed, blocked, or waiting`);
+}
+
+function nullableAuthorityActorKind(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityActorKind | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    value === "human" ||
+    value === "machine_user" ||
+    value === "service_account" ||
+    value === "external_agent" ||
+    value === "local" ||
+    value === "team"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid authority actor kind or null`);
+}
+
+function nullableAuthProfileKind(
+  value: unknown,
+  pathName: string,
+): NexusHostingAuthProfileKind | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (value === "human" || value === "automation" || value === "app") {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be human, automation, app, or null`);
+}
+
+function authorityAction(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAction {
+  if (
+    typeof value === "string" &&
+    (nexusAuthorityActionNames as readonly string[]).includes(value)
+  ) {
+    return value as NexusAuthorityAction;
+  }
+
+  throw new Error(`${pathName} must be a valid authority action`);
+}
+
+function nullableAuthorityAction(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityAction | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return authorityAction(value, pathName);
+}
+
+function authorityProviderSignal(
+  value: unknown,
+  pathName: string,
+): NexusAuthorityRequiredProviderSignal {
+  if (
+    value === "pull_request_review.approved" ||
+    value === "issue_design.approved" ||
+    value === "checks.passed" ||
+    value === "mergeable" ||
+    value === "branch_policy.clear"
+  ) {
+    return value;
+  }
+
+  throw new Error(`${pathName} must be a valid authority provider signal`);
 }
 
 function resolveScopedNexusAuthority(options: {
@@ -1120,6 +1852,10 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function optionalAuthorityString(value: string | null | undefined): string | null {
+  return normalizeOptionalString(value);
 }
 
 function authorityRoleMap(

@@ -21,6 +21,11 @@ import {
 import { nonInteractiveGitEnvironment } from "./nexusAutomationEnvironment.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
+  summarizeNexusAuthorityForProject,
+  type NexusAuthorityComponentSummary,
+  type NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
+import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
@@ -132,6 +137,7 @@ export interface NexusAutomationAgentLaunchComponentContext {
   defaultTrackerId: string | null;
   workTrackers: NexusAutomationWorkTrackerSummary[];
   publication: NexusAutomationConfig["publication"];
+  authority: NexusAuthorityComponentSummary | null;
   relationships: ResolvedNexusProjectComponent["relationships"];
 }
 
@@ -171,6 +177,7 @@ export interface NexusAutomationAgentLaunchContext {
   };
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   pluginCapabilities: NexusPluginCapabilityProjection[];
+  authority: NexusAuthorityProjectSummary;
   result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
   importCandidateWorkItems: NexusEligibleWorkItem[];
@@ -1043,6 +1050,21 @@ function buildAgentLaunchContext(
     "contextFile" | "resultFile"
   > & { resultFile: string },
 ): NexusAutomationAgentLaunchContext {
+  const authority = summarizeNexusAuthorityForProject({
+    projectId: input.projectConfig.id,
+    authority: input.projectConfig.authority,
+    components: input.components.map((component) => ({
+      projectId: input.projectConfig.id,
+      componentId: component.id,
+      componentName: component.name,
+      authority: input.projectConfig.authority,
+      publication: resolveNexusPublicationPolicy(input.projectConfig, component),
+      safety: input.automationConfig.safety,
+      tracker: component.defaultTrackerId,
+      repository: component.remoteUrl,
+    })),
+  });
+
   return {
     version: 1,
     runId: input.runId,
@@ -1055,7 +1077,7 @@ function buildAgentLaunchContext(
       componentCount: input.components.length,
     },
     components: input.components.map((component) =>
-      componentContext(component, input.projectConfig),
+      componentContext(component, input.projectConfig, authority),
     ),
     automation: {
       mode: "agent_launch",
@@ -1072,6 +1094,7 @@ function buildAgentLaunchContext(
       input.projectConfig.hosts,
     ),
     pluginCapabilities: projectPluginCapabilityProjections(input.projectConfig),
+    authority,
     result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
     importCandidateWorkItems: input.importCandidateWorkItems,
@@ -1086,6 +1109,7 @@ function buildAgentLaunchContext(
 function componentContext(
   component: ResolvedNexusProjectComponent,
   projectConfig: NexusProjectConfig,
+  authority: NexusAuthorityProjectSummary,
 ): NexusAutomationAgentLaunchComponentContext {
   return {
     id: component.id,
@@ -1105,6 +1129,9 @@ function componentContext(
     defaultTrackerId: component.defaultTrackerId,
     workTrackers: summarizeNexusAutomationWorkTrackers(component),
     publication: resolveNexusPublicationPolicy(projectConfig, component),
+    authority:
+      authority.components.find((summary) => summary.componentId === component.id) ??
+      null,
     relationships: component.relationships,
   };
 }

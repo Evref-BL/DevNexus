@@ -274,6 +274,26 @@ describe("nexus automation agent launch", () => {
             },
           },
         },
+        authority: {
+          actors: [
+            {
+              id: "example-bot-actor",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "example-bot",
+              displayName: "Example Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "example-bot-actor",
+              roles: ["maintainer"],
+              scope: {
+                component: "primary",
+              },
+            },
+          ],
+        },
       }),
     );
     const tracker = createLocalWorkTrackerProvider({
@@ -350,6 +370,13 @@ describe("nexus automation agent launch", () => {
                 provider: "github",
                 handle: "example-human",
               },
+            },
+            authority: {
+              componentId: "primary",
+              actor: {
+                actorId: "example-bot-actor",
+              },
+              roles: ["maintainer"],
             },
           },
         ],
@@ -479,6 +506,18 @@ describe("nexus automation agent launch", () => {
             ],
           },
         ],
+        authority: {
+          projectId: "demo-project",
+          components: [
+            {
+              componentId: "primary",
+              keyAllowedActions: expect.arrayContaining([
+                "git.push_target_branch",
+              ]),
+              summary: expect.stringContaining("actor=example-bot-actor"),
+            },
+          ],
+        },
         result: {
           file: options.env.DEV_NEXUS_AGENT_RESULT_FILE,
           requiredFields: ["status", "summary"],

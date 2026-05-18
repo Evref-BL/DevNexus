@@ -652,7 +652,42 @@ describe("nexus coordination", () => {
     const storePath = ".dev-nexus/work-items-dev-nexus.json";
     fs.mkdirSync(sourceRoot, { recursive: true });
     fs.mkdirSync(worktreePath, { recursive: true });
-    saveProjectConfig(projectRoot, projectConfig(sourceRoot, "worktrees/dev-nexus", storePath));
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+      automation: {
+        ...defaultNexusAutomationConfig,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "review_handoff",
+          actor: {
+            id: "coordination-bot",
+            kind: "machine_user",
+            provider: "github",
+            handle: "coordination-bot",
+          },
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "coordination-bot",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "coordination-bot",
+            displayName: "Coordination Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "coordination-bot",
+            roles: ["contributor"],
+            scope: {
+              component: "dev-nexus",
+            },
+          },
+        ],
+      },
+    });
     await createLocalWorkTrackerProvider({
       projectRoot,
       config: { provider: "local", storePath },
@@ -766,6 +801,15 @@ describe("nexus coordination", () => {
             stale: false,
           },
         ],
+      },
+      authority: {
+        componentId: "dev-nexus",
+        actor: {
+          actorId: "coordination-bot",
+        },
+        roles: ["contributor"],
+        blockedActions: expect.arrayContaining(["git.push_target_branch"]),
+        fallbackActions: expect.arrayContaining(["provider.pull_request.open"]),
       },
       nextAction: "Ready for review or integration.",
     });

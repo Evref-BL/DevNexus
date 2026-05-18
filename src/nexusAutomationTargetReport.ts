@@ -13,9 +13,17 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  summarizeNexusAuthorityForProject,
+  type NexusAuthorityComponentSummary,
+  type NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
+import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
+import {
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
 import {
   readNexusAutomationTargetContext,
   type NexusAutomationTargetContext,
@@ -174,6 +182,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   verification: NexusAutomationTargetReportVerificationSummary[];
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
+  authority: NexusAuthorityComponentSummary | null;
 }
 
 export interface NexusAutomationTargetReportRelaunchDecision {
@@ -200,6 +209,7 @@ export interface NexusAutomationTargetReport {
   runSummary: NexusAutomationTargetReportRunSummary | null;
   workItemSummary: NexusAutomationTargetReportWorkItemSummary | null;
   executionSummary: NexusAutomationTargetReportExecutionSummary | null;
+  authority: NexusAuthorityProjectSummary | null;
   componentProgress: NexusAutomationTargetReportComponentProgressSummary[];
   relaunchDecision: NexusAutomationTargetReportRelaunchDecision;
   activeBlockers: NexusAutomationTargetReportActiveBlocker[];
@@ -222,6 +232,20 @@ export function buildNexusAutomationTargetReport(
   const automationConfig = projectConfig.automation ?? null;
   const generatedAt = isoString(options.now ?? new Date());
   const components = resolveProjectComponents(projectRoot, projectConfig);
+  const authority = summarizeNexusAuthorityForProject({
+    projectId: projectConfig.id,
+    authority: projectConfig.authority,
+    components: components.map((component) => ({
+      projectId: projectConfig.id,
+      componentId: component.id,
+      componentName: component.name,
+      authority: projectConfig.authority,
+      publication: resolveNexusPublicationPolicy(projectConfig, component),
+      safety: projectConfig.automation?.safety ?? null,
+      tracker: component.defaultTrackerId,
+      repository: component.remoteUrl,
+    })),
+  });
   if (!automationConfig) {
     return {
       version: 1,
@@ -235,6 +259,7 @@ export function buildNexusAutomationTargetReport(
       runSummary: null,
       workItemSummary: null,
       executionSummary: null,
+      authority,
       componentProgress: [],
       relaunchDecision: {
         type: "not_ready",
@@ -293,11 +318,13 @@ export function buildNexusAutomationTargetReport(
     runSummary,
     workItemSummary,
     executionSummary,
+    authority,
     componentProgress: summarizeComponentProgress({
       components,
       workItemSummary,
       executionSummary,
       activeBlockers,
+      authority,
     }),
     relaunchDecision: relaunchDecision({
       automationConfig,
@@ -710,6 +737,7 @@ function summarizeComponentProgress(options: {
   workItemSummary: NexusAutomationTargetReportWorkItemSummary;
   executionSummary: NexusAutomationTargetReportExecutionSummary;
   activeBlockers: NexusAutomationTargetReportActiveBlocker[];
+  authority: NexusAuthorityProjectSummary | null;
 }): NexusAutomationTargetReportComponentProgressSummary[] {
   const drafts = new Map<
     string,
@@ -789,6 +817,10 @@ function summarizeComponentProgress(options: {
       verification,
       publicationDecisions,
       runs: draft.runs,
+      authority:
+        options.authority?.components.find(
+          (component) => component.componentId === componentId,
+        ) ?? null,
     };
   });
 }

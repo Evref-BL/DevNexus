@@ -571,6 +571,92 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("includes authority summaries in reports and preserves recorded cycle authority facts", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          targetBranch: "main",
+          push: true,
+          actor: {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            handle: "example-bot",
+          },
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["contributor"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const authority = buildNexusAutomationTargetReport({ projectRoot }).authority!;
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "cycle-authority",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        status: "dispatched",
+        authority,
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:05:00.000Z",
+    });
+
+    expect(report.authority).toMatchObject({
+      components: [
+        {
+          componentId: "primary",
+          actor: {
+            actorId: "example-bot-actor",
+          },
+          roles: ["contributor"],
+          blockedActions: expect.arrayContaining(["git.push_target_branch"]),
+          fallbackActions: expect.arrayContaining([
+            "provider.pull_request.open",
+          ]),
+        },
+      ],
+    });
+    expect(report.cycleSummary?.lastCycle?.authority).toMatchObject({
+      components: [
+        {
+          componentId: "primary",
+          summary: expect.stringContaining("fallback=provider.pull_request.open"),
+        },
+      ],
+    });
+  });
+
   it("reports wait for active cycles and failed decisions", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
