@@ -1,6 +1,7 @@
 export * from "./browserOpener.js";
 export * from "./codexAppServerCapabilityAdapter.js";
 export * from "./codexAppServerJsonRpc.js";
+export * from "./codexAppServerMcpRelay.js";
 export * from "./gitWorktreeService.js";
 export * from "./nexusAutomation.js";
 export * from "./nexusAutomationAgentLaunch.js";

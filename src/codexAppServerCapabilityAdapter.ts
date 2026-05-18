@@ -1,6 +1,10 @@
 import type {
   CodexAppServerJsonRpcClient,
 } from "./codexAppServerJsonRpc.js";
+import {
+  detectCodexAppServerMcpCapabilities,
+  type CodexAppServerMcpCapabilitySet,
+} from "./codexAppServerMcpRelay.js";
 
 export const codexAppServerControlMethods = [
   "thread/start",
@@ -38,6 +42,7 @@ export interface CodexAppServerCapabilitySet {
   threadRead: CodexAppServerMethodAvailability;
   threadList: CodexAppServerMethodAvailability;
   threadReadOrList: CodexAppServerAlternativeCapability;
+  mcp: CodexAppServerMcpCapabilitySet;
 }
 
 export interface CodexAppServerCapabilityAdapter {
@@ -121,6 +126,7 @@ export function detectCodexAppServerCapabilities(
       method: readMethod,
       alternatives: [...codexAppServerReadMethodCandidates],
     },
+    mcp: detectCodexAppServerMcpCapabilities(methodNames),
   };
 }
 
