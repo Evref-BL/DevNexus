@@ -1129,6 +1129,85 @@ describe("nexus coordination", () => {
     );
   });
 
+  it("plans component integration from the component repository when current path is the project repo", async () => {
+    const { projectRoot, sourceRoot, storePath } =
+      initCoordinationProjectFixture("coordination-component-repo");
+    const workItemId = await createFixtureWorkItem(
+      projectRoot,
+      storePath,
+      "Component repo integration",
+    );
+    const projectMainCommit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const componentMainCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const featureCommit = "cccccccccccccccccccccccccccccccccccccccc";
+    const branches = {
+      "codex/component-clean-branch": {
+        head: featureCommit,
+        mergeBase: componentMainCommit,
+        changedFiles: ["src/component-clean.ts"],
+        mergeStatus: "clean" as const,
+      },
+    };
+    await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      status: "ready",
+      changedAreas: ["src/component-clean.ts"],
+      currentPath: sourceRoot,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/component-clean-branch",
+        currentHead: featureCommit,
+        mainHead: componentMainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
+      now: () => "2026-05-16T10:00:00.000Z",
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const componentRunner = fakeIntegrationGitRunner(sourceRoot, gitCalls, {
+      currentBranch: "main",
+      currentHead: componentMainCommit,
+      mainHead: componentMainCommit,
+      branches,
+    });
+    const projectRunner = fakeIntegrationGitRunner(projectRoot, gitCalls, {
+      currentBranch: "main",
+      currentHead: projectMainCommit,
+      mainHead: projectMainCommit,
+      branches: {},
+    });
+    const gitRunner: GitRunner = (args, cwd) =>
+      cwd === sourceRoot ? componentRunner(args, cwd) : projectRunner(args, cwd);
+
+    const plan = await getNexusCoordinationIntegrationPlan({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId,
+      targetBranch: "main",
+      currentPath: projectRoot,
+      gitRunner,
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(plan.target.commit).toBe(componentMainCommit);
+    expect(plan.target.commit).not.toBe(projectMainCommit);
+    expect(plan.branches).toMatchObject([
+      {
+        branch: "codex/component-clean-branch",
+        merge: {
+          status: "clean",
+          targetCommit: componentMainCommit,
+          changedFiles: ["src/component-clean.ts"],
+        },
+      },
+    ]);
+    expect(gitCalls[0]).toMatchObject({
+      args: ["rev-parse", "--show-toplevel"],
+      cwd: sourceRoot,
+    });
+  }, 15000);
+
   it("reports concise textual conflicts from merge-tree", async () => {
     const { projectRoot, sourceRoot, storePath } =
       initCoordinationProjectFixture("coordination-conflict");

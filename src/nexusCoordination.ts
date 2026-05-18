@@ -588,7 +588,9 @@ export async function getNexusCoordinationIntegrationPlan(
   const now = currentTimestamp(options.now);
   const maxHandoffAgeMs =
     options.maxHandoffAgeMs ?? defaultCoordinationHandoffStaleAfterMs;
-  const git = getCoordinationGitStatus(context, runner);
+  const git = getCoordinationGitStatus(context, runner, {
+    repositoryCandidates: integrationRepositoryCandidates(context),
+  });
   const workItemId = context.workItemId;
   const workItem = workItemId
     ? await getCoordinationWorkItem(context, workItemId, options.now)
@@ -1145,12 +1147,16 @@ function trackerReferenceFromParts(options: {
 function getCoordinationGitStatus(
   context: ResolvedCoordinationContext,
   gitRunner: GitRunner | undefined,
+  options: { repositoryCandidates?: string[] } = {},
 ): NexusCoordinationGitStatus {
   const runner = gitRunner ?? defaultGitRunner;
-  const repositoryPath = findGitRepositoryPath(runner, [
-    context.currentPath,
-    context.component.sourceRoot,
-  ]);
+  const repositoryPath = findGitRepositoryPath(
+    runner,
+    options.repositoryCandidates ?? [
+      context.currentPath,
+      context.component.sourceRoot,
+    ],
+  );
   const baseRefFallback = context.component.defaultBranch;
   if (!repositoryPath) {
     return {
@@ -1218,6 +1224,12 @@ function getCoordinationGitStatus(
     pushed: upstream && aheadBehind.ahead !== null ? aheadBehind.ahead === 0 : null,
     warnings,
   };
+}
+
+function integrationRepositoryCandidates(
+  context: ResolvedCoordinationContext,
+): string[] {
+  return [context.component.sourceRoot, context.currentPath];
 }
 
 function integrationTargetBranch(
