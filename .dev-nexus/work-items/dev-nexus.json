@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 105,
-  "nextCommentNumber": 173,
-  "updatedAt": "2026-05-18T13:30:34.960Z",
+  "nextNumber": 112,
+  "nextCommentNumber": 174,
+  "updatedAt": "2026-05-18T13:34:31.535Z",
   "items": [
     {
       "id": "local-1",
@@ -2640,13 +2640,199 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:30:34.960Z",
-      "updatedAt": "2026-05-18T13:30:34.960Z",
+      "updatedAt": "2026-05-18T13:34:31.534Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-104",
         "itemNumber": 104
+      }
+    },
+    {
+      "id": "local-105",
+      "title": "Add active agent target policy and compatibility normalization",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: add one explicit active-agent-target policy that distinguishes supported providers from providers selected for this project or host.\n\nUser stories covered:\n- As a Codex-only project owner, I can configure DevNexus so only Codex-native project files are generated.\n- As a multi-provider team, we can explicitly select Codex and Claude and get both projections intentionally.\n\nAcceptance criteria:\n- Project configuration accepts an active agent target policy with provider id, enabled state, optional MCP settings, optional skill projection settings, source-control policy, and setup notes.\n- Existing projects using only mcp.agentTargets and skills.agentTargets continue to load through compatibility normalization.\n- Normalization preserves intentionally configured multi-provider projects, while allowing setup/status to recommend an explicit active target set.\n- New project/setup defaults can represent the provider chosen during setup without enabling every supported provider.\n- Invalid duplicate, unknown, disabled, or unsupported active target configurations fail with actionable errors.\n\nBoundaries:\n- Do not remove Codex, Claude, OpenCode, or manual/custom provider support.\n- Do not change projection materialization behavior in this slice beyond normalized configuration surfaces.\n- Do not write provider-global state or credentials.\n\nVerification:\n- Focused project config/lifecycle tests for Codex-only, Claude-only, multi-provider, legacy MCP-only, legacy skills-only, and invalid target configs.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:17.313Z",
+      "updatedAt": "2026-05-18T13:34:17.313Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-105",
+        "itemNumber": 105
+      }
+    },
+    {
+      "id": "local-106",
+      "title": "Filter MCP skills and plugin projections by active agent targets",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active agent target policy exists\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make MCP config refresh, skill projection, plugin projected skills, plugin MCP entries, and setup fragments materialize only for active compatible agent targets.\n\nUser stories covered:\n- As a Codex-only project owner, I do not receive Claude-native support directories.\n- As a plugin author, I can declare target-compatible capabilities without forcing every compatible provider to be materialized.\n\nAcceptance criteria:\n- MCP refresh defaults to the active target set unless the command explicitly names a provider target.\n- Skill refresh defaults to the active target set and does not create target directories outside that set.\n- Plugin capabilities declare compatible target agents, not mandatory target agents, and are materialized only when compatible with an active target.\n- Explicit command-line target selection can refresh a selected provider without mutating unrelated provider directories.\n- Codex-only fixture tests prove no `.claude` support directory is created; Claude-only fixture tests prove no Codex-native support is created unless selected; multi-provider tests still create both.\n\nDependencies:\n- Depends on dev-nexus:local-105 active target policy.\n\nBoundaries:\n- Do not delete existing stale directories in this slice; only stop creating newly unselected projections.\n- Do not weaken provider trust or approval settings.\n\nVerification:\n- Focused MCP config, skill materialization, plugin capability, and setup assistant tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "mcp",
+        "skills",
+        "plugins",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:17.583Z",
+      "updatedAt": "2026-05-18T13:34:17.583Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-106",
+        "itemNumber": 106
+      }
+    },
+    {
+      "id": "local-107",
+      "title": "Report stale and unexpected provider projections in setup and status",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make setup checks and project status distinguish expected, missing, stale generated, manual, and unsupported provider-native projections.\n\nUser stories covered:\n- As a coordinator agent, I can see whether a provider-native directory is expected, stale generated support, or manually authored.\n- As a new-machine setup user, I can avoid misreading stale provider support as an active workflow.\n\nAcceptance criteria:\n- Project status summarizes active agent targets, expected MCP config files, expected skill directories, selected plugin capabilities, unsupported/manual targets, and stale generated provider directories.\n- Setup check reports expected-present, expected-missing, present-stale-generated, present-manual, unsupported-provider, and locally-selected-but-not-allowed states.\n- Stale generated support is detected using generated markers, projection manifests, known ignored paths, or another safe evidence source.\n- Manual or source-controlled provider files are reported without being classified as cleanup-safe.\n- Output remains concise enough for agent consumption and does not include secrets or provider-global credentials.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Reporting only; do not remove files in this slice.\n- Do not inspect provider-global app databases or credentials.\n\nVerification:\n- Focused status/setup tests for expected, missing, stale generated, manual, unsupported, and host-local override cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "setup",
+        "status",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:17.844Z",
+      "updatedAt": "2026-05-18T13:34:17.844Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-107",
+        "itemNumber": 107
+      }
+    },
+    {
+      "id": "local-108",
+      "title": "Add safe cleanup for stale generated agent provider support",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after stale projection diagnostics exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: provide a dry-run-first cleanup path for generated provider support directories that are no longer selected by active agent targets.\n\nUser stories covered:\n- As a Codex-only project owner, I can remove stale generated Claude support without risking manually authored files.\n- As a multi-provider team, intentionally active provider support is preserved.\n\nAcceptance criteria:\n- Cleanup dry-run lists stale generated provider support paths, why they are considered generated, source-control state, and whether cleanup is safe.\n- Cleanup execution removes only cleanup-safe generated support paths when explicitly requested.\n- Cleanup refuses source-controlled, unknown, manually authored, or provider-global files unless a future explicit force policy exists.\n- Cleanup updates or recommends refreshing setup/status state after removal.\n- Errors are non-interactive and actionable for automation.\n\nDependencies:\n- Depends on dev-nexus:local-107 stale projection diagnostics.\n\nBoundaries:\n- Do not delete user-global skills, provider credentials, app databases, or unknown provider directories.\n- Do not remove active selected provider projections.\n\nVerification:\n- Focused cleanup tests for dry-run, safe removal, source-controlled refusal, unknown/manual refusal, active-provider preservation, and idempotent rerun.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "cleanup",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:18.113Z",
+      "updatedAt": "2026-05-18T13:34:18.113Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-108",
+        "itemNumber": 108
+      }
+    },
+    {
+      "id": "local-109",
+      "title": "Propagate active agent targets into worker context preparation",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: ensure generated worker context and prepared worktree support files describe and materialize only the provider-native projections relevant to the worker agent target.\n\nUser stories covered:\n- As a worker agent, I receive the skill and MCP context for the provider I am actually using.\n- As a coordinator agent, I can prepare a Codex worker without also creating Claude-native support state.\n\nAcceptance criteria:\n- Worker context records the project active target policy and the assigned worker provider target.\n- Worker-local skill projections and plugin fragments are filtered by the assigned provider target.\n- Worker briefing describes only relevant provider-native directories plus shared project-managed skill roots.\n- Preparing a worktree for a provider not active in project policy fails or produces a clear manual-target warning according to configuration.\n- Multi-provider projects can prepare distinct worker contexts for different active providers without cross-contaminating support files.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Do not create nested execution workspaces or change the Git worktree model.\n- Do not install global skills or write to user-global provider directories.\n\nVerification:\n- Focused worker context and worktree prepare tests for Codex-only, Claude-only, multi-provider, unsupported provider, and plugin fragment filtering cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "worker-context",
+        "worktrees",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:18.350Z",
+      "updatedAt": "2026-05-18T13:34:18.350Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-109",
+        "itemNumber": 109
+      }
+    },
+    {
+      "id": "local-110",
+      "title": "Document opt-in agent targets and projection cleanup",
+      "description": "Type: documentation and onboarding slice\nReadiness: autonomous agent-ready (AFK) after active target behavior stabilizes\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: document supported providers versus active targets, provider-specific projection behavior, and stale generated support cleanup for new and existing DevNexus projects.\n\nUser stories covered:\n- As a Codex-only project owner, I can understand why only Codex-native files are generated.\n- As a Claude or OpenCode user, I can opt into the provider I actually use.\n- As a multi-provider team, we can intentionally configure multiple active targets.\n\nAcceptance criteria:\n- User docs explain supported provider versus active target, MCP projection, skill projection, plugin compatibility, and worker context projection.\n- Docs include Codex-only, Claude-only, OpenCode/manual, and multi-provider examples.\n- Setup/onboarding docs explain how to choose active targets when creating or joining a project.\n- Cleanup docs explain stale generated support detection, dry-run, cleanup execution, and refusal of manual/source-controlled files.\n- Generic docs avoid dogfood-specific account names or implying Codex is universal default.\n\nDependencies:\n- Depends on the implemented active target and cleanup behavior.\n\nBoundaries:\n- Do not document unsupported live provider capability discovery.\n- Do not include personal paths, credentials, or provider-global details.\n\nVerification:\n- Static documentation review.\n- npm run check when feasible if docs participate in checks.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "docs",
+        "onboarding",
+        "afk",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:18.591Z",
+      "updatedAt": "2026-05-18T13:34:18.591Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-110",
+        "itemNumber": 110
+      }
+    },
+    {
+      "id": "local-111",
+      "title": "Migrate dogfood project to explicit Codex-only active targets",
+      "description": "Type: dogfood migration slice\nReadiness: todo/dependent after active target filtering, stale diagnostics, and cleanup behavior are available\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: migrate this dogfood project to an explicit Codex-only active target policy and remove stale ignored Claude support generated from the old skills target list.\n\nAcceptance criteria:\n- Update dogfood project configuration so the active agent target policy reflects the current Codex-only workflow.\n- Keep DevNexus support for Claude and other providers available but inactive for this project until explicitly selected.\n- Refresh MCP and skill projections after the config change.\n- Setup/status reports Codex projections as expected and `.claude/skills` as absent or cleaned, not active.\n- Remove `.claude/skills` only through the safe generated-support cleanup path or after verifying it is ignored generated support and not source-controlled/manual.\n- Run setup check and project status after migration.\n\nDependencies:\n- Depends on dev-nexus:local-105 through at least dev-nexus:local-108.\n\nBoundaries:\n- Do not remove Claude support from DevNexus source.\n- Do not delete manually authored provider files.\n- Do not touch user-global Claude or Codex directories.\n\nVerification:\n- dev-nexus setup check . join-existing-project --platform windows --json\n- dev-nexus project status . --json\n- git status summary showing only intended dogfood meta changes.\n\nPublication notes:\n- Commit and push dogfood meta-project changes through the bot remote after verification passes.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "agent-providers",
+        "projection",
+        "cleanup",
+        "migration",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T13:34:18.824Z",
+      "updatedAt": "2026-05-18T13:34:18.824Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-111",
+        "itemNumber": 111
       }
     }
   ],
@@ -4717,6 +4903,25 @@
     "local-101": [],
     "local-102": [],
     "local-103": [],
-    "local-104": []
+    "local-104": [
+      {
+        "id": "local-comment-173",
+        "body": "Sliced docs/agent-target-projection-opt-in-prd.md into component-owned DevNexus work items:\n\n- dev-nexus:local-105 Add active agent target policy and compatibility normalization (ready)\n- dev-nexus:local-106 Filter MCP skills and plugin projections by active agent targets (dependent)\n- dev-nexus:local-107 Report stale and unexpected provider projections in setup and status (dependent)\n- dev-nexus:local-108 Add safe cleanup for stale generated agent provider support (dependent)\n- dev-nexus:local-109 Propagate active agent targets into worker context preparation (dependent)\n- dev-nexus:local-110 Document opt-in agent targets and projection cleanup (dependent)\n- dev-nexus:local-111 Migrate dogfood project to explicit Codex-only active targets (dependent dogfood migration)\n\nImplementation should start with local-105. Keep provider support generic, preserve multi-provider projects, and do not delete stale support directories until diagnostics and cleanup safety behavior exist.",
+        "author": null,
+        "createdAt": "2026-05-18T13:34:31.534Z",
+        "updatedAt": "2026-05-18T13:34:31.534Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-173"
+        }
+      }
+    ],
+    "local-105": [],
+    "local-106": [],
+    "local-107": [],
+    "local-108": [],
+    "local-109": [],
+    "local-110": [],
+    "local-111": []
   }
 }

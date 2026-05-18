@@ -71,6 +71,12 @@ and ready for coordinator-driven work across its components.
   and implementation. Current dogfood evidence: MCP is Codex-only, but
   `skills.agentTargets` still includes Claude, so `.claude/skills` is stale
   ignored support state for this Codex-only workflow.
+- Agent-target projection opt-in has been sliced: start with
+  `dev-nexus:local-105` for active target policy and compatibility
+  normalization, then promote `local-106` through `local-111` as prerequisites
+  land. Do not remove `.claude/skills` until stale-projection diagnostics and
+  cleanup safety behavior are available, unless a separate manual cleanup is
+  explicitly approved.
 - No active implementation subagents are expected.
 
 ## Near-Term Direction
@@ -85,6 +91,9 @@ and ready for coordinator-driven work across its components.
   or advisory slices first (`local-97`, `local-99`, `local-102`), then promote
   shared-checkout enforcement, status expansion, start/adopt, and cleanup
   execution as their authority and lease dependencies land.
+- Start agent-target projection work at `dev-nexus:local-105`; `local-111`
+  is the dogfood Codex-only migration and should wait for active target
+  filtering plus stale cleanup safety.
 - Revisit `dev-nexus:local-51` after the sync execution shape from
   `dev-nexus:local-48` lands.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
