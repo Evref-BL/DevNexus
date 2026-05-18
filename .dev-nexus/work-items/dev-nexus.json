@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 76,
-  "nextCommentNumber": 166,
-  "updatedAt": "2026-05-18T11:58:11.055Z",
+  "nextNumber": 77,
+  "nextCommentNumber": 167,
+  "updatedAt": "2026-05-18T12:26:59.163Z",
   "items": [
     {
       "id": "local-1",
@@ -1763,7 +1763,7 @@
       "id": "local-71",
       "title": "Add componentsRoot portable path base for project-local component clones",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK)\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: add a first-class project-local component path base so shared DevNexus config can express stable source checkouts under the meta project root without absolute host paths or sibling-directory guessing.\n\nAcceptance criteria:\n- The central path resolver accepts `componentsRoot:<component-id-or-path>` and resolves it to `<projectRoot>/components/<component-id-or-path>` on Windows, macOS, and Linux path styles.\n- Existing project-relative paths, `projectRoot:`, `projectParent:`, `sourcesRoot:`, and compatible absolute legacy paths continue to work.\n- Agent profile/path-expression detection and setup/status surfaces that validate portable paths recognize `componentsRoot:` as portable.\n- User docs and examples state that `componentsRoot:<component-id>` is the preferred sourceRoot for normal project-local component clones; `sourcesRoot:` remains an advanced external-layout option.\n- Focused tests cover Windows and POSIX resolution, empty/tail normalization, compatibility with existing bases, and setup/status path analysis where relevant.\n\nBoundaries:\n- Do not migrate this dogfood project's component source roots in this slice.\n- Do not remove `sourcesRoot:` compatibility.\n- Do not introduce host-local secrets or absolute paths into shared config.\n\nVerification:\n- Focused path resolver and setup/status tests.\n- `npm run check` when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "ready",
+      "status": "blocked",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1775,7 +1775,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:56:51.724Z",
-      "updatedAt": "2026-05-18T11:56:51.724Z",
+      "updatedAt": "2026-05-18T12:26:47.321Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1884,6 +1884,31 @@
         "provider": "local",
         "itemId": "local-75",
         "itemNumber": 75
+      }
+    },
+    {
+      "id": "local-76",
+      "title": "Stabilize full-suite coordination test timeout",
+      "description": "Default npm run check repeatedly times out in nexusCoordination clean-handoff test under full-suite load; isolated test and serialized full suite pass. Make default check deterministic without weakening coverage.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "tests",
+        "verification",
+        "flake",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T12:21:15.591Z",
+      "updatedAt": "2026-05-18T12:26:59.163Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-76",
+        "itemNumber": 76
       }
     }
   ],
@@ -3840,10 +3865,23 @@
         }
       }
     ],
-    "local-71": [],
+    "local-71": [
+      {
+        "id": "local-comment-166",
+        "body": "Implemented in DevNexus worktree branch codex/dev-nexus/local-71-componentsroot and opened PR https://github.com/Evref-BL/DevNexus/pull/2 from the Gabot-Darbot fork. Commit: d747f9b. Verification passed: focused path/profile/setup tests; npm run build plus npx vitest run --maxWorkers=1 passed 53 files / 397 tests. Default npm run check still times out in the existing nexusCoordination clean-handoff test under full-suite load; tracked separately as dev-nexus:local-76.",
+        "author": null,
+        "createdAt": "2026-05-18T12:26:47.101Z",
+        "updatedAt": "2026-05-18T12:26:47.101Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-166"
+        }
+      }
+    ],
     "local-72": [],
     "local-73": [],
     "local-74": [],
-    "local-75": []
+    "local-75": [],
+    "local-76": []
   }
 }
