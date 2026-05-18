@@ -165,6 +165,16 @@ describe("project registry helpers", () => {
           worktreesRoot: path.join(root, "worktrees", "primary"),
           worktreesRootExists: false,
           defaultTrackerId: "default",
+          trackerDiscovery: {
+            scannedRoles: ["primary"],
+            directExternalSelection: "disabled",
+            importRequiredFirst: true,
+            providerFilters: [],
+            queryLimit: 50,
+            conflictWinner: "default_tracker",
+            missingCredentialBehavior: "block",
+            defaultTrackerOnly: true,
+          },
           workTrackers: [
             {
               id: "default",

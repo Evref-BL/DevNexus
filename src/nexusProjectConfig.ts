@@ -109,12 +109,42 @@ export interface NexusProjectComponentRelationshipConfig {
 
 export type NexusProjectWorkTrackerRole =
   | "primary"
+  | "eligible_source"
+  | "external_inbox"
   | "mirror"
   | "coordination"
   | "planning"
   | "external_feedback"
   | "migration"
   | "archive";
+
+export type NexusProjectTrackerDiscoveryDirectExternalSelection =
+  | "disabled"
+  | "allowed";
+
+export type NexusProjectTrackerDiscoveryConflictWinner =
+  | "block"
+  | "default_tracker"
+  | "scanned_tracker";
+
+export type NexusProjectTrackerDiscoveryMissingCredentialBehavior =
+  | "block"
+  | "skip";
+
+export interface NexusProjectTrackerDiscoveryPolicyConfig {
+  scannedRoles: NexusProjectWorkTrackerRole[];
+  directExternalSelection: NexusProjectTrackerDiscoveryDirectExternalSelection;
+  importRequiredFirst: boolean;
+  providerFilters: WorkTrackingProviderName[];
+  queryLimit: number | null;
+  conflictWinner: NexusProjectTrackerDiscoveryConflictWinner;
+  missingCredentialBehavior: NexusProjectTrackerDiscoveryMissingCredentialBehavior;
+}
+
+export interface NormalizedNexusProjectTrackerDiscoveryPolicy
+  extends NexusProjectTrackerDiscoveryPolicyConfig {
+  defaultTrackerOnly: boolean;
+}
 
 export interface NexusProjectWorkTrackerBindingConfig {
   id: string;
@@ -128,6 +158,7 @@ export interface NormalizedNexusProjectWorkTrackers {
   defaultTrackerId: string | null;
   defaultTracker: NexusProjectWorkTrackerBindingConfig | null;
   trackers: NexusProjectWorkTrackerBindingConfig[];
+  discoveryPolicy: NormalizedNexusProjectTrackerDiscoveryPolicy;
 }
 
 export interface NexusProjectComponentConfig {
@@ -142,6 +173,7 @@ export interface NexusProjectComponentConfig {
   workTracking?: WorkTrackingConfig;
   defaultWorkTrackerId?: string;
   workTrackers?: NexusProjectWorkTrackerBindingConfig[];
+  trackerDiscovery?: NexusProjectTrackerDiscoveryPolicyConfig;
   verification?: Partial<NexusAutomationVerificationConfig>;
   publication?: Partial<NexusAutomationPublicationConfig>;
   relationships: NexusProjectComponentRelationshipConfig[];
@@ -294,6 +326,16 @@ export class NexusConfigError extends Error {
     this.name = "NexusConfigError";
   }
 }
+
+export const defaultNexusProjectTrackerDiscoveryPolicy: NexusProjectTrackerDiscoveryPolicyConfig = {
+  scannedRoles: ["primary"],
+  directExternalSelection: "disabled",
+  importRequiredFirst: true,
+  providerFilters: [],
+  queryLimit: 50,
+  conflictWinner: "default_tracker",
+  missingCredentialBehavior: "block",
+};
 
 export function projectConfigPath(projectRootPath: string): string {
   return path.join(path.resolve(projectRootPath), devNexusProjectConfigFileName);
@@ -2798,24 +2840,31 @@ function assertUniqueValues(values: readonly string[], pathName: string): void {
   }
 }
 
+const nexusProjectWorkTrackerRoles: readonly NexusProjectWorkTrackerRole[] = [
+  "primary",
+  "eligible_source",
+  "external_inbox",
+  "mirror",
+  "coordination",
+  "planning",
+  "external_feedback",
+  "migration",
+  "archive",
+];
+
 function validateWorkTrackerRole(
   value: unknown,
   pathName: string,
 ): NexusProjectWorkTrackerRole {
   if (
-    value === "primary" ||
-    value === "mirror" ||
-    value === "coordination" ||
-    value === "planning" ||
-    value === "external_feedback" ||
-    value === "migration" ||
-    value === "archive"
+    typeof value === "string" &&
+    nexusProjectWorkTrackerRoles.includes(value as NexusProjectWorkTrackerRole)
   ) {
-    return value;
+    return value as NexusProjectWorkTrackerRole;
   }
 
   throw new NexusConfigError(
-    `${pathName} must be primary, mirror, coordination, planning, external_feedback, migration, or archive`,
+    `${pathName} must be ${nexusProjectWorkTrackerRoles.join(", ")}`,
   );
 }
 
@@ -2842,6 +2891,173 @@ function validateWorkTrackerRoles(
   }
 
   return roles;
+}
+
+function optionalWorkTrackerRoles(
+  value: unknown,
+  pathName: string,
+  fallback: NexusProjectWorkTrackerRole[],
+): NexusProjectWorkTrackerRole[] {
+  if (value === undefined) {
+    return [...fallback];
+  }
+
+  return validateWorkTrackerRoles(value, pathName);
+}
+
+function validateTrackerDiscoveryDirectExternalSelection(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerDiscoveryDirectExternalSelection {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.directExternalSelection;
+  }
+  if (value === "disabled" || value === "allowed") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be disabled or allowed`);
+}
+
+function validateTrackerDiscoveryConflictWinner(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerDiscoveryConflictWinner {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.conflictWinner;
+  }
+  if (
+    value === "block" ||
+    value === "default_tracker" ||
+    value === "scanned_tracker"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be block, default_tracker, or scanned_tracker`,
+  );
+}
+
+function validateTrackerDiscoveryMissingCredentialBehavior(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerDiscoveryMissingCredentialBehavior {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.missingCredentialBehavior;
+  }
+  if (value === "block" || value === "skip") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be block or skip`);
+}
+
+function validateTrackerDiscoveryProviderFilters(
+  value: unknown,
+  pathName: string,
+): WorkTrackingProviderName[] {
+  if (value === undefined) {
+    return [...defaultNexusProjectTrackerDiscoveryPolicy.providerFilters];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+
+  const providers = value.map((entry, index) =>
+    validateWorkTrackingProviderName(entry, `${pathName}[${index}]`),
+  );
+  assertUniqueValues(providers, pathName);
+
+  return providers;
+}
+
+function validateTrackerDiscoveryQueryLimit(
+  value: unknown,
+  pathName: string,
+): number | null {
+  if (value === undefined) {
+    return defaultNexusProjectTrackerDiscoveryPolicy.queryLimit;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusConfigError(`${pathName} must be a positive integer or null`);
+  }
+
+  return value;
+}
+
+function validateTrackerDiscoveryPolicy(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerDiscoveryPolicyConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const policy: NexusProjectTrackerDiscoveryPolicyConfig = {
+    scannedRoles: optionalWorkTrackerRoles(
+      record.scannedRoles,
+      `${pathName}.scannedRoles`,
+      defaultNexusProjectTrackerDiscoveryPolicy.scannedRoles,
+    ),
+    directExternalSelection: validateTrackerDiscoveryDirectExternalSelection(
+      record.directExternalSelection,
+      `${pathName}.directExternalSelection`,
+    ),
+    importRequiredFirst: optionalBoolean(
+      record,
+      "importRequiredFirst",
+      pathName,
+    ) ?? defaultNexusProjectTrackerDiscoveryPolicy.importRequiredFirst,
+    providerFilters: validateTrackerDiscoveryProviderFilters(
+      record.providerFilters,
+      `${pathName}.providerFilters`,
+    ),
+    queryLimit: validateTrackerDiscoveryQueryLimit(
+      record.queryLimit,
+      `${pathName}.queryLimit`,
+    ),
+    conflictWinner: validateTrackerDiscoveryConflictWinner(
+      record.conflictWinner,
+      `${pathName}.conflictWinner`,
+    ),
+    missingCredentialBehavior: validateTrackerDiscoveryMissingCredentialBehavior(
+      record.missingCredentialBehavior,
+      `${pathName}.missingCredentialBehavior`,
+    ),
+  };
+
+  if (
+    policy.directExternalSelection === "allowed" &&
+    policy.importRequiredFirst
+  ) {
+    throw new NexusConfigError(
+      `${pathName}.directExternalSelection cannot be allowed when importRequiredFirst is true`,
+    );
+  }
+
+  return policy;
+}
+
+export function normalizeNexusProjectTrackerDiscoveryPolicy(
+  policy: NexusProjectTrackerDiscoveryPolicyConfig | undefined,
+): NormalizedNexusProjectTrackerDiscoveryPolicy {
+  const normalized = policy ?? defaultNexusProjectTrackerDiscoveryPolicy;
+
+  return {
+    scannedRoles: [...normalized.scannedRoles],
+    directExternalSelection: normalized.directExternalSelection,
+    importRequiredFirst: normalized.importRequiredFirst,
+    providerFilters: [...normalized.providerFilters],
+    queryLimit: normalized.queryLimit,
+    conflictWinner: normalized.conflictWinner,
+    missingCredentialBehavior: normalized.missingCredentialBehavior,
+    defaultTrackerOnly: policy === undefined,
+  };
 }
 
 function validateComponentWorkTrackerBinding(
@@ -2944,7 +3160,7 @@ function validateComponentWorkTrackers(
 export function normalizeComponentWorkTrackers(
   component: Pick<
     NexusProjectComponentConfig,
-    "defaultWorkTrackerId" | "workTrackers" | "workTracking"
+    "defaultWorkTrackerId" | "trackerDiscovery" | "workTrackers" | "workTracking"
   >,
 ): NormalizedNexusProjectWorkTrackers {
   const explicitTrackers = component.workTrackers ?? [];
@@ -2977,6 +3193,9 @@ export function normalizeComponentWorkTrackers(
     defaultTrackerId: defaultTracker?.id ?? null,
     defaultTracker,
     trackers,
+    discoveryPolicy: normalizeNexusProjectTrackerDiscoveryPolicy(
+      component.trackerDiscovery,
+    ),
   };
 }
 
@@ -3113,6 +3332,10 @@ function validateProjectComponent(
   const worktreesRoot = optionalString(record, "worktreesRoot", pathName);
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const workTrackerBindings = validateComponentWorkTrackers(record, pathName);
+  const trackerDiscovery = validateTrackerDiscoveryPolicy(
+    record.trackerDiscovery,
+    `${pathName}.trackerDiscovery`,
+  );
   const verification = validateComponentVerificationConfig(
     record.verification,
     `${pathName}.verification`,
@@ -3137,6 +3360,7 @@ function validateProjectComponent(
     ...(worktreesRoot ? { worktreesRoot } : {}),
     ...(workTracking ? { workTracking } : {}),
     ...workTrackerBindings,
+    ...(trackerDiscovery ? { trackerDiscovery } : {}),
     ...(verification ? { verification } : {}),
     ...(publication ? { publication } : {}),
     relationships: validateComponentRelationships(
