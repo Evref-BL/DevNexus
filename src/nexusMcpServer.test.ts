@@ -18,6 +18,7 @@ import {
   StdioJsonRpcTransport,
   type GitCommandResult,
   type GitRunner,
+  type NexusProjectHostingProviderAdapter,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -50,6 +51,30 @@ function parseJsonRpcFrame(frame: Buffer): unknown {
   const bodyStart = headerEnd + 4;
   return JSON.parse(
     frame.slice(bodyStart, bodyStart + Number(lengthMatch![1])).toString("utf8"),
+  );
+}
+
+function saveHomeConfig(
+  homePath: string,
+  authProfiles: Array<Record<string, unknown>>,
+): void {
+  fs.mkdirSync(homePath, { recursive: true });
+  fs.writeFileSync(
+    path.join(homePath, "dev-nexus.home.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles,
+        projects: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
   );
 }
 
@@ -386,6 +411,118 @@ describe("DevNexus MCP server", () => {
       "git@github.com:ExampleOrg/mcp-demo.git",
     );
     expect(result.apply.finalPlan.actions).toEqual([]);
+  });
+
+  it("applies project hosting repository creation through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-hosting-create-");
+    const homePath = makeTempDir("dev-nexus-mcp-hosting-create-home-");
+    saveHomeConfig(homePath, [
+      {
+        id: "bot-github",
+        provider: "github",
+        kind: "automation",
+        account: "example-bot",
+        sshHost: "github.com-bot",
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "mcp-demo",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "bot",
+              role: "automation",
+              protocol: "ssh",
+              authProfile: "bot-github",
+            },
+          ],
+          access: [],
+          provisioning: {
+            allowCreate: true,
+            allowLocalRemoteRepair: false,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+            providerMutationAuthProfile: "bot-github",
+          },
+        },
+      }),
+    );
+    let repositoryCreated = false;
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return repositoryCreated
+          ? {
+              namespace: "ExampleOrg",
+              name: "mcp-demo",
+              visibility: "private",
+              defaultBranch: "main",
+            }
+          : null;
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async createRepository(input) {
+        repositoryCreated = true;
+        return {
+          status: "created",
+          repository: {
+            namespace: input.namespace,
+            name: input.repositoryName,
+            visibility: input.visibility,
+            defaultBranch: input.defaultBranch,
+          },
+          webUrl: "https://github.com/ExampleOrg/mcp-demo",
+          remoteUrl: "git@github.com-bot:ExampleOrg/mcp-demo.git",
+        };
+      },
+    };
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "project_hosting_apply",
+        { projectRoot, homePath },
+        { hostingProvider },
+      ),
+    );
+
+    expect(result.apply).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [
+        {
+          actionId: "repository:create",
+          disposition: "applied",
+          providerResult: {
+            status: "created",
+            webUrl: "https://github.com/ExampleOrg/mcp-demo",
+            remoteUrl: "git@github.com-bot:ExampleOrg/mcp-demo.git",
+          },
+        },
+      ],
+      finalPlan: {
+        actions: [],
+      },
+    });
   });
 
   it("returns guard details for guarded shared-checkout MCP mutations", async () => {

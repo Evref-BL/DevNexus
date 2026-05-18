@@ -157,6 +157,28 @@ export interface NexusProjectHostingProviderAccessRecord {
   invitationId?: string | null;
 }
 
+export interface NexusProjectHostingProviderCreateRepositoryInput
+  extends NexusProjectHostingProviderRepositoryInput {
+  visibility: NexusProjectHostingRepositoryVisibility;
+  defaultBranch: string;
+  authProfile: NexusHostingAuthProfileConfig;
+}
+
+export type NexusProjectHostingProviderMutationStatus =
+  | "created"
+  | "already_exists"
+  | "blocked"
+  | "failed";
+
+export interface NexusProjectHostingProviderMutationResult {
+  status: NexusProjectHostingProviderMutationStatus;
+  code?: string;
+  message?: string;
+  repository?: NexusProjectHostingRepositoryRecord | null;
+  webUrl?: string | null;
+  remoteUrl?: string | null;
+}
+
 export interface NexusProjectHostingProviderAdapter {
   provider: NexusProjectHostingProviderName;
   getRepository(
@@ -171,6 +193,9 @@ export interface NexusProjectHostingProviderAdapter {
   getAccess?(
     input: NexusProjectHostingProviderAccessInput,
   ): Promise<NexusProjectHostingProviderAccessRecord>;
+  createRepository?(
+    input: NexusProjectHostingProviderCreateRepositoryInput,
+  ): Promise<NexusProjectHostingProviderMutationResult>;
 }
 
 export type NexusProjectHostingPreflightStatus =
@@ -373,6 +398,7 @@ export type NexusProjectHostingApplyStatus =
 
 export type NexusProjectHostingApplyActionDisposition =
   | "applied"
+  | "blocked"
   | "skipped"
   | "failed";
 
@@ -403,18 +429,21 @@ export interface NexusProjectHostingApplyActionResult {
   disposition: NexusProjectHostingApplyActionDisposition;
   reason: string;
   command?: NexusProjectHostingLocalRemoteCommandResult;
+  providerResult?: NexusProjectHostingProviderMutationResult;
 }
 
-export interface NexusProjectHostingLocalRemoteApplyOptions {
+export interface NexusProjectHostingApplyOptions {
   hosting?: NexusProjectHostingConfig;
   status: NexusProjectHostingStatusResult;
-  runLocalRemoteCommand: NexusProjectHostingLocalRemoteCommandRunner;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  provider?: NexusProjectHostingProviderAdapter;
+  runLocalRemoteCommand?: NexusProjectHostingLocalRemoteCommandRunner;
   refreshStatus?: () =>
     | NexusProjectHostingStatusResult
     | Promise<NexusProjectHostingStatusResult>;
 }
 
-export interface NexusProjectHostingLocalRemoteApplyResult {
+export interface NexusProjectHostingApplyResult {
   ok: boolean;
   status: NexusProjectHostingApplyStatus;
   plan: NexusProjectHostingPlanResult;
@@ -422,6 +451,14 @@ export interface NexusProjectHostingLocalRemoteApplyResult {
   finalStatus?: NexusProjectHostingStatusResult;
   finalPlan?: NexusProjectHostingPlanResult;
 }
+
+export interface NexusProjectHostingLocalRemoteApplyOptions
+  extends NexusProjectHostingApplyOptions {
+  runLocalRemoteCommand: NexusProjectHostingLocalRemoteCommandRunner;
+}
+
+export type NexusProjectHostingLocalRemoteApplyResult =
+  NexusProjectHostingApplyResult;
 
 export class NexusProjectHostingError extends Error {
   constructor(message: string) {
@@ -814,14 +851,34 @@ export function planNexusProjectHosting(
 export async function applyNexusProjectHostingLocalRemoteRepairs(
   options: NexusProjectHostingLocalRemoteApplyOptions,
 ): Promise<NexusProjectHostingLocalRemoteApplyResult> {
+  return applyNexusProjectHostingActions({
+    ...options,
+    applyMutationClasses: ["local_remote_repair"],
+  });
+}
+
+export async function applyNexusProjectHosting(
+  options: NexusProjectHostingApplyOptions,
+): Promise<NexusProjectHostingApplyResult> {
+  return applyNexusProjectHostingActions(options);
+}
+
+async function applyNexusProjectHostingActions(
+  options: NexusProjectHostingApplyOptions & {
+    applyMutationClasses?: NexusProjectHostingPlanMutationClass[];
+  },
+): Promise<NexusProjectHostingApplyResult> {
   const plan = planNexusProjectHosting({
     hosting: options.hosting,
     status: options.status,
   });
   const actions: NexusProjectHostingApplyActionResult[] = [];
+  const applyMutationClasses = new Set<NexusProjectHostingPlanMutationClass>(
+    options.applyMutationClasses ?? ["repository_create", "local_remote_repair"],
+  );
 
   for (const action of plan.actions) {
-    if (action.mutationClass !== "local_remote_repair") {
+    if (!applyMutationClasses.has(action.mutationClass)) {
       continue;
     }
 
@@ -836,19 +893,14 @@ export async function applyNexusProjectHostingLocalRemoteRepairs(
       continue;
     }
 
-    const command = localRemoteRepairCommand(action);
-    const commandResult = await options.runLocalRemoteCommand(command);
-    const commandFailed = commandResult.exitCode !== 0;
-    actions.push({
-      actionId: action.id,
-      kind: action.kind,
-      mutationClass: action.mutationClass,
-      disposition: commandFailed ? "failed" : "applied",
-      reason: commandFailed
-        ? `Git remote command failed with exit code ${commandResult.exitCode ?? "null"}.`
-        : action.reason,
-      command: commandResult,
-    });
+    if (action.mutationClass === "repository_create") {
+      actions.push(await applyRepositoryCreateAction(options, action));
+      continue;
+    }
+
+    if (action.mutationClass === "local_remote_repair") {
+      actions.push(await applyLocalRemoteRepairAction(options, action));
+    }
   }
 
   const finalStatus = options.refreshStatus
@@ -862,6 +914,7 @@ export async function applyNexusProjectHostingLocalRemoteRepairs(
         })
       : undefined;
   const hasFailure = actions.some((action) => action.disposition === "failed");
+  const hasBlocked = actions.some((action) => action.disposition === "blocked");
   const hasBlockedSkip = actions.some(
     (action) =>
       action.disposition === "skipped" &&
@@ -869,13 +922,236 @@ export async function applyNexusProjectHostingLocalRemoteRepairs(
   );
 
   return {
-    ok: !hasFailure && !hasBlockedSkip,
-    status: hasFailure ? "failed" : hasBlockedSkip ? "blocked" : "passed",
+    ok: !hasFailure && !hasBlocked && !hasBlockedSkip,
+    status: hasFailure
+      ? "failed"
+      : hasBlocked || hasBlockedSkip
+        ? "blocked"
+        : "passed",
     plan,
     actions,
     ...(finalStatus ? { finalStatus } : {}),
     ...(finalPlan ? { finalPlan } : {}),
   };
+}
+
+async function applyRepositoryCreateAction(
+  options: NexusProjectHostingApplyOptions,
+  action: NexusProjectHostingPlanAction,
+): Promise<NexusProjectHostingApplyActionResult> {
+  const repository = action.repository;
+  if (!repository || !options.hosting) {
+    return blockedApplyAction(
+      action,
+      "Skipped repository create: hosting repository intent is unavailable.",
+    );
+  }
+  if (!options.provider) {
+    return blockedApplyAction(
+      action,
+      "Skipped repository create: no hosting provider adapter was supplied.",
+    );
+  }
+  if (options.provider.provider !== options.hosting.provider) {
+    return blockedApplyAction(
+      action,
+      `Skipped repository create: hosting provider ${options.hosting.provider} ` +
+        `cannot be mutated with ${options.provider.provider} adapter.`,
+    );
+  }
+  if (!options.provider.createRepository) {
+    return blockedApplyAction(
+      action,
+      `Skipped repository create: provider ${options.provider.provider} does ` +
+        "not expose repository creation.",
+    );
+  }
+  if (!action.authProfile) {
+    return blockedApplyAction(
+      action,
+      "Skipped repository create: no provider mutation auth profile is configured.",
+    );
+  }
+
+  const authProfile = options.authProfiles?.find(
+    (profile) => profile.id === action.authProfile,
+  );
+  if (!authProfile) {
+    return blockedApplyAction(
+      action,
+      `Skipped repository create: host-local auth profile is missing: ${action.authProfile}.`,
+    );
+  }
+
+  const authProfileStatus = options.status.authProfiles.find(
+    (status) => status.id === action.authProfile,
+  );
+  if (authProfileStatus?.status === "mismatch") {
+    return blockedApplyAction(
+      action,
+      `Skipped repository create: auth profile ${action.authProfile} is ` +
+        `authenticated as ${authProfileStatus.observedAccount ?? "unknown"}; ` +
+        `expected ${authProfileStatus.expectedAccount ?? "unknown"}.`,
+    );
+  }
+  if (authProfileStatus?.status === "missing") {
+    return blockedApplyAction(
+      action,
+      `Skipped repository create: host-local auth profile is missing: ${action.authProfile}.`,
+    );
+  }
+
+  try {
+    const providerResult = await options.provider.createRepository({
+      namespace: repository.namespace,
+      repositoryName: repository.name,
+      visibility: desiredRepositoryVisibility(action),
+      defaultBranch: desiredDefaultBranch(action),
+      authProfile,
+    });
+    const mismatchReason = repositoryResultMismatchReason(
+      providerResult.repository,
+      repository,
+    );
+    if (mismatchReason) {
+      return {
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "failed",
+        reason: mismatchReason,
+        providerResult,
+      };
+    }
+
+    if (providerResult.status === "blocked") {
+      return {
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "blocked",
+        reason: providerResult.message ?? "Provider blocked repository creation.",
+        providerResult,
+      };
+    }
+    if (providerResult.status === "failed") {
+      return {
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "failed",
+        reason: providerResult.message ?? "Provider failed repository creation.",
+        providerResult,
+      };
+    }
+
+    return {
+      actionId: action.id,
+      kind: action.kind,
+      mutationClass: action.mutationClass,
+      disposition:
+        providerResult.status === "already_exists" ? "skipped" : "applied",
+      reason: providerResult.message ?? action.reason,
+      providerResult,
+    };
+  } catch (error) {
+    return {
+      actionId: action.id,
+      kind: action.kind,
+      mutationClass: action.mutationClass,
+      disposition: "failed",
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Provider failed repository creation.",
+    };
+  }
+}
+
+async function applyLocalRemoteRepairAction(
+  options: NexusProjectHostingApplyOptions,
+  action: NexusProjectHostingPlanAction,
+): Promise<NexusProjectHostingApplyActionResult> {
+  if (!options.runLocalRemoteCommand) {
+    return blockedApplyAction(
+      action,
+      "Skipped local remote repair: no Git remote command runner was supplied.",
+    );
+  }
+
+  const command = localRemoteRepairCommand(action);
+  const commandResult = await options.runLocalRemoteCommand(command);
+  const commandFailed = commandResult.exitCode !== 0;
+  return {
+    actionId: action.id,
+    kind: action.kind,
+    mutationClass: action.mutationClass,
+    disposition: commandFailed ? "failed" : "applied",
+    reason: commandFailed
+      ? `Git remote command failed with exit code ${commandResult.exitCode ?? "null"}.`
+      : action.reason,
+    command: commandResult,
+  };
+}
+
+function blockedApplyAction(
+  action: NexusProjectHostingPlanAction,
+  reason: string,
+): NexusProjectHostingApplyActionResult {
+  return {
+    actionId: action.id,
+    kind: action.kind,
+    mutationClass: action.mutationClass,
+    disposition: "blocked",
+    reason,
+  };
+}
+
+function desiredRepositoryVisibility(
+  action: NexusProjectHostingPlanAction,
+): NexusProjectHostingRepositoryVisibility {
+  const visibility = action.desired.visibility;
+  if (
+    visibility === "public" ||
+    visibility === "private" ||
+    visibility === "internal"
+  ) {
+    return visibility;
+  }
+  throw new NexusProjectHostingError(
+    `Repository create action is missing desired visibility: ${action.id}`,
+  );
+}
+
+function desiredDefaultBranch(action: NexusProjectHostingPlanAction): string {
+  const defaultBranch = action.desired.defaultBranch;
+  if (typeof defaultBranch === "string" && defaultBranch.trim().length > 0) {
+    return defaultBranch;
+  }
+  throw new NexusProjectHostingError(
+    `Repository create action is missing desired default branch: ${action.id}`,
+  );
+}
+
+function repositoryResultMismatchReason(
+  resultRepository: NexusProjectHostingRepositoryRecord | null | undefined,
+  expectedRepository: NexusProjectHostingPlanActionRepository,
+): string | null {
+  if (!resultRepository) {
+    return null;
+  }
+  if (
+    resultRepository.namespace !== expectedRepository.namespace ||
+    resultRepository.name !== expectedRepository.name
+  ) {
+    return (
+      "Provider returned repository " +
+      `${resultRepository.namespace}/${resultRepository.name}; expected ` +
+      `${expectedRepository.namespace}/${expectedRepository.name}.`
+    );
+  }
+
+  return null;
 }
 
 export async function preflightNexusProjectHosting(

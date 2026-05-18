@@ -137,15 +137,16 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
-  applyNexusProjectHostingLocalRemoteRepairs,
+  applyNexusProjectHosting,
   planNexusProjectHosting,
   statusNexusProjectHosting,
   type NexusHostingAuthProfileConfig,
-  type NexusProjectHostingLocalRemoteApplyResult,
+  type NexusProjectHostingApplyResult,
   type NexusProjectHostingLocalRemoteRecord,
   type NexusProjectHostingLocalRemoteCommand,
   type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingPlanResult,
+  type NexusProjectHostingProviderAdapter,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
 import {
@@ -218,6 +219,7 @@ export interface DevNexusCliDependencies {
   commandRunner?: NexusAutomationCommandRunner;
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;
+  hostingProvider?: NexusProjectHostingProviderAdapter;
   now?: () => Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
@@ -237,7 +239,7 @@ interface ProjectHostingPlanCliResult extends ProjectHostingStatusCliResult {
 }
 
 interface ProjectHostingApplyCliResult extends ProjectHostingStatusCliResult {
-  apply: NexusProjectHostingLocalRemoteApplyResult;
+  apply: NexusProjectHostingApplyResult;
 }
 
 interface ParsedHomeInitCommand {
@@ -1196,9 +1198,17 @@ async function handleProjectHostingCommand(
       mutationClass: "local_remote_repair",
       targetPath: statusResult.projectRoot,
     });
-    const apply = await applyNexusProjectHostingLocalRemoteRepairs({
+    const authProfiles = hostingAuthProfilesForCli(
+      projectConfig,
+      parsed.homePath,
+    );
+    const apply = await applyNexusProjectHosting({
       hosting: projectConfig.hosting,
       status: statusResult.status,
+      ...(authProfiles.length > 0 ? { authProfiles } : {}),
+      ...(dependencies.hostingProvider
+        ? { provider: dependencies.hostingProvider }
+        : {}),
       runLocalRemoteCommand: hostingLocalRemoteCommandRunner(
         statusResult.projectRoot,
         dependencies.gitRunner,
@@ -6157,6 +6167,9 @@ async function resolveProjectHostingStatusForCli(
     hosting: projectConfig.hosting,
     ...(authProfiles.length > 0 ? { authProfiles } : {}),
     ...(localRemotes ? { localRemotes } : {}),
+    ...(dependencies.hostingProvider
+      ? { provider: dependencies.hostingProvider }
+      : {}),
   });
 
   return {
@@ -6573,6 +6586,7 @@ function hasInjectedCliDependency(dependencies: DevNexusCliDependencies): boolea
       dependencies.commandRunner ||
       dependencies.gitRunner ||
       dependencies.projectGitRunner ||
+      dependencies.hostingProvider ||
       dependencies.now,
   );
 }

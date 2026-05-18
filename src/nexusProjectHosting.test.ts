@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyNexusProjectHosting,
   applyNexusProjectHostingLocalRemoteRepairs,
   deriveNexusProjectHostingRepositoryName,
   expectedNexusProjectHostingRemotes,
@@ -1081,5 +1082,363 @@ describe("project hosting", () => {
       actions: [],
     });
     expect(commands).toEqual([]);
+  });
+
+  it("creates a missing repository through the provider and reports final facts", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: true,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let repository: NexusProjectHostingRepositoryRecord | null = null;
+    const createInputs: unknown[] = [];
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return repository;
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async createRepository(input) {
+        createInputs.push(input);
+        repository = {
+          namespace: input.namespace,
+          name: input.repositoryName,
+          visibility: input.visibility,
+          defaultBranch: input.defaultBranch,
+        };
+        return {
+          status: "created",
+          repository,
+          webUrl: "https://github.com/ExampleOrg/example-suite-meta",
+          remoteUrl: "git@github.com-bot:ExampleOrg/example-suite-meta.git",
+        };
+      },
+    };
+
+    const initialStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    const result = await applyNexusProjectHosting({
+      hosting: config,
+      status: initialStatus,
+      authProfiles,
+      provider: hostingProvider,
+      refreshStatus: () =>
+        statusNexusProjectHosting({
+          project,
+          hosting: config,
+          authProfiles,
+          provider: hostingProvider,
+        }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.actions).toEqual([
+      expect.objectContaining({
+        actionId: "repository:create",
+        disposition: "applied",
+        providerResult: expect.objectContaining({
+          status: "created",
+          webUrl: "https://github.com/ExampleOrg/example-suite-meta",
+          remoteUrl: "git@github.com-bot:ExampleOrg/example-suite-meta.git",
+        }),
+      }),
+    ]);
+    expect(createInputs).toEqual([
+      expect.objectContaining({
+        namespace: "ExampleOrg",
+        repositoryName: "example-suite-meta",
+        visibility: "private",
+        defaultBranch: "main",
+        authProfile: expect.objectContaining({ id: "bot-github" }),
+      }),
+    ]);
+    expect(result.finalStatus?.repository).toMatchObject({
+      exists: true,
+      visibility: "private",
+      defaultBranch: "main",
+    });
+    expect(result.finalPlan?.actions).toEqual([]);
+  });
+
+  it("blocks repository creation before provider mutation when auth is missing or mismatched", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: true,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let createCalls = 0;
+    const baseProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return null;
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async createRepository() {
+        createCalls += 1;
+        return {
+          status: "created",
+        };
+      },
+    };
+
+    const missingAuthStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      provider: baseProvider,
+    });
+    const missingAuthResult = await applyNexusProjectHosting({
+      hosting: config,
+      status: missingAuthStatus,
+      provider: baseProvider,
+    });
+
+    expect(missingAuthResult).toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          actionId: "repository:create",
+          disposition: "blocked",
+          reason:
+            "Skipped repository create: host-local auth profile is missing: bot-github.",
+        },
+      ],
+    });
+
+    const wrongActorProvider: NexusProjectHostingProviderAdapter = {
+      ...baseProvider,
+      async getAuthenticatedAccount() {
+        return "mallory";
+      },
+    };
+    const wrongActorStatus = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: wrongActorProvider,
+    });
+    const wrongActorResult = await applyNexusProjectHosting({
+      hosting: config,
+      status: wrongActorStatus,
+      authProfiles,
+      provider: wrongActorProvider,
+    });
+
+    expect(wrongActorResult.ok).toBe(false);
+    expect(wrongActorResult.actions).toEqual([
+      expect.objectContaining({
+        actionId: "repository:create",
+        disposition: "blocked",
+        reason:
+          "Skipped repository create: auth profile bot-github is authenticated as mallory; expected example-bot.",
+      }),
+    ]);
+    expect(createCalls).toBe(0);
+  });
+
+  it("reports provider repository creation blockers and returned repository mismatches", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: true,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: provider({
+        repository: null,
+        actors: {
+          "bot-github": "example-bot",
+        },
+      }),
+    });
+    const blockedProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return null;
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async createRepository() {
+        return {
+          status: "blocked",
+          code: "insufficient_token_scope",
+          message:
+            "GitHub token lacks repository administration scope for ExampleOrg.",
+        };
+      },
+    };
+
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status,
+        authProfiles,
+        provider: blockedProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "blocked",
+      actions: [
+        {
+          disposition: "blocked",
+          providerResult: {
+            code: "insufficient_token_scope",
+          },
+          reason:
+            "GitHub token lacks repository administration scope for ExampleOrg.",
+        },
+      ],
+    });
+
+    const mismatchProvider: NexusProjectHostingProviderAdapter = {
+      ...blockedProvider,
+      async createRepository() {
+        return {
+          status: "created",
+          repository: {
+            namespace: "OtherOrg",
+            name: "example-suite-meta",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+        };
+      },
+    };
+
+    await expect(
+      applyNexusProjectHosting({
+        hosting: config,
+        status,
+        authProfiles,
+        provider: mismatchProvider,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      status: "failed",
+      actions: [
+        {
+          disposition: "failed",
+          reason:
+            "Provider returned repository OtherOrg/example-suite-meta; expected ExampleOrg/example-suite-meta.",
+        },
+      ],
+    });
+  });
+
+  it("does not create a repository when status already reports the target exists", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: true,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+        providerMutationAuthProfile: "bot-github",
+      },
+    });
+    let createCalls = 0;
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        };
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async createRepository() {
+        createCalls += 1;
+        return {
+          status: "created",
+        };
+      },
+    };
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    const result = await applyNexusProjectHosting({
+      hosting: config,
+      status,
+      authProfiles,
+      provider: hostingProvider,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [],
+      plan: {
+        actions: [],
+      },
+    });
+    expect(createCalls).toBe(0);
   });
 });

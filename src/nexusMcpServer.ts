@@ -14,13 +14,14 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
-  applyNexusProjectHostingLocalRemoteRepairs,
+  applyNexusProjectHosting,
   planNexusProjectHosting,
   statusNexusProjectHosting,
   type NexusHostingAuthProfileConfig,
   type NexusProjectHostingLocalRemoteCommand,
   type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingLocalRemoteRecord,
+  type NexusProjectHostingProviderAdapter,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
 import {
@@ -135,6 +136,7 @@ export interface McpTool {
 export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
+  hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
@@ -927,9 +929,15 @@ export async function callDevNexusMcpTool(
           mutationClass: "local_remote_repair",
         });
         const config = loadProjectConfig(hostingStatus.projectRoot);
-        const apply = await applyNexusProjectHostingLocalRemoteRepairs({
+        const authProfiles = projectHostingAuthProfiles(
+          config,
+          optionalString(args, "homePath", "arguments"),
+        );
+        const apply = await applyNexusProjectHosting({
           hosting: config.hosting,
           status: hostingStatus.status,
+          ...(authProfiles.length > 0 ? { authProfiles } : {}),
+          ...(context.hostingProvider ? { provider: context.hostingProvider } : {}),
           runLocalRemoteCommand: projectHostingLocalRemoteCommandRunner(
             hostingStatus.projectRoot,
             context.gitRunner,
@@ -1848,6 +1856,7 @@ async function projectHostingStatusFromArgs(
     hosting: config.hosting,
     ...(authProfiles.length > 0 ? { authProfiles } : {}),
     ...(localRemotes ? { localRemotes } : {}),
+    ...(context.hostingProvider ? { provider: context.hostingProvider } : {}),
   });
 
   return {

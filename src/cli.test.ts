@@ -14,6 +14,7 @@ import {
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
+  type NexusProjectHostingProviderAdapter,
   type NexusAutomationCommandRunner,
   type NexusProjectConfig,
   type ProjectGitCommandResult,
@@ -39,6 +40,30 @@ function captureOutput() {
     },
     output: () => output,
   };
+}
+
+function saveHomeConfig(
+  homePath: string,
+  authProfiles: Array<Record<string, unknown>>,
+): void {
+  fs.mkdirSync(homePath, { recursive: true });
+  fs.writeFileSync(
+    path.join(homePath, "dev-nexus.home.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles,
+        projects: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
 }
 
 function fixedClock(...timestamps: string[]): () => string {
@@ -473,6 +498,119 @@ describe("dev-nexus cli", () => {
     expect(remotes.get("upstream")).toBe("git@github.com:ExampleOrg/upstream.git");
     expect(calls.filter((call) => call.join(" ") === "remote -v")).toHaveLength(2);
     expect(payload.apply.finalPlan.actions).toEqual([]);
+  });
+
+  it("applies project hosting repository creation through an injected provider", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-hosting-create-");
+    const homePath = makeTempDir("dev-nexus-cli-hosting-create-home-");
+    saveHomeConfig(homePath, [
+      {
+        id: "bot-github",
+        provider: "github",
+        kind: "automation",
+        account: "example-bot",
+        sshHost: "github.com-bot",
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "demo-project",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "bot",
+              role: "automation",
+              protocol: "ssh",
+              authProfile: "bot-github",
+            },
+          ],
+          access: [],
+          provisioning: {
+            allowCreate: true,
+            allowLocalRemoteRepair: false,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+            providerMutationAuthProfile: "bot-github",
+          },
+        },
+      }),
+    );
+    let repositoryCreated = false;
+    const hostingProvider: NexusProjectHostingProviderAdapter = {
+      provider: "github",
+      async getRepository() {
+        return repositoryCreated
+          ? {
+              namespace: "ExampleOrg",
+              name: "demo-project",
+              visibility: "private",
+              defaultBranch: "main",
+            }
+          : null;
+      },
+      async getPermissions() {
+        return {
+          read: true,
+          write: true,
+          maintain: true,
+          admin: true,
+        };
+      },
+      async getAuthenticatedAccount(input) {
+        return input.authProfile.account ?? null;
+      },
+      async createRepository(input) {
+        repositoryCreated = true;
+        return {
+          status: "created",
+          repository: {
+            namespace: input.namespace,
+            name: input.repositoryName,
+            visibility: input.visibility,
+            defaultBranch: input.defaultBranch,
+          },
+          webUrl: "https://github.com/ExampleOrg/demo-project",
+          remoteUrl: "git@github.com-bot:ExampleOrg/demo-project.git",
+        };
+      },
+    };
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "hosting", "apply", projectRoot, "--home", homePath, "--json"], {
+        stdout: output.writer,
+        hostingProvider,
+      }),
+    ).resolves.toBe(0);
+
+    const payload = JSON.parse(output.output());
+    expect(payload.apply).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [
+        {
+          actionId: "repository:create",
+          disposition: "applied",
+          providerResult: {
+            status: "created",
+            webUrl: "https://github.com/ExampleOrg/demo-project",
+            remoteUrl: "git@github.com-bot:ExampleOrg/demo-project.git",
+          },
+        },
+      ],
+      finalPlan: {
+        actions: [],
+      },
+    });
   });
 
   it("fails shared-checkout work-item mutations before writing local state", async () => {
