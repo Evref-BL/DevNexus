@@ -1527,6 +1527,155 @@ describe("project config", () => {
     ]);
   });
 
+  it("accepts additive plugin MCP tools that do not duplicate core DevNexus tools", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                tools: [
+                  {
+                    name: "inspect_facts",
+                    description: "Read plugin-supplied facts.",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }).plugins?.[0]?.capabilities[0],
+    ).toMatchObject({
+      kind: "mcp_server",
+      id: "analysis-mcp",
+      serverName: "analysis_tools",
+      tools: [
+        {
+          name: "inspect_facts",
+          description: "Read plugin-supplied facts.",
+        },
+      ],
+    });
+  });
+
+  it("rejects plugin MCP tools that duplicate work_item_list", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-mcp",
+                serverName: "analysis_tools",
+                tools: [{ name: "work_item_list" }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      /plugin id analysis-tools server analysis_tools duplicate tools: work_item_list/,
+    );
+  });
+
+  it("rejects plugin MCP tools that duplicate project_status", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "status-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "status-mcp",
+                serverName: "status_tools",
+                tools: [{ name: "project_status" }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      /Plugin MCP server tool overlap is not allowed: plugin id status-tools server status_tools duplicate tools: project_status\. Generic DevNexus operations belong to dev_nexus\./,
+    );
+  });
+
+  it("reports duplicate core tools across multiple plugin MCP servers", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "plugin-project",
+        name: "Plugin Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        plugins: [
+          {
+            id: "analysis-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "analysis-safe",
+                serverName: "analysis_safe",
+                tools: [{ name: "inspect_facts" }],
+              },
+              {
+                kind: "mcp_server",
+                id: "analysis-status",
+                serverName: "analysis_status",
+                tools: [{ name: "project_status" }],
+              },
+            ],
+          },
+          {
+            id: "workflow-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "workflow-work-items",
+                serverName: "workflow_items",
+                tools: [
+                  { name: "work_item_list" },
+                  { name: "work_item_get" },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      /plugin id analysis-tools server analysis_status duplicate tools: project_status; plugin id workflow-tools server workflow_items duplicate tools: work_item_get, work_item_list/,
+    );
+  });
+
   it("rejects invalid plugin dependency projection config", () => {
     const configWithDependencyProjection = (
       projection: Record<string, unknown>,

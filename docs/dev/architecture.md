@@ -82,7 +82,10 @@ When adding an MCP tool, keep the same boundary as the CLI:
 ## Plugin Capabilities
 
 Plugins are additive capability records inside a DevNexus project. They do not
-replace the core and they do not own orchestration decisions.
+replace the core and they do not own orchestration decisions. Plugin MCP
+servers expose additive domain surfaces; they are not alternate generic
+DevNexus servers. Generic project, setup, coordination, worktree, automation,
+and work-item operations belong to the core `dev_nexus` MCP server.
 
 Supported capability kinds include:
 
@@ -97,8 +100,10 @@ Supported capability kinds include:
 - `worker_briefing_fragment`
 
 DevNexus validates and projects these records into agent context and setup
-results. Plugin-specific packages own the provider-specific commands that
-materialize or start specialized runtime surfaces.
+results. A plugin MCP server capability may declare its expected tool names as
+metadata, and DevNexus rejects any declared tool name that overlaps a core
+`dev_nexus` MCP tool. Plugin-specific packages own the provider-specific
+commands that materialize or start specialized runtime surfaces.
 
 Example:
 

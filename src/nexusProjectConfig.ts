@@ -31,6 +31,10 @@ import {
   type NexusProjectPluginsConfig,
 } from "./nexusPluginCapabilities.js";
 import {
+  devNexusCoreMcpServerName,
+  devNexusCoreMcpToolNames,
+} from "./nexusCoreMcpTools.js";
+import {
   validatePartialNexusAutomationPublicationConfig,
   validateNexusAutomationConfig,
   type NexusAutomationConfig,
@@ -2332,6 +2336,53 @@ function validatePluginDependencyProjectionSourceComponents(
   }
 }
 
+function validatePluginMcpToolOwnership(
+  plugins: NexusProjectPluginsConfig | undefined,
+): void {
+  const coreToolNames = new Set<string>(devNexusCoreMcpToolNames);
+  const overlaps: Array<{
+    pluginId: string;
+    serverName: string;
+    duplicateTools: string[];
+  }> = [];
+
+  for (const plugin of plugins ?? []) {
+    for (const capability of plugin.capabilities) {
+      if (capability.kind !== "mcp_server") {
+        continue;
+      }
+
+      const duplicateTools = Array.from(new Set(
+        (capability.tools ?? [])
+          .map((tool) => tool.name.trim())
+          .filter((toolName) => coreToolNames.has(toolName)),
+      )).sort();
+      if (duplicateTools.length === 0) {
+        continue;
+      }
+
+      overlaps.push({
+        pluginId: plugin.id,
+        serverName: capability.serverName,
+        duplicateTools,
+      });
+    }
+  }
+
+  if (overlaps.length === 0) {
+    return;
+  }
+
+  const details = overlaps
+    .map((overlap) =>
+      `plugin id ${overlap.pluginId} server ${overlap.serverName} duplicate tools: ${overlap.duplicateTools.join(", ")}`,
+    )
+    .join("; ");
+  throw new NexusConfigError(
+    `Plugin MCP server tool overlap is not allowed: ${details}. Generic DevNexus operations belong to ${devNexusCoreMcpServerName}.`,
+  );
+}
+
 export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const record = assertRecord(value, "project config");
   if (record.version !== 1) {
@@ -2364,6 +2415,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   };
   const components = validateProjectComponentsConfig(record.components, common);
   validatePluginDependencyProjectionSourceComponents(plugins, components);
+  validatePluginMcpToolOwnership(plugins);
 
   return {
     ...common,

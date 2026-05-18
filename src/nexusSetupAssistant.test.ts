@@ -997,6 +997,55 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("blocks setup diagnostics when plugin MCP tools duplicate core DevNexus tools", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-plugin-overlap-");
+    writeProject(projectRoot, {
+      plugins: [
+        {
+          id: "workflow-tools",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_tools",
+              tools: [
+                { name: "work_item_list" },
+                { name: "project_status" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.status).toBe("blocked");
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "project-config",
+        status: "blocked",
+        summary: expect.stringContaining(
+          "plugin id workflow-tools server workflow_tools duplicate tools: project_status, work_item_list",
+        ),
+        nextAction: expect.stringContaining("project root"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "project-config",
+        summary: expect.stringContaining(
+          "Generic DevNexus operations belong to dev_nexus",
+        ),
+      }),
+    );
+  });
+
   it("checks safe local Mac setup facts without contacting GitHub", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-check-");
     writeProject(projectRoot);

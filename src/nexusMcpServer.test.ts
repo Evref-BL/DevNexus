@@ -8,6 +8,7 @@ import {
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
   defaultLocalWorkTrackingStorePath,
+  devNexusCoreMcpToolNames,
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
   listMcpInputSchemaProviderIssues,
@@ -219,6 +220,12 @@ describe("DevNexus MCP server", () => {
       "work_item_unlink",
       "work_item_sync_plan",
     ]);
+  });
+
+  it("keeps the core MCP ownership list aligned with the advertised tools", () => {
+    expect(devNexusCoreMcpToolNames).toEqual(
+      listDevNexusMcpTools().map((tool) => tool.name),
+    );
   });
 
   it("lists provider-compatible tool input schemas", () => {
@@ -1265,6 +1272,48 @@ describe("DevNexus MCP server", () => {
         },
       },
     });
+  });
+
+  it("returns project status diagnostics for plugin MCP core tool overlap", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-plugin-overlap-");
+    fs.writeFileSync(
+      path.join(projectRoot, "dev-nexus.project.json"),
+      `${JSON.stringify({
+        version: 1,
+        id: "overlap-demo",
+        name: "Overlap Demo",
+        home: null,
+        plugins: [
+          {
+            id: "workflow-tools",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "workflow-mcp",
+                serverName: "workflow_tools",
+                tools: [{ name: "work_item_list" }],
+              },
+            ],
+          },
+        ],
+      }, null, 2)}\n`,
+    );
+
+    const result = toolJson(
+      await callDevNexusMcpTool("project_status", {
+        project: projectRoot,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "plugin id workflow-tools server workflow_tools duplicate tools: work_item_list",
+      ),
+    });
+    expect(result.error).toContain(
+      "Generic DevNexus operations belong to dev_nexus",
+    );
   });
 
   it("targets component-scoped work items through MCP tool arguments", async () => {
