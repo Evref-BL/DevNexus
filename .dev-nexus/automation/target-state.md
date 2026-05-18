@@ -65,6 +65,12 @@ Immediate direction:
   their relaunch/report behavior. This root's project-local runtime install now
   resolves alpha.15, and target-report returns `stop` for final cycle
   `target-cycle-coordinator-loop-20260517-t230936-892-z-1-final`.
+- `dev-nexus:local-61` is complete through DevNexus `0b86587`: coordination
+  integration now reports malformed local tracker stores as structured
+  `ok:false` CLI/MCP diagnostics with component, tracker, provider, store path,
+  failing stage, and recovery guidance. Malformed handoff comment JSON is
+  reported per comment while valid handoffs remain visible. Focused diagnostics
+  tests, the configured focused suite, and `npm run check` passed.
 - Project-scoped PLexus runtime work is active from
   `docs/plexus-project-scoped-runtime-prd.md`:
   - `plexus:local-15` is complete and published through PLexus `75b6bc4`.
@@ -86,10 +92,8 @@ Immediate direction:
     `b220adf`.
   - DevNexus focused integrated tests plus `npm run check` passed; PLexus
     focused runtime tests, typecheck, `npm test`, and `npm run build` passed.
-- Current ready `dogfood` work matching the automation selector:
-  - `dev-nexus:local-61` coordination integration tracker diagnostics. The
-    heartbeat reflection promoted it to `ready` after the local-provider
-    transactional/concurrency fixes landed in the six-item wave.
+- Current ready `dogfood` work matching the automation selector: none after
+  closing `dev-nexus:local-61`.
 - GitHub identity dogfood state:
   - Plain `gh` is authenticated as `Gabriel-Darbord` for human/manual API work.
   - `C:\Users\gabriel.darbord\bin\gh-gabot.cmd` sets

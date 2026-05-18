@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 119,
-  "updatedAt": "2026-05-17T23:22:40.563Z",
+  "nextCommentNumber": 121,
+  "updatedAt": "2026-05-18T00:26:51.700Z",
   "items": [
     {
       "id": "local-1",
@@ -1508,7 +1508,7 @@
       "id": "local-61",
       "title": "Report coordination integration tracker parse failures actionably",
       "description": "Type: coordination diagnostics defect\nReadiness: autonomous agent-ready (AFK), after or alongside the local-provider concurrency fix\nSource: During the 2026-05-17 PLexus integration, coordination integrate failed with a raw JSON.parse message after the local tracker store was corrupted. The command did not identify the store path, affected component, failing provider operation, or a safe recovery path.\n\nGoal:\nMake coordination integrate and related coordination readers degrade cleanly when tracker stores or handoff comments are malformed.\n\nAcceptance criteria:\n- coordination integrate reports component id, tracker id/provider, store path when local, and the failing read/parse stage for malformed tracker state.\n- The command returns structured JSON with ok: false and actionable diagnostics instead of crashing with an uncaught parser message.\n- Malformed handoff comments are skipped or reported individually without hiding valid handoffs from other work items.\n- Tests cover malformed local stores, malformed handoff comment JSON blocks, and valid handoffs coexisting with bad records.\n\nVerification:\nRun focused coordination integrate diagnostics tests and npm run check.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1522,8 +1522,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T21:01:06.401Z",
-      "updatedAt": "2026-05-17T23:22:40.563Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T00:26:51.700Z",
+      "closedAt": "2026-05-18T00:26:36.739Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2952,6 +2952,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-118"
+        }
+      },
+      {
+        "id": "local-comment-119",
+        "body": "Coordinator run coordinator-loop-20260518-t000947-478-z-1 selected this item as the only eligible dogfood work item. Preparing a DevNexus component worktree for isolated implementation of actionable coordination integration diagnostics.",
+        "author": null,
+        "createdAt": "2026-05-18T00:11:23.363Z",
+        "updatedAt": "2026-05-18T00:11:23.363Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-119"
+        }
+      },
+      {
+        "id": "local-comment-120",
+        "body": "Implemented coordination integration diagnostics in DevNexus commit 0b86587. Corrupted local tracker stores now return structured ok:false JSON with component/tracker/provider/store/stage/recovery diagnostics through CLI and MCP; malformed handoff comments are reported individually while valid handoffs remain visible. Verification passed: npm test -- src/cli.test.ts; npm test -- src/nexusMcpServer.test.ts -t coordination-integration; npm test -- src/workTrackingLocalProvider.test.ts; npm test -- --exclude src/processSupervisor.test.ts; npm run check.",
+        "author": null,
+        "createdAt": "2026-05-18T00:26:51.700Z",
+        "updatedAt": "2026-05-18T00:26:51.700Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-120"
         }
       }
     ],
