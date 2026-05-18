@@ -7,7 +7,6 @@ import {
   createLocalWorkTrackerProvider,
   createNexusCoordinationHandoff,
   defaultNexusAutomationConfig,
-  defaultGitRunner,
   getNexusCoordinationStatus,
   getNexusCoordinationIntegrationPlan,
   loadLocalWorkTrackingStore,
@@ -195,6 +194,8 @@ function fakeGitRunner(
     status?: string;
     aheadBehind?: string;
     upstreamExitCode?: number;
+    branch?: string;
+    head?: string;
   } = {},
 ): GitRunner {
   return (args: readonly string[], cwd?: string): GitCommandResult => {
@@ -205,16 +206,18 @@ function fakeGitRunner(
       return ok(argsArray, `${repositoryPath}\n`);
     }
     if (joined === "symbolic-ref --short HEAD") {
-      return ok(argsArray, "codex/shared-coordination\n");
+      return ok(argsArray, `${overrides.branch ?? "codex/shared-coordination"}\n`);
     }
     if (joined === "rev-parse HEAD") {
-      return ok(argsArray, "abc123def456\n");
+      return ok(argsArray, `${overrides.head ?? "abc123def456"}\n`);
     }
     if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
       return {
         args: argsArray,
         stdout:
-          overrides.upstreamExitCode === 1 ? "" : "origin/codex/shared-coordination\n",
+          overrides.upstreamExitCode === 1
+            ? ""
+            : `origin/${overrides.branch ?? "codex/shared-coordination"}\n`,
         stderr: "",
         exitCode: overrides.upstreamExitCode ?? 0,
       };
@@ -230,6 +233,111 @@ function fakeGitRunner(
   };
 }
 
+interface FakeIntegrationBranch {
+  head: string;
+  mergeBase: string;
+  changedFiles: string[];
+  mergeStatus?: "clean" | "conflict";
+  conflictFiles?: string[];
+  messages?: string[];
+  rangeDiff?: string[];
+}
+
+function fakeIntegrationGitRunner(
+  repositoryPath: string,
+  calls: Array<{ args: string[]; cwd?: string }>,
+  options: {
+    currentBranch?: string;
+    currentHead?: string;
+    mainHead?: string;
+    upstreamExitCode?: number;
+    branches?: Record<string, FakeIntegrationBranch>;
+  } = {},
+): GitRunner {
+  const mainHead = options.mainHead ?? "1111111111111111111111111111111111111111";
+  const currentBranch = options.currentBranch ?? "main";
+  const currentHead = options.currentHead ?? mainHead;
+  const branches = options.branches ?? {};
+
+  return (args: readonly string[], cwd?: string): GitCommandResult => {
+    const argsArray = [...args];
+    calls.push({ args: argsArray, cwd });
+    const joined = argsArray.join(" ");
+
+    if (joined === "rev-parse --show-toplevel") {
+      return ok(argsArray, `${repositoryPath}\n`);
+    }
+    if (joined === "symbolic-ref --short HEAD") {
+      return ok(argsArray, `${currentBranch}\n`);
+    }
+    if (joined === "rev-parse HEAD") {
+      return ok(argsArray, `${currentHead}\n`);
+    }
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return {
+        args: argsArray,
+        stdout: options.upstreamExitCode === 1 ? "" : `origin/${currentBranch}\n`,
+        stderr: "",
+        exitCode: options.upstreamExitCode ?? 0,
+      };
+    }
+    if (joined === "status --porcelain=v1") {
+      return ok(argsArray, "");
+    }
+    if (joined === "rev-list --left-right --count HEAD...@{u}") {
+      return ok(argsArray, "0\t0\n");
+    }
+    if (argsArray[0] === "rev-parse" && argsArray[1] === "--verify") {
+      const ref = argsArray[2];
+      if (ref === "main" || ref === "origin/main") {
+        return ok(argsArray, `${mainHead}\n`);
+      }
+      const branch = ref ? branches[ref] : undefined;
+      return ok(argsArray, `${branch?.head ?? currentHead}\n`);
+    }
+    if (argsArray[0] === "merge-base") {
+      const branch = branches[argsArray[2] ?? ""];
+      return ok(argsArray, `${branch?.mergeBase ?? mainHead}\n`);
+    }
+    if (
+      argsArray[0] === "diff" &&
+      argsArray[1] === "--name-only" &&
+      argsArray[2]?.includes("...")
+    ) {
+      const branchName = argsArray[2].split("...").at(1) ?? "";
+      const branch = branches[branchName];
+      return ok(argsArray, `${branch?.changedFiles.join("\n") ?? ""}\n`);
+    }
+    if (joined.startsWith("merge-tree --write-tree --quiet ")) {
+      const branch = branches[argsArray.at(-1) ?? ""];
+      return {
+        args: argsArray,
+        stdout: branch?.mergeStatus === "conflict" ? "" : `${mainHead}\n`,
+        stderr: "",
+        exitCode: branch?.mergeStatus === "conflict" ? 1 : 0,
+      };
+    }
+    if (joined.startsWith("merge-tree --write-tree --name-only --messages ")) {
+      const branch = branches[argsArray.at(-1) ?? ""];
+      const outputLines = branch?.mergeStatus === "conflict"
+        ? [
+            ...(branch.conflictFiles ?? []),
+            ...(branch.messages ?? []),
+          ]
+        : [];
+      return ok(argsArray, `${outputLines.join("\n")}\n`);
+    }
+    if (argsArray[0] === "range-diff") {
+      const branchArg = argsArray[2] ?? "";
+      const branchName = branchArg.split("..").at(1) ?? "";
+      const branch = branches[branchName];
+      return ok(argsArray, `${branch?.rangeDiff?.join("\n") ?? ""}\n`);
+    }
+
+    return ok(argsArray, "");
+  };
+}
+
 function ok(args: string[], stdout: string): GitCommandResult {
   return {
     args,
@@ -237,17 +345,6 @@ function ok(args: string[], stdout: string): GitCommandResult {
     stderr: "",
     exitCode: 0,
   };
-}
-
-function runGit(cwd: string, args: string[]): string {
-  const result = defaultGitRunner(args, cwd);
-  if (result.exitCode !== 0) {
-    throw new Error(
-      `git ${args.join(" ")} failed: ${result.stderr || result.stdout}`,
-    );
-  }
-
-  return result.stdout.trim();
 }
 
 function writeText(filePath: string, text: string): void {
@@ -326,13 +423,7 @@ function holdStoreLock(storePath: string): () => void {
   return () => fs.rmSync(lockPath, { force: true });
 }
 
-function commitAll(repositoryPath: string, message: string): string {
-  runGit(repositoryPath, ["add", "."]);
-  runGit(repositoryPath, ["commit", "-m", message]);
-  return runGit(repositoryPath, ["rev-parse", "HEAD"]);
-}
-
-function initGitProjectFixture(name: string): {
+function initCoordinationProjectFixture(name: string): {
   projectRoot: string;
   sourceRoot: string;
   storePath: string;
@@ -341,12 +432,6 @@ function initGitProjectFixture(name: string): {
   const sourceRoot = path.join(projectRoot, "source");
   const storePath = ".dev-nexus/work-items-dev-nexus.json";
   fs.mkdirSync(sourceRoot, { recursive: true });
-  runGit(sourceRoot, ["init", "-b", "main"]);
-  runGit(sourceRoot, ["config", "user.email", "dev-nexus@example.invalid"]);
-  runGit(sourceRoot, ["config", "user.name", "DevNexus Test"]);
-  runGit(sourceRoot, ["config", "core.autocrlf", "false"]);
-  writeText(path.join(sourceRoot, "README.md"), "base\n");
-  commitAll(sourceRoot, "base");
   saveProjectConfig(
     projectRoot,
     projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
@@ -932,15 +1017,22 @@ describe("nexus coordination", () => {
 
   it("plans a clean handoff branch merge without mutating the source checkout", async () => {
     const { projectRoot, sourceRoot, storePath } =
-      initGitProjectFixture("coordination-clean");
+      initCoordinationProjectFixture("coordination-clean");
     const workItemId = await createFixtureWorkItem(
       projectRoot,
       storePath,
       "Clean integration",
     );
-    runGit(sourceRoot, ["switch", "-c", "codex/clean-branch"]);
-    writeText(path.join(sourceRoot, "src", "clean.ts"), "export const clean = true;\n");
-    const featureCommit = commitAll(sourceRoot, "clean branch change");
+    const mainCommit = "1111111111111111111111111111111111111111";
+    const featureCommit = "2222222222222222222222222222222222222222";
+    const branches = {
+      "codex/clean-branch": {
+        head: featureCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["src/clean.ts"],
+        mergeStatus: "clean" as const,
+      },
+    };
     await createNexusCoordinationHandoff({
       projectRoot,
       componentId: "dev-nexus",
@@ -953,10 +1045,16 @@ describe("nexus coordination", () => {
       verificationSummary: "focused tests passed",
       integrationPreference: "direct_integration",
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/clean-branch",
+        currentHead: featureCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
       now: () => "2026-05-16T10:00:00.000Z",
     });
-    runGit(sourceRoot, ["switch", "main"]);
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
 
     const plan = await getNexusCoordinationIntegrationPlan({
       projectRoot,
@@ -964,7 +1062,12 @@ describe("nexus coordination", () => {
       workItemId,
       targetBranch: "main",
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, gitCalls, {
+        currentBranch: "main",
+        currentHead: mainCommit,
+        mainHead: mainCommit,
+        branches,
+      }),
       now: () => "2026-05-16T10:15:00.000Z",
     });
 
@@ -989,22 +1092,36 @@ describe("nexus coordination", () => {
     expect(plan.suggestedOrder.map((step) => step.branch)).toEqual([
       "codex/clean-branch",
     ]);
-    expect(runGit(sourceRoot, ["branch", "--show-current"])).toBe("main");
-  }, 15000);
+    expect(
+      gitCalls.filter((call) =>
+        ["checkout", "merge", "reset", "switch"].includes(call.args[0] ?? ""),
+      ),
+    ).toEqual([]);
+    expect(gitCalls.map((call) => call.args.join(" "))).toContain(
+      "merge-tree --write-tree --quiet main codex/clean-branch",
+    );
+  });
 
   it("reports concise textual conflicts from merge-tree", async () => {
     const { projectRoot, sourceRoot, storePath } =
-      initGitProjectFixture("coordination-conflict");
+      initCoordinationProjectFixture("coordination-conflict");
     const workItemId = await createFixtureWorkItem(
       projectRoot,
       storePath,
       "Conflicting integration",
     );
-    writeText(path.join(sourceRoot, "settings.txt"), "mode=base\n");
-    commitAll(sourceRoot, "add settings");
-    runGit(sourceRoot, ["switch", "-c", "codex/conflicting-branch"]);
-    writeText(path.join(sourceRoot, "settings.txt"), "mode=feature\n");
-    commitAll(sourceRoot, "feature settings change");
+    const mainCommit = "1111111111111111111111111111111111111111";
+    const featureCommit = "3333333333333333333333333333333333333333";
+    const branches = {
+      "codex/conflicting-branch": {
+        head: featureCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["settings.txt"],
+        mergeStatus: "conflict" as const,
+        conflictFiles: ["settings.txt"],
+        messages: ["CONFLICT (content): Merge conflict in settings.txt"],
+      },
+    };
     await createNexusCoordinationHandoff({
       projectRoot,
       componentId: "dev-nexus",
@@ -1013,12 +1130,15 @@ describe("nexus coordination", () => {
       changedAreas: ["settings.txt"],
       decisions: ["Feature branch owns the settings mode."],
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/conflicting-branch",
+        currentHead: featureCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
       now: () => "2026-05-16T10:00:00.000Z",
     });
-    runGit(sourceRoot, ["switch", "main"]);
-    writeText(path.join(sourceRoot, "settings.txt"), "mode=main\n");
-    commitAll(sourceRoot, "main settings change");
 
     const plan = await getNexusCoordinationIntegrationPlan({
       projectRoot,
@@ -1026,7 +1146,12 @@ describe("nexus coordination", () => {
       workItemId,
       targetBranch: "main",
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "main",
+        currentHead: mainCommit,
+        mainHead: mainCommit,
+        branches,
+      }),
       now: () => "2026-05-16T10:15:00.000Z",
     });
 
@@ -1042,11 +1167,11 @@ describe("nexus coordination", () => {
     expect(plan.branches[0]!.merge.summary).toContain("settings.txt");
     expect(plan.branches[0]!.merge.messages.join("\n").length).toBeLessThan(800);
     expect(plan.nextAction).toContain("Resolve textual conflicts");
-  }, 15000);
+  });
 
   it("surfaces competing recorded decisions before recommending merge order", async () => {
     const { projectRoot, sourceRoot, storePath } =
-      initGitProjectFixture("coordination-decisions");
+      initCoordinationProjectFixture("coordination-decisions");
     const firstWorkItemId = await createFixtureWorkItem(
       projectRoot,
       storePath,
@@ -1057,9 +1182,23 @@ describe("nexus coordination", () => {
       storePath,
       "Second decision",
     );
-    runGit(sourceRoot, ["switch", "-c", "codex/use-json"]);
-    writeText(path.join(sourceRoot, "src", "json.ts"), "export const format = 'json';\n");
-    commitAll(sourceRoot, "json decision");
+    const mainCommit = "1111111111111111111111111111111111111111";
+    const jsonCommit = "4444444444444444444444444444444444444444";
+    const yamlCommit = "5555555555555555555555555555555555555555";
+    const branches = {
+      "codex/use-json": {
+        head: jsonCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["src/json.ts"],
+        mergeStatus: "clean" as const,
+      },
+      "codex/use-yaml": {
+        head: yamlCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["src/yaml.ts"],
+        mergeStatus: "clean" as const,
+      },
+    };
     await createNexusCoordinationHandoff({
       projectRoot,
       componentId: "dev-nexus",
@@ -1068,13 +1207,15 @@ describe("nexus coordination", () => {
       changedAreas: ["src/contracts.ts"],
       decisions: ["Represent integration facts as JSON records."],
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/use-json",
+        currentHead: jsonCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
       now: () => "2026-05-16T10:00:00.000Z",
     });
-    runGit(sourceRoot, ["switch", "main"]);
-    runGit(sourceRoot, ["switch", "-c", "codex/use-yaml"]);
-    writeText(path.join(sourceRoot, "src", "yaml.ts"), "export const format = 'yaml';\n");
-    commitAll(sourceRoot, "yaml decision");
     await createNexusCoordinationHandoff({
       projectRoot,
       componentId: "dev-nexus",
@@ -1083,17 +1224,27 @@ describe("nexus coordination", () => {
       changedAreas: ["src/contracts.ts"],
       decisions: ["Represent integration facts as YAML records."],
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/use-yaml",
+        currentHead: yamlCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
       now: () => "2026-05-16T10:05:00.000Z",
     });
-    runGit(sourceRoot, ["switch", "main"]);
 
     const plan = await getNexusCoordinationIntegrationPlan({
       projectRoot,
       componentId: "dev-nexus",
       targetBranch: "main",
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "main",
+        currentHead: mainCommit,
+        mainHead: mainCommit,
+        branches,
+      }),
       now: () => "2026-05-16T10:15:00.000Z",
     });
 
@@ -1106,19 +1257,26 @@ describe("nexus coordination", () => {
     ]);
     expect(plan.suggestedOrder).toEqual([]);
     expect(plan.nextAction).toContain("Resolve competing handoff decisions");
-  }, 15000);
+  });
 
   it("keeps stale handoffs visible but excludes them from the suggested order", async () => {
     const { projectRoot, sourceRoot, storePath } =
-      initGitProjectFixture("coordination-stale");
+      initCoordinationProjectFixture("coordination-stale");
     const workItemId = await createFixtureWorkItem(
       projectRoot,
       storePath,
       "Stale integration",
     );
-    runGit(sourceRoot, ["switch", "-c", "codex/stale-branch"]);
-    writeText(path.join(sourceRoot, "src", "stale.ts"), "export const stale = true;\n");
-    commitAll(sourceRoot, "stale branch change");
+    const mainCommit = "1111111111111111111111111111111111111111";
+    const staleCommit = "6666666666666666666666666666666666666666";
+    const branches = {
+      "codex/stale-branch": {
+        head: staleCommit,
+        mergeBase: mainCommit,
+        changedFiles: ["src/stale.ts"],
+        mergeStatus: "clean" as const,
+      },
+    };
     await createNexusCoordinationHandoff({
       projectRoot,
       componentId: "dev-nexus",
@@ -1126,10 +1284,15 @@ describe("nexus coordination", () => {
       status: "ready",
       changedAreas: ["src/stale.ts"],
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "codex/stale-branch",
+        currentHead: staleCommit,
+        mainHead: mainCommit,
+        upstreamExitCode: 1,
+        branches,
+      }),
       now: () => "2026-05-16T10:00:00.000Z",
     });
-    runGit(sourceRoot, ["switch", "main"]);
 
     const plan = await getNexusCoordinationIntegrationPlan({
       projectRoot,
@@ -1137,7 +1300,12 @@ describe("nexus coordination", () => {
       workItemId,
       targetBranch: "main",
       currentPath: sourceRoot,
-      gitRunner: defaultGitRunner,
+      gitRunner: fakeIntegrationGitRunner(sourceRoot, [], {
+        currentBranch: "main",
+        currentHead: mainCommit,
+        mainHead: mainCommit,
+        branches,
+      }),
       now: () => "2026-05-18T10:00:00.000Z",
     });
 
@@ -1155,7 +1323,7 @@ describe("nexus coordination", () => {
     expect(plan.warnings).toContain(
       "Handoff for local-1 from 2026-05-16T10:00:00.000Z is stale.",
     );
-  }, 15000);
+  });
 
   it("fetches configured remotes only when automation safety allows host mutation", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-fetch-project-");
