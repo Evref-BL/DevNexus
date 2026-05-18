@@ -42,9 +42,9 @@ dev-nexus project status <project-root>
 ## Project Layout
 
 The shared project root contains `dev-nexus.project.json` and project support
-state under `.dev-nexus/`. Component source checkouts can live inside the
-project or beside it. The important part is that each component has a stable
-`sourceRoot`.
+state under `.dev-nexus/`. By default, put stable component source checkouts
+under `components/<component-id>` inside the project root, and put generated
+implementation worktrees under `worktrees/<component-id>`.
 
 Common generated or support paths:
 
@@ -52,6 +52,7 @@ Common generated or support paths:
 | --- | --- | --- |
 | Project config | `dev-nexus.project.json` | User-authored shared configuration. |
 | Project state | `.dev-nexus/` | DevNexus support records, local ledgers, setup state, and generated files. |
+| Component sources | `components/<component-id>` | Stable component source checkouts. |
 | Target state | `.dev-nexus/automation/target-state.md` | Concise user-authored memory for an automation target. |
 | Generated worktrees | `<worktreesRoot>/<component-id>/` | Component-scoped worktrees for parallel work. |
 | Agent MCP config | `.codex/config.toml`, `.mcp.json`, or another configured target | Generated from `mcp.agentTargets`. |
@@ -72,7 +73,7 @@ shape as a larger project.
       "name": "Core",
       "kind": "git",
       "role": "primary",
-      "sourceRoot": "components/core",
+      "sourceRoot": "componentsRoot:core",
       "worktreesRoot": "worktrees/core",
       "workTracking": {
         "provider": "local",
@@ -105,14 +106,17 @@ Prefer portable component paths over machine-specific absolute paths.
 `sourceRoot` and `worktreesRoot` accept project-relative paths and explicit
 bases:
 
+- `componentsRoot:core`
 - `projectRoot:components/core`
 - `projectParent:sources/core`
 - `sourcesRoot:core`
 - `home:dev-nexus/core`
 
-`sourcesRoot:` resolves to a sibling `sources` directory beside the project
-root. Setup checks report foreign absolute paths as blocked on a different
-operating system instead of treating them as valid.
+`componentsRoot:` resolves to the project-local `components` directory and is
+the preferred source-root base for normal projects. `sourcesRoot:` resolves to a
+sibling `sources` directory beside the project root and is useful for advanced
+external layouts. Setup checks report foreign absolute paths as blocked on a
+different operating system instead of treating them as valid.
 
 ## Guided Setup
 

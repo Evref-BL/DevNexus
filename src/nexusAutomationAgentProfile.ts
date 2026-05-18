@@ -295,7 +295,7 @@ function resolveProfileToken(
 }
 
 function isPortableProjectPathExpression(value: string): boolean {
-  return /^(projectRoot|projectParent|home|sourcesRoot):/u.test(value);
+  return /^(componentsRoot|projectRoot|projectParent|home|sourcesRoot):/u.test(value);
 }
 
 function resolveProfileCommand(

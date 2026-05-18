@@ -636,6 +636,54 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("uses project-local componentsRoot source roots in setup commands", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-components-root-");
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "dev-nexus",
+          name: "DevNexus",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "componentsRoot:dev-nexus",
+          relationships: [],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const prepareStep = plan.steps.find(
+      (step) => step.id === "prepare-component-checkouts",
+    )!;
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(prepareStep.commands.join("\n")).toContain("components/dev-nexus");
+    expect(prepareStep.commands.join("\n")).not.toContain("componentsRoot:");
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        status: "blocked",
+        summary: expect.stringContaining("components"),
+      }),
+    );
+    expect(check.checks).not.toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        summary: expect.stringContaining("another OS"),
+      }),
+    );
+  });
+
   it("uses configured agent MCP targets in setup guidance and checks", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-agent-targets-");
     writeProject(projectRoot, {
