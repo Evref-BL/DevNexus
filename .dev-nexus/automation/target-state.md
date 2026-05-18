@@ -21,8 +21,16 @@ Current cycle:
 - Target-cycle final record
   `target-cycle-coordinator-loop-20260518-t041042-357-z-1-final` records
   `completed` with current eligible count `0`.
-- `automation target-report` currently returns `stop`: no ready `dogfood`
-  selector work remains.
+- Follow-up reflection promoted three dependency-unblocked items for the next
+  coordinator-loop:
+  - `dev-nexus:local-35`, optional Codex app-server MCP relay, now that
+    app-server launch and target-cycle fact recording are stable.
+  - `dev-nexus:local-46`, neutral work-item tracker link records, now that
+    tracker registry and explicit tracker selection landed.
+  - `dev-nexus:local-50`, coordination tools targeting configured tracker
+    roles, using local or mocked providers only.
+- `automation target-report` should relaunch while those three ready `dogfood`
+  selector items remain.
 
 Verification for this cycle:
 
@@ -35,13 +43,12 @@ Verification for this cycle:
 
 Near-term direction:
 
-- Let the next reflection or human triage promote newly unblocked work rather
-  than manually selecting more work in this completed cycle.
-- Reconsider Codex app-server follow-ups such as `dev-nexus:local-35` now that
-  launch fact recording is stable.
-- Reconsider component multi-tracker follow-ups `dev-nexus:local-46` through
-  `dev-nexus:local-51` now that tracker selection landed. Live sync policy
-  remains blocked on `dev-nexus:local-52`.
+- Next coordinator-loop should choose from `dev-nexus:local-35`,
+  `dev-nexus:local-46`, and `dev-nexus:local-50`, respecting overlapping
+  DevNexus write scopes.
+- Keep `dev-nexus:local-47`, `dev-nexus:local-48`, `dev-nexus:local-49`, and
+  `dev-nexus:local-51` parked until link records or later sync/coordination
+  shape land. Live sync policy remains blocked on `dev-nexus:local-52`.
 - Final PLexus legacy gateway support removal remains human-in-the-loop and
   must not be performed without a separate explicit decision.
 

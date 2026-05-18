@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 65,
-  "nextCommentNumber": 134,
-  "updatedAt": "2026-05-18T04:30:35.746Z",
+  "nextCommentNumber": 137,
+  "updatedAt": "2026-05-18T04:35:53.995Z",
   "items": [
     {
       "id": "local-1",
@@ -836,19 +836,20 @@
       "id": "local-35",
       "title": "Optionally relay MCP tool calls through Codex app-server",
       "description": "Type: implementation follow-up\nReadiness: autonomous agent-ready (AFK) after basic Codex app-server thread/turn launch and target-cycle recording are stable.\nSource plan: docs/codex-app-server-provider-prd.md.\n\nGoal: optionally let DevNexus call Codex-managed MCP tools through app-server when a coordinator or worker needs a Codex-owned MCP server surface.\n\nUser stories covered:\n- As a coordinator, I can use Codex app-server to call a configured MCP tool in the context of a managed thread when that is safer than direct process-level wiring.\n- As a DevNexus user, I get clear MCP capability and approval failures instead of silent blocked automation.\n\nAcceptance criteria:\n- DevNexus can list or check MCP server status for an app-server thread when the protocol supports it.\n- DevNexus can relay a bounded MCP tool call through Codex app-server with structured arguments and receive structured content/error results.\n- Approval, permission, missing server, missing tool, and protocol errors are reported as infrastructure failures with actionable summaries.\n- The relay is optional and not required for basic app-server execution.\n- Tests use mocked app-server MCP responses and do not require live MCP servers.\n\nBlockers and sequencing:\n- Depends on stable Codex app-server launch and target-cycle recording.\n\nBoundaries:\n- Do not bypass Codex MCP trust or approval policy.\n- Do not hard-code DevNexus-Pharo, PLexus, or Pharo MCP server names in generic core.\n\nVerification:\n- Run focused app-server MCP relay tests.\n- Run npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "codex-app-server",
         "mcp",
         "automation",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T10:38:29.366Z",
-      "updatedAt": "2026-05-17T10:38:29.366Z",
+      "updatedAt": "2026-05-18T04:35:24.563Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1123,7 +1124,7 @@
       "id": "local-46",
       "title": "Add neutral work-item tracker link records",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: add a neutral link model so DevNexus can represent one logical work item across local, GitHub, GitLab, Jira, or other tracker references.\n\nUser stories covered:\n- As a migration owner, I can link an existing GitHub issue to a local work item before enabling sync.\n- As a coordinator, I can see all provider references for one logical item.\n\nAcceptance criteria:\n- DevNexus persists work-item link records keyed by project id, component id, neutral logical item id, and tracker references.\n- Link references capture tracker id, provider, host, repository/project identity, item id, item number or key, node id, and web URL when available.\n- CLI and MCP surfaces can link, show, and unlink tracker references for a logical work item.\n- Link writes are idempotent and can update observed metadata without duplicating references.\n- Unlink records enough audit metadata to explain what was removed.\n- Tests cover link creation, duplicate/idempotent updates, invalid tracker refs, unlink, and show operations.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n\nBoundaries:\n- Do not auto-link likely matches without explicit policy.\n- Do not sync fields or comments in this slice.\n\nVerification:\n- Focused link-store/model tests plus CLI/MCP tests.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1131,12 +1132,13 @@
         "links",
         "identity",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:50.676Z",
-      "updatedAt": "2026-05-17T13:59:50.676Z",
+      "updatedAt": "2026-05-18T04:35:38.980Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -1228,7 +1230,7 @@
       "id": "local-50",
       "title": "Allow coordination tools to target tracker roles",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready (AFK) after tracker registry support lands; live external posting remains policy-gated.\nSource PRD: `docs/component-multi-tracker-prd.md`.\n\nGoal: let coordination status, handoff, integrate, and request flows use configured tracker roles such as coordination or external_feedback instead of assuming the component default tracker is the only backing store.\n\nUser stories covered:\n- As a Mac agent, I can read shared handoff state from a GitHub-backed coordination tracker while work selection remains local.\n- As an external reviewer, I can respond in a provider-native thread while DevNexus records the neutral effect locally.\n\nAcceptance criteria:\n- Coordination configuration can select a tracker by id or role for handoffs and external request records.\n- Work selection and canonical item updates still use the component default tracker unless policy says otherwise.\n- Handoff records include selected work item, logical item id, tracker references, branch facts, and provider target refs.\n- Integration planning can read handoffs from a coordination tracker and work details from the primary/default tracker.\n- Provider capability gaps for reading/writing comments are reported clearly.\n- Live external posting stays disabled unless coordination provider policy allows it.\n\nDependencies:\n- Depends on `dev-nexus:local-44` and `dev-nexus:local-45`.\n- Complements `dev-nexus:local-16` and `dev-nexus:local-18` for shared provider and external posting policy decisions.\n\nBoundaries:\n- Do not infer approval or merge permission from mirrored coordination records.\n- Do not create Vibe workspaces, sessions, executions, or implementation workers.\n\nVerification:\n- Focused coordination status/handoff/integrate/request tests with local and mocked external coordination trackers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "work-tracking",
@@ -1236,12 +1238,13 @@
         "coordination",
         "multi-host",
         "dependent",
-        "afk"
+        "afk",
+        "dogfood"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.423Z",
-      "updatedAt": "2026-05-17T13:59:51.423Z",
+      "updatedAt": "2026-05-18T04:35:53.995Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2511,7 +2514,19 @@
         }
       }
     ],
-    "local-35": [],
+    "local-35": [
+      {
+        "id": "local-comment-134",
+        "body": "Heartbeat reflection promoted this item after coordinator-loop 20260518-t041042 completed dev-nexus:local-34. App-server launch and target-cycle fact recording are now stable enough for the optional mocked MCP relay slice. Keep it provider-safe: no Codex heartbeat/cron automation management, no bypass of Codex MCP approval/trust policy, and no generic core references to DevNexus-Pharo, PLexus, or Pharo server names.",
+        "author": null,
+        "createdAt": "2026-05-18T04:35:24.563Z",
+        "updatedAt": "2026-05-18T04:35:24.563Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-134"
+        }
+      }
+    ],
     "local-36": [
       {
         "id": "local-comment-126",
@@ -2873,11 +2888,35 @@
         }
       }
     ],
-    "local-46": [],
+    "local-46": [
+      {
+        "id": "local-comment-135",
+        "body": "Heartbeat reflection promoted this item after coordinator-loop 20260518-t041042 completed dev-nexus:local-45. The tracker registry and explicit tracker selection are now published, so link records can be implemented as the next bounded multi-tracker slice. Keep this slice to explicit link/show/unlink and idempotent metadata updates; do not perform sync, auto-linking, or live provider writes.",
+        "author": null,
+        "createdAt": "2026-05-18T04:35:38.980Z",
+        "updatedAt": "2026-05-18T04:35:38.980Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-135"
+        }
+      }
+    ],
     "local-47": [],
     "local-48": [],
     "local-49": [],
-    "local-50": [],
+    "local-50": [
+      {
+        "id": "local-comment-136",
+        "body": "Heartbeat reflection promoted this item after coordinator-loop 20260518-t041042 completed dev-nexus:local-45. Tracker registry and explicit tracker selection are available, so coordination tools can be adapted to target configured tracker roles with local/mocked providers. Keep live external posting disabled unless a separate provider policy work item approves it; do not infer approval or merge permission from coordination tracker records.",
+        "author": null,
+        "createdAt": "2026-05-18T04:35:53.995Z",
+        "updatedAt": "2026-05-18T04:35:53.995Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-136"
+        }
+      }
+    ],
     "local-51": [],
     "local-52": [],
     "local-53": [
