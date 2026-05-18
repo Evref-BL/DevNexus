@@ -1,68 +1,64 @@
 # DevNexus Dogfood Context
 
-## Current Goal
+## Purpose
 
-Use DevNexus itself to drive continued work on DevNexus and its related
-components until the live plan has been split into component-owned work items
-and the remaining eligible work can be advanced through the DevNexus
-launch/relaunch workflow.
+This repository is the clean dogfood meta-project for DevNexus. It stores the
+portable project graph, local component work items, planning documents,
+agent-facing instructions, target state, and setup projections used to work on
+DevNexus and its related components.
 
-The transferred plan now lives in `PLAN.md`. Use it as the source for the next
-target and for `to-issues` splitting instead of relying on chat history or the
-older control-project handoff.
+DevNexus is infrastructure. It records project state, work items, agent launch
+policy, target-cycle facts, worktree metadata, verification, publication
+decisions, skills, and Model Context Protocol (MCP) configuration. A human or
+coordinator agent chooses and supervises implementation work.
 
 ## Components
 
 - `dev-nexus`: generic core and primary component.
 - `dev-nexus-pharo`: Pharo plugin for DevNexus.
 - `dev-nexus-typescript`: TypeScript/JavaScript plugin for DevNexus.
-- `plexus`: runtime gateway dependency for the Pharo plugin.
+- `plexus`: project-scoped Pharo runtime and gateway dependency.
 - `pharo-launcher-mcp`: launcher-side MCP dependency.
-- `mcp-pharo`: in-image MCP dependency.
+- `mcp-pharo`: in-image Pharo MCP dependency.
+
+## Current Operating State
+
+- Component work is tracked through local component-owned work-item stores under
+  `.dev-nexus/work-items/`.
+- The dogfood meta repository is pushed through the bot remote at
+  `Gabot-Darbot/dev-nexus-dogfood`.
+- The active scheduler path is DevNexus `automation coordinator-loop`.
+  Heartbeats may wake that loop, but DevNexus owns lock, backoff, run facts, and
+  relaunch decisions.
+- The coordinator profile uses the user-local Codex binary because Windows app
+  package aliases can be inaccessible from automation shells.
+- The project-local runtime package install under `.dev-nexus/runtime/npm-tools`
+  is intentionally retained because generated MCP config uses those binaries.
 
 ## Decisions
 
-- This project is the clean dogfood root. The older staging roots remain
-  historical context.
-- DevNexus plugins are additive project capabilities, not alternate project
-  runners. A project can load multiple plugins, such as DevNexus-Pharo for Pharo
-  work and DevNexus-TypeScript for TypeScript/JavaScript work.
-- DevNexus-Pharo is responsible for Pharo agent setup: scoped PLexus project
-  context, safe launcher affordances, gateway routing, and direct Pharo MCP
-  access for subagents.
-- Mac and Windows agents should coordinate through shared work-item intent,
-  structured handoffs, pushed branches, and integration records. Avoid hard
-  locks by default; keep Git worktrees useful for parallel work.
-- The planned shared coordination API is intentionally small:
-  `coordination_status`, `coordination_handoff`, `coordination_integrate`, and
-  `coordination_request`. DevNexus should automate host/worktree/branch
-  detection, handoff facts, conflict forecasting, integration planning, and
-  external approval/feedback requests behind those simple calls.
+- Plugins are additive DevNexus capabilities, not alternate project runners.
+- DevNexus-Pharo supplies Pharo-specific setup, scoped PLexus context, launcher
+  affordances, gateway routing, and image-side Pharo MCP access for Pharo work.
+- DevNexus-TypeScript supplies TypeScript/JavaScript setup policy, especially
+  reusable dependency projection for generated worktrees.
+- Mac and Windows agents coordinate through shared work-item intent, Git
+  branches, structured handoffs, target-cycle facts, and provider-backed
+  requests. Hard locks are avoided by default.
 - External coordination should use provider-native systems such as GitHub
-  Issues, GitHub pull requests, GitLab issues or merge requests, Jira issues,
-  and review comments while mapping their states into neutral DevNexus
-  coordination records.
-- Work items are local per component for immediate dogfooding. They can later
-  move to GitHub Issues, GitHub Projects, Jira, GitLab Issues, or Vibe Kanban
-  once those providers can list and update neutral work items well enough for
-  the target loop.
-- The coordinator profile uses the user-local Codex CLI binary because the
-  Windows app package alias is not executable from this shell.
-- The cron automation and dogfood MCP projection use the user-local Codex Node
-  executable directly. The previous Winget-managed Node path was executable
-  interactively but returned access denied from the scheduler shell.
-- The standalone cron is currently paused because Codex cron shell commands run
-  with restricted workspace/no-network permissions; nested `codex.exe`
-  coordinator launch can fail there. DevNexus source commit `af0b300` adds the
-  managed `automation coordinator-loop`; the active heartbeat should use that
-  loop as a temporary wake-up bridge. Current-agent adoption for already-running
-  coordinators is tracked separately by `dev-nexus:local-29`.
-- DevNexus source commit `7aa035d` fixes MCP work-item tools so
-  component-qualified ids such as `dev-nexus:local-27` route to the component
-  work tracker before provider selection.
-- DevNexus-Pharo source commit `ec14934` bundles MCP-Pharo domain skills for
-  Pharo-capable subagents: `pharo-ci-repro`, `pharo-image-git-handoff`,
-  `pharo-project-load`, and `pharo-version-compat`.
-- DevNexus-TypeScript source commit `bf19839` creates the standalone
-  TypeScript/JavaScript plugin repo and declares dependency projection plus
-  worker guidance for reusable package dependencies in generated worktrees.
+  Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
+  request and response state.
+- Live Pharo images, PLexus open/close, Docker, package installs, and
+  destructive runtime cleanup require an approved isolated runner profile.
+
+## Active Cleanup Notes
+
+- Completed historical runtime profiles are not current approval policy.
+- Generated worktrees are disposable once their branches have been integrated or
+  their commits are otherwise preserved.
+- Windows source roots currently use host-local junctions to older checkout
+  locations. `dev-nexus:local-69` tracks migration to cleaner source roots or an
+  explicit host-local indirection policy.
+- The active Codex session may still lack visible generic DevNexus MCP tools
+  even when config and stdio probes work. Use the project-local DevNexus CLI for
+  project operations until provider-session visibility is fixed.

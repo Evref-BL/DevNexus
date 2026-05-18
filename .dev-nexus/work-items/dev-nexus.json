@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 68,
-  "nextCommentNumber": 157,
-  "updatedAt": "2026-05-18T09:36:22.991Z",
+  "nextNumber": 70,
+  "nextCommentNumber": 158,
+  "updatedAt": "2026-05-18T10:03:19.987Z",
   "items": [
     {
       "id": "local-1",
@@ -1686,6 +1686,55 @@
         "provider": "local",
         "itemId": "local-67",
         "itemNumber": 67
+      }
+    },
+    {
+      "id": "local-68",
+      "title": "Clean dogfood project legacy artifacts",
+      "description": "Type: dogfood project cleanup\nReadiness: autonomous agent-ready (AFK)\nSource: user requested a thorough cleanup of the clean dogfood project; current audit found stale generated worktrees, an old `.mcp.json` pointing at `dev-nexus-control`, tracked overnight live runtime profile notes with old source paths, and target/context files carrying completed-cycle detail as current state.\n\nGoal: remove or shrink legacy dogfood project artifacts that are no longer useful while preserving source commits, active configuration, and current work-item intent.\n\nAcceptance criteria:\n- Remove ignored local artifacts that are clearly stale or superseded, including orphaned old-name worktree directories and obsolete `.mcp.json` provider config.\n- Remove clean generated dogfood worktree directories only after verifying no tracked changes; leave Git branches/commits intact unless separately proven safe.\n- Remove or retire tracked runtime approval notes that should not be reused as current policy.\n- Compact target/context documentation so it reflects current state and points to durable work items instead of stale completed-cycle detail.\n- Preserve required generated skills/MCP config/runtime package tools that active setup still uses.\n- Record follow-up items for cleanup that is outside this repo or requires a migration decision, such as replacing source-root junctions that still point to older checkout locations.\n\nBoundaries:\n- Do not delete component source roots or unmerged source branches.\n- Do not remove active `.codex/config.toml`, projected skills, or `.dev-nexus/runtime/npm-tools` while MCP config depends on them.\n- Do not run live Pharo/PLexus/Docker/runtime cleanup.\n\nVerification:\n- Git status clean for dogfood root after tracked cleanup commit.\n- DevNexus eligible-work/status still works.\n- Source component status remains clean.\n\nPublication notes:\n- Commit and push dogfood meta-project state only.",
+      "status": "done",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "cleanup",
+        "project-state",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T09:59:22.024Z",
+      "updatedAt": "2026-05-18T10:03:19.987Z",
+      "closedAt": "2026-05-18T10:03:19.987Z",
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-68",
+        "itemNumber": 68
+      }
+    },
+    {
+      "id": "local-69",
+      "title": "Migrate dogfood source roots away from old junction targets",
+      "description": "Type: host setup / cleanup migration\nReadiness: todo; human review before changing local source-root layout.\nSource: dogfood cleanup audit found that `C:\\dev\\code\\sources\\dev-nexus`, `dev-nexus-pharo`, `plexus`, `pharo-launcher-mcp`, and `mcp-pharo` are junctions to older checkout locations such as `dev-nexus-control`, `C:\\dev\\code\\git`, and a Pharo image Iceberg checkout.\n\nGoal: migrate component source roots to boring, current, OS-neutral local checkouts under the configured sources root, or explicitly document the intended junction model if it remains useful.\n\nAcceptance criteria:\n- Inventory current source-root junction targets on Windows and Mac.\n- Decide whether DevNexus should require real checkouts under `sources/` or allow host-local source-root indirection.\n- If migrating, create clean checkouts or worktrees with correct remotes and branches, then update host-local setup without breaking `dev-nexus.project.json` portability.\n- Verify all component statuses are clean, current MCP config still starts, and DevNexus setup check passes after migration.\n- Remove old-name references such as `dev-nexus-control` and historical PharoNexus paths from active host-local setup once no longer needed.\n\nBoundaries:\n- Do not delete old checkout locations until every component has a verified replacement and the user approves source-root migration.\n- Do not mutate Pharo image Iceberg state as a side effect.\n\nVerification:\n- `git status --short --branch` for every component source root.\n- DevNexus setup check for the dogfood root.\n\nPublication notes:\n- Mostly host-local; commit only portable project-state or docs changes if needed.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "cleanup",
+        "host-setup",
+        "source-roots",
+        "hitl"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T10:01:32.077Z",
+      "updatedAt": "2026-05-18T10:01:32.077Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-69",
+        "itemNumber": 69
       }
     }
   ],
@@ -3534,6 +3583,20 @@
         }
       }
     ],
-    "local-67": []
+    "local-67": [],
+    "local-68": [
+      {
+        "id": "local-comment-157",
+        "body": "Completed cleanup pass:\n- Removed 34 clean generated dogfood worktrees through git worktree removal, then removed leftover generated worktrees directory shells.\n- Removed obsolete ignored `.mcp.json` that still pointed at the old dev-nexus-control checkout.\n- Removed ignored scratch/runtime clutter: avatar handoff assets, empty `src`, old PLexus/launcher/artifact runtime caches. Kept `.dev-nexus/runtime/npm-tools` because current MCP config depends on those binaries.\n- Deleted tracked stale runtime profile `runtime-profile-overnight-live-20260517.md` so it cannot be mistaken for current approval policy.\n- Replaced historical CONTEXT.md, PLAN.md, and target-state.md with compact current project state.\n- Created follow-up `dev-nexus:local-69` for source-root junction cleanup because that touches host-local component checkout topology.\n\nVerification:\n- `dev-nexus automation eligible-work . --json` works and reports idle / 0 eligible items.\n- `dev-nexus project status . --json` works.\n- `dev-nexus setup check . join-existing-project --platform windows --json` passes all static checks and still reports the known active-session MCP visibility warning.\n- Legacy scan for PharoNexus/pharo-nexus/mcp-pl/dev-nexus-control/overnight-live/staging/access-denied terms is clean in tracked project docs/state, excluding ignored ledgers/runtime.\n- `git diff --check` passed.",
+        "author": null,
+        "createdAt": "2026-05-18T10:03:05.741Z",
+        "updatedAt": "2026-05-18T10:03:05.741Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-157"
+        }
+      }
+    ],
+    "local-69": []
   }
 }
