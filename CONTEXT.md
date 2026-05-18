@@ -69,3 +69,6 @@ coordinator agent chooses and supervises implementation work.
 - The active Codex session may still lack visible generic DevNexus MCP tools
   even when config and stdio probes work. Use the project-local DevNexus CLI for
   project operations until provider-session visibility is fixed.
+- Windows automation publication currently blocks until the host-local
+  `GH_CONFIG_DIR=home:.config/gh-automation-github` profile is authenticated as
+  `Gabot-Darbot`; this is intentional to prevent human-account fallback.

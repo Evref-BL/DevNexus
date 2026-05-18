@@ -13,6 +13,13 @@ and ready for coordinator-driven work across its components.
   agent-created Git/GitHub activity uses the `bot` remote and
   `Gabot-Darbot` machine-user profile. Direct-integration components also use
   component `bot` remotes for publication.
+- Reusable DevNexus support for join-existing auth checks and portable
+  `GH_CONFIG_DIR` resolution is proposed as
+  https://github.com/Evref-BL/DevNexus/pull/1 because the bot account has read
+  but not direct write access to `Evref-BL/DevNexus`.
+- Windows automation publication is intentionally blocked until the host-local
+  bot GitHub CLI profile is authenticated at
+  `home:.config/gh-automation-github`; the Mac bot profile is authenticated.
 - Cleanup work `dev-nexus:local-68` is complete.
 - Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
   been pruned after verifying they were merged or superseded by completed work
