@@ -19,7 +19,8 @@ export type NexusWorkerContextFileId =
   | "context"
   | "plan"
   | "target-state"
-  | `project-doc:${string}`;
+  | `project-doc:${string}`
+  | `component-doc:${string}`;
 
 export interface NexusWorkerContextFileReference {
   id: NexusWorkerContextFileId;
@@ -245,6 +246,7 @@ export function buildNexusWorkerContextBundle(
   const workItem = normalizeWorkerContextWorkItem(options.workItem);
   const projectContext = projectContextReferences({
     projectRoot,
+    sourceRoot,
     targetStatePath: options.targetStatePath,
     workItem,
   });
@@ -383,6 +385,7 @@ export function materializeNexusWorkerContextBundle(
 
 function projectContextReferences(options: {
   projectRoot: string;
+  sourceRoot: string;
   targetStatePath?: string | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
 }): NexusWorkerProjectContextReferences {
@@ -402,6 +405,7 @@ function projectContextReferences(options: {
   ];
   const referencedFiles = referencedProjectFiles({
     projectRoot: options.projectRoot,
+    sourceRoot: options.sourceRoot,
     textSources: [
       options.workItem?.title ?? "",
       options.workItem?.description ?? "",
@@ -420,6 +424,7 @@ function projectContextReferences(options: {
 
 function referencedProjectFiles(options: {
   projectRoot: string;
+  sourceRoot: string;
   textSources: string[];
 }): NexusWorkerContextFileReference[] {
   const references = new Map<string, NexusWorkerContextFileReference>();
@@ -428,21 +433,40 @@ function referencedProjectFiles(options: {
       if (references.has(relativePath)) {
         continue;
       }
-      const resolvedPath = resolveInsideProjectRoot(
+      const projectPath = resolveInsideRoot(
         options.projectRoot,
         relativePath,
         "referencedProjectFile",
+        "projectRoot",
       );
-      if (!fs.existsSync(resolvedPath)) {
-        throw new NexusWorkerContextBundleError(
-          `Referenced project context file is missing: ${relativePath} (${resolvedPath})`,
-        );
+      if (fs.existsSync(projectPath)) {
+        references.set(relativePath, {
+          id: `project-doc:${relativePath}`,
+          path: projectPath,
+          access: "read_only",
+        });
+        continue;
       }
-      references.set(relativePath, {
-        id: `project-doc:${relativePath}`,
-        path: resolvedPath,
-        access: "read_only",
-      });
+
+      const componentPath = resolveInsideRoot(
+        options.sourceRoot,
+        relativePath,
+        "referencedComponentFile",
+        "sourceRoot",
+      );
+      if (fs.existsSync(componentPath)) {
+        references.set(relativePath, {
+          id: `component-doc:${relativePath}`,
+          path: componentPath,
+          access: "read_only",
+        });
+        continue;
+      }
+
+      throw new NexusWorkerContextBundleError(
+        `Referenced context file is missing: ${relativePath} ` +
+          `(projectRoot: ${projectPath}; sourceRoot: ${componentPath})`,
+      );
     }
   }
 
@@ -479,11 +503,43 @@ function renderReferencedProjectFileLines(
     return [];
   }
 
+  const projectFiles = files.filter((file) => file.id.startsWith("project-doc:"));
+  const componentFiles = files.filter((file) =>
+    file.id.startsWith("component-doc:"),
+  );
+
+  return [
+    ...renderReferencedFileGroup("Referenced project docs:", projectFiles),
+    ...renderReferencedFileGroup("Referenced component docs:", componentFiles),
+  ];
+}
+
+function renderReferencedFileGroup(
+  title: string,
+  files: NexusWorkerContextFileReference[],
+): string[] {
+  if (files.length === 0) {
+    return [];
+  }
+
   return [
     "",
-    "Referenced project docs:",
-    ...files.map((file) => `- ${file.id.slice("project-doc:".length)}: ${file.path}`),
+    title,
+    ...files.map((file) => `- ${referencedFileRelativePath(file)}: ${file.path}`),
   ];
+}
+
+function referencedFileRelativePath(
+  file: NexusWorkerContextFileReference,
+): string {
+  if (file.id.startsWith("project-doc:")) {
+    return file.id.slice("project-doc:".length);
+  }
+  if (file.id.startsWith("component-doc:")) {
+    return file.id.slice("component-doc:".length);
+  }
+
+  return file.id;
 }
 
 function normalizeWorkerContextSkills(
@@ -966,8 +1022,17 @@ function resolveInsideProjectRoot(
   value: string,
   name: string,
 ): string {
-  const resolved = path.resolve(projectRoot, requiredNonEmptyString(value, name));
-  assertPathInsideRoot(projectRoot, resolved, name, "projectRoot");
+  return resolveInsideRoot(projectRoot, value, name, "projectRoot");
+}
+
+function resolveInsideRoot(
+  root: string,
+  value: string,
+  valueName: string,
+  rootName: string,
+): string {
+  const resolved = path.resolve(root, requiredNonEmptyString(value, valueName));
+  assertPathInsideRoot(root, resolved, valueName, rootName);
 
   return resolved;
 }

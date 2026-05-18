@@ -292,6 +292,59 @@ describe("nexus worker context bundle", () => {
     );
   });
 
+  it("records component docs referenced by work item descriptions as read-only component context", () => {
+    const projectRoot = makeTempDir("dev-nexus-worker-project-");
+    const sourceRoot = path.join(projectRoot, "components", "plexus");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "plexus");
+    const worktreePath = path.join(worktreesRoot, "local-31");
+    const componentDocPath = path.join(
+      sourceRoot,
+      "docs",
+      "kanban-agent-pharo-access.md",
+    );
+    fs.mkdirSync(path.dirname(componentDocPath), { recursive: true });
+    fs.writeFileSync(componentDocPath, "# Kanban Agent Pharo Access\n", "utf8");
+    const workItem: WorkItem = {
+      id: "local-31",
+      title: "Fix component doc context",
+      description:
+        "Component reference: `docs/kanban-agent-pharo-access.md`.",
+      status: "ready",
+      provider: "local",
+      labels: ["dogfood"],
+    };
+
+    const result = materializeNexusWorkerContextBundle({
+      projectRoot,
+      componentId: "plexus",
+      sourceRoot,
+      worktreesRoot,
+      worktreePath,
+      branchName: "codex/local-31-context-resolution",
+      baseRef: "origin/main",
+      workItem,
+    });
+
+    const expectedReference = {
+      id: "component-doc:docs/kanban-agent-pharo-access.md",
+      path: componentDocPath,
+      access: "read_only",
+    };
+    expect(result.context.projectContext.files).toContainEqual(
+      expectedReference,
+    );
+    expect(result.context.projectContext.referencedFiles).toEqual([
+      expectedReference,
+    ]);
+    expect(result.context.boundaries.read.files).toContainEqual(
+      expectedReference,
+    );
+    expect(result.briefingMarkdown).toContain("Referenced component docs:");
+    expect(result.briefingMarkdown).toContain(
+      `- docs/kanban-agent-pharo-access.md: ${componentDocPath}`,
+    );
+  });
+
   it("fails before worker launch when a referenced planning doc is missing", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
@@ -316,7 +369,7 @@ describe("nexus worker context bundle", () => {
         baseRef: "origin/main",
         workItem,
       }),
-    ).toThrow(/Referenced project context file is missing/);
+    ).toThrow(/Referenced context file is missing/);
   });
 
   it("records project-managed skills and worker-local agent projections", () => {
