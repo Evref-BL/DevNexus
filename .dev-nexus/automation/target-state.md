@@ -23,8 +23,11 @@ and ready for coordinator-driven work across its components.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
-  invitee-profile invitation acceptance. `dev-nexus:local-117` tracks slicing
-  the PRD into implementation work items.
+  invitee-profile invitation acceptance. The PRD has been sliced: start with
+  `dev-nexus:local-118` for access declarations and provisioning gates, then
+  promote `local-119` through `local-126` as prerequisites land. `local-127`
+  is an opt-in fake-project GitHub integration test and must not depend on
+  `dev-nexus-plexus` or any other active project.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
   component work into main without waiting for manual human review, using the
   configured bot/automation profile when permissions allow. Components that
@@ -110,7 +113,7 @@ and ready for coordinator-driven work across its components.
 - Run the next coordinator cycle on ready work such as `dev-nexus:local-51`,
   `dev-nexus:local-72`, `dev-nexus:local-78`, `dev-nexus:local-81`,
   `dev-nexus:local-87`, `dev-nexus:local-99`, `dev-nexus:local-102`,
-  `dev-nexus:local-104`, `dev-nexus:local-113`, and `dev-nexus:local-117`,
+  `dev-nexus:local-104`, `dev-nexus:local-113`, and `dev-nexus:local-118`,
   subject to dependency and concurrency limits.
 - Keep remote host execution ordered: implement `dev-nexus:local-81` before
   host checks, SSH transport, verification execution, or live dogfood smokes.

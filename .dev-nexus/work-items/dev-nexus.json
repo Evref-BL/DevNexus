@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 118,
-  "nextCommentNumber": 198,
-  "updatedAt": "2026-05-18T16:09:48.588Z",
+  "nextNumber": 128,
+  "nextCommentNumber": 199,
+  "updatedAt": "2026-05-18T16:17:05.555Z",
   "items": [
     {
       "id": "local-1",
@@ -2985,13 +2985,287 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:09:45.129Z",
-      "updatedAt": "2026-05-18T16:09:48.588Z",
+      "updatedAt": "2026-05-18T16:17:05.555Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-117",
         "itemNumber": 117
+      }
+    },
+    {
+      "id": "local-118",
+      "title": "Add hosting access declarations and provisioning gates",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK)\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: extend DevNexus hosting configuration so projects can declare required repository access and explicit provisioning gates with a minimal, obvious API.\n\nUser stories covered:\n- As a project owner, I can declare that a meta-project repository should exist under a bot account and grant my human account access.\n- As a maintainer reviewing project configuration, I can tell the intended repository access model by reading a short configuration block.\n\nAcceptance criteria:\n- Project config validates hosting access principals with kind, provider identity, intended role, required permission, optional auth profile, and invitation policy.\n- Provisioning config supports explicit gates for repository creation, local remote repair, access repair, invitation acceptance, default-branch repair, and visibility repair.\n- Existing hosting configs without access declarations remain valid through defaults or compatibility normalization.\n- Invalid duplicate principals, unsupported permission values, unknown principal kinds, and malformed policy values fail with actionable errors.\n- Shared project config does not store tokens, private keys, GitHub CLI state, or browser/session material.\n\nBoundaries:\n- Do not add provider mutation in this slice.\n- Do not contact GitHub or other live providers in tests.\n- Do not make GitHub mandatory for all DevNexus projects.\n\nVerification:\n- Focused project config tests for old configs, minimal access declarations, multi-principal access, invalid values, and provisioning defaults.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "github",
+        "provisioning",
+        "access",
+        "config",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:15:38.823Z",
+      "updatedAt": "2026-05-18T16:15:38.823Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-118",
+        "itemNumber": 118
+      }
+    },
+    {
+      "id": "local-119",
+      "title": "Build read-only hosting status model",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: build a read-only hosting status model that answers what is true right now without mutating local Git remotes or provider state.\n\nUser stories covered:\n- As a coordinator agent, I can report missing repository access as a setup blocker instead of inventing provider commands.\n- As a new host joining a project, I can validate local human and bot auth profiles against shared hosting intent.\n\nAcceptance criteria:\n- Hosting status reports configured provider, namespace, resolved repository name, repository existence, visibility, default branch, expected remotes, local remote matches, auth profiles, observed actors, required access, pending invitations, warnings, and blockers.\n- Status distinguishes missing hosting config, missing auth profiles, wrong observed actor, provider mismatch, repository missing, access missing, insufficient access, and pending invitation states.\n- Status never creates repositories, invites collaborators, accepts invitations, updates remotes, or writes provider state.\n- Provider reads are abstracted so tests can use mocked provider responses.\n- Output is structured enough for later CLI/MCP presentation and setup checks.\n\nDependencies:\n- Depends on dev-nexus:local-118 hosting access declarations and provisioning gates.\n\nBoundaries:\n- Do not implement apply/mutation behavior in this slice.\n- Do not run live GitHub calls in default tests.\n\nVerification:\n- Focused hosting status tests for healthy, missing repository, missing local remote, wrong remote URL, missing auth profile, wrong actor, missing access, insufficient access, pending invite, and unsupported provider cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "status",
+        "github",
+        "access",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:15:46.399Z",
+      "updatedAt": "2026-05-18T16:15:46.399Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-119",
+        "itemNumber": 119
+      }
+    },
+    {
+      "id": "local-120",
+      "title": "Build deterministic hosting plan actions",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-118 and dev-nexus:local-119\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: turn hosting status into deterministic dry-run plan actions that explain what DevNexus would do and what remains blocked.\n\nUser stories covered:\n- As a project owner, I can run a dry-run and see exactly what exists, what is missing, and what would change.\n- As a coordinator agent, I can paste a stable provisioning plan into a work-item comment.\n\nAcceptance criteria:\n- Planner emits ordered structured actions for repository creation, local remote add/update, collaborator add, collaborator permission update, collaborator invite, pending invitation acceptance, wait/manual invitation, default branch repair, visibility mismatch, and unsupported provider operations.\n- Every action includes provider, target repository, target principal or remote, current state, desired state, mutation class, allowed/blocked/manual state, reason, and auth profile that would perform the action.\n- Plans are stable across repeated runs with identical status input.\n- Planner honors provisioning gates from project configuration and never performs mutations.\n- Unsafe visibility changes and unsupported provider operations are declined with actionable reasons.\n\nDependencies:\n- Depends on dev-nexus:local-118 and dev-nexus:local-119.\n\nBoundaries:\n- Do not implement apply execution in this slice.\n- Do not contact live providers outside the read-only status inputs already modeled.\n\nVerification:\n- Focused planner snapshot or structural tests for each action class, blocked gate, manual wait state, action ordering, and no-mutation behavior.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "planning",
+        "github",
+        "provisioning",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:15:53.773Z",
+      "updatedAt": "2026-05-18T16:15:53.773Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-120",
+        "itemNumber": 120
+      }
+    },
+    {
+      "id": "local-121",
+      "title": "Expose project hosting status and plan in CLI and MCP",
+      "description": "Type: user-surface implementation slice\nReadiness: todo/dependent on dev-nexus:local-119 and dev-nexus:local-120\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: expose the read-only hosting status and plan through small, obvious CLI and MCP surfaces.\n\nUser stories covered:\n- As a coordinator agent, I can ask DevNexus for hosting facts without provider-specific tools.\n- As a project owner, I can run one command to see current hosting state and one command to see planned repairs.\n\nAcceptance criteria:\n- CLI supports `dev-nexus project hosting status <project-root> [--json]` and `dev-nexus project hosting plan <project-root> [--json]` or an equivalently obvious command shape that fits existing CLI conventions.\n- MCP exposes matching structured tools for hosting status and plan.\n- Text output is compact and readable; JSON output preserves full structured status and plan details.\n- Missing hosting config, missing auth profiles, missing provider support, and blocked actions produce non-crashing actionable output.\n- Status and plan commands do not mutate local Git remotes or provider state.\n\nDependencies:\n- Depends on dev-nexus:local-119 and dev-nexus:local-120.\n\nBoundaries:\n- Do not expose apply/mutation commands in this slice.\n- Do not require live GitHub credentials for normal unit tests.\n\nVerification:\n- Focused CLI and MCP tests for status, plan, JSON/text output, missing config, missing auth profile, and blocked plan action cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "cli",
+        "mcp",
+        "status",
+        "planning",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:01.143Z",
+      "updatedAt": "2026-05-18T16:16:01.143Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-121",
+        "itemNumber": 121
+      }
+    },
+    {
+      "id": "local-122",
+      "title": "Add local remote repair hosting apply",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-120 and dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: implement the first safe apply path by repairing only declared local Git remotes through the hosting plan.\n\nUser stories covered:\n- As an automation account, I can configure the declared remotes without accidentally using the human account.\n- As a maintainer, I can run apply twice against a healthy project without churn.\n\nAcceptance criteria:\n- `project hosting apply` or equivalent apply service recomputes the plan immediately before mutation.\n- Local remote add/update actions execute only when remote repair is explicitly allowed by project provisioning policy.\n- Apply mutates only declared remote names and preserves undeclared remotes.\n- Apply refuses blocked/manual actions and reports skipped actions clearly.\n- Apply returns a final status or plan summary after mutation.\n- Running apply twice against already-correct remotes performs no further mutations.\n\nDependencies:\n- Depends on dev-nexus:local-120 and dev-nexus:local-121.\n\nBoundaries:\n- Do not create repositories or call live provider mutation APIs in this slice.\n- Do not delete local remotes.\n- Do not mutate unknown remotes.\n\nVerification:\n- Focused tests for add remote, update remote, preserve undeclared remote, blocked gate, idempotent rerun, and final status reporting.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "apply",
+        "git",
+        "remotes",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:09.542Z",
+      "updatedAt": "2026-05-18T16:16:09.542Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-122",
+        "itemNumber": 122
+      }
+    },
+    {
+      "id": "local-123",
+      "title": "Add GitHub repository creation hosting apply",
+      "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-120 and dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: implement policy-gated GitHub repository creation behind the provider adapter and hosting apply plan.\n\nUser stories covered:\n- As a project owner, I can declare that a private meta-project repository should exist under the automation namespace.\n- As an automation account, DevNexus can create the repository only when project policy explicitly allows it.\n\nAcceptance criteria:\n- GitHub provider adapter can create a repository under a user or organization namespace in mocked tests.\n- Apply executes repository creation only when the recomputed plan marks it allowed and repository creation is explicitly enabled.\n- Creation uses declared visibility and default branch intent where supported, and reports provider URL and remote URL facts after mutation.\n- Missing auth profile, wrong actor, insufficient token scope, organization policy blocks, namespace mismatch, and already-existing repository states produce actionable results.\n- Re-running apply after creation is idempotent and does not attempt duplicate creation.\n\nDependencies:\n- Depends on dev-nexus:local-120 and dev-nexus:local-121.\n\nBoundaries:\n- Do not implement collaborator repair or invitation acceptance in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not create organizations or provider accounts.\n\nVerification:\n- Mocked GitHub provider tests for create success, already exists, insufficient permission, namespace policy rejection, missing auth profile, and idempotent rerun.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "apply",
+        "github",
+        "provisioning",
+        "repository",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:20.149Z",
+      "updatedAt": "2026-05-18T16:16:20.149Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-123",
+        "itemNumber": 123
+      }
+    },
+    {
+      "id": "local-124",
+      "title": "Add GitHub collaborator repair and pending invite detection",
+      "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-118 through dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: make GitHub access drift explicit and repair declared collaborators when provisioning policy allows it.\n\nUser stories covered:\n- As a project owner, I can declare required human and automation access without spelling out GitHub collaborator commands.\n- As a coordinator agent, I can report missing or insufficient account access as hosting drift.\n\nAcceptance criteria:\n- GitHub provider adapter can inspect effective collaborator permission and pending collaborator invitation state in mocked tests.\n- Hosting status and plan distinguish missing collaborator, insufficient permission, pending invitation, provider policy block, and unknown access states.\n- Apply adds or updates only declared collaborators when access repair is explicitly allowed.\n- Apply does not grant broad access to undeclared accounts or teams.\n- Pending invitations are reported separately from completed effective access.\n- Organization policy, single sign-on, missing scope, disabled collaborator invites, and unsupported principal kinds produce actionable blockers.\n\nDependencies:\n- Depends on dev-nexus:local-118, dev-nexus:local-119, dev-nexus:local-120, and dev-nexus:local-121.\n\nBoundaries:\n- Do not accept invitations as the invitee in this slice.\n- Do not create teams or manage organization membership.\n- Do not run live GitHub mutation in default tests.\n\nVerification:\n- Mocked GitHub provider tests for missing collaborator, insufficient permission, successful invite/add/update, pending invitation, organization policy rejection, and idempotent rerun.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "apply",
+        "github",
+        "access",
+        "invitations",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:32.070Z",
+      "updatedAt": "2026-05-18T16:16:32.070Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-124",
+        "itemNumber": 124
+      }
+    },
+    {
+      "id": "local-125",
+      "title": "Accept GitHub invitations through invitee auth profiles",
+      "description": "Type: provider-mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-124\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: let DevNexus accept a pending GitHub repository invitation automatically when the invited principal has a configured auth profile and project policy allows it.\n\nUser stories covered:\n- As an invited maintainer, I can let DevNexus accept a pending provider invitation for me when my host-local auth profile is configured.\n- As a human maintainer, I can see when an invitation is pending and whether DevNexus can complete acceptance without browser/manual steps.\n\nAcceptance criteria:\n- GitHub provider adapter can list repository invitations for the authenticated invited user in mocked tests.\n- Apply accepts a pending repository invitation as the invited principal only when invitation acceptance is explicitly allowed and the invitee auth profile is available.\n- DevNexus verifies the invitee auth profile is authenticated as the expected provider login before accepting.\n- Pending invitation is not treated as completed access until successful acceptance and final status confirms effective access.\n- Missing invitee auth profile, wrong account, expired invitation, insufficient token scope, provider policy rejection, and invitation not found produce distinct actionable blockers.\n- Re-running apply after acceptance is idempotent.\n\nDependencies:\n- Depends on dev-nexus:local-124.\n\nBoundaries:\n- Do not require browser-based invitation acceptance.\n- Do not accept invitations for undeclared principals.\n- Do not run live GitHub mutation in default tests.\n\nVerification:\n- Mocked GitHub provider tests for successful acceptance, missing profile, wrong account, expired invitation, insufficient scope, provider rejection, no pending invitation, and final effective-access confirmation.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "apply",
+        "github",
+        "invitations",
+        "auth",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:39.749Z",
+      "updatedAt": "2026-05-18T16:16:39.749Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-125",
+        "itemNumber": 125
+      }
+    },
+    {
+      "id": "local-126",
+      "title": "Integrate hosting status into setup and documentation",
+      "description": "Type: setup and documentation slice\nReadiness: todo/dependent on dev-nexus:local-121, with follow-up refresh after apply slices land\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: replace ad hoc setup guidance with DevNexus hosting status and plan output, and document the minimal API.\n\nUser stories covered:\n- As a new host joining a project, I can validate that host-local human and bot auth profiles match shared hosting intent before running automation.\n- As a maintainer, I can understand that provider-specific mechanics belong in the tool, not in project config or agent chat memory.\n\nAcceptance criteria:\n- Setup checks consume hosting status and plan instead of telling users to manually run provider-specific commands for normal facts DevNexus can inspect.\n- Setup/status output reports repository, remote, auth profile, actor, access, and pending invitation drift concisely.\n- Documentation shows minimal hosting config examples for repository, remotes, required access, and provisioning gates.\n- Documentation explains that provider details, collaborator invitations, and invitation acceptance are handled by hosting adapters.\n- Documentation states that secrets and local credential material stay in host-local config, not shared project config.\n- After apply slices land, setup docs are updated to describe allowed repair and invitation acceptance behavior.\n\nDependencies:\n- Depends on dev-nexus:local-121 for read-only status/plan surfaces; should be revisited after dev-nexus:local-122 through dev-nexus:local-125.\n\nBoundaries:\n- Do not run live GitHub mutation from setup checks.\n- Do not include personal paths, tokens, or account-specific dogfood-only details in generic docs.\n\nVerification:\n- Focused setup assistant tests for hosting status integration, missing auth profile, pending invitation, blocked plan action, and no-provider-mutation behavior.\n- Static documentation review.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "setup",
+        "docs",
+        "status",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:47.737Z",
+      "updatedAt": "2026-05-18T16:16:47.737Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-126",
+        "itemNumber": 126
+      }
+    },
+    {
+      "id": "local-127",
+      "title": "Add opt-in fake-project hosting integration test",
+      "description": "Type: opt-in integration testing slice\nReadiness: todo/dependent on mocked provider apply support in dev-nexus:local-123 through dev-nexus:local-125\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: validate live GitHub hosting provisioning against a disposable fake DevNexus project/repository fixture, not against `dev-nexus-plexus` or any other active project.\n\nUser stories covered:\n- As a maintainer, I can prove repository creation, collaborator repair, and invitation acceptance work end to end without risking an active project.\n- As an agent, I can run normal tests without live GitHub mutation unless the integration test is explicitly enabled.\n\nAcceptance criteria:\n- Integration test fixture builds a disposable fake DevNexus project config with a unique repository name, declared remotes, required access, and provisioning gates.\n- Live GitHub integration test is opt-in only through explicit test configuration or environment, and is skipped by default in normal `npm run check`.\n- The test creates or connects only the disposable fake repository, applies allowed hosting repairs, validates final status, and records enough cleanup information for safe teardown.\n- The test does not depend on `dev-nexus-plexus`, dogfood project state, or any active project repository.\n- Cleanup behavior avoids deleting or mutating non-fixture repositories and refuses to proceed when the repository name/owner does not match the disposable fixture policy.\n- Missing live credentials, missing invitee profile, wrong actor, provider policy block, and cleanup refusal produce clear skipped or blocked results rather than destructive fallback.\n\nDependencies:\n- Depends on dev-nexus:local-123, dev-nexus:local-124, and dev-nexus:local-125.\n\nBoundaries:\n- Do not run live GitHub mutation in default tests.\n- Do not use active DevNexus projects as integration fixtures.\n- Do not delete arbitrary repositories or broaden cleanup outside the disposable fixture naming policy.\n\nVerification:\n- Mocked tests for fixture planning, opt-in gating, wrong-owner refusal, cleanup refusal, and skipped default behavior.\n- Optional live GitHub integration run only when explicitly configured.\n- npm run check must pass without live credentials.\n\nPublication notes:\n- Direct integration to DevNexus main after mocked verification passes; live integration evidence can be recorded separately when explicitly run.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "hosting",
+        "github",
+        "integration-test",
+        "fake-project",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-18T16:16:56.851Z",
+      "updatedAt": "2026-05-18T16:16:56.851Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-127",
+        "itemNumber": 127
       }
     }
   ],
@@ -5358,7 +5632,28 @@
           "provider": "local",
           "itemId": "local-comment-197"
         }
+      },
+      {
+        "id": "local-comment-198",
+        "body": "Sliced the hosting provisioning PRD into `dev-nexus:local-118` through `dev-nexus:local-127`.\n\nOrder:\n- `local-118` access declarations and provisioning gates\n- `local-119` read-only hosting status\n- `local-120` deterministic hosting plan actions\n- `local-121` CLI/MCP status and plan surfaces\n- `local-122` local remote repair apply\n- `local-123` GitHub repository creation apply\n- `local-124` GitHub collaborator repair and pending invite detection\n- `local-125` invitee-profile invitation acceptance\n- `local-126` setup/status documentation integration\n- `local-127` opt-in fake-project GitHub hosting integration test\n\nImportant correction from review: live hosting validation must use a disposable fake project/repository fixture, not `dev-nexus-plexus` or any other active project.",
+        "author": null,
+        "createdAt": "2026-05-18T16:17:05.555Z",
+        "updatedAt": "2026-05-18T16:17:05.555Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-198"
+        }
       }
-    ]
+    ],
+    "local-118": [],
+    "local-119": [],
+    "local-120": [],
+    "local-121": [],
+    "local-122": [],
+    "local-123": [],
+    "local-124": [],
+    "local-125": [],
+    "local-126": [],
+    "local-127": []
   }
 }
