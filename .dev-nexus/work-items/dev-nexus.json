@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 138,
-  "nextCommentNumber": 228,
-  "updatedAt": "2026-05-18T20:12:51.569Z",
+  "nextCommentNumber": 230,
+  "updatedAt": "2026-05-18T20:23:58.019Z",
   "items": [
     {
       "id": "local-1",
@@ -3078,7 +3078,7 @@
       "id": "local-121",
       "title": "Expose project hosting status and plan in CLI and MCP",
       "description": "Type: user-surface implementation slice\nReadiness: todo/dependent on dev-nexus:local-119 and dev-nexus:local-120\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: expose the read-only hosting status and plan through small, obvious CLI and MCP surfaces.\n\nUser stories covered:\n- As a coordinator agent, I can ask DevNexus for hosting facts without provider-specific tools.\n- As a project owner, I can run one command to see current hosting state and one command to see planned repairs.\n\nAcceptance criteria:\n- CLI supports `dev-nexus project hosting status <project-root> [--json]` and `dev-nexus project hosting plan <project-root> [--json]` or an equivalently obvious command shape that fits existing CLI conventions.\n- MCP exposes matching structured tools for hosting status and plan.\n- Text output is compact and readable; JSON output preserves full structured status and plan details.\n- Missing hosting config, missing auth profiles, missing provider support, and blocked actions produce non-crashing actionable output.\n- Status and plan commands do not mutate local Git remotes or provider state.\n\nDependencies:\n- Depends on dev-nexus:local-119 and dev-nexus:local-120.\n\nBoundaries:\n- Do not expose apply/mutation commands in this slice.\n- Do not require live GitHub credentials for normal unit tests.\n\nVerification:\n- Focused CLI and MCP tests for status, plan, JSON/text output, missing config, missing auth profile, and blocked plan action cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3093,8 +3093,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:01.143Z",
-      "updatedAt": "2026-05-18T20:12:51.569Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-18T20:23:47.094Z",
+      "closedAt": "2026-05-18T20:23:47.094Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3106,7 +3106,7 @@
       "id": "local-122",
       "title": "Add local remote repair hosting apply",
       "description": "Type: implementation tracer-bullet slice\nReadiness: todo/dependent on dev-nexus:local-120 and dev-nexus:local-121\nParent planning item: dev-nexus:local-117\nSource PRD: docs/project-hosting-provisioning-prd.md\n\nGoal: implement the first safe apply path by repairing only declared local Git remotes through the hosting plan.\n\nUser stories covered:\n- As an automation account, I can configure the declared remotes without accidentally using the human account.\n- As a maintainer, I can run apply twice against a healthy project without churn.\n\nAcceptance criteria:\n- `project hosting apply` or equivalent apply service recomputes the plan immediately before mutation.\n- Local remote add/update actions execute only when remote repair is explicitly allowed by project provisioning policy.\n- Apply mutates only declared remote names and preserves undeclared remotes.\n- Apply refuses blocked/manual actions and reports skipped actions clearly.\n- Apply returns a final status or plan summary after mutation.\n- Running apply twice against already-correct remotes performs no further mutations.\n\nDependencies:\n- Depends on dev-nexus:local-120 and dev-nexus:local-121.\n\nBoundaries:\n- Do not create repositories or call live provider mutation APIs in this slice.\n- Do not delete local remotes.\n- Do not mutate unknown remotes.\n\nVerification:\n- Focused tests for add remote, update remote, preserve undeclared remote, blocked gate, idempotent rerun, and final status reporting.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3120,7 +3120,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T16:16:09.542Z",
-      "updatedAt": "2026-05-18T16:16:09.542Z",
+      "updatedAt": "2026-05-18T20:23:58.019Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6239,9 +6239,32 @@
           "provider": "local",
           "itemId": "local-comment-227"
         }
+      },
+      {
+        "id": "local-comment-228",
+        "body": "Completed and published to DevNexus main as 37717f7. Added read-only `dev-nexus project hosting status` and `dev-nexus project hosting plan` CLI commands plus `project_hosting_status` and `project_hosting_plan` MCP tools. JSON output preserves structured status and plan details; text output gives compact summaries; commands do not mutate remotes or provider state. Verification: npm test -- src/cli.test.ts src/nexusMcpServer.test.ts passed with 65 tests; npm run build passed; npm run check passed with 57 files and 459 tests.",
+        "author": null,
+        "createdAt": "2026-05-18T20:23:42.659Z",
+        "updatedAt": "2026-05-18T20:23:42.659Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-228"
+        }
       }
     ],
-    "local-122": [],
+    "local-122": [
+      {
+        "id": "local-comment-229",
+        "body": "Promoted to ready after dev-nexus:local-120 and dev-nexus:local-121 landed as 4fa962f and 37717f7. The deterministic dry-run plan and CLI/MCP status/plan surfaces are now available; local remote repair apply can build on those without adding provider mutations.",
+        "author": null,
+        "createdAt": "2026-05-18T20:23:52.151Z",
+        "updatedAt": "2026-05-18T20:23:52.151Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-229"
+        }
+      }
+    ],
     "local-123": [],
     "local-124": [],
     "local-125": [],
