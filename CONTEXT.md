@@ -25,8 +25,15 @@ coordinator agent chooses and supervises implementation work.
 
 - Component work is tracked through local component-owned work-item stores under
   `.dev-nexus/work-items/`.
-- The dogfood meta repository is pushed through the bot remote at
-  `Gabot-Darbot/dev-nexus-dogfood`.
+- The dogfood meta repository records explicit GitHub hosting metadata:
+  `origin` is the human remote and `bot` is the automation remote through the
+  generic `github.com-bot` SSH alias.
+- Automation publication is expected to run as GitHub machine user
+  `Gabot-Darbot` with `GH_CONFIG_DIR=home:.config/gh-automation-github`;
+  manual human work remains `Gabriel-Darbord` through the normal `origin`
+  remote.
+- Direct-integration component publication policies use component `bot`
+  remotes; `origin` remains the normal human/manual remote.
 - The active scheduler path is DevNexus `automation coordinator-loop`.
   Heartbeats may wake that loop, but DevNexus owns lock, backoff, run facts, and
   relaunch decisions.

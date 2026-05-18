@@ -8,6 +8,11 @@ and ready for coordinator-driven work across its components.
 - The latest completed source work is `dev-nexus:local-70`, published as
   DevNexus commit `62610fe` with generic automation identity examples in setup
   guidance and tests.
+- The dogfood meta-project now records GitHub hosting remotes and automation
+  publication actors explicitly: human manual work uses `origin`, while
+  agent-created Git/GitHub activity uses the `bot` remote and
+  `Gabot-Darbot` machine-user profile. Direct-integration components also use
+  component `bot` remotes for publication.
 - Cleanup work `dev-nexus:local-68` is complete.
 - Local stale `codex/*` branches in DevNexus, DevNexus-Pharo, and PLexus have
   been pruned after verifying they were merged or superseded by completed work

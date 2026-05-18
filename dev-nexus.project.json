@@ -5,8 +5,35 @@
   "home": null,
   "repo": {
     "kind": "git",
-    "remoteUrl": "git@github.com-gabot:Gabot-Darbot/dev-nexus-dogfood.git",
+    "remoteUrl": "git@github.com:Gabot-Darbot/dev-nexus-dogfood.git",
     "defaultBranch": "main"
+  },
+  "hosting": {
+    "provider": "github",
+    "namespace": "Gabot-Darbot",
+    "repository": {
+      "name": "dev-nexus-dogfood",
+      "visibility": "private",
+      "defaultBranch": "main"
+    },
+    "authProfile": "human-github",
+    "remotes": [
+      {
+        "name": "origin",
+        "role": "human",
+        "protocol": "ssh"
+      },
+      {
+        "name": "bot",
+        "role": "automation",
+        "protocol": "ssh",
+        "authProfile": "bot-github",
+        "sshHost": "github.com-bot"
+      }
+    ],
+    "provisioning": {
+      "allowCreate": false
+    }
   },
   "worktreesRoot": "worktrees",
   "components": [
@@ -34,7 +61,7 @@
       },
       "publication": {
         "strategy": "direct_integration",
-        "remote": "origin",
+        "remote": "bot",
         "targetBranch": "main",
         "push": true
       },
@@ -55,7 +82,7 @@
       },
       "publication": {
         "strategy": "direct_integration",
-        "remote": "origin",
+        "remote": "bot",
         "targetBranch": "main",
         "push": true
       },
@@ -94,7 +121,7 @@
       },
       "publication": {
         "strategy": "direct_integration",
-        "remote": "origin",
+        "remote": "bot",
         "targetBranch": "main",
         "push": true
       },
@@ -120,7 +147,7 @@
       },
       "publication": {
         "strategy": "direct_integration",
-        "remote": "origin",
+        "remote": "bot",
         "targetBranch": "main",
         "push": true
       },
@@ -141,7 +168,7 @@
       },
       "publication": {
         "strategy": "direct_integration",
-        "remote": "origin",
+        "remote": "bot",
         "targetBranch": "main",
         "push": true
       },
@@ -628,7 +655,23 @@
       "strategy": "direct_integration",
       "remote": "bot",
       "targetBranch": "main",
-      "push": true
+      "push": true,
+      "actor": {
+        "kind": "machine_user",
+        "provider": "github",
+        "handle": "Gabot-Darbot",
+        "id": null
+      },
+      "manualRemote": "origin",
+      "manualActor": {
+        "kind": "human",
+        "provider": "github",
+        "handle": "Gabriel-Darbord",
+        "id": null
+      },
+      "commandEnvironment": {
+        "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+      }
     }
   }
 }
