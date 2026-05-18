@@ -66,6 +66,10 @@ import {
   type NexusPluginCapabilityProjection,
 } from "./nexusPluginCapabilities.js";
 import {
+  buildNexusRunnerProfilePolicySummary,
+  type NexusRunnerProfilePolicySummary,
+} from "./nexusRunnerProfile.js";
+import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
@@ -163,6 +167,7 @@ export interface NexusAutomationCurrentAgentAdoptionContext {
     coordinatorProfile: NexusAutomationAgentPolicy["coordinatorProfile"];
     profiles: NexusAutomationAgentPolicy["profiles"];
   };
+  runnerProfiles: NexusRunnerProfilePolicySummary[];
   pluginCapabilities: NexusPluginCapabilityProjection[];
   result: NexusAutomationCurrentAgentResultContract;
   eligibleWorkItems: WorkItem[];
@@ -1167,6 +1172,10 @@ function buildCurrentAgentAdoptionContext(input: {
       config: input.automationConfig,
     }),
     agent: normalizeNexusAutomationAgentPolicy(input.automationConfig),
+    runnerProfiles: buildNexusRunnerProfilePolicySummary(
+      input.projectConfig.runnerProfiles,
+      input.projectConfig.hosts,
+    ),
     pluginCapabilities: projectPluginCapabilityProjections(input.projectConfig),
     result: currentAgentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,

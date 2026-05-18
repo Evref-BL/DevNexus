@@ -68,6 +68,35 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      runnerProfiles: [
+        {
+          id: "runtime-smoke",
+          displayName: "Runtime Smoke",
+          enabled: true,
+          requiredCapabilities: ["runtime"],
+          allowedOperationClasses: ["live_runtime"],
+          commandProfileRefs: ["runtime-smoke-command"],
+          limits: {
+            timeoutMs: 60000,
+            outputLineLimit: 1000,
+            outputByteLimit: 500000,
+          },
+          artifactRetention: {
+            mode: "summary",
+            ttlDays: 3,
+          },
+          credentialIdentity: {
+            kind: "automation",
+            identityRef: "github-bot",
+          },
+          mutationClass: "live_runtime",
+          approvalRequired: true,
+          approvalState: "policy_gated",
+          policyGateIds: ["runner.runtime.approved"],
+          missingHostCapabilities: ["runtime"],
+          runnableHostIds: [],
+        },
+      ],
     });
 
     const contextJsonPath = nexusWorkerContextJsonPath(worktreePath);
@@ -117,6 +146,16 @@ describe("nexus worker context bundle", () => {
           GH_CONFIG_DIR: "home:.config/gh-example-bot",
         },
       },
+      runnerProfiles: [
+        {
+          id: "runtime-smoke",
+          mutationClass: "live_runtime",
+          approvalState: "policy_gated",
+          requiredCapabilities: ["runtime"],
+          commandProfileRefs: ["runtime-smoke-command"],
+          missingHostCapabilities: ["runtime"],
+        },
+      ],
       projectContext: {
         agentsPath: path.join(projectRoot, "AGENTS.md"),
         contextPath: path.join(projectRoot, "CONTEXT.md"),
@@ -172,6 +211,9 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain("- automation remote: bot");
     expect(briefing).toContain(
       "- automation actor: machine_user:github:example-bot",
+    );
+    expect(briefing).toContain(
+      "- runtime-smoke: mutation=live_runtime approval=policy_gated capabilities=runtime missingHostCapabilities=runtime",
     );
     expect(briefing).toContain("- manual remote: origin");
     expect(briefing).toContain("- manual actor: human:github:example-human");

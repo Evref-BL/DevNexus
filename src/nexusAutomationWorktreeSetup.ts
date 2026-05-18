@@ -34,6 +34,7 @@ import {
   type NexusSkillSourceControl,
 } from "./nexusSkills.js";
 import type { NexusPluginWorkerFragmentsProjection } from "./nexusPluginCapabilities.js";
+import type { NexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -116,6 +117,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   targetStatePath?: string | null;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  runnerProfiles?: NexusRunnerProfilePolicySummary[];
 }
 
 export interface NexusAutomationWorktreeSetupOptions {
@@ -331,6 +333,7 @@ function materializeWorkerContext(options: {
     pluginFragments: options.context.pluginFragments,
     publication:
       options.context.publication ?? options.automationConfig.publication,
+    runnerProfiles: options.context.runnerProfiles,
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,

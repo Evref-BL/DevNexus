@@ -145,6 +145,31 @@ describe("nexus automation agent launch", () => {
     saveProjectConfig(
       projectRoot,
       projectConfig({
+        hosts: [
+          {
+            id: "linux-verifier",
+            capabilityTags: ["node", "git"],
+          },
+        ],
+        runnerProfiles: [
+          {
+            id: "verify-node",
+            requiredCapabilities: ["node"],
+            allowedOperationClasses: ["verification"],
+            commandProfileRefs: ["npm-check"],
+            mutationClass: "verification",
+          },
+          {
+            id: "runtime-smoke",
+            requiredCapabilities: ["runtime"],
+            allowedOperationClasses: ["live_runtime"],
+            mutationClass: "live_runtime",
+            approval: {
+              required: true,
+              policyGateIds: ["runner.runtime.approved"],
+            },
+          },
+        ],
         plugins: [
           {
             id: "analysis-tools",
@@ -386,6 +411,23 @@ describe("nexus automation agent launch", () => {
             },
           ],
         },
+        runnerProfiles: [
+          {
+            id: "verify-node",
+            mutationClass: "verification",
+            approvalState: "not_required",
+            requiredCapabilities: ["node"],
+            commandProfileRefs: ["npm-check"],
+            missingHostCapabilities: [],
+          },
+          {
+            id: "runtime-smoke",
+            mutationClass: "live_runtime",
+            approvalState: "policy_gated",
+            policyGateIds: ["runner.runtime.approved"],
+            missingHostCapabilities: ["runtime"],
+          },
+        ],
         pluginCapabilities: [
           {
             pluginId: "analysis-tools",

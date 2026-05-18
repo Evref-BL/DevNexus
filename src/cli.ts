@@ -4386,6 +4386,22 @@ function printProjectStatusResult(
       writeLine(stdout, `      Warning: ${warning}`);
     }
   }
+  writeLine(stdout, `  Runner profiles: ${project.runnerProfiles.length}`);
+  for (const profile of project.runnerProfiles) {
+    const enabled = profile.enabled ? "enabled" : "disabled";
+    const capabilities =
+      profile.requiredCapabilities.length > 0
+        ? profile.requiredCapabilities.join(",")
+        : "none";
+    const missing =
+      profile.missingHostCapabilities.length > 0
+        ? profile.missingHostCapabilities.join(",")
+        : "none";
+    writeLine(
+      stdout,
+      `    ${profile.id} [${enabled}] mutation=${profile.mutationClass} approval=${profile.approvalState} capabilities=${capabilities} missingHostCapabilities=${missing}`,
+    );
+  }
   writeLine(stdout, `  Components: ${project.components.length}`);
   for (const component of project.components) {
     writeLine(

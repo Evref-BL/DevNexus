@@ -26,6 +26,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  buildNexusRunnerProfileStatuses,
+  type NexusRunnerProfileStatus,
+} from "./nexusRunnerProfile.js";
+import {
   readNexusAutomationTargetContext,
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
@@ -110,6 +114,7 @@ export interface NexusAutomationStatus {
   target: NexusAutomationTargetContext | null;
   targetCycles: NexusAutomationTargetCycleSummary | null;
   agent: NexusAutomationAgentPolicy | null;
+  runnerProfiles: NexusRunnerProfileStatus[];
   publication: NexusPublicationStatus[];
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
@@ -615,6 +620,7 @@ type AutomationStatusInput = Omit<
   | "componentEligibleWorkItems"
   | "components"
   | "publication"
+  | "runnerProfiles"
   | "target"
   | "targetCycles"
 > &
@@ -625,6 +631,7 @@ type AutomationStatusInput = Omit<
       | "componentEligibleWorkItems"
       | "components"
       | "publication"
+      | "runnerProfiles"
       | "target"
       | "targetCycles"
     >
@@ -658,6 +665,12 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     target,
     targetCycles,
     agent,
+    runnerProfiles:
+      result.runnerProfiles ??
+      buildNexusRunnerProfileStatuses(
+        result.projectConfig.runnerProfiles,
+        result.projectConfig.hosts,
+      ),
     publication: result.publication ?? [],
     components: result.components ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,

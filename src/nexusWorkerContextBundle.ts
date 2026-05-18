@@ -12,6 +12,7 @@ import type {
   NexusPluginWorkerFragmentSource,
   NexusPluginWorkerFragmentsProjection,
 } from "./nexusPluginCapabilities.js";
+import type { NexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
 
 export type NexusWorkerContextFileId =
   | "agents"
@@ -146,6 +147,7 @@ export interface NexusWorkerContextBundle {
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   publication: NexusAutomationPublicationConfig | null;
+  runnerProfiles: NexusRunnerProfilePolicySummary[];
   projectContext: NexusWorkerProjectContextReferences;
   pluginFragments: NexusPluginWorkerFragmentsProjection;
   boundaries: NexusWorkerContextBoundaries;
@@ -167,6 +169,7 @@ export interface NexusWorkerContextBundleOptions {
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  runnerProfiles?: NexusRunnerProfilePolicySummary[];
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -253,6 +256,7 @@ export function buildNexusWorkerContextBundle(
     options.pluginFragments,
   );
   const publication = options.publication ?? null;
+  const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
   const worktree = {
     componentId,
     sourceRoot,
@@ -280,6 +284,7 @@ export function buildNexusWorkerContextBundle(
     ownership: worktree,
     worktree,
     publication,
+    runnerProfiles,
     projectContext,
     pluginFragments,
     boundaries: {
@@ -341,6 +346,8 @@ export function renderNexusWorkerBriefing(
     "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
     "",
     ...renderPublicationPolicyLines(context.publication),
+    "",
+    ...renderRunnerProfilePolicyLines(context.runnerProfiles),
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
@@ -727,6 +734,62 @@ function publicationActorLabel(
     actor.provider ?? "unknown-provider",
     actor.handle ?? actor.id ?? "unknown-actor",
   ].join(":");
+}
+
+function normalizeWorkerRunnerProfiles(
+  runnerProfiles: NexusRunnerProfilePolicySummary[] | undefined,
+): NexusRunnerProfilePolicySummary[] {
+  return (runnerProfiles ?? []).map((profile) => ({
+    id: requiredNonEmptyString(profile.id, "runnerProfiles.id"),
+    displayName: requiredNonEmptyString(
+      profile.displayName,
+      "runnerProfiles.displayName",
+    ),
+    enabled: profile.enabled,
+    requiredCapabilities: normalizeStringArray(
+      profile.requiredCapabilities,
+      "runnerProfiles.requiredCapabilities",
+    ),
+    allowedOperationClasses: [...profile.allowedOperationClasses],
+    commandProfileRefs: normalizeStringArray(
+      profile.commandProfileRefs,
+      "runnerProfiles.commandProfileRefs",
+    ),
+    limits: { ...profile.limits },
+    artifactRetention: { ...profile.artifactRetention },
+    credentialIdentity: { ...profile.credentialIdentity },
+    mutationClass: profile.mutationClass,
+    approvalRequired: profile.approvalRequired,
+    approvalState: profile.approvalState,
+    policyGateIds: normalizeStringArray(
+      profile.policyGateIds,
+      "runnerProfiles.policyGateIds",
+    ),
+    missingHostCapabilities: normalizeStringArray(
+      profile.missingHostCapabilities,
+      "runnerProfiles.missingHostCapabilities",
+    ),
+    runnableHostIds: normalizeStringArray(
+      profile.runnableHostIds,
+      "runnerProfiles.runnableHostIds",
+    ),
+  }));
+}
+
+function renderRunnerProfilePolicyLines(
+  runnerProfiles: NexusRunnerProfilePolicySummary[],
+): string[] {
+  if (runnerProfiles.length === 0) {
+    return ["Runner profile policy:", "- runner profiles: none"];
+  }
+
+  return [
+    "Runner profile policy:",
+    ...runnerProfiles.map(
+      (profile) =>
+        `- ${profile.id}: mutation=${profile.mutationClass} approval=${profile.approvalState} capabilities=${profile.requiredCapabilities.join(",") || "none"} missingHostCapabilities=${profile.missingHostCapabilities.join(",") || "none"}`,
+    ),
+  ];
 }
 
 function normalizeWorkerContextWorkItem(

@@ -21,6 +21,10 @@ import {
   type NexusHomeHostOverlaySource,
   type NexusProjectHostStatus,
 } from "./nexusHostRegistry.js";
+import {
+  buildNexusRunnerProfileStatuses,
+  type NexusRunnerProfileStatus,
+} from "./nexusRunnerProfile.js";
 import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
@@ -53,6 +57,7 @@ export interface NexusProjectStatusBase {
   vibeKanbanProjectId: string | null;
   vibeKanbanRepoId: string | null;
   hosts: NexusProjectHostStatus[];
+  runnerProfiles: NexusRunnerProfileStatus[];
   projectConfigPath: string;
   projectConfigExists: boolean;
   worktreesRoot: string;
@@ -140,6 +145,10 @@ export function buildNexusProjectStatus(
       config?.kanban?.projectId ?? reference.vibeKanbanProjectId ?? null,
     vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
     hosts: buildNexusProjectHostStatuses(config?.hosts, options.homeConfig),
+    runnerProfiles: buildNexusRunnerProfileStatuses(
+      config?.runnerProfiles,
+      config?.hosts,
+    ),
     projectConfigPath: resolvedProjectConfigPath,
     projectConfigExists: Boolean(config),
     worktreesRoot: resolvedWorktreesRoot,

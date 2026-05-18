@@ -254,6 +254,206 @@ describe("project config", () => {
     ]);
   });
 
+  it("accepts generic runner profiles across safety classes", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "runner-project",
+        name: "Runner Project",
+        hosts: [
+          {
+            id: "linux-verifier",
+            capabilityTags: ["node", "git", "runtime"],
+          },
+        ],
+        runnerProfiles: [
+          {
+            id: "read-only",
+            allowedOperationClasses: ["read_only"],
+            mutationClass: "none",
+          },
+          {
+            id: "verify",
+            requiredCapabilities: ["node"],
+            allowedOperationClasses: ["read_only", "verification"],
+            commandProfileRefs: ["npm-check"],
+            limits: {
+              timeoutMs: 120000,
+              outputLineLimit: 2000,
+              outputByteLimit: 1000000,
+            },
+            artifactRetention: {
+              mode: "logs",
+              ttlDays: 7,
+            },
+            credentialIdentity: {
+              kind: "automation",
+              identityRef: "github-bot",
+            },
+            mutationClass: "verification",
+          },
+          {
+            id: "project-local",
+            allowedOperationClasses: [
+              "read_only",
+              "verification",
+              "project_local_mutation",
+            ],
+            mutationClass: "project_local",
+          },
+          {
+            id: "live-runtime",
+            requiredCapabilities: ["runtime"],
+            allowedOperationClasses: ["read_only", "live_runtime"],
+            mutationClass: "live_runtime",
+            approval: {
+              required: true,
+              policyGateIds: ["runner.live-runtime.approved"],
+              reason: "Bounded live runtime smoke profile.",
+            },
+          },
+          {
+            id: "destructive-cleanup",
+            allowedOperationClasses: ["destructive"],
+            mutationClass: "destructive",
+            artifactRetention: {
+              mode: "summary",
+              ttlDays: 30,
+            },
+            approval: {
+              required: true,
+              approvalRef: "approval://cleanup/2026-05-18",
+            },
+          },
+        ],
+      }).runnerProfiles,
+    ).toEqual([
+      {
+        id: "read-only",
+        displayName: "read-only",
+        enabled: true,
+        requiredCapabilities: [],
+        allowedOperationClasses: ["read_only"],
+        commandProfileRefs: [],
+        limits: {
+          timeoutMs: null,
+          outputLineLimit: null,
+          outputByteLimit: null,
+        },
+        artifactRetention: {
+          mode: "none",
+          ttlDays: null,
+        },
+        credentialIdentity: {
+          kind: "none",
+          identityRef: null,
+        },
+        mutationClass: "none",
+        approval: {
+          required: false,
+          policyGateIds: [],
+          approvalRef: null,
+          reason: null,
+        },
+      },
+      expect.objectContaining({
+        id: "verify",
+        requiredCapabilities: ["node"],
+        commandProfileRefs: ["npm-check"],
+        mutationClass: "verification",
+      }),
+      expect.objectContaining({
+        id: "project-local",
+        mutationClass: "project_local",
+      }),
+      expect.objectContaining({
+        id: "live-runtime",
+        mutationClass: "live_runtime",
+        approval: expect.objectContaining({
+          required: true,
+          policyGateIds: ["runner.live-runtime.approved"],
+        }),
+      }),
+      expect.objectContaining({
+        id: "destructive-cleanup",
+        mutationClass: "destructive",
+        approval: expect.objectContaining({
+          required: true,
+          approvalRef: "approval://cleanup/2026-05-18",
+        }),
+      }),
+    ]);
+  });
+
+  it("rejects unsafe or contradictory runner profile combinations", () => {
+    const configWithRunnerProfile = (profile: Record<string, unknown>) => ({
+      version: 1,
+      id: "invalid-runner-project",
+      name: "Invalid Runner Project",
+      runnerProfiles: [
+        {
+          id: "runner",
+          ...profile,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithRunnerProfile({
+          allowedOperationClasses: ["live_runtime"],
+          mutationClass: "live_runtime",
+        }),
+      ),
+    ).toThrow(/approval\.required must be true/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithRunnerProfile({
+          allowedOperationClasses: ["destructive"],
+          mutationClass: "destructive",
+          approval: {
+            required: true,
+          },
+        }),
+      ),
+    ).toThrow(/policyGateIds or approvalRef/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithRunnerProfile({
+          allowedOperationClasses: ["read_only"],
+          mutationClass: "project_local",
+        }),
+      ),
+    ).toThrow(/mutationClass must be none/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithRunnerProfile({
+          allowedOperationClasses: ["verification"],
+          mutationClass: "verification",
+          credentialIdentity: {
+            kind: "automation",
+          },
+        }),
+      ),
+    ).toThrow(/credentialIdentity\.identityRef/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithRunnerProfile({
+          allowedOperationClasses: ["read_only"],
+          mutationClass: "none",
+          artifactRetention: {
+            mode: "none",
+            ttlDays: 7,
+          },
+        }),
+      ),
+    ).toThrow(/artifactRetention\.ttlDays/);
+  });
+
   it("resolves agent configuration using issue, project, home, then fallback precedence", () => {
     expect(
       resolveNexusAgentConfig({

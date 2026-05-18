@@ -214,11 +214,84 @@ describe("project registry helpers", () => {
       vibeKanbanProjectId: "vk-project",
       vibeKanbanRepoId: "vk-repo",
       hosts: [],
+      runnerProfiles: [],
       projectConfigPath: path.join(root, devNexusProjectConfigFileName),
       projectConfigExists: true,
       worktreesRoot: path.join(root, "worktrees"),
       worktreesRootExists: true,
     });
+  });
+
+  it("reports runner profile approval and missing host capability status", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(root, { recursive: true });
+    saveProjectConfig(root, {
+      ...projectConfig("config-id", "Config Project"),
+      hosts: [
+        {
+          id: "linux-verifier",
+          capabilityTags: ["node", "git"],
+        },
+        {
+          id: "mac-runtime",
+          capabilityTags: ["node", "runtime"],
+          enabled: false,
+        },
+      ],
+      runnerProfiles: [
+        {
+          id: "verify-node",
+          requiredCapabilities: ["node"],
+          allowedOperationClasses: ["verification"],
+          mutationClass: "verification",
+        },
+        {
+          id: "runtime-smoke",
+          requiredCapabilities: ["runtime", "tailscale"],
+          allowedOperationClasses: ["live_runtime"],
+          mutationClass: "live_runtime",
+          approval: {
+            required: true,
+            policyGateIds: ["runner.runtime.approved"],
+          },
+        },
+      ],
+    });
+
+    expect(
+      buildNexusProjectStatus({
+        id: "registry-id",
+        name: "Registry Project",
+        projectRoot: root,
+      }).runnerProfiles,
+    ).toMatchObject([
+      {
+        id: "verify-node",
+        mutationClass: "verification",
+        approvalState: "not_required",
+        missingHostCapabilities: [],
+        runnableHostIds: ["linux-verifier"],
+      },
+      {
+        id: "runtime-smoke",
+        mutationClass: "live_runtime",
+        approvalState: "policy_gated",
+        policyGateIds: ["runner.runtime.approved"],
+        missingHostCapabilities: ["runtime", "tailscale"],
+        runnableHostIds: [],
+        hostCapabilities: [
+          {
+            hostId: "linux-verifier",
+            missingCapabilities: ["runtime", "tailscale"],
+          },
+          {
+            hostId: "mac-runtime",
+            enabled: false,
+            missingCapabilities: ["tailscale"],
+          },
+        ],
+      },
+    ]);
   });
 
   it("reports host overlay readiness in project status", () => {

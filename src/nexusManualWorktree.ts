@@ -26,6 +26,7 @@ import {
   projectPluginDependencyProjections,
   projectPluginWorkerFragments,
 } from "./nexusPluginCapabilities.js";
+import { buildNexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
 import {
   resolveComponentWorkItemRoute,
   throwWorkItemLookupFailure,
@@ -229,6 +230,10 @@ export function prepareNexusManualWorktree(
       pluginFragments: projectPluginWorkerFragments(projectConfig, {
         componentId: target.ownerId,
       }),
+      runnerProfiles: buildNexusRunnerProfilePolicySummary(
+        projectConfig.runnerProfiles,
+        projectConfig.hosts,
+      ),
     },
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });

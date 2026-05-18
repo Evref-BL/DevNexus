@@ -46,6 +46,7 @@ export * from "./worktreeExecutionMetadata.js";
 export * from "./nexusExtension.js";
 export * from "./nexusHomeConfig.js";
 export * from "./nexusHostRegistry.js";
+export * from "./nexusRunnerProfile.js";
 export * from "./nexusProjectConfig.js";
 export * from "./nexusProjectHomeService.js";
 export * from "./nexusProjectLifecycle.js";

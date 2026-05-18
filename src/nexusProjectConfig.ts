@@ -46,6 +46,17 @@ import type {
   NexusProjectHostingRepositoryVisibility,
 } from "./nexusProjectHosting.js";
 import type { NexusProjectHostConfig } from "./nexusHostRegistry.js";
+import {
+  requiredMutationClassForOperationClasses,
+  runnerProfileRequiresApproval,
+  type NexusRunnerApprovalRequirementConfig,
+  type NexusRunnerArtifactRetentionConfig,
+  type NexusRunnerCredentialIdentityPolicyConfig,
+  type NexusRunnerMutationClass,
+  type NexusRunnerOperationClass,
+  type NexusRunnerProfileConfig,
+  type NexusRunnerProfileLimitsConfig,
+} from "./nexusRunnerProfile.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -177,6 +188,7 @@ export interface NexusProjectConfig {
   hosting?: NexusProjectHostingConfig;
   automation?: NexusAutomationConfig;
   hosts?: NexusProjectHostConfig[];
+  runnerProfiles?: NexusRunnerProfileConfig[];
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -495,6 +507,329 @@ function validateProjectHostsConfig(value: unknown): NexusProjectHostConfig[] {
   }
 
   return hosts;
+}
+
+function validateRunnerProfilesConfig(
+  value: unknown,
+): NexusRunnerProfileConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.runnerProfiles must be an array");
+  }
+
+  const profiles = value.map(validateRunnerProfileConfig);
+  const ids = new Set<string>();
+  for (const profile of profiles) {
+    if (ids.has(profile.id)) {
+      throw new NexusConfigError(
+        `project config.runnerProfiles contains duplicate id: ${profile.id}`,
+      );
+    }
+    ids.add(profile.id);
+  }
+
+  return profiles;
+}
+
+function validateRunnerProfileConfig(
+  value: unknown,
+  index: number,
+): NexusRunnerProfileConfig {
+  const pathName = `project config.runnerProfiles[${index}]`;
+  const record = assertRecord(value, pathName);
+  const id = requiredString(record, "id", pathName);
+  const allowedOperationClasses = validateRunnerOperationClasses(
+    record.allowedOperationClasses,
+    `${pathName}.allowedOperationClasses`,
+  );
+  const mutationClass = validateRunnerMutationClass(
+    record.mutationClass,
+    `${pathName}.mutationClass`,
+  );
+  validateRunnerMutationClassMatchesOperations({
+    mutationClass,
+    allowedOperationClasses,
+    pathName,
+  });
+  const approval = validateRunnerApprovalRequirement(
+    record.approval,
+    `${pathName}.approval`,
+  );
+  validateRunnerApprovalGate({
+    approval,
+    allowedOperationClasses,
+    mutationClass,
+    pathName,
+  });
+
+  return {
+    id,
+    displayName: optionalString(record, "displayName", pathName) ?? id,
+    enabled: optionalBoolean(record, "enabled", pathName) ?? true,
+    requiredCapabilities:
+      optionalUniqueStringArray(record, "requiredCapabilities", pathName) ?? [],
+    allowedOperationClasses,
+    commandProfileRefs:
+      optionalUniqueStringArray(record, "commandProfileRefs", pathName) ?? [],
+    limits: validateRunnerProfileLimits(record.limits, `${pathName}.limits`),
+    artifactRetention: validateRunnerArtifactRetention(
+      record.artifactRetention,
+      `${pathName}.artifactRetention`,
+    ),
+    credentialIdentity: validateRunnerCredentialIdentity(
+      record.credentialIdentity,
+      `${pathName}.credentialIdentity`,
+    ),
+    mutationClass,
+    approval,
+  };
+}
+
+function validateRunnerOperationClasses(
+  value: unknown,
+  pathName: string,
+): NexusRunnerOperationClass[] {
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName} must be an array`);
+  }
+  if (value.length === 0) {
+    throw new NexusConfigError(`${pathName} must not be empty`);
+  }
+
+  const classes = value.map((entry, index) =>
+    validateRunnerOperationClass(entry, `${pathName}[${index}]`),
+  );
+  assertUniqueValues(classes, pathName);
+  return classes;
+}
+
+function validateRunnerOperationClass(
+  value: unknown,
+  pathName: string,
+): NexusRunnerOperationClass {
+  if (
+    value === "read_only" ||
+    value === "verification" ||
+    value === "project_local_mutation" ||
+    value === "live_runtime" ||
+    value === "destructive"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be read_only, verification, project_local_mutation, live_runtime, or destructive`,
+  );
+}
+
+function validateRunnerMutationClass(
+  value: unknown,
+  pathName: string,
+): NexusRunnerMutationClass {
+  if (
+    value === "none" ||
+    value === "verification" ||
+    value === "project_local" ||
+    value === "live_runtime" ||
+    value === "destructive"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be none, verification, project_local, live_runtime, or destructive`,
+  );
+}
+
+function validateRunnerMutationClassMatchesOperations(options: {
+  mutationClass: NexusRunnerMutationClass;
+  allowedOperationClasses: NexusRunnerOperationClass[];
+  pathName: string;
+}): void {
+  const requiredMutationClass = requiredMutationClassForOperationClasses(
+    options.allowedOperationClasses,
+  );
+  if (options.mutationClass !== requiredMutationClass) {
+    throw new NexusConfigError(
+      `${options.pathName}.mutationClass must be ${requiredMutationClass} for allowedOperationClasses`,
+    );
+  }
+}
+
+function validateRunnerProfileLimits(
+  value: unknown,
+  pathName: string,
+): NexusRunnerProfileLimitsConfig {
+  if (value === undefined) {
+    return {
+      timeoutMs: null,
+      outputLineLimit: null,
+      outputByteLimit: null,
+    };
+  }
+
+  const record = assertRecord(value, pathName);
+  return {
+    timeoutMs: optionalNullablePositiveInteger(record, "timeoutMs", pathName),
+    outputLineLimit: optionalNullablePositiveInteger(
+      record,
+      "outputLineLimit",
+      pathName,
+    ),
+    outputByteLimit: optionalNullablePositiveInteger(
+      record,
+      "outputByteLimit",
+      pathName,
+    ),
+  };
+}
+
+function validateRunnerArtifactRetention(
+  value: unknown,
+  pathName: string,
+): NexusRunnerArtifactRetentionConfig {
+  if (value === undefined) {
+    return {
+      mode: "none",
+      ttlDays: null,
+    };
+  }
+
+  const record = assertRecord(value, pathName);
+  const mode = validateRunnerArtifactRetentionMode(record.mode, `${pathName}.mode`);
+  const ttlDays = optionalNullablePositiveInteger(record, "ttlDays", pathName);
+  if (mode === "none" && ttlDays !== null) {
+    throw new NexusConfigError(`${pathName}.ttlDays must be null when mode is none`);
+  }
+
+  return {
+    mode,
+    ttlDays,
+  };
+}
+
+function validateRunnerArtifactRetentionMode(
+  value: unknown,
+  pathName: string,
+): NexusRunnerArtifactRetentionConfig["mode"] {
+  if (
+    value === undefined ||
+    value === "none" ||
+    value === "summary" ||
+    value === "logs" ||
+    value === "artifacts"
+  ) {
+    return value ?? "none";
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be none, summary, logs, or artifacts`,
+  );
+}
+
+function validateRunnerCredentialIdentity(
+  value: unknown,
+  pathName: string,
+): NexusRunnerCredentialIdentityPolicyConfig {
+  if (value === undefined) {
+    return {
+      kind: "none",
+      identityRef: null,
+    };
+  }
+
+  const record = assertRecord(value, pathName);
+  const kind = validateRunnerCredentialIdentityKind(record.kind, `${pathName}.kind`);
+  const identityRef =
+    optionalNullableString(record, "identityRef", pathName) ?? null;
+  if (kind === "none" && identityRef !== null) {
+    throw new NexusConfigError(
+      `${pathName}.identityRef must be null when kind is none`,
+    );
+  }
+  if (kind !== "none" && identityRef === null) {
+    throw new NexusConfigError(
+      `${pathName}.identityRef must be configured when kind is ${kind}`,
+    );
+  }
+
+  return {
+    kind,
+    identityRef,
+  };
+}
+
+function validateRunnerCredentialIdentityKind(
+  value: unknown,
+  pathName: string,
+): NexusRunnerCredentialIdentityPolicyConfig["kind"] {
+  if (
+    value === undefined ||
+    value === "none" ||
+    value === "host" ||
+    value === "automation" ||
+    value === "manual"
+  ) {
+    return value ?? "none";
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be none, host, automation, or manual`,
+  );
+}
+
+function validateRunnerApprovalRequirement(
+  value: unknown,
+  pathName: string,
+): NexusRunnerApprovalRequirementConfig {
+  if (value === undefined) {
+    return {
+      required: false,
+      policyGateIds: [],
+      approvalRef: null,
+      reason: null,
+    };
+  }
+
+  const record = assertRecord(value, pathName);
+  return {
+    required: optionalBoolean(record, "required", pathName) ?? false,
+    policyGateIds:
+      optionalUniqueStringArray(record, "policyGateIds", pathName) ?? [],
+    approvalRef: optionalNullableString(record, "approvalRef", pathName) ?? null,
+    reason: optionalNullableString(record, "reason", pathName) ?? null,
+  };
+}
+
+function validateRunnerApprovalGate(options: {
+  approval: NexusRunnerApprovalRequirementConfig;
+  allowedOperationClasses: NexusRunnerOperationClass[];
+  mutationClass: NexusRunnerMutationClass;
+  pathName: string;
+}): void {
+  if (
+    !runnerProfileRequiresApproval(
+      options.allowedOperationClasses,
+      options.mutationClass,
+    )
+  ) {
+    return;
+  }
+  if (!options.approval.required) {
+    throw new NexusConfigError(
+      `${options.pathName}.approval.required must be true for live-runtime or destructive runner profiles`,
+    );
+  }
+  if (
+    options.approval.policyGateIds.length === 0 &&
+    !options.approval.approvalRef
+  ) {
+    throw new NexusConfigError(
+      `${options.pathName}.approval must declare policyGateIds or approvalRef for live-runtime or destructive runner profiles`,
+    );
+  }
 }
 
 function validateSkillMaterialization(
@@ -1523,6 +1858,48 @@ function optionalStringArray(
   return [...value];
 }
 
+function optionalUniqueStringArray(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] | undefined {
+  const values = optionalStringArray(record, key, pathName);
+  if (!values) {
+    return undefined;
+  }
+  assertUniqueValues(values, `${pathName}.${key}`);
+
+  return values;
+}
+
+function optionalNullablePositiveInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusConfigError(
+      `${pathName}.${key} must be a positive integer or null`,
+    );
+  }
+
+  return value;
+}
+
+function assertUniqueValues(values: readonly string[], pathName: string): void {
+  const uniqueValues = new Set<string>();
+  for (const value of values) {
+    if (uniqueValues.has(value)) {
+      throw new NexusConfigError(`${pathName} contains duplicate value: ${value}`);
+    }
+    uniqueValues.add(value);
+  }
+}
+
 function validateWorkTrackerRole(
   value: unknown,
   pathName: string,
@@ -1969,6 +2346,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const hosting = validateProjectHostingConfig(record.hosting);
   const automation = validateNexusAutomationConfig(record.automation);
   const hosts = validateProjectHostsConfig(record.hosts);
+  const runnerProfiles = validateRunnerProfilesConfig(record.runnerProfiles);
   const repo = validateRepoConfig(record.repo);
   const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
@@ -1998,6 +2376,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(hosting ? { hosting } : {}),
     ...(automation ? { automation } : {}),
     hosts,
+    ...(runnerProfiles !== undefined ? { runnerProfiles } : {}),
   };
 }
 

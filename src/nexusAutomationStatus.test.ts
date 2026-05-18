@@ -369,6 +369,63 @@ describe("nexus automation status", () => {
     });
   });
 
+  it("includes runner profile safety status without running profiles", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosts: [
+          {
+            id: "linux-verifier",
+            displayName: "Linux Verifier",
+            platformTags: ["linux"],
+            capabilityTags: ["node", "git"],
+            enabled: true,
+          },
+        ],
+        runnerProfiles: [
+          {
+            id: "verify-node",
+            requiredCapabilities: ["node"],
+            allowedOperationClasses: ["verification"],
+            mutationClass: "verification",
+          },
+          {
+            id: "runtime-smoke",
+            requiredCapabilities: ["runtime"],
+            allowedOperationClasses: ["live_runtime"],
+            mutationClass: "live_runtime",
+            approval: {
+              required: true,
+              policyGateIds: ["runner.runtime.approved"],
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result.runnerProfiles).toMatchObject([
+      {
+        id: "verify-node",
+        mutationClass: "verification",
+        approvalState: "not_required",
+        missingHostCapabilities: [],
+      },
+      {
+        id: "runtime-smoke",
+        mutationClass: "live_runtime",
+        approvalState: "policy_gated",
+        missingHostCapabilities: ["runtime"],
+      },
+    ]);
+  });
+
   it("reports an active run lock before listing candidate work", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     const config = projectConfig();

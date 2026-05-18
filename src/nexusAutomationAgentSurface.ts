@@ -22,6 +22,10 @@ import {
   type NexusPluginCapabilityProjection,
 } from "./nexusPluginCapabilities.js";
 import { loadProjectConfig } from "./nexusProjectConfig.js";
+import {
+  buildNexusRunnerProfilePolicySummary,
+  type NexusRunnerProfilePolicySummary,
+} from "./nexusRunnerProfile.js";
 import type { WorkItem, WorkTrackerRef } from "./workTrackingTypes.js";
 
 export interface NexusAutomationProjectSummary {
@@ -101,6 +105,7 @@ export interface NexusAutomationAgentProfileSummary {
   maxConcurrentSubagents: number | null;
   safety: NexusAutomationConfig["safety"] | null;
   profiles: NexusAutomationAgentProfilePolicySummary[];
+  runnerProfiles: NexusRunnerProfilePolicySummary[];
   pluginCapabilities: NexusPluginCapabilityProjection[];
 }
 
@@ -269,6 +274,10 @@ export function getNexusAutomationAgentProfileSummary(
             }
           : null,
       })) ?? [],
+    runnerProfiles: buildNexusRunnerProfilePolicySummary(
+      projectConfig.runnerProfiles,
+      projectConfig.hosts,
+    ),
     pluginCapabilities: projectPluginCapabilityProjections(projectConfig),
   };
 }
