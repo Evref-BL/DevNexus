@@ -211,6 +211,15 @@ describe("nexus automation status", () => {
             defaultBranch: "main",
             sourceRoot: "source",
             defaultWorkTrackerId: "primary",
+            trackerDiscovery: {
+              scannedRoles: ["eligible_source", "external_inbox"],
+              directExternalSelection: "allowed",
+              importRequiredFirst: false,
+              providerFilters: ["github", "local"],
+              queryLimit: 10,
+              conflictWinner: "scanned_tracker",
+              missingCredentialBehavior: "skip",
+            },
             workTrackers: [
               {
                 id: "primary",
@@ -296,6 +305,16 @@ describe("nexus automation status", () => {
           id: "primary",
           role: "primary",
           defaultTrackerId: "primary",
+          trackerDiscovery: {
+            scannedRoles: ["eligible_source", "external_inbox"],
+            directExternalSelection: "allowed",
+            importRequiredFirst: false,
+            providerFilters: ["github", "local"],
+            queryLimit: 10,
+            conflictWinner: "scanned_tracker",
+            missingCredentialBehavior: "skip",
+            defaultTrackerOnly: false,
+          },
           workTrackers: [
             {
               id: "primary",
@@ -330,6 +349,16 @@ describe("nexus automation status", () => {
         {
           id: "addon",
           role: "addon",
+          trackerDiscovery: {
+            scannedRoles: ["primary"],
+            directExternalSelection: "disabled",
+            importRequiredFirst: true,
+            providerFilters: [],
+            queryLimit: 50,
+            conflictWinner: "default_tracker",
+            missingCredentialBehavior: "block",
+            defaultTrackerOnly: true,
+          },
           workTrackingCapabilities: {
             createItem: true,
             listItems: true,

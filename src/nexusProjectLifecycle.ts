@@ -7,6 +7,7 @@ import {
   projectConfigPath,
   projectWorktreesRootPath,
   validateProjectConfig,
+  type NormalizedNexusProjectTrackerDiscoveryPolicy,
   type NexusProjectComponentConfig,
   type NexusProjectWorkTrackerBindingConfig,
   type NexusProjectConfig,
@@ -148,6 +149,7 @@ export interface ResolvedNexusProjectComponent {
   worktreesRoot: string;
   worktreesRootExists: boolean;
   defaultTrackerId: string | null;
+  trackerDiscovery: NormalizedNexusProjectTrackerDiscoveryPolicy;
   workTrackers: ResolvedNexusProjectWorkTracker[];
   workTracking: NexusProjectComponentConfig["workTracking"] | null;
   workTrackingCapabilities: TrackerCapabilities | null;
@@ -221,6 +223,7 @@ export function resolveProjectComponent(
     worktreesRoot,
     worktreesRootExists: directoryExists(worktreesRoot),
     defaultTrackerId: normalizedWorkTrackers.defaultTrackerId,
+    trackerDiscovery: normalizedWorkTrackers.discoveryPolicy,
     workTrackers,
     workTracking: defaultWorkTracking,
     workTrackingCapabilities: defaultWorkTracking

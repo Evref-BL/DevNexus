@@ -8,6 +8,7 @@ import {
   NexusConfigError,
   projectConfigPath,
   projectWorktreesRootPath,
+  normalizeComponentWorkTrackers,
   normalizeNexusProjectAgentTargets,
   resolveNexusAgentConfig,
   saveProjectConfig,
@@ -1168,6 +1169,106 @@ describe("project config", () => {
     });
   });
 
+  it("normalizes tracker discovery roles and effective default policy", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "tracker-discovery-project",
+      name: "Tracker Discovery Project",
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          defaultWorkTrackerId: "local",
+          trackerDiscovery: {
+            scannedRoles: ["eligible_source", "external_inbox"],
+            directExternalSelection: "allowed",
+            importRequiredFirst: false,
+            providerFilters: ["github", "jira"],
+            queryLimit: 25,
+            conflictWinner: "scanned_tracker",
+            missingCredentialBehavior: "skip",
+          },
+          workTrackers: [
+            {
+              id: "local",
+              roles: ["primary"],
+              workTracking: {
+                provider: "local",
+              },
+            },
+            {
+              id: "github-inbox",
+              roles: ["eligible_source", "external_inbox"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "example",
+                  name: "core",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(config.components[0].trackerDiscovery).toEqual({
+      scannedRoles: ["eligible_source", "external_inbox"],
+      directExternalSelection: "allowed",
+      importRequiredFirst: false,
+      providerFilters: ["github", "jira"],
+      queryLimit: 25,
+      conflictWinner: "scanned_tracker",
+      missingCredentialBehavior: "skip",
+    });
+    expect(normalizeComponentWorkTrackers(config.components[0]).discoveryPolicy).toEqual({
+      scannedRoles: ["eligible_source", "external_inbox"],
+      directExternalSelection: "allowed",
+      importRequiredFirst: false,
+      providerFilters: ["github", "jira"],
+      queryLimit: 25,
+      conflictWinner: "scanned_tracker",
+      missingCredentialBehavior: "skip",
+      defaultTrackerOnly: false,
+    });
+  });
+
+  it("preserves default-tracker-only discovery when no discovery policy is declared", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "legacy-discovery-project",
+      name: "Legacy Discovery Project",
+      components: [
+        {
+          id: "core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          workTracking: {
+            provider: "local",
+          },
+        },
+      ],
+    });
+
+    expect(config.components[0].trackerDiscovery).toBeUndefined();
+    expect(normalizeComponentWorkTrackers(config.components[0]).discoveryPolicy).toEqual({
+      scannedRoles: ["primary"],
+      directExternalSelection: "disabled",
+      importRequiredFirst: true,
+      providerFilters: [],
+      queryLimit: 50,
+      conflictWinner: "default_tracker",
+      missingCredentialBehavior: "block",
+      defaultTrackerOnly: true,
+    });
+  });
+
   it("rejects invalid component work tracker bindings", () => {
     const configWithComponentTracker = (
       componentPatch: Record<string, unknown>,
@@ -1291,6 +1392,78 @@ describe("project config", () => {
         }),
       ),
     ).toThrow(/roles\[0\]/);
+  });
+
+  it("rejects invalid tracker discovery policies", () => {
+    const configWithDiscovery = (
+      trackerDiscovery: Record<string, unknown>,
+    ) => ({
+      version: 1,
+      id: "invalid-discovery-project",
+      name: "Invalid Discovery Project",
+      components: [
+        {
+          id: "core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          workTracking: {
+            provider: "local",
+          },
+          trackerDiscovery,
+        },
+      ],
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          scannedRoles: ["external-sync"],
+        }),
+      ),
+    ).toThrow(/trackerDiscovery\.scannedRoles\[0\]/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          directExternalSelection: "allowed",
+          importRequiredFirst: true,
+        }),
+      ),
+    ).toThrow(/directExternalSelection cannot be allowed when importRequiredFirst is true/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          providerFilters: ["github", "trello"],
+        }),
+      ),
+    ).toThrow(/trackerDiscovery\.providerFilters\[1\]/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          queryLimit: 0,
+        }),
+      ),
+    ).toThrow(/trackerDiscovery\.queryLimit/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          conflictWinner: "latest_update",
+        }),
+      ),
+    ).toThrow(/trackerDiscovery\.conflictWinner/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithDiscovery({
+          missingCredentialBehavior: "prompt",
+        }),
+      ),
+    ).toThrow(/trackerDiscovery\.missingCredentialBehavior/);
   });
 
   it("accepts meta-project hosting config with portable auth profile references", () => {
