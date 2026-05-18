@@ -13,6 +13,11 @@ import {
   saveProjectConfig,
   validateProjectConfig,
 } from "./nexusProjectConfig.js";
+import {
+  normalizeNexusAuthorityPolicy,
+  recommendedNexusAuthorityRoleIds,
+  resolveNexusAuthorityForActor,
+} from "./nexusAuthority.js";
 
 const tempDirs: string[] = [];
 
@@ -176,6 +181,42 @@ describe("project config", () => {
           enabled: false,
         },
       ],
+      authority: {
+        actors: [
+          {
+            id: "gabot",
+            kind: "machine_user" as const,
+            provider: "github",
+            providerIdentity: "Gabot-Darbot",
+            displayName: "Gabot-Darbot",
+            handles: {
+              github: "Gabot-Darbot",
+            },
+          },
+        ],
+        roles: [
+          {
+            id: "docs_operator",
+            name: "Docs Operator",
+            actions: ["project.read", "work_item.comment"],
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "gabot",
+            roles: ["maintainer", "docs_operator"],
+            scope: {
+              project: "my-project",
+              component: "core",
+              provider: "github",
+              tracker: "default",
+              repository: "example/my-project",
+              targetBranch: "main",
+              environment: "dogfood",
+            },
+          },
+        ],
+      },
     };
 
     expect(validateProjectConfig(config)).toEqual(config);
@@ -189,16 +230,16 @@ describe("project config", () => {
   });
 
   it("defaults legacy project configs to the current explicit JSON shape", () => {
-    expect(
-      validateProjectConfig({
-        version: 1,
-        id: "legacy-project",
-        name: "Legacy Project",
-        kanban: {
-          provider: "vibe-kanban",
-        },
-      }),
-    ).toEqual({
+    const config = validateProjectConfig({
+      version: 1,
+      id: "legacy-project",
+      name: "Legacy Project",
+      kanban: {
+        provider: "vibe-kanban",
+      },
+    });
+
+    expect(config).toEqual({
       version: 1,
       id: "legacy-project",
       name: "Legacy Project",
@@ -227,6 +268,214 @@ describe("project config", () => {
         projectId: null,
       },
     });
+    expect(normalizeNexusAuthorityPolicy(config.authority)).toMatchObject({
+      unknownActorFallbackRole: "observer",
+    });
+  });
+
+  it("normalizes recommended authority roles and actor bindings", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "authority-project",
+      name: "Authority Project",
+      authority: {
+        actors: [
+          {
+            id: "gabot",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "Gabot-Darbot",
+            displayName: "Gabot-Darbot",
+            handles: {
+              github: "Gabot-Darbot",
+              git: "gabot@example.invalid",
+            },
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "gabot",
+            roles: ["maintainer", "release_operator"],
+            scope: {
+              project: "authority-project",
+              component: "dev-nexus",
+              provider: "github",
+              tracker: "default",
+              repository: "Evref-BL/DevNexus",
+              targetBranch: "main",
+              environment: "dogfood",
+            },
+          },
+        ],
+      },
+    });
+
+    const policy = normalizeNexusAuthorityPolicy(config.authority);
+
+    expect(recommendedNexusAuthorityRoleIds).toEqual([
+      "maintainer",
+      "contributor",
+      "reviewer",
+      "observer",
+      "runtime_operator",
+      "release_operator",
+    ]);
+    expect(policy.roles.map((role) => role.id)).toEqual(
+      expect.arrayContaining(recommendedNexusAuthorityRoleIds),
+    );
+    expect(policy.roleBindings[0]).toMatchObject({
+      actorId: "gabot",
+      roles: ["maintainer", "release_operator"],
+      scope: {
+        project: "authority-project",
+        component: "dev-nexus",
+        provider: "github",
+        tracker: "default",
+        repository: "Evref-BL/DevNexus",
+        targetBranch: "main",
+        environment: "dogfood",
+      },
+    });
+
+    const gabotAuthority = resolveNexusAuthorityForActor(
+      config.authority,
+      "gabot",
+    );
+    expect(gabotAuthority).toMatchObject({
+      actorId: "gabot",
+      knownActor: true,
+      roles: ["maintainer", "release_operator"],
+    });
+    expect(gabotAuthority.actions).toEqual(
+      expect.arrayContaining([
+        "git.push_target_branch",
+        "provider.pull_request.merge",
+        "release.publish",
+      ]),
+    );
+
+    expect(resolveNexusAuthorityForActor(config.authority, "unknown")).toMatchObject({
+      actorId: "unknown",
+      knownActor: false,
+      roles: ["observer"],
+      actions: expect.arrayContaining(["project.read"]),
+    });
+  });
+
+  it("supports project-configured unknown actor authority fallback", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "authority-project",
+      name: "Authority Project",
+      authority: {
+        unknownActorFallbackRole: "contributor",
+      },
+    });
+
+    const authority = resolveNexusAuthorityForActor(config.authority, "unlisted");
+    expect(authority).toMatchObject({
+      actorId: "unlisted",
+      knownActor: false,
+      roles: ["contributor"],
+    });
+    expect(authority.actions).toEqual(
+      expect.arrayContaining([
+        "git.commit",
+        "git.push_branch",
+        "provider.pull_request.open",
+      ]),
+    );
+    expect(authority.actions).not.toContain("provider.pull_request.merge");
+  });
+
+  it("rejects invalid authority policies", () => {
+    const configWithAuthority = (authority: unknown) => ({
+      version: 1,
+      id: "invalid-authority-project",
+      name: "Invalid Authority Project",
+      authority,
+    });
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAuthority({
+          actors: [
+            {
+              id: "gabot",
+              kind: "machine_user",
+              providerIdentity: "Gabot-Darbot",
+              displayName: "Gabot-Darbot",
+            },
+            {
+              id: "gabot",
+              kind: "machine_user",
+              providerIdentity: "Gabot-Darbot",
+              displayName: "Gabot-Darbot Duplicate",
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/authority\.actors contains duplicate id: gabot/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAuthority({
+          roles: [
+            {
+              id: "publisher",
+              actions: ["release.publish"],
+            },
+            {
+              id: "publisher",
+              actions: ["project.read"],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/authority\.roles contains duplicate id: publisher/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAuthority({
+          roleBindings: [
+            {
+              actorId: "gabot",
+              roles: ["unknown_role"],
+              scope: {
+                project: "invalid-authority-project",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/roleBindings\[0\]\.roles\[0\] references unknown role: unknown_role/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAuthority({
+          roles: [
+            {
+              id: "bad_action",
+              actions: ["merge_everything"],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/authority\.roles\[0\]\.actions\[0\]/);
+
+    expect(() =>
+      validateProjectConfig(
+        configWithAuthority({
+          roleBindings: [
+            {
+              actorId: "gabot",
+              roles: ["observer"],
+              scope: {},
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/authority\.roleBindings\[0\]\.scope must contain at least one scope/);
   });
 
   it("normalizes project host registry config without host-local details", () => {
