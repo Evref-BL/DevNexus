@@ -109,6 +109,13 @@ dev-nexus automation schedule <project-root> --max-runs 1
 dev-nexus automation coordinator-loop <project-root> --max-runs 1
 ```
 
+For chat-driven runs where final JSON is still needed, keep stdout machine
+readable and stream low-volume progress events to stderr:
+
+```bash
+dev-nexus automation coordinator-loop <project-root> --max-runs 1 --json --progress-jsonl
+```
+
 Use current-agent adoption when an already-running agent should proceed under
 the same result-file contract without spawning a child process:
 

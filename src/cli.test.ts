@@ -3382,4 +3382,106 @@ describe("dev-nexus cli", () => {
       runId: "cli-loop-20260517-t100000-000-z-1",
     });
   });
+
+  it("streams coordinator loop progress JSON Lines without changing final JSON output", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        mode: "agent_launch",
+        agent: {
+          ...config.automation!.agent,
+          command: "codex run",
+          timeoutMs: 2468,
+          relaunch: {
+            whileEligible: true,
+          },
+        },
+      },
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinator-loop task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const stdout = captureOutput();
+    const stderr = captureOutput();
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator loop completed",
+          commitIds: ["abc123"],
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "coordinator done",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await main(
+      [
+        "automation",
+        "coordinator-loop",
+        projectRoot,
+        "--max-runs",
+        "1",
+        "--run-id-prefix",
+        "cli-loop",
+        "--json",
+        "--progress-jsonl",
+      ],
+      {
+        stdout: stdout.writer,
+        stderr: stderr.writer,
+        commandRunner,
+        now: fixedClock("2026-05-17T10:00:00.000Z"),
+      },
+    );
+
+    const payload = JSON.parse(stdout.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      stoppedReason: "max_runs",
+      runs: [
+        {
+          status: "completed",
+          summary: "Coordinator loop completed",
+        },
+      ],
+    });
+    const events = stderr
+      .output()
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line));
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "loop_started",
+        "decision",
+        "launch_dispatched",
+        "run_started",
+        "run_finished",
+        "loop_stopped",
+      ]),
+    );
+    expect(events.find((event) => event.type === "run_finished")).toMatchObject({
+      status: "completed",
+      summary: "Coordinator loop completed",
+    });
+  });
 });

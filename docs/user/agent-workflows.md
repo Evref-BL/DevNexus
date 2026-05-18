@@ -124,6 +124,17 @@ dev-nexus automation schedule <project-root> --max-runs 1
 dev-nexus automation coordinator-loop <project-root> --max-runs 1
 ```
 
+Use `--progress-jsonl` with `--json` when the caller needs final JSON on
+stdout but should still see that a long nested coordinator run is alive:
+
+```bash
+dev-nexus automation coordinator-loop <project-root> --max-runs 1 --json --progress-jsonl
+```
+
+The progress stream is JSON Lines on stderr. It is intentionally low-volume and
+event-based, with records for loop start, decisions, launch dispatch, run start,
+run finish, and loop stop.
+
 `automation status` is read-only. It reports whether automation is disabled,
 locked, in retry backoff, blocked by preflight, idle, or ready to launch an
 agent. It also reports publication policy status for each component when

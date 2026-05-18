@@ -812,4 +812,73 @@ describe("nexus automation coordinator loop", () => {
       ],
     });
   });
+
+  it("emits launch progress before waiting for the coordinator launcher", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinator progress task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const events: Array<{ type: string }> = [];
+    let resolveLauncher: (() => void) | null = null;
+    const launcherMayFinish = new Promise<void>((resolve) => {
+      resolveLauncher = resolve;
+    });
+    let launcherStarted: (() => void) | null = null;
+    const launcherWasCalled = new Promise<void>((resolve) => {
+      launcherStarted = resolve;
+    });
+
+    const loop = runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "progress-loop",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      onProgress: (event) => {
+        events.push({ type: event.type });
+      },
+      launcher: async () => {
+        launcherStarted?.();
+        await launcherMayFinish;
+        return {
+          status: "completed",
+          summary: "Coordinator completed after progress was visible",
+        };
+      },
+    });
+
+    await launcherWasCalled;
+
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "loop_started",
+        "tick_started",
+        "decision",
+        "launch_dispatched",
+        "run_started",
+      ]),
+    );
+    expect(events.map((event) => event.type)).not.toContain("run_finished");
+
+    resolveLauncher?.();
+    await expect(loop).resolves.toMatchObject({
+      stoppedReason: "max_runs",
+      runs: [
+        {
+          status: "completed",
+          summary: "Coordinator completed after progress was visible",
+        },
+      ],
+    });
+    expect(events.map((event) => event.type)).toContain("run_finished");
+    expect(events.at(-1)?.type).toBe("loop_stopped");
+  });
 });

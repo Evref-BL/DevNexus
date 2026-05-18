@@ -30,6 +30,7 @@ import {
 } from "./nexusAutomationScheduler.js";
 import {
   runNexusAutomationCoordinatorLoop,
+  type NexusAutomationCoordinatorLoopProgressEvent,
   type NexusAutomationCoordinatorLoopTick,
   type RunNexusAutomationCoordinatorLoopResult,
 } from "./nexusAutomationCoordinatorLoop.js";
@@ -567,6 +568,7 @@ interface ParsedAutomationCoordinatorLoopCommand {
   runFullVerification?: boolean;
   adoptCurrent?: boolean;
   runId?: string;
+  progressJsonl?: boolean;
   json?: boolean;
 }
 
@@ -918,6 +920,7 @@ export function usage(): string {
     "  --max-runs <count>         stop after this many coordinator launches",
     "  --run-id-prefix <prefix>",
     "  --timeout-ms <ms>          applies to the coordinator command",
+    "  --progress-jsonl           emit low-volume JSON Lines progress events to stderr",
     "  --json",
     "",
     "Options for automation current-agent adopt:",
@@ -1738,6 +1741,7 @@ async function handleAutomationCommand(
   if (argv[1] === "coordinator-loop") {
     const parsed = parseAutomationCoordinatorLoopCommand(argv);
     const stdout = dependencies.stdout ?? process.stdout;
+    const stderr = dependencies.stderr ?? process.stderr;
     if (parsed.adoptCurrent) {
       if (parsed.command) {
         throw new Error(
@@ -1772,6 +1776,9 @@ async function handleAutomationCommand(
       onTick: parsed.json
         ? undefined
         : (tick) => printAutomationCoordinatorLoopTick(tick, stdout),
+      onProgress: parsed.progressJsonl
+        ? (event) => printAutomationCoordinatorLoopProgressEvent(event, stderr)
+        : undefined,
       launcher: createAutomationCoordinatorLoopCliLauncher(parsed, dependencies),
     });
     printAutomationCoordinatorLoopResult(result, parsed, stdout);
@@ -4031,6 +4038,9 @@ function parseAutomationCoordinatorLoopCommand(
       case "--run-id":
         parsed.runId = next();
         break;
+      case "--progress-jsonl":
+        parsed.progressJsonl = true;
+        break;
       case "--owner":
         parsed.owner = next();
         break;
@@ -4901,6 +4911,20 @@ function printAutomationCoordinatorLoopTick(
   writeLine(
     stdout,
     `DevNexus coordinator loop tick ${tick.index}: ${tick.status.status} decision=${tick.decision.type} action=${tick.action}${runStatus}${wait}`,
+  );
+}
+
+function printAutomationCoordinatorLoopProgressEvent(
+  event: NexusAutomationCoordinatorLoopProgressEvent,
+  stderr: TextWriter,
+): void {
+  writeLine(
+    stderr,
+    JSON.stringify({
+      kind: "dev-nexus.coordinator-loop.progress",
+      version: 1,
+      ...event,
+    }),
   );
 }
 
