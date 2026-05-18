@@ -2069,35 +2069,85 @@ export class StdioJsonRpcTransport {
     this.processing = true;
     try {
       while (true) {
-        const headerEnd = this.headerEndIndex();
-        if (!headerEnd) {
+        if (this.buffer.length === 0) {
           return;
         }
 
-        const [endIndex, separatorLength] = headerEnd;
-        const header = this.buffer.slice(0, endIndex).toString("utf8");
-        const lengthMatch = /^Content-Length:\s*(\d+)\s*$/imu.exec(header);
-        if (!lengthMatch) {
-          throw new Error("Missing Content-Length header");
+        if (this.startsWithContentLengthFrame()) {
+          const processed = await this.processContentLengthFrame();
+          if (!processed) {
+            return;
+          }
+          continue;
         }
 
-        const contentLength = Number(lengthMatch[1]);
-        const messageStart = endIndex + separatorLength;
-        const messageEnd = messageStart + contentLength;
-        if (this.buffer.length < messageEnd) {
+        const processed = await this.processJsonLine();
+        if (!processed) {
           return;
-        }
-
-        const body = this.buffer.slice(messageStart, messageEnd).toString("utf8");
-        this.buffer = this.buffer.slice(messageEnd);
-        const response = await this.onMessage(JSON.parse(body) as JsonRpcRequest);
-        if (response) {
-          this.send(response);
         }
       }
     } finally {
       this.processing = false;
     }
+  }
+
+  private async processContentLengthFrame(): Promise<boolean> {
+    const headerEnd = this.headerEndIndex();
+    if (!headerEnd) {
+      return false;
+    }
+
+    const [endIndex, separatorLength] = headerEnd;
+    const header = this.buffer.slice(0, endIndex).toString("utf8");
+    const lengthMatch = /^Content-Length:\s*(\d+)\s*$/imu.exec(header);
+    if (!lengthMatch) {
+      throw new Error("Missing Content-Length header");
+    }
+
+    const contentLength = Number(lengthMatch[1]);
+    const messageStart = endIndex + separatorLength;
+    const messageEnd = messageStart + contentLength;
+    if (this.buffer.length < messageEnd) {
+      return false;
+    }
+
+    const body = this.buffer.slice(messageStart, messageEnd).toString("utf8");
+    this.buffer = this.buffer.slice(messageEnd);
+    await this.handleMessageBody(body, "content-length");
+    return true;
+  }
+
+  private async processJsonLine(): Promise<boolean> {
+    const newlineIndex = this.buffer.indexOf("\n");
+    if (newlineIndex < 0) {
+      return false;
+    }
+
+    const line = this.buffer.slice(0, newlineIndex).toString("utf8").trim();
+    this.buffer = this.buffer.slice(newlineIndex + 1);
+    if (!line) {
+      return true;
+    }
+
+    await this.handleMessageBody(line, "json-line");
+    return true;
+  }
+
+  private async handleMessageBody(
+    body: string,
+    responseFormat: "content-length" | "json-line",
+  ): Promise<void> {
+    const response = await this.onMessage(JSON.parse(body) as JsonRpcRequest);
+    if (response) {
+      this.send(response, responseFormat);
+    }
+  }
+
+  private startsWithContentLengthFrame(): boolean {
+    return this.buffer
+      .subarray(0, Math.min(this.buffer.length, "Content-Length:".length))
+      .toString("utf8")
+      .toLowerCase() === "content-length:".toLowerCase();
   }
 
   private headerEndIndex(): [number, number] | undefined {
@@ -2110,8 +2160,16 @@ export class StdioJsonRpcTransport {
     return lfIndex >= 0 ? [lfIndex, 2] : undefined;
   }
 
-  private send(message: unknown): void {
+  private send(
+    message: unknown,
+    responseFormat: "content-length" | "json-line" = "content-length",
+  ): void {
     const body = JSON.stringify(message);
+    if (responseFormat === "json-line") {
+      this.streams.stdout.write(`${body}\n`);
+      return;
+    }
+
     this.streams.stdout.write(
       `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`,
     );

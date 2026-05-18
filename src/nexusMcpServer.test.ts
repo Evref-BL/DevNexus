@@ -1889,4 +1889,33 @@ describe("DevNexus MCP server", () => {
     stdin.end();
     await started;
   });
+
+  it("handles newline-delimited JSON-RPC over stdio", async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const transport = new StdioJsonRpcTransport(
+      async (message) => ({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: { method: message.method },
+      }),
+      { stdin, stdout },
+    );
+    const started = transport.start();
+    const response = nextChunk(stdout);
+
+    stdin.write(`${JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+    })}\n`);
+
+    expect(JSON.parse((await response).toString("utf8"))).toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      result: { method: "initialize" },
+    });
+    stdin.end();
+    await started;
+  });
 });
