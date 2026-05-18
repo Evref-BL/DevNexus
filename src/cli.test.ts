@@ -254,6 +254,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus project hosting status");
     expect(output.output()).toContain("dev-nexus project hosting plan");
+    expect(output.output()).toContain("dev-nexus project hosting apply");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus coordination status");
@@ -371,6 +372,107 @@ describe("dev-nexus cli", () => {
         }),
       ]),
     );
+  });
+
+  it("applies project hosting local remote repairs through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-hosting-apply-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "demo-project",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "origin",
+              role: "human",
+              protocol: "ssh",
+            },
+            {
+              name: "bot",
+              role: "automation",
+              protocol: "ssh",
+              sshHost: "github.com-bot",
+            },
+          ],
+          access: [],
+          provisioning: {
+            allowCreate: false,
+            allowLocalRemoteRepair: true,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+          },
+        },
+      }),
+    );
+    const remotes = new Map<string, string>([
+      ["origin", "git@github.com:WrongOrg/demo-project.git"],
+      ["upstream", "git@github.com:ExampleOrg/upstream.git"],
+    ]);
+    const calls: string[][] = [];
+    const gitRunner: GitRunner = (args: readonly string[]): GitCommandResult => {
+      const argsArray = [...args];
+      calls.push(argsArray);
+      if (argsArray.join(" ") === "remote -v") {
+        return ok(
+          argsArray,
+          [...remotes]
+            .flatMap(([name, url]) => [
+              `${name}\t${url} (fetch)`,
+              `${name}\t${url} (push)`,
+            ])
+            .join("\n") + "\n",
+        );
+      }
+      if (argsArray[0] === "remote" && argsArray[1] === "set-url") {
+        remotes.set(argsArray[2]!, argsArray[3]!);
+        return ok(argsArray, "");
+      }
+      if (argsArray[0] === "remote" && argsArray[1] === "add") {
+        remotes.set(argsArray[2]!, argsArray[3]!);
+        return ok(argsArray, "");
+      }
+
+      return ok(argsArray, "", 1);
+    };
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "hosting", "apply", projectRoot, "--json"], {
+        stdout: output.writer,
+        gitRunner,
+      }),
+    ).resolves.toBe(0);
+
+    const payload = JSON.parse(output.output());
+    expect(payload.apply).toMatchObject({
+      ok: true,
+      status: "passed",
+    });
+    expect(payload.apply.actions.map((action: any) => action.command.args)).toEqual([
+      [
+        "remote",
+        "set-url",
+        "origin",
+        "git@github.com:ExampleOrg/demo-project.git",
+      ],
+      [
+        "remote",
+        "add",
+        "bot",
+        "git@github.com-bot:ExampleOrg/demo-project.git",
+      ],
+    ]);
+    expect(remotes.get("upstream")).toBe("git@github.com:ExampleOrg/upstream.git");
+    expect(calls.filter((call) => call.join(" ") === "remote -v")).toHaveLength(2);
+    expect(payload.apply.finalPlan.actions).toEqual([]);
   });
 
   it("fails shared-checkout work-item mutations before writing local state", async () => {

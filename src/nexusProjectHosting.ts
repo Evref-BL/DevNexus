@@ -366,6 +366,63 @@ export interface NexusProjectHostingPlanResult {
   actions: NexusProjectHostingPlanAction[];
 }
 
+export type NexusProjectHostingApplyStatus =
+  | "passed"
+  | "blocked"
+  | "failed";
+
+export type NexusProjectHostingApplyActionDisposition =
+  | "applied"
+  | "skipped"
+  | "failed";
+
+export interface NexusProjectHostingLocalRemoteCommand {
+  kind: "add" | "set_url";
+  remoteName: string;
+  url: string;
+  args: string[];
+}
+
+export interface NexusProjectHostingLocalRemoteCommandResult {
+  args: string[];
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+}
+
+export type NexusProjectHostingLocalRemoteCommandRunner = (
+  command: NexusProjectHostingLocalRemoteCommand,
+) =>
+  | NexusProjectHostingLocalRemoteCommandResult
+  | Promise<NexusProjectHostingLocalRemoteCommandResult>;
+
+export interface NexusProjectHostingApplyActionResult {
+  actionId: string;
+  kind: NexusProjectHostingPlanActionKind;
+  mutationClass: NexusProjectHostingPlanMutationClass;
+  disposition: NexusProjectHostingApplyActionDisposition;
+  reason: string;
+  command?: NexusProjectHostingLocalRemoteCommandResult;
+}
+
+export interface NexusProjectHostingLocalRemoteApplyOptions {
+  hosting?: NexusProjectHostingConfig;
+  status: NexusProjectHostingStatusResult;
+  runLocalRemoteCommand: NexusProjectHostingLocalRemoteCommandRunner;
+  refreshStatus?: () =>
+    | NexusProjectHostingStatusResult
+    | Promise<NexusProjectHostingStatusResult>;
+}
+
+export interface NexusProjectHostingLocalRemoteApplyResult {
+  ok: boolean;
+  status: NexusProjectHostingApplyStatus;
+  plan: NexusProjectHostingPlanResult;
+  actions: NexusProjectHostingApplyActionResult[];
+  finalStatus?: NexusProjectHostingStatusResult;
+  finalPlan?: NexusProjectHostingPlanResult;
+}
+
 export class NexusProjectHostingError extends Error {
   constructor(message: string) {
     super(message);
@@ -752,6 +809,73 @@ export function planNexusProjectHosting(
     repositoryName: status.repositoryName,
     actions,
   });
+}
+
+export async function applyNexusProjectHostingLocalRemoteRepairs(
+  options: NexusProjectHostingLocalRemoteApplyOptions,
+): Promise<NexusProjectHostingLocalRemoteApplyResult> {
+  const plan = planNexusProjectHosting({
+    hosting: options.hosting,
+    status: options.status,
+  });
+  const actions: NexusProjectHostingApplyActionResult[] = [];
+
+  for (const action of plan.actions) {
+    if (action.mutationClass !== "local_remote_repair") {
+      continue;
+    }
+
+    if (action.disposition !== "allowed") {
+      actions.push({
+        actionId: action.id,
+        kind: action.kind,
+        mutationClass: action.mutationClass,
+        disposition: "skipped",
+        reason: `Skipped ${action.disposition} local remote repair: ${action.reason}`,
+      });
+      continue;
+    }
+
+    const command = localRemoteRepairCommand(action);
+    const commandResult = await options.runLocalRemoteCommand(command);
+    const commandFailed = commandResult.exitCode !== 0;
+    actions.push({
+      actionId: action.id,
+      kind: action.kind,
+      mutationClass: action.mutationClass,
+      disposition: commandFailed ? "failed" : "applied",
+      reason: commandFailed
+        ? `Git remote command failed with exit code ${commandResult.exitCode ?? "null"}.`
+        : action.reason,
+      command: commandResult,
+    });
+  }
+
+  const finalStatus = options.refreshStatus
+    ? await options.refreshStatus()
+    : undefined;
+  const finalPlan =
+    finalStatus && options.hosting
+      ? planNexusProjectHosting({
+          hosting: options.hosting,
+          status: finalStatus,
+        })
+      : undefined;
+  const hasFailure = actions.some((action) => action.disposition === "failed");
+  const hasBlockedSkip = actions.some(
+    (action) =>
+      action.disposition === "skipped" &&
+      action.reason.startsWith("Skipped blocked"),
+  );
+
+  return {
+    ok: !hasFailure && !hasBlockedSkip,
+    status: hasFailure ? "failed" : hasBlockedSkip ? "blocked" : "passed",
+    plan,
+    actions,
+    ...(finalStatus ? { finalStatus } : {}),
+    ...(finalPlan ? { finalPlan } : {}),
+  };
 }
 
 export async function preflightNexusProjectHosting(
@@ -1614,6 +1738,47 @@ function hostingPlanAction(
   action: NexusProjectHostingPlanAction,
 ): NexusProjectHostingPlanAction {
   return action;
+}
+
+function localRemoteRepairCommand(
+  action: NexusProjectHostingPlanAction,
+): NexusProjectHostingLocalRemoteCommand {
+  const remoteName = action.target.name;
+  const url = action.desired.url;
+  if (
+    action.kind !== "add_local_remote" &&
+    action.kind !== "update_local_remote"
+  ) {
+    throw new NexusProjectHostingError(
+      `Unsupported local remote repair action: ${action.kind}`,
+    );
+  }
+  if (!remoteName) {
+    throw new NexusProjectHostingError(
+      `Local remote repair action is missing a target remote name: ${action.id}`,
+    );
+  }
+  if (typeof url !== "string" || url.trim().length === 0) {
+    throw new NexusProjectHostingError(
+      `Local remote repair action is missing a desired URL: ${action.id}`,
+    );
+  }
+
+  if (action.kind === "add_local_remote") {
+    return {
+      kind: "add",
+      remoteName,
+      url,
+      args: ["remote", "add", remoteName, url],
+    };
+  }
+
+  return {
+    kind: "set_url",
+    remoteName,
+    url,
+    args: ["remote", "set-url", remoteName, url],
+  };
 }
 
 function gateDisposition(

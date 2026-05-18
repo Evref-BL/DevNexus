@@ -194,6 +194,7 @@ describe("DevNexus MCP server", () => {
       "project_status",
       "project_hosting_status",
       "project_hosting_plan",
+      "project_hosting_apply",
       "automation_status",
       "eligible_work",
       "agent_profiles",
@@ -307,6 +308,84 @@ describe("DevNexus MCP server", () => {
         }),
       ]),
     );
+  });
+
+  it("applies project hosting local remote repairs through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-hosting-apply-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        hosting: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repository: {
+            name: "mcp-demo",
+            visibility: "private",
+            defaultBranch: "main",
+          },
+          remotes: [
+            {
+              name: "origin",
+              role: "human",
+              protocol: "ssh",
+            },
+          ],
+          access: [],
+          provisioning: {
+            allowCreate: false,
+            allowLocalRemoteRepair: true,
+            allowAccessRepair: false,
+            allowInvitationAcceptance: false,
+            allowDefaultBranchRepair: false,
+            allowVisibilityRepair: false,
+          },
+        },
+      }),
+    );
+    const remotes = new Map<string, string>([
+      ["origin", "git@github.com:WrongOrg/mcp-demo.git"],
+    ]);
+    const gitRunner: GitRunner = (args: readonly string[]): GitCommandResult => {
+      const argsArray = [...args];
+      if (argsArray.join(" ") === "remote -v") {
+        return ok(
+          argsArray,
+          [...remotes]
+            .flatMap(([name, url]) => [
+              `${name}\t${url} (fetch)`,
+              `${name}\t${url} (push)`,
+            ])
+            .join("\n") + "\n",
+        );
+      }
+      if (argsArray[0] === "remote" && argsArray[1] === "set-url") {
+        remotes.set(argsArray[2]!, argsArray[3]!);
+      }
+      return ok(argsArray, "");
+    };
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "project_hosting_apply",
+        { projectRoot },
+        { gitRunner },
+      ),
+    );
+
+    expect(result.apply).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [
+        expect.objectContaining({
+          actionId: "remote:origin:update",
+          disposition: "applied",
+        }),
+      ],
+    });
+    expect(remotes.get("origin")).toBe(
+      "git@github.com:ExampleOrg/mcp-demo.git",
+    );
+    expect(result.apply.finalPlan.actions).toEqual([]);
   });
 
   it("returns guard details for guarded shared-checkout MCP mutations", async () => {

@@ -137,10 +137,14 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  applyNexusProjectHostingLocalRemoteRepairs,
   planNexusProjectHosting,
   statusNexusProjectHosting,
   type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingLocalRemoteApplyResult,
   type NexusProjectHostingLocalRemoteRecord,
+  type NexusProjectHostingLocalRemoteCommand,
+  type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingPlanResult,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
@@ -232,6 +236,10 @@ interface ProjectHostingPlanCliResult extends ProjectHostingStatusCliResult {
   plan: NexusProjectHostingPlanResult;
 }
 
+interface ProjectHostingApplyCliResult extends ProjectHostingStatusCliResult {
+  apply: NexusProjectHostingLocalRemoteApplyResult;
+}
+
 interface ParsedHomeInitCommand {
   homePath: string;
   projectsRoot?: string;
@@ -270,7 +278,7 @@ interface ParsedProjectStatusCommand {
 }
 
 interface ParsedProjectHostingCommand {
-  command: "status" | "plan";
+  command: "status" | "plan" | "apply";
   projectRoot: string;
   homePath?: string;
   json?: boolean;
@@ -653,6 +661,7 @@ export function usage(): string {
     "  dev-nexus project status <project-id-or-root> [options]",
     "  dev-nexus project hosting status <project-root> [options]",
     "  dev-nexus project hosting plan <project-root> [options]",
+    "  dev-nexus project hosting apply <project-root> [options]",
     "  dev-nexus project mcp refresh <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
@@ -1180,6 +1189,34 @@ async function handleProjectHostingCommand(
   }
 
   const projectConfig = loadProjectConfig(statusResult.projectRoot);
+  if (parsed.command === "apply") {
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: statusResult.projectRoot,
+      command: "project hosting apply",
+      mutationClass: "local_remote_repair",
+      targetPath: statusResult.projectRoot,
+    });
+    const apply = await applyNexusProjectHostingLocalRemoteRepairs({
+      hosting: projectConfig.hosting,
+      status: statusResult.status,
+      runLocalRemoteCommand: hostingLocalRemoteCommandRunner(
+        statusResult.projectRoot,
+        dependencies.gitRunner,
+      ),
+      refreshStatus: () => resolveProjectHostingStatusForCli(parsed, dependencies)
+        .then((result) => result.status),
+    });
+    printProjectHostingApplyResult(
+      {
+        ...statusResult,
+        apply,
+      },
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   const plan = planNexusProjectHosting({
     hosting: projectConfig.hosting,
     status: statusResult.status,
@@ -2645,8 +2682,8 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
 
 function parseProjectHostingCommand(argv: string[]): ParsedProjectHostingCommand {
   const [, , command, projectRoot, ...rest] = argv;
-  if (command !== "status" && command !== "plan") {
-    throw new Error("project hosting requires status or plan");
+  if (command !== "status" && command !== "plan" && command !== "apply") {
+    throw new Error("project hosting requires status, plan, or apply");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
     throw new Error(`project hosting ${command} requires a project root`);
@@ -4823,6 +4860,43 @@ function printProjectHostingPlanResult(
   }
 }
 
+function printProjectHostingApplyResult(
+  result: ProjectHostingApplyCliResult,
+  parsed: ParsedProjectHostingCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: result.apply.ok,
+    projectRoot: result.projectRoot,
+    status: result.status,
+    apply: result.apply,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus project hosting apply: ${result.apply.status}.`);
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(stdout, `  Actions: ${result.apply.actions.length}`);
+  for (const action of result.apply.actions) {
+    writeLine(
+      stdout,
+      `    ${action.disposition} ${action.kind} ${action.actionId}`,
+    );
+    writeLine(stdout, `      ${action.reason}`);
+  }
+  if (result.apply.actions.length === 0) {
+    writeLine(stdout, "    none");
+  }
+  if (result.apply.finalPlan) {
+    writeLine(
+      stdout,
+      `  Remaining plan actions: ${result.apply.finalPlan.actions.length}`,
+    );
+  }
+}
+
 function hostingRepositoryText(status: NexusProjectHostingStatusResult): string {
   if (!status.configured) {
     return "not configured";
@@ -6114,6 +6188,24 @@ function hostingLocalGitRemotes(
   }
 
   return parseGitRemoteVerboseOutput(result.stdout);
+}
+
+function hostingLocalRemoteCommandRunner(
+  projectRoot: string,
+  gitRunner: GitRunner | undefined,
+): (
+  command: NexusProjectHostingLocalRemoteCommand,
+) => NexusProjectHostingLocalRemoteCommandResult {
+  const runner = gitRunner ?? defaultGitRunner;
+  return (command) => {
+    const result = runner(command.args, projectRoot);
+    return {
+      args: result.args,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+    };
+  };
 }
 
 function parseGitRemoteVerboseOutput(

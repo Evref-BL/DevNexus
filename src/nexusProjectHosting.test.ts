@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyNexusProjectHostingLocalRemoteRepairs,
   deriveNexusProjectHostingRepositoryName,
   expectedNexusProjectHostingRemotes,
   planNexusProjectHosting,
@@ -893,5 +894,192 @@ describe("project hosting", () => {
         },
       ],
     });
+  });
+
+  it("applies allowed local remote repairs and reports final status", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: true,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+      },
+    });
+    const localRemotes = new Map<string, string | null>([
+      ["origin", "git@github.com:ExampleOrg/wrong.git"],
+      ["upstream", "git@github.com:ExampleOrg/upstream.git"],
+    ]);
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      localRemotes: [...localRemotes].map(([name, url]) => ({ name, url })),
+    });
+
+    const result = await applyNexusProjectHostingLocalRemoteRepairs({
+      hosting: config,
+      status,
+      async runLocalRemoteCommand(command) {
+        if (command.kind === "set_url") {
+          localRemotes.set(command.remoteName, command.url);
+        } else {
+          localRemotes.set(command.remoteName, command.url);
+        }
+        return {
+          args: command.args,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+        };
+      },
+      refreshStatus: () =>
+        statusNexusProjectHosting({
+          project,
+          hosting: config,
+          authProfiles,
+          localRemotes: [...localRemotes].map(([name, url]) => ({ name, url })),
+        }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe("passed");
+    expect(
+      result.actions.map((action) => [
+        action.actionId,
+        action.disposition,
+        action.command?.args,
+      ]),
+    ).toEqual([
+      [
+        "remote:origin:update",
+        "applied",
+        [
+          "remote",
+          "set-url",
+          "origin",
+          "git@github.com:ExampleOrg/example-suite-meta.git",
+        ],
+      ],
+      [
+        "remote:bot:add",
+        "applied",
+        [
+          "remote",
+          "add",
+          "bot",
+          "git@github.com-example-bot:ExampleOrg/example-suite-meta.git",
+        ],
+      ],
+    ]);
+    expect(localRemotes.get("upstream")).toBe(
+      "git@github.com:ExampleOrg/upstream.git",
+    );
+    expect(result.finalStatus?.remotes.map((remote) => remote.status)).toEqual([
+      "matched",
+      "matched",
+    ]);
+    expect(result.finalPlan?.actions).toEqual([]);
+  });
+
+  it("skips blocked local remote repairs without executing commands", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: false,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+      },
+    });
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      localRemotes: [],
+    });
+    const commands: unknown[] = [];
+
+    const result = await applyNexusProjectHostingLocalRemoteRepairs({
+      hosting: config,
+      status,
+      async runLocalRemoteCommand(command) {
+        commands.push(command);
+        return {
+          args: command.args,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe("blocked");
+    expect(commands).toEqual([]);
+    expect(result.actions).toEqual([
+      expect.objectContaining({
+        actionId: "remote:origin:add",
+        disposition: "skipped",
+        reason:
+          "Skipped blocked local remote repair: Local Git remote origin is missing, but hosting.provisioning.allowLocalRemoteRepair is false.",
+      }),
+      expect.objectContaining({
+        actionId: "remote:bot:add",
+        disposition: "skipped",
+      }),
+    ]);
+  });
+
+  it("does not mutate already-correct local remotes", async () => {
+    const config = hosting({
+      provisioning: {
+        allowCreate: false,
+        allowLocalRemoteRepair: true,
+        allowAccessRepair: false,
+        allowInvitationAcceptance: false,
+        allowDefaultBranchRepair: false,
+        allowVisibilityRepair: false,
+      },
+    });
+    const status = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      localRemotes: [
+        {
+          name: "origin",
+          url: "git@github.com:ExampleOrg/example-suite-meta.git",
+        },
+        {
+          name: "bot",
+          url: "git@github.com-example-bot:ExampleOrg/example-suite-meta.git",
+        },
+      ],
+    });
+    const commands: unknown[] = [];
+
+    const result = await applyNexusProjectHostingLocalRemoteRepairs({
+      hosting: config,
+      status,
+      async runLocalRemoteCommand(command) {
+        commands.push(command);
+        return {
+          args: command.args,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "passed",
+      actions: [],
+    });
+    expect(commands).toEqual([]);
   });
 });

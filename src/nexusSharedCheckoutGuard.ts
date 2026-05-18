@@ -35,6 +35,7 @@ export type NexusCheckoutMutationClass =
   | "worktree_bootstrap"
   | "publication_integration"
   | "cleanup_execution"
+  | "local_remote_repair"
   | "provider_sync";
 
 export type NexusSharedCheckoutGuardOverride =
@@ -286,6 +287,12 @@ function mutationAllowed(
 ): boolean {
   if (mutationClass === "read_only") {
     return true;
+  }
+  if (mutationClass === "local_remote_repair") {
+    return (
+      classification === "shared_project_checkout" ||
+      classification === "generated_project_meta_worktree"
+    );
   }
   if (classification === "generated_component_worktree") {
     return mutationClass === "component_source";

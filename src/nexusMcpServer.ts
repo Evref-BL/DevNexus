@@ -14,9 +14,12 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  applyNexusProjectHostingLocalRemoteRepairs,
   planNexusProjectHosting,
   statusNexusProjectHosting,
   type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingLocalRemoteCommand,
+  type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingLocalRemoteRecord,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
@@ -172,6 +175,19 @@ const tools: McpTool[] = [
   {
     name: "project_hosting_plan",
     description: "Build a deterministic dry-run DevNexus project hosting plan without applying repairs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "project_hosting_apply",
+    description: "Apply policy-gated local Git remote repairs from the DevNexus project hosting plan.",
     inputSchema: {
       type: "object",
       properties: {
@@ -902,6 +918,31 @@ export async function callDevNexusMcpTool(
             hosting: config.hosting,
             status: hostingStatus.status,
           }),
+        });
+      }
+      case "project_hosting_apply": {
+        const hostingStatus = await projectHostingStatusFromArgs(args, context);
+        assertMcpMutationAllowed(args, context, {
+          command: "project_hosting_apply",
+          mutationClass: "local_remote_repair",
+        });
+        const config = loadProjectConfig(hostingStatus.projectRoot);
+        const apply = await applyNexusProjectHostingLocalRemoteRepairs({
+          hosting: config.hosting,
+          status: hostingStatus.status,
+          runLocalRemoteCommand: projectHostingLocalRemoteCommandRunner(
+            hostingStatus.projectRoot,
+            context.gitRunner,
+          ),
+          refreshStatus: () =>
+            projectHostingStatusFromArgs(args, context).then(
+              (result) => result.status,
+            ),
+        });
+        return toolResult({
+          ok: apply.ok,
+          ...hostingStatus,
+          apply,
         });
       }
       case "automation_status":
@@ -1876,6 +1917,24 @@ function projectHostingLocalGitRemotes(
   }
 
   return parseGitRemoteVerboseOutput(result.stdout);
+}
+
+function projectHostingLocalRemoteCommandRunner(
+  projectRoot: string,
+  gitRunner: GitRunner | undefined,
+): (
+  command: NexusProjectHostingLocalRemoteCommand,
+) => NexusProjectHostingLocalRemoteCommandResult {
+  const runner = gitRunner ?? defaultGitRunner;
+  return (command) => {
+    const result = runner(command.args, projectRoot);
+    return {
+      args: result.args,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+    };
+  };
 }
 
 function parseGitRemoteVerboseOutput(

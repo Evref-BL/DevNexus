@@ -4,6 +4,7 @@ export const devNexusCoreMcpToolNames = [
   "project_status",
   "project_hosting_status",
   "project_hosting_plan",
+  "project_hosting_apply",
   "automation_status",
   "eligible_work",
   "agent_profiles",
