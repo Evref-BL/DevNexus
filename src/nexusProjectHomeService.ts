@@ -175,12 +175,16 @@ function saveProjectHome(
 
 export function statusForNexusProjectReference(
   reference: NexusProjectReference,
+  homeConfig?: NexusProjectRegistryWithRoot,
 ): NexusProjectStatusBase {
-  return buildNexusProjectStatus(reference);
+  return buildNexusProjectStatus(reference, { homeConfig });
 }
 
-function statusForNexusProjectPath(projectRoot: string): NexusProjectStatusBase {
-  const baseStatus = buildNexusProjectStatusForPath(projectRoot);
+function statusForNexusProjectPath(
+  projectRoot: string,
+  homeConfig?: NexusProjectRegistryWithRoot,
+): NexusProjectStatusBase {
+  const baseStatus = buildNexusProjectStatusForPath(projectRoot, { homeConfig });
   return statusForNexusProjectReference({
     id: baseStatus.id,
     name: baseStatus.name,
@@ -191,7 +195,7 @@ function statusForNexusProjectPath(projectRoot: string): NexusProjectStatusBase 
     ...(baseStatus.vibeKanbanRepoId
       ? { vibeKanbanRepoId: baseStatus.vibeKanbanRepoId }
       : {}),
-  });
+  }, homeConfig);
 }
 
 export function createNexusProject(
@@ -262,7 +266,9 @@ export function listNexusProjects(
 
   return {
     homePath,
-    projects: registry.projects.map(statusForNexusProjectReference),
+    projects: registry.projects.map((reference) =>
+      statusForNexusProjectReference(reference, registry),
+    ),
   };
 }
 
@@ -278,11 +284,11 @@ export function getNexusProjectStatus(
     findNexusProjectReferenceByPath(registry, projectSelector);
   let project: NexusProjectStatusBase;
   if (reference) {
-    project = statusForNexusProjectReference(reference);
+    project = statusForNexusProjectReference(reference, registry);
   } else {
     const projectRoot = projectRootFromInput(projectSelector);
     try {
-      project = statusForNexusProjectPath(projectRoot);
+      project = statusForNexusProjectPath(projectRoot, registry);
     } catch (error) {
       if (error instanceof NexusProjectError) {
         throw new NexusProjectError(

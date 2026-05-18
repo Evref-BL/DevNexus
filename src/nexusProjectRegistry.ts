@@ -16,6 +16,11 @@ import {
   type ResolvedNexusProjectWorkTracker,
   samePath,
 } from "./nexusProjectLifecycle.js";
+import {
+  buildNexusProjectHostStatuses,
+  type NexusHomeHostOverlaySource,
+  type NexusProjectHostStatus,
+} from "./nexusHostRegistry.js";
 import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
@@ -47,6 +52,7 @@ export interface NexusProjectStatusBase {
   workTrackingCapabilityReport: WorkTrackerCapabilityReport | null;
   vibeKanbanProjectId: string | null;
   vibeKanbanRepoId: string | null;
+  hosts: NexusProjectHostStatus[];
   projectConfigPath: string;
   projectConfigExists: boolean;
   worktreesRoot: string;
@@ -55,6 +61,7 @@ export interface NexusProjectStatusBase {
 
 export interface BuildNexusProjectStatusOptions {
   projectConfig?: NexusProjectConfig;
+  homeConfig?: NexusHomeHostOverlaySource | null;
 }
 
 export interface UpsertNexusProjectReferenceOptions {
@@ -132,6 +139,7 @@ export function buildNexusProjectStatus(
     vibeKanbanProjectId:
       config?.kanban?.projectId ?? reference.vibeKanbanProjectId ?? null,
     vibeKanbanRepoId: reference.vibeKanbanRepoId ?? null,
+    hosts: buildNexusProjectHostStatuses(config?.hosts, options.homeConfig),
     projectConfigPath: resolvedProjectConfigPath,
     projectConfigExists: Boolean(config),
     worktreesRoot: resolvedWorktreesRoot,
@@ -141,6 +149,7 @@ export function buildNexusProjectStatus(
 
 export function buildNexusProjectStatusForPath(
   projectRoot: string,
+  options: BuildNexusProjectStatusOptions = {},
 ): NexusProjectStatusBase {
   const config = loadProjectConfigIfExists(projectRoot);
   if (!config) {
@@ -149,14 +158,17 @@ export function buildNexusProjectStatusForPath(
     );
   }
 
-  return buildNexusProjectStatus({
-    id: config.id,
-    name: config.name,
-    projectRoot,
-    ...(config.kanban?.projectId
-      ? { vibeKanbanProjectId: config.kanban.projectId }
-      : {}),
-  }, { projectConfig: config });
+  return buildNexusProjectStatus(
+    {
+      id: config.id,
+      name: config.name,
+      projectRoot,
+      ...(config.kanban?.projectId
+        ? { vibeKanbanProjectId: config.kanban.projectId }
+        : {}),
+    },
+    { ...options, projectConfig: config },
+  );
 }
 
 export function upsertNexusProjectReference(

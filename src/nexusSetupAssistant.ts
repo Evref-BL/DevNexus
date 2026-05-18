@@ -11,7 +11,12 @@ import {
   loadNexusHomeConfigFile,
   validateNexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
-import { loadProjectConfig, type NexusProjectConfig } from "./nexusProjectConfig.js";
+import {
+  loadProjectConfig,
+  projectConfigPath,
+  type NexusProjectConfig,
+} from "./nexusProjectConfig.js";
+import { findForbiddenSharedHostLocalDetails } from "./nexusHostRegistry.js";
 import {
   deriveNexusProjectHostingRepositoryName,
   expectedNexusProjectHostingRemotes,
@@ -253,6 +258,7 @@ export function buildNexusSetupCheck(options: {
   }
 
   if (projectConfig) {
+    checks.push(sharedHostRegistryHostLocalDetailsCheck(projectRoot));
     checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
   }
 
@@ -417,6 +423,42 @@ function projectSummary(
     root: projectRoot,
     repoRemoteUrl: projectConfig.repo.remoteUrl,
     defaultBranch: projectConfig.repo.defaultBranch,
+  };
+}
+
+function sharedHostRegistryHostLocalDetailsCheck(
+  projectRoot: string,
+): NexusSetupCheckResult {
+  const configPath = projectConfigPath(projectRoot);
+  const rawConfig = JSON.parse(
+    fs.readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""),
+  );
+  const warnings = findForbiddenSharedHostLocalDetails(rawConfig);
+  if (warnings.length === 0) {
+    return {
+      id: "shared-host-registry-host-local-details",
+      title: "Shared host registry host-local details",
+      status: "passed",
+      summary: "Shared host registry contains no host-local transport, path, credential, port, or runtime artifact details.",
+      nextAction: null,
+    };
+  }
+
+  const warningPaths = [...new Set(warnings.map((warning) => warning.path))];
+  const visiblePaths = warningPaths.slice(0, 6).join(", ");
+  const suffix =
+    warningPaths.length > 6
+      ? `, and ${warningPaths.length - 6} more`
+      : "";
+
+  return {
+    id: "shared-host-registry-host-local-details",
+    title: "Shared host registry host-local details",
+    status: "warning",
+    summary:
+      `Shared host registry contains host-local details that must not be committed: ${visiblePaths}${suffix}.`,
+    nextAction:
+      "Move Tailscale or SSH targets, usernames, credentials, absolute paths, live ports, and runtime artifacts into DevNexus home host-local overlays keyed by stable host id.",
   };
 }
 

@@ -158,6 +158,23 @@ describe("project config", () => {
           },
         ],
       },
+      hosts: [
+        {
+          id: "mac-builder",
+          displayName: "Mac Builder",
+          platformTags: ["macos"],
+          capabilityTags: ["dev-nexus", "node", "pharo-launcher"],
+          enabled: true,
+          notes: "Shared logical host declaration only.",
+        },
+        {
+          id: "windows-builder",
+          displayName: "Windows Builder",
+          platformTags: ["windows"],
+          capabilityTags: ["dev-nexus", "powershell"],
+          enabled: false,
+        },
+      ],
     };
 
     expect(validateProjectConfig(config)).toEqual(config);
@@ -203,11 +220,38 @@ describe("project config", () => {
         },
       ],
       worktreesRoot: "worktrees",
+      hosts: [],
       kanban: {
         provider: "vibe-kanban",
         projectId: null,
       },
     });
+  });
+
+  it("normalizes project host registry config without host-local details", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "hosted-project",
+        name: "Hosted Project",
+        hosts: [
+          {
+            id: "linux-ci",
+            displayName: "Linux CI",
+            platformTags: ["linux"],
+            capabilityTags: ["dev-nexus", "node"],
+          },
+        ],
+      }).hosts,
+    ).toEqual([
+      {
+        id: "linux-ci",
+        displayName: "Linux CI",
+        platformTags: ["linux"],
+        capabilityTags: ["dev-nexus", "node"],
+        enabled: true,
+      },
+    ]);
   });
 
   it("resolves agent configuration using issue, project, home, then fallback precedence", () => {
@@ -1796,6 +1840,26 @@ describe("project config", () => {
         ],
       }),
     ).toThrow(/project config\.plugins\[0\]\.capabilities\[0\]\.serverName/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-host-registry",
+        name: "Invalid Host Registry",
+        hosts: [
+          {
+            id: "mac",
+            displayName: "Mac",
+            platformTags: ["macos"],
+            capabilityTags: ["dev-nexus"],
+          },
+          {
+            id: "mac",
+            displayName: "Mac Duplicate",
+          },
+        ],
+      }),
+    ).toThrow(/project config\.hosts contains duplicate id: mac/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {

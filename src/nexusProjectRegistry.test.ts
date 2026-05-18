@@ -213,11 +213,87 @@ describe("project registry helpers", () => {
       workTrackingCapabilityReport: localWorkTrackingCapabilityReport,
       vibeKanbanProjectId: "vk-project",
       vibeKanbanRepoId: "vk-repo",
+      hosts: [],
       projectConfigPath: path.join(root, devNexusProjectConfigFileName),
       projectConfigExists: true,
       worktreesRoot: path.join(root, "worktrees"),
       worktreesRootExists: true,
     });
+  });
+
+  it("reports host overlay readiness in project status", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(root, { recursive: true });
+    saveProjectConfig(root, {
+      ...projectConfig("config-id", "Config Project"),
+      hosts: [
+        {
+          id: "mac-builder",
+          displayName: "Mac Builder",
+          platformTags: ["macos"],
+          capabilityTags: ["dev-nexus", "node"],
+          enabled: true,
+        },
+        {
+          id: "win-builder",
+          displayName: "Windows Builder",
+          platformTags: ["windows"],
+          capabilityTags: ["dev-nexus", "powershell"],
+          enabled: true,
+        },
+      ],
+    });
+
+    expect(
+      buildNexusProjectStatus(
+        {
+          id: "registry-id",
+          name: "Registry Project",
+          projectRoot: root,
+        },
+        {
+          homeConfig: {
+            hostOverlays: [
+              {
+                hostId: "mac-builder",
+                transport: {
+                  kind: "ssh",
+                  host: "mac-builder.tailnet.example",
+                },
+                workspaceRoots: {
+                  projectRoot: "/Users/alice/dev/dev-nexus-dogfood",
+                },
+              },
+            ],
+          },
+        },
+      ).hosts,
+    ).toEqual([
+      {
+        id: "mac-builder",
+        displayName: "Mac Builder",
+        enabled: true,
+        platformTags: ["macos"],
+        capabilityTags: ["dev-nexus", "node"],
+        overlayConfigured: true,
+        transportConfigured: true,
+        workspaceRootsConfigured: true,
+        warnings: [],
+      },
+      {
+        id: "win-builder",
+        displayName: "Windows Builder",
+        enabled: true,
+        platformTags: ["windows"],
+        capabilityTags: ["dev-nexus", "powershell"],
+        overlayConfigured: false,
+        transportConfigured: false,
+        workspaceRootsConfigured: false,
+        warnings: [
+          "Host win-builder is enabled but no host-local overlay is configured.",
+        ],
+      },
+    ]);
   });
 
   it("resolves portable component source roots from the sibling sources root", () => {

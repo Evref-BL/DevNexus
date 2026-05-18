@@ -156,6 +156,85 @@ describe("home config primitives", () => {
     ).toThrow(/Auth profile id is duplicated/);
   });
 
+  it("validates host-local host overlays by stable host id", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
+
+    expect(
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        hostOverlays: [
+          {
+            hostId: "mac-builder",
+            transport: {
+              kind: "ssh",
+              host: "mac-builder.tailnet.example",
+              sshUser: "alice",
+              port: 22,
+              shell: "zsh",
+              authProfile: "mac-builder-ssh",
+              commandPaths: {
+                "dev-nexus": "/Users/alice/.npm/bin/dev-nexus",
+              },
+            },
+            workspaceRoots: {
+              projectRoot: "/Users/alice/dev/dev-nexus-dogfood",
+              componentsRoot: "/Users/alice/dev/sources",
+              worktreesRoot: "/Users/alice/dev/worktrees",
+              componentRoots: {
+                "dev-nexus": "/Users/alice/dev/sources/dev-nexus",
+              },
+            },
+            notes: "Host-local transport and path details.",
+          },
+        ],
+        projects: [],
+      }).hostOverlays,
+    ).toEqual([
+      {
+        hostId: "mac-builder",
+        transport: {
+          kind: "ssh",
+          host: "mac-builder.tailnet.example",
+          sshUser: "alice",
+          port: 22,
+          shell: "zsh",
+          authProfile: "mac-builder-ssh",
+          commandPaths: {
+            "dev-nexus": "/Users/alice/.npm/bin/dev-nexus",
+          },
+        },
+        workspaceRoots: {
+          projectRoot: "/Users/alice/dev/dev-nexus-dogfood",
+          componentsRoot: "/Users/alice/dev/sources",
+          worktreesRoot: "/Users/alice/dev/worktrees",
+          componentRoots: {
+            "dev-nexus": "/Users/alice/dev/sources/dev-nexus",
+          },
+        },
+        notes: "Host-local transport and path details.",
+      },
+    ]);
+
+    expect(() =>
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        hostOverlays: [
+          { hostId: "mac-builder" },
+          { hostId: "mac-builder" },
+        ],
+        projects: [],
+      }),
+    ).toThrow(/Host overlay id is duplicated: mac-builder/);
+  });
+
   it("validates project registry entries and rejects duplicate ids", () => {
     const config = createDefaultNexusHomeConfigBase(makeTempDir("dev-nexus-home-"));
     config.projects = [

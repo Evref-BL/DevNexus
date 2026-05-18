@@ -1081,6 +1081,41 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("warns when shared host registry entries contain host-local details", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-host-registry-");
+    writeProject(projectRoot, {
+      hosts: [
+        {
+          id: "mac-builder",
+          displayName: "Mac Builder",
+          platformTags: ["macos"],
+          capabilityTags: ["dev-nexus", "node"],
+          enabled: true,
+          tailscaleIp: "100.96.12.34",
+          sshUser: "alice",
+          workspaceRoot: "/Users/alice/dev/dev-nexus-dogfood",
+          mcpPort: 17576,
+          runtimeArtifactPath: "/Users/alice/Library/Pharo/image.image",
+        } as never,
+      ],
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "shared-host-registry-host-local-details",
+        status: "warning",
+        summary: expect.stringContaining("hosts[0].tailscaleIp"),
+      }),
+    );
+    expect(check.nextActions.join("\n")).toContain("host-local overlays");
+  });
+
   it("records host-local setup progress outside shared project config", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-record-");
     writeProject(projectRoot);

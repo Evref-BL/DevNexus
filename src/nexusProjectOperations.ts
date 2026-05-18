@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NexusExtension } from "./nexusExtension.js";
+import type { NexusHomeHostOverlayConfig } from "./nexusHostRegistry.js";
 import {
   nexusProjectWorktreesDirectoryName,
   loadProjectConfig,
@@ -47,6 +48,7 @@ export interface NexusProjectRegistryWithRoot extends NexusProjectRegistry {
   paths: {
     projectsRoot: string;
   };
+  hostOverlays?: NexusHomeHostOverlayConfig[];
 }
 
 export interface CreateNexusProjectInRegistryOptions {

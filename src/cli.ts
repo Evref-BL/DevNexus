@@ -4368,6 +4368,24 @@ function printProjectStatusResult(
         `${state} roles=${tracker.roles.join(",")} unsupported=${unsupported}`,
     );
   }
+  writeLine(stdout, `  Hosts: ${project.hosts.length}`);
+  for (const host of project.hosts) {
+    const enabled = host.enabled ? "enabled" : "disabled";
+    const platformTags =
+      host.platformTags.length > 0 ? host.platformTags.join(",") : "none";
+    const capabilityTags =
+      host.capabilityTags.length > 0 ? host.capabilityTags.join(",") : "none";
+    const overlay = host.overlayConfigured
+      ? "overlay=configured"
+      : "overlay=missing";
+    writeLine(
+      stdout,
+      `    ${host.id} [${enabled}] platforms=${platformTags} capabilities=${capabilityTags} ${overlay}`,
+    );
+    for (const warning of host.warnings) {
+      writeLine(stdout, `      Warning: ${warning}`);
+    }
+  }
   writeLine(stdout, `  Components: ${project.components.length}`);
   for (const component of project.components) {
     writeLine(
@@ -5498,6 +5516,17 @@ function resolvedCommandHomePath(homePath: string | undefined): string {
   return resolveNexusHome(homePath ?? defaultNexusHomePath());
 }
 
+function optionalCommandHomeConfig(
+  homePath: string | undefined,
+): NexusHomeConfigBase | null {
+  try {
+    const resolvedHomePath = resolvedCommandHomePath(homePath);
+    return fileProjectHomeStore().loadHomeConfig(resolvedHomePath);
+  } catch {
+    return null;
+  }
+}
+
 function resolveProjectStatusForCli(
   parsed: ParsedProjectStatusCommand,
 ): NexusProjectStatusBase {
@@ -5510,7 +5539,9 @@ function resolveProjectStatusForCli(
   }
 
   try {
-    return buildNexusProjectStatusForPath(parsed.project);
+    return buildNexusProjectStatusForPath(parsed.project, {
+      homeConfig: optionalCommandHomeConfig(undefined),
+    });
   } catch (pathError) {
     try {
       return getNexusProjectStatus({

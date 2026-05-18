@@ -45,6 +45,7 @@ import type {
   NexusProjectHostingRemoteRole,
   NexusProjectHostingRepositoryVisibility,
 } from "./nexusProjectHosting.js";
+import type { NexusProjectHostConfig } from "./nexusHostRegistry.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -175,6 +176,7 @@ export interface NexusProjectConfig {
   plugins?: NexusProjectPluginsConfig;
   hosting?: NexusProjectHostingConfig;
   automation?: NexusAutomationConfig;
+  hosts?: NexusProjectHostConfig[];
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -452,6 +454,47 @@ function validateProjectExtensionsConfig(
   }
 
   return extensions;
+}
+
+function validateProjectHostConfig(
+  value: unknown,
+  index: number,
+): NexusProjectHostConfig {
+  const pathName = `project config.hosts[${index}]`;
+  const record = assertRecord(value, pathName);
+  const id = requiredString(record, "id", pathName);
+  const notes = optionalString(record, "notes", pathName);
+
+  return {
+    id,
+    displayName: optionalString(record, "displayName", pathName) ?? id,
+    platformTags: optionalStringArray(record, "platformTags", pathName) ?? [],
+    capabilityTags: optionalStringArray(record, "capabilityTags", pathName) ?? [],
+    enabled: optionalBoolean(record, "enabled", pathName) ?? true,
+    ...(notes !== undefined ? { notes } : {}),
+  };
+}
+
+function validateProjectHostsConfig(value: unknown): NexusProjectHostConfig[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("project config.hosts must be an array");
+  }
+
+  const hosts = value.map(validateProjectHostConfig);
+  const ids = new Set<string>();
+  for (const host of hosts) {
+    if (ids.has(host.id)) {
+      throw new NexusConfigError(
+        `project config.hosts contains duplicate id: ${host.id}`,
+      );
+    }
+    ids.add(host.id);
+  }
+
+  return hosts;
 }
 
 function validateSkillMaterialization(
@@ -1925,6 +1968,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const mcp = validateProjectMcpConfig(record.mcp);
   const hosting = validateProjectHostingConfig(record.hosting);
   const automation = validateNexusAutomationConfig(record.automation);
+  const hosts = validateProjectHostsConfig(record.hosts);
   const repo = validateRepoConfig(record.repo);
   const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
@@ -1953,6 +1997,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(plugins ? { plugins } : {}),
     ...(hosting ? { hosting } : {}),
     ...(automation ? { automation } : {}),
+    hosts,
   };
 }
 

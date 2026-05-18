@@ -12,6 +12,12 @@ import type {
   NexusHostingAuthProfileKind,
   NexusProjectHostingProviderName,
 } from "./nexusProjectHosting.js";
+import type {
+  NexusHomeHostOverlayConfig,
+  NexusHomeHostTransportConfig,
+  NexusHomeHostTransportKind,
+  NexusHomeHostWorkspaceRootsConfig,
+} from "./nexusHostRegistry.js";
 import type { NexusProjectReference } from "./nexusProjectRegistry.js";
 
 export const devNexusHomeConfigFileName = "dev-nexus.home.json";
@@ -28,6 +34,7 @@ export interface NexusHomeConfigBase {
   paths: NexusHomePathsConfig;
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  hostOverlays?: NexusHomeHostOverlayConfig[];
   projects: NexusProjectReference[];
 }
 
@@ -36,6 +43,7 @@ export interface CreateDefaultNexusHomeConfigBaseOptions {
   workspacesRoot?: string;
   agent?: NexusAgentConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  hostOverlays?: NexusHomeHostOverlayConfig[];
 }
 
 export interface DefaultNexusHomePathOptions {
@@ -92,6 +100,67 @@ function optionalString(
   }
 
   return value;
+}
+
+function optionalPositiveInteger(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): number | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new NexusConfigError(
+      `${pathName}.${key} must be a positive integer`,
+    );
+  }
+
+  return value;
+}
+
+function optionalStringRecord(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): Record<string, string> | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName}.${key} must be an object`);
+  }
+
+  const stringRecord: Record<string, string> = {};
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (!entryKey.trim()) {
+      throw new NexusConfigError(
+        `${pathName}.${key} keys must be non-empty strings`,
+      );
+    }
+    if (typeof entryValue !== "string" || entryValue.trim().length === 0) {
+      throw new NexusConfigError(
+        `${pathName}.${key}.${entryKey} must be a non-empty string`,
+      );
+    }
+    stringRecord[entryKey] = entryValue;
+  }
+
+  return stringRecord;
+}
+
+function validateHomeHostTransportKind(
+  value: unknown,
+  pathName: string,
+): NexusHomeHostTransportKind {
+  if (value === "local" || value === "ssh" || value === "manual") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be local, ssh, or manual`);
 }
 
 function validateHostingProviderName(
@@ -168,6 +237,106 @@ function validateHostingAuthProfiles(
   }
 
   return authProfiles;
+}
+
+function validateHomeHostTransport(
+  value: unknown,
+  overlayPathName: string,
+): NexusHomeHostTransportConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const pathName = `${overlayPathName}.transport`;
+  const record = assertRecord(value, pathName);
+  const host = optionalString(record, "host", pathName);
+  const sshHost = optionalString(record, "sshHost", pathName);
+  const sshUser = optionalString(record, "sshUser", pathName);
+  const port = optionalPositiveInteger(record, "port", pathName);
+  const tailscaleAddress = optionalString(record, "tailscaleAddress", pathName);
+  const shell = optionalString(record, "shell", pathName);
+  const authProfile = optionalString(record, "authProfile", pathName);
+  const commandPaths = optionalStringRecord(record, "commandPaths", pathName);
+
+  return {
+    kind: validateHomeHostTransportKind(record.kind, `${pathName}.kind`),
+    ...(host !== undefined ? { host } : {}),
+    ...(sshHost !== undefined ? { sshHost } : {}),
+    ...(sshUser !== undefined ? { sshUser } : {}),
+    ...(port !== undefined ? { port } : {}),
+    ...(tailscaleAddress !== undefined ? { tailscaleAddress } : {}),
+    ...(shell !== undefined ? { shell } : {}),
+    ...(authProfile !== undefined ? { authProfile } : {}),
+    ...(commandPaths !== undefined ? { commandPaths } : {}),
+  };
+}
+
+function validateHomeHostWorkspaceRoots(
+  value: unknown,
+  overlayPathName: string,
+): NexusHomeHostWorkspaceRootsConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const pathName = `${overlayPathName}.workspaceRoots`;
+  const record = assertRecord(value, pathName);
+  const projectRoot = optionalString(record, "projectRoot", pathName);
+  const componentsRoot = optionalString(record, "componentsRoot", pathName);
+  const worktreesRoot = optionalString(record, "worktreesRoot", pathName);
+  const componentRoots = optionalStringRecord(record, "componentRoots", pathName);
+
+  return {
+    ...(projectRoot !== undefined ? { projectRoot } : {}),
+    ...(componentsRoot !== undefined ? { componentsRoot } : {}),
+    ...(worktreesRoot !== undefined ? { worktreesRoot } : {}),
+    ...(componentRoots !== undefined ? { componentRoots } : {}),
+  };
+}
+
+function validateHomeHostOverlay(
+  value: unknown,
+  index: number,
+): NexusHomeHostOverlayConfig {
+  const pathName = `hostOverlays[${index}]`;
+  const record = assertRecord(value, pathName);
+  const transport = validateHomeHostTransport(record.transport, pathName);
+  const workspaceRoots = validateHomeHostWorkspaceRoots(
+    record.workspaceRoots,
+    pathName,
+  );
+  const notes = optionalString(record, "notes", pathName);
+
+  return {
+    hostId: requiredString(record, "hostId", pathName),
+    ...(transport !== undefined ? { transport } : {}),
+    ...(workspaceRoots !== undefined ? { workspaceRoots } : {}),
+    ...(notes !== undefined ? { notes } : {}),
+  };
+}
+
+function validateHomeHostOverlays(
+  value: unknown,
+): NexusHomeHostOverlayConfig[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError("hostOverlays must be an array");
+  }
+
+  const hostOverlays = value.map(validateHomeHostOverlay);
+  const hostIds = new Set<string>();
+  for (const overlay of hostOverlays) {
+    if (hostIds.has(overlay.hostId)) {
+      throw new NexusConfigError(
+        `Host overlay id is duplicated: ${overlay.hostId}`,
+      );
+    }
+    hostIds.add(overlay.hostId);
+  }
+
+  return hostOverlays;
 }
 
 function validateNexusProjectReference(
@@ -270,6 +439,9 @@ export function createDefaultNexusHomeConfigBase(
   if (options.authProfiles) {
     config.authProfiles = validateHostingAuthProfiles(options.authProfiles);
   }
+  if (options.hostOverlays) {
+    config.hostOverlays = validateHomeHostOverlays(options.hostOverlays);
+  }
 
   return validateNexusHomeConfigBase(config, resolvedHomePath);
 }
@@ -286,6 +458,7 @@ export function validateNexusHomeConfigBase(
   const paths = assertRecord(record.paths, "paths");
   const agent = validateNexusAgentConfig(record.agent, "agent");
   const authProfiles = validateHostingAuthProfiles(record.authProfiles);
+  const hostOverlays = validateHomeHostOverlays(record.hostOverlays);
   const config: NexusHomeConfigBase = {
     version: 1,
     paths: {
@@ -300,6 +473,9 @@ export function validateNexusHomeConfigBase(
   }
   if (authProfiles) {
     config.authProfiles = authProfiles;
+  }
+  if (hostOverlays) {
+    config.hostOverlays = hostOverlays;
   }
 
   return config;
