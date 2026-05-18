@@ -880,6 +880,127 @@ coordinator may use `automation.agent.profiles` and
 and which executor/model/safety profile each one should receive, but DevNexus
 does not select the work item batch or supervise subagent execution.
 
+### Codex Launch Profile Choices
+
+DevNexus has three Codex-facing launch patterns. A command profile that runs
+`codex exec` is the simplest and most stable option: configure
+`executor: "codex"`, optionally `executorMode: "exec"`, plus `command` and
+`args`. Use it when DevNexus should start a fresh coordinator or worker
+process and only needs the normal process result contract. Once the command is
+running, DevNexus observes the exit status and result JSON; it does not steer
+the Codex turn.
+
+Current-agent adoption is the no-spawn option. Use
+`automation current-agent adopt` or
+`automation coordinator-loop --adopt-current` from an already-running Codex
+thread, host scheduler, or heartbeat context. DevNexus returns `shouldProceed`,
+the context file, the result file, and the `DEV_NEXUS_*` environment values,
+then the current agent must record the terminal result. Adoption does not
+create a Codex process, thread, or App automation record; the current provider
+thread remains whatever the user or host already opened.
+
+A Codex app-server profile is the experimental thread/turn-control option:
+configure `executor: "codex"`, `executorMode: "app_server"`, and `appServer`.
+Use it for bounded workers where the provider can start or fork Codex threads
+through the app-server JSON-RPC surface. DevNexus records the app-server
+provider, action, thread id, turn id, source thread or turn, ephemeral flag,
+current working directory, model, reasoning, and failure summary, but the
+worker still has to satisfy the same DevNexus context and result-file contract.
+
+```json
+{
+  "automation": {
+    "agent": {
+      "coordinatorProfileId": "codex-exec",
+      "profiles": [
+        {
+          "id": "codex-exec",
+          "executor": "codex",
+          "executorMode": "exec",
+          "intendedUse": "coordinator",
+          "model": "gpt-5.5",
+          "reasoning": "xhigh",
+          "command": "codex",
+          "args": [
+            "exec",
+            "--approval-policy",
+            "on-request",
+            "--sandbox",
+            "workspace-write"
+          ]
+        },
+        {
+          "id": "codex-app-worker",
+          "executor": "codex",
+          "executorMode": "app_server",
+          "intendedUse": "subagent",
+          "model": "gpt-5.5",
+          "reasoning": "high",
+          "command": null,
+          "args": [
+            "--approval-policy",
+            "on-request",
+            "--sandbox",
+            "workspace-write"
+          ],
+          "appServer": {
+            "mode": "spawn",
+            "command": "<host-local-codex-command>",
+            "args": ["app-server"],
+            "endpoint": "http://127.0.0.1:17655",
+            "ephemeralThreadDefault": true,
+            "localPolicy": {
+              "hostLocalSafetyHints": [
+                "requires_local_codex_account",
+                "spawns_local_process"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Use ephemeral Codex app-server threads by default for temporary workers,
+parallel subagents, local smokes, and work where the DevNexus result JSON and
+target-cycle facts are the durable record. `appServer.ephemeralThreadDefault`
+defaults to `true`; a launch may explicitly opt into a durable app-server
+thread when a human wants a visible Codex chat for review, manual continuation,
+or later thread forking. Durable Codex threads do not replace DevNexus ledgers:
+the agent must still write the result file and record target-cycle facts.
+Command-based `codex exec` profiles and current-agent adoption do not expose a
+DevNexus thread-persistence switch; their chat history behavior is owned by
+the Codex CLI or current Codex App thread.
+
+First-version DevNexus does not create, update, or delete Codex App heartbeat,
+cron, or schedule automation records. A host-local Codex heartbeat may wake
+`dev-nexus automation coordinator-loop <project-root> --adopt-current`, but
+the heartbeat's lifecycle stays outside DevNexus until Codex exposes a stable
+automation-management protocol. DevNexus owns the launch gate, lock, backoff,
+target-cycle facts, and result contract, not Codex App automation storage.
+
+App-server endpoint policy is deliberately local-first. Configure loopback
+endpoints such as `http://127.0.0.1:<port>`, `http://localhost:<port>`,
+`ws://127.0.0.1:<port>`, or `ws://[::1]:<port>` unless a host-local policy has
+explicitly approved a non-loopback endpoint. Non-loopback endpoints require
+`appServer.localPolicy.allowNonLoopbackEndpoint: true`. Endpoints must not
+embed credentials, query strings, or fragments. Keep capability tokens, token
+file paths, socket or pipe paths, and other host-specific connection details
+in host-local DevNexus home config, environment variables, wrappers, or Codex
+configuration, not in portable `dev-nexus.project.json`.
+
+Permission policy must not be weakened when switching between `codex exec`,
+current-agent adoption, and app-server profiles. `codex exec` receives the
+profile command and args exactly as configured. App-server launch preserves
+the profile model and reasoning, passes the profile safety settings as the
+permission profile, forwards Codex approval and sandbox values from profile
+args such as `--approval-policy`, `--sandbox`, `-c approval_policy=...`, and
+`-c sandbox_mode=...`, and includes configured Codex MCP default tool-approval
+mode. Codex approval or sandbox failures are DevNexus launch failures, not a
+reason for DevNexus to bypass provider policy.
+
 Manual `work-item` commands accept `--component <component-id>` for
 component-owned work-item services. Omitting it targets the primary component
 for compatibility. Agent-launch automation reads eligible work across all
