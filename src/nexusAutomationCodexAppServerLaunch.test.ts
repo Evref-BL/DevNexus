@@ -35,6 +35,52 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   }
 }
 
+class NotificationAwareMockCodexAppServerTransport
+  extends MockCodexAppServerTransport {
+  waitForNotificationCallCount = 0;
+  private readonly bufferedNotifications: { method: string; params?: unknown }[] = [];
+  private notificationWaiter:
+    | {
+        predicate: (notification: {
+          method: string;
+          params?: unknown;
+        }) => boolean;
+        resolve: (notification: {
+          method: string;
+          params?: unknown;
+        }) => void;
+      }
+    | null = null;
+
+  waitForNotification(
+    predicate: (notification: { method: string; params?: unknown }) => boolean,
+  ): Promise<{ method: string; params?: unknown }> {
+    this.waitForNotificationCallCount += 1;
+    for (let index = 0; index < this.bufferedNotifications.length; index += 1) {
+      const notification = this.bufferedNotifications[index]!;
+      if (predicate(notification)) {
+        this.bufferedNotifications.splice(index, 1);
+        return Promise.resolve(notification);
+      }
+    }
+
+    return new Promise((resolve) => {
+      this.notificationWaiter = { predicate, resolve };
+    });
+  }
+
+  emitNotification(notification: { method: string; params?: unknown }): void {
+    if (this.notificationWaiter?.predicate(notification)) {
+      const waiter = this.notificationWaiter;
+      this.notificationWaiter = null;
+      waiter.resolve(notification);
+      return;
+    }
+
+    this.bufferedNotifications.push(notification);
+  }
+}
+
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
@@ -532,6 +578,75 @@ describe("nexus automation Codex app-server launch", () => {
       codexAppServer: {
         status: "blocked",
         failureSummary: "approval missing",
+      },
+    });
+  });
+
+  it("waits for turn completion notifications before reading the result contract", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-turn-notification-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    let turnRequest: CodexAppServerJsonRpcRequest | null = null;
+    const transport = new NotificationAwareMockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request);
+      }
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: { threadId: "thread-notify" },
+        };
+      }
+      if (request.method === "turn/start") {
+        turnRequest = request;
+        queueMicrotask(() => {
+          writeResultFromTurnRequest(request, {
+            status: "completed",
+            summary: "Completion arrived from the turn notification",
+          });
+          transport.emitNotification({
+            method: "turn/completed",
+            params: {
+              threadId: "thread-notify",
+              turnId: "turn-notify",
+              status: "completed",
+            },
+          });
+        });
+        return {
+          id: request.id,
+          result: { turnId: "turn-notify" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-turn-notification-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(turnRequest).not.toBeNull();
+    expect(transport.waitForNotificationCallCount).toBe(1);
+    expect(result).toMatchObject({
+      status: "completed",
+      summary: "Completion arrived from the turn notification",
+      launch: {
+        codexAppServer: {
+          status: "completed",
+          threadId: "thread-notify",
+          turnId: "turn-notify",
+          failureSummary: null,
+        },
       },
     });
   });

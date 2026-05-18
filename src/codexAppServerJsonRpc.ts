@@ -33,10 +33,30 @@ export type CodexAppServerJsonRpcResponse =
   | CodexAppServerJsonRpcSuccessResponse
   | CodexAppServerJsonRpcErrorResponse;
 
+export interface CodexAppServerJsonRpcNotification {
+  jsonrpc?: "2.0";
+  method: string;
+  params?: unknown;
+}
+
+export interface CodexAppServerJsonRpcServerRequest {
+  jsonrpc?: "2.0";
+  id: CodexAppServerJsonRpcId;
+  method: string;
+  params?: unknown;
+}
+
+export type CodexAppServerJsonRpcNotificationPredicate = (
+  notification: CodexAppServerJsonRpcNotification,
+) => boolean;
+
 export interface CodexAppServerJsonRpcTransport {
   send(
     request: CodexAppServerJsonRpcRequest,
   ): Promise<CodexAppServerJsonRpcResponse>;
+  waitForNotification?(
+    predicate: CodexAppServerJsonRpcNotificationPredicate,
+  ): Promise<CodexAppServerJsonRpcNotification>;
   close?(): Promise<void> | void;
 }
 
@@ -147,6 +167,22 @@ export class CodexAppServerJsonRpcClient {
   close(): Promise<void> | void {
     return this.transport.close?.();
   }
+
+  supportsNotifications(): boolean {
+    return typeof this.transport.waitForNotification === "function";
+  }
+
+  waitForNotification(
+    predicate: CodexAppServerJsonRpcNotificationPredicate,
+  ): Promise<CodexAppServerJsonRpcNotification> {
+    if (!this.transport.waitForNotification) {
+      return Promise.reject(
+        new Error("Codex app-server transport does not support notifications"),
+      );
+    }
+
+    return this.transport.waitForNotification(predicate);
+  }
 }
 
 export type CodexAppServerStdioSpawn = (
@@ -169,6 +205,12 @@ interface PendingJsonRpcRequest {
   reject: (error: Error) => void;
 }
 
+interface PendingJsonRpcNotificationWaiter {
+  predicate: CodexAppServerJsonRpcNotificationPredicate;
+  resolve: (notification: CodexAppServerJsonRpcNotification) => void;
+  reject: (error: Error) => void;
+}
+
 export function createCodexAppServerStdioJsonRpcTransport(
   options: CreateCodexAppServerStdioJsonRpcTransportOptions,
 ): CodexAppServerJsonRpcTransport {
@@ -180,6 +222,8 @@ class CodexAppServerStdioJsonRpcTransport
 {
   private readonly child: ChildProcess;
   private readonly pending = new Map<CodexAppServerJsonRpcId, PendingJsonRpcRequest>();
+  private readonly notificationWaiters: PendingJsonRpcNotificationWaiter[] = [];
+  private readonly bufferedNotifications: CodexAppServerJsonRpcNotification[] = [];
   private buffer = Buffer.alloc(0);
   private closedError: Error | null = null;
 
@@ -233,6 +277,26 @@ class CodexAppServerStdioJsonRpcTransport
     });
   }
 
+  waitForNotification(
+    predicate: CodexAppServerJsonRpcNotificationPredicate,
+  ): Promise<CodexAppServerJsonRpcNotification> {
+    if (this.closedError) {
+      return Promise.reject(this.closedError);
+    }
+
+    for (let index = 0; index < this.bufferedNotifications.length; index += 1) {
+      const notification = this.bufferedNotifications[index]!;
+      if (predicate(notification)) {
+        this.bufferedNotifications.splice(index, 1);
+        return Promise.resolve(notification);
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      this.notificationWaiters.push({ predicate, resolve, reject });
+    });
+  }
+
   close(): void {
     this.closedError = new Error("Codex app-server stdio transport closed");
     this.child.stdin?.end();
@@ -264,7 +328,25 @@ class CodexAppServerStdioJsonRpcTransport
         continue;
       }
 
-      this.resolveResponse(parseStdioJsonLine(line));
+      this.routeMessage(parseStdioJsonLine(line));
+    }
+  }
+
+  private routeMessage(message: Record<string, unknown>): void {
+    if (isJsonRpcResponse(message)) {
+      this.resolveResponse(message);
+      return;
+    }
+    if (isJsonRpcServerRequest(message)) {
+      this.rejectUnsupportedServerRequest(
+        message as unknown as CodexAppServerJsonRpcServerRequest,
+      );
+      return;
+    }
+    if (isJsonRpcNotification(message)) {
+      this.routeNotification(
+        message as unknown as CodexAppServerJsonRpcNotification,
+      );
     }
   }
 
@@ -283,13 +365,92 @@ class CodexAppServerStdioJsonRpcTransport
     pending.resolve(response as unknown as CodexAppServerJsonRpcResponse);
   }
 
+  private routeNotification(
+    notification: CodexAppServerJsonRpcNotification,
+  ): void {
+    for (let index = 0; index < this.notificationWaiters.length; index += 1) {
+      const waiter = this.notificationWaiters[index]!;
+      if (waiter.predicate(notification)) {
+        this.notificationWaiters.splice(index, 1);
+        waiter.resolve(notification);
+        return;
+      }
+    }
+
+    this.bufferedNotifications.push(notification);
+    if (this.bufferedNotifications.length > 100) {
+      this.bufferedNotifications.shift();
+    }
+  }
+
+  private rejectUnsupportedServerRequest(
+    request: CodexAppServerJsonRpcServerRequest,
+  ): void {
+    this.writeServerRequestRejection(request);
+    this.failAll(
+      new Error(
+        `Codex app-server sent unsupported server request ${request.method}; DevNexus cannot satisfy Codex app-server approval, permission, or user-input requests through this transport`,
+      ),
+    );
+  }
+
+  private writeServerRequestRejection(
+    request: CodexAppServerJsonRpcServerRequest,
+  ): void {
+    if (!this.child.stdin?.writable) {
+      return;
+    }
+
+    const response = {
+      id: request.id,
+      error: {
+        code: -32001,
+        message:
+          `DevNexus cannot satisfy Codex app-server server request ${request.method} through this transport.`,
+      },
+    };
+    this.child.stdin.write(`${JSON.stringify(response)}\n`, "utf8");
+  }
+
   private failAll(error: Error): void {
     this.closedError = error;
     for (const pending of this.pending.values()) {
       pending.reject(error);
     }
     this.pending.clear();
+    for (const waiter of this.notificationWaiters.splice(0)) {
+      waiter.reject(error);
+    }
   }
+}
+
+function isJsonRpcResponse(
+  message: Record<string, unknown>,
+): boolean {
+  return isJsonRpcId(message.id) &&
+    (hasOwn(message, "result") || hasOwn(message, "error"));
+}
+
+function isJsonRpcServerRequest(
+  message: Record<string, unknown>,
+): boolean {
+  return isJsonRpcId(message.id) &&
+    typeof message.method === "string" &&
+    message.method.trim().length > 0 &&
+    !hasOwn(message, "result") &&
+    !hasOwn(message, "error");
+}
+
+function isJsonRpcNotification(
+  message: Record<string, unknown>,
+): boolean {
+  return !hasOwn(message, "id") &&
+    typeof message.method === "string" &&
+    message.method.trim().length > 0;
+}
+
+function isJsonRpcId(value: unknown): value is CodexAppServerJsonRpcId {
+  return typeof value === "string" || typeof value === "number";
 }
 
 function parseStdioJsonLine(line: string): Record<string, unknown> {
