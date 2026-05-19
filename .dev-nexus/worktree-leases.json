@@ -1,7 +1,176 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T02:29:00.000Z",
+  "updatedAt": "2026-05-19T03:23:00.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3d8c32e2d3f06e3d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-94",
+      "branchName": "codex/dev-nexus/local-94",
+      "baseRef": "bot/codex/dev-nexus/local-94",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-94-authority-roles-docs"
+      },
+      "writeScope": [
+        "README.md",
+        "docs/user/authority-roles.md",
+        "docs/user/getting-started.md",
+        "docs/user/agent-workflows.md"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T03:16:50.995Z",
+      "lastSeenAt": "2026-05-19T03:21:46.530Z",
+      "updatedAt": "2026-05-19T03:21:46.530Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "b07889d047f56fb7a45e80ae69d42ed9930ef068",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-94-authority-roles-docs"
+        },
+        "upstream": "bot/codex/dev-nexus/local-94",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Commit b07889d documents authority roles for local-94. Evidence for follow-up: work-item update/comment from project-meta worktree were blocked with authority_mutation_blocked because auth profile bot-github is provider github while requested provider is local; coordination/status context generated profile=none while automation_status generated profile=bot-github.",
+        "Verification: npm run check passed (64 files, 572 tests); git diff --check passed; generic docs scan found no new dogfood-specific account names.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-94. Direct integration held because generated worker/coordination authority surfaces disagreed with automation_status and work-item update/comment blocked on local tracker provider/profile matching."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-52dc2eb6db36d4af",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-94-meta-20260519T031408Z",
+      "branchName": "codex/dev-nexus-dogfood/local-94-meta-20260519-t031408-z",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/local-94-docs-meta-20260519T031408Z-project"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/automation/target-state.md",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T03:17:25.699Z",
+      "lastSeenAt": "2026-05-19T03:23:00.000Z",
+      "updatedAt": "2026-05-19T03:23:00.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "8231bcc11df216a5f93acbcb56288f13caf29ee8",
+      "dirty": false,
+      "pushed": false,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/local-94-docs-meta-20260519T031408Z-project"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Helper worktree and local branch removed after no-op cleanup."
+        ]
+      },
+      "notes": [
+        "No-op helper worktree created during local-94 metadata recording attempts; it carried no retained source or project changes.",
+        "The helper worktree and local branch were removed after the useful records were written to the shared dogfood checkout with an explicit integration override."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f335d4bbaa7e4df3",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-94-meta-20260519T031408Z",
+      "branchName": "codex/dev-nexus/local-94-meta-20260519-t031408-z",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-94-docs-meta-20260519T031408Z"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/automation/target-state.md",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T03:17:16.931Z",
+      "lastSeenAt": "2026-05-19T03:23:00.000Z",
+      "updatedAt": "2026-05-19T03:23:00.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
+      "dirty": false,
+      "pushed": false,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-94-docs-meta-20260519T031408Z"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Helper worktree and local branch removed after no-op cleanup."
+        ]
+      },
+      "notes": [
+        "No-op helper worktree created during local-94 metadata recording attempts; it carried no retained source or project changes.",
+        "The helper worktree and local branch were removed after the useful records were written to the shared dogfood checkout with an explicit integration override."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

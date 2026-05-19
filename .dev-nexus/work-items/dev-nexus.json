@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 304,
-  "updatedAt": "2026-05-19T01:18:29.272Z",
+  "nextCommentNumber": 305,
+  "updatedAt": "2026-05-19T03:21:46.568Z",
   "items": [
     {
       "id": "local-1",
@@ -2376,7 +2376,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:02.071Z",
-      "updatedAt": "2026-05-19T01:18:16.712Z",
+      "updatedAt": "2026-05-19T03:21:46.568Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6490,6 +6490,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-299"
+        }
+      },
+      {
+        "id": "local-comment-304",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-94\nHead: b07889d047f56fb7a45e80ae69d42ed9930ef068\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T03:21:46.530Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-94\",\n  \"logicalItemId\": \"local-94\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-94\",\n    \"itemNumber\": 94,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-94\",\n      \"itemNumber\": 94\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-94\",\n    \"itemNumber\": 94,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-94\",\n      \"itemNumber\": 94\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-94\",\n      \"itemNumber\": 94,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-94\",\n        \"itemNumber\": 94\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-94-authority-roles-docs\",\n  \"branch\": \"codex/dev-nexus/local-94\",\n  \"upstream\": \"bot/codex/dev-nexus/local-94\",\n  \"baseRef\": \"bot/codex/dev-nexus/local-94\",\n  \"headCommit\": \"b07889d047f56fb7a45e80ae69d42ed9930ef068\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"README.md\",\n    \"docs/user/authority-roles.md\",\n    \"docs/user/getting-started.md\",\n    \"docs/user/agent-workflows.md\"\n  ],\n  \"decisions\": [\n    \"Added generic user-facing authority-role guide covering actors, auth profiles, recommended roles, scoped bindings, safe defaults, onboarding, and open-source PR-only behavior.\",\n    \"Updated existing user workflow docs to point at authority roles and remove stale implementation-tracking wording.\"\n  ],\n  \"verificationSummary\": \"npm run check passed (64 files, 572 tests); git diff --check passed; generic docs scan found no new dogfood-specific account names.\",\n  \"integrationPreference\": \"Branch pushed to bot/codex/dev-nexus/local-94. Direct integration held because generated worker/coordination authority surfaces disagreed with automation_status and work-item update/comment blocked on local tracker provider/profile matching.\",\n  \"note\": \"Commit b07889d documents authority roles for local-94. Evidence for follow-up: work-item update/comment from project-meta worktree were blocked with authority_mutation_blocked because auth profile bot-github is provider github while requested provider is local; coordination/status context generated profile=none while automation_status generated profile=bot-github.\",\n  \"leaseId\": \"lease-3d8c32e2d3f06e3d\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T03:21:46.568Z",
+        "updatedAt": "2026-05-19T03:21:46.568Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-304"
         }
       }
     ],

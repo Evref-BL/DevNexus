@@ -222,9 +222,16 @@ and ready for coordinator-driven work across its components.
 
 ## Near-Term Direction
 
-- Return to ready follow-on work such as `dev-nexus:local-93`,
-  `dev-nexus:local-94`, `local-107`, `local-109`, `local-135`, `local-136`,
-  and `local-147`, subject to dependency and concurrency limits.
+- `dev-nexus:local-94` has a verified docs commit `b07889d` pushed to
+  `bot/codex/dev-nexus/local-94` with a ready handoff. Integration is held
+  because generated worker/coordination authority surfaces reported
+  `profile=none` while `automation_status` reported `profile=bot-github`, and
+  local tracker update/comment attempts blocked on GitHub-profile versus local
+  provider matching.
+- Return to ready follow-on work such as `dev-nexus:local-93`, `local-107`,
+  `local-109`, `local-135`, `local-136`, and `local-147`, subject to dependency
+  and concurrency limits. `local-107` is a strong next candidate because this
+  run produced concrete status/projection mismatch evidence.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
@@ -260,6 +267,7 @@ and ready for coordinator-driven work across its components.
   destructive host cleanup without a current approved isolated runner profile.
 - Preserve component source roots and source branches unless a work item
   explicitly owns their migration or deletion.
-- The generic DevNexus MCP entry may still be configured but not visible in the
-  active Codex tool namespace; use the project-local DevNexus CLI until that
-  provider-session issue is resolved.
+- The generic DevNexus MCP tools are visible in the active Codex tool
+  namespace. Prefer MCP surfaces for read-only inspection, and use guarded CLI
+  overrides only when recording integration-owned project-state facts from the
+  shared checkout.
