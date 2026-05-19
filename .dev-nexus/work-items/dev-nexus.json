@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 153,
-  "nextCommentNumber": 327,
-  "updatedAt": "2026-05-19T12:13:29.874Z",
+  "nextNumber": 154,
+  "nextCommentNumber": 329,
+  "updatedAt": "2026-05-19T12:41:59.510Z",
   "items": [
     {
       "id": "local-1",
@@ -1045,7 +1045,7 @@
       "id": "local-43",
       "title": "Slice component multi-tracker work tracking PRD into implementation items",
       "description": "Type: planning / issue-slicing follow-up\nReadiness: human-in-the-loop or planning-agent ready; not implementation-ready until sliced.\nSource artifact: `docs/component-multi-tracker-prd.md`.\n\nGoal: turn the Component Multi-Tracker Work Tracking Product Requirements Document (PRD) into bounded DevNexus-owned implementation work items.\n\nAcceptance criteria:\n- Use the `to-issues` workflow to slice the PRD into independently verifiable DevNexus component work items.\n- Preserve the PRD direction: additive multi-tracker schema, default tracker compatibility, tracker registry, link records, dry-run sync planning, one-way sync, coordination role support, and provider-policy guardrails.\n- Each created work item states readiness, dependencies, acceptance criteria, verification, and publication notes.\n- Implementation-ready items stay scoped to DevNexus core unless a provider/plugin component explicitly owns a slice.\n- Live external provider writes remain blocked unless a sliced item records explicit provider policy and credential approval.\n\nBoundaries:\n- Do not enable live external sync while slicing.\n- Do not create Vibe workspaces, sessions, executions, or implementation workers.\n- Do not treat mirrored external tracker items as canonical until the default tracker policy is implemented.\n\nVerification:\n- Static review that created items cover the PRD phases and keep dependencies ordered.\n\nPublication notes:\n- Dogfood project-state change only unless the issue slicing produces source changes later.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "planning",
@@ -1058,8 +1058,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:57:51.328Z",
-      "updatedAt": "2026-05-17T13:59:51.938Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T12:40:28.116Z",
+      "closedAt": "2026-05-19T12:40:28.116Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1285,22 +1285,24 @@
     },
     {
       "id": "local-52",
-      "title": "Choose first live multi-tracker dogfood sync policy",
-      "description": "Type: human-in-the-loop (HITL) policy decision slice\nReadiness: blocked on provider/write policy and dogfood target choice.\nSource PRD: `docs/component-multi-tracker-prd.md` open questions.\n\nGoal: decide the first live dogfood sync policy before enabling real external provider mutation for multi-tracker sync.\n\nDecision points:\n- Should the first live target be GitHub Issues only, or GitHub Issues plus GitHub Project v2 board status?\n- Should the dogfood project keep local as primary until bot identity and meta-project hosting guardrails are complete?\n- Which item subset should sync first: `dogfood` ready items, coordination-only handoffs, or a smaller manual allowlist?\n- Which comments should mirror externally: all DevNexus progress comments, only handoffs, only high-signal status transitions, or none initially?\n- Which host-local auth profile or bot identity is allowed to create/update external issues?\n- What quiet-period and no-repeat-ping rules apply to external waiting states?\n\nAcceptance criteria:\n- Record the chosen provider, repository/project target, auth profile, allowed operations, synced fields, comment policy, status mapping, and initial item filter.\n- Confirm whether live writes are allowed or whether the first rollout remains draft-only.\n- Update project config or target-state only after the policy is explicit.\n- Leave implementation slices blocked from live external mutation until this decision is recorded.\n\nDependencies:\n- Related to `dev-nexus:local-16`, `dev-nexus:local-18`, `dev-nexus:local-38`, and `dev-nexus:local-39`.\n\nBoundaries:\n- Do not perform live external provider writes as part of the decision.\n- Do not store secrets in shared project state.\n\nVerification:\n- Static policy/config review.\n- After approval, one harmless dry-run and then one explicitly approved provider smoke against the chosen test target.\n\nPublication notes:\n- Dogfood project-state/policy change only unless implementation changes are required later.",
+      "title": "Choose first live multi-tracker dogfood sync/mirroring policy",
+      "description": "Type: human-in-the-loop (HITL) provider-write and mirroring policy decision\nReadiness: blocked on provider/write policy and dogfood target choice.\nSource PRD: `docs/component-multi-tracker-prd.md` open questions.\n\nCurrent policy boundary:\nLocal primary trackers and configured GitHub Issues eligible-source trackers are peer discovery sources in this dogfood project. Matching GitHub issues may be selected directly without an import-first migration. This item does not gate read-only discovery or direct selection.\n\nGoal: decide the first live dogfood sync/mirroring policy before enabling real external provider mutation for multi-tracker sync, import comments, mirror updates, or scheduled import.\n\nDecision points:\n- Should the first live write target be GitHub Issues only, or GitHub Issues plus GitHub Project v2 board status?\n- Which fields may be written or mirrored externally: title, body, labels, status labels, assignees, milestones, comments, or only links?\n- Which item subset should sync first: directly selected GitHub issues, local `dogfood` ready items, coordination-only handoffs, or a smaller manual allowlist?\n- Which comments should mirror externally: all DevNexus progress comments, only handoffs, only high-signal status transitions, or none initially?\n- Which host-local auth profile or bot identity is allowed to create/update external issues?\n- What quiet-period and no-repeat-ping rules apply to external waiting states?\n\nAcceptance criteria:\n- Record the chosen provider, repository/project target, auth profile, allowed operations, synced fields, comment policy, status mapping, and initial item filter.\n- Confirm whether live writes are allowed or whether the first rollout remains draft-only.\n- Keep read-only local+GitHub discovery and direct GitHub selection independent from import/sync policy.\n- Update project config or target-state only after the provider-write policy is explicit.\n- Leave provider-write implementation slices blocked from live external mutation until this decision is recorded.\n\nDependencies:\n- Related to `dev-nexus:local-16`, `dev-nexus:local-18`, `dev-nexus:local-38`, `dev-nexus:local-39`, and `dev-nexus:local-137`.\n\nBoundaries:\n- Do not perform live external provider writes as part of the decision.\n- Do not require GitHub issues to be copied into local tracker state before selection.\n- Do not store secrets in shared project state.\n\nVerification:\n- Static policy/config review.\n- After approval, one harmless dry-run and then one explicitly approved provider smoke against the chosen test target.\n\nPublication notes:\n- Dogfood project-state/policy change only unless implementation changes are required later.",
       "status": "blocked",
       "provider": "local",
       "labels": [
         "work-tracking",
         "multi-tracker",
         "sync",
+        "mirroring",
         "github",
+        "provider-write-policy",
         "hitl",
         "blocked"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-17T13:59:51.755Z",
-      "updatedAt": "2026-05-17T13:59:51.755Z",
+      "updatedAt": "2026-05-19T12:40:43.261Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3930,6 +3932,33 @@
         "itemId": "local-152",
         "itemNumber": 152
       }
+    },
+    {
+      "id": "local-153",
+      "title": "Adopt GitHub issue eligibility labels for direct discovery",
+      "description": "Type: dogfood tracker hygiene and rollout slice\nReadiness: ready after the configured discovery PRs are merged or while validating them in the project-meta branch.\nSource decision: `dev-nexus:local-137` allows local primary trackers and configured GitHub Issues eligible-source trackers to be peer discovery sources. GitHub issues do not need to be copied/imported locally before selection.\n\nGoal: make existing and new GitHub Issues follow the same automation eligibility logic as local work items, so provider-native issues can be selected directly when intended.\n\nAcceptance criteria:\n- Record the dogfood GitHub issue eligibility convention: `dogfood` plus `status:ready` means selectable by the current automation selector; `blocked` or `unsafe-live-runtime` excludes selection.\n- Review open GitHub Issues on configured component trackers and decide which ones should be automation-eligible, backlog/todo only, or blocked/HITL.\n- Apply only the minimal provider-native labels/status labels needed for direct discovery when provider writes are explicitly allowed for label hygiene; do not copy issue bodies into local tracker state.\n- Verify `automation eligible-work` in discovery mode sees any intended GitHub Issues directly with a `sourceTrackerRef` for the GitHub tracker.\n- Leave sync/import/comment mirroring policy under `dev-nexus:local-52`; this item must not enable provider comments, scheduled import, or issue mirroring.\n\nBoundaries:\n- Do not import GitHub issues into local tracker state as a prerequisite for selection.\n- Do not create duplicate local work items for provider-native GitHub issues unless a separate import policy explicitly requests it.\n- Do not mutate GitHub issue content or comments in this slice; label/status hygiene only.\n- Do not broaden the automation selector beyond the explicit dogfood/status labels without a target-state decision.\n\nVerification:\n- `dev-nexus work-item discovery-status . --json` reports GitHub trackers readable.\n- `dev-nexus automation eligible-work . --json` returns the intended directly selectable GitHub issue(s), or records that no GitHub issue currently has the selector labels.\n- GitHub issue list review is recorded in the work-item comment.\n\nPublication notes:\n- Dogfood project-state and provider label hygiene only; no DevNexus source change expected unless verification exposes a discovery bug.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "trackers",
+        "github",
+        "discovery",
+        "selector",
+        "issue-hygiene",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T12:40:57.375Z",
+      "updatedAt": "2026-05-19T12:41:59.509Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-153",
+        "itemNumber": 153
+      }
     }
   ],
   "comments": {
@@ -5181,6 +5210,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-73"
+        }
+      },
+      {
+        "id": "local-comment-327",
+        "body": "PRD slicing is now complete enough for current dogfood purposes. The implemented/planned slices cover schema, registry routing, links, dry-run sync, one-way sync execution, coordination tracker roles, discovery roles/policy, eligible-work aggregation, dedupe, import planning/execution, visibility summaries, fake GitHub inbox smoke coverage, and the dogfood direct-selection policy in local-137. Remaining work should be tracked as targeted follow-ups rather than keeping this broad slicing item open.",
+        "author": null,
+        "createdAt": "2026-05-19T12:40:27.417Z",
+        "updatedAt": "2026-05-19T12:40:27.417Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-327"
         }
       }
     ],
@@ -7916,6 +7956,19 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-321"
+        }
+      }
+    ],
+    "local-153": [
+      {
+        "id": "local-comment-328",
+        "body": "Initial review recorded on 2026-05-19: configured GitHub issue trackers are readable. Open provider-native issues currently observed are DevNexus #4 (Detect stale project MCP processes before heartbeat work), DevNexus #3 (Add a DevNexus heartbeat bootstrap for sustained agent work), and DevNexus-Pharo #1 (Add guided scoped image setup and create affordance for Pharo-capable projects); DevNexus-TypeScript has no open issues. None currently carry the dogfood/status:ready selector labels, so they remain visible backlog but are not automatically selectable until label hygiene is applied deliberately. No import/copy to local tracker state is required for selection.",
+        "author": null,
+        "createdAt": "2026-05-19T12:41:59.509Z",
+        "updatedAt": "2026-05-19T12:41:59.509Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-328"
         }
       }
     ]

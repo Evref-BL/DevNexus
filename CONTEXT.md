@@ -78,6 +78,9 @@ coordinator agent chooses and supervises implementation work.
   selection from configured GitHub eligible-source trackers, while provider
   comments and scheduled import remain separate explicit policy decisions.
   Keep inbound import policy-gated because it mutates local tracker state.
+  `dev-nexus:local-153` is the active tracker-hygiene follow-up for keeping
+  GitHub issue labels/status labels aligned with the local automation selector
+  without copying those issues into local tracker state.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
 

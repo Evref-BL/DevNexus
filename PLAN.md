@@ -112,7 +112,9 @@ target-cycle facts, commits, and the target report.
   scans both local primary trackers and configured GitHub Issues eligible-source
   trackers without requiring import-first migration. Provider comments,
   scheduled import, and any external mutation policy remain separate blocked
-  decisions.
+  decisions. `local-153` is the next tracker-hygiene item to make GitHub issue
+  labels follow the same selector logic as local work items: `dogfood` plus
+  `status:ready` means directly selectable; blocked/unsafe labels exclude.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and

@@ -288,7 +288,11 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-137` for this dogfood policy: local and GitHub Issues are
   peer discovery sources for configured components, and matching GitHub issues
   can be selected directly without copy/import migration. Provider comments and
-  scheduled import are still not automatically enabled. The authority
+  scheduled import are still not automatically enabled. `dev-nexus:local-153`
+  now owns GitHub issue eligibility hygiene so provider-native issues follow
+  the same selector convention as local items (`dogfood` plus `status:ready`
+  is directly selectable; blocked/unsafe labels exclude) without creating local
+  duplicates. The authority
   provider-signal follow-on `local-93` is
   complete. The local tracker auth-profile mismatch follow-on `local-152` is
   also complete as `0e86479`; DevNexus-Pharo package-template and legacy Vibe
