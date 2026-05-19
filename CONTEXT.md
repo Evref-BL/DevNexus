@@ -21,10 +21,13 @@ coordinator agent chooses and supervises implementation work.
 ## Current Operating State
 
 - Component work is tracked through local component-owned work-item stores under
-  `.dev-nexus/work-items/`.
-- Current eligible-work discovery uses each component's default tracker. New
-  GitHub Issues do not become local dogfood work unless GitHub is explicitly
-  queried, selected as the default tracker, or imported into the local tracker.
+  `.dev-nexus/work-items/` and through GitHub Issues tracker bindings on each
+  configured component.
+- Current eligible-work discovery uses `automation.eligibleWorkMode:
+  discovery`, scans each component's local primary tracker and GitHub Issues
+  `eligible_source` tracker, and allows direct selection of matching external
+  issues without import-first migration. The automation selector still controls
+  which local or GitHub issues are eligible for coordinator work.
 - PLexus, pharo-launcher-mcp, and MCP-Pharo work moved to the sibling
   `/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus` DevNexus project.
 - The dogfood meta repository records explicit GitHub hosting metadata:
@@ -71,8 +74,10 @@ coordinator agent chooses and supervises implementation work.
   request and response state.
 - Cross-tracker discovery and inbound provider issue import are planned in
   `docs/tracker-discovery-inbound-sync-prd.md` and sliced into
-  `dev-nexus:local-129` through `local-137`; keep discovery read-only and
-  inbound import policy-gated because it mutates local tracker state.
+  `dev-nexus:local-129` through `local-137`. Dogfood policy now permits direct
+  selection from configured GitHub eligible-source trackers, while provider
+  comments and scheduled import remain separate explicit policy decisions.
+  Keep inbound import policy-gated because it mutates local tracker state.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
 

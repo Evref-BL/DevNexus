@@ -108,8 +108,11 @@ target-cycle facts, commits, and the target report.
   execution. `local-135` is complete for compact external issue visibility
   summaries, and `local-136` is complete for fake GitHub inbox discovery/import
   smoke coverage.
-  `local-137` is the blocked HITL policy decision for direct external
-  selection, provider comments, scheduler import, and ordering.
+  `local-137` is resolved for direct external selection: this dogfood project
+  scans both local primary trackers and configured GitHub Issues eligible-source
+  trackers without requiring import-first migration. Provider comments,
+  scheduled import, and any external mutation policy remain separate blocked
+  decisions.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.
 - Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 153,
-  "nextCommentNumber": 326,
-  "updatedAt": "2026-05-19T11:29:00.214Z",
+  "nextCommentNumber": 327,
+  "updatedAt": "2026-05-19T12:13:29.874Z",
   "items": [
     {
       "id": "local-1",
@@ -3517,21 +3517,20 @@
       "id": "local-137",
       "title": "Decide dogfood external issue selection policy",
       "description": "Type: human-in-the-loop decision slice\nReadiness: blocked on product/authority decision\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: record the dogfood policy choices that should not be guessed by an implementation agent.\n\nQuestions to decide:\n- Should dogfood ever allow direct assignment of external GitHub Issues, or should every external issue become a local canonical item first?\n- Should imported GitHub Issues receive a provider comment linking back to the local DevNexus item, or should the first inbound implementation avoid provider writes entirely?\n- Should scheduled automation run inbound import before every coordinator cycle, or should import remain a separate explicit step until authority and mutation guards are fully landed?\n- How should imported external issues be ordered relative to locally authored ready items when both match the automation selector?\n\nAcceptance criteria:\n- The selected dogfood policy is recorded in project documentation or target state.\n- Implementation issues that need the decision are updated or unblocked with the chosen policy.\n- The decision states whether provider writes are forbidden, optional, or explicitly gated for the first inbound path.\n- The decision states whether inbound import is manually invoked or scheduler-integrated during the first rollout.\n\nBoundaries:\n- Do not implement code in this item.\n- Do not grant broader provider write authority as part of the decision record.\n\nVerification:\n- Static review of the recorded decision and affected work items.\n\nPublication notes:\n- Meta-project update only, using the configured bot/automation profile when published.",
-      "status": "blocked",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
         "trackers",
         "github",
         "decision",
-        "blocked",
         "hitl"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:40.994Z",
-      "updatedAt": "2026-05-18T19:39:40.994Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T12:13:29.874Z",
+      "closedAt": "2026-05-19T12:13:20.737Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7641,7 +7640,19 @@
         }
       }
     ],
-    "local-137": [],
+    "local-137": [
+      {
+        "id": "local-comment-326",
+        "body": "Policy decision recorded: dogfood should scan both component local primary trackers and GitHub Issues eligible-source trackers. Matching GitHub issues may be directly selected without import-first copy/migration. Provider comments and scheduled import remain separate explicit policy decisions.",
+        "author": null,
+        "createdAt": "2026-05-19T12:13:11.668Z",
+        "updatedAt": "2026-05-19T12:13:11.668Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-326"
+        }
+      }
+    ],
     "local-138": [
       {
         "id": "local-comment-230",

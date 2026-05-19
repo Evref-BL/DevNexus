@@ -91,10 +91,55 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus",
       "worktreesRoot": "worktrees/dev-nexus",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/dev-nexus.json"
+      "defaultWorkTrackerId": "local",
+      "trackerDiscovery": {
+        "scannedRoles": [
+          "primary",
+          "eligible_source"
+        ],
+        "directExternalSelection": "allowed",
+        "importRequiredFirst": false,
+        "providerFilters": [
+          "local",
+          "github"
+        ],
+        "queryLimit": 50,
+        "conflictWinner": "scanned_tracker",
+        "missingCredentialBehavior": "skip"
       },
+      "workTrackers": [
+        {
+          "id": "local",
+          "name": "Local Primary",
+          "enabled": true,
+          "roles": [
+            "primary"
+          ],
+          "workTracking": {
+            "provider": "local",
+            "storePath": ".dev-nexus/work-items/dev-nexus.json"
+          }
+        },
+        {
+          "id": "github",
+          "name": "GitHub Issues",
+          "enabled": true,
+          "roles": [
+            "eligible_source",
+            "external_inbox",
+            "coordination",
+            "external_feedback"
+          ],
+          "workTracking": {
+            "provider": "github",
+            "host": "github.com",
+            "repository": {
+              "owner": "Evref-BL",
+              "name": "DevNexus"
+            }
+          }
+        }
+      ],
       "verification": {
         "focusedCommands": [
           "npm test -- --exclude src/processSupervisor.test.ts"
@@ -121,10 +166,55 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus-pharo",
       "worktreesRoot": "worktrees/dev-nexus-pharo",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/dev-nexus-pharo.json"
+      "defaultWorkTrackerId": "local",
+      "trackerDiscovery": {
+        "scannedRoles": [
+          "primary",
+          "eligible_source"
+        ],
+        "directExternalSelection": "allowed",
+        "importRequiredFirst": false,
+        "providerFilters": [
+          "local",
+          "github"
+        ],
+        "queryLimit": 50,
+        "conflictWinner": "scanned_tracker",
+        "missingCredentialBehavior": "skip"
       },
+      "workTrackers": [
+        {
+          "id": "local",
+          "name": "Local Primary",
+          "enabled": true,
+          "roles": [
+            "primary"
+          ],
+          "workTracking": {
+            "provider": "local",
+            "storePath": ".dev-nexus/work-items/dev-nexus-pharo.json"
+          }
+        },
+        {
+          "id": "github",
+          "name": "GitHub Issues",
+          "enabled": true,
+          "roles": [
+            "eligible_source",
+            "external_inbox",
+            "coordination",
+            "external_feedback"
+          ],
+          "workTracking": {
+            "provider": "github",
+            "host": "github.com",
+            "repository": {
+              "owner": "Evref-BL",
+              "name": "DevNexus-Pharo"
+            }
+          }
+        }
+      ],
       "publication": {
         "strategy": "direct_integration",
         "remote": "bot",
@@ -147,10 +237,55 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus-typescript",
       "worktreesRoot": "worktrees/dev-nexus-typescript",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/dev-nexus-typescript.json"
+      "defaultWorkTrackerId": "local",
+      "trackerDiscovery": {
+        "scannedRoles": [
+          "primary",
+          "eligible_source"
+        ],
+        "directExternalSelection": "allowed",
+        "importRequiredFirst": false,
+        "providerFilters": [
+          "local",
+          "github"
+        ],
+        "queryLimit": 50,
+        "conflictWinner": "scanned_tracker",
+        "missingCredentialBehavior": "skip"
       },
+      "workTrackers": [
+        {
+          "id": "local",
+          "name": "Local Primary",
+          "enabled": true,
+          "roles": [
+            "primary"
+          ],
+          "workTracking": {
+            "provider": "local",
+            "storePath": ".dev-nexus/work-items/dev-nexus-typescript.json"
+          }
+        },
+        {
+          "id": "github",
+          "name": "GitHub Issues",
+          "enabled": true,
+          "roles": [
+            "eligible_source",
+            "external_inbox",
+            "coordination",
+            "external_feedback"
+          ],
+          "workTracking": {
+            "provider": "github",
+            "host": "github.com",
+            "repository": {
+              "owner": "Evref-BL",
+              "name": "DevNexus-TypeScript"
+            }
+          }
+        }
+      ],
       "verification": {
         "focusedCommands": [
           "npm run check"
@@ -510,6 +645,7 @@
   "automation": {
     "enabled": true,
     "mode": "agent_launch",
+    "eligibleWorkMode": "discovery",
     "selector": {
       "statuses": [
         "ready"

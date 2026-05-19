@@ -111,9 +111,11 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-48`; multi-tracker migration/configuration documentation is
   complete in `dev-nexus:local-51`.
 - `docs/tracker-discovery-inbound-sync-prd.md` records the current gap that
-  eligible-work scans component default trackers, while provider-native GitHub
-  Issues require explicit tracker queries or inbound import before they become
-  local dogfood work. The PRD has been sliced: start with
+  eligible-work originally scanned component default trackers only. Dogfood now
+  configures local primary trackers plus GitHub Issues eligible-source trackers
+  for each component and uses discovery mode so matching GitHub Issues may be
+  selected directly without import-first migration. The PRD has been sliced:
+  start with
   `dev-nexus:local-129` for tracker roles and discovery-policy defaults, which
   is now complete. `local-130` is complete for read-only discovery status,
   `local-131` is complete for opt-in eligible-work aggregation from configured
@@ -124,9 +126,9 @@ and ready for coordinator-driven work across its components.
   summaries across status, eligible-work, agent context, and target reports.
   `local-136` is complete as `c3bb52a` for fake GitHub inbox discovery,
   planning, guarded import execution, idempotent rerun, missing-credential,
-  wrong-filter, and no-live-provider smoke coverage. `local-137` remains the
-  blocked HITL policy decision for direct external selection, provider
-  comments, scheduler import, and ordering.
+  wrong-filter, and no-live-provider smoke coverage. `local-137` is resolved
+  for direct external selection and no import-first requirement; provider
+  comments and scheduler import remain separate explicit policy decisions.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
@@ -283,9 +285,11 @@ and ready for coordinator-driven work across its components.
   posture. Keep `local-148` through `local-151` ordered behind this skeleton
   and the relevant setup/projection tests.
 - Cross-tracker discovery implementation is complete through
-  `dev-nexus:local-136`; keep `local-137` blocked until the user decides the
-  dogfood external issue selection, provider-comment, scheduler-import, and
-  ordering policy. The authority provider-signal follow-on `local-93` is
+  `dev-nexus:local-137` for this dogfood policy: local and GitHub Issues are
+  peer discovery sources for configured components, and matching GitHub issues
+  can be selected directly without copy/import migration. Provider comments and
+  scheduled import are still not automatically enabled. The authority
+  provider-signal follow-on `local-93` is
   complete. The local tracker auth-profile mismatch follow-on `local-152` is
   also complete as `0e86479`; DevNexus-Pharo package-template and legacy Vibe
   metadata fixes `dev-nexus-pharo:local-20` and `local-21` are complete as
