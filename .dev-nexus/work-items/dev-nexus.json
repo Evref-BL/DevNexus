@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 162,
-  "nextCommentNumber": 342,
-  "updatedAt": "2026-05-19T18:23:30.050Z",
+  "nextNumber": 164,
+  "nextCommentNumber": 344,
+  "updatedAt": "2026-05-19T19:20:23.137Z",
   "items": [
     {
       "id": "local-1",
@@ -4175,6 +4175,58 @@
         "provider": "local",
         "itemId": "local-161",
         "itemNumber": 161
+      }
+    },
+    {
+      "id": "local-162",
+      "title": "Add green-main branch-first publication policy model",
+      "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) with mocked provider/config tests.\nSource: dogfood CI/publication triage on 2026-05-19. User accepted the default decision that `main` should avoid red CI at all cost: agents should run CI on branches or pull requests, then merge to `main` only after required checks are green.\n\nGoal: make green-main branch-first publication an explicit DevNexus publication policy rather than an informal comment layered on top of `direct_integration`.\n\nSymptoms and motivation:\n- Current dogfood component publication config says `strategy: direct_integration`, which reads like target-branch push is the normal path.\n- The desired default is branch/worktree first, CI/checks on branch or PR, then merge to `main` only when green.\n- CI failure intake should be a recovery/intake mechanism, not the primary defense against red `main`.\n\nAcceptance criteria:\n- Component publication policy can declare a green-main or branch-first mode with target branch, integration branch or PR preference, direct-target-push default, required check selectors, and stale-check behavior.\n- Existing `direct_integration` configs remain compatible, but setup/status/reporting can distinguish direct target push from branch-first green-main publication.\n- Project status, agent context, and target report surfaces summarize the effective publication mode and whether direct target-branch push is allowed, exceptional, or blocked.\n- Invalid combinations produce clear validation errors, such as branch-first mode with no target branch or required checks that cannot be evaluated.\n- Tests cover existing direct-integration compatibility, green-main policy normalization, invalid policy combinations, status/context/report summaries, and a mocked provider branch/PR check requirement.\n\nBoundaries:\n- Do not perform live GitHub provider reads or writes in this slice.\n- Do not implement actual merge execution here; publication action enforcement stays owned by completed publication authority gating.\n- Do not duplicate provider check-signal mapping owned by completed provider branch-policy signal mapping.\n- Do not enable live CI triggers; CI intake remains a separate follow-up.\n\nRelated work:\n- Builds on completed publication authority gating and provider check/branch-policy signal mapping.\n- Aligns with branch/PR CI failure intake and treats red `main` as emergency recovery evidence, not the normal path.\n\nVerification:\n- Focused publication config/status/context tests.\n- Focused target-report tests for publication policy summaries.\n- npm run check when feasible.\n\nPublication notes:\n- Use branch-first publication once supported; until then publish through the current verified bot path with normal checks.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "ci",
+        "github",
+        "policy",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T19:06:51.862Z",
+      "updatedAt": "2026-05-19T19:20:23.136Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-162",
+        "itemNumber": 162
+      }
+    },
+    {
+      "id": "local-163",
+      "title": "Migrate dogfood components to green-main publication defaults",
+      "description": "Type: dogfood project-state migration slice\nReadiness: todo/dependent on green-main publication policy support and publication/check gating support.\nSource: dogfood CI/publication triage on 2026-05-19.\n\nGoal: update this dogfood project so configured components use the green-main branch-first publication policy as the default example once DevNexus can model and enforce it.\n\nDefault decision to apply:\n- `main` should avoid red CI at all cost.\n- Agents publish work to an implementation/integration branch or PR first.\n- Required CI/checks run on that branch or PR.\n- Merge to `main` only after required checks are green and publication authority allows the merge.\n- Direct target-branch push is blocked or explicitly exceptional for components with green-main protection.\n- CI failure intake handles branch/PR failures and emergency main recovery, but it is not the primary protection mechanism.\n\nAcceptance criteria:\n- The dogfood meta project config expresses green-main publication policy for the DevNexus, DevNexus-Pharo, and DevNexus-TypeScript components using the supported shared config shape.\n- Component policies name the target branch, branch/PR preference, expected bot remote/auth profile, required checks or provider branch-policy source, and direct-push exception policy.\n- Project status and target report show green-main publication mode for each component.\n- Existing automation/coordinator guidance points agents to branch-first CI-gated integration instead of assuming direct target push.\n- Any component that cannot yet support the policy records a concrete blocker rather than silently falling back to direct push.\n\nDependencies:\n- Depends on dev-nexus:local-162 for the publication policy model.\n- Depends on provider check and branch-policy signals if required checks are provider-resolved.\n- Depends on publication authority enforcement before live automation relies on the policy.\n\nBoundaries:\n- Do not mutate live provider branch protection in this slice unless a later explicit provider-write policy allows it.\n- Do not delete or rewrite remotes, branches, or component checkouts.\n- Do not store secrets in shared project state.\n\nVerification:\n- `dev-nexus project status` shows green-main policy summaries for all configured components.\n- `dev-nexus automation eligible-work` still works after the config migration.\n- Static review that target state and agent guidance no longer present direct push as the normal dogfood default.\n\nPublication notes:\n- Dogfood meta-project update through the configured bot profile after dependent source support lands.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "ci",
+        "github",
+        "migration",
+        "dependent"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T19:07:02.129Z",
+      "updatedAt": "2026-05-19T19:07:02.129Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-163",
+        "itemNumber": 163
       }
     }
   ],
@@ -8349,6 +8401,31 @@
           "itemId": "local-comment-339"
         }
       }
-    ]
+    ],
+    "local-162": [
+      {
+        "id": "local-comment-342",
+        "body": "Starting implementation from synced state. Scope: add explicit green-main/branch-first publication policy model and status/context/report summaries with mocked tests. Working in an isolated DevNexus component worktree; no live provider reads or writes.",
+        "author": null,
+        "createdAt": "2026-05-19T19:07:18.882Z",
+        "updatedAt": "2026-05-19T19:07:18.882Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-342"
+        }
+      },
+      {
+        "id": "local-comment-343",
+        "body": "Implementation complete on source branch codex/dev-nexus/local-162-green-main-policy. Commit d8ce3a2 adds the green_main publication strategy, branch-first defaults, direct target-push policy, required check/stale-check config, status/context/target-report summaries, and mocked validation/authority tests. Verification passed: npm run check. Branch pushed to bot/codex/dev-nexus/local-162-green-main-policy so CI can run off-main. Not checking CI status or opening a provider PR in this slice; next publication step is branch/PR CI and review before any merge to main.",
+        "author": null,
+        "createdAt": "2026-05-19T19:20:16.206Z",
+        "updatedAt": "2026-05-19T19:20:16.206Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-343"
+        }
+      }
+    ],
+    "local-163": []
   }
 }
