@@ -88,9 +88,10 @@ target-cycle facts, commits, and the target report.
   diagnostics. `local-109` worker context propagation is complete. Cleanup and
   dogfood migration remain later.
 - Continue DevNexus-Pharo onboarding cleanup after completed
-  `dev-nexus-pharo:local-20`; packaged create/import now includes the default
-  `AGENTS.md` template, and remaining Pharo project-import defects should stay
-  source-only unless an approved runtime boundary is explicit.
+  `dev-nexus-pharo:local-20` and `local-21`; packaged create/import now
+  includes the default `AGENTS.md` template, and neutral imports no longer
+  preserve legacy PLexus/Vibe metadata. Remaining Pharo project-import defects
+  should stay source-only unless an approved runtime boundary is explicit.
 - Continue DevNexus-Research from `docs/dev-nexus-research-plugin-prd.md`.
   `dev-nexus:local-146` is the blocked human-in-the-loop license and upstream
   ARS integration posture decision; `local-147` is complete for an original

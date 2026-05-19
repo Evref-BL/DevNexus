@@ -1,7 +1,59 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T10:27:09.480Z",
+  "updatedAt": "2026-05-19T11:11:55.207Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a8ac07f5506642b5",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-pharo"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-21",
+      "branchName": "codex/dev-nexus-pharo/local-21-no-vibe-import-metadata",
+      "baseRef": "bot/codex/dev-nexus-pharo/local-21-no-vibe-import-metadata",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus-pharo",
+        "relativePath": null
+      },
+      "writeScope": [
+        "DevNexus-Pharo project import/config setup"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T10:33:46.553Z",
+      "lastSeenAt": "2026-05-19T11:11:55.207Z",
+      "updatedAt": "2026-05-19T11:11:55.207Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "f0027daa41595e828230609fd85ae081facb521a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus-pharo",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus-pharo/local-21-no-vibe-import-metadata",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged local-21 as DevNexus-Pharo commit f0027da.",
+        "Verification: npm run check passed; git diff --check passed; static legacy import smoke passed.",
+        "Integration preference: Published by direct integration through bot/main."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
