@@ -32,6 +32,10 @@ import {
 import {
   resolveNexusPublicationPolicy,
 } from "./nexusPublicationPolicy.js";
+import {
+  buildNexusProjectAgentProjectionStatus,
+  type NexusProjectAgentProjectionStatus,
+} from "./nexusAgentProjectionStatus.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type {
   TrackerCapabilities,
@@ -67,6 +71,7 @@ export interface NexusProjectStatusBase {
   hosts: NexusProjectHostStatus[];
   runnerProfiles: NexusRunnerProfileStatus[];
   authority: NexusAuthorityProjectSummary | null;
+  agentTargets: NexusProjectAgentProjectionStatus | null;
   projectConfigPath: string;
   projectConfigExists: boolean;
   worktreesRoot: string;
@@ -160,6 +165,12 @@ export function buildNexusProjectStatus(
       config?.runnerProfiles,
       config?.hosts,
     ),
+    agentTargets: config
+      ? buildNexusProjectAgentProjectionStatus({
+          projectRoot,
+          projectConfig: config,
+        })
+      : null,
     authority: config
       ? summarizeNexusAuthorityForProject({
           projectId: config.id,
