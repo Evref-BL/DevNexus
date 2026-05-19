@@ -139,6 +139,12 @@ and ready for coordinator-driven work across its components.
 - `dev-nexus:local-166` is ready for CI failure intake and coordinator wakeup
   policy: allowed scopes, webhook/poll/manual replay rollout, dedupe/backoff,
   failure-to-work-item mapping, and policy-gated coordinator wakeups.
+- `dev-nexus:local-165` is complete for version-scoped planning issue slicing.
+  It created `dev-nexus:local-167` through `local-171` in dependency order:
+  version config, scope resolution, readiness reporting, agent/report exposure,
+  and dogfood read-only version configuration. Promote `local-167` first; keep
+  provider milestone writes, automatic release publishing, and merge automation
+  out of the first implementation path.
 - The current bot profile has direct write access for the active
   `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
   `c0dc6d2` after branch CI passed.

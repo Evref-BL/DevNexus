@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 167,
-  "nextCommentNumber": 353,
-  "updatedAt": "2026-05-19T20:10:58.670Z",
+  "nextNumber": 172,
+  "nextCommentNumber": 355,
+  "updatedAt": "2026-05-19T22:24:42.171Z",
   "items": [
     {
       "id": "local-1",
@@ -4259,7 +4259,7 @@
       "id": "local-165",
       "title": "Slice version-scoped planning PRD into implementation issues",
       "description": "Type: planning and issue-slicing slice\nReadiness: ready for issue slicing, not implementation yet.\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: turn the version-scoped planning Product Requirements Document into bounded implementation issues after review. The concept is intentionally parked separately from green_main publication refinement.\n\nProduct direction:\n- Treat versions as first-class planning and readiness objects.\n- Keep work items as the implementation unit and milestones as provider-compatible grouping fields.\n- Use versions to report scope, readiness gates, cross-component progress, blockers, release policy, and post-release follow-up.\n- Integrate with green-main as candidate validation, not merge authority.\n\nAcceptance criteria:\n- Review the PRD for contradictions with current work-item, milestone, target-cycle, authority, publication, and release models.\n- Slice implementation into independent issues for version config, scope resolution, readiness reporting, agent context, and dogfood configuration.\n- Keep live provider writes, automatic release publishing, and merge automation out of the first implementation slice.\n- Preserve compatibility with providers that support only labels or milestones rather than rich version objects.\n\nVerification:\n- Static PRD review.\n- Issue-slicing output has one owner and one verification path per issue.\n\nPublication notes:\n- Project-meta planning work only until implementation issues are selected.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4272,8 +4272,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:33:51.183Z",
-      "updatedAt": "2026-05-19T19:34:05.205Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T22:24:42.171Z",
+      "closedAt": "2026-05-19T22:22:30.777Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4305,6 +4305,138 @@
         "provider": "local",
         "itemId": "local-166",
         "itemNumber": 166
+      }
+    },
+    {
+      "id": "local-167",
+      "title": "Add version planning config model and validation",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: add the first read-only DevNexus version planning configuration model without changing work-item statuses, publication authority, or release automation.\n\nAcceptance criteria:\n- Define a version planning model that can be stored in project configuration or automation target configuration and serialized deterministically.\n- Validate and normalize version id, objective, owning components, target branch, scope entries, readiness gates, and release policy fields.\n- Support scope references by explicit work item, label, milestone, and tracker query descriptor without requiring provider-native rich version objects.\n- Preserve milestone compatibility for providers that support milestones while allowing label or explicit-link fallback for providers that do not.\n- Produce clear validation diagnostics for invalid scope status, missing component references, invalid readiness gates, and unsupported release policy fields.\n- Do not add live provider writes, release tagging, package publishing, or merge automation.\n\nVerification:\n- Focused unit tests for valid and invalid version config examples.\n- Serialization stability coverage for the normalized config shape.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "version-planning",
+        "config",
+        "release",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T22:21:41.803Z",
+      "updatedAt": "2026-05-19T22:21:41.803Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-167",
+        "itemNumber": 167
+      }
+    },
+    {
+      "id": "local-168",
+      "title": "Resolve version scope from work items and tracker fields",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: resolve normalized version scope into concrete component work-item references using existing work-tracker fields and provider-compatible grouping conventions.\n\nAcceptance criteria:\n- Resolve explicit component/work-item refs, labels, milestones, and tracker-query descriptors into version-scoped work items using mocked local and provider-backed tracker data.\n- Represent scope status as committed, candidate, stretch, deferred, or excluded without replacing the work item status field.\n- Deduplicate linked or mirrored tracker items using existing work-item link and canonical reference behavior where available.\n- Treat unsupported provider capabilities, missing milestones, and unresolved references as warnings in the scope result rather than crashes.\n- Keep provider reads mocked or injected for tests; do not add live provider writes or import-first requirements.\n\nVerification:\n- Focused unit tests for explicit refs, labels, milestones, tracker-query descriptors, dedupe, unsupported milestones, and unresolved references.\n- Regression coverage that normal eligible-work discovery still works without a version config.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "version-planning",
+        "scope",
+        "trackers",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T22:21:49.146Z",
+      "updatedAt": "2026-05-19T22:21:49.146Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-168",
+        "itemNumber": 168
+      }
+    },
+    {
+      "id": "local-169",
+      "title": "Report version readiness from existing project facts",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167 and dev-nexus:local-168.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: compute factual version readiness from existing DevNexus work-item, target-cycle, verification, publication, authority, and release-policy facts.\n\nAcceptance criteria:\n- Produce per-version progress counts by component, work status, scope status, blocker state, failed work, deferred work, and stretch work.\n- Evaluate readiness gates from configured gates plus existing facts such as work completion, target-cycle history, verification records, publication decisions, authority summaries, and green-main validation state.\n- Represent green-main branch or pull-request validation as readiness evidence only; do not grant merge authority or release authority through the version model.\n- Summarize package and release readiness as policy and authority state without publishing packages, tags, provider releases, or changelogs.\n- Include stable warnings when a gate cannot be evaluated from available facts.\n\nVerification:\n- Focused unit tests for complete, blocked, failed, deferred, stretch, and warning-heavy version states.\n- Coverage that green-main validation can satisfy a readiness gate without allowing target-branch push, merge, package publish, or release publish.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "version-planning",
+        "readiness",
+        "target-report",
+        "publication",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T22:21:57.239Z",
+      "updatedAt": "2026-05-19T22:21:57.239Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-169",
+        "itemNumber": 169
+      }
+    },
+    {
+      "id": "local-170",
+      "title": "Expose version planning in agent and report surfaces",
+      "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-169.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: expose compact version scope and readiness facts through existing read-only DevNexus agent, target report, CLI, and MCP-facing surfaces.\n\nAcceptance criteria:\n- Add a compact version section to target reports with objective, target branch, owning components, scope counts, readiness state, blockers, and gate warnings.\n- Add version planning context to agent-facing surfaces so agents can tell whether selected work is in committed, candidate, stretch, deferred, excluded, or unrelated scope.\n- Keep output low-token by default and omit unrelated future versions unless an explicit version or verbose/detail option asks for them.\n- Preserve existing target-report and automation-status output when no version configuration is present.\n- Expose only read-only facts; no provider milestone creation, provider comments, merge action, package publish, or release publish.\n\nVerification:\n- Focused CLI text and JSON tests for version report output.\n- MCP/schema or target-report serialization tests for the new version section.\n- Agent-context regression coverage for projects with and without version configuration.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "version-planning",
+        "agent-context",
+        "target-report",
+        "mcp",
+        "cli",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T22:22:03.839Z",
+      "updatedAt": "2026-05-19T22:22:03.839Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-170",
+        "itemNumber": 170
+      }
+    },
+    {
+      "id": "local-171",
+      "title": "Dogfood version planning with a read-only project version",
+      "description": "Type: dogfood configuration and smoke slice\nReadiness: autonomous agent-ready after dev-nexus:local-170.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: configure one read-only DevNexus Dogfood version plan and prove the version reporting path works against real dogfood project metadata.\n\nAcceptance criteria:\n- Add a dogfood version plan that names the objective, owning components, target branch, readiness gates, release policy posture, and initial committed or candidate scope.\n- Use existing work-item fields such as labels, milestones, or explicit local item references; do not create provider milestones or require rich provider version objects.\n- Confirm the normal eligible-work selector is unchanged unless a later implementation explicitly opts into version-filtered work selection.\n- Confirm target reports and agent context show the configured version with useful readiness and blocker information.\n- Do not publish tags, packages, provider releases, changelogs, or merge work as part of this dogfood configuration.\n\nVerification:\n- Run a read-only DevNexus target report or equivalent CLI/MCP smoke showing the configured version.\n- Run focused tests touched by the version config/reporting path, and `npm run check` when feasible.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "version-planning",
+        "dogfood-config",
+        "smoke-test",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T22:22:11.709Z",
+      "updatedAt": "2026-05-19T22:22:11.709Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-171",
+        "itemNumber": 171
       }
     }
   ],
@@ -8607,8 +8739,35 @@
           "provider": "local",
           "itemId": "local-comment-344"
         }
+      },
+      {
+        "id": "local-comment-353",
+        "body": "Heartbeat PRD review completed.\n\nReview result:\n- No contradiction found with the current work-item, milestone, target-cycle, authority, publication, or release models as long as the first implementation remains read-only and planning-oriented.\n- The version object should coordinate existing facts, not replace work items, milestones, target cycles, green-main publication, or release authority.\n- Milestones remain a compatibility bridge only; labels, explicit item refs, and tracker-query descriptors must also work for providers without rich milestone/version support.\n- Green-main validation can satisfy readiness gates, but merge, package publication, and release publication stay governed by existing authority and publication policy.\n\nCreated implementation slices in dependency order:\n- dev-nexus:local-167 Add version planning config model and validation (ready)\n- dev-nexus:local-168 Resolve version scope from work items and tracker fields (todo, depends on local-167)\n- dev-nexus:local-169 Report version readiness from existing project facts (todo, depends on local-167 and local-168)\n- dev-nexus:local-170 Expose version planning in agent and report surfaces (todo, depends on local-169)\n- dev-nexus:local-171 Dogfood version planning with a read-only project version (todo, depends on local-170)\n\nVerification: static PRD review plus tracker creation check in the isolated project-meta worktree.",
+        "author": null,
+        "createdAt": "2026-05-19T22:22:26.573Z",
+        "updatedAt": "2026-05-19T22:22:26.573Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-353"
+        }
+      },
+      {
+        "id": "local-comment-354",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-dogfood/local-165-version-planning-issues\nHead: 165ed679f8f171d83b4773e5ed338e135078e4a7\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T22:24:42.157Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-165-version-planning-issues\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-165\",\n  \"logicalItemId\": \"local-165\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-165\",\n    \"itemNumber\": 165,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-165\",\n    \"itemNumber\": 165,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-165\",\n        \"itemNumber\": 165\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-165-version-planning-issues\",\n  \"branch\": \"codex/dev-nexus-dogfood/local-165-version-planning-issues\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"165ed679f8f171d83b4773e5ed338e135078e4a7\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \".dev-nexus/work-items/dev-nexus.json\",\n    \".dev-nexus/automation/target-state.md\",\n    \"PLAN.md\"\n  ],\n  \"decisions\": [\n    \"Reviewed docs/version-scoped-planning-prd.md against current work-item, milestone, target-cycle, authority, publication, and release models.\",\n    \"Kept version planning read-only for the first implementation sequence; provider milestone writes, merge automation, package publishing, and release publishing remain out of scope.\",\n    \"Created dev-nexus:local-167 through local-171 in dependency order, with local-167 ready and later slices todo/dependent.\"\n  ],\n  \"verificationSummary\": \"Static PRD review completed; local work item store parses as JSON; git diff --check passed with line-ending warnings only.\",\n  \"integrationPreference\": \"Fast-forward project meta branch into dogfood main and push via bot remote.\",\n  \"note\": \"Project-meta branch commit 165ed67 slices version-scoped planning into implementation work items and updates handoff state.\",\n  \"leaseId\": \"lease-3a676deda39c5c67\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T22:24:42.171Z",
+        "updatedAt": "2026-05-19T22:24:42.171Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-354"
+        }
       }
     ],
-    "local-166": []
+    "local-166": [],
+    "local-167": [],
+    "local-168": [],
+    "local-169": [],
+    "local-170": [],
+    "local-171": []
   }
 }
