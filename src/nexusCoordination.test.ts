@@ -599,6 +599,93 @@ describe("nexus coordination", () => {
     });
   });
 
+  it("defaults component-scoped handoff Git facts to the selected component source root", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const primarySourceRoot = path.join(projectRoot, "components", "primary");
+    const addonSourceRoot = path.join(projectRoot, "components", "addon");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const addonStorePath = ".dev-nexus/work-items-addon.json";
+    fs.mkdirSync(primarySourceRoot, { recursive: true });
+    fs.mkdirSync(addonSourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      multiComponentProjectConfig({
+        primarySourceRoot,
+        primaryWorktreesRoot: path.join(projectRoot, "worktrees", "primary"),
+        primaryStorePath,
+        addonSourceRoot,
+        addonWorktreesRoot: path.join(projectRoot, "worktrees", "addon"),
+        addonStorePath,
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: addonStorePath },
+      now: () => "2026-05-17T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Addon coordination",
+      status: "in_progress",
+    });
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const handoff = await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "addon",
+      workItemId: "local-1",
+      status: "ready",
+      gitRunner: fakeGitRunner(addonSourceRoot, gitCalls),
+      now: () => "2026-05-17T10:00:00.000Z",
+    });
+
+    expect(gitCalls[0]).toMatchObject({
+      args: ["rev-parse", "--show-toplevel"],
+      cwd: addonSourceRoot,
+    });
+    expect(handoff.record).toMatchObject({
+      componentId: "addon",
+      repositoryPath: addonSourceRoot,
+      branch: "codex/shared-coordination",
+    });
+  });
+
+  it("asks for currentPath when a component-scoped coordination path has no source checkout", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "components", "missing-dev-nexus");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(
+        sourceRoot,
+        path.join(projectRoot, "worktrees", "dev-nexus"),
+        ".dev-nexus/work-items-dev-nexus.json",
+      ),
+    );
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const failingGitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      gitCalls.push({ args: argsArray, cwd });
+      return {
+        args: argsArray,
+        stdout: "",
+        stderr: "not a git repository",
+        exitCode: 1,
+      };
+    };
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      gitRunner: failingGitRunner,
+    });
+
+    expect(gitCalls[0]).toMatchObject({
+      args: ["rev-parse", "--show-toplevel"],
+      cwd: sourceRoot,
+    });
+    expect(status.git.repositoryPath).toBeNull();
+    expect(status.warnings.join("\n")).toContain("Pass currentPath");
+  });
+
   it("rejects mismatched and ambiguous provider-local coordination ids with tracker diagnostics", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const primarySourceRoot = path.join(projectRoot, "components", "primary");

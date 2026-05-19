@@ -1431,10 +1431,7 @@ export async function callDevNexusMcpTool(
             workItemId: optionalString(args, "workItemId", "arguments"),
             trackerId: optionalString(args, "trackerId", "arguments"),
             trackerRole: optionalString(args, "trackerRole", "arguments"),
-            currentPath:
-              optionalString(args, "currentPath", "arguments") ??
-              context.currentPath ??
-              process.cwd(),
+            currentPath: optionalString(args, "currentPath", "arguments"),
             gitRunner: context.gitRunner,
             now: context.now,
           }),
@@ -1473,10 +1470,7 @@ export async function callDevNexusMcpTool(
               "arguments",
             ),
             note: optionalNullableString(args, "note", "arguments"),
-            currentPath:
-              optionalString(args, "currentPath", "arguments") ??
-              context.currentPath ??
-              process.cwd(),
+            currentPath: optionalString(args, "currentPath", "arguments"),
             gitRunner: context.gitRunner,
             now: context.now,
           })),
@@ -1492,10 +1486,7 @@ export async function callDevNexusMcpTool(
             trackerRole: optionalString(args, "trackerRole", "arguments"),
             targetBranch: optionalString(args, "targetBranch", "arguments"),
             fetch: optionalBoolean(args, "fetch", "arguments"),
-            currentPath:
-              optionalString(args, "currentPath", "arguments") ??
-              context.currentPath ??
-              process.cwd(),
+            currentPath: optionalString(args, "currentPath", "arguments"),
             gitRunner: context.gitRunner,
             now: context.now,
           }),
@@ -1537,10 +1528,7 @@ export async function callDevNexusMcpTool(
             responder: optionalNullableString(args, "responder", "arguments"),
             requestedChanges:
               optionalStringArray(args, "requestedChanges", "arguments") ?? [],
-            currentPath:
-              optionalString(args, "currentPath", "arguments") ??
-              context.currentPath ??
-              process.cwd(),
+            currentPath: optionalString(args, "currentPath", "arguments"),
             gitRunner: context.gitRunner,
             now: context.now,
           })),

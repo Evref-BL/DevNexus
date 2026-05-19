@@ -386,6 +386,8 @@ interface ResolvedCoordinationContext {
   component: ResolvedNexusProjectComponent;
   workItemId?: string;
   currentPath: string;
+  currentPathExplicit: boolean;
+  componentSelectionExplicit: boolean;
 }
 
 interface ResolvedCoordinationTracker {
@@ -806,6 +808,7 @@ function resolveCoordinationContext(
     requiredNonEmptyString(options.projectRoot, "projectRoot"),
   );
   const projectConfig = loadProjectConfig(projectRoot);
+  const currentPathExplicit = options.currentPath !== undefined;
   const currentPath = path.resolve(options.currentPath ?? process.cwd());
   const workItemRoute = options.workItemId
     ? resolveComponentWorkItemRoute({
@@ -834,6 +837,10 @@ function resolveCoordinationContext(
     component,
     ...(workItemRoute ? { workItemId: workItemRoute.itemId } : {}),
     currentPath,
+    currentPathExplicit,
+    componentSelectionExplicit:
+      optionalTrimmedString(options.componentId) !== undefined ||
+      workItemRoute?.qualified === true,
   };
 }
 
@@ -1203,10 +1210,7 @@ function getCoordinationGitStatus(
   const runner = gitRunner ?? defaultGitRunner;
   const repositoryPath = findGitRepositoryPath(
     runner,
-    options.repositoryCandidates ?? [
-      context.currentPath,
-      context.component.sourceRoot,
-    ],
+    options.repositoryCandidates ?? coordinationRepositoryCandidates(context),
   );
   const baseRefFallback = context.component.defaultBranch;
   if (!repositoryPath) {
@@ -1223,7 +1227,7 @@ function getCoordinationGitStatus(
       ahead: null,
       behind: null,
       pushed: null,
-      warnings: ["No git repository could be resolved for the coordination path."],
+      warnings: coordinationGitResolutionWarnings(context),
     };
   }
 
@@ -1275,6 +1279,31 @@ function getCoordinationGitStatus(
     pushed: upstream && aheadBehind.ahead !== null ? aheadBehind.ahead === 0 : null,
     warnings,
   };
+}
+
+function coordinationRepositoryCandidates(
+  context: ResolvedCoordinationContext,
+): string[] {
+  if (!context.currentPathExplicit && context.componentSelectionExplicit) {
+    return [context.component.sourceRoot];
+  }
+
+  return [context.currentPath, context.component.sourceRoot];
+}
+
+function coordinationGitResolutionWarnings(
+  context: ResolvedCoordinationContext,
+): string[] {
+  const warnings = ["No git repository could be resolved for the coordination path."];
+  if (!context.currentPathExplicit && context.componentSelectionExplicit) {
+    warnings.push(
+      `Coordination was scoped to component ${context.component.id} without currentPath; ` +
+        `checked component source root ${context.component.sourceRoot}. ` +
+        "Pass currentPath to record a generated component worktree or another checkout.",
+    );
+  }
+
+  return warnings;
 }
 
 function integrationRepositoryCandidates(
