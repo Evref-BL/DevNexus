@@ -1291,6 +1291,7 @@ function recordCoordinatorLoopCycle(options: {
       summary: options.summary,
       eligibleWorkItemCount: options.eligibleWorkItemCount,
       workItems: options.workItems,
+      authority: options.status.authority,
       blockers: options.blockers ?? [],
       notes: [
         ...(options.notes ?? []),

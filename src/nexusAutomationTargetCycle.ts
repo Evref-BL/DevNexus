@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import {
+  normalizeNexusAuthorityProjectSummary,
+  type NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
 import type { WorkStatus } from "./workTrackingTypes.js";
 
 export const maxNexusAutomationTargetCycleNoteLength = 1000;
@@ -48,6 +52,7 @@ export interface NexusAutomationTargetCycleRecord {
   summary: string | null;
   eligibleWorkItemCount: number | null;
   workItems: NexusAutomationTargetCycleWorkItem[];
+  authority: NexusAuthorityProjectSummary | null;
   blockers: string[];
   notes: string[];
   nextCycleNotBefore: string | null;
@@ -65,6 +70,7 @@ export interface NexusAutomationTargetCycleRecordInput {
   summary?: string | null;
   eligibleWorkItemCount?: number | null;
   workItems?: NexusAutomationTargetCycleWorkItemInput[];
+  authority?: NexusAuthorityProjectSummary | null;
   blockers?: string[];
   notes?: string[];
   nextCycleNotBefore?: string | null;
@@ -333,6 +339,7 @@ function normalizeTargetCycleRecordInput(
     summary: input.summary ?? null,
     eligibleWorkItemCount: input.eligibleWorkItemCount ?? null,
     workItems: input.workItems ?? [],
+    authority: input.authority ?? null,
     blockers: input.blockers ?? [],
     notes: input.notes ?? [],
     nextCycleNotBefore: input.nextCycleNotBefore ?? null,
@@ -364,6 +371,7 @@ function normalizeTargetCycleRecord(
       "target cycle.eligibleWorkItemCount",
     ),
     workItems: normalizeWorkItems(record.workItems),
+    authority: optionalAuthoritySummary(record.authority),
     blockers: normalizeStringArray(record.blockers, "target cycle.blockers"),
     notes: normalizeStringArray(
       record.notes,
@@ -515,6 +523,16 @@ function optionalWorkStatus(value: unknown, name: string): WorkStatus | null {
   throw new NexusAutomationTargetCycleError(
     `${name} must be todo, ready, in_progress, blocked, done, or wont_do`,
   );
+}
+
+function optionalAuthoritySummary(
+  value: unknown,
+): NexusAuthorityProjectSummary | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return normalizeNexusAuthorityProjectSummary(value, "target cycle.authority");
 }
 
 function normalizeStringArray(

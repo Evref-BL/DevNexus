@@ -6,6 +6,7 @@ import {
   type PrepareGitWorktreeResult,
 } from "./gitWorktreeService.js";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
+import { summarizeNexusAuthorityForComponent } from "./nexusAuthority.js";
 import {
   materializeNexusAutomationWorktreeSetup,
   preflightNexusAutomationWorktreeSetup,
@@ -32,6 +33,7 @@ import {
   projectPluginWorkerFragments,
 } from "./nexusPluginCapabilities.js";
 import { buildNexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
+import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import {
   resolveComponentWorkItemRoute,
   throwWorkItemLookupFailure,
@@ -179,6 +181,21 @@ export function prepareNexusManualWorktree(
   const baseRef =
     options.baseRef !== undefined ? options.baseRef ?? null : target.defaultBaseRef;
   const automationConfig = projectConfig.automation ?? defaultNexusAutomationConfig;
+  const publication = target.component
+    ? resolveNexusPublicationPolicy(projectConfig, target.component)
+    : automationConfig.publication;
+  const authority = target.component
+    ? summarizeNexusAuthorityForComponent({
+        projectId: projectConfig.id,
+        componentId: target.component.id,
+        componentName: target.component.name,
+        authority: projectConfig.authority,
+        publication,
+        safety: automationConfig.safety,
+        tracker: target.component.defaultTrackerId,
+        repository: target.component.remoteUrl,
+      })
+    : null;
   const pluginDependencyProjections = manualWorktreePluginDependencyProjections({
     projectRoot,
     projectConfig,
@@ -241,6 +258,8 @@ export function prepareNexusManualWorktree(
         componentId: target.ownerId,
         activeAgents: activeNexusProjectAgentProviders(projectConfig),
       }),
+      publication,
+      authority,
       runnerProfiles: buildNexusRunnerProfilePolicySummary(
         projectConfig.runnerProfiles,
         projectConfig.hosts,

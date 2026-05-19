@@ -8,6 +8,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  summarizeNexusAuthorityForProject,
+  type NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
+import {
   ensureUniqueProject,
   loadProjectConfigIfExists,
   NexusProjectError,
@@ -25,6 +29,10 @@ import {
   buildNexusRunnerProfileStatuses,
   type NexusRunnerProfileStatus,
 } from "./nexusRunnerProfile.js";
+import {
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
@@ -58,6 +66,7 @@ export interface NexusProjectStatusBase {
   vibeKanbanRepoId: string | null;
   hosts: NexusProjectHostStatus[];
   runnerProfiles: NexusRunnerProfileStatus[];
+  authority: NexusAuthorityProjectSummary | null;
   projectConfigPath: string;
   projectConfigExists: boolean;
   worktreesRoot: string;
@@ -66,7 +75,9 @@ export interface NexusProjectStatusBase {
 
 export interface BuildNexusProjectStatusOptions {
   projectConfig?: NexusProjectConfig;
-  homeConfig?: NexusHomeHostOverlaySource | null;
+  homeConfig?: (NexusHomeHostOverlaySource & {
+    authProfiles?: NexusHostingAuthProfileConfig[];
+  }) | null;
 }
 
 export interface UpsertNexusProjectReferenceOptions {
@@ -149,6 +160,23 @@ export function buildNexusProjectStatus(
       config?.runnerProfiles,
       config?.hosts,
     ),
+    authority: config
+      ? summarizeNexusAuthorityForProject({
+          projectId: config.id,
+          authority: config.authority,
+          components: components.map((component) => ({
+            projectId: config.id,
+            componentId: component.id,
+            componentName: component.name,
+            authority: config.authority,
+            publication: resolveNexusPublicationPolicy(config, component),
+            safety: config.automation?.safety ?? null,
+            authProfiles: options.homeConfig?.authProfiles ?? [],
+            tracker: component.defaultTrackerId,
+            repository: component.remoteUrl,
+          })),
+        })
+      : null,
     projectConfigPath: resolvedProjectConfigPath,
     projectConfigExists: Boolean(config),
     worktreesRoot: resolvedWorktreesRoot,

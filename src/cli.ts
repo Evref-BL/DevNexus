@@ -52,6 +52,10 @@ import {
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import type {
+  NexusAuthorityComponentSummary,
+  NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
+import type {
   NexusPublicationActorStatus,
   NexusPublicationStatus,
 } from "./nexusPublicationPolicy.js";
@@ -5386,6 +5390,9 @@ function printProjectStatusResult(
       `    ${profile.id} [${enabled}] mutation=${profile.mutationClass} approval=${profile.approvalState} capabilities=${capabilities} missingHostCapabilities=${missing}`,
     );
   }
+  if (project.authority) {
+    printAuthorityProjectSummary(project.authority, stdout);
+  }
   writeLine(stdout, `  Components: ${project.components.length}`);
   for (const component of project.components) {
     writeLine(
@@ -5720,6 +5727,7 @@ function printCoordinationStatusResult(
   }
   writeLine(stdout, `  Repository: ${status.git.repositoryPath ?? "not resolved"}`);
   writeLine(stdout, `  Branch: ${status.git.branch ?? "unknown"}`);
+  printAuthorityComponentSummary(status.authority, stdout);
   writeLine(
     stdout,
     `  Dirty: ${status.git.dirty === null ? "unknown" : String(status.git.dirty)}`,
@@ -5781,6 +5789,7 @@ function printCoordinationIntegrationPlan(
       `  Coordination tracker: ${plan.handoffs.tracker.trackerId} (${plan.handoffs.tracker.provider})`,
     );
   }
+  printAuthorityComponentSummary(plan.authority, stdout);
   writeLine(stdout, `  Handoff branches: ${plan.branches.length}`);
   writeLine(
     stdout,
@@ -6338,6 +6347,9 @@ function printAutomationTargetReportResult(
     stdout,
     `  Relaunch decision: ${result.relaunchDecision.type} (${result.relaunchDecision.reason})`,
   );
+  if (result.authority) {
+    printAuthorityProjectSummary(result.authority, stdout);
+  }
   if (result.workItemSummary) {
     writeLine(
       stdout,
@@ -6577,6 +6589,7 @@ function printAutomationStatusResult(
       }
     }
   }
+  printAuthorityProjectSummary(result.authority, stdout);
   if (result.selectedWorkItem) {
     writeLine(
       stdout,
@@ -6642,6 +6655,42 @@ function formatPublicationActor(actor: NexusPublicationActorStatus): string {
     : actor.status;
 
   return `${expected}->${observed}`;
+}
+
+function printAuthorityProjectSummary(
+  authority: NexusAuthorityProjectSummary,
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  Authority: ${authority.components.length} component(s)`);
+  for (const component of authority.components) {
+    printAuthorityComponentSummary(component, stdout, "    ");
+  }
+}
+
+function printAuthorityComponentSummary(
+  authority: NexusAuthorityComponentSummary,
+  stdout: TextWriter,
+  indent = "  ",
+): void {
+  const allowed = authority.keyAllowedActions.length > 0
+    ? authority.keyAllowedActions.join(",")
+    : "none";
+  const blocked = authority.blockedActions.length > 0
+    ? authority.blockedActions.join(",")
+    : "none";
+  const fallback = authority.fallbackActions.length > 0
+    ? authority.fallbackActions.join(",")
+    : "none";
+  const bindings = authority.roleBindings.length > 0
+    ? authority.roleBindings
+        .map((binding) => binding.roles.join(","))
+        .join(";")
+    : "none";
+
+  writeLine(
+    stdout,
+    `${indent}${authority.componentId}: actor=${authority.actor.actorId ?? "unknown"} profile=${authority.authProfile?.id ?? "none"} roles=${authority.roles.join(",") || "none"} bindings=${bindings} allowed=${allowed} blocked=${blocked} fallback=${fallback}`,
+  );
 }
 
 function printAutomationEligibleWorkResult(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveNexusEffectiveAuthority,
   resolveNexusCurrentAutomationActor,
+  summarizeNexusAuthorityForComponent,
   type NexusAuthorityConfig,
   type ResolveNexusEffectiveAuthorityOptions,
 } from "./nexusAuthority.js";
@@ -573,6 +574,122 @@ describe("nexus effective authority resolution", () => {
       recommendedFallbackAction: "provider.pull_request.open",
     });
     expect(result.explanation).toContain("Component publication policy");
+  });
+});
+
+describe("nexus authority summaries", () => {
+  it("projects concise actor, profile, role, action, and fallback facts without credential material", () => {
+    const result = summarizeNexusAuthorityForComponent({
+      projectId: "demo-project",
+      componentId: "dev-nexus",
+      componentName: "DevNexus",
+      authority,
+      publication,
+      safety: defaultNexusAutomationConfig.safety,
+      authProfiles: [
+        automationProfile({
+          githubCliConfigDir: "home:.config/gh-automation-github",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        }),
+      ],
+      tracker: "default",
+      repository: "Evref-BL/DevNexus",
+    });
+
+    expect(result).toMatchObject({
+      componentId: "dev-nexus",
+      actor: {
+        status: "matched",
+        actorId: "example-bot-actor",
+        handle: "Example-Bot",
+      },
+      authProfile: {
+        id: "bot-github",
+        kind: "automation",
+      },
+      roles: ["maintainer"],
+      roleBindings: [
+        {
+          roles: ["maintainer"],
+          scope: {
+            component: "dev-nexus",
+          },
+        },
+      ],
+    });
+    expect(result.keyAllowedActions).toContain("git.push_target_branch");
+    expect(result.decisions).toContainEqual(
+      expect.objectContaining({
+        key: "direct_integration",
+        action: "git.push_target_branch",
+        status: "allowed",
+        fallbackAction: null,
+      }),
+    );
+    expect(result.summary).toContain("profile=bot-github");
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("home:.config");
+    expect(serialized).not.toContain("GH_CONFIG_DIR");
+  });
+
+  it("reports roles and allowed actions from the current scoped rule", () => {
+    const result = summarizeNexusAuthorityForComponent({
+      projectId: "demo-project",
+      componentId: "dev-nexus",
+      componentName: "DevNexus",
+      authority: effectiveAuthority,
+      publication: {
+        ...publication,
+        actor: {
+          id: "scoped-bot",
+          kind: "machine_user",
+          provider: "github",
+          handle: "scoped-bot",
+        },
+      },
+      safety: defaultNexusAutomationConfig.safety,
+      authProfiles: [
+        automationProfile({
+          actorId: "scoped-bot",
+          account: "scoped-bot",
+        }),
+      ],
+      tracker: "default",
+      repository: "Evref-BL/DevNexus",
+    });
+
+    expect(result.roles).toEqual(["contributor"]);
+    expect(result.roleBindings).toEqual([
+      {
+        roles: ["contributor"],
+        scope: {
+          targetBranch: "main",
+        },
+      },
+    ]);
+    expect(result.keyAllowedActions).toEqual(
+      expect.arrayContaining([
+        "git.commit",
+        "git.push_branch",
+        "provider.pull_request.open",
+        "provider.review.request",
+        "work_item.update",
+        "coordination.handoff",
+      ]),
+    );
+    expect(result.keyAllowedActions).not.toContain("git.push_target_branch");
+    expect(result.blockedActions).toContain("git.push_target_branch");
+    expect(result.decisions).toContainEqual(
+      expect.objectContaining({
+        key: "direct_integration",
+        action: "git.push_target_branch",
+        status: "blocked",
+        fallbackAction: "provider.pull_request.open",
+        missingRequiredActions: ["git.push_target_branch"],
+      }),
+    );
+    expect(result.summary).toContain("roles=contributor");
+    expect(result.summary).not.toContain("roles=maintainer");
   });
 });
 

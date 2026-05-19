@@ -647,7 +647,37 @@ describe("nexus automation status", () => {
           roles: ["maintainer"],
         },
       ],
+      authority: {
+        components: [
+          {
+            componentId: "primary",
+            actor: {
+              actorId: "example-bot-actor",
+              status: "matched",
+            },
+            authProfile: {
+              id: "bot-github",
+              kind: "automation",
+            },
+            roleBindings: [
+              {
+                roles: ["maintainer"],
+                scope: {
+                  component: "primary",
+                },
+              },
+            ],
+          },
+        ],
+      },
     });
+    expect(result.authority.components[0]?.keyAllowedActions).toContain(
+      "git.push_target_branch",
+    );
+    expect(result.authority.components[0]?.summary).toContain(
+      "profile=bot-github",
+    );
+    expect(JSON.stringify(result.authority)).not.toContain("home:.config");
     expect(result.preflight).toContainEqual(
       expect.objectContaining({
         name: "publication:primary:actor",

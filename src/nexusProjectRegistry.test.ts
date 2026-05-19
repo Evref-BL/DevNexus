@@ -233,6 +233,19 @@ describe("project registry helpers", () => {
       vibeKanbanRepoId: "vk-repo",
       hosts: [],
       runnerProfiles: [],
+      authority: expect.objectContaining({
+        projectId: "config-id",
+        components: [
+          expect.objectContaining({
+            componentId: "primary",
+            actor: expect.objectContaining({
+              actorId: null,
+              status: "unknown",
+            }),
+            keyAllowedActions: ["coordination.handoff"],
+          }),
+        ],
+      }),
       projectConfigPath: path.join(root, devNexusProjectConfigFileName),
       projectConfigExists: true,
       worktreesRoot: path.join(root, "worktrees"),

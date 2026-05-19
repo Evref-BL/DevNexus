@@ -15,6 +15,10 @@ import {
 } from "./nexusAutomation.js";
 import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
+  summarizeNexusAuthorityForProject,
+  type NexusAuthorityProjectSummary,
+} from "./nexusAuthority.js";
+import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
 } from "./nexusAutomationAgentProfile.js";
@@ -169,6 +173,7 @@ export interface NexusAutomationCurrentAgentAdoptionContext {
   };
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   pluginCapabilities: NexusPluginCapabilityProjection[];
+  authority: NexusAuthorityProjectSummary;
   result: NexusAutomationCurrentAgentResultContract;
   eligibleWorkItems: WorkItem[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
@@ -1142,6 +1147,21 @@ function buildCurrentAgentAdoptionContext(input: {
   targetCycleId: string | null;
   coordinatorLoop: boolean;
 }): NexusAutomationCurrentAgentAdoptionContext {
+  const authority = summarizeNexusAuthorityForProject({
+    projectId: input.projectConfig.id,
+    authority: input.projectConfig.authority,
+    components: input.components.map((component) => ({
+      projectId: input.projectConfig.id,
+      componentId: component.id,
+      componentName: component.name,
+      authority: input.projectConfig.authority,
+      publication: resolveNexusPublicationPolicy(input.projectConfig, component),
+      safety: input.automationConfig.safety,
+      tracker: component.defaultTrackerId,
+      repository: component.remoteUrl,
+    })),
+  });
+
   return {
     version: 1,
     runId: input.runId,
@@ -1154,7 +1174,7 @@ function buildCurrentAgentAdoptionContext(input: {
       componentCount: input.components.length,
     },
     components: input.components.map((component) =>
-      componentContext(component, input.projectConfig),
+      componentContext(component, input.projectConfig, authority),
     ),
     automation: {
       mode: "agent_launch",
@@ -1177,6 +1197,7 @@ function buildCurrentAgentAdoptionContext(input: {
       input.projectConfig.hosts,
     ),
     pluginCapabilities: projectPluginCapabilityProjections(input.projectConfig),
+    authority,
     result: currentAgentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
     componentEligibleWorkItems: input.componentEligibleWorkItems,
@@ -1188,6 +1209,7 @@ function buildCurrentAgentAdoptionContext(input: {
 function componentContext(
   component: ResolvedNexusProjectComponent,
   projectConfig: NexusProjectConfig,
+  authority: NexusAuthorityProjectSummary,
 ): NexusAutomationAgentLaunchComponentContext {
   return {
     id: component.id,
@@ -1207,6 +1229,9 @@ function componentContext(
     defaultTrackerId: component.defaultTrackerId,
     workTrackers: summarizeNexusAutomationWorkTrackers(component),
     publication: resolveNexusPublicationPolicy(projectConfig, component),
+    authority:
+      authority.components.find((summary) => summary.componentId === component.id) ??
+      null,
     relationships: component.relationships,
   };
 }
@@ -1576,6 +1601,7 @@ function recordCurrentAgentAdoptionTargetCycle(options: {
         existing?.eligibleWorkItemCount ??
         options.context.eligibleWorkItems.length,
       workItems: existing?.workItems ?? contextWorkItems(options.context),
+      authority: existing?.authority ?? options.context.authority,
       blockers:
         cycleStatus === "blocked" || cycleStatus === "failed"
           ? [options.summary]
@@ -1807,6 +1833,7 @@ function recordCoordinatorAdoptionCycle(options: {
       summary: options.summary,
       eligibleWorkItemCount: options.eligibleWorkItemCount,
       workItems: options.workItems,
+      authority: options.status.authority,
       blockers: options.blockers ?? [],
       notes: [
         ...(options.notes ?? []),
