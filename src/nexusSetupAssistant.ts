@@ -128,6 +128,13 @@ interface ConfiguredMcpServerCommandLine {
   args: string[];
 }
 
+export interface NexusMcpRuntimeProcess {
+  pid: number;
+  commandLine: string;
+  provider?: string | null;
+  serverName?: string | null;
+}
+
 export interface NexusSetupState {
   version: 1;
   updatedAt: string;
@@ -349,13 +356,27 @@ export function buildNexusSetupCheck(options: {
 export function buildNexusMcpRuntimeFreshnessChecks(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
+  liveProcesses?: readonly NexusMcpRuntimeProcess[] | false;
 }): NexusSetupCheckResult[] {
   const projectRoot = path.resolve(options.projectRoot);
   const agentMcpTargets = setupAgentMcpTargets(projectRoot, options.projectConfig);
-  return [
+  const staticChecks = [
     ...agentMcpTargets.map(agentMcpServerConfiguredCheck),
     ...pluginMcpServerChecks(projectRoot, options.projectConfig),
   ].filter((check) => check.summary.includes("stale or unexpected"));
+  const liveProcesses = options.liveProcesses === false
+    ? []
+    : options.liveProcesses ?? listNexusMcpRuntimeProcesses();
+
+  return [
+    ...staticChecks,
+    ...liveMcpRuntimeChecks({
+      projectRoot,
+      projectConfig: options.projectConfig,
+      agentMcpTargets,
+      liveProcesses,
+    }),
+  ];
 }
 
 export function recordNexusSetupStep(
@@ -1415,6 +1436,125 @@ function agentMcpServerConfiguredCheck(
   };
 }
 
+interface NexusMcpRuntimeExpectedTarget {
+  id: string;
+  title: string;
+  agent: string;
+  provider: string;
+  serverName: string;
+  expectedCommandLine: ConfiguredMcpServerCommandLine;
+}
+
+function liveMcpRuntimeChecks(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[];
+  liveProcesses: readonly NexusMcpRuntimeProcess[];
+}): NexusSetupCheckResult[] {
+  const expectedTargets = [
+    ...options.agentMcpTargets.map(agentMcpRuntimeExpectedTarget),
+    ...pluginMcpRuntimeExpectedTargets(options.projectRoot, options.projectConfig),
+  ];
+  const checks: NexusSetupCheckResult[] = [];
+
+  for (const runtimeProcess of options.liveProcesses) {
+    const observedCommandLine = parseMcpProcessCommandLine(
+      runtimeProcess.commandLine,
+    );
+    if (!observedCommandLine) {
+      continue;
+    }
+
+    for (const expectedTarget of expectedTargets) {
+      if (
+        !mcpRuntimeProcessMatchesExpectedTarget(
+          runtimeProcess,
+          observedCommandLine,
+          expectedTarget,
+        )
+      ) {
+        continue;
+      }
+      if (
+        mcpRuntimeCommandLinesEqual(
+          observedCommandLine,
+          expectedTarget.expectedCommandLine,
+        )
+      ) {
+        continue;
+      }
+
+      checks.push({
+        id: `${expectedTarget.id}-${runtimeProcess.pid}`,
+        title: `${expectedTarget.title} live MCP process`,
+        status: "warning",
+        summary:
+          `${expectedTarget.provider} live MCP process ${runtimeProcess.pid} for ${expectedTarget.serverName} is stale or unexpected. ` +
+          `Current: ${formatMcpCommandLine(observedCommandLine)}. Expected: ${formatMcpCommandLine(expectedTarget.expectedCommandLine)}.`,
+        nextAction:
+          `Reload or restart the ${expectedTarget.provider} session so ${expectedTarget.serverName} uses ${formatMcpCommandLine(expectedTarget.expectedCommandLine)}.`,
+      });
+    }
+  }
+
+  return checks;
+}
+
+function agentMcpRuntimeExpectedTarget(
+  target: MaterializedNexusAgentMcpTarget,
+): NexusMcpRuntimeExpectedTarget {
+  return {
+    id: `agent-mcp-live-${setupCheckIdPart(target.agent)}-${setupCheckIdPart(target.serverName)}`,
+    title: `${target.agent} MCP server ${target.serverName}`,
+    agent: target.agent,
+    provider: target.provider,
+    serverName: target.serverName,
+    expectedCommandLine: {
+      command: target.command,
+      args: target.args,
+    },
+  };
+}
+
+function pluginMcpRuntimeExpectedTargets(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusMcpRuntimeExpectedTarget[] {
+  const expectedTargets: NexusMcpRuntimeExpectedTarget[] = [];
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+
+  for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
+    for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
+      const configured = fs.existsSync(target.configPath)
+        ? configuredMcpServerCommandLine({
+            provider: target.provider,
+            configPath: target.configPath,
+            configSchema: target.configSchema,
+            serverName: capability.serverName,
+          })
+        : null;
+      const expectedCommandLine = pluginExpectedMcpCommandLine(capability) ??
+        configured;
+      if (!expectedCommandLine) {
+        continue;
+      }
+
+      expectedTargets.push({
+        id:
+          `plugin-${setupCheckIdPart(plugin.id)}-mcp-live-` +
+          `${setupCheckIdPart(capability.serverName)}-${setupCheckIdPart(target.agent)}`,
+        title: `${target.agent} MCP server ${capability.serverName}`,
+        agent: target.agent,
+        provider: target.provider,
+        serverName: capability.serverName,
+        expectedCommandLine,
+      });
+    }
+  }
+
+  return expectedTargets;
+}
+
 function setupAgentSkillTargets(
   projectConfig: NexusProjectConfig | null,
 ): { agent: string; directory: string }[] {
@@ -1692,6 +1832,269 @@ function mcpCommandsEqual(left: string, right: string): boolean {
 
 function stripWindowsCommandShim(value: string): string {
   return value.toLowerCase().endsWith(".cmd") ? value.slice(0, -4) : value;
+}
+
+function mcpRuntimeProcessMatchesExpectedTarget(
+  runtimeProcess: NexusMcpRuntimeProcess,
+  observed: ConfiguredMcpServerCommandLine,
+  expected: NexusMcpRuntimeExpectedTarget,
+): boolean {
+  if (
+    runtimeProcess.provider &&
+    normalizedProvider(runtimeProcess.provider) !== normalizedProvider(expected.provider)
+  ) {
+    return false;
+  }
+  if (
+    runtimeProcess.serverName &&
+    normalizedProvider(runtimeProcess.serverName) !== normalizedProvider(expected.serverName)
+  ) {
+    return false;
+  }
+  if (runtimeProcess.serverName) {
+    return true;
+  }
+
+  return (
+    mcpRuntimeCommandLinesEqual(observed, expected.expectedCommandLine) ||
+    (
+      mcpRuntimeCommandsRelated(observed.command, expected.expectedCommandLine.command) &&
+      mcpArgsContainSequence(observed.args, expected.expectedCommandLine.args)
+    )
+  );
+}
+
+function mcpRuntimeCommandLinesEqual(
+  left: ConfiguredMcpServerCommandLine,
+  right: ConfiguredMcpServerCommandLine,
+): boolean {
+  return (
+    mcpRuntimeCommandsEqual(left.command, right.command) &&
+    left.args.length === right.args.length &&
+    left.args.every((arg, index) => arg === right.args[index])
+  );
+}
+
+function mcpRuntimeCommandsEqual(left: string, right: string): boolean {
+  if (mcpCommandsEqual(left, right)) {
+    return true;
+  }
+
+  const leftName = normalizedCommandName(left);
+  const rightName = normalizedCommandName(right);
+  if (!commandHasPathSegment(right)) {
+    return leftName === rightName;
+  }
+
+  return normalizeCommandPath(left) === normalizeCommandPath(right);
+}
+
+function mcpRuntimeCommandsRelated(left: string, right: string): boolean {
+  const leftName = normalizedCommandName(left);
+  const rightName = normalizedCommandName(right);
+  return leftName === rightName || leftName.includes(rightName);
+}
+
+function mcpArgsContainSequence(
+  observedArgs: readonly string[],
+  expectedArgs: readonly string[],
+): boolean {
+  if (expectedArgs.length === 0) {
+    return true;
+  }
+
+  let expectedIndex = 0;
+  for (const arg of observedArgs) {
+    if (arg === expectedArgs[expectedIndex]) {
+      expectedIndex += 1;
+      if (expectedIndex === expectedArgs.length) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function parseMcpProcessCommandLine(
+  commandLine: string,
+): ConfiguredMcpServerCommandLine | null {
+  const tokens = shellCommandTokens(commandLine);
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  let command = tokens[0]!;
+  let args = tokens.slice(1);
+  if (isNodeCommand(command) && args.length > 0 && args[0]) {
+    command = args[0]!;
+    args = args.slice(1);
+  }
+
+  return { command, args };
+}
+
+function shellCommandTokens(commandLine: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "\"" | "'" | null = null;
+  let escaped = false;
+
+  for (const char of commandLine.trim()) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/u.test(char)) {
+      if (current) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (escaped) {
+    current += "\\";
+  }
+  if (current) {
+    tokens.push(current);
+  }
+
+  return tokens;
+}
+
+function isNodeCommand(command: string): boolean {
+  const name = normalizedCommandName(command);
+  return name === "node" || name === "node.exe";
+}
+
+function commandHasPathSegment(command: string): boolean {
+  return command.includes("/") || command.includes("\\");
+}
+
+function normalizedCommandName(command: string): string {
+  return stripWindowsCommandShim(commandPathBasename(command)).toLowerCase();
+}
+
+function commandPathBasename(command: string): string {
+  return command.split(/[\\/]/u).filter(Boolean).pop() ?? command;
+}
+
+function normalizeCommandPath(command: string): string {
+  return stripWindowsCommandShim(command.replace(/\\/gu, "/")).toLowerCase();
+}
+
+function normalizedProvider(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function listNexusMcpRuntimeProcesses(options: {
+  platform?: NodeJS.Platform;
+  timeoutMs?: number;
+} = {}): NexusMcpRuntimeProcess[] {
+  const platform = options.platform ?? process.platform;
+  return platform === "win32"
+    ? listWindowsMcpRuntimeProcesses(options.timeoutMs)
+    : listPosixMcpRuntimeProcesses(options.timeoutMs);
+}
+
+function listWindowsMcpRuntimeProcesses(
+  timeoutMs: number | undefined,
+): NexusMcpRuntimeProcess[] {
+  const script = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    "Get-CimInstance Win32_Process |",
+    "Where-Object { $_.CommandLine -match 'mcp' } |",
+    "Select-Object ProcessId, CommandLine |",
+    "ConvertTo-Json -Compress",
+  ].join(" ");
+  const result = childProcess.spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-Command", script],
+    {
+      encoding: "utf8",
+      shell: false,
+      timeout: timeoutMs ?? 2_000,
+      windowsHide: true,
+    },
+  );
+  if (result.status !== 0 || !result.stdout.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(result.stdout) as unknown;
+    const records = Array.isArray(parsed) ? parsed : [parsed];
+    return records.flatMap((record) => {
+      if (!record || typeof record !== "object" || Array.isArray(record)) {
+        return [];
+      }
+      const processId = (record as Record<string, unknown>).ProcessId;
+      const commandLine = (record as Record<string, unknown>).CommandLine;
+      return runtimeProcessRecord(processId, commandLine);
+    });
+  } catch {
+    return [];
+  }
+}
+
+function listPosixMcpRuntimeProcesses(
+  timeoutMs: number | undefined,
+): NexusMcpRuntimeProcess[] {
+  const result = childProcess.spawnSync("ps", ["-axo", "pid=,command="], {
+    encoding: "utf8",
+    shell: false,
+    timeout: timeoutMs ?? 2_000,
+  });
+  if (result.status !== 0) {
+    return [];
+  }
+
+  return result.stdout
+    .split(/\r?\n/u)
+    .flatMap((line) => {
+      const match = /^\s*(\d+)\s+(.+)$/u.exec(line);
+      if (!match?.[1] || !match[2] || !/\bmcp\b|mcp-stdio/u.test(match[2])) {
+        return [];
+      }
+      return runtimeProcessRecord(Number(match[1]), match[2]);
+    });
+}
+
+function runtimeProcessRecord(
+  processId: unknown,
+  commandLine: unknown,
+): NexusMcpRuntimeProcess[] {
+  const pid = Number(processId);
+  if (
+    !Number.isInteger(pid) ||
+    pid <= 0 ||
+    typeof commandLine !== "string" ||
+    commandLine.trim().length === 0
+  ) {
+    return [];
+  }
+
+  return [{ pid, commandLine: commandLine.trim() }];
 }
 
 function formatMcpCommandLine(commandLine: ConfiguredMcpServerCommandLine): string {

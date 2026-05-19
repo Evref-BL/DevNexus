@@ -4,6 +4,7 @@ import path from "node:path";
 import childProcess from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  buildNexusMcpRuntimeFreshnessChecks,
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -53,6 +54,7 @@ function writeProject(root: string, overrides: Partial<NexusProjectConfig> = {})
     path.join(root, "dev-nexus.project.json"),
     `${JSON.stringify(config, null, 2)}\n`,
   );
+  return config;
 }
 
 function writeHome(root: string, authProfiles: unknown[] = []) {
@@ -1131,6 +1133,46 @@ describe("nexus setup assistant", () => {
     ).toContain(
       `Expected: "${process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus"}" "mcp-stdio"`,
     );
+  });
+
+  it("warns when a live MCP process still uses a stale command line", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-live-mcp-stale-");
+    const config = writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const checks = buildNexusMcpRuntimeFreshnessChecks({
+      projectRoot,
+      projectConfig: config,
+      liveProcesses: [
+        {
+          pid: 4242,
+          commandLine: "old-dev-nexus mcp-stdio",
+        },
+      ],
+    });
+
+    expect(checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-live-codex-dev_nexus-4242",
+        status: "warning",
+        summary: expect.stringContaining("live MCP process 4242"),
+        nextAction: expect.stringContaining("Reload or restart"),
+      }),
+    );
+    expect(
+      checks.find((item) => item.id === "agent-mcp-live-codex-dev_nexus-4242")
+        ?.summary,
+    ).toContain('Current: "old-dev-nexus" "mcp-stdio"');
   });
 
   it("lists OpenCode and manual provider MCP targets in setup guidance and checks", () => {

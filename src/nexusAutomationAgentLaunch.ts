@@ -52,7 +52,10 @@ import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
-import { buildNexusMcpRuntimeFreshnessChecks } from "./nexusSetupAssistant.js";
+import {
+  buildNexusMcpRuntimeFreshnessChecks,
+  type NexusMcpRuntimeProcess,
+} from "./nexusSetupAssistant.js";
 import {
   preflightNexusNpmRuntimeInstall,
   type NexusNpmRuntimeCommandRunner,
@@ -281,6 +284,7 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   gitRunner?: GitRunner;
   publicationActorRunner?: NexusPublicationActorRunner;
   runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
+  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
 }
@@ -521,6 +525,7 @@ export async function runNexusAutomationAgentLaunchOnce(
         componentProviders,
         automationConfig,
         runtimePackageCommandRunner: options.runtimePackageCommandRunner,
+        mcpRuntimeProcesses: options.mcpRuntimeProcesses,
       }),
       ...publicationPreflightChecks(publication),
     ];
@@ -890,6 +895,7 @@ export function preflightNexusAutomationAgentLaunch(options: {
   componentProviders: NexusAutomationAgentLaunchComponentProvider[];
   automationConfig: NexusAutomationConfig;
   runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
+  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
 }): NexusAutomationPreflightCheck[] {
   return [
     ...preflightNexusAutomationAgentPolicy(options.automationConfig),
@@ -903,7 +909,10 @@ export function preflightNexusAutomationAgentLaunch(options: {
           })
       : []),
     ...(options.projectRoot
-      ? preflightNexusMcpRuntimeFreshness(options.projectRoot)
+      ? preflightNexusMcpRuntimeFreshness({
+          projectRoot: options.projectRoot,
+          liveProcesses: options.mcpRuntimeProcesses,
+        })
       : []),
     check(
       "workTracking",
@@ -930,20 +939,23 @@ export function preflightNexusAutomationAgentLaunch(options: {
   ];
 }
 
-function preflightNexusMcpRuntimeFreshness(
-  projectRoot: string,
-): NexusAutomationPreflightCheck[] {
+function preflightNexusMcpRuntimeFreshness(options: {
+  projectRoot: string;
+  liveProcesses?: readonly NexusMcpRuntimeProcess[] | false;
+}): NexusAutomationPreflightCheck[] {
   try {
-    const projectConfig = loadProjectConfig(projectRoot);
-    return buildNexusMcpRuntimeFreshnessChecks({ projectRoot, projectConfig }).map(
-      (freshnessCheck) => ({
+    const projectConfig = loadProjectConfig(options.projectRoot);
+    return buildNexusMcpRuntimeFreshnessChecks({
+      projectRoot: options.projectRoot,
+      projectConfig,
+      liveProcesses: options.liveProcesses,
+    }).map((freshnessCheck) => ({
         name: `mcpRuntime:${freshnessCheck.id}`,
         status: "failed",
         message: freshnessCheck.nextAction
           ? `${freshnessCheck.summary} ${freshnessCheck.nextAction}`
           : freshnessCheck.summary,
-      }),
-    );
+      }));
   } catch (error) {
     return [{
       name: "mcpRuntime:freshness",

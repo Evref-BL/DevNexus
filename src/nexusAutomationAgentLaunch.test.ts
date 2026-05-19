@@ -953,6 +953,65 @@ describe("nexus automation agent launch", () => {
     );
   });
 
+  it("blocks coordinator launch when live MCP processes are stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        mcp: {
+          agentTargets: [{ agent: "codex" }],
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs fresh live MCP runtime",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-live-mcp-freshness-preflight",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      mcpRuntimeProcesses: [
+        {
+          pid: 4242,
+          commandLine: "old-dev-nexus mcp-stdio",
+        },
+      ],
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: expect.stringContaining("live MCP process 4242"),
+      contextFile: null,
+      resultFile: null,
+      launch: null,
+    });
+    expect(result.preflight).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "mcpRuntime:agent-mcp-live-codex-dev_nexus-4242",
+          status: "failed",
+          message: expect.stringContaining("Reload or restart"),
+        }),
+      ]),
+    );
+  });
+
   it("blocks before launching when project-local runtime npm packages are damaged and repair is not approved", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
