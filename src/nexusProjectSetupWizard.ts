@@ -18,6 +18,7 @@ import {
   type NexusProjectConfig,
   type NexusProjectWorkTrackerBindingConfig,
 } from "./nexusProjectConfig.js";
+import { analyzeNexusProjectSetupComponentTopology } from "./nexusProjectComponentTopology.js";
 import {
   defaultProjectGitRunner,
   pathForProjectConfig,
@@ -111,13 +112,13 @@ export function readNexusProjectSetupAnswersFile(
 export function previewNexusProjectSetup(
   answers: NexusProjectSetupAnswers,
 ): NexusProjectSetupProposal {
-  return buildNexusProjectSetupProposal(answers);
+  return withTopologyDiagnostics(buildNexusProjectSetupProposal(answers));
 }
 
 export async function applyNexusProjectSetup(
   options: ApplyNexusProjectSetupOptions,
 ): Promise<NexusProjectSetupApplyResult> {
-  const proposal = buildNexusProjectSetupProposal(options.answers);
+  const proposal = previewNexusProjectSetup(options.answers);
   if (proposal.status !== "ready") {
     throw new Error(
       `project setup proposal is blocked: ${proposal.diagnostics
@@ -237,7 +238,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
     },
     worktreesRoot: "worktrees",
     components: answers.components.map((component) =>
-      projectComponentFromSetupAnswers(projectRoot, component, {
+      buildNexusProjectComponentConfigFromSetupAnswers(projectRoot, component, {
         localWorkTracking,
         publication: answers.publication,
       }),
@@ -311,6 +312,28 @@ export function renderNexusProjectSetupRequiredAnswers(): string {
     "Required answer paths:",
     ...nexusProjectSetupRequiredAnswerPaths.map((answer) => `- ${answer}`),
   ].join("\n");
+}
+
+function withTopologyDiagnostics(
+  proposal: NexusProjectSetupProposal,
+): NexusProjectSetupProposal {
+  const topology = analyzeNexusProjectSetupComponentTopology(proposal.answers);
+  const diagnostics = [
+    ...proposal.diagnostics,
+    ...topology.diagnostics.map((diagnostic) => ({
+      severity: diagnostic.severity,
+      path: diagnostic.path,
+      message: diagnostic.message,
+    })),
+  ];
+
+  return {
+    ...proposal,
+    status: diagnostics.some((diagnostic) => diagnostic.severity === "error")
+      ? "blocked"
+      : proposal.status,
+    diagnostics,
+  };
 }
 
 async function promptForNexusProjectSetupAnswers(options: {
@@ -411,7 +434,7 @@ function applyNexusProjectSetupAnswerOverrides(
   };
 }
 
-function projectComponentFromSetupAnswers(
+export function buildNexusProjectComponentConfigFromSetupAnswers(
   projectRoot: string,
   component: NexusProjectSetupAnswers["components"][number],
   options: {
@@ -514,7 +537,7 @@ function componentSourceRoot(
     : path.resolve(projectRoot, sourcePath);
 }
 
-async function ensureLocalTrackerStores(options: {
+export async function ensureLocalTrackerStores(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
 }): Promise<string[]> {

@@ -190,6 +190,13 @@ import {
   type NexusProjectSetupProposal,
 } from "./nexusProjectSetupWizard.js";
 import {
+  applyNexusProjectComponentAdd,
+  previewNexusProjectComponentAdd,
+  readNexusProjectComponentAddAnswersFile,
+  type NexusProjectComponentAddApplyResult,
+  type NexusProjectComponentAddProposal,
+} from "./nexusProjectComponentAdd.js";
+import {
   applyNexusProjectHosting,
   planNexusProjectHosting,
   statusNexusProjectHosting,
@@ -335,6 +342,15 @@ interface ParsedProjectSetupCommand {
   projectRoot?: string;
   homePath?: string;
   answersPath?: string;
+  yes?: boolean;
+  dryRun?: boolean;
+  json?: boolean;
+}
+
+interface ParsedProjectComponentAddCommand {
+  projectRoot: string;
+  homePath?: string;
+  answersPath: string;
   yes?: boolean;
   dryRun?: boolean;
   json?: boolean;
@@ -829,6 +845,7 @@ export function usage(): string {
     "  dev-nexus home init [home-path] [options]",
     "  dev-nexus project create <name> [options]",
     "  dev-nexus project setup [project-root] [options]",
+    "  dev-nexus project component add <project-root> [options]",
     "  dev-nexus project import <source-root> [options]",
     "  dev-nexus project list [options]",
     "  dev-nexus project status <project-id-or-root> [options]",
@@ -905,6 +922,13 @@ export function usage(): string {
     "  --home <path>",
     "  --answers <json-file>     setup answers; required in non-interactive mode",
     "  --yes                     apply local setup writes after preview validation",
+    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --json",
+    "",
+    "Options for project component add:",
+    "  --answers <json-file>     component answers with one or more components",
+    "  --home <path>",
+    "  --yes                     apply local project config/scaffold writes after preview validation",
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
@@ -1423,6 +1447,10 @@ async function handleProjectCommand(
     return proposal.status === "ready" ? 0 : 2;
   }
 
+  if (command === "component") {
+    return handleProjectComponentCommand(argv, dependencies);
+  }
+
   if (command === "import") {
     const parsed = parseProjectImportCommand(argv);
     const result = importNexusProject({
@@ -1469,7 +1497,42 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, setup, import, list, status, hosting, mcp, or tracker");
+  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, or tracker");
+}
+
+async function handleProjectComponentCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const subcommand = argv[2];
+  if (subcommand !== "add") {
+    throw new Error("project component requires add");
+  }
+
+  const parsed = parseProjectComponentAddCommand(argv);
+  const answers = readNexusProjectComponentAddAnswersFile(parsed.answersPath);
+  const proposal = previewNexusProjectComponentAdd({
+    projectRoot: parsed.projectRoot,
+    answers,
+  });
+  if (parsed.yes) {
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: parsed.projectRoot,
+      command: "project component add",
+      mutationClass: "project_state",
+      targetPath: parsed.projectRoot,
+    });
+    const result = await applyNexusProjectComponentAdd({
+      projectRoot: parsed.projectRoot,
+      answers,
+      ...(parsed.homePath ? { homePath: resolvedCommandHomePath(parsed.homePath) } : {}),
+    });
+    printProjectComponentAddApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  printProjectComponentAddPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
+  return proposal.status === "ready" ? 0 : 2;
 }
 
 async function handleProjectHostingCommand(
@@ -3352,6 +3415,59 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
   }
 
   return parsed;
+}
+
+function parseProjectComponentAddCommand(argv: string[]): ParsedProjectComponentAddCommand {
+  const rest = argv.slice(3);
+  const parsed: Partial<ParsedProjectComponentAddCommand> = {};
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    if (!arg.startsWith("--") && !parsed.projectRoot) {
+      parsed.projectRoot = arg;
+      continue;
+    }
+
+    switch (arg) {
+      case "--answers":
+        parsed.answersPath = next();
+        break;
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--yes":
+        parsed.yes = true;
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project component add option: ${arg}`);
+    }
+  }
+
+  if (!parsed.projectRoot) {
+    throw new Error("project component add requires <project-root>");
+  }
+  if (!parsed.answersPath) {
+    throw new Error("project component add requires --answers <json-file>");
+  }
+  if (parsed.yes && parsed.dryRun) {
+    throw new Error("project component add --yes and --dry-run are mutually exclusive");
+  }
+
+  return parsed as ParsedProjectComponentAddCommand;
 }
 
 function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
@@ -5992,6 +6108,79 @@ function printProjectSetupApplyResult(
   for (const action of payload.nextActions) {
     writeLine(stdout, `  Next: ${action}`);
   }
+}
+
+function printProjectComponentAddPreviewResult(
+  proposal: NexusProjectComponentAddProposal,
+  parsed: ParsedProjectComponentAddCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: proposal.status === "ready",
+    applied: false,
+    proposal,
+    nextAction: proposal.status === "ready"
+      ? "Review the component topology preview, then rerun with --yes to update the project."
+      : "Fix the reported component topology diagnostics before applying.",
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, renderProjectComponentAddSummary(proposal));
+  writeLine(stdout, "");
+  writeLine(stdout, payload.nextAction);
+}
+
+function printProjectComponentAddApplyResult(
+  result: NexusProjectComponentAddApplyResult,
+  parsed: ParsedProjectComponentAddCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    applied: true,
+    projectRoot: result.projectRoot,
+    projectConfigPath: result.projectConfigPath,
+    addedComponentIds: result.proposal.addedComponentIds,
+    proposal: result.proposal,
+    writtenFiles: result.writtenFiles,
+    ensuredLocalTrackerStores: result.ensuredLocalTrackerStores,
+    nextActions: [
+      "Run dev-nexus project status <project-root> to inspect the updated component graph.",
+      "Run dev-nexus setup check <project-root> join-existing-project to verify local readiness.",
+      "Create component-scoped work items with --component <component-id>.",
+    ],
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project components added.");
+  writeLine(stdout, `  Root: ${result.projectRoot}`);
+  writeLine(stdout, `  Added: ${result.proposal.addedComponentIds.join(", ")}`);
+  for (const action of payload.nextActions) {
+    writeLine(stdout, `  Next: ${action}`);
+  }
+}
+
+function renderProjectComponentAddSummary(
+  proposal: NexusProjectComponentAddProposal,
+): string {
+  const lines = [
+    `Project component add proposal: ${proposal.project.name} (${proposal.project.id})`,
+    `Root: ${proposal.projectRoot}`,
+    `Existing components: ${proposal.existingComponentIds.join(", ") || "none"}`,
+    `Added components: ${proposal.addedComponentIds.join(", ") || "none"}`,
+    `Diagnostics: ${proposal.diagnostics.length}`,
+  ];
+  for (const diagnostic of proposal.diagnostics) {
+    lines.push(`- [${diagnostic.severity}] ${diagnostic.path}: ${diagnostic.message}`);
+  }
+
+  return lines.join("\n");
 }
 
 function printProjectImportResult(

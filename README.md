@@ -66,6 +66,18 @@ repository if the goal is one DevNexus project with several components; use
 `project setup` with multiple component answers instead. The full example is
 in [Getting started](docs/user/getting-started.md#first-project-from-existing-components).
 
+To add components later without manual JSON editing, preview and apply a
+component answer file:
+
+```bash
+dev-nexus project component add "$HOME/dev-nexus/example-suite" --answers ./component-add.json --json
+dev-nexus project component add "$HOME/dev-nexus/example-suite" --answers ./component-add.json --yes
+```
+
+Setup and component-add previews warn about common topology mistakes, including
+container folders with nested repositories, non-Git folders, branch or remote
+drift, and source roots placed under generated `worktrees/`.
+
 List registered projects:
 
 ```bash

@@ -46,6 +46,8 @@ Use the nouns precisely:
 dev-nexus home init <home-path>
 dev-nexus project setup <project-root> --home <home-path> --answers <answers.json>
 dev-nexus project setup <project-root> --home <home-path> --answers <answers.json> --yes
+dev-nexus project component add <project-root> --answers <answers.json>
+dev-nexus project component add <project-root> --answers <answers.json> --yes
 dev-nexus project create <name> --home <home-path>
 dev-nexus project import <source-root> --home <home-path> --name <name>
 dev-nexus project list --home <home-path>
@@ -289,6 +291,42 @@ The preview reports local writes and next-phase provider work. The apply step
 writes `dev-nexus.project.json`, `.dev-nexus/` support files, `AGENTS.md`,
 project-local agent MCP configuration, local tracker stores, and home registry
 state. It does not create or modify provider repositories.
+
+To add components later, use the same preview/apply pattern instead of editing
+`dev-nexus.project.json` by hand:
+
+```json
+{
+  "components": [
+    {
+      "id": "dataset-tools",
+      "name": "Dataset Tools",
+      "role": "dependency",
+      "source": {
+        "kind": "clone_project_local",
+        "remoteUrl": "git@github.com:Example/dataset-tools.git",
+        "path": "components/dataset-tools",
+        "defaultBranch": "main"
+      }
+    }
+  ],
+  "localWorkTracking": {
+    "enabled": true,
+    "provider": "local"
+  }
+}
+```
+
+```bash
+dev-nexus project component add "$HOME/dev-nexus/graphrag-research-suite" --answers ./component-add.json --json
+dev-nexus project component add "$HOME/dev-nexus/graphrag-research-suite" --answers ./component-add.json --yes
+```
+
+Both setup and component-add previews analyze component topology before
+writing. They report when a path is a container folder with nested
+repositories, when an existing source is not a Git repository, when the
+declared branch or remote does not match the checkout, and when a stable
+component source root is inside generated `worktrees/`.
 
 Use absolute existing paths only when you deliberately want DevNexus to
 reference those external checkouts in place. The project-local default is to

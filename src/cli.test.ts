@@ -304,6 +304,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
     expect(output.output()).toContain("dev-nexus project setup");
+    expect(output.output()).toContain("dev-nexus project component add");
     expect(output.output()).toContain("dev-nexus project hosting status");
     expect(output.output()).toContain("dev-nexus project hosting plan");
     expect(output.output()).toContain("dev-nexus project hosting apply");
@@ -1218,6 +1219,137 @@ describe("dev-nexus cli", () => {
         projectRoot,
       }),
     ]);
+  });
+
+  it("previews and applies component add from an answer file", async () => {
+    const projectRoot = makeTempDir("dev-nexus-component-add-");
+    const homePath = makeTempDir("dev-nexus-component-add-home-");
+    const primaryRoot = path.join(projectRoot, "components", "primary");
+    const addonRoot = path.join(projectRoot, "components", "addon");
+    fs.mkdirSync(primaryRoot, { recursive: true });
+    fs.mkdirSync(addonRoot, { recursive: true });
+    const setupAnswersPath = path.join(projectRoot, "setup.json");
+    fs.writeFileSync(
+      setupAnswersPath,
+      `${JSON.stringify({
+        home: {
+          path: homePath,
+        },
+        project: {
+          id: "component-add-demo",
+          name: "Component Add Demo",
+          root: projectRoot,
+        },
+        components: [
+          {
+            id: "primary",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: "components/primary",
+            },
+          },
+        ],
+        agentTargets: [
+          {
+            provider: "codex",
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+        },
+      }, null, 2)}\n`,
+    );
+    const componentAnswersPath = path.join(projectRoot, "component-add.json");
+    fs.writeFileSync(
+      componentAnswersPath,
+      `${JSON.stringify({
+        components: [
+          {
+            id: "addon",
+            name: "Addon",
+            role: "addon",
+            source: {
+              kind: "reference_existing",
+              path: "components/addon",
+            },
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+        },
+      }, null, 2)}\n`,
+    );
+
+    const setupOutput = captureOutput();
+    await expect(
+      main([
+        "project",
+        "setup",
+        projectRoot,
+        "--answers",
+        setupAnswersPath,
+        "--yes",
+        "--json",
+      ], { stdout: setupOutput.writer }),
+    ).resolves.toBe(0);
+
+    const previewOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "project",
+          "component",
+          "add",
+          projectRoot,
+          "--answers",
+          componentAnswersPath,
+          "--json",
+        ],
+        { stdout: previewOutput.writer },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(previewOutput.output())).toMatchObject({
+      ok: true,
+      applied: false,
+      proposal: {
+        addedComponentIds: ["addon"],
+      },
+    });
+    expect(loadProjectConfig(projectRoot).components.map((component) => component.id))
+      .toEqual(["primary"]);
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "project",
+          "component",
+          "add",
+          projectRoot,
+          "--answers",
+          componentAnswersPath,
+          "--yes",
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(applyOutput.output())).toMatchObject({
+      ok: true,
+      applied: true,
+      addedComponentIds: ["addon"],
+    });
+    expect(loadProjectConfig(projectRoot).components.map((component) => component.id))
+      .toEqual(["primary", "addon"]);
+    expect(
+      loadLocalWorkTrackingStore(
+        path.join(projectRoot, ".dev-nexus", "work-items", "addon.json"),
+      ).items,
+    ).toEqual([]);
   });
 
   it("initializes a home and manages projects through the CLI", async () => {
