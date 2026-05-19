@@ -1,7 +1,61 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T22:25:40.000Z",
+  "updatedAt": "2026-05-19T22:43:01.076Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-772993ca1cbeb853",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-167",
+      "branchName": "codex/dev-nexus/local-167-version-planning-config",
+      "baseRef": "bot/codex/dev-nexus/local-167-version-planning-config",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-167-version-planning-config"
+      },
+      "writeScope": [
+        "src/nexusVersionPlanningConfig.ts",
+        "src/nexusVersionPlanningConfig.test.ts",
+        "src/nexusProjectConfig.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T22:33:26.263Z",
+      "lastSeenAt": "2026-05-19T22:43:01.076Z",
+      "updatedAt": "2026-05-19T22:43:01.076Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "3520ac67b878c6fd90fb8b5e5331ffedf8820fc1",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-167-version-planning-config"
+        },
+        "upstream": "bot/codex/dev-nexus/local-167-version-planning-config",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: npm run check passed locally; PR #15 passed Node 24 checks on ubuntu-latest, windows-latest, and macos-latest; merged to main at 0325f8e.",
+        "Integration preference: merged via GitHub PR #15"
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

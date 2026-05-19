@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 355,
-  "updatedAt": "2026-05-19T22:24:42.171Z",
+  "nextCommentNumber": 358,
+  "updatedAt": "2026-05-19T22:43:08.733Z",
   "items": [
     {
       "id": "local-1",
@@ -4311,7 +4311,7 @@
       "id": "local-167",
       "title": "Add version planning config model and validation",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: add the first read-only DevNexus version planning configuration model without changing work-item statuses, publication authority, or release automation.\n\nAcceptance criteria:\n- Define a version planning model that can be stored in project configuration or automation target configuration and serialized deterministically.\n- Validate and normalize version id, objective, owning components, target branch, scope entries, readiness gates, and release policy fields.\n- Support scope references by explicit work item, label, milestone, and tracker query descriptor without requiring provider-native rich version objects.\n- Preserve milestone compatibility for providers that support milestones while allowing label or explicit-link fallback for providers that do not.\n- Produce clear validation diagnostics for invalid scope status, missing component references, invalid readiness gates, and unsupported release policy fields.\n- Do not add live provider writes, release tagging, package publishing, or merge automation.\n\nVerification:\n- Focused unit tests for valid and invalid version config examples.\n- Serialization stability coverage for the normalized config shape.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4323,8 +4323,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:21:41.803Z",
-      "updatedAt": "2026-05-19T22:21:41.803Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T22:43:01.114Z",
+      "closedAt": "2026-05-19T22:41:58.316Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4336,20 +4336,19 @@
       "id": "local-168",
       "title": "Resolve version scope from work items and tracker fields",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: resolve normalized version scope into concrete component work-item references using existing work-tracker fields and provider-compatible grouping conventions.\n\nAcceptance criteria:\n- Resolve explicit component/work-item refs, labels, milestones, and tracker-query descriptors into version-scoped work items using mocked local and provider-backed tracker data.\n- Represent scope status as committed, candidate, stretch, deferred, or excluded without replacing the work item status field.\n- Deduplicate linked or mirrored tracker items using existing work-item link and canonical reference behavior where available.\n- Treat unsupported provider capabilities, missing milestones, and unresolved references as warnings in the scope result rather than crashes.\n- Keep provider reads mocked or injected for tests; do not add live provider writes or import-first requirements.\n\nVerification:\n- Focused unit tests for explicit refs, labels, milestones, tracker-query descriptors, dedupe, unsupported milestones, and unresolved references.\n- Regression coverage that normal eligible-work discovery still works without a version config.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
         "version-planning",
         "scope",
         "trackers",
-        "dependent",
         "afk"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:21:49.146Z",
-      "updatedAt": "2026-05-19T22:21:49.146Z",
+      "updatedAt": "2026-05-19T22:43:08.733Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -8764,8 +8763,43 @@
       }
     ],
     "local-166": [],
-    "local-167": [],
-    "local-168": [],
+    "local-167": [
+      {
+        "id": "local-comment-355",
+        "body": "Completed in DevNexus source PR #15. Added read-only version planning configuration model and validation, exported it from the package surface, and integrated project-config support. Verification passed locally with npm test -- src/nexusVersionPlanningConfig.test.ts, npm run build, npm test -- src/nexusProjectConfig.test.ts src/nexusVersionPlanningConfig.test.ts, npm run check, and git diff --check. GitHub CI for PR #15 passed Node 24 checks on ubuntu-latest, windows-latest, and macos-latest before merge to main at 0325f8e.",
+        "author": null,
+        "createdAt": "2026-05-19T22:41:59.134Z",
+        "updatedAt": "2026-05-19T22:41:59.134Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-355"
+        }
+      },
+      {
+        "id": "local-comment-356",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-167-version-planning-config\nHead: 3520ac67b878c6fd90fb8b5e5331ffedf8820fc1\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T22:43:01.076Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-167\",\n  \"logicalItemId\": \"local-167\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-167\",\n    \"itemNumber\": 167,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-167\",\n      \"itemNumber\": 167\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-167\",\n    \"itemNumber\": 167,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-167\",\n      \"itemNumber\": 167\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-167\",\n      \"itemNumber\": 167,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-167\",\n        \"itemNumber\": 167\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-167-version-planning-config\",\n  \"branch\": \"codex/dev-nexus/local-167-version-planning-config\",\n  \"upstream\": \"bot/codex/dev-nexus/local-167-version-planning-config\",\n  \"baseRef\": \"bot/codex/dev-nexus/local-167-version-planning-config\",\n  \"headCommit\": \"3520ac67b878c6fd90fb8b5e5331ffedf8820fc1\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusVersionPlanningConfig.ts\",\n    \"src/nexusVersionPlanningConfig.test.ts\",\n    \"src/nexusProjectConfig.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Implemented read-only version planning config model in DevNexus source.\",\n    \"Published through green-main PR #15 after required GitHub Actions checks passed.\",\n    \"No provider writes, release tagging, package publishing, or merge automation were added.\"\n  ],\n  \"verificationSummary\": \"npm run check passed locally; PR #15 passed Node 24 checks on ubuntu-latest, windows-latest, and macos-latest; merged to main at 0325f8e.\",\n  \"integrationPreference\": \"merged via GitHub PR #15\",\n  \"note\": null,\n  \"leaseId\": \"lease-772993ca1cbeb853\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T22:43:01.114Z",
+        "updatedAt": "2026-05-19T22:43:01.114Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-356"
+        }
+      }
+    ],
+    "local-168": [
+      {
+        "id": "local-comment-357",
+        "body": "Promoted to ready after dev-nexus:local-167 landed through PR #15. The version planning config model is now available on DevNexus main at 0325f8e, so this scope-resolution slice can build on the normalized config shape.",
+        "author": null,
+        "createdAt": "2026-05-19T22:43:08.733Z",
+        "updatedAt": "2026-05-19T22:43:08.733Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-357"
+        }
+      }
+    ],
     "local-169": [],
     "local-170": [],
     "local-171": []

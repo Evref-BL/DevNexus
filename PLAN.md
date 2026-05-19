@@ -72,8 +72,9 @@ target-cycle facts, commits, and the target report.
   webhook/poll/manual replay rollout, dedupe/backoff, and failure-to-work-item
   mapping. Version-scoped planning follow-up from
   `docs/version-scoped-planning-prd.md` has been sliced by
-  `dev-nexus:local-165`; promote `dev-nexus:local-167` first, then
-  `local-168` through `local-171` in dependency order.
+  `dev-nexus:local-165`; `dev-nexus:local-167` is complete, and
+  `dev-nexus:local-168` is now ready. Continue `local-168` through
+  `local-171` in dependency order.
 - Continue remote-host execution after the durable `dev-nexus:local-81`
   request/result record model; keep host checks, SSH transport, and live
   verification execution ordered behind explicit runner policy.
