@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 335,
-  "updatedAt": "2026-05-19T17:30:40.956Z",
+  "nextCommentNumber": 336,
+  "updatedAt": "2026-05-19T17:46:37.342Z",
   "items": [
     {
       "id": "local-1",
@@ -4016,7 +4016,7 @@
       "id": "local-156",
       "title": "Implement guided local project setup wizard",
       "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nA first-time user or agent needs one guided local entry point after installation. Today the user must infer how to combine home init, project create/import, tracker configure, MCP refresh, skills projection, and next-step advice.\n\nAcceptance criteria:\n- Add `dev-nexus project setup` as the guided local project creation/configuration command.\n- In TTY mode, ask concise Gradle-style prompts with safe defaults; in non-TTY/agent mode, fail with a structured list of required answers or accept an answer file/JSON input.\n- Collect home path, project identity, project root, components, local source strategy, primary component, agent targets, local tracker choice, and whether to record hosting intent.\n- Show a local-write preview before mutating files; provider mutations are not executed by this command.\n- Create/regenerate the project scaffold, local tracker stores, agent support files, MCP config, and AGENTS.md/skill projections expected for the selected agent targets.\n- The flow is idempotent enough to resume or repair a partially scaffolded project.\n\nVerification:\n- CLI tests for interactive defaults and non-interactive JSON/error behavior.\n- Fake project smoke covering new-project and existing-directory setup.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4029,8 +4029,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:22:54.153Z",
-      "updatedAt": "2026-05-19T17:22:54.153Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T17:46:37.342Z",
+      "closedAt": "2026-05-19T17:46:37.342Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8260,7 +8260,19 @@
         }
       }
     ],
-    "local-156": [],
+    "local-156": [
+      {
+        "id": "local-comment-335",
+        "body": "Implemented guided `dev-nexus project setup` in DevNexus source commit `85206d98c5b68de628d13df8af9981a9de22fdc1` and pushed it to `bot/main`.\n\nCovered non-interactive structured required-answer errors, answer-file preview/apply, local-only setup writes, local tracker store creation, AGENTS.md/MCP support projection, and first-project documentation. Verification passed: `npm run build`; `npm test -- src/cli.test.ts src/nexusProjectSetupModel.test.ts`; `npm run check`; `git diff --check HEAD~1..HEAD`.",
+        "author": null,
+        "createdAt": "2026-05-19T17:46:33.032Z",
+        "updatedAt": "2026-05-19T17:46:33.032Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-335"
+        }
+      }
+    ],
     "local-157": [],
     "local-158": [],
     "local-159": [],

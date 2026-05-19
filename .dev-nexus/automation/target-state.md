@@ -68,7 +68,10 @@ and ready for coordinator-driven work across its components.
   foundation `dev-nexus:local-155` is published as `b941546` for the typed
   project setup answer/proposal model, explicit mutation classification, local
   setup versus hosting handoff separation, JSON-safe proposal rendering, and
-  secret diagnostics.
+  secret diagnostics. `dev-nexus:local-156` is published as `85206d9` for the
+  guided `dev-nexus project setup` CLI, non-interactive answer-file preview
+  and apply flow, local scaffold/tracker/agent support generation, and
+  first-project onboarding documentation.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -308,12 +311,11 @@ and ready for coordinator-driven work across its components.
   re-check eligible work and either promote the next dependency-satisfied
   bounded slice or record the blocker that keeps remaining items out of ready
   state.
-- Continue first-user onboarding from the now-complete setup proposal model:
-  next implementation slices are `dev-nexus:local-156` for the guided local
-  setup wizard, `local-157` for component topology/component-add, `local-158`
-  for auth-profile inventory, `local-159` for hosting-intent handoff,
-  `local-160` for readiness reporting, and `local-161` for installed CLI versus
-  docs version-skew diagnostics.
+- Continue first-user onboarding from the now-complete setup proposal model and
+  guided setup CLI: next implementation slices are `dev-nexus:local-157` for
+  component topology/component-add, `local-158` for auth-profile inventory,
+  `local-159` for hosting-intent handoff, `local-160` for readiness reporting,
+  and `local-161` for installed CLI versus docs version-skew diagnostics.
 
 ## Boundaries
 
