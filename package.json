@@ -28,7 +28,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test && npm run check:plugins",
+    "check:plugins": "npm --prefix plugins/dev-nexus-research run check"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
