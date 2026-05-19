@@ -12,6 +12,7 @@ import {
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
+  shellQuoteArgument,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectHostingProviderAdapter,
@@ -1419,8 +1420,8 @@ describe("dev-nexus cli", () => {
     });
     expect(applied.nextActions).toEqual([
       `Open the DevNexus project root in the configured agent application: ${projectRoot}`,
-      `Run dev-nexus setup check ${projectRoot} join-existing-project --json.`,
-      `Run dev-nexus project hosting status ${projectRoot} --home ${homePath} --json when hosting intent is configured.`,
+      `Run dev-nexus setup check ${shellQuoteArgument(projectRoot)} join-existing-project --json.`,
+      `Run dev-nexus project hosting status ${shellQuoteArgument(projectRoot)} --home ${shellQuoteArgument(homePath)} --json when hosting intent is configured.`,
     ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(true);
