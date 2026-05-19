@@ -511,8 +511,11 @@ describe("nexus automation agent launch", () => {
           components: [
             {
               componentId: "primary",
-              keyAllowedActions: expect.arrayContaining([
+              blockedActions: expect.arrayContaining([
                 "git.push_target_branch",
+              ]),
+              fallbackActions: expect.arrayContaining([
+                "provider.pull_request.open",
               ]),
               summary: expect.stringContaining("actor=example-bot-actor"),
             },
