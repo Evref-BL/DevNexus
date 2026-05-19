@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 154,
-  "nextCommentNumber": 331,
-  "updatedAt": "2026-05-19T12:47:15.324Z",
+  "nextCommentNumber": 333,
+  "updatedAt": "2026-05-19T14:26:04.436Z",
   "items": [
     {
       "id": "local-1",
@@ -3626,7 +3626,7 @@
       "id": "local-141",
       "title": "Make project create/import scaffold failures recoverable",
       "description": "Type: project lifecycle reliability defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved failure:\nA DevNexus-Pharo scaffold error during project import left a partially initialized project root containing `.git`, `dev-nexus.project.json`, and `plexus.project.json`, but no completed AGENTS setup and no usable registry entry. Manual cleanup/repair and re-import were required.\n\nCurrent evidence:\n- `src/nexusProjectOperations.ts` writes the project root, initializes Git, saves `dev-nexus.project.json`, and then calls `scaffoldNexusProject(...)`.\n- If an extension `installProjectFiles` hook throws, the root can remain ambiguous: not empty, not fully registered, and not clearly resumable.\n\nGoal:\nMake create/import failures during scaffold extension setup atomic enough that users do not need manual repair, or explicitly resumable with a first-class repair/retry path.\n\nAcceptance criteria:\n- A throwing scaffold extension during project create does not leave an ambiguous partial project root, or leaves a documented resumable state with a clear repair/retry command.\n- A throwing scaffold extension during project import has the same recoverable behavior and does not register a completed project reference.\n- Existing source checkout imports remain non-destructive; rollback must not delete or mutate the imported source checkout.\n- Error output names the failed extension/scaffold phase and the safe next action.\n- Tests cover create and import with a scaffold extension that throws after initial files would otherwise have been written.\n\nBoundaries:\n- Keep plugin-specific template behavior out of DevNexus core.\n- Do not make DevNexus choose or supervise implementation work; this is only project lifecycle robustness.\n\nVerification:\n- Focused `nexusProjectOperations` create/import failure tests.\n- `npm run check` in DevNexus when feasible.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3639,8 +3639,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T20:55:33.885Z",
-      "updatedAt": "2026-05-18T20:55:33.885Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T14:26:04.435Z",
+      "closedAt": "2026-05-19T14:26:04.435Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7732,7 +7732,30 @@
         }
       }
     ],
-    "local-141": [],
+    "local-141": [
+      {
+        "id": "local-comment-331",
+        "body": "Starting autonomous defect slice. Plan: reproduce scaffold-extension failure in focused nexusProjectOperations tests, make create/import failures recoverable without deleting imported source checkouts, verify focused tests then npm run check.",
+        "author": null,
+        "createdAt": "2026-05-19T14:16:58.186Z",
+        "updatedAt": "2026-05-19T14:16:58.186Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-331"
+        }
+      },
+      {
+        "id": "local-comment-332",
+        "body": "Completed source fix in DevNexus commit 0057d3c. Create/import now wrap scaffold extension failures as NexusProjectError messages that name the extension/phase and safe next action; create and managed import rollback clean up the operation-owned partial root, and import preserves the source checkout without registering a completed project reference. Verification: npm test -- src/nexusProjectOperations.test.ts; npm run check; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T14:26:01.230Z",
+        "updatedAt": "2026-05-19T14:26:01.230Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-332"
+        }
+      }
+    ],
     "local-142": [
       {
         "id": "local-comment-322",
