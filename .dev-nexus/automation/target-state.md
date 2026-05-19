@@ -51,7 +51,10 @@ and ready for coordinator-driven work across its components.
   together as `e946039` for current-actor authority resolution and read-only
   tracker discovery status, `dev-nexus:local-89` as `0bc80d9` for the
   effective authority resolver, and `dev-nexus:local-131` as `c7928f1` for
-  opt-in eligible-work discovery aggregation.
+  opt-in eligible-work discovery aggregation. The latest batch published
+  `dev-nexus:local-132` as `d3df60c` for linked tracker work-item
+  deduplication and `dev-nexus:local-90` as `f315a66` for scoped authority
+  summaries in status/report/agent-context surfaces.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -99,10 +102,11 @@ and ready for coordinator-driven work across its components.
   Issues require explicit tracker queries or inbound import before they become
   local dogfood work. The PRD has been sliced: start with
   `dev-nexus:local-129` for tracker roles and discovery-policy defaults, which
-  is now complete. `local-130` is complete for read-only discovery status, and
+  is now complete. `local-130` is complete for read-only discovery status,
   `local-131` is complete for opt-in eligible-work aggregation from configured
-  discovery sources. `local-132` is ready next for richer reusable
-  deduplication; promote `local-133` through `local-136` as prerequisites land.
+  discovery sources, and `local-132` is complete for reusable linked-item
+  deduplication. `local-133` is ready next for read-only inbound import
+  planning; promote `local-134` through `local-136` as prerequisites land.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
@@ -138,10 +142,11 @@ and ready for coordinator-driven work across its components.
   DevNexus comment.
 - The authority PRD has been sliced: `dev-nexus:local-87` is complete for the
   actor/role/action configuration model, `local-88` is complete for host-local
-  current-actor resolution, and `local-89` is complete for the pure effective
-  authority resolver. `local-90` is ready next for authority status and agent
-  context reporting; promote `local-91` through `local-94` as their
-  prerequisites land. `local-95` is a blocked HITL decision item for
+  current-actor resolution, `local-89` is complete for the pure effective
+  authority resolver, and `local-90` is complete for scoped authority status and
+  agent-context reporting. `local-91` is ready next for publication action
+  gating; promote `local-92` through `local-94` as their prerequisites land.
+  `local-95` is a blocked HITL decision item for
   self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
@@ -199,13 +204,13 @@ and ready for coordinator-driven work across its components.
 - No active implementation worktrees are expected for the completed source
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
-  `local-106`, `local-88`, `local-130`, `local-89`, and `local-131` were
-  removed after publication.
+  `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
+  and `local-90` were removed after publication.
 
 ## Near-Term Direction
 
-- Return to ready follow-on work such as `dev-nexus:local-90`,
-  `dev-nexus:local-132`, `local-107`, `local-109`, and `local-147`, subject to
+- Return to ready follow-on work such as `dev-nexus:local-91`,
+  `dev-nexus:local-133`, `local-107`, `local-109`, and `local-147`, subject to
   dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies

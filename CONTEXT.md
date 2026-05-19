@@ -114,7 +114,10 @@ coordinator agent chooses and supervises implementation work.
   `local-88` and read-only tracker discovery status in `local-130` together as
   `e946039`, effective authority resolution in `local-89` as `0bc80d9`, and
   eligible-work discovery aggregation in `local-131` as `c7928f1`. The latest
-  implementation worktrees and local branches were removed after publication.
+  source integrations published linked tracker work-item deduplication in
+  `local-132` as `d3df60c` and scoped authority summaries in `local-90` as
+  `f315a66`. The latest implementation worktrees and local branches were
+  removed after publication.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

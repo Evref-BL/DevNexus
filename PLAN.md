@@ -72,15 +72,15 @@ target-cycle facts, commits, and the target report.
   verification execution ordered behind explicit runner policy.
 - Continue parallel-agent workflow with the fail-closed mutation guard
   `dev-nexus:local-98`; cleanup/read-only slice `dev-nexus:local-102` is
-  complete, and status expansion `local-100` remains dependent until authority
-  status summaries exist.
+  complete, authority status summaries now exist through `local-90`, and status
+  expansion `local-100` can be reconsidered with the newer authority context.
 - Continue Codex app-server correction after completed `dev-nexus:local-115`
   safe initialize probes; keep provider-native worker orchestration behind the
   remaining app-server event and capability facts.
-- Continue authority configuration after completed `dev-nexus:local-88`
-  current-actor resolution. `local-89` effective authority resolution is ready
-  next; later publication and provider mutation gating should consume that
-  resolver instead of duplicating role logic.
+- Continue authority configuration after completed `dev-nexus:local-90`
+  scoped status/report/agent-context summaries. `local-91` publication action
+  gating is ready next; later provider mutation gating should consume the same
+  resolver and summaries instead of duplicating role logic.
 - Continue agent-target projection after completed `dev-nexus:local-106`
   active-target filtering. `local-107` stale projection diagnostics and
   `local-109` worker context propagation are now the next independent
@@ -93,8 +93,9 @@ target-cycle facts, commits, and the target report.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
   `dev-nexus:local-129` is complete for tracker roles and discovery-policy
   defaults, and `local-130` is complete for read-only discovery status.
-  `local-131` is complete for opt-in eligible-work aggregation. `local-132`
-  deduplication is ready next, then promote `local-133` through `local-136` as
+  `local-131` is complete for opt-in eligible-work aggregation, and `local-132`
+  is complete for linked-item deduplication. `local-133` inbound import
+  planning is ready next, then promote `local-134` through `local-136` as
   dependencies land. `local-137` is the blocked HITL policy decision for direct
   external selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

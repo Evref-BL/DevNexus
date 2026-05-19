@@ -1,7 +1,137 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-18T23:34:50.640Z",
+  "updatedAt": "2026-05-19T00:03:37.749Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-789d3983aea47432",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-90",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/cli.ts",
+        "src/nexusAuthority.ts",
+        "src/nexusAuthority.test.ts",
+        "src/nexusAutomationAgentLaunch.ts",
+        "src/nexusAutomationAgentLaunch.test.ts",
+        "src/nexusAutomationCoordinatorLoop.ts",
+        "src/nexusAutomationCoordinatorLoop.test.ts",
+        "src/nexusAutomationCurrentAgentAdoption.ts",
+        "src/nexusAutomationCurrentAgentAdoption.test.ts",
+        "src/nexusAutomationStatus.ts",
+        "src/nexusAutomationStatus.test.ts",
+        "src/nexusAutomationTargetCycle.ts",
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationTargetReport.test.ts",
+        "src/nexusAutomationWorktreeSetup.ts",
+        "src/nexusCoordination.ts",
+        "src/nexusCoordination.test.ts",
+        "src/nexusManualWorktree.ts",
+        "src/nexusProjectRegistry.ts",
+        "src/nexusProjectRegistry.test.ts",
+        "src/nexusWorkerContextBundle.ts",
+        "src/nexusWorkerContextBundle.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T00:02:58.444Z",
+      "lastSeenAt": "2026-05-19T00:02:58.444Z",
+      "updatedAt": "2026-05-19T00:02:58.444Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f315a66991ff06464fefd8fc7451bb9a1178a705",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged amended local-90 worker branch after fixing scoped authority summary reporting found during review.",
+        "Verification: Integrated verification passed on source main: focused local-90 suite with 12 files/165 tests, git diff --check HEAD~1..HEAD, and npm run check with 63 files/549 tests.",
+        "Integration preference: Published direct integration to DevNexus bot/main as f315a66."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-0fc186753c8eb73c",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-132",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusEligibleWork.ts",
+        "src/nexusEligibleWork.test.ts",
+        "src/nexusEligibleWorkSummary.ts",
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts",
+        "src/nexusProjectRegistry.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-18T23:51:49.367Z",
+      "lastSeenAt": "2026-05-18T23:51:49.367Z",
+      "updatedAt": "2026-05-18T23:51:49.367Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "d3df60cd792784e474a9367ad9bb9741af4bf450",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged local-132 worker commit 7b051f3 into DevNexus main through bot remote.",
+        "Verification: Integrated verification passed: focused local-132 suite with 3 files/56 tests; git diff --check HEAD~1..HEAD; npm run check with 63 files and 546 tests.",
+        "Integration preference: Published direct integration to DevNexus bot/main as d3df60c."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
@@ -39,12 +169,12 @@
         "src/nexusProjectRegistry.test.ts",
         "src/index.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T23:34:50.640Z",
-      "lastSeenAt": "2026-05-18T23:34:50.640Z",
-      "updatedAt": "2026-05-18T23:34:50.640Z",
+      "lastSeenAt": "2026-05-19T00:03:37.749Z",
+      "updatedAt": "2026-05-19T00:03:37.749Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5",
+      "lastObservedHeadCommit": "d3df60cd792784e474a9367ad9bb9741af4bf450",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -65,7 +195,8 @@
       "notes": [
         "Implement reusable read-only tracker-linked work item deduplication after local-131 eligible aggregation.",
         "Do not mutate link records or tracker items in this slice.",
-        "Avoid authority/status/agent-context files owned by local-90."
+        "Avoid authority/status/agent-context files owned by local-90.",
+        "Merged worker commit 7b051f3 into DevNexus main as d3df60c and removed the component worktree."
       ]
     },
     {
@@ -109,12 +240,12 @@
         "src/nexusMcpServer.test.ts",
         "src/index.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-18T23:34:43.083Z",
-      "lastSeenAt": "2026-05-18T23:34:43.083Z",
-      "updatedAt": "2026-05-18T23:34:43.083Z",
+      "lastSeenAt": "2026-05-19T00:03:37.749Z",
+      "updatedAt": "2026-05-19T00:03:37.749Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "c7928f18ae78ae50bc07b6bec6c39bfed9e33ee5",
+      "lastObservedHeadCommit": "f315a66991ff06464fefd8fc7451bb9a1178a705",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -135,7 +266,8 @@
       "notes": [
         "Implement reporting-only authority summaries after local-89 effective resolver.",
         "Do not add command gating or live provider calls in this slice.",
-        "Avoid tracker deduplication and eligible-work identity files owned by local-132."
+        "Avoid tracker deduplication and eligible-work identity files owned by local-132.",
+        "Merged amended worker commit 6cfb6dd into DevNexus main as f315a66 and removed the component worktree."
       ]
     },
     {
