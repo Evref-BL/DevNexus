@@ -1,7 +1,116 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T08:15:48.805Z",
+  "updatedAt": "2026-05-19T08:37:30.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b47d37d6bb9a4487",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-136",
+      "branchName": "codex/dev-nexus/local-136-fake-github-inbox-smoke",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-136-fake-github-inbox-smoke"
+      },
+      "writeScope": [
+        "src",
+        "docs",
+        "README.md",
+        "package.json",
+        "package-lock.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T08:23:37.243Z",
+      "lastSeenAt": "2026-05-19T08:37:30.000Z",
+      "updatedAt": "2026-05-19T08:37:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "c3bb52a1d07bc1e174be33e6178bf7491762f543",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-136-fake-github-inbox-smoke"
+        },
+        "upstream": "bot/codex/dev-nexus/local-136-fake-github-inbox-smoke",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published dev-nexus:local-136 to DevNexus main as c3bb52a via bot remote.",
+        "Verification: npm run check passed in the component worktree with 66 test files and 579 tests.",
+        "Integration preference: direct_integration"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-4a1b9e4913dfab09",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-136",
+      "branchName": "codex/project-meta/close-local-136",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/project-meta-close-local-136"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/worktree-leases.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T08:33:51.644Z",
+      "lastSeenAt": "2026-05-19T08:37:30.000Z",
+      "updatedAt": "2026-05-19T08:37:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": null,
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/project-meta-close-local-136"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Recorded local-136 status/comment and target-state closeout after source publication.",
+        "Integration preference: direct_integration"
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

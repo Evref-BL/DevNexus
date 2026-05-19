@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 315,
-  "updatedAt": "2026-05-19T08:17:10.268Z",
+  "nextCommentNumber": 316,
+  "updatedAt": "2026-05-19T08:35:35.940Z",
   "items": [
     {
       "id": "local-1",
@@ -3490,7 +3490,7 @@
       "id": "local-136",
       "title": "Add fake GitHub inbox discovery and import smoke test",
       "description": "Type: opt-in integration testing slice\nReadiness: todo/dependent on dev-nexus:local-133 and dev-nexus:local-134\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prove the external-inbox path against a fake or disposable GitHub-like source, not against an active DevNexus project.\n\nUser stories covered:\n- As a maintainer, I can validate that a provider-native issue can become a canonical local work item without risking active project state.\n- As an agent, I can run normal checks without live provider mutation or hidden dependency on another project.\n\nAcceptance criteria:\n- Test coverage uses a mocked provider or disposable fake-project fixture that represents a configured GitHub issue inbox and canonical local tracker.\n- The smoke proves discovery status, import planning, and guarded import execution can take a provider-native issue to a canonical local item and link record.\n- Default verification does not require live GitHub credentials and does not mutate live provider issues.\n- Optional live validation, if added, is opt-in only and constrained to a disposable repository/project fixture with strict naming and cleanup policy.\n- The test does not depend on dev-nexus-plexus, this dogfood project as a live provider target, or any other active project.\n- Missing live credentials, wrong actor, provider policy block, and cleanup refusal produce skipped or blocked results rather than unsafe fallback.\n\nDependencies:\n- Depends on dev-nexus:local-133 for import planning.\n- Depends on dev-nexus:local-134 for guarded import execution.\n\nBoundaries:\n- Do not use active DevNexus projects as integration fixtures.\n- Do not run live provider mutation in default tests.\n- Do not delete arbitrary repositories or issues.\n\nVerification:\n- Mocked smoke tests for discovery-to-plan-to-import, duplicate rerun, missing credentials, wrong source filter, and no-live-provider default behavior.\n- Optional live smoke only when explicitly configured.\n- npm run check must pass without live credentials.\n\nPublication notes:\n- Direct integration to DevNexus main after mocked verification passes; live integration evidence can be recorded separately when explicitly run.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3504,8 +3504,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:34.378Z",
-      "updatedAt": "2026-05-19T01:18:17.456Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T08:35:35.940Z",
+      "closedAt": "2026-05-19T08:35:35.088Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7577,6 +7577,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-301"
+        }
+      },
+      {
+        "id": "local-comment-315",
+        "body": "Completed and published fake GitHub inbox smoke coverage in DevNexus source commit c3bb52a. Evidence: new src/workItemFakeGithubInboxSmoke.test.ts covers discovery status, no-live-provider default credential behavior, eligible-work import candidates, dry-run planning, missing-credential and wrong-filter blocked/skipped paths, guarded execution to canonical local item/link, idempotent rerun, and no source-provider mutation. Verification passed: npm run check (66 files, 579 tests). Publication: direct integration to DevNexus bot/main as c3bb52a.",
+        "author": null,
+        "createdAt": "2026-05-19T08:35:35.940Z",
+        "updatedAt": "2026-05-19T08:35:35.940Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-315"
         }
       }
     ],

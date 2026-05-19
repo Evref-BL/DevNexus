@@ -122,10 +122,11 @@ and ready for coordinator-driven work across its components.
   and `local-134` is complete for policy-gated local import execution.
   `local-135` is complete as `3819017` for compact external issue visibility
   summaries across status, eligible-work, agent context, and target reports.
-  `local-136` remains the ready follow-on for fake/disposable provider import
-  reporting.
-  `local-137` is the blocked HITL policy decision for direct external
-  selection, provider comments, scheduler import, and ordering.
+  `local-136` is complete as `c3bb52a` for fake GitHub inbox discovery,
+  planning, guarded import execution, idempotent rerun, missing-credential,
+  wrong-filter, and no-live-provider smoke coverage. `local-137` remains the
+  blocked HITL policy decision for direct external selection, provider
+  comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
   `dev-nexus:local-79` through `local-86` and `dev-nexus-pharo:local-14`;
   corresponding PLexus runtime follow-up work is tracked in `dev-nexus-plexus`.
@@ -264,10 +265,12 @@ and ready for coordinator-driven work across its components.
   DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
-- Keep cross-tracker discovery ordered after completed `dev-nexus:local-129`
-  through `local-135`: proceed to `local-136` for fake/disposable provider
-  import reporting. Use fake or disposable provider fixtures for validation,
-  not active projects.
+- Cross-tracker discovery implementation is complete through
+  `dev-nexus:local-136`; keep `local-137` blocked until the user decides the
+  dogfood external issue selection, provider-comment, scheduler-import, and
+  ordering policy. Next ready DevNexus source cycles should choose between
+  `local-93` provider authority signals and `local-147` DevNexus-Research
+  plugin skeleton work based on current target priority.
 
 ## Boundaries
 
