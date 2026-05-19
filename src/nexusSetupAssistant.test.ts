@@ -983,6 +983,90 @@ describe("nexus setup assistant", () => {
     expect(checks).not.toContain(".agents/skills");
   });
 
+  it("reports expected, stale, manual, unsupported, and disallowed agent projections", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-projections-");
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [
+          { provider: "codex" },
+          { provider: "custom" },
+        ],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      skills: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".agents", "skills"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".claude", "skills", "legacy"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(projectRoot, ".claude", "skills", "legacy", "dev-nexus.skill.json"),
+      "{}\n",
+    );
+    fs.mkdirSync(path.join(projectRoot, ".opencode", "skills"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".opencode", "skills", "README.md"), "manual\n");
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-mcp-codex-expected-missing",
+        status: "warning",
+        summary: expect.stringContaining("state=expected-missing"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-skills-codex-expected-present",
+        status: "passed",
+        summary: expect.stringContaining(".agents/skills"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-skills-claude-present-stale-generated",
+        status: "warning",
+        summary: expect.stringContaining("cleanupSafe=true"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-skills-opencode-present-manual",
+        status: "warning",
+        summary: expect.stringContaining("state=present-manual"),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-policy-custom-unsupported-provider",
+        status: "warning",
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-projection-policy-claude-locally-selected-but-not-allowed",
+        status: "warning",
+        summary: expect.stringContaining("skills.agentTargets"),
+      }),
+    );
+  });
+
   it("passes the agent MCP server check when the expected server is configured", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-agent-server-");
     writeProject(projectRoot, {

@@ -143,7 +143,7 @@ describe("project registry helpers", () => {
         projectRoot: root,
         vibeKanbanRepoId: "vk-repo",
       }),
-    ).toEqual({
+    ).toMatchObject({
       id: "config-id",
       name: "Config Project",
       projectRoot: root,
@@ -233,6 +233,16 @@ describe("project registry helpers", () => {
       vibeKanbanRepoId: "vk-repo",
       hosts: [],
       runnerProfiles: [],
+      agentTargets: expect.objectContaining({
+        activeProviders: ["codex"],
+        expectedMcpConfigFiles: [
+          expect.objectContaining({
+            provider: "codex",
+            path: ".codex/config.toml",
+            state: "expected-missing",
+          }),
+        ],
+      }),
       authority: expect.objectContaining({
         projectId: "config-id",
         components: [
@@ -398,6 +408,114 @@ describe("project registry helpers", () => {
         ],
       },
     ]);
+  });
+
+  it("summarizes active agent target projections in project status", () => {
+    const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
+    fs.mkdirSync(path.join(root, ".codex"), { recursive: true });
+    fs.mkdirSync(path.join(root, ".agents", "skills"), { recursive: true });
+    fs.mkdirSync(path.join(root, ".claude", "skills", "legacy"), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(root, ".codex", "config.toml"), "");
+    fs.writeFileSync(
+      path.join(root, ".claude", "skills", "legacy", "dev-nexus.skill.json"),
+      "{}\n",
+    );
+    fs.mkdirSync(path.join(root, ".opencode", "skills"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".opencode", "skills", "README.md"), "manual\n");
+    saveProjectConfig(root, {
+      ...projectConfig("agent-projection-project", "Agent Projection Project"),
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      mcp: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      skills: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+      plugins: [
+        {
+          id: "runtime-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "skill-codex",
+              skillId: "codex-diagnostic",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-claude",
+              serverName: "claude_runtime",
+              targetAgents: ["claude"],
+            },
+          ],
+        },
+      ],
+    });
+
+    const status = buildNexusProjectStatusForPath(root).agentTargets!;
+
+    expect(status).toMatchObject({
+      explicit: true,
+      activeProviders: ["codex"],
+      expectedMcpConfigFiles: [
+        expect.objectContaining({
+          provider: "codex",
+          path: ".codex/config.toml",
+          state: "expected-present",
+        }),
+      ],
+      expectedSkillDirectories: [
+        expect.objectContaining({
+          provider: "codex",
+          path: ".agents/skills",
+          state: "expected-present",
+        }),
+      ],
+      staleGeneratedProviderDirectories: [
+        expect.objectContaining({
+          provider: "claude",
+          path: ".claude/skills",
+          state: "present-stale-generated",
+          cleanupSafe: true,
+        }),
+      ],
+      manualProviderDirectories: [
+        expect.objectContaining({
+          provider: "opencode",
+          path: ".opencode/skills",
+          state: "present-manual",
+          cleanupSafe: false,
+        }),
+      ],
+      locallySelectedButNotAllowed: [
+        expect.objectContaining({
+          provider: "claude",
+          state: "locally-selected-but-not-allowed",
+        }),
+      ],
+      selectedPluginCapabilities: [
+        {
+          pluginId: "runtime-plugin",
+          capabilityId: "skill-codex",
+          kind: "projected_skill",
+          targetProviders: ["codex"],
+        },
+      ],
+    });
+    expect(status.summary).toContain("active=codex");
+    expect(status.summary).toContain("staleGenerated=1");
+    expect(status.summary).toContain("manual=1");
   });
 
   it("resolves portable component source roots from the sibling sources root", () => {

@@ -7,6 +7,11 @@ import {
   type MaterializedNexusAgentMcpTarget,
 } from "./nexusAgentMcpConfig.js";
 import {
+  buildNexusProjectAgentProjectionStatus,
+  type NexusAgentProjectionPathStatus,
+  type NexusAgentProjectionPolicyDiagnostic,
+} from "./nexusAgentProjectionStatus.js";
+import {
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
   validateNexusHomeConfigBase,
@@ -265,6 +270,7 @@ export function buildNexusSetupCheck(options: {
 
   if (projectConfig) {
     checks.push(sharedHostRegistryHostLocalDetailsCheck(projectRoot));
+    checks.push(...agentProjectionStatusChecks(projectRoot, projectConfig));
     checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
   }
 
@@ -1044,6 +1050,112 @@ function pluginProjectionChecks(
     ...pluginProjectedSkillChecks(projectRoot, projectConfig),
     ...pluginMcpServerChecks(projectRoot, projectConfig),
   ];
+}
+
+function agentProjectionStatusChecks(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusSetupCheckResult[] {
+  const status = buildNexusProjectAgentProjectionStatus({
+    projectRoot,
+    projectConfig,
+  });
+  const hasActionableDiagnostics =
+    status.explicit ||
+    status.staleGeneratedProviderDirectories.length > 0 ||
+    status.manualProviderDirectories.length > 0 ||
+    status.unsupportedTargets.length > 0 ||
+    status.locallySelectedButNotAllowed.length > 0;
+  if (!hasActionableDiagnostics) {
+    return [];
+  }
+
+  const summaryStatus: NexusSetupCheckStatus =
+    status.expectedMcpConfigFiles.some(projectionMissing) ||
+    status.expectedSkillDirectories.some(projectionMissing) ||
+    status.staleGeneratedProviderDirectories.length > 0 ||
+    status.manualProviderDirectories.length > 0 ||
+    status.unsupportedTargets.length > 0 ||
+    status.locallySelectedButNotAllowed.length > 0
+      ? "warning"
+      : "passed";
+  const checks: NexusSetupCheckResult[] = [{
+    id: "agent-projection-summary",
+    title: "Agent projection status",
+    status: summaryStatus,
+    summary: `Agent projection summary: ${status.summary}.`,
+    nextAction: summaryStatus === "passed"
+      ? null
+      : status.explicit
+        ? "Review non-passed agent projection checks before refreshing or cleaning provider-native support state."
+        : "Add config.agentTargets.active to make provider projection selection explicit.",
+  }];
+
+  for (const projection of [
+    ...status.expectedMcpConfigFiles,
+    ...status.expectedSkillDirectories,
+  ]) {
+    checks.push(agentProjectionPathCheck(projection));
+  }
+  for (const projection of status.staleGeneratedProviderDirectories) {
+    checks.push(agentProjectionPathCheck(projection));
+  }
+  for (const projection of status.manualProviderDirectories) {
+    checks.push(agentProjectionPathCheck(projection));
+  }
+  for (const diagnostic of status.unsupportedTargets) {
+    checks.push(agentProjectionPolicyCheck(diagnostic));
+  }
+  for (const diagnostic of status.locallySelectedButNotAllowed) {
+    checks.push(agentProjectionPolicyCheck(diagnostic));
+  }
+
+  return checks;
+}
+
+function agentProjectionPathCheck(
+  projection: NexusAgentProjectionPathStatus,
+): NexusSetupCheckResult {
+  const passed = projection.state === "expected-present";
+  const cleanupNote = projection.cleanupSafe ? " cleanupSafe=true" : "";
+  return {
+    id:
+      `agent-projection-${setupCheckIdPart(projection.kind)}-` +
+      `${setupCheckIdPart(projection.provider)}-${setupCheckIdPart(projection.state)}`,
+    title: `${projection.provider} ${projection.kind} projection`,
+    status: passed ? "passed" : "warning",
+    summary:
+      `state=${projection.state}${cleanupNote}; path=${projection.path}; ` +
+      projection.reason,
+    nextAction: passed
+      ? null
+      : projection.state === "expected-missing"
+        ? `Refresh ${projection.provider} ${projection.kind} projection or record why this host intentionally leaves it missing.`
+        : projection.cleanupSafe
+          ? "Run a cleanup dry-run before removing stale generated support state; do not remove source-controlled or manual files."
+          : "Inspect the file ownership before cleanup; DevNexus does not classify this path as generated cleanup-safe support.",
+  };
+}
+
+function agentProjectionPolicyCheck(
+  diagnostic: NexusAgentProjectionPolicyDiagnostic,
+): NexusSetupCheckResult {
+  return {
+    id:
+      `agent-projection-policy-${setupCheckIdPart(diagnostic.provider)}-` +
+      `${setupCheckIdPart(diagnostic.state)}`,
+    title: `${diagnostic.provider} agent projection policy`,
+    status: "warning",
+    summary: `state=${diagnostic.state}; source=${diagnostic.source}; ${diagnostic.reason}`,
+    nextAction:
+      diagnostic.state === "unsupported-provider"
+        ? "Add a provider adapter, mark the target as manual, or document the provider-specific setup path."
+        : "Remove the legacy provider target or add it to config.agentTargets.active before refreshing provider-native projections.",
+  };
+}
+
+function projectionMissing(projection: NexusAgentProjectionPathStatus): boolean {
+  return projection.state === "expected-missing";
 }
 
 function pluginProjectedSkillChecks(

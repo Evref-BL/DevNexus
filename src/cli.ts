@@ -5774,6 +5774,27 @@ function printProjectStatusResult(
         `${state} roles=${tracker.roles.join(",")} unsupported=${unsupported}`,
     );
   }
+  if (project.agentTargets) {
+    writeLine(
+      stdout,
+      `  Agent targets: ${project.agentTargets.summary}`,
+    );
+    for (const recommendation of project.agentTargets.recommendations) {
+      writeLine(stdout, `    Recommendation: ${recommendation}`);
+    }
+    for (const stale of project.agentTargets.staleGeneratedProviderDirectories) {
+      writeLine(
+        stdout,
+        `    Stale generated ${stale.provider} ${stale.kind}: ${stale.path}`,
+      );
+    }
+    for (const manual of project.agentTargets.manualProviderDirectories) {
+      writeLine(
+        stdout,
+        `    Manual ${manual.provider} ${manual.kind}: ${manual.path}`,
+      );
+    }
+  }
   writeLine(stdout, `  Hosts: ${project.hosts.length}`);
   for (const host of project.hosts) {
     const enabled = host.enabled ? "enabled" : "disabled";
