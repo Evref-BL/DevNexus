@@ -90,6 +90,7 @@ export type NexusProjectSetupWorkTrackingProvider =
 
 export type NexusProjectSetupPublicationPosture =
   | "local_only"
+  | "green_main"
   | "review_handoff"
   | "direct_integration";
 

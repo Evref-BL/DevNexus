@@ -1903,6 +1903,120 @@ describe("project config", () => {
     });
   });
 
+  it("accepts green-main publication defaults and branch-first check selectors", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            greenMain: {
+              requiredChecks: ["build", "test"],
+            },
+          },
+        },
+      }).automation?.publication,
+    ).toMatchObject({
+      strategy: "green_main",
+      remote: "origin",
+      targetBranch: "main",
+      push: false,
+      greenMain: {
+        integrationPreference: "pull_request",
+        integrationBranch: null,
+        directTargetPush: "blocked",
+        requiredChecks: ["build", "test"],
+        staleChecks: "block",
+      },
+    });
+  });
+
+  it("rejects invalid green-main publication combinations", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "green_main",
+          },
+        },
+      }),
+    ).toThrow(/targetBranch is required/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            greenMain: {
+              integrationPreference: "branch",
+            },
+          },
+        },
+      }),
+    ).toThrow(/integrationBranch is required/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            push: true,
+          },
+        },
+      }),
+    ).toThrow(/push must be false/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "review_handoff",
+            greenMain: {
+              requiredChecks: ["build"],
+            },
+          },
+        },
+      }),
+    ).toThrow(/greenMain requires strategy green_main/);
+  });
+
   it("rejects secret-like publication command environment keys", () => {
     expect(() =>
       validateProjectConfig({

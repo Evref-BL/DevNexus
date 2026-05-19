@@ -1775,7 +1775,16 @@ function directIntegrationPolicyBlocker(
   if (!publication) {
     return "Component publication policy is unavailable; direct integration is blocked.";
   }
-  if (publication.strategy !== "direct_integration" || !publication.push) {
+  if (publication.strategy === "green_main") {
+    const directTargetPush =
+      publication.greenMain?.directTargetPush ?? "blocked";
+    if (directTargetPush === "blocked" || !publication.push) {
+      return `Component publication policy is green_main with directTargetPush=${directTargetPush} and push=${publication.push}; direct target-branch push is blocked.`;
+    }
+  } else if (
+    publication.strategy !== "direct_integration" ||
+    !publication.push
+  ) {
     return `Component publication policy is ${publication.strategy} with push=${publication.push}; direct integration requires direct_integration with push enabled.`;
   }
   if (

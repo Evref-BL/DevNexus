@@ -286,7 +286,9 @@ function publicationDecision(
   }
 
   return {
-    type: publication.strategy,
+    type: publication.strategy === "green_main"
+      ? "review_handoff"
+      : publication.strategy,
     remote: publication.remote,
     targetBranch: publication.targetBranch,
     reason: publication.push

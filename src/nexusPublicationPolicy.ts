@@ -17,7 +17,10 @@ import {
 } from "./nexusAuthority.js";
 import {
   defaultNexusAutomationConfig,
+  normalizeNexusAutomationPublicationConfig,
+  summarizeNexusAutomationPublicationPolicy,
   type NexusAutomationPublicationConfig,
+  type NexusAutomationPublicationPolicySummary,
   type NexusPublicationActorConfig,
 } from "./nexusAutomationConfig.js";
 import {
@@ -107,6 +110,7 @@ export interface NexusPublicationStatus {
   sourceRoot: string;
   action: NexusPublicationGuardAction;
   policy: NexusAutomationPublicationConfig;
+  policySummary: NexusAutomationPublicationPolicySummary;
   git: NexusPublicationGitStatus;
   gitIdentity: NexusGitIdentityStatus;
   actor: NexusPublicationActorStatus;
@@ -132,7 +136,11 @@ export function resolveNexusPublicationPolicy(
     defaultNexusAutomationConfig.publication;
   const componentPublication = component?.publication ?? {};
 
-  return {
+  const hasComponentGreenMain = Object.prototype.hasOwnProperty.call(
+    componentPublication,
+    "greenMain",
+  );
+  const merged: NexusAutomationPublicationConfig = {
     ...defaultNexusAutomationConfig.publication,
     ...projectPublication,
     ...componentPublication,
@@ -149,7 +157,15 @@ export function resolveNexusPublicationPolicy(
       ...projectPublication.commandEnvironment,
       ...componentPublication.commandEnvironment,
     },
+    greenMain: hasComponentGreenMain
+      ? componentPublication.greenMain ?? null
+      : projectPublication.greenMain ?? null,
   };
+
+  return normalizeNexusAutomationPublicationConfig(
+    merged,
+    "resolved publication policy",
+  );
 }
 
 export function getNexusPublicationStatus(options: {
@@ -236,6 +252,7 @@ export function getNexusPublicationStatus(options: {
     sourceRoot: options.component.sourceRoot,
     action,
     policy,
+    policySummary: summarizeNexusAutomationPublicationPolicy(policy),
     git,
     gitIdentity,
     actor,
@@ -362,9 +379,22 @@ function shouldUseIsolatedGitHubCliProfile(
 export function publicationEnvironmentVariables(
   policy: NexusAutomationPublicationConfig,
 ): NodeJS.ProcessEnv {
+  const policySummary = summarizeNexusAutomationPublicationPolicy(policy);
   return {
+    DEV_NEXUS_PUBLICATION_STRATEGY: policy.strategy,
+    DEV_NEXUS_PUBLICATION_MODE: policySummary.mode,
     DEV_NEXUS_PUBLICATION_REMOTE: policy.remote ?? "",
     DEV_NEXUS_PUBLICATION_TARGET_BRANCH: policy.targetBranch ?? "",
+    DEV_NEXUS_PUBLICATION_INTEGRATION_PREFERENCE:
+      policySummary.integrationPreference,
+    DEV_NEXUS_PUBLICATION_INTEGRATION_BRANCH:
+      policySummary.integrationBranch ?? "",
+    DEV_NEXUS_PUBLICATION_DIRECT_TARGET_PUSH:
+      policySummary.directTargetPush,
+    DEV_NEXUS_PUBLICATION_REQUIRED_CHECKS:
+      policySummary.requiredChecks.join(","),
+    DEV_NEXUS_PUBLICATION_STALE_CHECKS:
+      policySummary.staleChecks ?? "",
     DEV_NEXUS_PUBLICATION_ACTOR_KIND: policy.actor?.kind ?? "",
     DEV_NEXUS_PUBLICATION_ACTOR_PROVIDER: policy.actor?.provider ?? "",
     DEV_NEXUS_PUBLICATION_ACTOR_HANDLE: policy.actor?.handle ?? "",
@@ -630,6 +660,7 @@ export function publicationPolicyRequiresGuard(
   return (
     action !== "status" ||
     policy.push ||
+    policy.strategy === "green_main" ||
     policy.strategy === "direct_integration" ||
     Boolean(
       policy.remoteUrl ||
@@ -837,6 +868,9 @@ function publicationAuthorityAction(
     case "status":
       if (policy.strategy === "direct_integration" && policy.push) {
         return "git.push_target_branch";
+      }
+      if (policy.strategy === "green_main") {
+        return "provider.pull_request.open";
       }
       if (policy.strategy !== "local_only") {
         return "provider.pull_request.open";

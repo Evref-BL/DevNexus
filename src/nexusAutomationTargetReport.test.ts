@@ -670,6 +670,42 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("summarizes effective green-main publication policy in component progress", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          greenMain: {
+            integrationPreference: "pull_request",
+            integrationBranch: null,
+            directTargetPush: "blocked",
+            requiredChecks: ["build"],
+            staleChecks: "block",
+          },
+        },
+      },
+    }));
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:05:00.000Z",
+    });
+
+    expect(report.componentProgress[0]?.publication).toMatchObject({
+      mode: "green_main",
+      targetBranch: "main",
+      integrationPreference: "pull_request",
+      directTargetPush: "blocked",
+      requiredChecks: ["build"],
+      staleChecks: "block",
+    });
+  });
+
   it("reports wait for active cycles and failed decisions", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

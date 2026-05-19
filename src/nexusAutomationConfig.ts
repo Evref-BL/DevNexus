@@ -8,8 +8,17 @@ export type NexusAutomationSafetyProfile =
   | "host-authorized";
 export type NexusAutomationPublicationStrategy =
   | "local_only"
+  | "green_main"
   | "direct_integration"
   | "review_handoff";
+export type NexusAutomationGreenMainIntegrationPreference =
+  | "branch"
+  | "pull_request";
+export type NexusAutomationGreenMainDirectTargetPushPolicy =
+  | "blocked"
+  | "exceptional"
+  | "allowed";
+export type NexusAutomationGreenMainStaleCheckPolicy = "block" | "allow";
 export type NexusPublicationActorKind =
   | "human"
   | "machine_user"
@@ -146,6 +155,14 @@ export interface NexusPublicationActorConfig {
   id: string | null;
 }
 
+export interface NexusAutomationGreenMainConfig {
+  integrationPreference: NexusAutomationGreenMainIntegrationPreference;
+  integrationBranch: string | null;
+  directTargetPush: NexusAutomationGreenMainDirectTargetPushPolicy;
+  requiredChecks: string[];
+  staleChecks: NexusAutomationGreenMainStaleCheckPolicy;
+}
+
 export interface NexusAutomationPublicationConfig {
   strategy: NexusAutomationPublicationStrategy;
   remote: string | null;
@@ -160,6 +177,21 @@ export interface NexusAutomationPublicationConfig {
   manualRemote: string | null;
   manualActor: NexusPublicationActorConfig | null;
   commandEnvironment: Record<string, string>;
+  greenMain?: NexusAutomationGreenMainConfig | null;
+}
+
+export interface NexusAutomationPublicationPolicySummary {
+  mode: NexusAutomationPublicationStrategy;
+  targetBranch: string | null;
+  integrationPreference:
+    | NexusAutomationGreenMainIntegrationPreference
+    | "direct_push"
+    | "local_only";
+  integrationBranch: string | null;
+  directTargetPush: NexusAutomationGreenMainDirectTargetPushPolicy;
+  requiredChecks: string[];
+  staleChecks: NexusAutomationGreenMainStaleCheckPolicy | null;
+  summary: string;
 }
 
 export interface NexusAutomationConfig {
@@ -264,6 +296,15 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   },
 };
 
+export const defaultNexusAutomationGreenMainConfig:
+  NexusAutomationGreenMainConfig = {
+    integrationPreference: "pull_request",
+    integrationBranch: null,
+    directTargetPush: "blocked",
+    requiredChecks: [],
+    staleChecks: "block",
+  };
+
 export class NexusAutomationConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -358,14 +399,142 @@ export function validateNexusAutomationConfig(
       ...defaultNexusAutomationConfig.safety,
       ...safety,
     },
-    publication: {
-      ...defaultNexusAutomationConfig.publication,
-      ...publication,
-      commandEnvironment: {
-        ...defaultNexusAutomationConfig.publication.commandEnvironment,
-        ...publication.commandEnvironment,
+    publication: normalizeNexusAutomationPublicationConfig(
+      {
+        ...defaultNexusAutomationConfig.publication,
+        ...publication,
+        commandEnvironment: {
+          ...defaultNexusAutomationConfig.publication.commandEnvironment,
+          ...publication.commandEnvironment,
+        },
       },
-    },
+      "project config.automation.publication",
+    ),
+  };
+}
+
+export function normalizeNexusAutomationPublicationConfig(
+  value: NexusAutomationPublicationConfig,
+  pathName = "project config.automation.publication",
+): NexusAutomationPublicationConfig {
+  if (value.strategy === "green_main") {
+    const greenMain = {
+      ...defaultNexusAutomationGreenMainConfig,
+      ...(value.greenMain ?? {}),
+    };
+    if (!value.targetBranch) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.targetBranch is required when strategy is green_main`,
+      );
+    }
+    if (
+      greenMain.integrationPreference === "branch" &&
+      !greenMain.integrationBranch
+    ) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.greenMain.integrationBranch is required when integrationPreference is branch`,
+      );
+    }
+    if (
+      greenMain.integrationBranch &&
+      value.targetBranch &&
+      greenMain.integrationBranch === value.targetBranch
+    ) {
+      throw new NexusAutomationConfigError(
+        `${pathName}.greenMain.integrationBranch must not be the targetBranch`,
+      );
+    }
+    if (value.push && greenMain.directTargetPush === "blocked") {
+      throw new NexusAutomationConfigError(
+        `${pathName}.push must be false when greenMain.directTargetPush is blocked`,
+      );
+    }
+
+    return {
+      ...value,
+      greenMain: {
+        ...greenMain,
+        requiredChecks: [...greenMain.requiredChecks],
+      },
+    };
+  }
+
+  if (value.greenMain && Object.keys(value.greenMain).length > 0) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.greenMain requires strategy green_main`,
+    );
+  }
+
+  const { greenMain: _greenMain, ...withoutGreenMain } = value;
+  return withoutGreenMain;
+}
+
+export function summarizeNexusAutomationPublicationPolicy(
+  policy: NexusAutomationPublicationConfig,
+): NexusAutomationPublicationPolicySummary {
+  if (policy.strategy === "green_main") {
+    const greenMain = {
+      ...defaultNexusAutomationGreenMainConfig,
+      ...(policy.greenMain ?? {}),
+    };
+    const directTargetPush = greenMain.directTargetPush;
+    const checks = greenMain.requiredChecks.length > 0
+      ? greenMain.requiredChecks.join(",")
+      : "none";
+    return {
+      mode: "green_main",
+      targetBranch: policy.targetBranch,
+      integrationPreference: greenMain.integrationPreference,
+      integrationBranch: greenMain.integrationBranch,
+      directTargetPush,
+      requiredChecks: [...greenMain.requiredChecks],
+      staleChecks: greenMain.staleChecks,
+      summary:
+        `green_main target=${policy.targetBranch ?? "none"} ` +
+        `integration=${greenMain.integrationPreference}` +
+        `${greenMain.integrationBranch ? ` branch=${greenMain.integrationBranch}` : ""} ` +
+        `directTargetPush=${directTargetPush} checks=${checks} ` +
+        `staleChecks=${greenMain.staleChecks}`,
+    };
+  }
+
+  if (policy.strategy === "direct_integration") {
+    return {
+      mode: "direct_integration",
+      targetBranch: policy.targetBranch,
+      integrationPreference: "direct_push",
+      integrationBranch: null,
+      directTargetPush: policy.push ? "allowed" : "blocked",
+      requiredChecks: [],
+      staleChecks: null,
+      summary:
+        `direct_integration target=${policy.targetBranch ?? "none"} ` +
+        `directTargetPush=${policy.push ? "allowed" : "blocked"}`,
+    };
+  }
+
+  if (policy.strategy === "review_handoff") {
+    return {
+      mode: "review_handoff",
+      targetBranch: policy.targetBranch,
+      integrationPreference: "pull_request",
+      integrationBranch: null,
+      directTargetPush: "blocked",
+      requiredChecks: [],
+      staleChecks: null,
+      summary: `review_handoff target=${policy.targetBranch ?? "none"}`,
+    };
+  }
+
+  return {
+    mode: "local_only",
+    targetBranch: policy.targetBranch,
+    integrationPreference: "local_only",
+    integrationBranch: null,
+    directTargetPush: "blocked",
+    requiredChecks: [],
+    staleChecks: null,
+    summary: "local_only",
   };
 }
 
@@ -1036,6 +1205,7 @@ export function validatePartialNexusAutomationPublicationConfig(
     ...optionalNullableStringField(record, "manualRemote", pathName),
     ...optionalPublicationActorField(record, "manualActor", pathName),
     ...optionalCommandEnvironmentField(record, "commandEnvironment", pathName),
+    ...optionalGreenMainPublicationField(record, "greenMain", pathName),
   };
 }
 
@@ -1276,6 +1446,70 @@ function optionalPublicationActorField<Key extends string>(
   } as Record<Key, NexusPublicationActorConfig>;
 }
 
+function optionalGreenMainPublicationField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusAutomationGreenMainConfig | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<Key, null>;
+  }
+
+  return {
+    [key]: validateGreenMainPublicationConfig(value, `${pathName}.${key}`),
+  } as Record<Key, NexusAutomationGreenMainConfig>;
+}
+
+function validateGreenMainPublicationConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationGreenMainConfig {
+  const record = assertRecord(value, pathName);
+  const integrationPreference = validateGreenMainIntegrationPreference(
+    record.integrationPreference,
+    `${pathName}.integrationPreference`,
+  );
+  const integrationBranch = optionalNullableString(
+    record.integrationBranch,
+    `${pathName}.integrationBranch`,
+  );
+  const directTargetPush = validateGreenMainDirectTargetPushPolicy(
+    record.directTargetPush,
+    `${pathName}.directTargetPush`,
+  );
+  const requiredChecks = optionalStringArray(
+    record.requiredChecks,
+    `${pathName}.requiredChecks`,
+  );
+  const staleChecks = validateGreenMainStaleCheckPolicy(
+    record.staleChecks,
+    `${pathName}.staleChecks`,
+  );
+
+  return {
+    integrationPreference:
+      integrationPreference ??
+      defaultNexusAutomationGreenMainConfig.integrationPreference,
+    integrationBranch:
+      integrationBranch ??
+      defaultNexusAutomationGreenMainConfig.integrationBranch,
+    directTargetPush:
+      directTargetPush ??
+      defaultNexusAutomationGreenMainConfig.directTargetPush,
+    requiredChecks: [
+      ...(requiredChecks ??
+        defaultNexusAutomationGreenMainConfig.requiredChecks),
+    ],
+    staleChecks:
+      staleChecks ??
+      defaultNexusAutomationGreenMainConfig.staleChecks,
+  };
+}
+
 function validatePublicationActorConfig(
   value: unknown,
   pathName: string,
@@ -1307,6 +1541,56 @@ function validatePublicationActorKind(
   );
 }
 
+function validateGreenMainIntegrationPreference(
+  value: unknown,
+  pathName: string,
+): NexusAutomationGreenMainIntegrationPreference | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "branch" || value === "pull_request") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be branch or pull_request`,
+  );
+}
+
+function validateGreenMainDirectTargetPushPolicy(
+  value: unknown,
+  pathName: string,
+): NexusAutomationGreenMainDirectTargetPushPolicy | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (
+    value === "blocked" ||
+    value === "exceptional" ||
+    value === "allowed"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be blocked, exceptional, or allowed`,
+  );
+}
+
+function validateGreenMainStaleCheckPolicy(
+  value: unknown,
+  pathName: string,
+): NexusAutomationGreenMainStaleCheckPolicy | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "block" || value === "allow") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(`${pathName} must be block or allow`);
+}
+
 function optionalSafetyProfileField<Key extends string>(
   record: Record<string, unknown>,
   key: Key,
@@ -1336,6 +1620,7 @@ function optionalPublicationStrategyField<Key extends string>(
   }
   if (
     value === "local_only" ||
+    value === "green_main" ||
     value === "direct_integration" ||
     value === "review_handoff"
   ) {
@@ -1343,7 +1628,7 @@ function optionalPublicationStrategyField<Key extends string>(
   }
 
   throw new NexusAutomationConfigError(
-    `${pathName}.${key} must be local_only, direct_integration, or review_handoff`,
+    `${pathName}.${key} must be local_only, green_main, direct_integration, or review_handoff`,
   );
 }
 

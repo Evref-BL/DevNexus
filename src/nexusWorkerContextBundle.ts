@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
+import {
+  summarizeNexusAutomationPublicationPolicy,
+  type NexusAutomationPublicationConfig,
+} from "./nexusAutomationConfig.js";
 import type {
   NexusAuthorityComponentSummary,
   NexusAuthorityScopeConfig,
@@ -840,9 +843,17 @@ function renderPublicationPolicyLines(
   const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
     .sort()
     .join(", ");
+  const policySummary = summarizeNexusAutomationPublicationPolicy(publication);
 
   return [
     "Publication policy:",
+    `- mode: ${policySummary.mode}`,
+    `- target branch: ${policySummary.targetBranch ?? "none"}`,
+    `- integration preference: ${policySummary.integrationPreference}`,
+    `- integration branch: ${policySummary.integrationBranch ?? "none"}`,
+    `- direct target push: ${policySummary.directTargetPush}`,
+    `- required checks: ${policySummary.requiredChecks.join(", ") || "none"}`,
+    `- stale checks: ${policySummary.staleChecks ?? "none"}`,
     `- automation remote: ${publication.remote ?? "none"}`,
     `- automation actor: ${publicationActorLabel(publication.actor)}`,
     `- manual remote: ${publication.manualRemote ?? "none"}`,

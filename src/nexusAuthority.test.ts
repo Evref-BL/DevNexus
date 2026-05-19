@@ -704,6 +704,32 @@ describe("nexus effective authority resolution", () => {
     });
     expect(result.explanation).toContain("Component publication policy");
   });
+
+  it("allows explicit green-main exceptional target-branch push only when policy opts in", () => {
+    const result = resolveEffectiveAuthority({
+      actor: { id: "maintainer-bot" },
+      requestedAction: "git.push_target_branch",
+      publication: {
+        ...publication,
+        strategy: "green_main",
+        push: true,
+        greenMain: {
+          integrationPreference: "pull_request",
+          integrationBranch: null,
+          directTargetPush: "exceptional",
+          requiredChecks: ["build"],
+          staleChecks: "block",
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "allowed",
+      missingRequiredActions: [],
+      missingProviderSignals: [],
+      recommendedFallbackAction: null,
+    });
+  });
 });
 
 describe("nexus authority summaries", () => {

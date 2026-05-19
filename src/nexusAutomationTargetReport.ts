@@ -51,6 +51,12 @@ import {
 } from "./workTrackingLocalProvider.js";
 import type { WorkStatus } from "./workTrackingTypes.js";
 import type {
+  NexusAutomationPublicationPolicySummary,
+} from "./nexusAutomationConfig.js";
+import {
+  summarizeNexusAutomationPublicationPolicy,
+} from "./nexusAutomationConfig.js";
+import type {
   WorktreePublicationDecision,
   WorktreeVerificationRecord,
 } from "./worktreeExecutionMetadata.js";
@@ -189,6 +195,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   verification: NexusAutomationTargetReportVerificationSummary[];
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
+  publication: NexusAutomationPublicationPolicySummary | null;
   authority: NexusAuthorityComponentSummary | null;
 }
 
@@ -334,6 +341,7 @@ export function buildNexusAutomationTargetReport(
     externalIssueVisibility,
     authority,
     componentProgress: summarizeComponentProgress({
+      projectConfig,
       components,
       workItemSummary,
       executionSummary,
@@ -747,6 +755,7 @@ function summarizeActiveBlockers(options: {
 }
 
 function summarizeComponentProgress(options: {
+  projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
   workItemSummary: NexusAutomationTargetReportWorkItemSummary;
   executionSummary: NexusAutomationTargetReportExecutionSummary;
@@ -831,6 +840,14 @@ function summarizeComponentProgress(options: {
       verification,
       publicationDecisions,
       runs: draft.runs,
+      publication: draft.component
+        ? summarizeNexusAutomationPublicationPolicy(
+            resolveNexusPublicationPolicy(
+              options.projectConfig,
+              draft.component,
+            ),
+          )
+        : null,
       authority:
         options.authority?.components.find(
           (component) => component.componentId === componentId,

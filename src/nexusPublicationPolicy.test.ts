@@ -416,6 +416,63 @@ describe("nexus publication policy", () => {
     });
   });
 
+  it("summarizes green-main policy and blocks direct target push by default", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...projectConfig().automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          push: false,
+          greenMain: {
+            integrationPreference: "pull_request",
+            integrationBranch: null,
+            directTargetPush: "blocked",
+            requiredChecks: ["build", "test"],
+            staleChecks: "block",
+          },
+        },
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "git_push",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(sourceRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.policySummary).toMatchObject({
+      mode: "green_main",
+      targetBranch: "main",
+      integrationPreference: "pull_request",
+      directTargetPush: "blocked",
+      requiredChecks: ["build", "test"],
+      staleChecks: "block",
+    });
+    expect(status.blocking).toBe(true);
+    expect(status.authority).toMatchObject({
+      requestedAction: "git.push_target_branch",
+      allowed: false,
+      recommendedFallbackAction: "provider.pull_request.open",
+    });
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:authority:git.push_target_branch",
+        status: "failed",
+      }),
+    );
+  });
+
   it("blocks pull request merge until provider approval checks and branch policy are clear", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-project-");
     const sourceRoot = path.join(projectRoot, "source");

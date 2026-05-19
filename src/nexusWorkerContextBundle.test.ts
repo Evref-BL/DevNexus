@@ -262,6 +262,8 @@ describe("nexus worker context bundle", () => {
       "Treat project context files as read-only unless the coordinator explicitly assigns project-state ownership.",
     );
     expect(briefing).toContain(`- AGENTS.md: ${path.join(projectRoot, "AGENTS.md")}`);
+    expect(briefing).toContain("- mode: review_handoff");
+    expect(briefing).toContain("- direct target push: blocked");
     expect(briefing).toContain("- automation remote: bot");
     expect(briefing).toContain(
       "- automation actor: machine_user:github:example-bot",
