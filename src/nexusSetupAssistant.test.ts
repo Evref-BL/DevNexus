@@ -1096,6 +1096,43 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("warns when the configured agent MCP server command line is stale", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-server-stale-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"old-dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "warning",
+        summary: expect.stringContaining("stale or unexpected"),
+        nextAction: expect.stringContaining("dev-nexus project mcp refresh"),
+      }),
+    );
+    expect(
+      check.checks.find((item) => item.id === "agent-mcp-server-codex-dev_nexus")
+        ?.summary,
+    ).toContain(
+      `Expected: "${process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus"}" "mcp-stdio"`,
+    );
+  });
+
   it("lists OpenCode and manual provider MCP targets in setup guidance and checks", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-provider-targets-");
     writeProject(projectRoot, {
@@ -1310,6 +1347,68 @@ describe("nexus setup assistant", () => {
         status: "passed",
       }),
     );
+  });
+
+  it("warns when a plugin MCP server uses a stale command line", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-plugin-mcp-stale-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "example-runtime-plugin",
+          enabled: true,
+          name: "Example Runtime Plugin",
+          version: "0.1.0-alpha.0",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "mcp-example-runtime",
+              serverName: "example_runtime",
+              command: "example-runtime",
+              args: ["mcp", "project"],
+            },
+          ],
+        },
+      ],
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      [
+        "[mcp_servers.dev_nexus]",
+        'command = "dev-nexus"',
+        'args = ["mcp-stdio"]',
+        "",
+        "[mcp_servers.example_runtime]",
+        'command = "node"',
+        'args = ["mcp-stdio"]',
+        "",
+      ].join("\n"),
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-example_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("stale or unexpected"),
+        nextAction: expect.stringContaining("reload or restart the agent session"),
+      }),
+    );
+    expect(
+      check.checks.find((item) =>
+        item.id === "plugin-example-runtime-plugin-mcp-example_runtime-codex"
+      )?.summary,
+    ).toContain('Expected: "example-runtime" "mcp" "project"');
   });
 
   it("blocks setup diagnostics when plugin MCP tools duplicate core DevNexus tools", () => {

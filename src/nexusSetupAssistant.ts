@@ -123,6 +123,11 @@ export interface NexusSetupCheckResult {
   nextAction: string | null;
 }
 
+interface ConfiguredMcpServerCommandLine {
+  command: string;
+  args: string[];
+}
+
 export interface NexusSetupState {
   version: 1;
   updatedAt: string;
@@ -339,6 +344,18 @@ export function buildNexusSetupCheck(options: {
       .filter((check) => check.status !== "passed" && check.nextAction)
       .map((check) => check.nextAction!),
   };
+}
+
+export function buildNexusMcpRuntimeFreshnessChecks(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+}): NexusSetupCheckResult[] {
+  const projectRoot = path.resolve(options.projectRoot);
+  const agentMcpTargets = setupAgentMcpTargets(projectRoot, options.projectConfig);
+  return [
+    ...agentMcpTargets.map(agentMcpServerConfiguredCheck),
+    ...pluginMcpServerChecks(projectRoot, options.projectConfig),
+  ].filter((check) => check.summary.includes("stale or unexpected"));
 }
 
 export function recordNexusSetupStep(
@@ -1272,20 +1289,36 @@ function pluginMcpServerCheck(options: {
     serverName,
   });
   if (configured === true) {
-    const command = configuredMcpServerCommand({
+    const commandLine = configuredMcpServerCommandLine({
       provider: options.provider,
       configPath,
       configSchema: options.configSchema,
       serverName,
     });
-    if (command && !mcpCommandAvailable(command, options.projectRoot)) {
+    const expectedCommandLine = pluginExpectedMcpCommandLine(options.capability);
+    if (
+      commandLine &&
+      expectedCommandLine &&
+      !mcpCommandLinesEqual(commandLine, expectedCommandLine)
+    ) {
       return {
         ...checkBase,
         status: "warning",
         summary:
-          `Plugin MCP server ${serverName} is configured for ${options.provider}, but command ${command} is not available on PATH.`,
+          `Plugin MCP server ${serverName} is configured for ${options.provider}, but its command line is stale or unexpected. ` +
+          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.`,
         nextAction:
-          `Install or expose ${command} for this host, or update ${options.configPathRelative} to use the configured plugin MCP command.`,
+          `Refresh ${options.provider} MCP config for ${serverName}, then reload or restart the agent session so it uses the updated command.`,
+      };
+    }
+    if (commandLine && !mcpCommandAvailable(commandLine.command, options.projectRoot)) {
+      return {
+        ...checkBase,
+        status: "warning",
+        summary:
+          `Plugin MCP server ${serverName} is configured for ${options.provider}, but command ${commandLine.command} is not available on PATH.`,
+        nextAction:
+          `Install or expose ${commandLine.command} for this host, or update ${options.configPathRelative} to use the configured plugin MCP command.`,
       };
     }
 
@@ -1337,6 +1370,28 @@ function agentMcpServerConfiguredCheck(
     serverName: target.serverName,
   });
   if (configured === true) {
+    const commandLine = configuredMcpServerCommandLine({
+      provider: target.provider,
+      configPath: target.configPath,
+      configSchema: target.configSchema,
+      serverName: target.serverName,
+    });
+    const expectedCommandLine = {
+      command: target.command,
+      args: target.args,
+    };
+    if (commandLine && !mcpCommandLinesEqual(commandLine, expectedCommandLine)) {
+      return {
+        ...checkBase,
+        status: "warning",
+        summary:
+          `DevNexus MCP server ${target.serverName} is configured for ${target.provider}, but its command line is stale or unexpected. ` +
+          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.`,
+        nextAction:
+          `Run dev-nexus project mcp refresh . and reload or restart the ${target.provider} session so it uses ${formatMcpCommandLine(expectedCommandLine)}.`,
+      };
+    }
+
     return {
       ...checkBase,
       status: "passed",
@@ -1494,15 +1549,31 @@ function mcpServerConfigured(options: {
   return null;
 }
 
-function configuredMcpServerCommand(options: {
+function configuredMcpServerCommandLine(options: {
   provider: string;
   configPath: string;
   configSchema: string;
   serverName: string;
-}): string | null {
+}): ConfiguredMcpServerCommandLine | null {
   if (options.configSchema === "codex.mcp_servers") {
-    return codexMcpServerCommand(
+    return codexMcpServerCommandLine(
       fs.readFileSync(options.configPath, "utf8"),
+      options.serverName,
+    );
+  }
+
+  if (options.configSchema === "claude.mcpServers") {
+    return jsonObjectMcpServerCommandLine(
+      options.configPath,
+      "mcpServers",
+      options.serverName,
+    );
+  }
+
+  if (options.configSchema === "opencode.mcp.local") {
+    return jsonObjectMcpServerCommandLine(
+      options.configPath,
+      "mcp",
       options.serverName,
     );
   }
@@ -1510,12 +1581,14 @@ function configuredMcpServerCommand(options: {
   return null;
 }
 
-function codexMcpServerCommand(
+function codexMcpServerCommandLine(
   content: string,
   serverName: string,
-): string | null {
+): ConfiguredMcpServerCommandLine | null {
   const lines = content.replace(/\r\n/gu, "\n").split("\n");
   let inServerTable = false;
+  let command: string | null = null;
+  let args: string[] = [];
   for (const line of lines) {
     const tableName = tomlTableName(line);
     if (tableName !== null) {
@@ -1529,13 +1602,122 @@ function codexMcpServerCommand(
       continue;
     }
 
-    const match = /^\s*command\s*=\s*"([^"]+)"\s*(?:#.*)?$/u.exec(line);
-    if (match) {
-      return match[1]!;
+    const commandMatch = /^\s*command\s*=\s*("(?:[^"\\]|\\.)*")\s*(?:#.*)?$/u
+      .exec(line);
+    if (commandMatch) {
+      command = parseJsonStringLiteral(commandMatch[1]!);
+      continue;
+    }
+    const argsMatch = /^\s*args\s*=\s*(\[[^\]]*\])\s*(?:#.*)?$/u.exec(line);
+    if (argsMatch) {
+      args = parseJsonStringArray(argsMatch[1]!);
     }
   }
 
-  return null;
+  return command ? { command, args } : null;
+}
+
+function jsonObjectMcpServerCommandLine(
+  configPath: string,
+  containerKey: "mcp" | "mcpServers",
+  serverName: string,
+): ConfiguredMcpServerCommandLine | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const mcpServers = (parsed as Record<string, unknown>)[containerKey];
+    if (!mcpServers || typeof mcpServers !== "object" || Array.isArray(mcpServers)) {
+      return null;
+    }
+    const server = (mcpServers as Record<string, unknown>)[serverName];
+    if (!server || typeof server !== "object" || Array.isArray(server)) {
+      return null;
+    }
+    const commandValue = (server as Record<string, unknown>).command;
+    const argsValue = (server as Record<string, unknown>).args;
+    if (Array.isArray(commandValue)) {
+      const commandParts = commandValue.filter(
+        (value): value is string => typeof value === "string",
+      );
+      const command = commandParts[0];
+      return command ? { command, args: commandParts.slice(1) } : null;
+    }
+    if (typeof commandValue === "string") {
+      return {
+        command: commandValue,
+        args: Array.isArray(argsValue)
+          ? argsValue.filter((value): value is string => typeof value === "string")
+          : [],
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function pluginExpectedMcpCommandLine(
+  capability: NexusPluginMcpServerCapability,
+): ConfiguredMcpServerCommandLine | null {
+  return capability.command
+    ? { command: capability.command, args: capability.args ?? [] }
+    : null;
+}
+
+function mcpCommandLinesEqual(
+  left: ConfiguredMcpServerCommandLine,
+  right: ConfiguredMcpServerCommandLine,
+): boolean {
+  return (
+    mcpCommandsEqual(left.command, right.command) &&
+    left.args.length === right.args.length &&
+    left.args.every((arg, index) => arg === right.args[index])
+  );
+}
+
+function mcpCommandsEqual(left: string, right: string): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (process.platform !== "win32") {
+    return false;
+  }
+
+  return stripWindowsCommandShim(left).toLowerCase() ===
+    stripWindowsCommandShim(right).toLowerCase();
+}
+
+function stripWindowsCommandShim(value: string): string {
+  return value.toLowerCase().endsWith(".cmd") ? value.slice(0, -4) : value;
+}
+
+function formatMcpCommandLine(commandLine: ConfiguredMcpServerCommandLine): string {
+  return [commandLine.command, ...commandLine.args]
+    .map((part) => JSON.stringify(part))
+    .join(" ");
+}
+
+function parseJsonStringLiteral(value: string): string {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "string" ? parsed : "";
+  } catch {
+    return "";
+  }
+}
+
+function parseJsonStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function mcpCommandAvailable(command: string, projectRoot: string): boolean {

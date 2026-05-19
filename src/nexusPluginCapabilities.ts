@@ -48,6 +48,8 @@ export interface NexusPluginMcpServerCapability
   extends NexusPluginCapabilityBase {
   kind: "mcp_server";
   serverName: string;
+  command?: string;
+  args?: string[];
   targetAgents?: string[];
   tools?: NexusPluginMcpToolCapability[];
 }
