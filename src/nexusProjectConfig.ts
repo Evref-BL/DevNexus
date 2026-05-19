@@ -77,6 +77,10 @@ import {
   type NexusAuthorityRoleDefinitionConfig,
   type NexusAuthorityScopeConfig,
 } from "./nexusAuthority.js";
+import {
+  validateNexusVersionPlanningConfig,
+  type NexusVersionPlanningConfig,
+} from "./nexusVersionPlanningConfig.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -354,6 +358,7 @@ export interface NexusProjectConfig {
   hosts?: NexusProjectHostConfig[];
   runnerProfiles?: NexusRunnerProfileConfig[];
   authority?: NexusAuthorityConfig;
+  versionPlanning?: NexusVersionPlanningConfig;
 }
 
 export interface ResolveNexusAgentConfigOptions {
@@ -3899,6 +3904,13 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     ...(workTracking ? { workTracking } : {}),
   };
   const components = validateProjectComponentsConfig(record.components, common);
+  const versionPlanning = validateNexusVersionPlanningConfig(
+    record.versionPlanning,
+    {
+      componentIds: new Set(components.map((component) => component.id)),
+      pathName: "project config.versionPlanning",
+    },
+  );
   validatePluginDependencyProjectionSourceComponents(plugins, components);
   validatePluginMcpToolOwnership(plugins);
 
@@ -3916,6 +3928,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     hosts,
     ...(runnerProfiles !== undefined ? { runnerProfiles } : {}),
     ...(authority ? { authority } : {}),
+    ...(versionPlanning ? { versionPlanning } : {}),
   };
 }
 
