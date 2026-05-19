@@ -211,6 +211,11 @@ and ready for coordinator-driven work across its components.
   published as `f0027da`; normal create/import now treats Vibe linkage as
   explicit DevNexus-Pharo extension configuration and no longer preserves
   legacy PLexus/Vibe metadata in neutral project imports.
+- DevNexus project import extension merge work `dev-nexus:local-142` is
+  published as `9fbb9f1`; empty/default same-key extension markers now
+  preserve nested extension config, including DevNexus-Pharo
+  `plexusProjectConfig` and `imageExecution`, while explicit replacement and
+  clearing remain available to callers.
 - DevNexus core guardrail work `dev-nexus:local-112` is complete; core now
   rejects plugin MCP tool names that overlap `dev_nexus`.
 - `docs/codex-architecture-design-audit-prd.md` records the Codex architecture
@@ -237,9 +242,9 @@ and ready for coordinator-driven work across its components.
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
   `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
   `local-90`, `local-91`, `local-133`, `local-92`, and `local-134` were
-  removed after publication. `local-94` and `local-107` are now published;
-  their ready leases are closed as merged and their generated helper
-  worktrees have been removed after cleanup. One old unmerged dogfood
+  removed after publication. `local-94`, `local-107`, and `local-142` are now
+  published; their ready leases are closed as merged and their generated
+  helper worktrees have been removed after cleanup. One old unmerged dogfood
   metadata branch remains preserved because Git does not classify it as merged.
 
 ## Near-Term Direction
@@ -284,9 +289,11 @@ and ready for coordinator-driven work across its components.
   complete. The local tracker auth-profile mismatch follow-on `local-152` is
   also complete as `0e86479`; DevNexus-Pharo package-template and legacy Vibe
   metadata fixes `dev-nexus-pharo:local-20` and `local-21` are complete as
-  `84a4556` and `f0027da`. The next cycle should re-check eligible work and
-  either promote the next dependency-satisfied bounded slice or record the
-  blocker that keeps remaining items out of ready state.
+  `84a4556` and `f0027da`. DevNexus import extension config preservation
+  `dev-nexus:local-142` is complete as `9fbb9f1`. The next cycle should
+  re-check eligible work and either promote the next dependency-satisfied
+  bounded slice or record the blocker that keeps remaining items out of ready
+  state.
 
 ## Boundaries
 

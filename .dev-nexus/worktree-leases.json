@@ -1,7 +1,61 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T11:11:55.207Z",
+  "updatedAt": "2026-05-19T11:29:00.196Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-e34718d4846709d4",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-142",
+      "branchName": "codex/dev-nexus/local-142-preserve-extension-config",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusProjectOperations.ts",
+        "src/nexusProjectOperations.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T11:20:55.281Z",
+      "lastSeenAt": "2026-05-19T11:29:00.196Z",
+      "updatedAt": "2026-05-19T11:29:00.196Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "9fbb9f19f0c500ffcc663deac1245d2f1d8b7740",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "local-142 completed and integrated.",
+        "Verification: Passed: npm test -- src/nexusProjectOperations.test.ts -t \"preserves same-key extension metadata\" (red before implementation, green after); npm test -- src/nexusProjectOperations.test.ts; npm run build; npm run check; git diff --check."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 153,
-  "nextCommentNumber": 322,
-  "updatedAt": "2026-05-19T10:10:40.284Z",
+  "nextCommentNumber": 326,
+  "updatedAt": "2026-05-19T11:29:00.214Z",
   "items": [
     {
       "id": "local-1",
@@ -3651,7 +3651,7 @@
       "id": "local-142",
       "title": "Preserve extension-specific config when re-importing existing projects",
       "description": "Type: project config merge defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved failure:\nRe-importing an existing DevNexus-Pharo project reset `extensions[\"dev-nexus-pharo\"]` from a configured object containing `plexusProjectConfig` and `imageExecution` to `{}`. The extension config then had to be restored manually.\n\nCurrent evidence:\n- `src/nexusProjectOperations.ts` merges project extensions with a shallow top-level spread: existing extension keys are retained, but a caller-provided entry for the same extension key replaces the whole nested object.\n- DevNexus-Pharo `importDevNexusPharoProject` passes `extensions: devNexusPharoProjectExtensionEntry()`, whose default value is `{ \"dev-nexus-pharo\": {} }`.\n- Existing tests cover retaining unrelated extension keys, but not preserving nested config for the same extension when the incoming value is an empty/default marker.\n\nGoal:\nMake re-import idempotent for extension-owned project settings while still allowing intentional extension config replacement when a caller explicitly requests it.\n\nAcceptance criteria:\n- Re-importing an initialized project with an empty/default extension marker preserves existing nested extension config for that extension key.\n- Callers still have an explicit way to replace or clear extension config when that is intended.\n- Tests cover same-key nested extension preservation, same-key intentional override, and unrelated extension retention.\n- DevNexus-Pharo project import no longer clobbers `plexusProjectConfig` or `imageExecution` on existing projects.\n\nBoundaries:\n- Keep merge semantics generic in DevNexus core; do not hard-code DevNexus-Pharo keys in core.\n- A DevNexus-Pharo-side change may still be needed if the plugin should avoid passing an empty extension marker on re-import.\n\nVerification:\n- Focused `nexusProjectOperations` import tests.\n- DevNexus-Pharo import/idempotence test if plugin call behavior changes.\n- `npm run check` in affected component(s) when feasible.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3664,8 +3664,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T20:55:41.825Z",
-      "updatedAt": "2026-05-18T20:55:41.825Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T11:29:00.214Z",
+      "closedAt": "2026-05-19T11:28:46.080Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7682,7 +7682,52 @@
       }
     ],
     "local-141": [],
-    "local-142": [],
+    "local-142": [
+      {
+        "id": "local-comment-322",
+        "body": "Started local-142 from isolated DevNexus source worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-142-preserve-extension-config. Plan: TDD around same-key extension config merge semantics in nexusProjectOperations; no live runtime or external provider writes.",
+        "author": null,
+        "createdAt": "2026-05-19T11:20:49.297Z",
+        "updatedAt": "2026-05-19T11:20:49.297Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-322"
+        }
+      },
+      {
+        "id": "local-comment-323",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-142-preserve-extension-config\nHead: 0e86479c57505073a22ea60cd0175c4b6a0110f0\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T11:20:55.281Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-142-preserve-extension-config-meta\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-142\",\n  \"logicalItemId\": \"local-142\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-142\",\n    \"itemNumber\": 142,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-142\",\n    \"itemNumber\": 142,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-142\",\n        \"itemNumber\": 142\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-142-preserve-extension-config\",\n  \"branch\": \"codex/dev-nexus/local-142-preserve-extension-config\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"0e86479c57505073a22ea60cd0175c4b6a0110f0\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"DevNexus project import extension config merge semantics\"\n  ],\n  \"decisions\": [\n    \"Selected AFK local-142 because no selector-ready work remained and it is source-only with bounded tests.\",\n    \"Use TDD in the isolated component worktree; keep DevNexus-Pharo behavior covered through generic core merge semantics unless plugin code needs a separate change.\"\n  ],\n  \"verificationSummary\": \"Not run yet; focused red test is next.\",\n  \"integrationPreference\": null,\n  \"note\": \"Starting local-142 from isolated component and project-meta worktrees.\",\n  \"leaseId\": \"lease-e34718d4846709d4\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T11:20:55.298Z",
+        "updatedAt": "2026-05-19T11:20:55.298Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-323"
+        }
+      },
+      {
+        "id": "local-comment-324",
+        "body": "Completed local-142 as DevNexus commit 9fbb9f1 and pushed it to bot/main. Import now patches same-key extension config by default, preserves empty DevNexus-Pharo markers, and adds explicit replaceExtensions/clearExtensions options. Verification passed: focused red/green regression, npm run check, git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T11:28:51.976Z",
+        "updatedAt": "2026-05-19T11:28:51.976Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-324"
+        }
+      },
+      {
+        "id": "local-comment-325",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-142-preserve-extension-config\nHead: 9fbb9f19f0c500ffcc663deac1245d2f1d8b7740\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T11:29:00.196Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-142-preserve-extension-config-meta\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-142\",\n  \"logicalItemId\": \"local-142\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-142\",\n    \"itemNumber\": 142,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-142\",\n    \"itemNumber\": 142,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-142\",\n      \"itemNumber\": 142,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-142\",\n        \"itemNumber\": 142\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-142-preserve-extension-config\",\n  \"branch\": \"codex/dev-nexus/local-142-preserve-extension-config\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"9fbb9f19f0c500ffcc663deac1245d2f1d8b7740\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusProjectOperations.ts\",\n    \"src/nexusProjectOperations.test.ts\"\n  ],\n  \"decisions\": [\n    \"Kept merge behavior generic in DevNexus core rather than adding DevNexus-Pharo-specific logic.\",\n    \"Default import extension updates now patch same-key extension objects; callers can use replaceExtensions for full replacement and clearExtensions to delete extension entries.\",\n    \"Published verified commit 9fbb9f1 directly to DevNexus bot/main under direct-integration policy.\"\n  ],\n  \"verificationSummary\": \"Passed: npm test -- src/nexusProjectOperations.test.ts -t \\\"preserves same-key extension metadata\\\" (red before implementation, green after); npm test -- src/nexusProjectOperations.test.ts; npm run build; npm run check; git diff --check.\",\n  \"integrationPreference\": null,\n  \"note\": \"local-142 completed and integrated.\",\n  \"leaseId\": \"lease-e34718d4846709d4\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T11:29:00.214Z",
+        "updatedAt": "2026-05-19T11:29:00.214Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-325"
+        }
+      }
+    ],
     "local-143": [
       {
         "id": "local-comment-233",
