@@ -228,6 +228,7 @@ export function buildNexusSetupCheck(options: {
 }): NexusSetupCheck {
   const flow = setupFlow(options.flowId);
   const platform = normalizeSetupPlatform(options.platform);
+  const localPathPlatform = currentSetupPlatform();
   const projectRoot = path.resolve(options.projectRoot);
   const checks: NexusSetupCheckResult[] = [];
   const setupState = readNexusSetupState(nexusSetupStatePath(projectRoot));
@@ -321,7 +322,7 @@ export function buildNexusSetupCheck(options: {
       const sourceRootPlan = componentCheckSourceRoot(
         component,
         projectRoot,
-        platform,
+        localPathPlatform,
       );
 
       checks.push(pathCheck({

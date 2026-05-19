@@ -8,7 +8,7 @@ import {
   createNexusAutomationCodexAppServerLauncher,
   defaultNexusAutomationConfig,
   readNexusAutomationRunLedger,
-  runNexusAutomationAgentLaunchOnce,
+  runNexusAutomationAgentLaunchOnce as runNexusAutomationAgentLaunchOnceBase,
   saveProjectConfig,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
@@ -17,6 +17,15 @@ import {
 } from "./index.js";
 
 const tempDirs: string[] = [];
+
+function runNexusAutomationAgentLaunchOnce(
+  options: Parameters<typeof runNexusAutomationAgentLaunchOnceBase>[0],
+): ReturnType<typeof runNexusAutomationAgentLaunchOnceBase> {
+  return runNexusAutomationAgentLaunchOnceBase({
+    mcpRuntimeProcesses: false,
+    ...options,
+  });
+}
 
 class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
   readonly requests: CodexAppServerJsonRpcRequest[] = [];

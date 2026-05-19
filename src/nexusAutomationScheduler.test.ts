@@ -8,7 +8,7 @@ import {
   defaultNexusAutomationConfig,
   loadLocalWorkTrackingStore,
   nextNexusAutomationSchedulerDelayMs,
-  runNexusAutomationScheduler,
+  runNexusAutomationScheduler as runNexusAutomationSchedulerBase,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
@@ -16,6 +16,15 @@ import {
 } from "./index.js";
 
 const tempDirs: string[] = [];
+
+function runNexusAutomationScheduler(
+  options: Parameters<typeof runNexusAutomationSchedulerBase>[0],
+): ReturnType<typeof runNexusAutomationSchedulerBase> {
+  return runNexusAutomationSchedulerBase({
+    mcpRuntimeProcesses: false,
+    ...options,
+  });
+}
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

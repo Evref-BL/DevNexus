@@ -10,13 +10,22 @@ import {
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
   buildNexusAutomationTargetReport,
-  runNexusAutomationCoordinatorLoop,
+  runNexusAutomationCoordinatorLoop as runNexusAutomationCoordinatorLoopBase,
   saveProjectConfig,
   type NexusProjectConfig,
 } from "./index.js";
 import type { WorkTrackerProvider } from "./workTrackingTypes.js";
 
 const tempDirs: string[] = [];
+
+function runNexusAutomationCoordinatorLoop(
+  options: Parameters<typeof runNexusAutomationCoordinatorLoopBase>[0],
+): ReturnType<typeof runNexusAutomationCoordinatorLoopBase> {
+  return runNexusAutomationCoordinatorLoopBase({
+    mcpRuntimeProcesses: false,
+    ...options,
+  });
+}
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

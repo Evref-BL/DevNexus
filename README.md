@@ -19,6 +19,10 @@ npm install -g @evref-bl/dev-nexus
 dev-nexus --help
 ```
 
+The online README on `main` can move ahead of the latest npm release. When an
+agent installs from npm, verify the installed command surface with
+`dev-nexus --help` before following newer source-branch examples.
+
 For source development:
 
 ```bash
@@ -28,19 +32,36 @@ npm run check
 
 ## Quick Start
 
-Initialize a DevNexus home and create or import a project:
+Start by choosing three different locations:
+
+- The **DevNexus home** is user-local registry and host setup state. It is not
+  the project you work in.
+- The **DevNexus project root** is the shared orchestration directory. Open
+  this directory as the Codex or Claude project/session.
+- **Component source roots** are the actual repositories or folders the project
+  coordinates. The default layout puts stable component checkouts under
+  `components/<component-id>` inside the project root.
+
+For a new DevNexus project, initialize the home, create the project root, then
+inspect it:
 
 ```bash
-dev-nexus home init <home-path>
-dev-nexus project create <name> --home <home-path>
-dev-nexus project import <source-root> --home <home-path> --name <name>
-dev-nexus project list --home <home-path>
+dev-nexus home init "$HOME/.dev-nexus"
+dev-nexus project create example-suite --home "$HOME/.dev-nexus" --root "$HOME/dev-nexus/example-suite"
+dev-nexus project status "$HOME/dev-nexus/example-suite"
 ```
 
-Inspect a project root:
+Use `project import` only when one existing source checkout should become the
+primary component of a new DevNexus project. Do not run `project import` once
+per repository if the goal is one DevNexus project with several components.
+For that case, create one project and declare those repositories as components
+in `dev-nexus.project.json`; the full example is in
+[Getting started](docs/user/getting-started.md#first-project-from-existing-components).
+
+List registered projects:
 
 ```bash
-dev-nexus project status <project-root>
+dev-nexus project list --home "$HOME/.dev-nexus"
 ```
 
 Inspect declared repository hosting before onboarding or publication:
@@ -68,6 +89,10 @@ Refresh agent Model Context Protocol (MCP) configuration:
 dev-nexus project mcp refresh <project-root> --agent codex
 dev-nexus mcp-stdio
 ```
+
+For Codex Desktop, also create or open a Codex project whose root is the same
+DevNexus project root. DevNexus writes project-local `.codex/config.toml`; it
+does not switch the desktop app to that project for you.
 
 Check automation readiness:
 

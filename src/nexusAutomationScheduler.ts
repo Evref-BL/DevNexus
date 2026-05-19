@@ -15,6 +15,7 @@ import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
 import type { CreateWorkTrackerProviderOptions } from "./workTrackingProviderService.js";
 import type { WorkTrackerProvider } from "./workTrackingTypes.js";
 
@@ -48,6 +49,7 @@ export interface RunNexusAutomationSchedulerOptions {
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
+  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   now?: () => Date | string;
   sleep?: (ms: number) => Promise<void>;
   onTick?: (tick: NexusAutomationSchedulerTick) => void | Promise<void>;
@@ -145,6 +147,7 @@ export async function runNexusAutomationScheduler(
           providerFactory: options.providerFactory,
           providerOptions: options.providerOptions,
           gitRunner: options.gitRunner,
+          mcpRuntimeProcesses: options.mcpRuntimeProcesses,
           now: options.now,
           owner: options.owner ?? "scheduler",
           runId,

@@ -11,7 +11,7 @@ import {
   loadLocalWorkTrackingStore,
   loadProjectConfig,
   readNexusAutomationRunLedger,
-  runNexusAutomationAgentLaunchOnce,
+  runNexusAutomationAgentLaunchOnce as runNexusAutomationAgentLaunchOnceBase,
   saveNexusHomeConfigFile,
   saveProjectConfig,
   validateNexusHomeConfigBase,
@@ -23,6 +23,15 @@ import {
 } from "./index.js";
 
 const tempDirs: string[] = [];
+
+function runNexusAutomationAgentLaunchOnce(
+  options: Parameters<typeof runNexusAutomationAgentLaunchOnceBase>[0],
+): ReturnType<typeof runNexusAutomationAgentLaunchOnceBase> {
+  return runNexusAutomationAgentLaunchOnceBase({
+    mcpRuntimeProcesses: false,
+    ...options,
+  });
+}
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));

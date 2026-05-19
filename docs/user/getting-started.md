@@ -18,10 +18,29 @@ npm install -g @evref-bl/dev-nexus
 dev-nexus --help
 ```
 
+If you are reading documentation from the GitHub `main` branch while using an
+older npm release, verify each command with `dev-nexus --help`. The docs in
+the installed package and the CLI help are the authority for that installed
+version.
+
 ## Homes And Projects
 
 A DevNexus home stores user-local configuration. A DevNexus project is the
 shared orchestration root for one or more components.
+
+Use the nouns precisely:
+
+- The **home** is local registry and host setup state. It can hold references
+  to many DevNexus projects.
+- The **project root** is the shared DevNexus orchestration directory. It
+  contains `dev-nexus.project.json`, `AGENTS.md`, planning files, and
+  `.dev-nexus/` support state.
+- A **component source root** is an actual repository or folder that the
+  project coordinates.
+- A **generated worktree** is an isolated implementation checkout under
+  `worktrees/<component-id>/`.
+- An **agent project or session** is the provider-side workspace, such as a
+  Codex Desktop project, opened at the DevNexus project root.
 
 ```bash
 dev-nexus home init <home-path>
@@ -38,6 +57,11 @@ directly:
 ```bash
 dev-nexus project status <project-root>
 ```
+
+`project import <source-root>` creates a DevNexus project whose primary
+component is that source root. It is not a command for adding a component to an
+existing project. If you have three existing repositories that should be worked
+on together, create one DevNexus project and declare three components.
 
 ## Project Layout
 
@@ -62,6 +86,11 @@ Common generated or support paths:
 | Target state | `.dev-nexus/automation/target-state.md` | Concise user-authored memory for an automation target. |
 | Generated worktrees | `<worktreesRoot>/<component-id>/` | Component-scoped worker worktrees for parallel source work. |
 | Agent MCP config | `.codex/config.toml`, `.mcp.json`, or another configured target | Generated from `mcp.agentTargets`. |
+
+Do not put primary editable component clones under `.dev-nexus/`. That
+directory is for support records, local ledgers, generated setup, and runtime
+state. Component source roots should be visible project layout, normally under
+`components/`, or explicit advanced external paths.
 
 ## Components
 
@@ -105,6 +134,150 @@ shape as a larger project.
 
 Older project-level work tracking config is still accepted for compatibility,
 but new projects should put work tracking on the owning component.
+
+## First Project From Existing Components
+
+Suppose the user wants one DevNexus project named `graphrag-research-suite`
+that coordinates these existing folders:
+
+```text
+/Users/alice/projects/benchmark-graphRag
+/Users/alice/projects/GraphRag-Projects/json-java-moose
+/Users/alice/projects/GraphRag-Projects/json-java-no-moose
+/Users/alice/papers/2026-iwst-modelsandllms
+```
+
+Create one DevNexus project first:
+
+```bash
+dev-nexus home init "$HOME/.dev-nexus"
+dev-nexus project create graphrag-research-suite --home "$HOME/.dev-nexus" --root "$HOME/dev-nexus/graphrag-research-suite"
+```
+
+Then edit `dev-nexus.project.json` so the existing folders are components of
+that one project. Until a component-add command exists, this explicit config is
+the supported path for multi-component first projects:
+
+```json
+{
+  "version": 1,
+  "id": "graphrag-research-suite",
+  "name": "GraphRAG Research Suite",
+  "worktreesRoot": "worktrees",
+  "components": [
+    {
+      "id": "benchmark-graphrag",
+      "name": "Benchmark GraphRAG",
+      "kind": "git",
+      "role": "primary",
+      "sourceRoot": "/Users/alice/projects/benchmark-graphRag",
+      "worktreesRoot": "worktrees/benchmark-graphrag",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/benchmark-graphrag.json"
+      },
+      "relationships": []
+    },
+    {
+      "id": "json-java-moose",
+      "name": "JSON Java Moose",
+      "kind": "git",
+      "role": "dependency",
+      "sourceRoot": "/Users/alice/projects/GraphRag-Projects/json-java-moose",
+      "worktreesRoot": "worktrees/json-java-moose",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/json-java-moose.json"
+      },
+      "relationships": [
+        {
+          "kind": "supports",
+          "componentId": "benchmark-graphrag"
+        }
+      ]
+    },
+    {
+      "id": "json-java-no-moose",
+      "name": "JSON Java No Moose",
+      "kind": "git",
+      "role": "dependency",
+      "sourceRoot": "/Users/alice/projects/GraphRag-Projects/json-java-no-moose",
+      "worktreesRoot": "worktrees/json-java-no-moose",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/json-java-no-moose.json"
+      },
+      "relationships": [
+        {
+          "kind": "supports",
+          "componentId": "benchmark-graphrag"
+        }
+      ]
+    },
+    {
+      "id": "iwst-paper",
+      "name": "IWST Paper",
+      "kind": "git",
+      "role": "addon",
+      "sourceRoot": "/Users/alice/papers/2026-iwst-modelsandllms",
+      "worktreesRoot": "worktrees/iwst-paper",
+      "workTracking": {
+        "provider": "local",
+        "storePath": ".dev-nexus/work-items/iwst-paper.json"
+      },
+      "relationships": [
+        {
+          "kind": "documents",
+          "componentId": "benchmark-graphrag"
+        }
+      ]
+    }
+  ],
+  "mcp": {
+    "command": "dev-nexus",
+    "args": ["mcp-stdio"],
+    "agentTargets": [
+      {
+        "agent": "codex"
+      }
+    ]
+  },
+  "skills": {
+    "defaultCorePack": true,
+    "sourceControl": "support",
+    "agentTargets": [
+      {
+        "agent": "codex"
+      }
+    ]
+  }
+}
+```
+
+Use absolute existing paths only when you deliberately want DevNexus to
+reference those external checkouts in place. The project-local default is to
+clone or move component source roots under
+`$HOME/dev-nexus/graphrag-research-suite/components/<component-id>` and use
+`componentsRoot:<component-id>` in shared config.
+
+After saving the config, refresh support and inspect readiness:
+
+```bash
+dev-nexus project status "$HOME/dev-nexus/graphrag-research-suite"
+dev-nexus project mcp refresh "$HOME/dev-nexus/graphrag-research-suite" --agent codex
+dev-nexus setup check "$HOME/dev-nexus/graphrag-research-suite" join-existing-project --platform macos
+```
+
+For Codex Desktop, create or open the Codex project at
+`$HOME/dev-nexus/graphrag-research-suite`. DevNexus creates the project-local
+`.codex/config.toml`; it does not change the desktop app's selected project.
+
+Create the first component-scoped work item:
+
+```bash
+dev-nexus work-item create "$HOME/dev-nexus/graphrag-research-suite" --component benchmark-graphrag --title "Define GraphRAG benchmark protocol" --status ready
+dev-nexus work-item list "$HOME/dev-nexus/graphrag-research-suite" --component benchmark-graphrag
+```
 
 ## Portable Paths
 

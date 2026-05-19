@@ -132,6 +132,7 @@ import {
   recordNexusSetupStep,
   type NexusSetupCheck,
   type NexusSetupFlowSummary,
+  type NexusMcpRuntimeProcess,
   type NexusSetupPlan,
   type NexusSetupPlatform,
   type NexusSetupRecordedStepStatus,
@@ -280,6 +281,7 @@ export interface DevNexusCliDependencies {
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
+  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   now?: () => Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
@@ -2476,6 +2478,7 @@ async function handleAutomationCommand(
       maxRuns: parsed.maxRuns,
       runIdPrefix: parsed.runIdPrefix,
       gitRunner: dependencies.gitRunner,
+      mcpRuntimeProcesses: dependencies.mcpRuntimeProcesses,
       now: dependencies.now,
       onTick: parsed.json
         ? undefined
@@ -2536,6 +2539,7 @@ async function handleAutomationCommand(
       maxRuns: parsed.maxRuns,
       runIdPrefix: parsed.runIdPrefix,
       gitRunner: dependencies.gitRunner,
+      mcpRuntimeProcesses: dependencies.mcpRuntimeProcesses,
       now: dependencies.now,
       onTick: parsed.json
         ? undefined
@@ -2563,6 +2567,7 @@ async function handleAutomationCommand(
       runId: parsed.runId,
       owner: parsed.owner,
       gitRunner: dependencies.gitRunner,
+      mcpRuntimeProcesses: dependencies.mcpRuntimeProcesses,
       now: dependencies.now,
       launcher: createNexusAutomationAgentCommandLauncher({
         command: commandOptions.command,

@@ -28,6 +28,7 @@ import {
   buildNexusAutomationTargetReport,
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
+import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
 import type {
   NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
@@ -146,6 +147,7 @@ export interface RunNexusAutomationCoordinatorLoopOptions {
   providerFactory?: NexusAutomationWorkTrackerProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
+  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   now?: () => Date | string;
   sleep?: (ms: number) => Promise<void>;
   onTick?: (tick: NexusAutomationCoordinatorLoopTick) => void | Promise<void>;
@@ -462,6 +464,7 @@ export async function runNexusAutomationCoordinatorLoop(
         providerFactory: options.providerFactory,
         providerOptions: options.providerOptions,
         gitRunner: options.gitRunner,
+        mcpRuntimeProcesses: options.mcpRuntimeProcesses,
         owner: options.owner ?? "coordinator-loop",
         now: options.now,
         runId,

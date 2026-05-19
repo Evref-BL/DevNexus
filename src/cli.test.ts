@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { main } from "./cli.js";
+import { main, usage } from "./cli.js";
 import {
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
@@ -69,6 +69,32 @@ function saveHomeConfig(
 function fixedClock(...timestamps: string[]): () => string {
   let index = 0;
   return () => timestamps[Math.min(index++, timestamps.length - 1)] ?? timestamps[0]!;
+}
+
+function documentedDevNexusCommands(relativePath: string): string[] {
+  return fs
+    .readFileSync(path.join(process.cwd(), relativePath), "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("dev-nexus "));
+}
+
+function commandPrefix(commandLine: string): string {
+  const tokens = commandLine.trim().split(/\s+/);
+  const prefix: string[] = [];
+  for (const token of tokens) {
+    if (
+      prefix.length > 0 &&
+      (token.startsWith("<") ||
+        token.startsWith("[") ||
+        token.startsWith("(") ||
+        (token.startsWith("--") && token !== "--help"))
+    ) {
+      break;
+    }
+    prefix.push(token);
+  }
+  return prefix.join(" ");
 }
 
 function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjectConfig {
@@ -292,6 +318,32 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("keeps onboarding documentation command examples on the CLI surface", () => {
+    const usagePrefixes = new Set(
+      usage()
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith("dev-nexus "))
+        .map(commandPrefix),
+    );
+    const documented = ["README.md", path.join("docs", "user", "getting-started.md")]
+      .flatMap((relativePath) =>
+        documentedDevNexusCommands(relativePath).map((command) => ({
+          relativePath,
+          command,
+        })),
+      );
+
+    const missing = documented.filter(
+      ({ command }) =>
+        ![...usagePrefixes].some(
+          (prefix) => command === prefix || command.startsWith(`${prefix} `),
+        ),
+    );
+
+    expect(missing).toEqual([]);
   });
 
   it("prints project hosting status and plan through the CLI", async () => {
@@ -4197,6 +4249,7 @@ describe("dev-nexus cli", () => {
     await main(["automation", "run-once", projectRoot, "--json"], {
       stdout: output.writer,
       commandRunner,
+      mcpRuntimeProcesses: false,
       now: fixedClock(
         "2026-05-16T10:00:00.000Z",
         "2026-05-16T10:01:00.000Z",
@@ -4294,6 +4347,7 @@ describe("dev-nexus cli", () => {
     await main(["automation", "run-once", projectRoot, "--json"], {
       stdout: output.writer,
       commandRunner,
+      mcpRuntimeProcesses: false,
       now: fixedClock(
         "2026-05-16T10:00:00.000Z",
         "2026-05-16T10:01:00.000Z",
@@ -4606,6 +4660,7 @@ describe("dev-nexus cli", () => {
       {
         stdout: output.writer,
         commandRunner,
+        mcpRuntimeProcesses: false,
         now: fixedClock("2026-05-17T10:00:00.000Z"),
       },
     );
@@ -4719,6 +4774,7 @@ describe("dev-nexus cli", () => {
         stdout: stdout.writer,
         stderr: stderr.writer,
         commandRunner,
+        mcpRuntimeProcesses: false,
         now: fixedClock("2026-05-17T10:00:00.000Z"),
       },
     );
