@@ -249,6 +249,13 @@ target or work item explicitly says otherwise. Treat items from mirror,
 coordination, planning, external-feedback, migration, or archive trackers as
 supporting records.
 
+Projects that intentionally allow selected external trackers into automation can
+set `automation.eligibleWorkMode` to `discovery`. In that mode, configured
+component `trackerDiscovery` policy decides which tracker roles are scanned and
+whether non-default tracker items are directly selectable or import-only. Keep
+the default mode for projects that want automation to read only the component
+default tracker.
+
 When an agent is assigned a canonical local item:
 
 - Update status and progress comments on the default tracker.

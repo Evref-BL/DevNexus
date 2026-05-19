@@ -372,7 +372,7 @@ export async function getNexusAutomationStatus(
       components,
       automationConfig,
       selectorQuery,
-      mode: options.eligibleWorkMode ?? "default",
+      mode: options.eligibleWorkMode ?? automationConfig.eligibleWorkMode,
       provider: options.provider,
       providerFactory: statusEligibleWorkProviderFactory({
         options,

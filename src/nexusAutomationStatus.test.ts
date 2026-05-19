@@ -191,6 +191,101 @@ describe("nexus automation status", () => {
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
 
+  it("uses configured discovery mode for agent launch readiness", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    const inboxStorePath = ".dev-nexus/work-items-inbox.json";
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "allowed",
+              importRequiredFirst: false,
+              providerFilters: ["local"],
+              queryLimit: 10,
+              conflictWinner: "scanned_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                  storePath: primaryStorePath,
+                },
+              },
+              {
+                id: "inbox",
+                name: "Inbox",
+                enabled: true,
+                roles: ["eligible_source"],
+                workTracking: {
+                  provider: "local",
+                  storePath: inboxStorePath,
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...projectConfig().automation!,
+          mode: "agent_launch",
+          eligibleWorkMode: "discovery",
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: inboxStorePath },
+      now: fixedClock("2026-05-16T09:05:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Inbox work",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      eligibleWorkMode: "discovery",
+      candidateCount: 1,
+      eligibleWorkItems: [
+        {
+          title: "Inbox work",
+          trackerRef: {
+            componentId: "primary",
+            trackerId: "inbox",
+            default: false,
+          },
+          selectable: true,
+          importOnly: false,
+        },
+      ],
+    });
+  });
+
   it("reports agent launch readiness grouped by configured components", async () => {
     const projectRoot = makeTempDir("dev-nexus-status-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

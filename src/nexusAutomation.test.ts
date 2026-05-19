@@ -54,6 +54,16 @@ afterEach(() => {
 });
 
 describe("nexus automation", () => {
+  it("accepts configured eligible-work discovery mode", () => {
+    expect(automationConfig({}).eligibleWorkMode).toBe("default");
+    expect(automationConfig({ eligibleWorkMode: "discovery" }).eligibleWorkMode).toBe(
+      "discovery",
+    );
+    expect(() => automationConfig({ eligibleWorkMode: "external" })).toThrow(
+      /eligibleWorkMode must be default or discovery/,
+    );
+  });
+
   it("builds a bounded tracker query and selects the first eligible work item", () => {
     const config = automationConfig({
       selector: {

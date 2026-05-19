@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  defaultNexusAutomationConfig,
   getNexusWorkItemDiscoveryStatus,
   saveProjectConfig,
   type NexusProjectConfig,
@@ -214,6 +215,84 @@ describe("work item discovery status", () => {
     });
     expect(fs.existsSync(storePath)).toBe(false);
     expect(fs.existsSync(linkPath)).toBe(false);
+  });
+
+  it("uses automation publication command environment for provider credential visibility", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    saveProjectConfig(
+      projectRoot,
+      {
+        ...projectConfig([
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/core.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "local",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local Work",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: { provider: "local" },
+              },
+              {
+                id: "github-inbox",
+                name: "GitHub Inbox",
+                enabled: true,
+                roles: ["eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "allowed",
+              importRequiredFirst: false,
+              providerFilters: ["local", "github"],
+              queryLimit: 25,
+              conflictWinner: "scanned_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            relationships: [],
+          },
+        ]),
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            commandEnvironment: {
+              GH_CONFIG_DIR: "home:.config/gh-example-bot",
+            },
+          },
+        },
+      },
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      env: {},
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.components[0]!.configuredTrackers[1]).toMatchObject({
+      id: "github-inbox",
+      credentials: {
+        status: "available",
+      },
+      readable: {
+        status: "readable",
+      },
+    });
   });
 
   it("keeps the default policy scoped to only the component default tracker", () => {

@@ -575,7 +575,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       components,
       automationConfig,
       selectorQuery,
-      mode: options.eligibleWorkMode ?? "default",
+      mode: options.eligibleWorkMode ?? automationConfig.eligibleWorkMode,
       provider: options.provider,
       providerFactory: agentLaunchEligibleWorkProviderFactory({
         options,

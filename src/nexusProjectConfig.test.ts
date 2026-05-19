@@ -1751,6 +1751,7 @@ describe("project config", () => {
     ).toEqual({
       enabled: true,
       mode: "run_once",
+      eligibleWorkMode: "default",
       selector: {
         statuses: ["ready"],
         labels: ["automation"],

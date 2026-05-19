@@ -96,6 +96,186 @@ describe("eligible work discovery", () => {
     ]);
   });
 
+  it("uses automation command environment to keep external provider discovery selectable", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const automation = {
+      ...automationConfig(),
+      publication: {
+        ...automationConfig().publication,
+        commandEnvironment: {
+          GH_CONFIG_DIR: "home:.config/gh-example-bot",
+        },
+      },
+    };
+    const config = {
+      ...projectConfig({
+        trackerDiscovery: {
+          scannedRoles: ["primary", "eligible_source"],
+          directExternalSelection: "allowed",
+          importRequiredFirst: false,
+          providerFilters: ["local", "github"],
+          queryLimit: 25,
+          conflictWinner: "scanned_tracker",
+          missingCredentialBehavior: "skip",
+        },
+      }),
+      automation,
+    };
+    saveProjectConfig(projectRoot, config);
+    const fetchCalls: Array<{ url: string; authorization: string | null }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      fetchCalls.push({
+        url: String(input),
+        authorization: headers.Authorization ?? headers.authorization ?? null,
+      });
+      return new Response(
+        JSON.stringify([
+          {
+            id: 42,
+            number: 42,
+            title: "GitHub task",
+            body: null,
+            state: "open",
+            labels: ["automation", "status:ready"],
+            assignees: [],
+            milestone: null,
+            created_at: "2026-05-18T09:00:00.000Z",
+            updated_at: "2026-05-18T09:00:00.000Z",
+            closed_at: null,
+            html_url: "https://github.com/example/demo/issues/42",
+          },
+        ]),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    };
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automation,
+      selectorQuery: buildNexusAutomationWorkItemQuery(automation),
+      mode: "discovery",
+      env: {},
+      providerOptions: {
+        github: {
+          fetch: fakeFetch,
+          credentialRunner: () => ({
+            status: 0,
+            stdout: [
+              "protocol=https",
+              "host=github.com",
+              "username=example-bot",
+              "password=credential-token",
+              "",
+            ].join("\n"),
+            stderr: "",
+          }),
+        },
+      },
+    });
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0]).toMatchObject({
+      authorization: "Bearer credential-token",
+    });
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "github-42",
+        componentId: "core",
+        title: "GitHub task",
+        sourceTrackerRef: {
+          trackerId: "inbox",
+          provider: "github",
+        },
+      },
+    ]);
+  });
+
+  it("passes discovery environment variables to external providers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["eligible_source"],
+        directExternalSelection: "allowed",
+        importRequiredFirst: false,
+        providerFilters: ["github"],
+        queryLimit: 25,
+        conflictWinner: "scanned_tracker",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const fetchCalls: Array<{ authorization: string | null }> = [];
+    const fakeFetch: typeof fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      fetchCalls.push({
+        authorization: headers.Authorization ?? headers.authorization ?? null,
+      });
+      return new Response(
+        JSON.stringify([
+          {
+            id: 43,
+            number: 43,
+            title: "Token-backed GitHub task",
+            state: "open",
+            labels: ["automation", "status:ready"],
+            assignees: [],
+            milestone: null,
+            created_at: "2026-05-18T09:00:00.000Z",
+            updated_at: "2026-05-18T09:00:00.000Z",
+            html_url: "https://github.com/example/demo/issues/43",
+          },
+        ]),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    };
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: config.automation!,
+      selectorQuery: buildNexusAutomationWorkItemQuery(config.automation!),
+      mode: "discovery",
+      env: {
+        GH_TOKEN: "runtime-token",
+      },
+      providerOptions: {
+        github: {
+          fetch: fakeFetch,
+          credentialRunner: false,
+        },
+      },
+    });
+
+    expect(fetchCalls).toEqual([
+      {
+        authorization: "Bearer runtime-token",
+      },
+    ]);
+    expect(result.eligibleWorkItems).toMatchObject([
+      {
+        id: "github-43",
+        sourceTrackerRef: {
+          trackerId: "inbox",
+          provider: "github",
+        },
+      },
+    ]);
+  });
+
   it("aggregates discovery sources with policy filters and final limits", async () => {
     const projectRoot = makeTempDir("dev-nexus-eligible-work-");
     const config = projectConfig({

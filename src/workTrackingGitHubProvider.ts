@@ -179,7 +179,12 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
     this.credentialRunner =
       options.credentialRunner === false
         ? undefined
-        : options.credentialRunner ?? defaultGitCredentialRunner;
+        : options.credentialRunner ??
+          ((request, runnerOptions) =>
+            defaultGitCredentialRunner(request, {
+              ...runnerOptions,
+              env: options.env,
+            }));
     this.credentialInteractive = options.credentialInteractive ?? false;
   }
 
@@ -655,13 +660,17 @@ function githubProjectV2BoardConfig(
 
 export function defaultGitCredentialRunner(
   request: GitCredentialRequest,
-  options: { interactive: boolean },
+  options: {
+    interactive: boolean;
+    env?: Record<string, string | undefined>;
+  },
 ): GitCredentialCommandResult {
   const result = spawnSync("git", ["credential", "fill"], {
     input: gitCredentialInput(request),
     encoding: "utf8",
     env: {
       ...process.env,
+      ...(options.env ?? {}),
       ...(options.interactive
         ? {}
         : {

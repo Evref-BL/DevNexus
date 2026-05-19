@@ -1,6 +1,9 @@
 import path from "node:path";
 import { eligibleNexusAutomationWorkItems } from "./nexusAutomation.js";
-import type { NexusAutomationConfig } from "./nexusAutomationConfig.js";
+import type {
+  NexusAutomationConfig,
+  NexusAutomationEligibleWorkMode,
+} from "./nexusAutomationConfig.js";
 import type {
   NexusProjectConfig,
   NexusProjectTrackerDiscoveryFingerprintConfig,
@@ -11,6 +14,7 @@ import type {
 } from "./nexusProjectLifecycle.js";
 import {
   defaultNexusWorkItemDiscoveryCredentialResolver,
+  nexusWorkItemDiscoveryCredentialEnvironment,
   nexusWorkItemDiscoveryTrackerSelection,
   type NexusWorkItemDiscoveryCredentialCheck,
   type NexusWorkItemDiscoveryCredentialResolver,
@@ -35,7 +39,7 @@ import type {
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
 
-export type NexusEligibleWorkMode = "default" | "discovery";
+export type NexusEligibleWorkMode = NexusAutomationEligibleWorkMode;
 
 export interface NexusEligibleWorkProviderContext {
   projectRoot: string;
@@ -151,11 +155,20 @@ export async function listNexusEligibleWorkByComponent(
   options: ListNexusEligibleWorkOptions,
 ): Promise<NexusEligibleWorkResult> {
   const projectRoot = path.resolve(requiredNonEmptyString(options.projectRoot, "projectRoot"));
+  const runtimeOptions = {
+    ...options,
+    projectRoot,
+    env: nexusWorkItemDiscoveryCredentialEnvironment({
+      projectRoot,
+      projectConfig: options.projectConfig,
+      env: options.env,
+    }),
+  };
   const mode = options.mode ?? "default";
   const result =
     mode === "discovery"
-      ? await listDiscoveryEligibleWork({ ...options, projectRoot })
-      : await listDefaultEligibleWork({ ...options, projectRoot });
+      ? await listDiscoveryEligibleWork(runtimeOptions)
+      : await listDefaultEligibleWork(runtimeOptions);
 
   return result;
 }
@@ -983,10 +996,35 @@ function createProvider(
   }
 
   return createWorkTrackerProvider(tracker.workTracking, {
-    ...options.providerOptions,
+    ...providerOptionsWithEnv(options.providerOptions, options.env),
     projectRoot: options.projectRoot,
     now: options.now,
   });
+}
+
+function providerOptionsWithEnv(
+  providerOptions: CreateWorkTrackerProviderOptions | undefined,
+  env: NodeJS.ProcessEnv | undefined,
+): CreateWorkTrackerProviderOptions | undefined {
+  if (!env) {
+    return providerOptions;
+  }
+
+  return {
+    ...providerOptions,
+    github: {
+      ...providerOptions?.github,
+      env: providerOptions?.github?.env ?? env,
+    },
+    gitlab: {
+      ...providerOptions?.gitlab,
+      env: providerOptions?.gitlab?.env ?? env,
+    },
+    jira: {
+      ...providerOptions?.jira,
+      env: providerOptions?.jira?.env ?? env,
+    },
+  };
 }
 
 function eligibleItem(options: {

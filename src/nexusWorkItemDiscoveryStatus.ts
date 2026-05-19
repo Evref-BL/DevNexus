@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   loadProjectConfig,
+  type NexusProjectConfig,
   type NormalizedNexusProjectTrackerDiscoveryPolicy,
 } from "./nexusProjectConfig.js";
 import {
@@ -12,6 +13,7 @@ import type {
   WorkTrackerCapabilityReport,
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
+import { publicationCommandEnvironment } from "./nexusPublicationPolicy.js";
 
 export type NexusWorkItemDiscoveryCredentialStatus =
   | "not_required"
@@ -107,7 +109,13 @@ export function getNexusWorkItemDiscoveryStatus(
   const components = resolveProjectComponents(projectRoot, projectConfig);
   const credentialResolver =
     options.credentialResolver ??
-    defaultNexusWorkItemDiscoveryCredentialResolver(options.env ?? process.env);
+    defaultNexusWorkItemDiscoveryCredentialResolver(
+      nexusWorkItemDiscoveryCredentialEnvironment({
+        projectRoot,
+        projectConfig,
+        env: options.env,
+      }),
+    );
   const componentStatuses = components.map((component) =>
     componentDiscoveryStatus(component, credentialResolver),
   );
@@ -127,6 +135,21 @@ export function getNexusWorkItemDiscoveryStatus(
       blockers.length > 0
         ? `Tracker discovery status has ${blockers.length} blocker(s)`
         : `Tracker discovery status reported ${warnings.length} warning(s)`,
+  };
+}
+
+export function nexusWorkItemDiscoveryCredentialEnvironment(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  env?: NodeJS.ProcessEnv;
+}): NodeJS.ProcessEnv {
+  return {
+    ...(options.env ?? process.env),
+    ...(options.projectConfig.automation
+      ? publicationCommandEnvironment(options.projectConfig.automation.publication, {
+          projectRoot: options.projectRoot,
+        })
+      : {}),
   };
 }
 
@@ -326,7 +349,11 @@ function providerEnvironmentCredentialAvailable(
   env: NodeJS.ProcessEnv,
 ): boolean {
   if (provider === "github") {
-    return nonEmpty(env.GITHUB_TOKEN) || nonEmpty(env.GH_TOKEN);
+    return (
+      nonEmpty(env.GITHUB_TOKEN) ||
+      nonEmpty(env.GH_TOKEN) ||
+      nonEmpty(env.GH_CONFIG_DIR)
+    );
   }
   if (provider === "gitlab") {
     return nonEmpty(env.GITLAB_TOKEN) || nonEmpty(env.GL_TOKEN);

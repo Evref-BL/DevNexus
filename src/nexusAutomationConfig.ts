@@ -1,6 +1,7 @@
 import type { WorkStatus } from "./workTrackingTypes.js";
 
 export type NexusAutomationMode = "run_once" | "agent_launch";
+export type NexusAutomationEligibleWorkMode = "default" | "discovery";
 export type NexusAutomationSafetyProfile =
   | "local"
   | "isolated"
@@ -164,6 +165,7 @@ export interface NexusAutomationPublicationConfig {
 export interface NexusAutomationConfig {
   enabled: boolean;
   mode: NexusAutomationMode;
+  eligibleWorkMode: NexusAutomationEligibleWorkMode;
   selector: NexusAutomationSelectorConfig;
   verification: NexusAutomationVerificationConfig;
   ledger: NexusAutomationLedgerConfig;
@@ -181,6 +183,7 @@ export interface NexusAutomationConfig {
 export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   enabled: true,
   mode: "run_once",
+  eligibleWorkMode: "default",
   selector: {
     statuses: ["ready", "todo"],
     labels: [],
@@ -282,6 +285,10 @@ export function validateNexusAutomationConfig(
     "project config.automation",
   );
   const mode = validateMode(record.mode, "project config.automation.mode");
+  const eligibleWorkMode = validateEligibleWorkMode(
+    record.eligibleWorkMode,
+    "project config.automation.eligibleWorkMode",
+  );
   const selector = validateSelectorConfig(record.selector);
   const verification = validateVerificationConfig(record.verification);
   const ledger = validateLedgerConfig(record.ledger);
@@ -301,6 +308,8 @@ export function validateNexusAutomationConfig(
   return {
     enabled: enabled ?? defaultNexusAutomationConfig.enabled,
     mode: mode ?? defaultNexusAutomationConfig.mode,
+    eligibleWorkMode:
+      eligibleWorkMode ?? defaultNexusAutomationConfig.eligibleWorkMode,
     selector: {
       ...defaultNexusAutomationConfig.selector,
       ...selector,
@@ -372,6 +381,20 @@ function validateMode(
   }
 
   throw new NexusAutomationConfigError(`${pathName} must be run_once or agent_launch`);
+}
+
+function validateEligibleWorkMode(
+  value: unknown,
+  pathName: string,
+): NexusAutomationEligibleWorkMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "default" || value === "discovery") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(`${pathName} must be default or discovery`);
 }
 
 function validateSelectorConfig(
