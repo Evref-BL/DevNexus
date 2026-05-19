@@ -52,6 +52,7 @@ import {
   loadProjectConfig,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import { buildNexusMcpRuntimeFreshnessChecks } from "./nexusSetupAssistant.js";
 import {
   preflightNexusNpmRuntimeInstall,
   type NexusNpmRuntimeCommandRunner,
@@ -899,7 +900,10 @@ export function preflightNexusAutomationAgentLaunch(options: {
           ...(options.runtimePackageCommandRunner
             ? { commandRunner: options.runtimePackageCommandRunner }
             : {}),
-        })
+          })
+      : []),
+    ...(options.projectRoot
+      ? preflightNexusMcpRuntimeFreshness(options.projectRoot)
       : []),
     check(
       "workTracking",
@@ -924,6 +928,32 @@ export function preflightNexusAutomationAgentLaunch(options: {
       ),
     ),
   ];
+}
+
+function preflightNexusMcpRuntimeFreshness(
+  projectRoot: string,
+): NexusAutomationPreflightCheck[] {
+  try {
+    const projectConfig = loadProjectConfig(projectRoot);
+    return buildNexusMcpRuntimeFreshnessChecks({ projectRoot, projectConfig }).map(
+      (freshnessCheck) => ({
+        name: `mcpRuntime:${freshnessCheck.id}`,
+        status: "failed",
+        message: freshnessCheck.nextAction
+          ? `${freshnessCheck.summary} ${freshnessCheck.nextAction}`
+          : freshnessCheck.summary,
+      }),
+    );
+  } catch (error) {
+    return [{
+      name: "mcpRuntime:freshness",
+      status: "failed",
+      message:
+        error instanceof Error
+          ? `Unable to inspect MCP runtime freshness: ${error.message}`
+          : `Unable to inspect MCP runtime freshness: ${String(error)}`,
+    }];
+  }
 }
 
 function preflightNexusAutomationAgentPolicy(

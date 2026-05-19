@@ -2245,6 +2245,8 @@ describe("project config", () => {
                 kind: "mcp_server",
                 id: "analysis-mcp",
                 serverName: "analysis_tools",
+                command: "analysis-tools",
+                args: ["mcp"],
                 targetAgents: ["codex"],
                 tools: [
                   {
@@ -2329,6 +2331,8 @@ describe("project config", () => {
             kind: "mcp_server",
             id: "analysis-mcp",
             serverName: "analysis_tools",
+            command: "analysis-tools",
+            args: ["mcp"],
             targetAgents: ["codex"],
             tools: [
               {

@@ -892,6 +892,61 @@ describe("nexus automation agent launch", () => {
     );
   });
 
+  it("blocks coordinator launch when projected MCP command lines are stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "[mcp_servers.dev_nexus]\ncommand = \"old-dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+    );
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        mcp: {
+          agentTargets: [{ agent: "codex" }],
+        },
+      }),
+    );
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Needs fresh MCP runtime",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-mcp-freshness-preflight",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: expect.stringContaining("stale or unexpected"),
+      contextFile: null,
+      resultFile: null,
+      launch: null,
+    });
+    expect(result.preflight).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "mcpRuntime:agent-mcp-server-codex-dev_nexus",
+          status: "failed",
+          message: expect.stringContaining(
+            `Expected: "${process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus"}" "mcp-stdio"`,
+          ),
+        }),
+      ]),
+    );
+  });
+
   it("blocks before launching when project-local runtime npm packages are damaged and repair is not approved", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

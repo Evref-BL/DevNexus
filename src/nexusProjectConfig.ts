@@ -1777,11 +1777,15 @@ function validatePluginCapabilityRecord(
   if (kind === "mcp_server") {
     const targetAgents = optionalStringArray(record, "targetAgents", pathName);
     const tools = validatePluginMcpTools(record.tools, `${pathName}.tools`);
+    const command = optionalString(record, "command", pathName);
+    const args = optionalStringArray(record, "args", pathName);
     return {
       kind,
       id,
       ...(description !== undefined ? { description } : {}),
       serverName: requiredString(record, "serverName", pathName),
+      ...(command !== undefined ? { command } : {}),
+      ...(args !== undefined ? { args } : {}),
       ...(targetAgents !== undefined ? { targetAgents } : {}),
       ...(tools !== undefined ? { tools } : {}),
     };

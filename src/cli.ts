@@ -1605,7 +1605,7 @@ async function handleCoordinationCommand(
       workItemId: parsed.workItemId,
       trackerId: parsed.trackerId,
       trackerRole: parsed.trackerRole,
-      currentPath: parsed.currentPath ?? process.cwd(),
+      currentPath: parsed.currentPath,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -1638,7 +1638,7 @@ async function handleCoordinationCommand(
       verificationSummary: parsed.verificationSummary,
       integrationPreference: parsed.integrationPreference,
       note: parsed.note,
-      currentPath: parsed.currentPath ?? process.cwd(),
+      currentPath: parsed.currentPath,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
@@ -1670,7 +1670,7 @@ async function handleCoordinationCommand(
         trackerRole: parsed.trackerRole,
         targetBranch: parsed.targetBranch,
         fetch: parsed.fetch,
-        currentPath: parsed.currentPath ?? process.cwd(),
+        currentPath: parsed.currentPath,
         gitRunner: dependencies.gitRunner,
         now: dependencies.now,
       });
@@ -1732,7 +1732,7 @@ async function handleCoordinationCommand(
       responseSummary: parsed.responseSummary,
       responder: parsed.responder,
       requestedChanges: parsed.requestedChanges,
-      currentPath: parsed.currentPath ?? process.cwd(),
+      currentPath: parsed.currentPath,
       gitRunner: dependencies.gitRunner,
       now: dependencies.now,
     });
