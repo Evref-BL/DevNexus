@@ -1,7 +1,171 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T08:37:30.000Z",
+  "updatedAt": "2026-05-19T09:32:30.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c0db318440dd6a07",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-147",
+      "branchName": "codex/dev-nexus/local-147-research-plugin-skeleton",
+      "baseRef": "bot/codex/dev-nexus/local-147-research-plugin-skeleton",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "package.json",
+        "plugins/dev-nexus-research"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T09:32:09.979Z",
+      "lastSeenAt": "2026-05-19T09:32:09.979Z",
+      "updatedAt": "2026-05-19T09:32:09.979Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c283c2f81fbacd404a063feb9794aded1d50f118",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus/local-147-research-plugin-skeleton",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published dev-nexus:local-147 to DevNexus main and closed the local tracker item from a project-meta worktree.",
+        "Verification: npm --prefix plugins/dev-nexus-research run check passed; npm run check passed pre-publication and post-publication.",
+        "Integration preference: direct_integration to DevNexus bot/main as c283c2f"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-40696713804ab835",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-147",
+      "branchName": "codex/project-meta/close-local-147",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/project-meta-close-local-147"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/worktree-leases.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T09:31:15.365Z",
+      "lastSeenAt": "2026-05-19T09:32:30.000Z",
+      "updatedAt": "2026-05-19T09:32:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "39ca9dac5177e95c1121fc544cfb0b84dfadfe8b",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/project-meta-close-local-147"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Recorded local-147 status/comment, coordination handoff, and target-state closeout after source publication.",
+        "Integration preference: direct_integration"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-369014a30d1a57a7",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-147",
+      "branchName": "codex/dev-nexus/local-147-research-plugin-skeleton",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-147-research-plugin-skeleton"
+      },
+      "writeScope": [
+        "plugins/dev-nexus-research",
+        "package.json",
+        "vitest.config.ts",
+        "docs/dev/architecture.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T09:26:05.400Z",
+      "lastSeenAt": "2026-05-19T09:32:30.000Z",
+      "updatedAt": "2026-05-19T09:32:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "c283c2f81fbacd404a063feb9794aded1d50f118",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-147-research-plugin-skeleton"
+        },
+        "upstream": "bot/codex/dev-nexus/local-147-research-plugin-skeleton",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published dev-nexus:local-147 to DevNexus main as c283c2f via bot remote.",
+        "Verification: npm --prefix plugins/dev-nexus-research run check passed; npm run check passed pre-publication and post-publication.",
+        "Integration preference: direct_integration"
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

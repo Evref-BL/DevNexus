@@ -218,10 +218,10 @@ and ready for coordinator-driven work across its components.
   skills, setup checks, artifact conventions, integrity gates, and human
   checkpoints. The PRD is sliced: `dev-nexus:local-146` is the blocked
   human-in-the-loop license and upstream ARS integration posture decision;
-  `local-147` is ready for an original plugin skeleton; `local-148` through
-  `local-151` cover projected research skills, artifact/setup conventions,
-  optional external ARS Codex skill integration, and a dogfood paper-project
-  smoke.
+  `local-147` is complete as `c283c2f` for an original DevNexus-Research plugin
+  package skeleton; `local-148` through `local-151` cover projected research
+  skills, artifact/setup conventions, optional external ARS Codex skill
+  integration, and a dogfood paper-project smoke.
 - No active implementation worktrees are expected for the completed source
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
@@ -261,16 +261,18 @@ and ready for coordinator-driven work across its components.
 - Continue Codex app-server correction after completed `dev-nexus:local-115`
   before worker-thread orchestration, MCP relay expansion, or provider-native
   subagent features.
-- Start DevNexus-Research with `dev-nexus:local-147` using original
-  DevNexus-owned plugin content. Keep `dev-nexus:local-146` blocked until the
-  user decides whether ARS is inspiration-only, optional external integration,
-  or bundled/adapted content under an explicit license posture.
+- DevNexus-Research plugin skeleton work `dev-nexus:local-147` is published as
+  `c283c2f` with original placeholder content only. Keep `dev-nexus:local-146`
+  blocked until the user decides whether ARS is inspiration-only, optional
+  external integration, or bundled/adapted content under an explicit license
+  posture. Keep `local-148` through `local-151` ordered behind this skeleton
+  and the relevant setup/projection tests.
 - Cross-tracker discovery implementation is complete through
   `dev-nexus:local-136`; keep `local-137` blocked until the user decides the
   dogfood external issue selection, provider-comment, scheduler-import, and
-  ordering policy. Next ready DevNexus source cycles should choose between
-  `local-93` provider authority signals and `local-147` DevNexus-Research
-  plugin skeleton work based on current target priority.
+  ordering policy. The next ready DevNexus source cycle should prioritize
+  `local-93` provider authority signals unless a new bounded research-plugin
+  slice is made ready.
 
 ## Boundaries
 

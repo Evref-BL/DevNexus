@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 316,
-  "updatedAt": "2026-05-19T08:35:35.940Z",
+  "nextCommentNumber": 318,
+  "updatedAt": "2026-05-19T09:32:10.032Z",
   "items": [
     {
       "id": "local-1",
@@ -3776,7 +3776,7 @@
       "id": "local-147",
       "title": "Scaffold DevNexus-Research plugin component",
       "description": "Type: plugin scaffold tracer-bullet\nReadiness: autonomous agent-ready if implemented with original DevNexus-owned content only.\nSource PRD: docs/dev-nexus-research-plugin-prd.md\nRelated blocker: dev-nexus:local-146 blocks ARS-derived or bundled content, but not an original plugin skeleton.\n\nGoal: create the initial DevNexus-Research plugin package or component skeleton that proves research can be modeled as an additive DevNexus plugin.\n\nAcceptance criteria:\n- A DevNexus-Research package/component exists with package metadata, README, tests, and a minimal exported plugin capability config.\n- The plugin declares only generic DevNexus plugin capability records such as projected_skill, setup_obligation, environment_hint, worker_context_fragment, and worker_briefing_fragment.\n- The skeleton uses original placeholder skills and guidance, with no copied ARS content.\n- The plugin can be referenced from a DevNexus project config without adding research-specific behavior to DevNexus core.\n- Documentation states that the plugin is a domain add-on and that DevNexus still owns generic project, tracker, worktree, and coordination behavior.\n\nBoundaries:\n- Do not vendor ARS or adapt ARS prompt text in this slice.\n- Do not add live external API calls, document rendering, Zotero integration, or citation-provider clients.\n- Do not add the plugin to the dogfood root as enabled until setup and projection behavior is tested.\n\nVerification:\n- Package build/test for the new component.\n- Static project-config fixture proving the plugin capability shape validates.\n- npm run check for the component when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3788,8 +3788,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T21:54:19.630Z",
-      "updatedAt": "2026-05-18T21:56:38.705Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T09:32:10.032Z",
+      "closedAt": "2026-05-19T09:31:49.822Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7760,6 +7760,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-243"
+        }
+      },
+      {
+        "id": "local-comment-316",
+        "body": "Completed and published DevNexus-Research plugin scaffold.\n\nSource: DevNexus c283c2f on bot/main.\nScope: plugins/dev-nexus-research package with metadata, README, placeholder research workflow skill, minimal generic plugin capability export, static project-config fixture, and package tests. No ARS-derived content, live APIs, document rendering, Zotero integration, or citation-provider clients were added.\nVerification: npm --prefix plugins/dev-nexus-research run check passed; npm run check passed pre-publication in the worktree and post-publication in C:\\dev\\code\\sources\\dev-nexus.\nPublication: direct integration to DevNexus bot/main.",
+        "author": null,
+        "createdAt": "2026-05-19T09:31:57.989Z",
+        "updatedAt": "2026-05-19T09:31:57.989Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-316"
+        }
+      },
+      {
+        "id": "local-comment-317",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-147-research-plugin-skeleton\nHead: c283c2f81fbacd404a063feb9794aded1d50f118\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T09:32:09.979Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\project-meta-close-local-147\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-147\",\n  \"logicalItemId\": \"local-147\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-147\",\n    \"itemNumber\": 147,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-147\",\n      \"itemNumber\": 147,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-147\",\n        \"itemNumber\": 147\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-147-research-plugin-skeleton\",\n  \"branch\": \"codex/dev-nexus/local-147-research-plugin-skeleton\",\n  \"upstream\": \"bot/codex/dev-nexus/local-147-research-plugin-skeleton\",\n  \"baseRef\": \"bot/codex/dev-nexus/local-147-research-plugin-skeleton\",\n  \"headCommit\": \"c283c2f81fbacd404a063feb9794aded1d50f118\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"package.json\",\n    \"plugins/dev-nexus-research\"\n  ],\n  \"decisions\": [\n    \"Implemented DevNexus-Research as a separate source-owned plugin package under plugins/dev-nexus-research.\",\n    \"Kept the skeleton original-only: no ARS-derived content, live APIs, document rendering, Zotero integration, or citation-provider clients.\",\n    \"Root npm run check now includes the plugin package check.\"\n  ],\n  \"verificationSummary\": \"npm --prefix plugins/dev-nexus-research run check passed; npm run check passed pre-publication and post-publication.\",\n  \"integrationPreference\": \"direct_integration to DevNexus bot/main as c283c2f\",\n  \"note\": \"Published dev-nexus:local-147 to DevNexus main and closed the local tracker item from a project-meta worktree.\",\n  \"leaseId\": \"lease-c0db318440dd6a07\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T09:32:10.032Z",
+        "updatedAt": "2026-05-19T09:32:10.032Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-317"
         }
       }
     ],
