@@ -4,6 +4,7 @@ import process from "node:process";
 import readline from "node:readline/promises";
 import {
   createDefaultNexusHomeConfigBase,
+  defaultNexusHomePath,
   loadNexusHomeConfigFile,
   nexusHomeConfigPath,
   saveNexusHomeConfigFile,
@@ -40,7 +41,6 @@ import {
 import { createLocalWorkTrackerProvider } from "./workTrackingLocalProvider.js";
 
 export const nexusProjectSetupRequiredAnswerPaths = [
-  "home.path",
   "project.id",
   "project.name",
   "project.root",
@@ -366,7 +366,7 @@ async function promptForNexusProjectSetupAnswers(options: {
     const homePath = await askWithDefault(
       rl,
       "DevNexus home",
-      options.homePath ?? path.join(process.env.HOME ?? process.cwd(), ".dev-nexus"),
+      options.homePath ?? defaultNexusHomePath(),
     );
     const componentId = await askWithDefault(rl, "Primary component id", "primary");
     const componentPath = await askWithDefault(

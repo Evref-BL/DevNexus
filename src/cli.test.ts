@@ -22,6 +22,7 @@ import {
 } from "./index.js";
 
 const tempDirs: string[] = [];
+const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -291,6 +292,11 @@ function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+  if (originalDevNexusHome === undefined) {
+    delete process.env.DEV_NEXUS_HOME;
+  } else {
+    process.env.DEV_NEXUS_HOME = originalDevNexusHome;
   }
 });
 
@@ -1118,11 +1124,84 @@ describe("dev-nexus cli", () => {
       ok: false,
       error: "project_setup_answers_required",
       requiredAnswers: expect.arrayContaining([
-        "home.path",
         "project.id",
         "components[0].source.path|remoteUrl",
       ]),
     });
+    expect(JSON.parse(output.output()).requiredAnswers).not.toContain("home.path");
+  });
+
+  it("defaults project setup home when answers omit home path", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-setup-default-home-");
+    const defaultHomePath = path.join(makeTempDir("dev-nexus-default-home-"), "home");
+    const componentRoot = path.join(projectRoot, "components", "core");
+    fs.mkdirSync(componentRoot, { recursive: true });
+    process.env.DEV_NEXUS_HOME = defaultHomePath;
+    const answersPath = path.join(projectRoot, "answers.json");
+    fs.writeFileSync(
+      answersPath,
+      `${JSON.stringify({
+        project: {
+          id: "default-home-demo",
+          name: "Default Home Demo",
+          root: projectRoot,
+        },
+        components: [
+          {
+            id: "core",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: "components/core",
+            },
+          },
+        ],
+      }, null, 2)}\n`,
+    );
+
+    const previewOutput = captureOutput();
+    await expect(
+      main(
+        ["project", "setup", projectRoot, "--answers", answersPath, "--json"],
+        { stdout: previewOutput.writer },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(previewOutput.output())).toMatchObject({
+      ok: true,
+      applied: false,
+      proposal: {
+        answers: {
+          home: {
+            path: defaultHomePath,
+          },
+        },
+      },
+    });
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "project",
+          "setup",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--yes",
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(
+      fs.readFileSync(path.join(defaultHomePath, "dev-nexus.home.json"), "utf8"),
+    ).projects).toEqual([
+      expect.objectContaining({
+        id: "default-home-demo",
+        projectRoot,
+      }),
+    ]);
   });
 
   it("previews and applies project setup from an answer file without provider mutations", async () => {

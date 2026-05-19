@@ -50,14 +50,14 @@ Use the nouns precisely:
   Codex Desktop project, opened at the DevNexus project root.
 
 ```bash
-dev-nexus home init <home-path>
-dev-nexus project setup <project-root> --home <home-path> --answers <answers.json>
-dev-nexus project setup <project-root> --home <home-path> --answers <answers.json> --yes
+dev-nexus home init
+dev-nexus project setup <project-root> --answers <answers.json>
+dev-nexus project setup <project-root> --answers <answers.json> --yes
 dev-nexus project component add <project-root> --answers <answers.json>
 dev-nexus project component add <project-root> --answers <answers.json> --yes
-dev-nexus project create <name> --home <home-path>
-dev-nexus project import <source-root> --home <home-path> --name <name>
-dev-nexus project list --home <home-path>
+dev-nexus project create <name>
+dev-nexus project import <source-root> --name <name>
+dev-nexus project list
 ```
 
 Commands that need a registry accept `--home`. When `--home` is omitted,
@@ -195,9 +195,6 @@ Write an answer file for one DevNexus project with several components:
 
 ```json
 {
-  "home": {
-    "path": "/Users/alice/.dev-nexus"
-  },
   "project": {
     "id": "graphrag-research-suite",
     "name": "GraphRAG Research Suite",
@@ -312,9 +309,9 @@ Write an answer file for one DevNexus project with several components:
 Then preview and apply the local scaffold:
 
 ```bash
-dev-nexus home init "$HOME/.dev-nexus"
-dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --home "$HOME/.dev-nexus" --answers ./graphrag.setup.json --json
-dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --home "$HOME/.dev-nexus" --answers ./graphrag.setup.json --yes
+dev-nexus home init
+dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --answers ./graphrag.setup.json --json
+dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --answers ./graphrag.setup.json --yes
 ```
 
 The preview reports local writes and next-phase provider work. The apply step

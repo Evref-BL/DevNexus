@@ -1,5 +1,6 @@
 import type { NexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
 import type { NexusProjectSetupHostingHandoff } from "./nexusProjectSetupHostingHandoff.js";
+import { defaultNexusHomePath } from "./nexusHomeConfig.js";
 
 export type NexusProjectSetupMutationClass =
   | "local_file_write"
@@ -244,9 +245,6 @@ export function validateNexusProjectSetupAnswers(
     ...findNexusProjectSetupSecretDiagnostics(answers),
   ];
 
-  if (!nonEmptyString(answers.home?.path)) {
-    diagnostics.push(errorDiagnostic("home.path", "DevNexus home path is required."));
-  }
   if (!nonEmptyString(answers.project?.id)) {
     diagnostics.push(errorDiagnostic("project.id", "Project id is required."));
   }
@@ -536,7 +534,7 @@ function normalizeNexusProjectSetupAnswers(
   return {
     version: 1,
     home: {
-      path: answers.home?.path ?? "",
+      path: answers.home?.path ?? defaultNexusHomePath(),
       ...(answers.home?.registerProject !== undefined
         ? { registerProject: answers.home.registerProject }
         : {}),

@@ -50,13 +50,14 @@ small JSON answer file, previews local writes by default, and applies only when
 `--yes` is present:
 
 ```bash
-dev-nexus home init "$HOME/.dev-nexus"
-dev-nexus project setup "$HOME/dev-nexus/example-suite" --home "$HOME/.dev-nexus" --answers ./dev-nexus.setup.json --json
-dev-nexus project setup "$HOME/dev-nexus/example-suite" --home "$HOME/.dev-nexus" --answers ./dev-nexus.setup.json --yes
+dev-nexus home init
+dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --json
+dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --yes
 dev-nexus project status "$HOME/dev-nexus/example-suite"
 ```
 
-`project setup` collects the home, project root, component sources, primary
+`project setup` defaults the DevNexus home to `DEV_NEXUS_HOME` or
+`~/.dev-nexus`, then collects the project root, component sources, primary
 component, agent targets, local tracker choice, hosting intent, auth-profile
 references, and publication posture. Provider mutations, such as creating a
 GitHub repository or repairing access, are left as explicit next-phase hosting
