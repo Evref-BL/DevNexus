@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 52,
-  "updatedAt": "2026-05-18T21:46:49.109Z",
+  "nextCommentNumber": 56,
+  "updatedAt": "2026-05-19T10:27:09.503Z",
   "items": [
     {
       "id": "local-1",
@@ -481,7 +481,7 @@
       "id": "local-20",
       "title": "Package DevNexus-Pharo project templates used by project import",
       "description": "Type: packaging/import defect\nReadiness: autonomous agent-ready (AFK)\nSource: dedicated MCP-Pharo project setup on 2026-05-18.\n\nObserved failure:\nA packaged/global `dev-nexus-pharo project import` failed before completing setup with `Default AGENTS.md template is missing: /opt/homebrew/lib/node_modules/@evref-bl/dev-nexus-pharo/AGENTS.md`.\n\nCurrent evidence:\n- `src/devNexusPharoExtension.ts` resolves the default template as package-root `AGENTS.md` through `defaultAgentsTemplatePath()` and `installDefaultAgentsFile()`.\n- `package.json` publishes only `dist`, `README.md`, and `package.json`, so `AGENTS.md` is not included in the installed package.\n- The source checkout has `AGENTS.md`; the installed package path did not.\n\nGoal:\nMake DevNexus-Pharo project create/import work from a normal packaged install without relying on a source checkout.\n\nAcceptance criteria:\n- `AGENTS.md` or an equivalent explicit template is included in published package contents, embedded in built output, or moved to a packaged template path.\n- A packaged-install smoke proves `dev-nexus-pharo project create` and `dev-nexus-pharo project import` can install the project AGENTS file.\n- Missing-template errors, if still possible, clearly report a package integrity/setup problem before ambiguous manual repair is needed.\n- Regression coverage exercises the packaged/template lookup path, not only the repository source layout.\n\nBoundaries:\n- Do not run live Pharo images, PLexus open/close, Docker, or gateway routes.\n- Keep generic project creation/import behavior in DevNexus core; this item owns the DevNexus-Pharo template/package defect.\n\nVerification:\n- `npm run check` in DevNexus-Pharo.\n- `npm pack --dry-run` or equivalent package-content assertion.\n- Temp install/package smoke that runs project create/import far enough to prove the template is available.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -494,8 +494,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T20:55:26.592Z",
-      "updatedAt": "2026-05-18T20:55:26.592Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T10:27:09.502Z",
+      "closedAt": "2026-05-19T10:25:11.377Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -1131,7 +1131,52 @@
         }
       }
     ],
-    "local-20": [],
+    "local-20": [
+      {
+        "id": "local-comment-52",
+        "body": "Started dogfood cycle for packaging/import defect. Source worktree: codex/dev-nexus-pharo/local-20-package-agents-template. Plan: add focused package-content regression for AGENTS template, fix package contents or lookup, run focused tests plus npm run check and package dry-run.",
+        "author": null,
+        "createdAt": "2026-05-19T10:18:42.403Z",
+        "updatedAt": "2026-05-19T10:18:42.403Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-52"
+        }
+      },
+      {
+        "id": "local-comment-53",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-pharo/local-20-package-agents-template\nHead: 84a4556ec56a47e5e909bae0188f8d00c2ae4968\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T10:23:36.020Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-20-package-agents-template-meta\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-20\",\n  \"logicalItemId\": \"local-20\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-20\",\n    \"itemNumber\": 20,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-20\",\n    \"itemNumber\": 20,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-20\",\n        \"itemNumber\": 20\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-pharo\\\\local-20-package-agents-template\",\n  \"branch\": \"codex/dev-nexus-pharo/local-20-package-agents-template\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"84a4556ec56a47e5e909bae0188f8d00c2ae4968\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"package.json\",\n    \"src/devNexusPharoExtension.test.ts\"\n  ],\n  \"decisions\": [\n    \"Package AGENTS.md in the published DevNexus-Pharo npm artifact because packaged project setup reads the template from package root.\",\n    \"Added focused regression to protect the package file-list contract.\"\n  ],\n  \"verificationSummary\": \"Focused red/green test passed; full dev-nexus-pharo npm run check passed; built npm pack --dry-run includes AGENTS.md and dist; temp tarball install smoke created and imported projects with AGENTS.md.\",\n  \"integrationPreference\": null,\n  \"note\": null,\n  \"leaseId\": \"lease-a4dd270d6a6a57c7\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T10:23:36.038Z",
+        "updatedAt": "2026-05-19T10:23:36.038Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-53"
+        }
+      },
+      {
+        "id": "local-comment-54",
+        "body": "Completed in DevNexus-Pharo source commit 84a4556. Added AGENTS.md to package files and a focused package-manifest regression. Verification: focused red/green test, full src/devNexusPharoExtension.test.ts, npm run check, built npm pack --dry-run showing AGENTS.md plus dist, temp tarball install smoke for project create/import writing AGENTS.md, shared checkout npm run check, shared checkout npm pack --dry-run, and git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T10:25:11.489Z",
+        "updatedAt": "2026-05-19T10:25:11.489Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-54"
+        }
+      },
+      {
+        "id": "local-comment-55",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 84a4556ec56a47e5e909bae0188f8d00c2ae4968\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T10:27:09.480Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-20-package-agents-template-meta\",\n  \"componentId\": \"dev-nexus-pharo\",\n  \"componentName\": \"DevNexus-Pharo\",\n  \"workItemId\": \"local-20\",\n  \"logicalItemId\": \"local-20\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-20\",\n    \"itemNumber\": 20,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus-pharo\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-20\",\n    \"itemNumber\": 20,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus-pharo\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-20\",\n      \"itemNumber\": 20,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-20\",\n        \"itemNumber\": 20\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\MetaPharoNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"84a4556ec56a47e5e909bae0188f8d00c2ae4968\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"package.json\",\n    \"src/devNexusPharoExtension.test.ts\"\n  ],\n  \"decisions\": [\n    \"Integrated verified DevNexus-Pharo source commit 84a4556 directly to bot/main under component policy.\",\n    \"Kept the change to package file-list plus regression coverage; no runtime services were used.\"\n  ],\n  \"verificationSummary\": \"Shared checkout verification passed: npm run check, npm pack --dry-run including AGENTS.md and dist, git diff --check. Tarball install smoke in temp verified project create/import write AGENTS.md.\",\n  \"integrationPreference\": null,\n  \"note\": null,\n  \"leaseId\": \"lease-c9bc4593573a2cae\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T10:27:09.502Z",
+        "updatedAt": "2026-05-19T10:27:09.502Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-55"
+        }
+      }
+    ],
     "local-21": []
   }
 }

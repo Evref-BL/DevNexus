@@ -1,7 +1,111 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T10:10:40.255Z",
+  "updatedAt": "2026-05-19T10:27:09.480Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c9bc4593573a2cae",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-pharo"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-20",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus-pharo",
+        "relativePath": null
+      },
+      "writeScope": [
+        "package.json",
+        "src/devNexusPharoExtension.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T10:27:09.480Z",
+      "lastSeenAt": "2026-05-19T10:27:09.480Z",
+      "updatedAt": "2026-05-19T10:27:09.480Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "84a4556ec56a47e5e909bae0188f8d00c2ae4968",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus-pharo",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Verification: Shared checkout verification passed: npm run check, npm pack --dry-run including AGENTS.md and dist, git diff --check. Tarball install smoke in temp verified project create/import write AGENTS.md."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a4dd270d6a6a57c7",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-pharo"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-20",
+      "branchName": "codex/dev-nexus-pharo/local-20-package-agents-template",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus-pharo",
+        "relativePath": null
+      },
+      "writeScope": [
+        "package.json",
+        "src/devNexusPharoExtension.test.ts"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T10:23:36.020Z",
+      "lastSeenAt": "2026-05-19T10:23:36.020Z",
+      "updatedAt": "2026-05-19T10:23:36.020Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "84a4556ec56a47e5e909bae0188f8d00c2ae4968",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus-pharo",
+          "relativePath": null
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Verification: Focused red/green test passed; full dev-nexus-pharo npm run check passed; built npm pack --dry-run includes AGENTS.md and dist; temp tarball install smoke created and imported projects with AGENTS.md."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

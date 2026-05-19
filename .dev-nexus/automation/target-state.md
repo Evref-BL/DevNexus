@@ -204,6 +204,9 @@ and ready for coordinator-driven work across its components.
   six Pharo-owned `pharo_project_*` project/skill tools, has no default
   tool-name overlap with core `dev_nexus`, and no longer carries obsolete
   DevNexus-Pharo config migration paths.
+- DevNexus-Pharo packaging work `dev-nexus-pharo:local-20` is published as
+  `84a4556`; packaged npm contents now include `AGENTS.md` plus built `dist`,
+  and a tarball-install smoke proved project create/import write `AGENTS.md`.
 - DevNexus core guardrail work `dev-nexus:local-112` is complete; core now
   rejects plugin MCP tool names that overlap `dev_nexus`.
 - `docs/codex-architecture-design-audit-prd.md` records the Codex architecture
@@ -275,9 +278,11 @@ and ready for coordinator-driven work across its components.
   dogfood external issue selection, provider-comment, scheduler-import, and
   ordering policy. The authority provider-signal follow-on `local-93` is
   complete. The local tracker auth-profile mismatch follow-on `local-152` is
-  also complete as `0e86479`; the next cycle should re-check eligible work and
-  either promote a dependency-satisfied bounded slice or record the blocker that
-  keeps remaining items out of ready state.
+  also complete as `0e86479`; DevNexus-Pharo package-template fix
+  `dev-nexus-pharo:local-20` is complete as `84a4556`. The next cycle should
+  re-check eligible work and either promote the next dependency-satisfied
+  bounded slice or record the blocker that keeps remaining items out of ready
+  state.
 
 ## Boundaries
 
