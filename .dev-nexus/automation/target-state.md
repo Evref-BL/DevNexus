@@ -108,11 +108,10 @@ and ready for coordinator-driven work across its components.
 - GitHub CI expansion issues are complete across all three source components:
   DevNexus #11 merged through PR #13 as `ae38fee`, DevNexus-Pharo #3 merged
   through PR #4 as `041fbe0`, and DevNexus-TypeScript #1 merged through PR #2
-  as `626a54e`. Each component's latest `main` CI passed the three required
-  Node 24 checks on Ubuntu, Windows, and macOS. The DevNexus PR exposed and
-  fixed a stale Windows path-quoting test expectation; the DevNexus-Pharo
-  post-merge Windows run exposed a transient Vitest worker-pool crash and
-  passed on failed-job rerun.
+  as `626a54e`. A later DevNexus-Pharo main commit exposed a Windows runtime
+  test timeout; PR #5 fixed it as `4d9f59f`. Each component's latest `main` CI
+  passed the three required Node 24 checks on Ubuntu, Windows, and macOS. The
+  DevNexus PR exposed and fixed a stale Windows path-quoting test expectation.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
