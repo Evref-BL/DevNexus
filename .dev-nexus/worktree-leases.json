@@ -1,7 +1,119 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T22:43:01.076Z",
+  "updatedAt": "2026-05-19T23:35:25.088Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-9e5e29d5ee60c715",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-168-project-state",
+      "branchName": "codex/dev-nexus-dogfood/local-168-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-168-project-state"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/worktree-leases.json",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T23:21:09.523Z",
+      "lastSeenAt": "2026-05-19T23:35:25.088Z",
+      "updatedAt": "2026-05-19T23:35:25.088Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "7ac4c41812a26f863affd631fad999b817cb1493",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-168-project-state"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Project-meta worktree for local tracker, target-cycle, target-state, and plan updates related to local-168.",
+        "Project-state updates for local-168 were committed and published to dogfood bot/main."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b31ea5e40167f007",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-168",
+      "branchName": "codex/dev-nexus/local-168-version-scope-resolution",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-168-version-scope-resolution"
+      },
+      "writeScope": [
+        "src/nexusVersionScopeResolver.ts",
+        "src/nexusVersionScopeResolver.test.ts",
+        "src/index.ts",
+        "src/nexusEligibleWork.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T23:20:52.400Z",
+      "lastSeenAt": "2026-05-19T23:35:25.088Z",
+      "updatedAt": "2026-05-19T23:35:25.088Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "bf45196eece526112f9c1aed3cba4e6ab39540df",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-168-version-scope-resolution"
+        },
+        "upstream": "bot/codex/dev-nexus/local-168-version-scope-resolution",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Heartbeat selected dependency-next version-planning slice local-168.",
+        "Keep provider reads mocked or injected; no live provider writes/import-first requirements.",
+        "Merged through DevNexus PR #16 as bf45196; source branch and disposable worktree removed."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

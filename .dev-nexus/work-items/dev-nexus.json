@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 358,
-  "updatedAt": "2026-05-19T22:43:08.733Z",
+  "nextCommentNumber": 362,
+  "updatedAt": "2026-05-19T23:34:11.155Z",
   "items": [
     {
       "id": "local-1",
@@ -4336,7 +4336,7 @@
       "id": "local-168",
       "title": "Resolve version scope from work items and tracker fields",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: resolve normalized version scope into concrete component work-item references using existing work-tracker fields and provider-compatible grouping conventions.\n\nAcceptance criteria:\n- Resolve explicit component/work-item refs, labels, milestones, and tracker-query descriptors into version-scoped work items using mocked local and provider-backed tracker data.\n- Represent scope status as committed, candidate, stretch, deferred, or excluded without replacing the work item status field.\n- Deduplicate linked or mirrored tracker items using existing work-item link and canonical reference behavior where available.\n- Treat unsupported provider capabilities, missing milestones, and unresolved references as warnings in the scope result rather than crashes.\n- Keep provider reads mocked or injected for tests; do not add live provider writes or import-first requirements.\n\nVerification:\n- Focused unit tests for explicit refs, labels, milestones, tracker-query descriptors, dedupe, unsupported milestones, and unresolved references.\n- Regression coverage that normal eligible-work discovery still works without a version config.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4348,8 +4348,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:21:49.146Z",
-      "updatedAt": "2026-05-19T22:43:08.733Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T23:34:11.155Z",
+      "closedAt": "2026-05-19T23:33:35.440Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4361,7 +4361,7 @@
       "id": "local-169",
       "title": "Report version readiness from existing project facts",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167 and dev-nexus:local-168.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: compute factual version readiness from existing DevNexus work-item, target-cycle, verification, publication, authority, and release-policy facts.\n\nAcceptance criteria:\n- Produce per-version progress counts by component, work status, scope status, blocker state, failed work, deferred work, and stretch work.\n- Evaluate readiness gates from configured gates plus existing facts such as work completion, target-cycle history, verification records, publication decisions, authority summaries, and green-main validation state.\n- Represent green-main branch or pull-request validation as readiness evidence only; do not grant merge authority or release authority through the version model.\n- Summarize package and release readiness as policy and authority state without publishing packages, tags, provider releases, or changelogs.\n- Include stable warnings when a gate cannot be evaluated from available facts.\n\nVerification:\n- Focused unit tests for complete, blocked, failed, deferred, stretch, and warning-heavy version states.\n- Coverage that green-main validation can satisfy a readiness gate without allowing target-branch push, merge, package publish, or release publish.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4369,13 +4369,12 @@
         "readiness",
         "target-report",
         "publication",
-        "dependent",
         "afk"
       ],
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:21:57.239Z",
-      "updatedAt": "2026-05-19T22:21:57.239Z",
+      "updatedAt": "2026-05-19T23:33:36.504Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -8798,9 +8797,54 @@
           "provider": "local",
           "itemId": "local-comment-357"
         }
+      },
+      {
+        "id": "local-comment-358",
+        "body": "Heartbeat selected this dependency-next version-planning slice for implementation. Source worktree: C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\codex-dev-nexus-local-168-version-scope-resolution on branch codex/dev-nexus/local-168-version-scope-resolution. Initial plan: add focused scope-resolution tests first, implement a pure/injected resolver with warnings for unsupported or unresolved provider fields, then run focused and broad DevNexus checks.",
+        "author": null,
+        "createdAt": "2026-05-19T23:21:20.334Z",
+        "updatedAt": "2026-05-19T23:21:20.334Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-358"
+        }
+      },
+      {
+        "id": "local-comment-359",
+        "body": "Completed in DevNexus PR #16: https://github.com/Evref-BL/DevNexus/pull/16\\n\\nSource commits: ebd18a8 Add version scope resolver; merged to main as bf45196.\\n\\nImplemented a pure/injected version scope resolver for explicit work-item refs, labels, milestones, and tracker-query descriptors. Results preserve work item status separately from version scope status, include canonical tracker refs and linked-item dedupe metadata, and return warnings for unresolved refs, unsupported provider capabilities, and empty scope matches. Provider reads are mocked/injected in tests; no provider writes or import-first behavior were added.\\n\\nVerification passed: npm test -- src/nexusVersionScopeResolver.test.ts; npm run build; npm test -- src/nexusVersionPlanningConfig.test.ts src/nexusVersionScopeResolver.test.ts src/nexusEligibleWork.test.ts; npm run check; git diff --check. GitHub required checks passed on ubuntu-latest, windows-latest, and macos-latest before merge.",
+        "author": null,
+        "createdAt": "2026-05-19T23:33:36.165Z",
+        "updatedAt": "2026-05-19T23:33:36.165Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-359"
+        }
+      },
+      {
+        "id": "local-comment-361",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: bf45196eece526112f9c1aed3cba4e6ab39540df\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T23:34:11.142Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-168-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-168\",\n  \"logicalItemId\": \"local-168\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-168\",\n    \"itemNumber\": 168,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-168\",\n      \"itemNumber\": 168\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-168\",\n    \"itemNumber\": 168,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-168\",\n      \"itemNumber\": 168\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-168\",\n      \"itemNumber\": 168,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-168\",\n        \"itemNumber\": 168\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"bf45196eece526112f9c1aed3cba4e6ab39540df\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusVersionScopeResolver.ts\",\n    \"src/nexusVersionScopeResolver.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Implemented local-168 as a pure resolver with injected provider reads so tests can use mocked local and provider-backed tracker data.\",\n    \"Resolved scope statuses are separate from WorkItem.status and duplicates retain all contributing scope statuses.\",\n    \"Linked or mirrored tracker items dedupe through existing work-item link records and canonical default tracker references when available.\",\n    \"Unsupported capabilities, unresolved explicit refs, provider mismatches, and empty scope matches are warnings rather than crashes.\"\n  ],\n  \"verificationSummary\": \"Passed npm test -- src/nexusVersionScopeResolver.test.ts; npm run build; npm test -- src/nexusVersionPlanningConfig.test.ts src/nexusVersionScopeResolver.test.ts src/nexusEligibleWork.test.ts; npm run check; git diff --check. GitHub required Node 24 checks passed on ubuntu-latest, windows-latest, and macos-latest before PR #16 merge.\",\n  \"integrationPreference\": \"Merged through DevNexus green-main PR #16 to main as bf45196; source branch and disposable worktree cleaned.\",\n  \"note\": null,\n  \"leaseId\": \"lease-473ff7d8e6fdce9b\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T23:34:11.155Z",
+        "updatedAt": "2026-05-19T23:34:11.155Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-361"
+        }
       }
     ],
-    "local-169": [],
+    "local-169": [
+      {
+        "id": "local-comment-360",
+        "body": "Promoted to ready because dev-nexus:local-168 is complete and merged through PR #16 as bf45196. Next dependency-ready version-planning slice: compute factual readiness from resolved scope and existing project facts.",
+        "author": null,
+        "createdAt": "2026-05-19T23:33:36.504Z",
+        "updatedAt": "2026-05-19T23:33:36.504Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-360"
+        }
+      }
+    ],
     "local-170": [],
     "local-171": []
   }

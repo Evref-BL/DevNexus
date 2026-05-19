@@ -146,12 +146,16 @@ and ready for coordinator-driven work across its components.
 - `dev-nexus:local-167` is complete through DevNexus PR #15 as merge commit
   `0325f8e`, adding the read-only `versionPlanning` project config model,
   deterministic normalization, focused validation diagnostics, and package
-  exports. `dev-nexus:local-168` is now ready for scope resolution. Keep
+  exports. `dev-nexus:local-168` is complete through DevNexus PR #16 as merge
+  commit `bf45196`, adding a pure/injected version scope resolver for explicit
+  refs, labels, milestones, tracker-query descriptors, linked-item dedupe,
+  canonical tracker refs, and non-fatal warning diagnostics. `dev-nexus:local-169`
+  is now ready for factual version readiness reporting. Keep
   provider milestone writes, automatic release publishing, and merge automation
   out of the first implementation path.
 - The current bot profile has direct write access for the active
   `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
-  `0325f8e` after PR #15 branch CI passed.
+  `bf45196` after PR #16 branch CI passed.
 - Windows and Mac bot publication paths are authenticated for the current
   dogfood flow. Agent-created Git/GitHub activity must continue to use the
   configured `bot` remotes and `Gabot-Darbot` automation profile.
