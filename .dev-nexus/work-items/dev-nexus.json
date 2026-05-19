@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 336,
-  "updatedAt": "2026-05-19T17:46:37.342Z",
+  "nextCommentNumber": 337,
+  "updatedAt": "2026-05-19T17:55:30.317Z",
   "items": [
     {
       "id": "local-1",
@@ -4042,7 +4042,7 @@
       "id": "local-157",
       "title": "Add guided component topology and component-add flow",
       "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nNicolas asked for one DevNexus project using several existing folders as components, but the current command vocabulary naturally led the agent to create separate DevNexus projects. The setup flow needs an explicit component topology model instead of relying on wording.\n\nAcceptance criteria:\n- Add guided component topology prompts that distinguish one DevNexus project with multiple components from multiple independent DevNexus projects.\n- Support component source strategies: reference existing checkout, clone into project-local `components/<id>`, and create a new empty/local component when appropriate.\n- Validate existing paths, Git repositories, container folders with nested repositories, default branches, remotes, and non-Git folders; surface warnings rather than silently choosing the wrong shape.\n- Require or infer exactly one primary component, while allowing dependency/extension/addon/support roles.\n- Provide an explicit follow-up command or setup subflow for adding components to an existing DevNexus project without manual JSON editing.\n- Keep generated worktrees separate from stable component source roots.\n\nVerification:\n- Unit tests for topology validation and container-folder detection.\n- CLI fake project tests for existing multi-component setup.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4056,8 +4056,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:22:54.375Z",
-      "updatedAt": "2026-05-19T17:22:54.375Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T17:55:30.317Z",
+      "closedAt": "2026-05-19T17:55:30.317Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8273,7 +8273,19 @@
         }
       }
     ],
-    "local-157": [],
+    "local-157": [
+      {
+        "id": "local-comment-336",
+        "body": "Implemented guided component topology and `dev-nexus project component add` in DevNexus source commit `bea572cb437d21c8c52b462024f2cb11e406fa5a` and pushed it to `bot/main`.\n\nCovered topology diagnostics for container folders with nested repositories, non-Git source folders, branch/remote drift, and source roots under generated `worktrees/`. Added component-add answer-file preview/apply flow for existing projects. Verification passed: `npm run build`; `npm test -- src/nexusProjectComponentTopology.test.ts src/cli.test.ts src/nexusProjectSetupModel.test.ts`; `npm run check`; `git diff --check`.",
+        "author": null,
+        "createdAt": "2026-05-19T17:55:22.065Z",
+        "updatedAt": "2026-05-19T17:55:22.065Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-336"
+        }
+      }
+    ],
     "local-158": [],
     "local-159": [],
     "local-160": [],
