@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 354,
-  "updatedAt": "2026-05-19T22:22:30.777Z",
+  "nextCommentNumber": 355,
+  "updatedAt": "2026-05-19T22:24:42.171Z",
   "items": [
     {
       "id": "local-1",
@@ -4272,7 +4272,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:33:51.183Z",
-      "updatedAt": "2026-05-19T22:22:30.777Z",
+      "updatedAt": "2026-05-19T22:24:42.171Z",
       "closedAt": "2026-05-19T22:22:30.777Z",
       "webUrl": null,
       "externalRef": {
@@ -8749,6 +8749,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-353"
+        }
+      },
+      {
+        "id": "local-comment-354",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus-dogfood/local-165-version-planning-issues\nHead: 165ed679f8f171d83b4773e5ed338e135078e4a7\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T22:24:42.157Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-165-version-planning-issues\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-165\",\n  \"logicalItemId\": \"local-165\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-165\",\n    \"itemNumber\": 165,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-165\",\n    \"itemNumber\": 165,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-165\",\n      \"itemNumber\": 165,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-165\",\n        \"itemNumber\": 165\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-165-version-planning-issues\",\n  \"branch\": \"codex/dev-nexus-dogfood/local-165-version-planning-issues\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"165ed679f8f171d83b4773e5ed338e135078e4a7\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \".dev-nexus/work-items/dev-nexus.json\",\n    \".dev-nexus/automation/target-state.md\",\n    \"PLAN.md\"\n  ],\n  \"decisions\": [\n    \"Reviewed docs/version-scoped-planning-prd.md against current work-item, milestone, target-cycle, authority, publication, and release models.\",\n    \"Kept version planning read-only for the first implementation sequence; provider milestone writes, merge automation, package publishing, and release publishing remain out of scope.\",\n    \"Created dev-nexus:local-167 through local-171 in dependency order, with local-167 ready and later slices todo/dependent.\"\n  ],\n  \"verificationSummary\": \"Static PRD review completed; local work item store parses as JSON; git diff --check passed with line-ending warnings only.\",\n  \"integrationPreference\": \"Fast-forward project meta branch into dogfood main and push via bot remote.\",\n  \"note\": \"Project-meta branch commit 165ed67 slices version-scoped planning into implementation work items and updates handoff state.\",\n  \"leaseId\": \"lease-3a676deda39c5c67\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T22:24:42.171Z",
+        "updatedAt": "2026-05-19T22:24:42.171Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-354"
         }
       }
     ],
