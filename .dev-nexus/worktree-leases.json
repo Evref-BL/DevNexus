@@ -1,7 +1,66 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T09:48:35.201Z",
+  "updatedAt": "2026-05-19T10:10:40.255Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-092930114584544a",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-152",
+      "branchName": "codex/dev-nexus/local-152-local-tracker-auth-mismatch",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.test.ts",
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T10:10:40.255Z",
+      "lastSeenAt": "2026-05-19T10:10:40.255Z",
+      "updatedAt": "2026-05-19T10:10:40.255Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "0e86479c57505073a22ea60cd0175c4b6a0110f0",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Verification: Focused CLI/MCP regression tests passed; adjacent provider mutation block tests passed; src/nexusMcpServer.test.ts src/cli.test.ts src/nexusAuthority.test.ts passed; npm run build passed; npm run check passed in component worktree and shared source checkout; git diff --check passed.",
+        "Integration preference: merged to DevNexus bot/main; dogfood metadata closeout pending commit/push."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

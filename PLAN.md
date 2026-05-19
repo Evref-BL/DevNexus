@@ -80,6 +80,7 @@ target-cycle facts, commits, and the target report.
 - Continue authority configuration after completed `dev-nexus:local-92`
   coordination and provider mutation gating. `local-94` role documentation is
   complete; `local-93` provider approval and branch-policy signal mapping is
+  complete; `local-152` local tracker auth-profile mismatch handling is
   complete. Keep `local-95` blocked for the remaining HITL role-policy
   decisions.
 - Continue agent-target projection after completed `dev-nexus:local-106`

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 153,
-  "nextCommentNumber": 320,
-  "updatedAt": "2026-05-19T10:00:11.815Z",
+  "nextCommentNumber": 322,
+  "updatedAt": "2026-05-19T10:10:40.284Z",
   "items": [
     {
       "id": "local-1",
@@ -3908,7 +3908,7 @@
       "id": "local-152",
       "title": "Allow local tracker mutations with provider-scoped automation auth profiles",
       "description": "Type: implementation bugfix slice\nReadiness: autonomous agent-ready (AFK)\n\nEvidence:\n- During dogfood closeout for dev-nexus:local-93, MCP work_item_set_status and work_item_comment failed with: Auth profile bot-github is for provider github, not requested provider local.\n- A direct MCP work_item_create repro from a project-meta worktree failed with the same authority block.\n- The owning tracker is the configured local provider, and local work-item update/comment authority is project authority, not a live provider mutation.\n- The guarded project-local CLI workaround succeeded only by using an isolated DevNexus home without the GitHub auth profile, which proves the provider check is over-scoped for local tracker mutations.\n\nGoal: local tracker work_item.update, work_item.comment, work_item.create, and status updates should honor actor/role authority without rejecting provider-scoped automation auth profiles when the tracker provider is local.\n\nAcceptance criteria:\n- MCP work_item_update, work_item_comment, work_item_set_status, and work_item_create allow a project automation actor with a GitHub-scoped auth profile to mutate a local tracker when authority grants work_item.* actions.\n- CLI work-item create/update/comment/set-status has the same behavior for local trackers.\n- Provider-backed tracker mutations still enforce provider-specific actions such as provider.comment, provider.label, provider.assign, and provider.transition.\n- A regression test covers the exact provider mismatch observed in dogfood.\n\nBoundaries:\n- Do not weaken authority checks for provider-backed trackers.\n- Do not add live provider calls or external writes.\n\nVerification:\n- Focused CLI/MCP authority tests for local and provider-backed work-item mutations.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3923,8 +3923,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T10:00:11.814Z",
-      "updatedAt": "2026-05-19T10:00:11.814Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T10:10:40.284Z",
+      "closedAt": "2026-05-19T10:09:31.047Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7839,6 +7839,29 @@
     "local-149": [],
     "local-150": [],
     "local-151": [],
-    "local-152": []
+    "local-152": [
+      {
+        "id": "local-comment-320",
+        "body": "Completed and published DevNexus source commit 0e86479 to bot/main. The fix passes local work_item.* authority without applying provider-profile matching, while provider.* tracker mutations still retain provider gates. Verification passed: focused CLI/MCP regression tests, adjacent provider mutation block tests, src/nexusMcpServer.test.ts src/cli.test.ts src/nexusAuthority.test.ts, npm run build, npm run check in component worktree and shared checkout, and git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T10:09:43.010Z",
+        "updatedAt": "2026-05-19T10:09:43.010Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-320"
+        }
+      },
+      {
+        "id": "local-comment-321",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-152-local-tracker-auth-mismatch\nHead: 0e86479c57505073a22ea60cd0175c4b6a0110f0\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T10:10:40.255Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-tracker-auth-mismatch\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-152\",\n  \"logicalItemId\": \"local-152\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-152\",\n    \"itemNumber\": 152,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-152\",\n      \"itemNumber\": 152\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-152\",\n    \"itemNumber\": 152,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-152\",\n      \"itemNumber\": 152\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-152\",\n      \"itemNumber\": 152,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-152\",\n        \"itemNumber\": 152\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-152-local-tracker-auth-mismatch\",\n  \"branch\": \"codex/dev-nexus/local-152-local-tracker-auth-mismatch\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"0e86479c57505073a22ea60cd0175c4b6a0110f0\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/cli.test.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \".dev-nexus/work-items/dev-nexus.json\",\n    \".dev-nexus/automation/target-state.md\",\n    \"PLAN.md\"\n  ],\n  \"decisions\": [\n    \"DevNexus source commit 0e86479 is published to bot/main.\",\n    \"Local tracker work_item.* actions omit provider matching; provider.* actions still use tracker provider context.\",\n    \"Updated CLI successfully closed/commented local-152 through the normal bot-github auth path.\"\n  ],\n  \"verificationSummary\": \"Focused CLI/MCP regression tests passed; adjacent provider mutation block tests passed; src/nexusMcpServer.test.ts src/cli.test.ts src/nexusAuthority.test.ts passed; npm run build passed; npm run check passed in component worktree and shared source checkout; git diff --check passed.\",\n  \"integrationPreference\": \"merged to DevNexus bot/main; dogfood metadata closeout pending commit/push.\",\n  \"note\": null,\n  \"leaseId\": \"lease-092930114584544a\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T10:10:40.284Z",
+        "updatedAt": "2026-05-19T10:10:40.284Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-321"
+        }
+      }
+    ]
   }
 }

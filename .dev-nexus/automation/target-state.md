@@ -167,9 +167,10 @@ and ready for coordinator-driven work across its components.
   authority gates. `local-93` is complete as DevNexus source commit
   `8a97548` for mocked GitHub, GitLab, and Jira provider approval,
   branch-policy, and issue-level decision signal summaries. `local-94` is
-  complete for authority-role documentation. `local-95` is a blocked HITL
-  decision item for self-approval, temporary elevation, and advanced role-policy
-  questions.
+  complete for authority-role documentation. `local-152` is complete as
+  `0e86479` for local tracker work-item mutations with provider-scoped
+  automation auth profiles. `local-95` is a blocked HITL decision item for
+  self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
   `local-103`. `local-97`, `local-98`, `local-99`, and `local-102` are
@@ -273,9 +274,10 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-136`; keep `local-137` blocked until the user decides the
   dogfood external issue selection, provider-comment, scheduler-import, and
   ordering policy. The authority provider-signal follow-on `local-93` is
-  complete; the next cycle should re-check eligible work and either promote a
-  dependency-satisfied bounded slice or record the blocker that keeps remaining
-  items out of ready state.
+  complete. The local tracker auth-profile mismatch follow-on `local-152` is
+  also complete as `0e86479`; the next cycle should re-check eligible work and
+  either promote a dependency-satisfied bounded slice or record the blocker that
+  keeps remaining items out of ready state.
 
 ## Boundaries
 
