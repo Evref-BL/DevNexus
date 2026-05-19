@@ -101,10 +101,18 @@ and ready for coordinator-driven work across its components.
   pull-request validation, `Node 24 check (ubuntu-latest)`,
   `Node 24 check (windows-latest)`, and `Node 24 check (macos-latest)` as the
   required checks, stale checks blocked, direct target-branch push blocked, and
-  authorized merge only after checks are green. The dogfood project authority model binds
-  `dogfood-automation-bot` to the `Gabot-Darbot` machine-user profile with
-  maintainer authority, and host-local DevNexus home config binds `bot-github`
-  to that actor.
+  authorized merge only after checks are green. The dogfood project authority
+  model binds `dogfood-automation-bot` to the `Gabot-Darbot` machine-user
+  profile with maintainer authority, and host-local DevNexus home config binds
+  `bot-github` to that actor.
+- GitHub CI expansion issues are complete across all three source components:
+  DevNexus #11 merged through PR #13 as `ae38fee`, DevNexus-Pharo #3 merged
+  through PR #4 as `041fbe0`, and DevNexus-TypeScript #1 merged through PR #2
+  as `626a54e`. Each component's latest `main` CI passed the three required
+  Node 24 checks on Ubuntu, Windows, and macOS. The DevNexus PR exposed and
+  fixed a stale Windows path-quoting test expectation; the DevNexus-Pharo
+  post-merge Windows run exposed a transient Vitest worker-pool crash and
+  passed on failed-job rerun.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
