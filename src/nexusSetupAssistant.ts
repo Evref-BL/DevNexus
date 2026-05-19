@@ -322,6 +322,7 @@ export function buildNexusSetupCheck(options: {
       const sourceRootPlan = componentCheckSourceRoot(
         component,
         projectRoot,
+        platform,
         localPathPlatform,
       );
 
@@ -2810,12 +2811,13 @@ function componentCheckSourceRoot(
   component: NexusProjectConfig["components"][number],
   projectRoot: string,
   platform: NexusSetupPlatform,
+  pathPlatform: NexusSetupPlatform,
 ): { path: string; reason: string } {
   return componentSetupSourceRoot({
     component,
     platform,
     projectRoot,
-    pathPlatform: platform,
+    pathPlatform,
   });
 }
 
@@ -2840,14 +2842,21 @@ function componentSetupSourceRoot(options: {
     };
   }
 
-  const analysis = analyzeNexusProjectPath({
+  const compatibilityAnalysis = analyzeNexusProjectPath({
     projectRoot,
     value: component.sourceRoot,
-    platform: pathPlatform,
+    platform,
   });
-  if (analysis.compatible) {
+  if (compatibilityAnalysis.compatible) {
+    const pathAnalysis = platform === pathPlatform
+      ? compatibilityAnalysis
+      : analyzeNexusProjectPath({
+          projectRoot,
+          value: component.sourceRoot,
+          platform: pathPlatform,
+        });
     return {
-      path: analysis.path,
+      path: pathAnalysis.path,
       reason: `Using configured sourceRoot for ${component.id}.`,
     };
   }
