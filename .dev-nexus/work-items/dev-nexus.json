@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 294,
-  "updatedAt": "2026-05-19T00:34:03.886Z",
+  "nextCommentNumber": 296,
+  "updatedAt": "2026-05-19T00:36:17.766Z",
   "items": [
     {
       "id": "local-1",
@@ -2307,7 +2307,7 @@
       "id": "local-92",
       "title": "Gate coordination and provider mutation actions with authority checks",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: apply authority checks to coordination handoff, integration planning, coordination requests, provider comments, labels, assignments, transitions, approvals, and review decisions.\n\nUser stories covered:\n- As a coordinator agent, I can draft or post a provider request only when policy allows the underlying action.\n- As a reviewer, I can approve or request changes without receiving merge authority.\n\nAcceptance criteria:\n- Read-only coordination status and mutation-free integration planning remain available to observer-style actors.\n- Coordination handoff, work-item comments, provider comments, labels, assignments, workflow transitions, and review approvals each check the relevant authority action before mutation.\n- Coordination request can draft when provider posting is disallowed, and can post only when provider mutation authority allows it.\n- Review approval, requested changes, and merge authority remain separate decisions.\n- Blocked coordination mutation records a clear reason and suggested fallback without silently dropping the coordination fact.\n\nDependencies:\n- Depends on effective authority resolution.\n- Builds on coordination tracker role selection and external request surfaces.\n\nBoundaries:\n- No live provider posting is required for this slice.\n- Do not infer approval from assignment, silence, or casual comments.\n\nVerification:\n- Focused coordination tests for observer read-only status, contributor handoff allowed but provider label blocked, draft-only request, provider-comment allowed, assignment blocked, reviewer approval allowed, and merge still blocked after reviewer approval.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2320,7 +2320,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.653Z",
-      "updatedAt": "2026-05-19T00:19:29.028Z",
+      "updatedAt": "2026-05-19T00:36:17.742Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3434,7 +3434,7 @@
       "id": "local-134",
       "title": "Execute policy-gated inbound import to local tracker",
       "description": "Type: guarded mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-98 and dev-nexus:local-133\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: execute a reviewed inbound import plan by creating or updating canonical local work items and tracker links from external provider issues, with fail-closed mutation safety.\n\nUser stories covered:\n- As a project owner, I can keep local work items canonical while importing selected GitHub Issues.\n- As a bot account, I can read a GitHub inbox and write local tracker state only when authority, policy, and checkout safety allow it.\n\nAcceptance criteria:\n- Execution requires explicit source and target tracker ids, external-to-local direction, a write policy allowing local tracker mutation, and effective actor authority for local work-item writes and provider reads.\n- Execution recomputes or validates the import plan immediately before mutation and refuses blocked, stale, or ambiguous plans.\n- Execution creates or updates local canonical work items and link records idempotently; rerunning against the same provider items does not create duplicates.\n- Execution writes only local tracker/link files for the owning DevNexus project and does not write provider issues in the first implementation.\n- Execution fails closed in shared checkouts unless the path is classified as an owned project-meta worktree or explicit integration context.\n- Execution records a concise import summary through the work-item service or run result without leaking secrets.\n\nDependencies:\n- Depends on dev-nexus:local-98 for shared-checkout mutation enforcement.\n- Depends on dev-nexus:local-133 for inbound import planning.\n\nBoundaries:\n- Do not implement provider-native issue comments or provider writes in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not import from unconfigured repositories.\n\nVerification:\n- Focused tests for allowed local import, idempotent rerun, blocked policy, missing authority, shared-checkout refusal, stale plan refusal, ambiguous conflict refusal, and no provider writes.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3450,7 +3450,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:18.171Z",
-      "updatedAt": "2026-05-19T00:19:40.185Z",
+      "updatedAt": "2026-05-19T00:36:17.766Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6432,6 +6432,17 @@
           "provider": "local",
           "itemId": "local-comment-288"
         }
+      },
+      {
+        "id": "local-comment-294",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-92-coordination-authority` on branch `codex/dev-nexus-local-92-coordination-authority`. Scope: coordination/provider authority gates; avoid inbound-import execution files except shared public surfaces that are necessary and coordinate conflicts.",
+        "author": null,
+        "createdAt": "2026-05-19T00:36:17.742Z",
+        "updatedAt": "2026-05-19T00:36:17.742Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-294"
+        }
       }
     ],
     "local-93": [],
@@ -7340,6 +7351,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-289"
+        }
+      },
+      {
+        "id": "local-comment-295",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-134-inbound-import-execution` on branch `codex/dev-nexus-local-134-inbound-import-execution`. Scope: policy-gated local inbound import execution; avoid coordination/provider authority surfaces except shared CLI/MCP registration needed for this tool.",
+        "author": null,
+        "createdAt": "2026-05-19T00:36:17.766Z",
+        "updatedAt": "2026-05-19T00:36:17.766Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-295"
         }
       }
     ],
