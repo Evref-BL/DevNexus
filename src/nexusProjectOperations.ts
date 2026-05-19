@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { NexusExtension } from "./nexusExtension.js";
+import type {
+  NexusExtension,
+  NexusProjectScaffoldContext,
+  NexusProjectSkillsContext,
+} from "./nexusExtension.js";
 import type { NexusHomeHostOverlayConfig } from "./nexusHostRegistry.js";
 import {
   nexusProjectWorktreesDirectoryName,
@@ -258,6 +262,131 @@ function mergeExistingProjectExtensions(
   };
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function scaffoldExtensionsWithFailureContext(
+  extensions: NexusExtension<NexusProjectConfig>[] | undefined,
+): NexusExtension<NexusProjectConfig>[] | undefined {
+  if (!extensions) {
+    return undefined;
+  }
+
+  return extensions.map((extension) => {
+    const projectSkills = extension.projectSkills;
+    const installProjectFiles = extension.installProjectFiles;
+    return {
+      ...extension,
+      ...(projectSkills
+        ? {
+            projectSkills: (
+              context: NexusProjectSkillsContext<NexusProjectConfig>,
+            ) => {
+              try {
+                return projectSkills(context);
+              } catch (error) {
+                throw new NexusProjectError(
+                  `extension "${extension.id}" projectSkills failed: ${errorMessage(error)}`,
+                );
+              }
+            },
+          }
+        : {}),
+      ...(installProjectFiles
+        ? {
+            installProjectFiles: (
+              context: NexusProjectScaffoldContext<NexusProjectConfig>,
+            ) => {
+              try {
+                return installProjectFiles(context);
+              } catch (error) {
+                throw new NexusProjectError(
+                  `extension "${extension.id}" installProjectFiles failed: ${errorMessage(error)}`,
+                );
+              }
+            },
+          }
+        : {}),
+    };
+  });
+}
+
+function cleanupPartialProjectRoot(
+  projectRoot: string,
+  options: { preserveRootDirectory: boolean },
+): void {
+  if (!fs.existsSync(projectRoot)) {
+    return;
+  }
+
+  if (!options.preserveRootDirectory) {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+    return;
+  }
+
+  for (const entry of fs.readdirSync(projectRoot)) {
+    fs.rmSync(path.join(projectRoot, entry), { recursive: true, force: true });
+  }
+}
+
+function restoreProjectConfigFile(
+  configPath: string,
+  previousContents: string | null,
+): void {
+  if (previousContents === null) {
+    fs.rmSync(configPath, { force: true });
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, previousContents, "utf8");
+}
+
+function scaffoldNexusProjectWithRecovery(options: {
+  homePath: string;
+  projectRoot: string;
+  worktreesRoot: string;
+  projectConfig: NexusProjectConfig;
+  skills: NexusProjectConfig["skills"];
+  mcp: NexusProjectConfig["mcp"];
+  extensions?: NexusExtension<NexusProjectConfig>[];
+  recover: () => void;
+  safeNextAction: string;
+}): ScaffoldNexusProjectResult {
+  try {
+    return scaffoldNexusProject({
+      homePath: options.homePath,
+      projectRoot: options.projectRoot,
+      worktreesRoot: options.worktreesRoot,
+      projectConfig: options.projectConfig,
+      skills: options.skills,
+      mcp: options.mcp,
+      extensions: scaffoldExtensionsWithFailureContext(options.extensions),
+    });
+  } catch (error) {
+    let recoveryFailure: string | null = null;
+    try {
+      options.recover();
+    } catch (recoverError) {
+      recoveryFailure = errorMessage(recoverError);
+    }
+
+    throw new NexusProjectError(
+      [
+        `Project scaffold failed during extension/template setup: ${errorMessage(error)}.`,
+        recoveryFailure ? `Recovery also failed: ${recoveryFailure}.` : null,
+        `Safe next action: ${options.safeNextAction}`,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join(" "),
+    );
+  }
+}
+
 export function buildConfiguredWorkTracking(
   options: ConfigureNexusProjectTrackerInRegistryOptions,
 ): WorkTrackingConfig {
@@ -364,6 +493,7 @@ export function createNexusProjectInRegistry(
   ensureUniqueProject(options.registry, projectId, projectRoot);
 
   const creatingFromRemote = Boolean(options.from);
+  const projectRootExistedBeforeCreate = fs.existsSync(projectRoot);
   if (directoryExistsAndIsNonEmpty(projectRoot)) {
     throw new NexusProjectError(
       `Project root already exists and is not empty: ${projectRoot}`,
@@ -407,7 +537,7 @@ export function createNexusProjectInRegistry(
 
   assertFileDoesNotExist(devNexusProjectConfigPath);
   saveProjectConfig(projectRoot, projectConfig);
-  const scaffold = scaffoldNexusProject({
+  const scaffold = scaffoldNexusProjectWithRecovery({
     homePath: options.homePath,
     projectRoot,
     worktreesRoot,
@@ -415,6 +545,12 @@ export function createNexusProjectInRegistry(
     skills: projectConfig.skills,
     mcp: projectConfig.mcp,
     extensions: options.scaffoldExtensions,
+    recover: () =>
+      cleanupPartialProjectRoot(projectRoot, {
+        preserveRootDirectory: projectRootExistedBeforeCreate,
+      }),
+    safeNextAction:
+      "fix the scaffold extension failure and rerun project create; the partial project root was cleaned up.",
   });
 
   const reference = upsertNexusProjectReference(
@@ -469,6 +605,7 @@ export function importNexusProjectInRegistry(
           defaultImportedProjectRoot(options.registry, projectName, sourceRoot),
       );
   ensureUniqueProject(options.registry, projectId, projectRoot);
+  const projectRootExistedBeforeImport = fs.existsSync(projectRoot);
   if (!existingProjectConfig && directoryExistsAndIsNonEmpty(projectRoot)) {
     throw new NexusProjectError(
       `Project root already exists and is not empty: ${projectRoot}`,
@@ -502,12 +639,17 @@ export function importNexusProjectInRegistry(
   }
 
   const devNexusProjectConfigPath = projectConfigPath(projectRoot);
+  const previousProjectConfigContents = fs.existsSync(devNexusProjectConfigPath)
+    ? fs.readFileSync(devNexusProjectConfigPath, "utf8")
+    : null;
+  let savedProjectConfig = false;
   if (!existingProjectConfig || vibeKanbanProjectId || projectExtensionUpdates) {
     saveProjectConfig(projectRoot, projectConfig);
+    savedProjectConfig = true;
   }
 
   const worktreesRoot = projectWorktreesRootPath(projectRoot, projectConfig);
-  const scaffold = scaffoldNexusProject({
+  const scaffold = scaffoldNexusProjectWithRecovery({
     homePath: options.homePath,
     projectRoot,
     worktreesRoot,
@@ -515,6 +657,24 @@ export function importNexusProjectInRegistry(
     skills: projectConfig.skills,
     mcp: projectConfig.mcp,
     extensions: options.scaffoldExtensions,
+    recover: () => {
+      if (existingProjectConfig) {
+        if (savedProjectConfig) {
+          restoreProjectConfigFile(
+            devNexusProjectConfigPath,
+            previousProjectConfigContents,
+          );
+        }
+        return;
+      }
+
+      cleanupPartialProjectRoot(projectRoot, {
+        preserveRootDirectory: projectRootExistedBeforeImport,
+      });
+    },
+    safeNextAction: existingProjectConfig
+      ? "fix the scaffold extension failure and rerun project import; the existing project checkout was not deleted and its project config was restored."
+      : "fix the scaffold extension failure and rerun project import; the partial managed project root was cleaned up and the source checkout was left intact.",
   });
 
   const reference = upsertNexusProjectReference(

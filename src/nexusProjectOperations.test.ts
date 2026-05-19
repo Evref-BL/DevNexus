@@ -8,6 +8,7 @@ import {
   devNexusProjectConfigFileName,
   importNexusProjectInRegistry,
   loadProjectConfig,
+  NexusProjectError,
   type NexusExtension,
   type NexusProjectConfig,
   type NexusProjectRegistryWithRoot,
@@ -93,6 +94,28 @@ const sampleExtension: NexusExtension<NexusProjectConfig> = {
     markerPath: path.join(projectRoot, "sample-extension.marker"),
   }),
 };
+
+const throwingExtension: NexusExtension<NexusProjectConfig> = {
+  id: "throwing-extension",
+  name: "Throwing Extension",
+  installProjectFiles: ({ projectRoot }) => {
+    fs.writeFileSync(
+      path.join(projectRoot, "throwing-extension.partial"),
+      "partial scaffold output\n",
+      "utf8",
+    );
+    throw new Error("throwing-extension installProjectFiles failed");
+  },
+};
+
+function captureError(action: () => unknown): unknown {
+  try {
+    action();
+    return null;
+  } catch (error) {
+    return error;
+  }
+}
 
 function writeInitializedProjectConfig(
   projectRoot: string,
@@ -199,6 +222,29 @@ describe("project operations", () => {
     });
   });
 
+  it("removes the partial project root when create scaffold extension setup fails", () => {
+    const projectRegistry = registry();
+    const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "BrokenTool");
+
+    const error = captureError(() =>
+      createNexusProjectInRegistry({
+        homePath: makeTempDir("dev-nexus-home-"),
+        registry: projectRegistry,
+        name: "BrokenTool",
+        root: projectRoot,
+        gitRunner: fakeGitRunner([], { branch: "main" }),
+        scaffoldExtensions: [throwingExtension],
+      }),
+    );
+
+    expect(error).toBeInstanceOf(NexusProjectError);
+    expect((error as Error).message).toMatch(/Project scaffold failed/u);
+    expect((error as Error).message).toMatch(/throwing-extension/u);
+    expect((error as Error).message).toMatch(/Safe next action/u);
+    expect(fs.existsSync(projectRoot)).toBe(false);
+    expect(projectRegistry.projects).toEqual([]);
+  });
+
   it("creates a managed project root and clones a remote source under it", () => {
     const projectRegistry = registry();
     const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "RemoteProject");
@@ -278,6 +324,40 @@ describe("project operations", () => {
         projectRoot: result.projectRoot,
       },
     ]);
+  });
+
+  it("removes the managed project root but preserves the source checkout when import scaffold extension setup fails", () => {
+    const projectRegistry = registry();
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Imported");
+    const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "Imported");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.writeFileSync(path.join(sourceRoot, "source.txt"), "source checkout\n", "utf8");
+
+    const error = captureError(() =>
+      importNexusProjectInRegistry({
+        homePath: makeTempDir("dev-nexus-home-"),
+        registry: projectRegistry,
+        root: sourceRoot,
+        projectRoot,
+        name: "Imported",
+        gitRunner: fakeGitRunner([], {
+          branch: "main",
+          remoteUrl: "https://github.com/example/imported.git",
+        }),
+        scaffoldExtensions: [throwingExtension],
+      }),
+    );
+
+    expect(error).toBeInstanceOf(NexusProjectError);
+    expect((error as Error).message).toMatch(/Project scaffold failed/u);
+    expect((error as Error).message).toMatch(/throwing-extension/u);
+    expect((error as Error).message).toMatch(/Safe next action/u);
+    expect(fs.existsSync(projectRoot)).toBe(false);
+    expect(fs.readFileSync(path.join(sourceRoot, "source.txt"), "utf8")).toBe(
+      "source checkout\n",
+    );
+    expect(fs.existsSync(path.join(sourceRoot, devNexusProjectConfigFileName))).toBe(false);
+    expect(projectRegistry.projects).toEqual([]);
   });
 
   it("merges extension metadata when importing an initialized project", () => {
