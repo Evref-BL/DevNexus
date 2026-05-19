@@ -205,6 +205,7 @@ Useful commands:
 ```bash
 dev-nexus automation status <project-root>
 dev-nexus automation enqueue <project-root> --title "Implement focused task"
+dev-nexus automation heartbeat prepare <project-root> --json
 dev-nexus automation run-once <project-root>
 dev-nexus automation schedule <project-root> --max-runs 1
 dev-nexus automation coordinator-loop <project-root> --max-runs 1
@@ -228,6 +229,15 @@ configured.
 
 `automation enqueue` creates a work item that matches the configured launch
 filter and refuses inputs that would be invisible to that filter.
+
+`automation heartbeat prepare` renders a Codex heartbeat automation recipe
+without mutating Codex or any provider state. The recipe includes a suggested
+heartbeat name, thread destination, hourly default schedule, active/paused state,
+and a self-contained prompt generated from project metadata. The prompt tells a
+wake-up agent to read DevNexus project context, use automation and tracker
+surfaces, prepare isolated worktrees, respect component tracker roles including
+direct external issue selection, record target-cycle facts, verify work, and use
+the idle path to remove blockers or capture focused component-owned issues.
 
 `automation run-once` and `automation coordinator-loop` launch the configured
 agent command when the project is ready. The launched agent receives

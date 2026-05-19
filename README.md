@@ -75,6 +75,7 @@ Check automation readiness:
 dev-nexus automation status <project-root>
 dev-nexus automation eligible-work <project-root> --json
 dev-nexus automation agent-profiles <project-root> --json
+dev-nexus automation heartbeat prepare <project-root> --json
 ```
 
 ## Core Concepts

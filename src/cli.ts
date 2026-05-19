@@ -24,6 +24,11 @@ import {
   type EnqueueNexusAutomationWorkItemResult,
 } from "./nexusAutomationEnqueue.js";
 import {
+  prepareNexusAutomationHeartbeat,
+  type NexusAutomationHeartbeatPreparation,
+  type NexusAutomationHeartbeatStatus,
+} from "./nexusAutomationHeartbeat.js";
+import {
   runNexusAutomationOnce,
   type RunNexusAutomationOnceResult,
 } from "./nexusAutomationRunOnce.js";
@@ -590,6 +595,14 @@ interface ParsedAutomationEnqueueCommand {
   json?: boolean;
 }
 
+interface ParsedAutomationHeartbeatPrepareCommand {
+  projectRoot: string;
+  name?: string | null;
+  intervalMinutes?: number | null;
+  status?: NexusAutomationHeartbeatStatus | null;
+  json?: boolean;
+}
+
 interface ParsedAutomationTargetCycleListCommand {
   projectRoot: string;
   json?: boolean;
@@ -835,6 +848,7 @@ export function usage(): string {
     "  dev-nexus automation agent-profiles <project-root> [options]",
     "  dev-nexus automation app-server-probe <project-root> [options]",
     "  dev-nexus automation enqueue <project-root> --title <title> [options]",
+    "  dev-nexus automation heartbeat prepare <project-root> [options]",
     "  dev-nexus automation target-cycle list <project-root> [options]",
     "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
     "  dev-nexus automation target-report <project-root> [options]",
@@ -1158,6 +1172,12 @@ export function usage(): string {
     "  --label <label>            repeatable, added after selector labels",
     "  --assignee <assignee>      repeatable, added after selector assignees",
     "  --milestone <text>",
+    "  --json",
+    "",
+    "Options for automation heartbeat prepare:",
+    "  --name <name>",
+    "  --interval-minutes <count>  defaults to 60",
+    "  --paused                    prepare a paused heartbeat recipe",
     "  --json",
     "",
     "Options for automation target-cycle list:",
@@ -2402,6 +2422,22 @@ async function handleAutomationCommand(
     return 0;
   }
 
+  if (argv[1] === "heartbeat") {
+    const parsed = parseAutomationHeartbeatPrepareCommand(argv);
+    const result = prepareNexusAutomationHeartbeat({
+      projectRoot: parsed.projectRoot,
+      name: parsed.name,
+      intervalMinutes: parsed.intervalMinutes,
+      status: parsed.status,
+    });
+    printAutomationHeartbeatPrepareResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "target-cycle") {
     return handleAutomationTargetCycleCommand(argv, dependencies);
   }
@@ -2515,7 +2551,7 @@ async function handleAutomationCommand(
 
   if (argv[1] !== "run-once") {
     throw new Error(
-      "automation requires status, eligible-work, agent-profiles, app-server-probe, enqueue, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
+      "automation requires status, eligible-work, agent-profiles, app-server-probe, enqueue, heartbeat, target-cycle, target-report, run-once, schedule, coordinator-loop, or current-agent",
     );
   }
 
@@ -5056,6 +5092,50 @@ function parseAutomationEnqueueCommand(
   return parsed as ParsedAutomationEnqueueCommand;
 }
 
+function parseAutomationHeartbeatPrepareCommand(
+  argv: string[],
+): ParsedAutomationHeartbeatPrepareCommand {
+  const [, , command, projectRoot, ...rest] = argv;
+  if (command !== "prepare") {
+    throw new Error("automation heartbeat requires prepare");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation heartbeat prepare requires a project root");
+  }
+
+  const parsed: ParsedAutomationHeartbeatPrepareCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--name":
+        parsed.name = next();
+        break;
+      case "--interval-minutes":
+        parsed.intervalMinutes = parsePositiveInteger(next(), arg);
+        break;
+      case "--paused":
+        parsed.status = "PAUSED";
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation heartbeat prepare option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationTargetCycleListCommand(
   argv: string[],
 ): ParsedAutomationTargetCycleListCommand {
@@ -6796,6 +6876,33 @@ function printAutomationEnqueueResult(
   writeLine(stdout, `  Id: ${result.workItem.id}`);
   writeLine(stdout, `  Title: ${result.workItem.title}`);
   writeLine(stdout, `  Status: ${result.workItem.status}`);
+}
+
+function printAutomationHeartbeatPrepareResult(
+  result: NexusAutomationHeartbeatPreparation,
+  parsed: ParsedAutomationHeartbeatPrepareCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus heartbeat automation prepared.");
+  writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
+  writeLine(stdout, `  Name: ${result.codexAutomation.name}`);
+  writeLine(stdout, `  Kind: ${result.codexAutomation.kind}`);
+  writeLine(stdout, `  Destination: ${result.codexAutomation.destination}`);
+  writeLine(stdout, `  Schedule: ${result.codexAutomation.rrule}`);
+  writeLine(stdout, `  Status: ${result.codexAutomation.status}`);
+  for (const warning of result.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+  writeLine(stdout, "  Prompt:");
+  for (const line of result.codexAutomation.prompt.split("\n")) {
+    writeLine(stdout, `    ${line}`);
+  }
 }
 
 function printAutomationTargetCycleListResult(

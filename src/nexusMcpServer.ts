@@ -53,6 +53,10 @@ import {
   getNexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
 import {
+  prepareNexusAutomationHeartbeat,
+  type NexusAutomationHeartbeatStatus,
+} from "./nexusAutomationHeartbeat.js";
+import {
   getNexusAutomationAgentProfileSummary,
 } from "./nexusAutomationAgentSurface.js";
 import {
@@ -289,6 +293,25 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
         profileId: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "automation_heartbeat_prepare",
+    description: "Prepare a Codex heartbeat automation recipe and prompt for a DevNexus project without mutating Codex or provider state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        name: { type: ["string", "null"] },
+        intervalMinutes: { type: ["number", "null"] },
+        status: {
+          type: ["string", "null"],
+          enum: ["ACTIVE", "PAUSED", null],
+        },
       },
       additionalProperties: false,
     },
@@ -1266,6 +1289,20 @@ export async function callDevNexusMcpTool(
           probe,
         });
       }
+      case "automation_heartbeat_prepare":
+        return toolResult({
+          ok: true,
+          ...prepareNexusAutomationHeartbeat({
+            projectRoot: projectRootFromArgs(args),
+            name: optionalNullableString(args, "name", "arguments"),
+            intervalMinutes: optionalPositiveInteger(
+              args,
+              "intervalMinutes",
+              "arguments",
+            ),
+            status: optionalHeartbeatStatus(args, "status", "arguments"),
+          }),
+        });
       case "setup_flow_list":
         return toolResult({
           ok: true,
@@ -3503,6 +3540,22 @@ function parseNexusSetupRecordedStepStatus(
   }
 
   throw new Error(`${pathName} must be pending, completed, blocked, or skipped`);
+}
+
+function optionalHeartbeatStatus(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusAutomationHeartbeatStatus | undefined {
+  const value = optionalString(record, key, pathName);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "ACTIVE" || value === "PAUSED") {
+    return value;
+  }
+
+  throw new Error(`${pathName}.${key} must be ACTIVE or PAUSED`);
 }
 
 function optionalWorkStatus(
