@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 334,
-  "updatedAt": "2026-05-19T17:23:24.607Z",
+  "nextCommentNumber": 335,
+  "updatedAt": "2026-05-19T17:30:40.956Z",
   "items": [
     {
       "id": "local-1",
@@ -3990,7 +3990,7 @@
       "id": "local-155",
       "title": "Define project setup answer model and local mutation boundary",
       "description": "Type: design/model slice\nSource: Nicolas onboarding follow-up and 2026-05-19 setup discussion.\nOwner: dev-nexus component.\n\nProblem:\nFirst-time project creation exposes low-level commands before users or agents know which parameters are mandatory, optional, local-only, or provider-mutating. A giant `project create` command would preserve the friction in another form.\n\nDecision to encode:\n- Default first-project entry point should be `dev-nexus project setup`.\n- It may preview local writes and ask for confirmation, but it should not force a separate local `setup plan` / `setup apply` dance.\n- Provider mutations, especially meta-repo creation/push and access repair, stay outside the local setup wizard and continue through explicit hosting status/plan/apply surfaces.\n\nAcceptance criteria:\n- Define a typed setup answers/proposal model covering home, project identity, project root, components, source strategy, agent targets, local work tracking, optional hosting intent, auth profile references, publication posture, and readiness checks.\n- Mark each proposed operation with mutation class: local file write, local git operation, host-local auth check, provider read, or provider mutation.\n- Local project scaffold writes are allowed behind preview/confirmation; provider mutations are represented only as next-phase handoff actions.\n- The model can be rendered as JSON for agents and as concise human preview text.\n- No shared config field accepts raw tokens, private keys, or passwords.\n\nVerification:\n- Unit tests for model validation and mutation classification.\n- npm run check.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4003,8 +4003,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:21:20.920Z",
-      "updatedAt": "2026-05-19T17:21:20.920Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T17:30:40.956Z",
+      "closedAt": "2026-05-19T17:30:40.956Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8247,7 +8247,19 @@
       }
     ],
     "local-154": [],
-    "local-155": [],
+    "local-155": [
+      {
+        "id": "local-comment-334",
+        "body": "Implemented in DevNexus source commit b94154616f4732494d60771cdc8e5a5f624e27f3 (`Add project setup proposal model`). The source change adds a typed project setup answer/proposal model, explicit mutation classes, local setup versus next-phase hosting operation separation, JSON-serializable sanitized proposals, concise human summaries, and secret-field/raw-token diagnostics. Verification: `npm run check` passed in the DevNexus source worktree, including 69 core test files, 609 passing tests plus 1 skipped, and DevNexus-Research plugin checks.",
+        "author": null,
+        "createdAt": "2026-05-19T17:30:40.829Z",
+        "updatedAt": "2026-05-19T17:30:40.829Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-334"
+        }
+      }
+    ],
     "local-156": [],
     "local-157": [],
     "local-158": [],

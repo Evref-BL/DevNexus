@@ -64,7 +64,11 @@ and ready for coordinator-driven work across its components.
   resolved the authority-profile integration hold, then published
   `dev-nexus:local-94` as merge commit `b218118` for authority-role
   documentation and `dev-nexus:local-107` through `3753adf` for stale and
-  unexpected provider-projection diagnostics.
+  unexpected provider-projection diagnostics. The first-user onboarding
+  foundation `dev-nexus:local-155` is published as `b941546` for the typed
+  project setup answer/proposal model, explicit mutation classification, local
+  setup versus hosting handoff separation, JSON-safe proposal rendering, and
+  secret diagnostics.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -304,6 +308,12 @@ and ready for coordinator-driven work across its components.
   re-check eligible work and either promote the next dependency-satisfied
   bounded slice or record the blocker that keeps remaining items out of ready
   state.
+- Continue first-user onboarding from the now-complete setup proposal model:
+  next implementation slices are `dev-nexus:local-156` for the guided local
+  setup wizard, `local-157` for component topology/component-add, `local-158`
+  for auth-profile inventory, `local-159` for hosting-intent handoff,
+  `local-160` for readiness reporting, and `local-161` for installed CLI versus
+  docs version-skew diagnostics.
 
 ## Boundaries
 
