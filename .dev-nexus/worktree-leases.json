@@ -1,7 +1,59 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T07:46:09.876Z",
+  "updatedAt": "2026-05-19T08:15:48.805Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f1e8a9dc13d05909",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-135",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "DevNexus automation status, eligible-work summaries, agent launch/adoption context, target report, CLI/MCP JSON surfaces"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T08:15:48.805Z",
+      "lastSeenAt": "2026-05-19T08:15:48.805Z",
+      "updatedAt": "2026-05-19T08:15:48.805Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "b13dfd6ee5dadb95345218fe3afa7afc75241245",
+      "dirty": true,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 1,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "local-135 implementation is complete and published. Human/local-tracker authority should close local-135 as done if the local provider auth-profile mismatch remains intentional.",
+        "Verification: npm run check passed in C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-135-external-visibility: 65 test files, 578 tests.",
+        "Integration preference: direct_integration"
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

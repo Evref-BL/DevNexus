@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 313,
-  "updatedAt": "2026-05-19T07:52:57.650Z",
+  "nextCommentNumber": 315,
+  "updatedAt": "2026-05-19T08:17:10.268Z",
   "items": [
     {
       "id": "local-1",
@@ -3463,7 +3463,7 @@
       "id": "local-135",
       "title": "Summarize external issue visibility in agent and target surfaces",
       "description": "Type: agent-facing reporting slice\nReadiness: todo/dependent on dev-nexus:local-130 and dev-nexus:local-131; refresh after dev-nexus:local-133 when import planning lands\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: make external issue visibility explicit in automation status, eligible-work output, agent launch context, and target reports.\n\nUser stories covered:\n- As a coordinator agent, I can answer whether provider-native GitHub Issues are ignored, directly selectable, or import candidates.\n- As a cross-host worker, I can tell whether I need to fetch the meta-project, query a provider, run import, or wait for scheduled sync.\n\nAcceptance criteria:\n- Automation status and eligible-work summaries include concise discovery mode, configured source roles, selected/ignored/import-only tracker counts, and provider access warnings.\n- Agent launch context states whether external issues are automatically visible, import-required, direct-selectable, or explicitly ignored for each component.\n- Target report includes last discovery/import status when available without duplicating long provider payloads.\n- The summaries remain compact enough for coordinator prompts and do not leak tokens, secrets, or host-local auth paths.\n- Default-tracker-only projects continue to produce simple output without noisy empty discovery sections.\n\nDependencies:\n- Depends on dev-nexus:local-130 and dev-nexus:local-131.\n- Should be refreshed after dev-nexus:local-133 adds import planning facts.\n\nBoundaries:\n- Do not implement new provider reads or import execution in this slice.\n- Do not make summaries the source of truth for tracker policy.\n\nVerification:\n- Focused tests for automation status, eligible-work, agent context, and target report summaries in default-only, discovery, import-required, missing-credential, and no-eligible-work cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3477,8 +3477,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:26.098Z",
-      "updatedAt": "2026-05-19T01:18:17.089Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T08:17:10.268Z",
+      "closedAt": "2026-05-19T08:17:01.968Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7542,6 +7542,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-300"
+        }
+      },
+      {
+        "id": "local-comment-313",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: b13dfd6ee5dadb95345218fe3afa7afc75241245\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T08:15:48.805Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\dogfood-local-135-closeout\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-135\",\n  \"logicalItemId\": \"local-135\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-135\",\n    \"itemNumber\": 135,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-135\",\n      \"itemNumber\": 135\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-135\",\n    \"itemNumber\": 135,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-135\",\n      \"itemNumber\": 135\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-135\",\n      \"itemNumber\": 135,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-135\",\n        \"itemNumber\": 135\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"b13dfd6ee5dadb95345218fe3afa7afc75241245\",\n  \"dirty\": true,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"DevNexus automation status, eligible-work summaries, agent launch/adoption context, target report, CLI/MCP JSON surfaces\"\n  ],\n  \"decisions\": [\n    \"Published source change directly to DevNexus bot/main as 3819017 after full npm run check passed.\",\n    \"Local tracker status/comment mutation was authority-blocked because active auth profile bot-github is provider github while the tracker provider is local; recording this handoff as the configured fallback.\"\n  ],\n  \"verificationSummary\": \"npm run check passed in C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-135-external-visibility: 65 test files, 578 tests.\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"local-135 implementation is complete and published. Human/local-tracker authority should close local-135 as done if the local provider auth-profile mismatch remains intentional.\",\n  \"leaseId\": \"lease-f1e8a9dc13d05909\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T08:15:48.821Z",
+        "updatedAt": "2026-05-19T08:15:48.821Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-313"
+        }
+      },
+      {
+        "id": "local-comment-314",
+        "body": "Completed and published through DevNexus source main as 3819017 (Expose external issue visibility summaries). Added compact external issue visibility summaries to automation status, eligible-work summaries, agent launch/current-agent context, target reports, CLI text output, and exported API surface. Verification passed: focused surface suites, MCP/eligible discovery suites, and full npm run check (65 files, 578 tests). Publication decision: direct integration to bot/main.",
+        "author": null,
+        "createdAt": "2026-05-19T08:17:10.268Z",
+        "updatedAt": "2026-05-19T08:17:10.268Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-314"
         }
       }
     ],

@@ -120,8 +120,10 @@ and ready for coordinator-driven work across its components.
   discovery sources, `local-132` is complete for reusable linked-item
   deduplication, `local-133` is complete for read-only inbound import planning,
   and `local-134` is complete for policy-gated local import execution.
-  `local-135` and `local-136` are ready follow-ons for scheduler import job
-  configuration and provider-backed import run reporting.
+  `local-135` is complete as `3819017` for compact external issue visibility
+  summaries across status, eligible-work, agent context, and target reports.
+  `local-136` remains the ready follow-on for fake/disposable provider import
+  reporting.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
@@ -263,8 +265,8 @@ and ready for coordinator-driven work across its components.
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
 - Keep cross-tracker discovery ordered after completed `dev-nexus:local-129`
-  through `local-133`: proceed through guarded inbound import execution and
-  visibility summaries. Use fake or disposable provider fixtures for validation,
+  through `local-135`: proceed to `local-136` for fake/disposable provider
+  import reporting. Use fake or disposable provider fixtures for validation,
   not active projects.
 
 ## Boundaries
