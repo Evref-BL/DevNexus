@@ -77,10 +77,10 @@ target-cycle facts, commits, and the target report.
 - Continue Codex app-server correction after completed `dev-nexus:local-115`
   safe initialize probes; keep provider-native worker orchestration behind the
   remaining app-server event and capability facts.
-- Continue authority configuration after completed `dev-nexus:local-91`
-  publication action gating. `local-92` coordination and provider mutation
-  gating is ready next and should consume the same resolver and summaries
-  instead of duplicating role logic.
+- Continue authority configuration after completed `dev-nexus:local-92`
+  coordination and provider mutation gating. `local-93` and `local-94` are the
+  next authority follow-ons for provider approval/branch-policy signals and
+  role documentation.
 - Continue agent-target projection after completed `dev-nexus:local-106`
   active-target filtering. `local-107` stale projection diagnostics and
   `local-109` worker context propagation are now the next independent
@@ -94,9 +94,9 @@ target-cycle facts, commits, and the target report.
   `dev-nexus:local-129` is complete for tracker roles and discovery-policy
   defaults, and `local-130` is complete for read-only discovery status.
   `local-131` is complete for opt-in eligible-work aggregation, `local-132`
-  is complete for linked-item deduplication, and `local-133` is complete for
-  inbound import planning. `local-134` policy-gated import execution is ready
-  next, then promote `local-135` and `local-136` as dependencies land.
+  is complete for linked-item deduplication, `local-133` is complete for
+  inbound import planning, and `local-134` is complete for policy-gated import
+  execution. `local-135` and `local-136` are ready next.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

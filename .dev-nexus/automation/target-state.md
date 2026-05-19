@@ -57,7 +57,10 @@ and ready for coordinator-driven work across its components.
   summaries in status/report/agent-context surfaces. The latest integration
   published `dev-nexus:local-91` and `dev-nexus:local-133` through `08b700c`
   for publication authority gating, read-only inbound import planning, and the
-  post-review import identity-matching fixes.
+  post-review import identity-matching fixes. The next heartbeat integration
+  published `dev-nexus:local-92` and `dev-nexus:local-134` through `793a162`
+  for coordination/provider mutation authority gates, policy-gated inbound
+  import execution, and integration import cleanup.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -108,9 +111,10 @@ and ready for coordinator-driven work across its components.
   is now complete. `local-130` is complete for read-only discovery status,
   `local-131` is complete for opt-in eligible-work aggregation from configured
   discovery sources, `local-132` is complete for reusable linked-item
-  deduplication, and `local-133` is complete for read-only inbound import
-  planning. `local-134` is ready next for policy-gated local import execution;
-  promote `local-135` and `local-136` as prerequisites land.
+  deduplication, `local-133` is complete for read-only inbound import planning,
+  and `local-134` is complete for policy-gated local import execution.
+  `local-135` and `local-136` are ready follow-ons for scheduler import job
+  configuration and provider-backed import run reporting.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Remote host execution PRD slicing is complete. `dev-nexus:local-77` created
@@ -148,9 +152,10 @@ and ready for coordinator-driven work across its components.
   actor/role/action configuration model, `local-88` is complete for host-local
   current-actor resolution, `local-89` is complete for the pure effective
   authority resolver, `local-90` is complete for scoped authority status and
-  agent-context reporting, and `local-91` is complete for publication action
-  gating. `local-92` is ready next for coordination/provider mutation authority
-  gates; promote `local-93` and `local-94` as their prerequisites land.
+  agent-context reporting, `local-91` is complete for publication action
+  gating, and `local-92` is complete for coordination/provider mutation
+  authority gates. `local-93` and `local-94` are ready follow-ons for provider
+  approval/branch-policy signals and authority-role documentation.
   `local-95` is a blocked HITL decision item for
   self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
@@ -209,13 +214,14 @@ and ready for coordinator-driven work across its components.
   batches. The merged worktrees and local branches for `local-126`,
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
   `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
-  `local-90`, `local-91`, and `local-133` were removed after publication.
+  `local-90`, `local-91`, `local-133`, `local-92`, and `local-134` were
+  removed after publication.
 
 ## Near-Term Direction
 
-- Return to ready follow-on work such as `dev-nexus:local-92`,
-  `dev-nexus:local-134`, `local-107`, `local-109`, and `local-147`, subject to
-  dependency and concurrency limits.
+- Return to ready follow-on work such as `dev-nexus:local-93`,
+  `dev-nexus:local-94`, `local-107`, `local-109`, `local-135`, `local-136`,
+  and `local-147`, subject to dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.

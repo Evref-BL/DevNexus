@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 296,
-  "updatedAt": "2026-05-19T00:36:17.766Z",
+  "nextCommentNumber": 304,
+  "updatedAt": "2026-05-19T01:18:29.272Z",
   "items": [
     {
       "id": "local-1",
@@ -2307,7 +2307,7 @@
       "id": "local-92",
       "title": "Gate coordination and provider mutation actions with authority checks",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: apply authority checks to coordination handoff, integration planning, coordination requests, provider comments, labels, assignments, transitions, approvals, and review decisions.\n\nUser stories covered:\n- As a coordinator agent, I can draft or post a provider request only when policy allows the underlying action.\n- As a reviewer, I can approve or request changes without receiving merge authority.\n\nAcceptance criteria:\n- Read-only coordination status and mutation-free integration planning remain available to observer-style actors.\n- Coordination handoff, work-item comments, provider comments, labels, assignments, workflow transitions, and review approvals each check the relevant authority action before mutation.\n- Coordination request can draft when provider posting is disallowed, and can post only when provider mutation authority allows it.\n- Review approval, requested changes, and merge authority remain separate decisions.\n- Blocked coordination mutation records a clear reason and suggested fallback without silently dropping the coordination fact.\n\nDependencies:\n- Depends on effective authority resolution.\n- Builds on coordination tracker role selection and external request surfaces.\n\nBoundaries:\n- No live provider posting is required for this slice.\n- Do not infer approval from assignment, silence, or casual comments.\n\nVerification:\n- Focused coordination tests for observer read-only status, contributor handoff allowed but provider label blocked, draft-only request, provider-comment allowed, assignment blocked, reviewer approval allowed, and merge still blocked after reviewer approval.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2320,8 +2320,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.653Z",
-      "updatedAt": "2026-05-19T00:36:17.742Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T01:18:28.198Z",
+      "closedAt": "2026-05-19T01:17:55.246Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2333,7 +2333,7 @@
       "id": "local-93",
       "title": "Map provider approval and branch-policy signals into authority state",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority resolver and provider-neutral signal shape exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add mocked provider adapters or adapter helpers that translate provider-native review, check, branch-policy, issue-status, and workflow signals into neutral DevNexus authority signals.\n\nUser stories covered:\n- As an integration agent, I can understand whether provider approval, checks, branch policy, and DevNexus publication policy all allow merging.\n- As a worker agent, I can see that an issue-level design approval and a pull-request merge approval are different signals.\n\nAcceptance criteria:\n- Neutral provider authority signals include waiting_for_approval, approved, changes_requested, rejected, checks_pending, checks_failed, checks_passed, branch_policy_blocked, mergeable, merge_conflict, and timed_out.\n- GitHub-style mocked provider state maps pull request reviews, required checks, mergeability, branch protection, labels, and project-status signals into neutral signals.\n- GitLab-style mocked provider state maps merge request approvals, pipeline state, mergeability, labels, and status transitions into neutral signals.\n- Jira-style mocked provider state maps workflow transitions, assignees, comments, and status categories into neutral signals for issue-level decisions.\n- Assignment remains ownership or expected-responder metadata unless a project explicitly overrides it.\n- Provider signal summaries can be consumed by the effective authority resolver without provider-specific branching in command code.\n\nDependencies:\n- Depends on effective authority resolver concepts and provider abstraction points.\n\nBoundaries:\n- Mocked providers only for the first implementation.\n- Do not add webhooks or continuous polling.\n\nVerification:\n- Focused provider-signal mapping tests for GitHub, GitLab, Jira, ambiguous signals, assignment-not-approval, and branch-policy blockers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2349,7 +2349,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.871Z",
-      "updatedAt": "2026-05-18T13:08:01.871Z",
+      "updatedAt": "2026-05-19T01:18:16.242Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -2362,7 +2362,7 @@
       "id": "local-94",
       "title": "Document authority roles for private bots and open-source contributors",
       "description": "Type: documentation and onboarding slice\nReadiness: autonomous agent-ready (AFK) after the implemented authority configuration shape stabilizes\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: document how users configure agent roles and authority for private DevNexus projects, bot accounts, existing project onboarding, and open-source contribution workflows.\n\nUser stories covered:\n- As a project owner, I can configure a machine-user bot as maintainer for my private meta-project.\n- As an open-source contributor, I can use DevNexus to prepare work and propose pull requests without adding DevNexus artifacts or needing maintainer rights.\n\nAcceptance criteria:\n- Documentation explains actors, auth profiles, roles, action grants, scoped role bindings, effective authority, and safe defaults.\n- Documentation includes generic examples for maintainer bot, contributor-only bot, reviewer, observer, runtime operator, and release operator roles.\n- Documentation explains human/manual profile versus automation/bot profile separation and account mismatch warnings.\n- Onboarding guidance covers project creation and joining an existing project on a new machine without storing secrets in the shared meta-project.\n- Open-source contribution guidance explains PR-only behavior, review waits, no direct integration by default, and no DevNexus artifact contamination of target repositories.\n- Dogfood-specific account names appear only in dogfood-specific examples or state, not in generic user-facing docs.\n\nDependencies:\n- Depends on the stabilized authority configuration and status/reporting shape.\n\nBoundaries:\n- Do not document unsupported live provider behavior as available.\n- Do not include secrets, personal tokens, or private SSH key paths.\n\nVerification:\n- Static documentation review.\n- Run repository documentation/check command when available.\n- npm run check when feasible if docs are included in checks.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2376,7 +2376,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:02.071Z",
-      "updatedAt": "2026-05-18T13:08:02.071Z",
+      "updatedAt": "2026-05-19T01:18:16.712Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3434,7 +3434,7 @@
       "id": "local-134",
       "title": "Execute policy-gated inbound import to local tracker",
       "description": "Type: guarded mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-98 and dev-nexus:local-133\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: execute a reviewed inbound import plan by creating or updating canonical local work items and tracker links from external provider issues, with fail-closed mutation safety.\n\nUser stories covered:\n- As a project owner, I can keep local work items canonical while importing selected GitHub Issues.\n- As a bot account, I can read a GitHub inbox and write local tracker state only when authority, policy, and checkout safety allow it.\n\nAcceptance criteria:\n- Execution requires explicit source and target tracker ids, external-to-local direction, a write policy allowing local tracker mutation, and effective actor authority for local work-item writes and provider reads.\n- Execution recomputes or validates the import plan immediately before mutation and refuses blocked, stale, or ambiguous plans.\n- Execution creates or updates local canonical work items and link records idempotently; rerunning against the same provider items does not create duplicates.\n- Execution writes only local tracker/link files for the owning DevNexus project and does not write provider issues in the first implementation.\n- Execution fails closed in shared checkouts unless the path is classified as an owned project-meta worktree or explicit integration context.\n- Execution records a concise import summary through the work-item service or run result without leaking secrets.\n\nDependencies:\n- Depends on dev-nexus:local-98 for shared-checkout mutation enforcement.\n- Depends on dev-nexus:local-133 for inbound import planning.\n\nBoundaries:\n- Do not implement provider-native issue comments or provider writes in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not import from unconfigured repositories.\n\nVerification:\n- Focused tests for allowed local import, idempotent rerun, blocked policy, missing authority, shared-checkout refusal, stale plan refusal, ambiguous conflict refusal, and no provider writes.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3450,8 +3450,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:18.171Z",
-      "updatedAt": "2026-05-19T00:36:17.766Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T01:18:29.272Z",
+      "closedAt": "2026-05-19T01:17:55.607Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3463,7 +3463,7 @@
       "id": "local-135",
       "title": "Summarize external issue visibility in agent and target surfaces",
       "description": "Type: agent-facing reporting slice\nReadiness: todo/dependent on dev-nexus:local-130 and dev-nexus:local-131; refresh after dev-nexus:local-133 when import planning lands\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: make external issue visibility explicit in automation status, eligible-work output, agent launch context, and target reports.\n\nUser stories covered:\n- As a coordinator agent, I can answer whether provider-native GitHub Issues are ignored, directly selectable, or import candidates.\n- As a cross-host worker, I can tell whether I need to fetch the meta-project, query a provider, run import, or wait for scheduled sync.\n\nAcceptance criteria:\n- Automation status and eligible-work summaries include concise discovery mode, configured source roles, selected/ignored/import-only tracker counts, and provider access warnings.\n- Agent launch context states whether external issues are automatically visible, import-required, direct-selectable, or explicitly ignored for each component.\n- Target report includes last discovery/import status when available without duplicating long provider payloads.\n- The summaries remain compact enough for coordinator prompts and do not leak tokens, secrets, or host-local auth paths.\n- Default-tracker-only projects continue to produce simple output without noisy empty discovery sections.\n\nDependencies:\n- Depends on dev-nexus:local-130 and dev-nexus:local-131.\n- Should be refreshed after dev-nexus:local-133 adds import planning facts.\n\nBoundaries:\n- Do not implement new provider reads or import execution in this slice.\n- Do not make summaries the source of truth for tracker policy.\n\nVerification:\n- Focused tests for automation status, eligible-work, agent context, and target report summaries in default-only, discovery, import-required, missing-credential, and no-eligible-work cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3477,7 +3477,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:26.098Z",
-      "updatedAt": "2026-05-18T19:39:26.098Z",
+      "updatedAt": "2026-05-19T01:18:17.089Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3490,7 +3490,7 @@
       "id": "local-136",
       "title": "Add fake GitHub inbox discovery and import smoke test",
       "description": "Type: opt-in integration testing slice\nReadiness: todo/dependent on dev-nexus:local-133 and dev-nexus:local-134\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: prove the external-inbox path against a fake or disposable GitHub-like source, not against an active DevNexus project.\n\nUser stories covered:\n- As a maintainer, I can validate that a provider-native issue can become a canonical local work item without risking active project state.\n- As an agent, I can run normal checks without live provider mutation or hidden dependency on another project.\n\nAcceptance criteria:\n- Test coverage uses a mocked provider or disposable fake-project fixture that represents a configured GitHub issue inbox and canonical local tracker.\n- The smoke proves discovery status, import planning, and guarded import execution can take a provider-native issue to a canonical local item and link record.\n- Default verification does not require live GitHub credentials and does not mutate live provider issues.\n- Optional live validation, if added, is opt-in only and constrained to a disposable repository/project fixture with strict naming and cleanup policy.\n- The test does not depend on dev-nexus-plexus, this dogfood project as a live provider target, or any other active project.\n- Missing live credentials, wrong actor, provider policy block, and cleanup refusal produce skipped or blocked results rather than unsafe fallback.\n\nDependencies:\n- Depends on dev-nexus:local-133 for import planning.\n- Depends on dev-nexus:local-134 for guarded import execution.\n\nBoundaries:\n- Do not use active DevNexus projects as integration fixtures.\n- Do not run live provider mutation in default tests.\n- Do not delete arbitrary repositories or issues.\n\nVerification:\n- Mocked smoke tests for discovery-to-plan-to-import, duplicate rerun, missing credentials, wrong source filter, and no-live-provider default behavior.\n- Optional live smoke only when explicitly configured.\n- npm run check must pass without live credentials.\n\nPublication notes:\n- Direct integration to DevNexus main after mocked verification passes; live integration evidence can be recorded separately when explicitly run.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3504,7 +3504,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:34.378Z",
-      "updatedAt": "2026-05-18T19:39:34.378Z",
+      "updatedAt": "2026-05-19T01:18:17.456Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6443,10 +6443,56 @@
           "provider": "local",
           "itemId": "local-comment-294"
         }
+      },
+      {
+        "id": "local-comment-296",
+        "body": "Completed and published in DevNexus main as 793a162 through the bot remote. Worker commit a0d26de adds authority checks for coordination/provider mutation paths including handoff, request posting, provider comments, labels, assignment, workflow transition, and review approval separation.\n\nVerification: worker focused suite passed (4 files, 111 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed on source main with 64 files and 572 tests.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:07.009Z",
+        "updatedAt": "2026-05-19T01:18:07.009Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-296"
+        }
+      },
+      {
+        "id": "local-comment-302",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 793a162b57645c8c0a268ed6c9ca12fa60dd9e4e\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T01:18:28.186Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-92-local-134-metadata\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-92\",\n  \"logicalItemId\": \"local-92\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-92\",\n    \"itemNumber\": 92,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-92\",\n      \"itemNumber\": 92\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-92\",\n    \"itemNumber\": 92,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-92\",\n      \"itemNumber\": 92\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-92\",\n      \"itemNumber\": 92,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-92\",\n        \"itemNumber\": 92\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-e0cdf0370aea8d06\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"793a162b57645c8c0a268ed6c9ca12fa60dd9e4e\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusCoordination.ts\",\n    \"src/nexusCoordinationRequest.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"coordination authority tests\"\n  ],\n  \"decisions\": [\n    \"Integrated local-92 coordination/provider mutation authority gating into DevNexus main.\",\n    \"Resolved shared CLI/MCP import integration after merging local-92 with local-134.\",\n    \"Published final DevNexus main through bot/main at 793a162.\"\n  ],\n  \"verificationSummary\": \"Worker focused suite passed (4 files, 111 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"local-92 is merged and published; worker branch content is preserved in source main at 793a162.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:28.198Z",
+        "updatedAt": "2026-05-19T01:18:28.198Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-302"
+        }
       }
     ],
-    "local-93": [],
-    "local-94": [],
+    "local-93": [
+      {
+        "id": "local-comment-298",
+        "body": "Promoted to ready after dev-nexus:local-92 landed in DevNexus main as 793a162. Coordination/provider mutation gates and authority separation are available for provider-signal mapping.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:16.242Z",
+        "updatedAt": "2026-05-19T01:18:16.242Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-298"
+        }
+      }
+    ],
+    "local-94": [
+      {
+        "id": "local-comment-299",
+        "body": "Promoted to ready after dev-nexus:local-92 landed in DevNexus main as 793a162. The authority configuration/status shape is now stable enough for documentation and onboarding guidance.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:16.712Z",
+        "updatedAt": "2026-05-19T01:18:16.712Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-299"
+        }
+      }
+    ],
     "local-95": [],
     "local-96": [],
     "local-97": [
@@ -7363,10 +7409,56 @@
           "provider": "local",
           "itemId": "local-comment-295"
         }
+      },
+      {
+        "id": "local-comment-297",
+        "body": "Completed and published in DevNexus main as 793a162 through the bot remote. Worker commit 1ecdf15 adds guarded inbound work-item import execution, CLI/MCP surfaces, idempotent local item/link writes, shared-checkout refusal, and no provider writes for the first execution slice.\n\nVerification: worker focused suite passed (3 files, 86 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed on source main with 64 files and 572 tests.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:07.408Z",
+        "updatedAt": "2026-05-19T01:18:07.408Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-297"
+        }
+      },
+      {
+        "id": "local-comment-303",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 793a162b57645c8c0a268ed6c9ca12fa60dd9e4e\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T01:18:29.261Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-92-local-134-metadata\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-134\",\n  \"logicalItemId\": \"local-134\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-134\",\n    \"itemNumber\": 134,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-134\",\n      \"itemNumber\": 134\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-134\",\n    \"itemNumber\": 134,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-134\",\n      \"itemNumber\": 134\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-134\",\n      \"itemNumber\": 134,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-134\",\n        \"itemNumber\": 134\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-6a9c4a785cf3840c\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"793a162b57645c8c0a268ed6c9ca12fa60dd9e4e\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/workItemImportPlanner.ts\",\n    \"src/workItemImportPlanner.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"inbound import execution tests\"\n  ],\n  \"decisions\": [\n    \"Integrated local-134 guarded inbound import execution into DevNexus main.\",\n    \"Kept first execution slice local-only with no provider writes.\",\n    \"Published final DevNexus main through bot/main at 793a162.\"\n  ],\n  \"verificationSummary\": \"Worker focused suite passed (3 files, 86 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).\",\n  \"integrationPreference\": \"direct_integration\",\n  \"note\": \"local-134 is merged and published; worker branch content is preserved in source main at 793a162.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:29.272Z",
+        "updatedAt": "2026-05-19T01:18:29.272Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-303"
+        }
       }
     ],
-    "local-135": [],
-    "local-136": [],
+    "local-135": [
+      {
+        "id": "local-comment-300",
+        "body": "Promoted to ready after dev-nexus:local-133 import planning and dev-nexus:local-134 guarded import execution landed through DevNexus main 793a162. External issue visibility summaries can now describe planning and execution state without adding provider reads.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:17.089Z",
+        "updatedAt": "2026-05-19T01:18:17.089Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-300"
+        }
+      }
+    ],
+    "local-136": [
+      {
+        "id": "local-comment-301",
+        "body": "Promoted to ready after dev-nexus:local-134 landed in DevNexus main as 793a162. The fake GitHub inbox smoke can now cover discovery, import planning, guarded execution, idempotent reruns, and no-live-provider defaults.",
+        "author": null,
+        "createdAt": "2026-05-19T01:18:17.456Z",
+        "updatedAt": "2026-05-19T01:18:17.456Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-301"
+        }
+      }
+    ],
     "local-137": [],
     "local-138": [
       {
