@@ -87,6 +87,12 @@ tokens, passwords, and private keys do not belong in the answer file; reference
 host-local credential context such as `gh`, `glab`, environment-variable names,
 or token-store ids instead.
 
+When `project setup` previews JSON output, it includes `proposal.authInventory`.
+That inventory lists configured profiles, missing referenced profiles, whether
+each profile is required now, optional later, or only needed for provider
+mutations, and read-only host checks for provider CLI commands or environment
+variable presence. It never includes token values.
+
 ## Project Layout
 
 The shared project root contains `dev-nexus.project.json` and project support
@@ -259,6 +265,16 @@ Write an answer file for one DevNexus project with several components:
         "cli": "gh",
         "configDir": "home:.config/gh-bot"
       }
+    }
+  ],
+  "workTrackers": [
+    {
+      "id": "github",
+      "provider": "github",
+      "role": "eligible_source",
+      "repositoryOwner": "ExampleOrg",
+      "repositoryName": "graphrag-research-suite",
+      "authProfileId": "bot-github"
     }
   ],
   "hostingIntent": {

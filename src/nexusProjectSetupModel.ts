@@ -1,3 +1,5 @@
+import type { NexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
+
 export type NexusProjectSetupMutationClass =
   | "local_file_write"
   | "local_git_operation"
@@ -133,6 +135,7 @@ export interface NexusProjectSetupWorkTrackerAnswers {
   id: string;
   provider: NexusProjectSetupWorkTrackingProvider;
   role?: "primary" | "eligible_source" | "external_inbox" | "coordination";
+  authProfileId?: string;
   repositoryOwner?: string;
   repositoryName?: string;
   projectKey?: string;
@@ -210,6 +213,7 @@ export interface NexusProjectSetupProposal {
   operations: NexusProjectSetupOperation[];
   diagnostics: NexusProjectSetupDiagnostic[];
   nextPhaseActions: NexusProjectSetupOperation[];
+  authInventory?: NexusProjectSetupAuthInventory;
 }
 
 export function buildNexusProjectSetupProposal(
@@ -587,6 +591,7 @@ function normalizeNexusProjectSetupAnswers(
             id: tracker.id,
             provider: tracker.provider,
             ...(tracker.role ? { role: tracker.role } : {}),
+            ...(tracker.authProfileId ? { authProfileId: tracker.authProfileId } : {}),
             ...(tracker.repositoryOwner ? { repositoryOwner: tracker.repositoryOwner } : {}),
             ...(tracker.repositoryName ? { repositoryName: tracker.repositoryName } : {}),
             ...(tracker.projectKey ? { projectKey: tracker.projectKey } : {}),

@@ -19,6 +19,7 @@ import {
   type NexusProjectWorkTrackerBindingConfig,
 } from "./nexusProjectConfig.js";
 import { analyzeNexusProjectSetupComponentTopology } from "./nexusProjectComponentTopology.js";
+import { buildNexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
 import {
   defaultProjectGitRunner,
   pathForProjectConfig,
@@ -333,6 +334,7 @@ function withTopologyDiagnostics(
       ? "blocked"
       : proposal.status,
     diagnostics,
+    authInventory: buildNexusProjectSetupAuthInventory(proposal.answers),
   };
 }
 

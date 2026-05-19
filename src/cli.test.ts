@@ -1148,6 +1148,13 @@ describe("dev-nexus cli", () => {
       ok: true,
       applied: false,
       proposal: {
+        authInventory: {
+          requiredNowProfileIds: expect.arrayContaining([
+            "human-github",
+            "bot-github",
+          ]),
+          missingProfiles: [],
+        },
         nextPhaseActions: [
           expect.objectContaining({
             id: "apply-hosting-intent",

@@ -78,6 +78,12 @@ Setup and component-add previews warn about common topology mistakes, including
 container folders with nested repositories, non-Git folders, branch or remote
 drift, and source roots placed under generated `worktrees/`.
 
+Setup previews also include an auth inventory for referenced GitHub, GitLab,
+Jira, and generic Git profiles. The inventory reports whether a profile is
+needed now, later, or only for provider mutations, and it checks host-local
+credential handles such as provider CLIs or environment-variable names without
+recording raw secret values.
+
 List registered projects:
 
 ```bash
