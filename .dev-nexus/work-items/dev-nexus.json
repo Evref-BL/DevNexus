@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 164,
-  "nextCommentNumber": 344,
-  "updatedAt": "2026-05-19T19:20:23.137Z",
+  "nextNumber": 166,
+  "nextCommentNumber": 346,
+  "updatedAt": "2026-05-19T19:34:05.322Z",
   "items": [
     {
       "id": "local-1",
@@ -4220,13 +4220,65 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:07:02.129Z",
-      "updatedAt": "2026-05-19T19:07:02.129Z",
+      "updatedAt": "2026-05-19T19:34:05.322Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
         "provider": "local",
         "itemId": "local-163",
         "itemNumber": 163
+      }
+    },
+    {
+      "id": "local-164",
+      "title": "Refine green-main into validation and protected handoff policy",
+      "description": "Type: implementation refinement slice\nReadiness: autonomous agent-ready (AFK) with mocked provider/status tests; no live provider writes.\nSource: follow-up decision on 2026-05-19. User confirmed that green_main must not imply the bot owns merging to main or even has merge permission. Branch CI should still be checked explicitly.\n\nGoal: refine green_main from a branch-first publication flag into a protected target workflow that separates candidate production, branch or pull-request validation, and integration authority/handoff.\n\nDecision model:\n- Agents produce candidate work on branches and may push those branches through configured bot credentials.\n- DevNexus may check branch or pull-request CI/readiness through explicit read-only provider status workflows.\n- Merge to main is a separate authority decision. The bot may merge only when policy and credentials explicitly allow it.\n- Default green_main behavior is handoff-by-default after validation, not automatic merge.\n\nAcceptance criteria:\n- Publication policy expresses validation/readiness separately from integration authority, including default handoff behavior.\n- Green-main status distinguishes candidate branch pushed, branch/PR checks pending, checks green, checks stale, checks failed, mergeability unknown/clear/blocked, and ready-for-human-or-maintainer handoff.\n- Branch CI status checks are explicit actions or provider-signal inputs, not implicit background polling during unrelated agent work.\n- Agent context and target report explain whether the current actor may push a branch, open/update a PR, check CI/readiness, request review, or merge.\n- Direct target-branch push remains blocked by default and exceptional only when configured.\n- Tests use mocked provider signals and do not perform live GitHub reads or writes.\n\nBoundaries:\n- Do not automatically merge to main.\n- Do not add a permanent develop branch default.\n- Do not enable unsolicited CI polling or provider writes.\n- Do not implement release/version planning in this slice; that is tracked separately in the version-scoped planning PRD.\n\nDependencies:\n- Builds on dev-nexus:local-162 green_main model.\n- Should unblock or refine dev-nexus:local-163 dogfood component migration.\n\nVerification:\n- Focused publication policy/status/authority/provider-signal tests.\n- Focused agent context and target report tests.\n- npm run check when feasible.\n\nPublication notes:\n- Publish as branch/PR first; merge to main only after branch CI/review policy is satisfied.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "ci",
+        "github",
+        "policy",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T19:33:39.236Z",
+      "updatedAt": "2026-05-19T19:33:39.236Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-164",
+        "itemNumber": 164
+      }
+    },
+    {
+      "id": "local-165",
+      "title": "Slice version-scoped planning PRD into implementation issues",
+      "description": "Type: planning and issue-slicing slice\nReadiness: ready for issue slicing, not implementation yet.\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: turn the version-scoped planning Product Requirements Document into bounded implementation issues after review. The concept is intentionally parked separately from green_main publication refinement.\n\nProduct direction:\n- Treat versions as first-class planning and readiness objects.\n- Keep work items as the implementation unit and milestones as provider-compatible grouping fields.\n- Use versions to report scope, readiness gates, cross-component progress, blockers, release policy, and post-release follow-up.\n- Integrate with green-main as candidate validation, not merge authority.\n\nAcceptance criteria:\n- Review the PRD for contradictions with current work-item, milestone, target-cycle, authority, publication, and release models.\n- Slice implementation into independent issues for version config, scope resolution, readiness reporting, agent context, and dogfood configuration.\n- Keep live provider writes, automatic release publishing, and merge automation out of the first implementation slice.\n- Preserve compatibility with providers that support only labels or milestones rather than rich version objects.\n\nVerification:\n- Static PRD review.\n- Issue-slicing output has one owner and one verification path per issue.\n\nPublication notes:\n- Project-meta planning work only until implementation issues are selected.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "prd",
+        "planning",
+        "version",
+        "release",
+        "to-issues"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T19:33:51.183Z",
+      "updatedAt": "2026-05-19T19:34:05.205Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-165",
+        "itemNumber": 165
       }
     }
   ],
@@ -8426,6 +8478,32 @@
         }
       }
     ],
-    "local-163": []
+    "local-163": [
+      {
+        "id": "local-comment-345",
+        "body": "Dependency refinement from follow-up discussion: dogfood migration should wait for dev-nexus:local-164 so green_main migration uses validation/readiness/handoff semantics rather than implying bot-owned merge to main.",
+        "author": null,
+        "createdAt": "2026-05-19T19:34:05.322Z",
+        "updatedAt": "2026-05-19T19:34:05.322Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-345"
+        }
+      }
+    ],
+    "local-164": [],
+    "local-165": [
+      {
+        "id": "local-comment-344",
+        "body": "Product Requirements Document attached in docs/version-scoped-planning-prd.md. Kept separate from green_main implementation; next step is issue slicing after review.",
+        "author": null,
+        "createdAt": "2026-05-19T19:34:05.205Z",
+        "updatedAt": "2026-05-19T19:34:05.205Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-344"
+        }
+      }
+    ]
   }
 }
