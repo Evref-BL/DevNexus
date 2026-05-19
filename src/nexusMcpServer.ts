@@ -121,6 +121,13 @@ import {
   type WorkItemSyncPolicyConfig,
 } from "./workItemSyncPlanner.js";
 import {
+  createWorkItemImportPlan,
+  defaultWorkItemImportPolicy,
+  parseWorkItemImportDirection,
+  parseWorkItemImportFingerprint,
+  type WorkItemImportPolicyConfig,
+} from "./workItemImportPlanner.js";
+import {
   createWorkItemTrackerLinkService,
 } from "./workItemTrackerLinks.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
@@ -1005,6 +1012,52 @@ const tools: McpTool[] = [
     },
   },
   {
+    name: "work_item_import_plan",
+    description: "Build a strictly read-only inbound GitHub-to-local work-item import plan.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        sourceTrackerId: { type: "string" },
+        targetTrackerId: { type: "string" },
+        direction: { type: "string", enum: ["external_to_local"] },
+        filters: { type: "object" },
+        fieldSet: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "title",
+              "description",
+              "status",
+              "labels",
+              "assignees",
+              "milestone",
+            ],
+          },
+        },
+        statusMapping: { type: "object" },
+        conflictPolicy: {
+          type: "string",
+          enum: ["block", "source_wins", "target_wins"],
+        },
+        writePolicy: { type: "object" },
+        fingerprints: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["external_ref", "web_url", "title"],
+          },
+        },
+      },
+      required: ["sourceTrackerId", "targetTrackerId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "work_item_sync_execute",
     description: "Execute an explicitly policy-gated one-way local-to-GitHub work-item sync and record a run summary.",
     inputSchema: {
@@ -1713,6 +1766,19 @@ export async function callDevNexusMcpTool(
           plan: await createWorkItemSyncPlan({
             ...projectSelectorFromArgs(args),
             policy: workItemSyncPolicyFromArgs(args),
+            resolveProject: (selector) =>
+              resolveWorkItemProject(selector, homePath),
+            now: context.now,
+          }),
+        });
+      }
+      case "work_item_import_plan": {
+        const homePath = homePathFromArgs(args);
+        return toolResult({
+          ok: true,
+          plan: await createWorkItemImportPlan({
+            ...projectSelectorFromArgs(args),
+            policy: workItemImportPolicyFromArgs(args),
             resolveProject: (selector) =>
               resolveWorkItemProject(selector, homePath),
             now: context.now,
@@ -2580,6 +2646,46 @@ function workItemSyncPolicyFromArgs(
   });
 }
 
+function workItemImportPolicyFromArgs(
+  args: Record<string, unknown>,
+): WorkItemImportPolicyConfig {
+  const direction = optionalString(args, "direction", "arguments");
+  const conflictPolicy = optionalString(args, "conflictPolicy", "arguments");
+  const fieldSet = optionalStringArray(args, "fieldSet", "arguments")?.map(
+    (field) => parseWorkItemSyncField(field, "arguments.fieldSet"),
+  );
+  const fingerprints = optionalStringArray(
+    args,
+    "fingerprints",
+    "arguments",
+  )?.map((fingerprint) =>
+    parseWorkItemImportFingerprint(fingerprint, "arguments.fingerprints"),
+  );
+
+  return defaultWorkItemImportPolicy({
+    sourceTrackerId: requiredString(args, "sourceTrackerId", "arguments"),
+    targetTrackerId: requiredString(args, "targetTrackerId", "arguments"),
+    ...(direction
+      ? { direction: parseWorkItemImportDirection(direction, "arguments.direction") }
+      : {}),
+    filters: workItemSyncFiltersFromArgs(args),
+    ...(fieldSet ? { fieldSet } : {}),
+    statusMapping: workItemSyncStatusMappingFromArgs(args),
+    ...(conflictPolicy
+      ? {
+          conflictPolicy: {
+            mode: parseWorkItemSyncConflictPolicyMode(
+              conflictPolicy,
+              "arguments.conflictPolicy",
+            ),
+          },
+        }
+      : {}),
+    writePolicy: workItemImportWritePolicyFromArgs(args),
+    ...(fingerprints ? { fingerprints } : {}),
+  });
+}
+
 function workItemSyncFiltersFromArgs(
   args: Record<string, unknown>,
 ): NonNullable<WorkItemSyncPolicyConfig["filters"]> {
@@ -2665,6 +2771,28 @@ function workItemSyncWritePolicyFromArgs(
               "reason",
               "arguments.writePolicy",
             ) ?? null,
+        }
+      : {}),
+  };
+}
+
+function workItemImportWritePolicyFromArgs(
+  args: Record<string, unknown>,
+): NonNullable<WorkItemImportPolicyConfig["writePolicy"]> {
+  const syncPolicy = workItemSyncWritePolicyFromArgs(args);
+  if (!hasOwn(args, "writePolicy")) {
+    return syncPolicy;
+  }
+  const writePolicy = asRecord(args.writePolicy, "arguments.writePolicy");
+  const links = optionalString(writePolicy, "links", "arguments.writePolicy");
+  return {
+    ...syncPolicy,
+    ...(links
+      ? {
+          links: parseWorkItemSyncWriteDisposition(
+            links,
+            "arguments.writePolicy.links",
+          ),
         }
       : {}),
   };

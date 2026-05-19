@@ -252,6 +252,7 @@ describe("DevNexus MCP server", () => {
       "work_item_show_links",
       "work_item_unlink",
       "work_item_sync_plan",
+      "work_item_import_plan",
       "work_item_sync_execute",
     ]);
   });
