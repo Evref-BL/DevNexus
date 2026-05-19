@@ -163,13 +163,13 @@ Git state, verification, active related work, and recoverability before merging
 or preparing a publishable result.
 
 Actor identity, direct integration, pull requests, provider mutation, approval,
-and publication permission belong to the authority model tracked by
-`dev-nexus:local-87` through `dev-nexus:local-95`. Worktree coordination should
-consume that effective authority result before mutating shared checkouts,
-pushing, opening provider requests, merging, approving, publishing, or deleting
-branches and worktrees. Until those source slices land, this section describes
-the expected operating practice; it is not a claim that DevNexus enforces every
-guardrail automatically.
+and publication permission belong to the authority model described in
+[authority roles](authority-roles.md). Worktree coordination should consume the
+effective authority result before mutating shared checkouts, pushing, opening
+provider requests, merging, approving, publishing, or deleting branches and
+worktrees. Authority checks do not make unsupported provider behavior
+available; publication policy, provider adapters, credentials, review state,
+checks, mergeability, and branch policy can still block a command.
 
 The no-loss default is conservative. Commit or hand off useful work before
 ending a mutating chat. Do not delete branches or worktrees when ownership,
