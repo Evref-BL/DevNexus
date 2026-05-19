@@ -2,7 +2,7 @@
   "version": 1,
   "nextNumber": 152,
   "nextCommentNumber": 313,
-  "updatedAt": "2026-05-19T07:46:09.889Z",
+  "updatedAt": "2026-05-19T07:52:57.650Z",
   "items": [
     {
       "id": "local-1",
@@ -2758,7 +2758,7 @@
       "id": "local-109",
       "title": "Propagate active agent targets into worker context preparation",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: ensure generated worker context and prepared worktree support files describe and materialize only the provider-native projections relevant to the worker agent target.\n\nUser stories covered:\n- As a worker agent, I receive the skill and MCP context for the provider I am actually using.\n- As a coordinator agent, I can prepare a Codex worker without also creating Claude-native support state.\n\nAcceptance criteria:\n- Worker context records the project active target policy and the assigned worker provider target.\n- Worker-local skill projections and plugin fragments are filtered by the assigned provider target.\n- Worker briefing describes only relevant provider-native directories plus shared project-managed skill roots.\n- Preparing a worktree for a provider not active in project policy fails or produces a clear manual-target warning according to configuration.\n- Multi-provider projects can prepare distinct worker contexts for different active providers without cross-contaminating support files.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Do not create nested execution workspaces or change the Git worktree model.\n- Do not install global skills or write to user-global provider directories.\n\nVerification:\n- Focused worker context and worktree prepare tests for Codex-only, Claude-only, multi-provider, unsupported provider, and plugin fragment filtering cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2772,8 +2772,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:18.350Z",
-      "updatedAt": "2026-05-19T07:46:09.889Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T07:52:57.650Z",
+      "closedAt": "2026-05-19T07:52:57.650Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
