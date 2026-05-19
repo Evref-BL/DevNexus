@@ -1,7 +1,63 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T11:49:09.717Z",
+  "updatedAt": "2026-05-19T22:24:42.157Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3a676deda39c5c67",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-165",
+      "branchName": "codex/dev-nexus-dogfood/local-165-version-planning-issues",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_root",
+        "base": "projectRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "."
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T22:24:42.157Z",
+      "lastSeenAt": "2026-05-19T22:24:42.157Z",
+      "updatedAt": "2026-05-19T22:24:42.157Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "165ed679f8f171d83b4773e5ed338e135078e4a7",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_root",
+          "base": "projectRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "."
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Project-meta branch commit 165ed67 slices version-scoped planning into implementation work items and updates handoff state.",
+        "Verification: Static PRD review completed; local work item store parses as JSON; git diff --check passed with line-ending warnings only.",
+        "Integration preference: Fast-forward project meta branch into dogfood main and push via bot remote."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
