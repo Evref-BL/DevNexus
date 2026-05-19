@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 284,
-  "updatedAt": "2026-05-19T00:03:05.841Z",
+  "nextCommentNumber": 286,
+  "updatedAt": "2026-05-19T00:06:26.711Z",
   "items": [
     {
       "id": "local-1",
@@ -2281,7 +2281,7 @@
       "id": "local-91",
       "title": "Gate publication actions with authority checks",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make publication helpers and automation publication decisions refuse unsafe push, pull request, merge, approval, and publish actions when the current actor lacks authority.\n\nUser stories covered:\n- As a coordinator agent, I can directly integrate verified work only when the project says my actor is allowed to do so.\n- As an open-source contributor agent, I can prepare a branch and pull request without needing maintainer permissions.\n\nAcceptance criteria:\n- Direct target-branch push is blocked unless component publication policy, actor authority, and resolved auth profile all allow it.\n- Pull request or merge request creation is allowed for contributor-style actors when configured, and is recommended as fallback when direct integration is blocked.\n- Pull request or merge request merge is blocked unless merge authority, provider approval state, required checks, branch policy, and component publication policy all allow it.\n- Package or release publication is gated separately from merge authority.\n- Blocked publication produces a non-interactive, machine-readable result and a human-readable fallback suggestion.\n- Existing direct-integration dogfood behavior remains possible for configured maintainer bots.\n\nDependencies:\n- Depends on effective authority resolution and current actor detection.\n\nBoundaries:\n- Use mocked provider/merge state in tests.\n- Do not self-approve pull requests unless a later explicit policy item allows it.\n- Do not require live GitHub credentials for the first implementation.\n\nVerification:\n- Focused publication tests for direct push allowed, direct push blocked with PR fallback, PR-only contributor, merge blocked by missing approval, merge blocked by failed checks, release publish blocked without release authority, and dogfood maintainer merge allowed.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2294,7 +2294,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.456Z",
-      "updatedAt": "2026-05-19T00:03:05.820Z",
+      "updatedAt": "2026-05-19T00:06:26.687Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3407,7 +3407,7 @@
       "id": "local-133",
       "title": "Plan inbound GitHub-to-local issue import",
       "description": "Type: dry-run inbound import implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-132\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only inbound import plan from a configured external tracker such as GitHub Issues into the canonical local tracker.\n\nUser stories covered:\n- As a maintainer, I can dry-run GitHub-to-local import and review creates, updates, skips, conflicts, and missing links before any local files change.\n- As a Windows worker, I can know which provider-native issues would become local work once import is executed.\n\nAcceptance criteria:\n- DevNexus exposes a small planning surface such as work_item_inbound_sync_plan or an equivalent command shape that fits existing sync conventions.\n- The plan supports external-to-local direction starting with GitHub source and local target trackers.\n- Planning reports creates, updates, skips, conflicts, ambiguous duplicates, stale links, missing credentials, unsupported capabilities, provider filters, field/status mappings, and exact local files that would change.\n- Planning is idempotent: linked items and configured fingerprints map back to the same local logical item on repeated runs.\n- The plan is strictly read-only and does not create local items, update link records, comment on provider issues, or mutate Git state.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-132.\n\nBoundaries:\n- Do not implement apply/execution in this slice.\n- Do not add provider-native writes or comments in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused tests for create/update/skip/conflict plans, ambiguous duplicate plans, stale link plans, missing credential behavior, exact local-file reporting, and no-mutation behavior with mocked GitHub provider data.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "in_progress",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3421,7 +3421,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:09.878Z",
-      "updatedAt": "2026-05-19T00:03:05.841Z",
+      "updatedAt": "2026-05-19T00:06:26.711Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6375,7 +6375,19 @@
         }
       }
     ],
-    "local-91": [],
+    "local-91": [
+      {
+        "id": "local-comment-284",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-91-publication-authority` on branch `codex/dev-nexus-local-91-publication-authority`. Scope: publication authority gating; avoid tracker import/dedupe files owned by local-133. Agent Git/GitHub activity uses the bot profile.",
+        "author": null,
+        "createdAt": "2026-05-19T00:06:26.687Z",
+        "updatedAt": "2026-05-19T00:06:26.687Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-284"
+        }
+      }
+    ],
     "local-92": [],
     "local-93": [],
     "local-94": [],
@@ -7227,7 +7239,19 @@
         }
       }
     ],
-    "local-133": [],
+    "local-133": [
+      {
+        "id": "local-comment-285",
+        "body": "Started in isolated component worktree `worktrees/dev-nexus/local-133-inbound-import-plan` on branch `codex/dev-nexus-local-133-inbound-import-plan`. Scope: read-only inbound GitHub-to-local import planning; avoid publication authority gating files owned by local-91. Agent Git/GitHub activity uses the bot profile.",
+        "author": null,
+        "createdAt": "2026-05-19T00:06:26.711Z",
+        "updatedAt": "2026-05-19T00:06:26.711Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-285"
+        }
+      }
+    ],
     "local-134": [],
     "local-135": [],
     "local-136": [],
