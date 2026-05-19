@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 338,
-  "updatedAt": "2026-05-19T18:00:05.130Z",
+  "nextCommentNumber": 339,
+  "updatedAt": "2026-05-19T18:03:03.616Z",
   "items": [
     {
       "id": "local-1",
@@ -4098,7 +4098,7 @@
       "id": "local-159",
       "title": "Record hosting intent during setup and hand off to hosting plan/apply",
       "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nRelated: dev-nexus:local-117 through dev-nexus:local-126\nSource: 2026-05-19 setup discussion.\nOwner: dev-nexus component.\n\nProblem:\nUsers need to decide whether and where the meta-repo should be hosted, but creating/pushing provider repositories is a different risk class from local setup. The setup flow should capture intent and route users to the explicit hosting workflow.\n\nAcceptance criteria:\n- Let setup record optional meta-repo hosting intent: provider, host, owner/group/project key, repository name, desired remotes, human account, automation/bot account, and access policy references.\n- Clearly separate DevNexus meta-project hosting from component repository hosting.\n- Do not create provider repositories, push branches, repair collaborators, or accept invitations from `project setup`.\n- After local setup, show the exact next hosting commands: status, plan, and apply, with the auth profile each would require.\n- Include JSON output so agents can report whether hosting is not configured, planned, blocked on auth, or ready for explicit apply.\n\nVerification:\n- Tests proving setup produces hosting handoff actions without provider mutations.\n- Fake GitHub hosting handoff test using existing hosting planner fixtures.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4113,8 +4113,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:22:54.832Z",
-      "updatedAt": "2026-05-19T17:22:54.832Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T18:03:03.616Z",
+      "closedAt": "2026-05-19T18:03:03.616Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8299,7 +8299,19 @@
         }
       }
     ],
-    "local-159": [],
+    "local-159": [
+      {
+        "id": "local-comment-338",
+        "body": "Implemented setup hosting handoff reporting in DevNexus source commit `4fbc4a440683c7f7f9105cc939ff0f970dcdacde` and pushed it to `bot/main`.\n\nSetup preview JSON now includes `proposal.hostingHandoff` with not-configured/planned/blocked-on-auth state, exact hosting status/plan/apply commands, auth profile ids per command, meta-project-only scope, and explicit deferral of provider mutations. Verification passed: `npm run build`; `npm test -- src/nexusProjectSetupHostingHandoff.test.ts src/nexusProjectSetupAuthInventory.test.ts src/cli.test.ts`; `npm run check`; `git diff --check`.",
+        "author": null,
+        "createdAt": "2026-05-19T18:02:59.267Z",
+        "updatedAt": "2026-05-19T18:02:59.267Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-338"
+        }
+      }
+    ],
     "local-160": [],
     "local-161": []
   }

@@ -78,7 +78,10 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-158` is published as `5ba2844` for setup auth profile
   inventory reporting, required-now versus provider-mutation-only profile
   classification, missing profile diagnostics, and host-local credential-handle
-  checks that avoid raw secret values.
+  checks that avoid raw secret values. `dev-nexus:local-159` is published as
+  `4fbc4a4` for setup hosting handoff reporting, exact hosting status/plan/apply
+  next commands, meta-project-only scope, and explicit deferral of provider
+  mutations out of `project setup`.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -319,10 +322,9 @@ and ready for coordinator-driven work across its components.
   bounded slice or record the blocker that keeps remaining items out of ready
   state.
 - Continue first-user onboarding from the now-complete setup proposal model,
-  guided setup CLI, component-add flow, and auth inventory: next implementation
-  slices are `dev-nexus:local-159` for hosting-intent handoff, `local-160` for
-  readiness reporting, and `local-161` for installed CLI versus docs
-  version-skew diagnostics.
+  guided setup CLI, component-add flow, auth inventory, and hosting handoff:
+  next implementation slices are `dev-nexus:local-160` for readiness reporting
+  and `local-161` for installed CLI versus docs version-skew diagnostics.
 
 ## Boundaries
 
