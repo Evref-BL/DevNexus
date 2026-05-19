@@ -1,7 +1,119 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T00:06:18.634Z",
+  "updatedAt": "2026-05-19T00:20:16.628Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-02e897f7d6b31c5b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-133",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/workItemImportPlanner.ts",
+        "src/workItemImportPlanner.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusCoreMcpTools.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T00:20:16.628Z",
+      "lastSeenAt": "2026-05-19T00:20:16.628Z",
+      "updatedAt": "2026-05-19T00:20:16.628Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged local-133 worker commit 4b9e192 into DevNexus main after local-91.",
+        "Verification: Worker focused tests passed: npm test -- src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.",
+        "Integration preference: Published direct integration to DevNexus bot/main as 1ce46f2."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-7a73aae49d12db39",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-91",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusAuthority.test.ts",
+        "src/nexusAutomationAgentLaunch.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T00:19:53.662Z",
+      "lastSeenAt": "2026-05-19T00:19:53.662Z",
+      "updatedAt": "2026-05-19T00:19:53.662Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged local-91 worker commit 644f356 into DevNexus main before local-133.",
+        "Verification: Worker focused tests passed: npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.",
+        "Integration preference: Published direct integration to DevNexus bot/main as 1ce46f2."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
@@ -41,12 +153,12 @@
         "src/nexusMcpServer.ts",
         "src/nexusMcpServer.test.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-19T00:06:18.634Z",
-      "lastSeenAt": "2026-05-19T00:06:18.634Z",
-      "updatedAt": "2026-05-19T00:06:18.634Z",
+      "lastSeenAt": "2026-05-19T00:20:16.628Z",
+      "updatedAt": "2026-05-19T00:20:16.628Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "f315a66991ff06464fefd8fc7451bb9a1178a705",
+      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -65,9 +177,8 @@
         "warnings": []
       },
       "notes": [
-        "Implement a strictly read-only inbound GitHub-to-local import planning surface.",
-        "Do not mutate local work items, tracker links, provider issues, provider comments, or Git state in this slice.",
-        "Avoid publication authority gating files owned by local-91 except shared CLI/MCP registration if necessary."
+        "Worker branch codex/dev-nexus-local-133-inbound-import-plan was merged into DevNexus main at 1ce46f2, pushed through bot/main, then its worktree and local branch were removed.",
+        "Verification: focused local-133 suite passed; integrated focused suite passed with 108 tests; npm run build passed; npm run check passed with 64 files and 556 tests."
       ]
     },
     {
@@ -106,12 +217,12 @@
         "src/nexusMcpServer.ts",
         "src/nexusMcpServer.test.ts"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-19T00:06:09.903Z",
-      "lastSeenAt": "2026-05-19T00:06:09.903Z",
-      "updatedAt": "2026-05-19T00:06:09.903Z",
+      "lastSeenAt": "2026-05-19T00:20:16.628Z",
+      "updatedAt": "2026-05-19T00:20:16.628Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "f315a66991ff06464fefd8fc7451bb9a1178a705",
+      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -130,9 +241,8 @@
         "warnings": []
       },
       "notes": [
-        "Implement publication action gating using existing effective authority resolver and current actor summaries.",
-        "Do not touch tracker discovery, inbound import, eligible-work dedupe, or work-item sync/import planning files owned by local-133.",
-        "Use mocked provider/merge state in tests; no live GitHub calls."
+        "Worker branch codex/dev-nexus-local-91-publication-authority was merged into DevNexus main at 1ce46f2, pushed through bot/main, then its worktree and local branch were removed.",
+        "Verification: focused local-91 suite passed; integrated focused suite passed with 108 tests; npm run build passed; npm run check passed with 64 files and 556 tests."
       ]
     },
     {

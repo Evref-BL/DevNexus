@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 286,
-  "updatedAt": "2026-05-19T00:06:26.711Z",
+  "nextCommentNumber": 292,
+  "updatedAt": "2026-05-19T00:20:16.650Z",
   "items": [
     {
       "id": "local-1",
@@ -2281,7 +2281,7 @@
       "id": "local-91",
       "title": "Gate publication actions with authority checks",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: make publication helpers and automation publication decisions refuse unsafe push, pull request, merge, approval, and publish actions when the current actor lacks authority.\n\nUser stories covered:\n- As a coordinator agent, I can directly integrate verified work only when the project says my actor is allowed to do so.\n- As an open-source contributor agent, I can prepare a branch and pull request without needing maintainer permissions.\n\nAcceptance criteria:\n- Direct target-branch push is blocked unless component publication policy, actor authority, and resolved auth profile all allow it.\n- Pull request or merge request creation is allowed for contributor-style actors when configured, and is recommended as fallback when direct integration is blocked.\n- Pull request or merge request merge is blocked unless merge authority, provider approval state, required checks, branch policy, and component publication policy all allow it.\n- Package or release publication is gated separately from merge authority.\n- Blocked publication produces a non-interactive, machine-readable result and a human-readable fallback suggestion.\n- Existing direct-integration dogfood behavior remains possible for configured maintainer bots.\n\nDependencies:\n- Depends on effective authority resolution and current actor detection.\n\nBoundaries:\n- Use mocked provider/merge state in tests.\n- Do not self-approve pull requests unless a later explicit policy item allows it.\n- Do not require live GitHub credentials for the first implementation.\n\nVerification:\n- Focused publication tests for direct push allowed, direct push blocked with PR fallback, PR-only contributor, merge blocked by missing approval, merge blocked by failed checks, release publish blocked without release authority, and dogfood maintainer merge allowed.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2294,8 +2294,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.456Z",
-      "updatedAt": "2026-05-19T00:06:26.687Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T00:19:53.676Z",
+      "closedAt": "2026-05-19T00:19:04.177Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2307,7 +2307,7 @@
       "id": "local-92",
       "title": "Gate coordination and provider mutation actions with authority checks",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after effective authority resolution exists\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: apply authority checks to coordination handoff, integration planning, coordination requests, provider comments, labels, assignments, transitions, approvals, and review decisions.\n\nUser stories covered:\n- As a coordinator agent, I can draft or post a provider request only when policy allows the underlying action.\n- As a reviewer, I can approve or request changes without receiving merge authority.\n\nAcceptance criteria:\n- Read-only coordination status and mutation-free integration planning remain available to observer-style actors.\n- Coordination handoff, work-item comments, provider comments, labels, assignments, workflow transitions, and review approvals each check the relevant authority action before mutation.\n- Coordination request can draft when provider posting is disallowed, and can post only when provider mutation authority allows it.\n- Review approval, requested changes, and merge authority remain separate decisions.\n- Blocked coordination mutation records a clear reason and suggested fallback without silently dropping the coordination fact.\n\nDependencies:\n- Depends on effective authority resolution.\n- Builds on coordination tracker role selection and external request surfaces.\n\nBoundaries:\n- No live provider posting is required for this slice.\n- Do not infer approval from assignment, silence, or casual comments.\n\nVerification:\n- Focused coordination tests for observer read-only status, contributor handoff allowed but provider label blocked, draft-only request, provider-comment allowed, assignment blocked, reviewer approval allowed, and merge still blocked after reviewer approval.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2320,7 +2320,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.653Z",
-      "updatedAt": "2026-05-18T13:08:01.653Z",
+      "updatedAt": "2026-05-19T00:19:29.028Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -3407,7 +3407,7 @@
       "id": "local-133",
       "title": "Plan inbound GitHub-to-local issue import",
       "description": "Type: dry-run inbound import implementation slice\nReadiness: todo/dependent on dev-nexus:local-129 and dev-nexus:local-132\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: add a read-only inbound import plan from a configured external tracker such as GitHub Issues into the canonical local tracker.\n\nUser stories covered:\n- As a maintainer, I can dry-run GitHub-to-local import and review creates, updates, skips, conflicts, and missing links before any local files change.\n- As a Windows worker, I can know which provider-native issues would become local work once import is executed.\n\nAcceptance criteria:\n- DevNexus exposes a small planning surface such as work_item_inbound_sync_plan or an equivalent command shape that fits existing sync conventions.\n- The plan supports external-to-local direction starting with GitHub source and local target trackers.\n- Planning reports creates, updates, skips, conflicts, ambiguous duplicates, stale links, missing credentials, unsupported capabilities, provider filters, field/status mappings, and exact local files that would change.\n- Planning is idempotent: linked items and configured fingerprints map back to the same local logical item on repeated runs.\n- The plan is strictly read-only and does not create local items, update link records, comment on provider issues, or mutate Git state.\n\nDependencies:\n- Depends on dev-nexus:local-129 and dev-nexus:local-132.\n\nBoundaries:\n- Do not implement apply/execution in this slice.\n- Do not add provider-native writes or comments in this slice.\n- Do not require live GitHub credentials for default tests.\n\nVerification:\n- Focused tests for create/update/skip/conflict plans, ambiguous duplicate plans, stale link plans, missing credential behavior, exact local-file reporting, and no-mutation behavior with mocked GitHub provider data.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "in_progress",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3421,8 +3421,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:09.878Z",
-      "updatedAt": "2026-05-19T00:06:26.711Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T00:20:16.650Z",
+      "closedAt": "2026-05-19T00:19:14.436Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3434,7 +3434,7 @@
       "id": "local-134",
       "title": "Execute policy-gated inbound import to local tracker",
       "description": "Type: guarded mutation implementation slice\nReadiness: todo/dependent on dev-nexus:local-98 and dev-nexus:local-133\nParent planning item: dev-nexus:local-128\nSource PRD: docs/tracker-discovery-inbound-sync-prd.md\n\nGoal: execute a reviewed inbound import plan by creating or updating canonical local work items and tracker links from external provider issues, with fail-closed mutation safety.\n\nUser stories covered:\n- As a project owner, I can keep local work items canonical while importing selected GitHub Issues.\n- As a bot account, I can read a GitHub inbox and write local tracker state only when authority, policy, and checkout safety allow it.\n\nAcceptance criteria:\n- Execution requires explicit source and target tracker ids, external-to-local direction, a write policy allowing local tracker mutation, and effective actor authority for local work-item writes and provider reads.\n- Execution recomputes or validates the import plan immediately before mutation and refuses blocked, stale, or ambiguous plans.\n- Execution creates or updates local canonical work items and link records idempotently; rerunning against the same provider items does not create duplicates.\n- Execution writes only local tracker/link files for the owning DevNexus project and does not write provider issues in the first implementation.\n- Execution fails closed in shared checkouts unless the path is classified as an owned project-meta worktree or explicit integration context.\n- Execution records a concise import summary through the work-item service or run result without leaking secrets.\n\nDependencies:\n- Depends on dev-nexus:local-98 for shared-checkout mutation enforcement.\n- Depends on dev-nexus:local-133 for inbound import planning.\n\nBoundaries:\n- Do not implement provider-native issue comments or provider writes in this slice.\n- Do not run live GitHub mutation in default tests.\n- Do not import from unconfigured repositories.\n\nVerification:\n- Focused tests for allowed local import, idempotent rerun, blocked policy, missing authority, shared-checkout refusal, stale plan refusal, ambiguous conflict refusal, and no provider writes.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3450,7 +3450,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:18.171Z",
-      "updatedAt": "2026-05-18T19:39:18.171Z",
+      "updatedAt": "2026-05-19T00:19:40.185Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6386,9 +6386,43 @@
           "provider": "local",
           "itemId": "local-comment-284"
         }
+      },
+      {
+        "id": "local-comment-286",
+        "body": "Completed and published in DevNexus main as `1ce46f2` through the `bot` remote. Worker commit `644f356` adds publication-aware authority checks for direct target pushes, PR creation/merge, branch-policy readiness, package/release publish separation, blocker reasons, and fallback suggestions.\n\nVerification: `npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts` passed in the worker worktree; integrated focused suite `npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts src/cli.test.ts` passed; `npm run build`, `git diff --check HEAD~2..HEAD`, and `npm run check` passed on source main with 64 files and 556 tests.",
+        "author": null,
+        "createdAt": "2026-05-19T00:19:09.483Z",
+        "updatedAt": "2026-05-19T00:19:09.483Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-286"
+        }
+      },
+      {
+        "id": "local-comment-290",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T00:19:53.662Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-91-local-133-metadata\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-91\",\n  \"logicalItemId\": \"local-91\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-91\",\n    \"itemNumber\": 91,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-91\",\n    \"itemNumber\": 91,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-91\",\n        \"itemNumber\": 91\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-7a73aae49d12db39\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthority.ts\",\n    \"src/nexusAuthority.test.ts\",\n    \"src/nexusAutomationAgentLaunch.test.ts\"\n  ],\n  \"decisions\": [\n    \"Publication authority checks now include publication policy and resolved auth-profile blockers for direct target-branch pushes, pull request creation/merge, package publishing, and release publishing.\",\n    \"Direct push fallback can recommend pull request review when configured; local-only publication falls back to coordination handoff or provider comments instead of unsafe provider actions.\",\n    \"Pull request merge waits for explicit branch-policy clearance and keeps reviewer approval distinct from merge authority.\"\n  ],\n  \"verificationSummary\": \"Worker focused tests passed: npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as 1ce46f2.\",\n  \"note\": \"Merged local-91 worker commit 644f356 into DevNexus main before local-133.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T00:19:53.676Z",
+        "updatedAt": "2026-05-19T00:19:53.676Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-290"
+        }
       }
     ],
-    "local-92": [],
+    "local-92": [
+      {
+        "id": "local-comment-288",
+        "body": "Promoted to ready after `dev-nexus:local-91` landed in DevNexus main as `1ce46f2`. Publication authority gates and fallback/blocker result fields are now available for coordination/provider mutation gating.",
+        "author": null,
+        "createdAt": "2026-05-19T00:19:29.028Z",
+        "updatedAt": "2026-05-19T00:19:29.028Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-288"
+        }
+      }
+    ],
     "local-93": [],
     "local-94": [],
     "local-95": [],
@@ -7250,9 +7284,43 @@
           "provider": "local",
           "itemId": "local-comment-285"
         }
+      },
+      {
+        "id": "local-comment-287",
+        "body": "Completed and published in DevNexus main as `1ce46f2` through the `bot` remote. Worker commit `4b9e192` adds a strictly read-only inbound GitHub-to-local import planner, CLI `work-item import-plan`, MCP `work_item_import_plan`, export surface, and mocked provider coverage for creates, updates, skips, conflicts, ambiguous duplicates, stale links, missing credentials, provider-path blockers, filters, mappings, planned files, idempotence, and no mutation.\n\nVerification: `npm test -- src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts` passed in the worker worktree; integrated focused suite `npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts src/cli.test.ts` passed; `npm run build`, `git diff --check HEAD~2..HEAD`, and `npm run check` passed on source main with 64 files and 556 tests.",
+        "author": null,
+        "createdAt": "2026-05-19T00:19:21.521Z",
+        "updatedAt": "2026-05-19T00:19:21.521Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-287"
+        }
+      },
+      {
+        "id": "local-comment-291",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T00:20:16.628Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-91-local-133-metadata\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-133\",\n  \"logicalItemId\": \"local-133\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-133\",\n    \"itemNumber\": 133,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-133\",\n    \"itemNumber\": 133,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-133\",\n        \"itemNumber\": 133\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-02e897f7d6b31c5b\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/workItemImportPlanner.ts\",\n    \"src/workItemImportPlanner.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Inbound import planning is strictly read-only and supports external_to_local GitHub source trackers into local target trackers.\",\n    \"Plans report creates, updates, skips, conflicts, ambiguous duplicates, stale links, missing credentials, provider blockers, filters, field mappings, planned local files, and fingerprint matches.\",\n    \"CLI and MCP surfaces expose planning only; no provider writes, local item writes, link writes, or provider comments are performed in this slice.\"\n  ],\n  \"verificationSummary\": \"Worker focused tests passed: npm test -- src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.\",\n  \"integrationPreference\": \"Published direct integration to DevNexus bot/main as 1ce46f2.\",\n  \"note\": \"Merged local-133 worker commit 4b9e192 into DevNexus main after local-91.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T00:20:16.650Z",
+        "updatedAt": "2026-05-19T00:20:16.650Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-291"
+        }
       }
     ],
-    "local-134": [],
+    "local-134": [
+      {
+        "id": "local-comment-289",
+        "body": "Promoted to ready after `dev-nexus:local-133` landed in DevNexus main as `1ce46f2`. The read-only inbound import planner now provides the plan data and dry-run safety boundary needed before local tracker/link execution.",
+        "author": null,
+        "createdAt": "2026-05-19T00:19:40.185Z",
+        "updatedAt": "2026-05-19T00:19:40.185Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-289"
+        }
+      }
+    ],
     "local-135": [],
     "local-136": [],
     "local-137": [],

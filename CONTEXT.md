@@ -116,7 +116,9 @@ coordinator agent chooses and supervises implementation work.
   eligible-work discovery aggregation in `local-131` as `c7928f1`. The latest
   source integrations published linked tracker work-item deduplication in
   `local-132` as `d3df60c` and scoped authority summaries in `local-90` as
-  `f315a66`. The latest implementation worktrees and local branches were
+  `f315a66`. The latest source integration published publication authority
+  gating in `local-91` and inbound import planning in `local-133` together as
+  `1ce46f2`. The latest implementation worktrees and local branches were
   removed after publication.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
