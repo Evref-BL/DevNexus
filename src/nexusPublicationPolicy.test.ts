@@ -11,6 +11,7 @@ import {
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
+  type NexusHostingAuthProfileConfig,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
 } from "./index.js";
@@ -73,6 +74,26 @@ function projectConfig(
         },
       },
     },
+    authority: {
+      actors: [
+        {
+          id: "example-bot-actor",
+          kind: "machine_user",
+          provider: "github",
+          providerIdentity: "example-bot",
+          displayName: "Example Bot",
+        },
+      ],
+      roleBindings: [
+        {
+          actorId: "example-bot-actor",
+          roles: ["maintainer"],
+          scope: {
+            component: "primary",
+          },
+        },
+      ],
+    },
     ...overrides,
   };
 }
@@ -99,6 +120,7 @@ describe("nexus publication policy", () => {
       projectConfig: config,
       component,
       action: "git_push",
+      authProfiles: automationAuthProfiles(),
       gitRunner: publicationGitRunner(sourceRoot, {
         remoteUrl: "git@github.com-bot:example/project.git",
         pushUrl: "git@github.com-bot:example/project.git",
@@ -158,6 +180,7 @@ describe("nexus publication policy", () => {
       projectConfig: config,
       component,
       action: "provider_write",
+      authProfiles: automationAuthProfiles(),
       gitRunner: publicationGitRunner(sourceRoot),
       actorRunner: actorRunnerWithHandle("example-human"),
     });
@@ -187,6 +210,7 @@ describe("nexus publication policy", () => {
       projectConfig: config,
       component,
       action: "git_push",
+      authProfiles: automationAuthProfiles(),
       gitRunner: publicationGitRunner(sourceRoot, {
         remoteUrl: "git@github.com:example/project.git",
         pushUrl: "git@github.com:example/project.git",
@@ -204,11 +228,233 @@ describe("nexus publication policy", () => {
     expect(status.checks).toContainEqual(
       expect.objectContaining({
         name: "publication:primary:sshHostAlias",
+      status: "failed",
+      }),
+    );
+  });
+
+  it("blocks direct target branch push without a resolved automation auth profile and suggests pull request fallback", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["contributor"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "git_push",
+      authProfiles: [],
+      gitRunner: publicationGitRunner(sourceRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(true);
+    expect(status.authority).toMatchObject({
+      requestedAction: "git.push_target_branch",
+      allowed: false,
+      recommendedFallbackAction: "provider.pull_request.open",
+    });
+    expect(status.warnings).toContain(
+      "Open a pull request or merge request for review instead of pushing the target branch directly.",
+    );
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:authority:git.push_target_branch",
         status: "failed",
       }),
     );
   });
+
+  it("allows contributor-style pull request publication when policy and auth profile match", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...projectConfig().automation!.publication,
+          strategy: "review_handoff",
+          push: false,
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["contributor"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "provider_write",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(sourceRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(false);
+    expect(status.authority).toMatchObject({
+      requestedAction: "provider.pull_request.open",
+      allowed: true,
+    });
+  });
+
+  it("blocks pull request merge until provider approval checks and branch policy are clear", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "provider_pull_request_merge",
+      authProfiles: automationAuthProfiles(),
+      providerState: {
+        pullRequest: {
+          review: "waiting_for_approval",
+          checks: "checks_failed",
+          mergeability: "mergeable",
+          branchPolicy: "branch_policy_blocked",
+        },
+      },
+      gitRunner: publicationGitRunner(sourceRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(true);
+    expect(status.authority).toMatchObject({
+      requestedAction: "provider.pull_request.merge",
+      allowed: false,
+      missingProviderSignals: expect.arrayContaining([
+        "pull_request_review.approved",
+        "checks.passed",
+        "branch_policy.clear",
+      ]),
+    });
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:authority:provider.pull_request.merge",
+        status: "failed",
+      }),
+    );
+  });
+
+  it("gates package publication separately from merge authority and publication policy", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["maintainer"],
+            scope: {
+              component: "primary",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "package_publish",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(sourceRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(true);
+    expect(status.authority).toMatchObject({
+      requestedAction: "package.publish",
+      allowed: false,
+      missingRequiredActions: ["package.publish"],
+    });
+    expect(status.authority?.blockingReasons).toEqual(
+      expect.arrayContaining([
+        "Component publication policy does not allow package publication.",
+        "Actor example-bot-actor lacks action package.publish.",
+      ]),
+    );
+  });
 });
+
+function automationAuthProfiles(): NexusHostingAuthProfileConfig[] {
+  return [
+    {
+      id: "bot-github",
+      actorId: "example-bot-actor",
+      provider: "github",
+      kind: "automation",
+      account: "example-bot",
+      sshHost: "github.com-bot",
+      githubCliConfigDir: "home:.config/gh-example-bot",
+      environmentKeys: ["GH_CONFIG_DIR"],
+    },
+  ];
+}
 
 function publicationGitRunner(
   repositoryPath: string,

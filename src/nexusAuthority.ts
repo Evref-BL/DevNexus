@@ -1743,6 +1743,18 @@ function packageOrReleasePublicationPolicyBlocker(
   if (publication.strategy === "local_only") {
     return `Component publication policy is local_only; ${options.requestedAction} is blocked.`;
   }
+  if (
+    options.requestedAction === "package.publish" &&
+    !publication.packagePublish
+  ) {
+    return "Component publication policy does not allow package publication.";
+  }
+  if (
+    options.requestedAction === "release.publish" &&
+    !publication.releasePublish
+  ) {
+    return "Component publication policy does not allow release publication.";
+  }
 
   return null;
 }

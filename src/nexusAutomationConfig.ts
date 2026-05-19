@@ -153,6 +153,8 @@ export interface NexusAutomationPublicationConfig {
   remoteUrl: string | null;
   pushUrl: string | null;
   sshHostAlias: string | null;
+  packagePublish: boolean;
+  releasePublish: boolean;
   actor: NexusPublicationActorConfig | null;
   manualRemote: string | null;
   manualActor: NexusPublicationActorConfig | null;
@@ -250,6 +252,8 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     remoteUrl: null,
     pushUrl: null,
     sshHostAlias: null,
+    packagePublish: false,
+    releasePublish: false,
     actor: null,
     manualRemote: null,
     manualActor: null,
@@ -1003,6 +1007,8 @@ export function validatePartialNexusAutomationPublicationConfig(
     ...optionalNullableStringField(record, "remoteUrl", pathName),
     ...optionalNullableStringField(record, "pushUrl", pathName),
     ...optionalNullableStringField(record, "sshHostAlias", pathName),
+    ...optionalBooleanField(record, "packagePublish", pathName),
+    ...optionalBooleanField(record, "releasePublish", pathName),
     ...optionalPublicationActorField(record, "actor", pathName),
     ...optionalNullableStringField(record, "manualRemote", pathName),
     ...optionalPublicationActorField(record, "manualActor", pathName),

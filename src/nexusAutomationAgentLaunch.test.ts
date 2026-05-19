@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createLocalWorkTrackerProvider,
+  createDefaultNexusHomeConfigBase,
   createNexusAutomationAgentCommandLauncher,
   defaultLocalWorkTrackingStorePath,
   defaultNexusAutomationConfig,
@@ -11,7 +12,9 @@ import {
   loadProjectConfig,
   readNexusAutomationRunLedger,
   runNexusAutomationAgentLaunchOnce,
+  saveNexusHomeConfigFile,
   saveProjectConfig,
+  validateNexusHomeConfigBase,
   type GitCommandResult,
   type GitRunner,
   type NexusAutomationCommandRunner,
@@ -73,6 +76,29 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
     },
     ...overrides,
   };
+}
+
+function saveAutomationHomeConfig(homePath: string): void {
+  saveNexusHomeConfigFile(
+    homePath,
+    createDefaultNexusHomeConfigBase(homePath, {
+      projectsRoot: path.join(homePath, "projects"),
+      workspacesRoot: path.join(homePath, "workspaces"),
+      authProfiles: [
+        {
+          id: "bot-github",
+          actorId: "example-bot-actor",
+          provider: "github",
+          kind: "automation",
+          account: "example-bot",
+          sshHost: "github.com-bot",
+          githubCliConfigDir: "home:.config/gh-example-bot",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        },
+      ],
+    }),
+    validateNexusHomeConfigBase,
+  );
 }
 
 afterEach(() => {
@@ -312,6 +338,8 @@ describe("nexus automation agent launch", () => {
       status: "ready",
       labels: ["automation", "blocked"],
     });
+    const homePath = makeTempDir("dev-nexus-home-");
+    saveAutomationHomeConfig(homePath);
     const githubConfigDir = path.join(os.homedir(), ".config", "gh-example-bot");
     const commandRunner: NexusAutomationCommandRunner = (command, options) => {
       expect(command).toBe("codex run");
@@ -511,12 +539,13 @@ describe("nexus automation agent launch", () => {
           components: [
             {
               componentId: "primary",
-              blockedActions: expect.arrayContaining([
+              keyAllowedActions: expect.arrayContaining([
                 "git.push_target_branch",
               ]),
-              fallbackActions: expect.arrayContaining([
-                "provider.pull_request.open",
-              ]),
+              authProfile: {
+                id: "bot-github",
+                kind: "automation",
+              },
               summary: expect.stringContaining("actor=example-bot-actor"),
             },
           ],
@@ -597,6 +626,7 @@ describe("nexus automation agent launch", () => {
 
     const result = await runNexusAutomationAgentLaunchOnce({
       projectRoot,
+      homePath,
       runId: "agent-run-1",
       gitRunner: publicationGitRunner(path.join(projectRoot, "source")),
       publicationActorRunner: actorRunnerWithHandle("example-bot"),

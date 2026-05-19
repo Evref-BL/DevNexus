@@ -324,6 +324,7 @@ export async function runNexusAutomationOnce(
       automationConfig,
       provider,
       pluginDependencyProjections,
+      homePath: options.homePath,
       gitRunner: options.gitRunner,
       publicationActorRunner: options.publicationActorRunner,
     });
@@ -612,6 +613,7 @@ export function preflightNexusAutomationRunOnce(options: {
   automationConfig: NexusAutomationConfig;
   provider: WorkTrackerProvider;
   pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
+  homePath?: string;
   gitRunner?: GitRunner;
   publicationActorRunner?: NexusPublicationActorRunner;
 }): NexusAutomationPreflightCheck[] {
@@ -632,6 +634,7 @@ export function preflightNexusAutomationRunOnce(options: {
           projectConfig: options.projectConfig,
           component: options.component,
           action: publicationAction,
+          homePath: options.homePath,
           gitRunner: options.gitRunner,
           actorRunner: options.publicationActorRunner,
         }),

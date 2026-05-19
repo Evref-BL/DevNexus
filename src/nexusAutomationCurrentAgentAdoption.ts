@@ -59,12 +59,14 @@ import {
 } from "./nexusAutomationTargetReport.js";
 import {
   getNexusPublicationStatuses,
+  loadNexusPublicationAuthProfiles,
   publicationCommandEnvironment,
   publicationEnvironmentVariables,
   publicationPreflightChecks,
   resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
 } from "./nexusPublicationPolicy.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import {
   projectPluginCapabilityProjections,
   type NexusPluginCapabilityProjection,
@@ -196,6 +198,7 @@ export interface NexusAutomationCurrentAgentAdoptionMetadata {
 
 export interface AdoptNexusAutomationCurrentAgentOptions {
   projectRoot: string;
+  homePath?: string;
   runId?: string;
   owner?: string | null;
   provider?: WorkTrackerProvider;
@@ -520,11 +523,17 @@ export async function adoptNexusAutomationCurrentAgent(
       });
     }
 
+    const authProfiles = loadNexusPublicationAuthProfiles({
+      projectRoot,
+      projectConfig,
+      homePath: options.homePath,
+    });
     const publication = getNexusPublicationStatuses({
       projectRoot,
       projectConfig,
       components,
       action: "status",
+      authProfiles,
       gitRunner: options.gitRunner,
       actorRunner: options.publicationActorRunner,
     });
@@ -664,6 +673,7 @@ export async function adoptNexusAutomationCurrentAgent(
           selectorQuery,
           eligibleWorkItems,
           componentEligibleWorkItems,
+          authProfiles,
           resultFile,
           metadataFile,
           targetCycleId: metadata.targetCycleId,
@@ -1142,6 +1152,7 @@ function buildCurrentAgentAdoptionContext(input: {
   selectorQuery: WorkItemQuery;
   eligibleWorkItems: WorkItem[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  authProfiles: NexusHostingAuthProfileConfig[];
   resultFile: string;
   metadataFile: string;
   targetCycleId: string | null;
@@ -1156,6 +1167,7 @@ function buildCurrentAgentAdoptionContext(input: {
       componentName: component.name,
       authority: input.projectConfig.authority,
       publication: resolveNexusPublicationPolicy(input.projectConfig, component),
+      authProfiles: input.authProfiles,
       safety: input.automationConfig.safety,
       tracker: component.defaultTrackerId,
       repository: component.remoteUrl,

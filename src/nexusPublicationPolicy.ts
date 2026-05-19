@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import process from "node:process";
 import type {
   GitCommandResult,
@@ -8,18 +9,35 @@ import {
   defaultGitRunner,
 } from "./gitWorktreeService.js";
 import {
+  resolveNexusCurrentAutomationActor,
+  resolveNexusEffectiveAuthority,
+  type NexusAuthorityAction,
+  type NexusAuthorityProviderState,
+  type NexusEffectiveAuthorityResolution,
+} from "./nexusAuthority.js";
+import {
   defaultNexusAutomationConfig,
   type NexusAutomationPublicationConfig,
   type NexusPublicationActorConfig,
 } from "./nexusAutomationConfig.js";
+import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
 
 export type NexusPublicationGuardAction =
   | "status"
   | "git_push"
-  | "provider_write";
+  | "provider_write"
+  | "provider_pull_request_merge"
+  | "provider_review_approve"
+  | "package_publish"
+  | "release_publish";
 
 export interface NexusPublicationCommandResult {
   status: number | null;
@@ -84,6 +102,7 @@ export interface NexusPublicationStatus {
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
   actor: NexusPublicationActorStatus;
+  authority: NexusEffectiveAuthorityResolution | null;
   checks: NexusPublicationPolicyCheck[];
   blocking: boolean;
   warnings: string[];
@@ -130,6 +149,9 @@ export function getNexusPublicationStatus(options: {
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
   action?: NexusPublicationGuardAction;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  homePath?: string;
+  providerState?: NexusAuthorityProviderState | null;
   gitRunner?: GitRunner;
   actorRunner?: NexusPublicationActorRunner;
   env?: NodeJS.ProcessEnv;
@@ -153,18 +175,38 @@ export function getNexusPublicationStatus(options: {
     actorRunner: options.actorRunner ?? defaultPublicationActorRunner,
     baseEnv: options.env ?? process.env,
   });
+  const authProfiles =
+    options.authProfiles ??
+    loadNexusPublicationAuthProfiles({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      homePath: options.homePath,
+    });
+  const authority = resolvePublicationAuthority({
+    projectConfig: options.projectConfig,
+    component: options.component,
+    policy,
+    git,
+    action,
+    authProfiles,
+    providerState: options.providerState ?? null,
+  });
   const strict = publicationPolicyRequiresGuard(policy, action);
   const checks = publicationPolicyChecks({
     component: options.component,
     policy,
     git,
     actor,
+    authority,
     strict,
   });
   const warnings = [
     ...git.warnings,
     ...(actor.status === "unchecked" || actor.status === "unavailable"
       ? [actor.message]
+      : []),
+    ...(authority && !authority.allowed && authority.fallbackSuggestion
+      ? [authority.fallbackSuggestion]
       : []),
   ];
 
@@ -175,6 +217,7 @@ export function getNexusPublicationStatus(options: {
     policy,
     git,
     actor,
+    authority,
     checks,
     blocking: checks.some((check) => check.status === "failed"),
     warnings,
@@ -186,6 +229,9 @@ export function getNexusPublicationStatuses(options: {
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
   action?: NexusPublicationGuardAction;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  homePath?: string;
+  providerState?: NexusAuthorityProviderState | null;
   gitRunner?: GitRunner;
   actorRunner?: NexusPublicationActorRunner;
   env?: NodeJS.ProcessEnv;
@@ -196,6 +242,9 @@ export function getNexusPublicationStatuses(options: {
       projectConfig: options.projectConfig,
       component,
       action: options.action,
+      authProfiles: options.authProfiles,
+      homePath: options.homePath,
+      providerState: options.providerState,
       gitRunner: options.gitRunner,
       actorRunner: options.actorRunner,
       env: options.env,
@@ -261,12 +310,37 @@ export function publicationEnvironmentVariables(
       policy.manualActor?.provider ?? "",
     DEV_NEXUS_PUBLICATION_MANUAL_ACTOR_HANDLE:
       policy.manualActor?.handle ?? "",
+    DEV_NEXUS_PUBLICATION_PACKAGE_PUBLISH: String(policy.packagePublish),
+    DEV_NEXUS_PUBLICATION_RELEASE_PUBLISH: String(policy.releasePublish),
     DEV_NEXUS_PUBLICATION_COMMAND_ENV_KEYS: Object.keys(
       policy.commandEnvironment,
     )
       .sort()
       .join(","),
   };
+}
+
+export function loadNexusPublicationAuthProfiles(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): NexusHostingAuthProfileConfig[] {
+  const homePath = options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+  try {
+    return loadNexusHomeConfigFile(
+      homePath,
+      validateNexusHomeConfigBase,
+    ).authProfiles ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function readPublicationGitStatus(options: {
@@ -487,6 +561,7 @@ function publicationPolicyChecks(options: {
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
   actor: NexusPublicationActorStatus;
+  authority: NexusEffectiveAuthorityResolution | null;
   strict: boolean;
 }): NexusPublicationPolicyCheck[] {
   const checks: NexusPublicationPolicyCheck[] = [];
@@ -553,7 +628,122 @@ function publicationPolicyChecks(options: {
     );
   }
 
+  if (options.authority && options.strict) {
+    const failedMessage = [
+      options.authority.explanation,
+      ...(options.authority.blockingReasons.length > 0
+        ? [`Reasons: ${options.authority.blockingReasons.join(" ")}`]
+        : []),
+      ...(options.authority.fallbackSuggestion
+        ? [`Fallback: ${options.authority.fallbackSuggestion}`]
+        : []),
+    ].join(" ");
+    checks.push(
+      check(
+        `${prefix}:authority:${options.authority.requestedAction}`,
+        options.authority.allowed,
+        options.authority.explanation,
+        failedMessage,
+      ),
+    );
+  }
+
   return checks;
+}
+
+function resolvePublicationAuthority(options: {
+  projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
+  policy: NexusAutomationPublicationConfig;
+  git: NexusPublicationGitStatus;
+  action: NexusPublicationGuardAction;
+  authProfiles: NexusHostingAuthProfileConfig[];
+  providerState: NexusAuthorityProviderState | null;
+}): NexusEffectiveAuthorityResolution | null {
+  const requestedAction = publicationAuthorityAction(
+    options.action,
+    options.policy,
+  );
+  if (!requestedAction) {
+    return null;
+  }
+
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: options.projectConfig.authority,
+    componentId: options.component.id,
+    publication: options.policy,
+    authProfiles: options.authProfiles,
+  });
+  const authProfile = currentActor.profileId
+    ? options.authProfiles.find((profile) => profile.id === currentActor.profileId) ??
+      null
+    : null;
+
+  return resolveNexusEffectiveAuthority({
+    authority: options.projectConfig.authority,
+    actor: {
+      id: currentActor.expectedActorId,
+      kind: currentActor.expectedActorKind,
+      provider: currentActor.expectedProvider,
+      providerIdentity: currentActor.expectedHandle,
+    },
+    authProfile: authProfile
+      ? {
+          id: authProfile.id,
+          actorId: authProfile.actorId ?? null,
+          kind: authProfile.kind ?? null,
+          provider: authProfile.provider,
+          account: authProfile.account ?? null,
+        }
+      : null,
+    project: options.projectConfig.id,
+    component: options.component.id,
+    provider:
+      options.policy.actor?.provider ??
+      options.policy.manualActor?.provider ??
+      currentActor.expectedProvider ??
+      options.component.workTracking?.provider ??
+      null,
+    tracker: options.component.defaultTrackerId,
+    remote: options.git.remoteName ?? options.policy.remote,
+    repository:
+      options.component.remoteUrl ??
+      options.git.pushUrl ??
+      options.git.remoteUrl ??
+      null,
+    targetBranch: options.git.targetBranch ?? options.policy.targetBranch,
+    requestedAction,
+    publication: options.policy,
+    providerState: options.providerState,
+  });
+}
+
+function publicationAuthorityAction(
+  action: NexusPublicationGuardAction,
+  policy: NexusAutomationPublicationConfig,
+): NexusAuthorityAction | null {
+  switch (action) {
+    case "git_push":
+      return "git.push_target_branch";
+    case "provider_write":
+      return "provider.pull_request.open";
+    case "provider_pull_request_merge":
+      return "provider.pull_request.merge";
+    case "provider_review_approve":
+      return "provider.review.approve";
+    case "package_publish":
+      return "package.publish";
+    case "release_publish":
+      return "release.publish";
+    case "status":
+      if (policy.strategy === "direct_integration" && policy.push) {
+        return "git.push_target_branch";
+      }
+      if (policy.strategy !== "local_only") {
+        return "provider.pull_request.open";
+      }
+      return null;
+  }
 }
 
 function defaultPublicationActorRunner(
