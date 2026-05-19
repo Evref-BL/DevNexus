@@ -47,6 +47,7 @@ export * from "./nexusProjectHostingIntegrationFixture.js";
 export * from "./nexusPublicationPolicy.js";
 export * from "./nexusRemoteExecution.js";
 export * from "./nexusProjectScaffold.js";
+export * from "./nexusProjectSetupModel.js";
 export * from "./nexusProjectTemplate.js";
 export * from "./processSupervisor.js";
 export * from "./workTrackingGitHubProvider.js";
