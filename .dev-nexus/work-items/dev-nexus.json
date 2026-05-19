@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 152,
+  "nextNumber": 153,
   "nextCommentNumber": 320,
-  "updatedAt": "2026-05-19T09:48:58.650Z",
+  "updatedAt": "2026-05-19T10:00:11.815Z",
   "items": [
     {
       "id": "local-1",
@@ -3902,6 +3902,34 @@
         "provider": "local",
         "itemId": "local-151",
         "itemNumber": 151
+      }
+    },
+    {
+      "id": "local-152",
+      "title": "Allow local tracker mutations with provider-scoped automation auth profiles",
+      "description": "Type: implementation bugfix slice\nReadiness: autonomous agent-ready (AFK)\n\nEvidence:\n- During dogfood closeout for dev-nexus:local-93, MCP work_item_set_status and work_item_comment failed with: Auth profile bot-github is for provider github, not requested provider local.\n- A direct MCP work_item_create repro from a project-meta worktree failed with the same authority block.\n- The owning tracker is the configured local provider, and local work-item update/comment authority is project authority, not a live provider mutation.\n- The guarded project-local CLI workaround succeeded only by using an isolated DevNexus home without the GitHub auth profile, which proves the provider check is over-scoped for local tracker mutations.\n\nGoal: local tracker work_item.update, work_item.comment, work_item.create, and status updates should honor actor/role authority without rejecting provider-scoped automation auth profiles when the tracker provider is local.\n\nAcceptance criteria:\n- MCP work_item_update, work_item_comment, work_item_set_status, and work_item_create allow a project automation actor with a GitHub-scoped auth profile to mutate a local tracker when authority grants work_item.* actions.\n- CLI work-item create/update/comment/set-status has the same behavior for local trackers.\n- Provider-backed tracker mutations still enforce provider-specific actions such as provider.comment, provider.label, provider.assign, and provider.transition.\n- A regression test covers the exact provider mismatch observed in dogfood.\n\nBoundaries:\n- Do not weaken authority checks for provider-backed trackers.\n- Do not add live provider calls or external writes.\n\nVerification:\n- Focused CLI/MCP authority tests for local and provider-backed work-item mutations.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "work-tracking",
+        "authority",
+        "mcp",
+        "cli",
+        "local-tracker",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T10:00:11.814Z",
+      "updatedAt": "2026-05-19T10:00:11.814Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-152",
+        "itemNumber": 152
       }
     }
   ],
@@ -7810,6 +7838,7 @@
     "local-148": [],
     "local-149": [],
     "local-150": [],
-    "local-151": []
+    "local-151": [],
+    "local-152": []
   }
 }
