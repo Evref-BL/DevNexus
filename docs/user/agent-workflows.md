@@ -103,6 +103,13 @@ and migration guidance.
 
 ## Generated Worktrees
 
+Before editing a Git checkout, run a freshness preflight:
+
+- Inspect status, remotes, upstream, and ahead/behind state.
+- Fetch configured remotes when policy allows.
+- Fast-forward clean branches with an upstream.
+- Record a blocker when freshness cannot be checked.
+
 Prepare a component-scoped worktree when implementation should be isolated:
 
 ```bash
@@ -176,6 +183,10 @@ ending a mutating chat. Do not delete branches or worktrees when ownership,
 dirty state, pushed state, merge state, or publication state is ambiguous. Run
 a cleanup dry-run or equivalent read-only status review first, and preserve
 uncertain work with a rescue branch or explicit handoff instead of guessing.
+After a direct integration or merge, fetch and prune, confirm the work branch is
+an ancestor of the target branch, remove the disposable worktree, and delete the
+local and remote review branches. If any check is ambiguous, leave a handoff
+instead of deleting.
 
 ## Coordination
 

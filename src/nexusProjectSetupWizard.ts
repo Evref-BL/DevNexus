@@ -692,6 +692,8 @@ function writeProjectAgentsFile(
       "",
       "- Read this file, `CONTEXT.md` when present, and DevNexus project status before making changes.",
       "- Use DevNexus work items, component metadata, and generated worktrees for coordinated work.",
+      "- Before editing a Git checkout, inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, then fast-forward clean branches with an upstream.",
+      "- After direct integration or merge, delete only branches and worktrees proven merged into the target branch; hand off ambiguous or dirty state.",
       "- Keep provider mutations separate from local setup; use explicit hosting status, plan, and apply commands.",
       "- Preserve unrelated user changes in component source roots.",
       "",

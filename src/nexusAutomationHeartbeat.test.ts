@@ -165,6 +165,12 @@ describe("nexus automation heartbeat preparation", () => {
       "automation status, eligible work, agent profiles, target report",
     );
     expect(preparation.codexAutomation.prompt).toContain(
+      "Git freshness preflight",
+    );
+    expect(preparation.codexAutomation.prompt).toContain(
+      "delete merged local and remote review branches",
+    );
+    expect(preparation.codexAutomation.prompt).toContain(
       "provider-native issue directly without importing or copying",
     );
     expect(preparation.codexAutomation.prompt).toContain(

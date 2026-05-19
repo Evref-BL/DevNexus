@@ -1424,6 +1424,10 @@ describe("dev-nexus cli", () => {
       `Run dev-nexus project hosting status ${shellQuoteArgument(projectRoot)} --home ${shellQuoteArgument(homePath)} --json when hosting intent is configured.`,
     ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
+    const agentsText = fs.readFileSync(path.join(projectRoot, "AGENTS.md"), "utf8");
+    expect(agentsText).toContain("Before editing a Git checkout");
+    expect(agentsText).toContain("Fetch configured remotes when policy allows");
+    expect(agentsText).toContain("branches and worktrees proven merged");
     expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(true);
     expect(loadProjectConfig(projectRoot)).toMatchObject({
       id: "guided-demo",

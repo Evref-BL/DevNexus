@@ -188,6 +188,13 @@ describe("nexus skills", () => {
     expect(skillMarkdown["dev-nexus"]).toContain(
       "component-qualified work-item ids",
     );
+    expect(skillMarkdown["dev-nexus"]).toContain("Git freshness preflight");
+    expect(skillMarkdown["dev-nexus"]).toContain(
+      "Fetch configured remotes when policy allows",
+    );
+    expect(skillMarkdown["dev-nexus"]).toContain(
+      "delete merged local and remote review branches",
+    );
     expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
     expect(skillMarkdown["dev-nexus"]).toContain("project/meta worktree");
     expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");

@@ -167,6 +167,15 @@ to inspect status and prepare or adopt an isolated component or project-meta
 worktree. Keep shared checkouts and stable component source roots read-mostly
 unless the chat explicitly owns integration or project-state mutation.
 
+Before editing a Git checkout, run a freshness preflight: inspect status,
+remotes, upstream, and ahead/behind state; fetch configured remotes when policy
+allows; fast-forward clean branches with an upstream.
+
+After direct integration or merge, run a cleanup pass: fetch/prune, confirm the
+work branch is an ancestor of the target branch, remove the disposable worktree,
+and delete local and remote review branches only after that ancestry check
+passes. Preserve dirty or ambiguous branches with a handoff instead.
+
 Prepare an isolated component worktree for parallel work:
 
 ```bash
