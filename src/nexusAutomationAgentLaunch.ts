@@ -41,8 +41,8 @@ import {
 import {
   getNexusPublicationStatuses,
   loadNexusPublicationAuthProfiles,
-  publicationCommandEnvironment,
   publicationEnvironmentVariables,
+  publicationProcessEnvironment,
   publicationPreflightChecks,
   resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
@@ -1247,8 +1247,8 @@ function agentLaunchEnvironment(
 ): NodeJS.ProcessEnv {
   const publication = input.automationConfig.publication;
   const explicitEnv = {
-    ...baseEnv,
-    ...publicationCommandEnvironment(publication, {
+    ...publicationProcessEnvironment(publication, {
+      baseEnv,
       projectRoot: input.projectRoot,
     }),
     ...publicationEnvironmentVariables(publication),

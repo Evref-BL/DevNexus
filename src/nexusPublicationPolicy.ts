@@ -284,6 +284,31 @@ export function publicationCommandEnvironment(
   );
 }
 
+export function publicationProcessEnvironment(
+  policy: NexusAutomationPublicationConfig,
+  options: {
+    baseEnv: NodeJS.ProcessEnv;
+    projectRoot?: string;
+  },
+): NodeJS.ProcessEnv {
+  const commandEnvironment = publicationCommandEnvironment(policy, {
+    projectRoot: options.projectRoot,
+  });
+  const env: NodeJS.ProcessEnv = {
+    ...options.baseEnv,
+    ...commandEnvironment,
+  };
+
+  if (shouldUseIsolatedGitHubCliProfile(policy, commandEnvironment)) {
+    delete env.GH_TOKEN;
+    delete env.GITHUB_TOKEN;
+    delete env.GH_ENTERPRISE_TOKEN;
+    delete env.GITHUB_ENTERPRISE_TOKEN;
+  }
+
+  return env;
+}
+
 function resolvePublicationCommandEnvironmentValue(
   value: string,
   projectRoot: string,
@@ -293,6 +318,16 @@ function resolvePublicationCommandEnvironmentValue(
   }
 
   return value;
+}
+
+function shouldUseIsolatedGitHubCliProfile(
+  policy: NexusAutomationPublicationConfig,
+  commandEnvironment: Record<string, string>,
+): boolean {
+  return (
+    policy.actor?.provider?.toLowerCase() === "github" &&
+    Boolean(commandEnvironment.GH_CONFIG_DIR?.trim())
+  );
 }
 
 export function publicationEnvironmentVariables(
@@ -481,10 +516,10 @@ function readPublicationActorStatus(options: {
       : ["api", "user", "--jq", ".login", "--hostname", host];
   const result = options.actorRunner("gh", args, {
     cwd: options.cwd,
-    env: {
-      ...options.baseEnv,
-      ...commandEnvironment,
-    },
+    env: publicationProcessEnvironment(options.policy, {
+      baseEnv: options.baseEnv,
+      projectRoot: options.projectRoot,
+    }),
   });
   if (result.status !== 0 || result.error) {
     const detail =

@@ -125,6 +125,11 @@ describe("nexus publication policy", () => {
         remoteUrl: "git@github.com-bot:example/project.git",
         pushUrl: "git@github.com-bot:example/project.git",
       }),
+      env: {
+        GH_TOKEN: "ambient-gh-token",
+        GITHUB_TOKEN: "ambient-github-token",
+        PATH: process.env.PATH,
+      },
       actorRunner: (command, args, options) => {
         actorCommands.push({ command, args, env: options.env });
         return { status: 0, stdout: "example-bot\n", stderr: "" };
@@ -164,6 +169,8 @@ describe("nexus publication policy", () => {
         }),
       },
     ]);
+    expect(actorCommands[0]!.env.GH_TOKEN).toBeUndefined();
+    expect(actorCommands[0]!.env.GITHUB_TOKEN).toBeUndefined();
     expect(() => assertNexusPublicationGuard(status)).not.toThrow();
   });
 

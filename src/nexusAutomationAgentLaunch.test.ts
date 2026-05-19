@@ -372,6 +372,8 @@ describe("nexus automation agent launch", () => {
       expect(options.env.DEV_NEXUS_PUBLICATION_COMMAND_ENV_KEYS).toBe(
         "GH_CONFIG_DIR",
       );
+      expect(options.env.GH_TOKEN).toBeUndefined();
+      expect(options.env.GITHUB_TOKEN).toBeUndefined();
       const context = JSON.parse(
         fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
       );
@@ -649,6 +651,10 @@ describe("nexus automation agent launch", () => {
       ),
       launcher: createNexusAutomationAgentCommandLauncher({
         command: "codex run",
+        env: {
+          GH_TOKEN: "ambient-gh-token",
+          GITHUB_TOKEN: "ambient-github-token",
+        },
         commandRunner,
         timeoutMs: 120000,
       }),
