@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T22:24:42.157Z",
+  "updatedAt": "2026-05-19T22:25:40.000Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -27,12 +27,12 @@
         ".dev-nexus/automation/target-state.md",
         "PLAN.md"
       ],
-      "status": "ready",
+      "status": "merged",
       "createdAt": "2026-05-19T22:24:42.157Z",
       "lastSeenAt": "2026-05-19T22:24:42.157Z",
-      "updatedAt": "2026-05-19T22:24:42.157Z",
+      "updatedAt": "2026-05-19T22:25:40.000Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "165ed679f8f171d83b4773e5ed338e135078e4a7",
+      "lastObservedHeadCommit": "91d83803715992ef978235708916c5e52721a2ec",
       "dirty": false,
       "pushed": null,
       "git": {
