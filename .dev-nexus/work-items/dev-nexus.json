@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 154,
+  "nextNumber": 155,
   "nextCommentNumber": 333,
-  "updatedAt": "2026-05-19T14:26:04.436Z",
+  "updatedAt": "2026-05-19T15:26:53.741Z",
   "items": [
     {
       "id": "local-1",
@@ -3958,6 +3958,32 @@
         "provider": "local",
         "itemId": "local-153",
         "itemNumber": 153
+      }
+    },
+    {
+      "id": "local-154",
+      "title": "Guard automation commits against human Git author identity",
+      "description": "Type: publication/account safety defect\nReadiness: autonomous agent-ready (AFK)\nSource: investigation of Evref-BL/DevNexus-Pharo#2 on 2026-05-19.\n\nObserved failure:\nEvref-BL/DevNexus-Pharo#2 was opened and merged by the configured automation GitHub actor `Gabot-Darbot`, but the Git commits themselves were authored and committed as the human account `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`:\n- PR commit `c365351`: author/committer `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`.\n- Merge commit `998d5ce`: author/committer `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`.\nThe local DevNexus-Pharo checkout has no repo-local `user.name` or `user.email`, so Git falls back to the host global human identity. The `bot` remote and isolated `GH_CONFIG_DIR` control push/API authentication, but they do not set Git author/committer metadata.\n\nCurrent evidence:\n- DevNexus already has publication actor/remote guardrails (`dev-nexus:local-38`) and later fixed ambient GitHub token leakage in source commit `05928d6`.\n- Those fixes cover GitHub actor and provider credential selection, but not local Git author/committer identity.\n- The DevNexus and dogfood checkouts currently have repo-local bot `user.name`/`user.email`, but DevNexus-Pharo and DevNexus-TypeScript can still inherit the global human Git identity.\n\nGoal:\nPrevent DevNexus-owned automation commits, merge commits, and integration commits from being created with a human Git author/committer identity when the configured publication actor is a machine user.\n\nAcceptance criteria:\n- Publication/worker setup can derive expected Git author and committer identity from the configured automation actor/auth profile, without hard-coding dogfood-specific users in DevNexus core.\n- DevNexus prepares component worktrees with repo-local `user.name` and `user.email`, or sets equivalent `GIT_AUTHOR_*` and `GIT_COMMITTER_*` environment for DevNexus-owned commit/merge operations.\n- Publication preflight/status reports the observed Git author/committer config for each component checkout and flags mismatch with the configured automation actor.\n- DevNexus-owned commit or target-branch integration paths fail closed, or use the configured bot identity, when `git config user.name/user.email` would otherwise resolve to a human identity.\n- Tests cover a component checkout with only global human Git config and assert automation commit setup/preflight does not silently accept it.\n- Dogfood smoke evidence covers DevNexus-Pharo or a fixture equivalent where the configured bot actor would create commits as `Gabot-Darbot <285409735+Gabot-Darbot@users.noreply.github.com>` rather than the human account.\n\nBoundaries:\n- Do not rewrite or force-push existing public history from Evref-BL/DevNexus-Pharo#2 as part of this implementation.\n- Do not store secrets in shared project config.\n- Keep the model provider-neutral where possible; GitHub noreply email derivation may be a GitHub-specific adapter or explicit auth-profile field.\n- Do not conflate Git commit identity with GitHub API actor identity; both must be reported separately.\n\nVerification:\n- Focused tests around publication policy/status and worktree setup Git identity behavior.\n- Focused CLI/MCP preflight output test if the status surface changes.\n- `npm run check` in DevNexus when feasible.\n- Manual read-only verification of DevNexus-Pharo local config after setup, or fixture smoke, showing repo-local bot identity is configured.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "account-safety",
+        "git",
+        "bug",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T15:26:53.741Z",
+      "updatedAt": "2026-05-19T15:26:53.741Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-154",
+        "itemNumber": 154
       }
     }
   ],
@@ -8016,6 +8042,7 @@
           "itemId": "local-comment-330"
         }
       }
-    ]
+    ],
+    "local-154": []
   }
 }
