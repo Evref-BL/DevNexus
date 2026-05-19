@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 22,
-  "nextCommentNumber": 59,
-  "updatedAt": "2026-05-19T11:12:22.358Z",
+  "nextCommentNumber": 60,
+  "updatedAt": "2026-05-19T11:17:16.014Z",
   "items": [
     {
       "id": "local-1",
@@ -522,7 +522,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T20:55:50.653Z",
-      "updatedAt": "2026-05-19T11:12:22.358Z",
+      "updatedAt": "2026-05-19T11:17:16.014Z",
       "closedAt": "2026-05-19T11:11:53.271Z",
       "webUrl": null,
       "externalRef": {
@@ -1209,6 +1209,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-58"
+        }
+      },
+      {
+        "id": "local-comment-59",
+        "body": "Post-closeout verification: after rebuilding dist from published DevNexus-Pharo main f0027da, a temporary legacy project import followed by dev-nexus-pharo codex doctor completed without diagnostics mentioning legacy kanban, VIBE_KANBAN_, or vibe_kanban metadata. Temporary smoke files were removed.",
+        "author": null,
+        "createdAt": "2026-05-19T11:17:16.014Z",
+        "updatedAt": "2026-05-19T11:17:16.014Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-59"
         }
       }
     ]
