@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 337,
-  "updatedAt": "2026-05-19T17:55:30.317Z",
+  "nextCommentNumber": 338,
+  "updatedAt": "2026-05-19T18:00:05.130Z",
   "items": [
     {
       "id": "local-1",
@@ -4069,7 +4069,7 @@
       "id": "local-158",
       "title": "Integrate provider auth profile inventory into project setup",
       "description": "Type: implementation/design slice\nDepends on: dev-nexus:local-155\nSource: 2026-05-19 parameter inventory discussion.\nOwner: dev-nexus component.\n\nProblem:\nSetup needs to expose auth choices without teaching users to paste secrets into project config. It also needs to distinguish human accounts from bot/automation accounts across GitHub, GitLab, Jira, and future providers.\n\nAcceptance criteria:\n- Add setup/auth inventory surfaces for provider auth profiles referenced by hosting, work tracking, publication, and external issue discovery.\n- Support host-local credential methods such as provider CLI profiles, environment-variable references, token store references, and HTTP API token references without storing raw token values in shared project metadata.\n- Model actor kind and intent: human account, machine user/bot account, CI/service account, and unknown/manual-only.\n- Report which auth profiles are required now, optional later, or only needed for hosting apply/provider mutations.\n- Provide read-only capability checks where possible and provider-specific actionable next steps where credentials are missing.\n- Preserve the rule that agent-created Git/provider mutations use automation/bot profiles unless the user explicitly overrides it.\n\nVerification:\n- Tests for auth profile normalization and secret redaction.\n- CLI/setup report tests for missing and available provider auth profiles.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4085,8 +4085,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:22:54.606Z",
-      "updatedAt": "2026-05-19T17:22:54.606Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T18:00:05.130Z",
+      "closedAt": "2026-05-19T18:00:05.130Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8286,7 +8286,19 @@
         }
       }
     ],
-    "local-158": [],
+    "local-158": [
+      {
+        "id": "local-comment-337",
+        "body": "Implemented setup auth profile inventory in DevNexus source commit `5ba284499a9101ac1af3ed0f80dbe955fd9efebe` and pushed it to `bot/main`.\n\nSetup preview JSON now includes `proposal.authInventory` with configured profiles, missing referenced profiles, required-now versus provider-mutation-only versus optional-later classifications, and read-only host-local credential checks for provider CLI commands/environment variables/token references without storing raw secret values. Verification passed: `npm run build`; `npm test -- src/nexusProjectSetupAuthInventory.test.ts src/nexusProjectSetupModel.test.ts src/cli.test.ts`; `npm run check`; `git diff --check`.",
+        "author": null,
+        "createdAt": "2026-05-19T17:59:57.302Z",
+        "updatedAt": "2026-05-19T17:59:57.302Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-337"
+        }
+      }
+    ],
     "local-159": [],
     "local-160": [],
     "local-161": []
