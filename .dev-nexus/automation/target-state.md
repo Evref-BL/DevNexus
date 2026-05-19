@@ -98,9 +98,10 @@ and ready for coordinator-driven work across its components.
   `Gabot-Darbot` machine-user profile. `dev-nexus:local-163` migrated dogfood
   component publication config to green-main: component publication uses the
   `bot` remote, `GH_CONFIG_DIR=home:.config/gh-automation-github`,
-  pull-request validation, `Windows Node 24 check` as the required check, stale
-  checks blocked, direct target-branch push blocked, and authorized merge only
-  after checks are green. The dogfood project authority model binds
+  pull-request validation, `Node 24 check (ubuntu-latest)`,
+  `Node 24 check (windows-latest)`, and `Node 24 check (macos-latest)` as the
+  required checks, stale checks blocked, direct target-branch push blocked, and
+  authorized merge only after checks are green. The dogfood project authority model binds
   `dogfood-automation-bot` to the `Gabot-Darbot` machine-user profile with
   maintainer authority, and host-local DevNexus home config binds `bot-github`
   to that actor.

@@ -162,7 +162,9 @@
           "directTargetPush": "blocked",
           "mergeAuthority": "authorized_merge",
           "requiredChecks": [
-            "Windows Node 24 check"
+            "Node 24 check (ubuntu-latest)",
+            "Node 24 check (windows-latest)",
+            "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
         }
@@ -240,7 +242,9 @@
           "directTargetPush": "blocked",
           "mergeAuthority": "authorized_merge",
           "requiredChecks": [
-            "Windows Node 24 check"
+            "Node 24 check (ubuntu-latest)",
+            "Node 24 check (windows-latest)",
+            "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
         }
@@ -332,7 +336,9 @@
           "directTargetPush": "blocked",
           "mergeAuthority": "authorized_merge",
           "requiredChecks": [
-            "Windows Node 24 check"
+            "Node 24 check (ubuntu-latest)",
+            "Node 24 check (windows-latest)",
+            "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
         }
