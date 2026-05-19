@@ -35,6 +35,51 @@
       "allowCreate": false
     }
   },
+  "authority": {
+    "actors": [
+      {
+        "id": "dogfood-automation-bot",
+        "kind": "machine_user",
+        "provider": "github",
+        "providerIdentity": "Gabot-Darbot",
+        "displayName": "Gabot-Darbot",
+        "handles": {
+          "github": "Gabot-Darbot"
+        }
+      },
+      {
+        "id": "dogfood-human-maintainer",
+        "kind": "human",
+        "provider": "github",
+        "providerIdentity": "Gabriel-Darbord",
+        "displayName": "Gabriel-Darbord",
+        "handles": {
+          "github": "Gabriel-Darbord"
+        }
+      }
+    ],
+    "roleBindings": [
+      {
+        "actorId": "dogfood-automation-bot",
+        "roles": [
+          "maintainer"
+        ],
+        "scope": {
+          "project": "dev-nexus-dogfood"
+        }
+      },
+      {
+        "actorId": "dogfood-human-maintainer",
+        "roles": [
+          "maintainer"
+        ],
+        "scope": {
+          "project": "dev-nexus-dogfood"
+        }
+      }
+    ],
+    "unknownActorFallbackRole": "observer"
+  },
   "worktreesRoot": "worktrees",
   "components": [
     {
@@ -593,14 +638,14 @@
         "kind": "machine_user",
         "provider": "github",
         "handle": "Gabot-Darbot",
-        "id": null
+        "id": "dogfood-automation-bot"
       },
       "manualRemote": "origin",
       "manualActor": {
         "kind": "human",
         "provider": "github",
         "handle": "Gabriel-Darbord",
-        "id": null
+        "id": "dogfood-human-maintainer"
       },
       "commandEnvironment": {
         "GH_CONFIG_DIR": "home:.config/gh-automation-github"

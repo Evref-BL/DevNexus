@@ -65,7 +65,10 @@ and ready for coordinator-driven work across its components.
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
   `Gabot-Darbot` machine-user profile. Direct-integration components also use
-  component `bot` remotes for publication.
+  component `bot` remotes for publication. The dogfood project authority model
+  binds `dogfood-automation-bot` to the `Gabot-Darbot` machine-user profile
+  with maintainer authority, and host-local DevNexus home config binds
+  `bot-github` to that actor.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
