@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 154,
-  "nextCommentNumber": 329,
-  "updatedAt": "2026-05-19T12:41:59.510Z",
+  "nextCommentNumber": 331,
+  "updatedAt": "2026-05-19T12:47:15.324Z",
   "items": [
     {
       "id": "local-1",
@@ -3937,7 +3937,7 @@
       "id": "local-153",
       "title": "Adopt GitHub issue eligibility labels for direct discovery",
       "description": "Type: dogfood tracker hygiene and rollout slice\nReadiness: ready after the configured discovery PRs are merged or while validating them in the project-meta branch.\nSource decision: `dev-nexus:local-137` allows local primary trackers and configured GitHub Issues eligible-source trackers to be peer discovery sources. GitHub issues do not need to be copied/imported locally before selection.\n\nGoal: make existing and new GitHub Issues follow the same automation eligibility logic as local work items, so provider-native issues can be selected directly when intended.\n\nAcceptance criteria:\n- Record the dogfood GitHub issue eligibility convention: `dogfood` plus `status:ready` means selectable by the current automation selector; `blocked` or `unsafe-live-runtime` excludes selection.\n- Review open GitHub Issues on configured component trackers and decide which ones should be automation-eligible, backlog/todo only, or blocked/HITL.\n- Apply only the minimal provider-native labels/status labels needed for direct discovery when provider writes are explicitly allowed for label hygiene; do not copy issue bodies into local tracker state.\n- Verify `automation eligible-work` in discovery mode sees any intended GitHub Issues directly with a `sourceTrackerRef` for the GitHub tracker.\n- Leave sync/import/comment mirroring policy under `dev-nexus:local-52`; this item must not enable provider comments, scheduled import, or issue mirroring.\n\nBoundaries:\n- Do not import GitHub issues into local tracker state as a prerequisite for selection.\n- Do not create duplicate local work items for provider-native GitHub issues unless a separate import policy explicitly requests it.\n- Do not mutate GitHub issue content or comments in this slice; label/status hygiene only.\n- Do not broaden the automation selector beyond the explicit dogfood/status labels without a target-state decision.\n\nVerification:\n- `dev-nexus work-item discovery-status . --json` reports GitHub trackers readable.\n- `dev-nexus automation eligible-work . --json` returns the intended directly selectable GitHub issue(s), or records that no GitHub issue currently has the selector labels.\n- GitHub issue list review is recorded in the work-item comment.\n\nPublication notes:\n- Dogfood project-state and provider label hygiene only; no DevNexus source change expected unless verification exposes a discovery bug.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3951,8 +3951,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T12:40:57.375Z",
-      "updatedAt": "2026-05-19T12:41:59.509Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T12:47:15.324Z",
+      "closedAt": "2026-05-19T12:46:09.562Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -7969,6 +7969,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-328"
+        }
+      },
+      {
+        "id": "local-comment-329",
+        "body": "Applied the direct discovery label convention without importing or copying GitHub issues. Created the `dogfood` and `status:ready` labels in the configured GitHub trackers, then labeled Evref-BL/DevNexus#3, Evref-BL/DevNexus#4, and Evref-BL/DevNexus-Pharo#1 as dogfood-ready. Verified the selector through the DevNexus library path: `listNexusEligibleWorkByComponent` returned `mode: discovery` with local-153 plus GitHub github-4, github-3, and dev-nexus-pharo github-1 as directly eligible provider-native work items. The full automation preflight still cannot run from the isolated project-meta worktree because component source checkouts are not projected there, but tracker discovery and selector aggregation are working.",
+        "author": null,
+        "createdAt": "2026-05-19T12:46:06.105Z",
+        "updatedAt": "2026-05-19T12:46:06.105Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-329"
+        }
+      },
+      {
+        "id": "local-comment-330",
+        "body": "Post-close verification reran the discovery-mode selector. With local-153 now done, the eligible queue contains three provider-native GitHub issues: Evref-BL/DevNexus#4, Evref-BL/DevNexus#3, and Evref-BL/DevNexus-Pharo#1, each surfaced from the configured `github` tracker with `status: ready` and `dogfood` labels. This confirms the remaining queue is GitHub-direct rather than local-imported.",
+        "author": null,
+        "createdAt": "2026-05-19T12:47:15.324Z",
+        "updatedAt": "2026-05-19T12:47:15.324Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-330"
         }
       }
     ]

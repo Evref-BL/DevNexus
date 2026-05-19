@@ -289,12 +289,14 @@ and ready for coordinator-driven work across its components.
   peer discovery sources for configured components, and matching GitHub issues
   can be selected directly without copy/import migration. Provider comments and
   scheduled import are still not automatically enabled. `dev-nexus:local-153`
-  now owns GitHub issue eligibility hygiene so provider-native issues follow
-  the same selector convention as local items (`dogfood` plus `status:ready`
-  is directly selectable; blocked/unsafe labels exclude) without creating local
-  duplicates. The authority
-  provider-signal follow-on `local-93` is
-  complete. The local tracker auth-profile mismatch follow-on `local-152` is
+  is complete for GitHub issue eligibility hygiene: provider-native issues now
+  use the same selector convention as local items (`dogfood` plus
+  `status:ready` is directly selectable; blocked/unsafe labels exclude) without
+  creating local duplicates. Selector-level direct discovery currently returns
+  Evref-BL/DevNexus#3, Evref-BL/DevNexus#4, and Evref-BL/DevNexus-Pharo#1 as
+  eligible GitHub issues. The authority provider-signal
+  follow-on `local-93` is complete. The local tracker auth-profile mismatch
+  follow-on `local-152` is
   also complete as `0e86479`; DevNexus-Pharo package-template and legacy Vibe
   metadata fixes `dev-nexus-pharo:local-20` and `local-21` are complete as
   `84a4556` and `f0027da`. DevNexus import extension config preservation
