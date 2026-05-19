@@ -408,7 +408,7 @@ export function collectNexusWorktreeLeaseGitFacts(options: {
     ),
   );
   const status = parsePorcelainStatus(
-    gitStdout(
+    gitRawStdout(
       runOptionalGit(runner, ["status", "--porcelain=v1"], repositoryPath),
     ) ?? "",
   );
@@ -887,6 +887,11 @@ function runOptionalGit(
 function gitStdout(result: GitCommandResult | null): string | null {
   const value = result?.stdout.trim();
   return value ? value : null;
+}
+
+function gitRawStdout(result: GitCommandResult | null): string | null {
+  const value = result?.stdout;
+  return value && value.length > 0 ? value : null;
 }
 
 function parsePorcelainStatus(output: string): {

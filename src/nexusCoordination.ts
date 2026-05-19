@@ -1245,7 +1245,7 @@ function getCoordinationGitStatus(
     ),
   );
   const parsedStatus = parsePorcelainStatus(
-    gitStdout(runOptionalGit(runner, ["status", "--porcelain=v1"], repositoryPath)) ??
+    gitRawStdout(runOptionalGit(runner, ["status", "--porcelain=v1"], repositoryPath)) ??
       "",
   );
   const aheadBehind = upstream
@@ -1915,6 +1915,11 @@ function runOptionalGit(
 function gitStdout(result: GitCommandResult | null): string | null {
   const value = result?.stdout.trim();
   return value ? value : null;
+}
+
+function gitRawStdout(result: GitCommandResult | null): string | null {
+  const value = result?.stdout;
+  return value && value.length > 0 ? value : null;
 }
 
 function parsePorcelainStatus(output: string): {

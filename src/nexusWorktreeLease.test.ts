@@ -3,12 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  collectNexusWorktreeLeaseGitFacts,
   createOrRefreshNexusWorktreeLease,
   listNexusWorktreeLeases,
   nexusWorktreeLeaseStorePath,
   parseNexusWorktreeLeaseStatus,
   readNexusWorktreeLeaseStore,
   saveProjectConfig,
+  type GitCommandResult,
+  type GitRunner,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -73,6 +76,37 @@ function initLeaseFixture(): {
   saveProjectConfig(projectRoot, projectConfig({ sourceRoot, worktreesRoot }));
 
   return { projectRoot, sourceRoot, worktreesRoot, worktreePath };
+}
+
+function ok(args: readonly string[], stdout: string): GitCommandResult {
+  return {
+    args: [...args],
+    stdout,
+    stderr: "",
+    exitCode: 0,
+  };
+}
+
+function fakeLeaseGitRunner(repositoryPath: string, status: string): GitRunner {
+  return (args: readonly string[]): GitCommandResult => {
+    const joined = [...args].join(" ");
+    if (joined === "rev-parse --show-toplevel") {
+      return ok(args, `${repositoryPath}\n`);
+    }
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return ok(args, "origin/codex/dev-nexus/status\n");
+    }
+    if (joined === "status --porcelain=v1") {
+      return ok(args, status);
+    }
+    if (joined === "rev-list --left-right --count HEAD...@{u}") {
+      return ok(args, "0\t0\n");
+    }
+    if (joined === "rev-parse HEAD") {
+      return ok(args, "1111111111111111111111111111111111111111\n");
+    }
+    return ok(args, "");
+  };
 }
 
 afterEach(() => {
@@ -180,6 +214,26 @@ describe("nexus worktree leases", () => {
     const rawStore = fs.readFileSync(nexusWorktreeLeaseStorePath(projectRoot), "utf8");
     expect(rawStore).not.toContain(projectRoot);
     expect(rawStore).not.toContain(sourceRoot);
+  });
+
+  it("preserves porcelain status columns when collecting lease Git facts", () => {
+    const { worktreePath } = initLeaseFixture();
+    const gitFacts = collectNexusWorktreeLeaseGitFacts({
+      worktreePath,
+      gitRunner: fakeLeaseGitRunner(
+        worktreePath,
+        " M src/unstaged.ts\nM  src/staged.ts\nMM src/both.ts\n?? src/new.ts\n",
+      ),
+    });
+
+    expect(gitFacts).toMatchObject({
+      repositoryPath: worktreePath,
+      dirty: true,
+      stagedCount: 2,
+      unstagedCount: 2,
+      untrackedCount: 1,
+      pushed: true,
+    });
   });
 
   it("detects stale leases and keeps them advisory", () => {

@@ -928,6 +928,36 @@ describe("nexus coordination", () => {
     });
   });
 
+  it("preserves porcelain status columns when counting dirty files", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "status");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+    );
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, [], {
+        status:
+          " M src/unstaged.ts\nM  src/staged.ts\nMM src/both.ts\n?? src/new.ts\n",
+      }),
+    });
+
+    expect(status.git).toMatchObject({
+      dirty: true,
+      stagedCount: 2,
+      unstagedCount: 2,
+      untrackedCount: 1,
+    });
+  });
+
   it("uses host-local auth profiles in coordination authority status", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const homePath = makeTempDir("dev-nexus-coordination-home-");
