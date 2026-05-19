@@ -327,6 +327,265 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("advertises compact detail controls only on tools with full-output opt-in", () => {
+    const toolsByName = new Map(
+      listDevNexusMcpTools().map((tool) => [tool.name, tool]),
+    );
+    for (const toolName of [
+      "project_status",
+      "automation_status",
+      "target_report",
+      "coordination_status",
+      "work_item_list",
+    ]) {
+      expect(toolsByName.get(toolName)?.inputSchema).toMatchObject({
+        properties: {
+          detail: {
+            enum: ["summary", "full"],
+            default: "summary",
+          },
+        },
+      });
+    }
+    for (const toolName of [
+      "project_hosting_status",
+      "project_hosting_plan",
+      "project_hosting_apply",
+      "agent_profiles",
+      "target_cycle_list",
+    ]) {
+      expect(
+        (toolsByName.get(toolName)?.inputSchema.properties as Record<string, unknown>)
+          .detail,
+      ).toBeUndefined();
+    }
+  });
+
+  it("defaults oversized status tools to compact summaries with full detail opt-in", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-14");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Compact surface task",
+      status: "ready",
+      labels: ["automation"],
+      description: "Long description that should not appear in summary lists.",
+    });
+    await callDevNexusMcpTool(
+      "target_cycle_record",
+      {
+        projectRoot,
+        cycleId: "cycle-1",
+        status: "completed",
+        summary: "Target completed.",
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "completed",
+            notes: "Detailed cycle note.",
+          },
+        ],
+        notes: ["Detailed cycle-level note."],
+      },
+      { now: fixedClock("2026-05-16T10:00:00.000Z") },
+    );
+    await callDevNexusMcpTool(
+      "coordination_handoff",
+      {
+        projectRoot,
+        workItemId: "local-1",
+        status: "ready",
+        changedAreas: ["src/nexusMcpServer.ts"],
+        decisions: ["Summaries are default."],
+        currentPath: worktreePath,
+      },
+      {
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(worktreePath),
+      },
+    );
+
+    const projectSummary = toolJson(
+      await callDevNexusMcpTool("project_status", { project: projectRoot }),
+    );
+    const projectFull = toolJson(
+      await callDevNexusMcpTool("project_status", {
+        project: projectRoot,
+        detail: "full",
+      }),
+    );
+    expect(projectSummary).toMatchObject({
+      detail: "summary",
+      project: {
+        componentCount: 1,
+        components: [
+          {
+            id: "primary",
+            workTrackerCount: 1,
+          },
+        ],
+      },
+    });
+    expect(projectSummary.project.components[0].trackerDiscovery).toBeUndefined();
+    expect(projectSummary.project.components[0].workTrackers).toBeUndefined();
+    expect(
+      projectSummary.project.components[0].workTrackingCapabilityReport,
+    ).toBeUndefined();
+    expect(projectFull.project.components[0].trackerDiscovery).toBeDefined();
+
+    const automationSummary = toolJson(
+      await callDevNexusMcpTool(
+        "automation_status",
+        { projectRoot },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+    const automationFull = toolJson(
+      await callDevNexusMcpTool(
+        "automation_status",
+        { projectRoot, detail: "full" },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+    expect(automationSummary).toMatchObject({
+      detail: "summary",
+      status: "ready",
+      project: {
+        id: "mcp-demo",
+      },
+      eligibleWorkItemCount: 1,
+      target: {
+        id: "dogfood",
+        stateMarkdownLength: null,
+      },
+    });
+    expect(automationSummary.projectConfig).toBeUndefined();
+    expect(automationSummary.automationConfig).toBeUndefined();
+    expect(automationSummary.eligibleWorkItems[0].labels).toBeUndefined();
+    expect(automationSummary.eligibleWorkItems[0].warningCount).toBe(0);
+    expect(automationFull.projectConfig).toBeDefined();
+    expect(automationFull.automationConfig).toBeDefined();
+
+    const targetSummary = toolJson(
+      await callDevNexusMcpTool(
+        "target_report",
+        { projectRoot },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+    const targetFull = toolJson(
+      await callDevNexusMcpTool(
+        "target_report",
+        { projectRoot, detail: "full" },
+        { now: fixedClock("2026-05-16T10:05:00.000Z") },
+      ),
+    );
+    expect(targetSummary).toMatchObject({
+      detail: "summary",
+      report: {
+        status: "completed",
+        workItemSummary: {
+          uniqueReferenceCount: 1,
+          uniqueReferences: [
+            {
+              id: "local-1",
+              latestCycleStatus: "completed",
+            },
+          ],
+        },
+      },
+    });
+    expect(targetSummary.report.target.stateMarkdown).toBeUndefined();
+    expect(targetSummary.report.authority.summary).toBeUndefined();
+    expect(targetFull.report.workItemSummary.uniqueReferences[0].notes).toBe(
+      "Detailed cycle note.",
+    );
+
+    const coordinationSummary = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_status",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-16T10:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+    const coordinationFull = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_status",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          currentPath: worktreePath,
+          detail: "full",
+        },
+        {
+          now: fixedClock("2026-05-16T10:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+    expect(coordinationSummary).toMatchObject({
+      detail: "summary",
+      status: {
+        leases: {
+          totalCount: expect.any(Number),
+        },
+        handoffs: {
+          totalCount: 1,
+          records: [
+            {
+              status: "ready",
+              stale: false,
+            },
+          ],
+        },
+      },
+    });
+    expect(coordinationSummary.status.leases.records[0]?.git).toBeUndefined();
+    expect(coordinationSummary.status.handoffs.records[0]?.decisions).toBeUndefined();
+    expect(coordinationSummary.status.handoffs.records[0]?.decisionCount).toBe(1);
+    expect(coordinationSummary.status.git.warnings).toBeUndefined();
+    expect(coordinationFull.status.leases.records[0]?.git).toBeDefined();
+
+    for (const payload of [
+      projectSummary,
+      automationSummary,
+      targetSummary,
+      coordinationSummary,
+    ]) {
+      expect(JSON.stringify(payload).length).toBeLessThan(20000);
+    }
+  });
+
+  it("rejects invalid detail values on compactable MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const response = await callDevNexusMcpTool("project_status", {
+      project: projectRoot,
+      detail: "everything",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(toolJson(response)).toMatchObject({
+      ok: false,
+      error: "arguments.detail must be summary or full",
+    });
+  });
+
   it("returns project hosting status and plan through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-hosting-");
     saveProjectConfig(
@@ -1650,16 +1909,13 @@ describe("DevNexus MCP server", () => {
             workTracking: {
               provider: "local",
             },
-            workTrackingCapabilities: {
-              createItem: true,
-              listItems: true,
-              updateItem: true,
-              comment: true,
-            },
           },
         ],
       },
     });
+    expect(
+      projectStatus.project.components[0].workTrackingCapabilities,
+    ).toBeUndefined();
 
     const created = toolJson(
       await callDevNexusMcpTool(
