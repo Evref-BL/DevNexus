@@ -9,6 +9,7 @@ export const devNexusCoreMcpToolNames = [
   "eligible_work",
   "agent_profiles",
   "codex_app_server_probe",
+  "automation_heartbeat_prepare",
   "setup_flow_list",
   "setup_plan",
   "setup_check",

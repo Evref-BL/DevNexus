@@ -2755,6 +2755,49 @@ describe("dev-nexus cli", () => {
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
 
+  it("prepares a Codex heartbeat automation recipe", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-heartbeat-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "heartbeat",
+        "prepare",
+        projectRoot,
+        "--interval-minutes",
+        "20",
+        "--paused",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      project: {
+        id: "demo-project",
+      },
+      codexAutomation: {
+        kind: "heartbeat",
+        destination: "thread",
+        rrule: "FREQ=MINUTELY;INTERVAL=20",
+        status: "PAUSED",
+      },
+    });
+    expect(payload.codexAutomation.prompt).toContain(
+      "automation status, eligible work, agent profiles, target report",
+    );
+    expect(payload.codexAutomation.prompt).toContain(
+      "provider-native issue directly without importing or copying",
+    );
+  });
+
   it("prints concise eligible work grouped by component", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

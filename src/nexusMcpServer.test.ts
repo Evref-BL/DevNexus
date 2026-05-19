@@ -224,6 +224,7 @@ describe("DevNexus MCP server", () => {
       "eligible_work",
       "agent_profiles",
       "codex_app_server_probe",
+      "automation_heartbeat_prepare",
       "setup_flow_list",
       "setup_plan",
       "setup_check",
@@ -1658,6 +1659,30 @@ describe("DevNexus MCP server", () => {
       profiles: [],
     });
     expect(agentProfiles.projectConfig).toBeUndefined();
+
+    const heartbeat = toolJson(
+      await callDevNexusMcpTool("automation_heartbeat_prepare", {
+        projectRoot,
+        intervalMinutes: 45,
+        status: "PAUSED",
+      }),
+    );
+    expect(heartbeat).toMatchObject({
+      ok: true,
+      project: {
+        id: "mcp-demo",
+      },
+      codexAutomation: {
+        kind: "heartbeat",
+        destination: "thread",
+        rrule: "FREQ=MINUTELY;INTERVAL=45",
+        status: "PAUSED",
+      },
+    });
+    expect(heartbeat.codexAutomation.prompt).toContain(
+      "provider-native issue directly without importing or copying",
+    );
+    expect(heartbeat.projectConfig).toBeUndefined();
 
     const updated = toolJson(
       await callDevNexusMcpTool("work_item_update", {
