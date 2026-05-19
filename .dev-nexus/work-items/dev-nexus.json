@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 307,
-  "updatedAt": "2026-05-19T04:25:55.371Z",
+  "nextCommentNumber": 308,
+  "updatedAt": "2026-05-19T05:21:22.035Z",
   "items": [
     {
       "id": "local-1",
@@ -2719,7 +2719,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.844Z",
-      "updatedAt": "2026-05-19T04:25:55.371Z",
+      "updatedAt": "2026-05-19T05:21:22.035Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6753,6 +6753,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-306"
+        }
+      },
+      {
+        "id": "local-comment-307",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/coordination-auth-profiles-20260519T051409Z\nHead: 8735a73c3f60b2c01078e125b6321f766c2f566a\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T05:21:22.022Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\coordination-auth-profiles-meta-20260519T051409Z\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-107\",\n  \"logicalItemId\": \"local-107\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-107\",\n        \"itemNumber\": 107\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\coordination-auth-profiles-20260519T051409Z\",\n  \"branch\": \"codex/dev-nexus/coordination-auth-profiles-20260519T051409Z\",\n  \"upstream\": \"bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z\",\n  \"baseRef\": \"bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z\",\n  \"headCommit\": \"8735a73c3f60b2c01078e125b6321f766c2f566a\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusCoordination.ts\",\n    \"src/nexusCoordination.test.ts\"\n  ],\n  \"decisions\": [\n    \"Confirmed installed coordination status still reports dogfood-automation-bot profile=none while automation_status resolves bot-github/maintainer.\",\n    \"Fixed coordinationAuthoritySummary to load host-local publication auth profiles before summarizing component authority.\",\n    \"Kept coordination mutation authorization unchanged so local tracker handoff fallback remains available while the provider-specific auth path is corrected for status/reporting.\"\n  ],\n  \"verificationSummary\": \"Passed: npm test -- src/nexusCoordination.test.ts (13 tests); npm run check (TypeScript build plus 64 Vitest files, 573 tests).\",\n  \"integrationPreference\": \"Branch pushed to bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z at 8735a73c3f60b2c01078e125b6321f766c2f566a. Direct integration intentionally held because the currently installed coordination status path is the stale path being fixed; integrate via trusted host or after this branch is available in the coordinator runtime.\",\n  \"note\": \"Dogfood blocker fix prepared during heartbeat 2026-05-19T05:14:09.565Z. This branch should remove the auth-profile mismatch that prevented local-107 and related ready branches from using the configured direct-integration policy.\",\n  \"leaseId\": \"lease-21dc84663a34ba3d\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T05:21:22.035Z",
+        "updatedAt": "2026-05-19T05:21:22.035Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-307"
         }
       }
     ],

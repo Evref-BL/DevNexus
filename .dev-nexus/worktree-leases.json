@@ -1,7 +1,168 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T04:32:29.237Z",
+  "updatedAt": "2026-05-19T05:21:22.022Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-21dc84663a34ba3d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-107",
+      "branchName": "codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+      "baseRef": "bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusCoordination.ts",
+        "src/nexusCoordination.test.ts"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T05:21:22.022Z",
+      "lastSeenAt": "2026-05-19T05:21:22.022Z",
+      "updatedAt": "2026-05-19T05:21:22.022Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "8735a73c3f60b2c01078e125b6321f766c2f566a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Dogfood blocker fix prepared during heartbeat 2026-05-19T05:14:09.565Z. This branch should remove the auth-profile mismatch that prevented local-107 and related ready branches from using the configured direct-integration policy.",
+        "Verification: Passed: npm test -- src/nexusCoordination.test.ts (13 tests); npm run check (TypeScript build plus 64 Vitest files, 573 tests).",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z at 8735a73c3f60b2c01078e125b6321f766c2f566a. Direct integration intentionally held because the currently installed coordination status path is the stale path being fixed; integrate via trusted host or after this branch is available in the coordinator runtime."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-8153bce8dd2ea289",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "coordination-auth-profiles-20260519T051409Z-meta",
+      "branchName": "codex/dev-nexus-dogfood/coordination-auth-profiles-meta-20260519T051409Z",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/coordination-auth-profiles-meta-20260519T051409Z"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/coordination/**",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/automation/target-state.md",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T05:21:02.461Z",
+      "lastSeenAt": "2026-05-19T05:21:22.022Z",
+      "updatedAt": "2026-05-19T05:21:22.022Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f09cb8438b881d1230492392a660f951e9c54b3d",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/coordination-auth-profiles-meta-20260519T051409Z"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project-meta worktree recorded the coordination auth-profile handoff and target-state update.",
+        "Metadata records were integrated into the shared dogfood checkout during the heartbeat."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a09edc96e6a0df0c",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "authority-profile-context-fix-20260519T051409Z",
+      "branchName": "codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "coordination-auth-profiles-20260519T051409Z"
+      },
+      "writeScope": [
+        "src/nexusCoordination.ts",
+        "src/nexusCoordination.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T05:15:35.410Z",
+      "lastSeenAt": "2026-05-19T05:21:22.022Z",
+      "updatedAt": "2026-05-19T05:21:22.022Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "8735a73c3f60b2c01078e125b6321f766c2f566a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "coordination-auth-profiles-20260519T051409Z"
+        },
+        "upstream": "bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Superseded by ready coordination handoff lease lease-21dc84663a34ba3d for the pushed component branch.",
+        "Verification passed: npm test -- src/nexusCoordination.test.ts and npm run check."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
