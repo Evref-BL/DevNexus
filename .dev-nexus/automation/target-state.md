@@ -243,9 +243,9 @@ and ready for coordinator-driven work across its components.
   `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
   `local-90`, `local-91`, `local-133`, `local-92`, and `local-134` were
   removed after publication. `local-94`, `local-107`, and `local-142` are now
-  published; their ready leases are closed as merged and their generated
-  helper worktrees have been removed after cleanup. One old unmerged dogfood
-  metadata branch remains preserved because Git does not classify it as merged.
+  published; their ready leases are closed as merged, their generated helper
+  worktrees have been removed, and the old unmerged dogfood metadata branch was
+  deleted after confirming its handoff facts are already represented on main.
 
 ## Near-Term Direction
 

@@ -1,7 +1,60 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T11:29:00.196Z",
+  "updatedAt": "2026-05-19T11:49:09.717Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3116168bf42dd4fa",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-107-branch-cleanup-20260519",
+      "branchName": "codex/dev-nexus-dogfood/local-107-dogfood-branch-cleanup",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/local-107-dogfood-branch-cleanup"
+      },
+      "writeScope": [
+        ".dev-nexus/automation/target-state.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T11:49:09.717Z",
+      "lastSeenAt": "2026-05-19T11:49:09.717Z",
+      "updatedAt": "2026-05-19T11:49:09.717Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "92764127eb935fcf10c5ed3417b161e17518f607",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/local-107-dogfood-branch-cleanup"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Cleaned the stale local-107 dogfood metadata branch after confirming its handoff comments, lease facts, and target-state conclusions were already represented on main.",
+        "Updated target state so the completed-batch cleanup note no longer says the branch is preserved."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
