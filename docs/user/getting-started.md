@@ -159,6 +159,13 @@ required principals, and provisioning gates. Host-local auth profiles point to
 local credential context, but tokens, private keys, GitHub CLI state, SSH key
 paths, and wrapper scripts stay outside shared project config.
 
+Authority roles describe who may use those profiles for project work. Add
+shared actor and role-binding records for maintainers, contributors, reviewers,
+runtime operators, and release operators, then keep each machine's credential
+details in its own DevNexus home. See
+[authority roles](authority-roles.md) for complete examples and open-source
+contributor guidance.
+
 ```json
 {
   "hosting": {

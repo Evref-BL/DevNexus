@@ -50,6 +50,10 @@ dev-nexus project hosting status <project-root>
 dev-nexus project hosting plan <project-root>
 ```
 
+Configure authority roles for humans, automation accounts, reviewers, runtime
+operators, and release operators with the
+[authority roles guide](docs/user/authority-roles.md).
+
 Configure local work tracking and create a work item:
 
 ```bash
