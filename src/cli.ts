@@ -180,6 +180,16 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  applyNexusProjectSetup,
+  loadNexusProjectSetupAnswers,
+  previewNexusProjectSetup,
+  renderNexusProjectSetupRequiredAnswers,
+  renderNexusProjectSetupProposalSummary,
+  nexusProjectSetupRequiredAnswerPaths,
+  type NexusProjectSetupApplyResult,
+  type NexusProjectSetupProposal,
+} from "./nexusProjectSetupWizard.js";
+import {
   applyNexusProjectHosting,
   planNexusProjectHosting,
   statusNexusProjectHosting,
@@ -318,6 +328,15 @@ interface ParsedProjectCreateCommand {
   from?: string;
   gitInit?: boolean;
   trackerProjectId?: string;
+  json?: boolean;
+}
+
+interface ParsedProjectSetupCommand {
+  projectRoot?: string;
+  homePath?: string;
+  answersPath?: string;
+  yes?: boolean;
+  dryRun?: boolean;
   json?: boolean;
 }
 
@@ -809,6 +828,7 @@ export function usage(): string {
     "  dev-nexus mcp-stdio",
     "  dev-nexus home init [home-path] [options]",
     "  dev-nexus project create <name> [options]",
+    "  dev-nexus project setup [project-root] [options]",
     "  dev-nexus project import <source-root> [options]",
     "  dev-nexus project list [options]",
     "  dev-nexus project status <project-id-or-root> [options]",
@@ -879,6 +899,13 @@ export function usage(): string {
     "  --from <git-url>",
     "  --git-init",
     "  --tracker-project-id <id>",
+    "  --json",
+    "",
+    "Options for project setup:",
+    "  --home <path>",
+    "  --answers <json-file>     setup answers; required in non-interactive mode",
+    "  --yes                     apply local setup writes after preview validation",
+    "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
     "Options for project import:",
@@ -1362,6 +1389,40 @@ async function handleProjectCommand(
     return 0;
   }
 
+  if (command === "setup") {
+    const parsed = parseProjectSetupCommand(argv);
+    const answers = await loadNexusProjectSetupAnswers({
+      ...(parsed.answersPath ? { answersPath: parsed.answersPath } : {}),
+      ...(parsed.projectRoot ? { projectRoot: parsed.projectRoot } : {}),
+      ...(parsed.homePath ? { homePath: resolvedCommandHomePath(parsed.homePath) } : {}),
+    });
+    if (!answers) {
+      printProjectSetupMissingAnswers(parsed, dependencies.stdout ?? process.stdout);
+      return parsed.json ? 2 : Promise.reject(new Error(renderNexusProjectSetupRequiredAnswers()));
+    }
+
+    const proposal = previewNexusProjectSetup(answers);
+    if (parsed.yes) {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: proposal.answers.project.root,
+        command: "project setup",
+        mutationClass: "worktree_bootstrap",
+        targetPath: proposal.answers.project.root,
+      });
+      const result = await applyNexusProjectSetup({
+        answers,
+        ...(dependencies.projectGitRunner
+          ? { projectGitRunner: dependencies.projectGitRunner }
+          : {}),
+      });
+      printProjectSetupApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
+      return 0;
+    }
+
+    printProjectSetupPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
+    return proposal.status === "ready" ? 0 : 2;
+  }
+
   if (command === "import") {
     const parsed = parseProjectImportCommand(argv);
     const result = importNexusProject({
@@ -1408,7 +1469,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, import, list, status, hosting, mcp, or tracker");
+  throw new Error("project requires create, setup, import, list, status, hosting, mcp, or tracker");
 }
 
 async function handleProjectHostingCommand(
@@ -3241,6 +3302,53 @@ function parseProjectCreateCommand(argv: string[]): ParsedProjectCreateCommand {
       default:
         throw new Error(`Unknown project create option: ${arg}`);
     }
+  }
+
+  return parsed;
+}
+
+function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
+  const rest = argv.slice(2);
+  const parsed: ParsedProjectSetupCommand = {};
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    if (!arg.startsWith("--") && !parsed.projectRoot) {
+      parsed.projectRoot = arg;
+      continue;
+    }
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--answers":
+        parsed.answersPath = next();
+        break;
+      case "--yes":
+        parsed.yes = true;
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project setup option: ${arg}`);
+    }
+  }
+
+  if (parsed.yes && parsed.dryRun) {
+    throw new Error("project setup --yes and --dry-run are mutually exclusive");
   }
 
   return parsed;
@@ -5807,6 +5915,83 @@ function printProjectCreateResult(
   writeLine(stdout, "DevNexus project created.");
   printProjectStatusText(result.reference, stdout);
   writeLine(stdout, `  Config: ${result.projectConfigPath}`);
+}
+
+function printProjectSetupMissingAnswers(
+  parsed: ParsedProjectSetupCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: false,
+    error: "project_setup_answers_required",
+    requiredAnswers: [...nexusProjectSetupRequiredAnswerPaths],
+    nextAction:
+      "Provide --answers <json-file>, or run from an interactive terminal to answer setup prompts.",
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, renderNexusProjectSetupRequiredAnswers());
+}
+
+function printProjectSetupPreviewResult(
+  proposal: NexusProjectSetupProposal,
+  parsed: ParsedProjectSetupCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: proposal.status === "ready",
+    applied: false,
+    proposal,
+    nextAction: proposal.status === "ready"
+      ? "Review the preview, then rerun with --yes to apply local setup writes."
+      : "Fix the reported setup diagnostics before applying.",
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, renderNexusProjectSetupProposalSummary(proposal));
+  writeLine(stdout, "");
+  writeLine(stdout, payload.nextAction);
+}
+
+function printProjectSetupApplyResult(
+  result: NexusProjectSetupApplyResult,
+  parsed: ParsedProjectSetupCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    applied: true,
+    projectRoot: result.projectRoot,
+    projectConfigPath: result.projectConfigPath,
+    worktreesRoot: result.worktreesRoot,
+    proposal: result.proposal,
+    writtenFiles: result.writtenFiles,
+    ensuredLocalTrackerStores: result.ensuredLocalTrackerStores,
+    git: result.git,
+    nextActions: [
+      "Open the DevNexus project root in the configured agent application.",
+      "Run dev-nexus setup check . join-existing-project --json.",
+      "Run dev-nexus project hosting status . --json when hosting intent is configured.",
+    ],
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus project setup applied.");
+  writeLine(stdout, `  Root: ${result.projectRoot}`);
+  writeLine(stdout, `  Config: ${result.projectConfigPath}`);
+  writeLine(stdout, `  Worktrees: ${result.worktreesRoot}`);
+  for (const action of payload.nextActions) {
+    writeLine(stdout, `  Next: ${action}`);
+  }
 }
 
 function printProjectImportResult(

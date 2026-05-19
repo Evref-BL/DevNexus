@@ -42,21 +42,29 @@ Start by choosing three different locations:
   coordinates. The default layout puts stable component checkouts under
   `components/<component-id>` inside the project root.
 
-For a new DevNexus project, initialize the home, create the project root, then
-inspect it:
+For a first DevNexus project, prefer the guided setup command. It accepts a
+small JSON answer file, previews local writes by default, and applies only when
+`--yes` is present:
 
 ```bash
 dev-nexus home init "$HOME/.dev-nexus"
-dev-nexus project create example-suite --home "$HOME/.dev-nexus" --root "$HOME/dev-nexus/example-suite"
+dev-nexus project setup "$HOME/dev-nexus/example-suite" --home "$HOME/.dev-nexus" --answers ./dev-nexus.setup.json --json
+dev-nexus project setup "$HOME/dev-nexus/example-suite" --home "$HOME/.dev-nexus" --answers ./dev-nexus.setup.json --yes
 dev-nexus project status "$HOME/dev-nexus/example-suite"
 ```
 
-Use `project import` only when one existing source checkout should become the
-primary component of a new DevNexus project. Do not run `project import` once
-per repository if the goal is one DevNexus project with several components.
-For that case, create one project and declare those repositories as components
-in `dev-nexus.project.json`; the full example is in
-[Getting started](docs/user/getting-started.md#first-project-from-existing-components).
+`project setup` collects the home, project root, component sources, primary
+component, agent targets, local tracker choice, hosting intent, auth-profile
+references, and publication posture. Provider mutations, such as creating a
+GitHub repository or repairing access, are left as explicit next-phase hosting
+actions.
+
+Use `project create` as a low-level local scaffold command. Use `project
+import` only when one existing source checkout should become the primary
+component of a new DevNexus project. Do not run `project import` once per
+repository if the goal is one DevNexus project with several components; use
+`project setup` with multiple component answers instead. The full example is
+in [Getting started](docs/user/getting-started.md#first-project-from-existing-components).
 
 List registered projects:
 

@@ -44,6 +44,8 @@ Use the nouns precisely:
 
 ```bash
 dev-nexus home init <home-path>
+dev-nexus project setup <project-root> --home <home-path> --answers <answers.json>
+dev-nexus project setup <project-root> --home <home-path> --answers <answers.json> --yes
 dev-nexus project create <name> --home <home-path>
 dev-nexus project import <source-root> --home <home-path> --name <name>
 dev-nexus project list --home <home-path>
@@ -58,10 +60,30 @@ directly:
 dev-nexus project status <project-root>
 ```
 
-`project import <source-root>` creates a DevNexus project whose primary
-component is that source root. It is not a command for adding a component to an
-existing project. If you have three existing repositories that should be worked
-on together, create one DevNexus project and declare three components.
+`project setup` is the first-project path. It gathers the DevNexus home,
+project identity, project root, components, source strategy, primary
+component, agent targets, local tracker choice, hosting intent, auth-profile
+references, and publication posture. Without `--yes`, it prints a preview and
+does not write local project files. Provider mutations, such as creating a
+GitHub repository or repairing collaborator access, remain separate hosting
+status/plan/apply actions.
+
+`project create` is a low-level local scaffold command. `project import
+<source-root>` creates a DevNexus project whose primary component is that
+source root. It is not a command for adding a component to an existing project.
+If you have three existing repositories that should be worked on together, use
+one `project setup` answer file with three components.
+
+Minimum setup answers are `home.path`, `project.id`, `project.name`,
+`project.root`, at least one component, exactly one `primary` component, and a
+source strategy for each component. Optional setup answers cover whether to
+initialize the meta Git repository, component source defaults, agent targets,
+local work tracking, external work-tracker intent, host-local auth-profile
+references for GitHub/GitLab/Jira/generic Git providers, meta-repository
+hosting intent, publication posture, and read-only readiness reports. Raw
+tokens, passwords, and private keys do not belong in the answer file; reference
+host-local credential context such as `gh`, `glab`, environment-variable names,
+or token-store ids instead.
 
 ## Project Layout
 
@@ -147,112 +169,126 @@ that coordinates these existing folders:
 /Users/alice/papers/2026-iwst-modelsandllms
 ```
 
-Create one DevNexus project first:
-
-```bash
-dev-nexus home init "$HOME/.dev-nexus"
-dev-nexus project create graphrag-research-suite --home "$HOME/.dev-nexus" --root "$HOME/dev-nexus/graphrag-research-suite"
-```
-
-Then edit `dev-nexus.project.json` so the existing folders are components of
-that one project. Until a component-add command exists, this explicit config is
-the supported path for multi-component first projects:
+Write an answer file for one DevNexus project with several components:
 
 ```json
 {
-  "version": 1,
-  "id": "graphrag-research-suite",
-  "name": "GraphRAG Research Suite",
-  "worktreesRoot": "worktrees",
+  "home": {
+    "path": "/Users/alice/.dev-nexus"
+  },
+  "project": {
+    "id": "graphrag-research-suite",
+    "name": "GraphRAG Research Suite",
+    "root": "/Users/alice/dev-nexus/graphrag-research-suite",
+    "initializeGit": true,
+    "defaultBranch": "main"
+  },
   "components": [
     {
       "id": "benchmark-graphrag",
       "name": "Benchmark GraphRAG",
-      "kind": "git",
       "role": "primary",
-      "sourceRoot": "/Users/alice/projects/benchmark-graphRag",
-      "worktreesRoot": "worktrees/benchmark-graphrag",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/benchmark-graphrag.json"
-      },
-      "relationships": []
+      "source": {
+        "kind": "reference_existing",
+        "path": "/Users/alice/projects/benchmark-graphRag",
+        "defaultBranch": "main"
+      }
     },
     {
       "id": "json-java-moose",
       "name": "JSON Java Moose",
-      "kind": "git",
       "role": "dependency",
-      "sourceRoot": "/Users/alice/projects/GraphRag-Projects/json-java-moose",
-      "worktreesRoot": "worktrees/json-java-moose",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/json-java-moose.json"
-      },
-      "relationships": [
-        {
-          "kind": "supports",
-          "componentId": "benchmark-graphrag"
-        }
-      ]
+      "source": {
+        "kind": "reference_existing",
+        "path": "/Users/alice/projects/GraphRag-Projects/json-java-moose",
+        "defaultBranch": "main"
+      }
     },
     {
       "id": "json-java-no-moose",
       "name": "JSON Java No Moose",
-      "kind": "git",
       "role": "dependency",
-      "sourceRoot": "/Users/alice/projects/GraphRag-Projects/json-java-no-moose",
-      "worktreesRoot": "worktrees/json-java-no-moose",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/json-java-no-moose.json"
-      },
-      "relationships": [
-        {
-          "kind": "supports",
-          "componentId": "benchmark-graphrag"
-        }
-      ]
+      "source": {
+        "kind": "reference_existing",
+        "path": "/Users/alice/projects/GraphRag-Projects/json-java-no-moose",
+        "defaultBranch": "main"
+      }
     },
     {
       "id": "iwst-paper",
       "name": "IWST Paper",
-      "kind": "git",
       "role": "addon",
-      "sourceRoot": "/Users/alice/papers/2026-iwst-modelsandllms",
-      "worktreesRoot": "worktrees/iwst-paper",
-      "workTracking": {
-        "provider": "local",
-        "storePath": ".dev-nexus/work-items/iwst-paper.json"
-      },
-      "relationships": [
-        {
-          "kind": "documents",
-          "componentId": "benchmark-graphrag"
-        }
-      ]
+      "source": {
+        "kind": "reference_existing",
+        "path": "/Users/alice/papers/2026-iwst-modelsandllms",
+        "defaultBranch": "main"
+      }
     }
   ],
-  "mcp": {
-    "command": "dev-nexus",
-    "args": ["mcp-stdio"],
-    "agentTargets": [
-      {
-        "agent": "codex"
-      }
-    ]
+  "agentTargets": [
+    {
+      "provider": "codex",
+      "configPath": ".codex/config.toml"
+    }
+  ],
+  "localWorkTracking": {
+    "enabled": true,
+    "provider": "local"
   },
-  "skills": {
-    "defaultCorePack": true,
-    "sourceControl": "support",
-    "agentTargets": [
-      {
-        "agent": "codex"
+  "authProfiles": [
+    {
+      "id": "human-github",
+      "provider": "github",
+      "actorKind": "human",
+      "account": "alice",
+      "credentialMethod": {
+        "kind": "provider_cli",
+        "cli": "gh",
+        "configDir": "home:.config/gh"
       }
-    ]
+    },
+    {
+      "id": "bot-github",
+      "provider": "github",
+      "actorKind": "machine_user",
+      "account": "example-bot",
+      "credentialMethod": {
+        "kind": "provider_cli",
+        "cli": "gh",
+        "configDir": "home:.config/gh-bot"
+      }
+    }
+  ],
+  "hostingIntent": {
+    "provider": "github",
+    "namespace": "ExampleOrg",
+    "repositoryName": "graphrag-research-suite",
+    "defaultBranch": "main",
+    "humanAuthProfileId": "human-github",
+    "automationAuthProfileId": "bot-github",
+    "providerMutationAuthProfileId": "bot-github"
+  },
+  "publication": {
+    "posture": "review_handoff",
+    "remote": "bot",
+    "targetBranch": "main",
+    "automationAuthProfileId": "bot-github"
   }
 }
 ```
+
+Then preview and apply the local scaffold:
+
+```bash
+dev-nexus home init "$HOME/.dev-nexus"
+dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --home "$HOME/.dev-nexus" --answers ./graphrag.setup.json --json
+dev-nexus project setup "$HOME/dev-nexus/graphrag-research-suite" --home "$HOME/.dev-nexus" --answers ./graphrag.setup.json --yes
+```
+
+The preview reports local writes and next-phase provider work. The apply step
+writes `dev-nexus.project.json`, `.dev-nexus/` support files, `AGENTS.md`,
+project-local agent MCP configuration, local tracker stores, and home registry
+state. It does not create or modify provider repositories.
 
 Use absolute existing paths only when you deliberately want DevNexus to
 reference those external checkouts in place. The project-local default is to
@@ -266,6 +302,8 @@ After saving the config, refresh support and inspect readiness:
 dev-nexus project status "$HOME/dev-nexus/graphrag-research-suite"
 dev-nexus project mcp refresh "$HOME/dev-nexus/graphrag-research-suite" --agent codex
 dev-nexus setup check "$HOME/dev-nexus/graphrag-research-suite" join-existing-project --platform macos
+dev-nexus project hosting status "$HOME/dev-nexus/graphrag-research-suite" --json
+dev-nexus project hosting plan "$HOME/dev-nexus/graphrag-research-suite" --json
 ```
 
 For Codex Desktop, create or open the Codex project at

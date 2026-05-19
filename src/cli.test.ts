@@ -303,6 +303,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus project status");
+    expect(output.output()).toContain("dev-nexus project setup");
     expect(output.output()).toContain("dev-nexus project hosting status");
     expect(output.output()).toContain("dev-nexus project hosting plan");
     expect(output.output()).toContain("dev-nexus project hosting apply");
@@ -1025,6 +1026,198 @@ describe("dev-nexus cli", () => {
     expect(parsed.plan.steps.map((step: { id: string }) => step.id)).toContain(
       "configure-automation-auth-profile",
     );
+  });
+
+  it("reports required project setup answers in non-interactive JSON mode", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "setup", "--json"], { stdout: output.writer }),
+    ).resolves.toBe(2);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: "project_setup_answers_required",
+      requiredAnswers: expect.arrayContaining([
+        "home.path",
+        "project.id",
+        "components[0].source.path|remoteUrl",
+      ]),
+    });
+  });
+
+  it("previews and applies project setup from an answer file without provider mutations", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-setup-");
+    const homePath = makeTempDir("dev-nexus-project-setup-home-");
+    const componentRoot = path.join(projectRoot, "components", "core");
+    fs.mkdirSync(componentRoot, { recursive: true });
+    const answersPath = path.join(projectRoot, "answers.json");
+    fs.writeFileSync(
+      answersPath,
+      `${JSON.stringify({
+        home: {
+          path: homePath,
+        },
+        project: {
+          id: "guided-demo",
+          name: "Guided Demo",
+          root: projectRoot,
+          initializeGit: true,
+          defaultBranch: "main",
+        },
+        components: [
+          {
+            id: "core",
+            name: "Core",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: "components/core",
+              defaultBranch: "main",
+            },
+          },
+        ],
+        agentTargets: [
+          {
+            provider: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+          storePath: ".dev-nexus/work-items/core.json",
+        },
+        authProfiles: [
+          {
+            id: "human-github",
+            provider: "github",
+            actorKind: "human",
+            credentialMethod: {
+              kind: "provider_cli",
+              cli: "gh",
+              configDir: "home:.config/gh",
+            },
+          },
+          {
+            id: "bot-github",
+            provider: "github",
+            actorKind: "machine_user",
+            credentialMethod: {
+              kind: "provider_cli",
+              cli: "gh",
+              configDir: "home:.config/gh-bot",
+            },
+          },
+        ],
+        hostingIntent: {
+          provider: "github",
+          namespace: "ExampleOrg",
+          repositoryName: "guided-demo-meta",
+          humanAuthProfileId: "human-github",
+          automationAuthProfileId: "bot-github",
+          providerMutationAuthProfileId: "bot-github",
+        },
+        publication: {
+          posture: "review_handoff",
+          remote: "bot",
+          targetBranch: "main",
+          automationAuthProfileId: "bot-github",
+        },
+      }, null, 2)}\n`,
+    );
+    const previewOutput = captureOutput();
+
+    await expect(
+      main(
+        [
+          "project",
+          "setup",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--json",
+        ],
+        { stdout: previewOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    const preview = JSON.parse(previewOutput.output());
+    expect(preview).toMatchObject({
+      ok: true,
+      applied: false,
+      proposal: {
+        nextPhaseActions: [
+          expect.objectContaining({
+            id: "apply-hosting-intent",
+            mutationClass: "provider_mutation",
+            allowedDuringLocalSetup: false,
+          }),
+        ],
+      },
+    });
+    expect(fs.existsSync(path.join(projectRoot, "dev-nexus.project.json"))).toBe(false);
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "project",
+          "setup",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--yes",
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    const applied = JSON.parse(applyOutput.output());
+    expect(applied).toMatchObject({
+      ok: true,
+      applied: true,
+      projectRoot,
+      proposal: {
+        nextPhaseActions: [
+          expect.objectContaining({
+            id: "apply-hosting-intent",
+          }),
+        ],
+      },
+    });
+    expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
+    expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(true);
+    expect(loadProjectConfig(projectRoot)).toMatchObject({
+      id: "guided-demo",
+      components: [
+        expect.objectContaining({
+          id: "core",
+          defaultWorkTrackerId: "local",
+        }),
+      ],
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "guided-demo-meta",
+        },
+      },
+    });
+    expect(
+      loadLocalWorkTrackingStore(
+        path.join(projectRoot, ".dev-nexus", "work-items", "core.json"),
+      ).items,
+    ).toEqual([]);
+    expect(JSON.parse(
+      fs.readFileSync(path.join(homePath, "dev-nexus.home.json"), "utf8"),
+    ).projects).toEqual([
+      expect.objectContaining({
+        id: "guided-demo",
+        projectRoot,
+      }),
+    ]);
   });
 
   it("initializes a home and manages projects through the CLI", async () => {
