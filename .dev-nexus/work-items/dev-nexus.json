@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 308,
-  "updatedAt": "2026-05-19T05:21:22.035Z",
+  "nextCommentNumber": 310,
+  "updatedAt": "2026-05-19T06:22:31.833Z",
   "items": [
     {
       "id": "local-1",
@@ -2362,7 +2362,7 @@
       "id": "local-94",
       "title": "Document authority roles for private bots and open-source contributors",
       "description": "Type: documentation and onboarding slice\nReadiness: autonomous agent-ready (AFK) after the implemented authority configuration shape stabilizes\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: document how users configure agent roles and authority for private DevNexus projects, bot accounts, existing project onboarding, and open-source contribution workflows.\n\nUser stories covered:\n- As a project owner, I can configure a machine-user bot as maintainer for my private meta-project.\n- As an open-source contributor, I can use DevNexus to prepare work and propose pull requests without adding DevNexus artifacts or needing maintainer rights.\n\nAcceptance criteria:\n- Documentation explains actors, auth profiles, roles, action grants, scoped role bindings, effective authority, and safe defaults.\n- Documentation includes generic examples for maintainer bot, contributor-only bot, reviewer, observer, runtime operator, and release operator roles.\n- Documentation explains human/manual profile versus automation/bot profile separation and account mismatch warnings.\n- Onboarding guidance covers project creation and joining an existing project on a new machine without storing secrets in the shared meta-project.\n- Open-source contribution guidance explains PR-only behavior, review waits, no direct integration by default, and no DevNexus artifact contamination of target repositories.\n- Dogfood-specific account names appear only in dogfood-specific examples or state, not in generic user-facing docs.\n\nDependencies:\n- Depends on the stabilized authority configuration and status/reporting shape.\n\nBoundaries:\n- Do not document unsupported live provider behavior as available.\n- Do not include secrets, personal tokens, or private SSH key paths.\n\nVerification:\n- Static documentation review.\n- Run repository documentation/check command when available.\n- npm run check when feasible if docs are included in checks.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2376,8 +2376,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:02.071Z",
-      "updatedAt": "2026-05-19T03:21:46.568Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T06:22:31.833Z",
+      "closedAt": "2026-05-19T06:22:31.833Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -2705,7 +2705,7 @@
       "id": "local-107",
       "title": "Report stale and unexpected provider projections in setup and status",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after active target policy and projection filtering exist\nParent planning item: dev-nexus:local-104\nSource PRD: docs/agent-target-projection-opt-in-prd.md\n\nGoal: make setup checks and project status distinguish expected, missing, stale generated, manual, and unsupported provider-native projections.\n\nUser stories covered:\n- As a coordinator agent, I can see whether a provider-native directory is expected, stale generated support, or manually authored.\n- As a new-machine setup user, I can avoid misreading stale provider support as an active workflow.\n\nAcceptance criteria:\n- Project status summarizes active agent targets, expected MCP config files, expected skill directories, selected plugin capabilities, unsupported/manual targets, and stale generated provider directories.\n- Setup check reports expected-present, expected-missing, present-stale-generated, present-manual, unsupported-provider, and locally-selected-but-not-allowed states.\n- Stale generated support is detected using generated markers, projection manifests, known ignored paths, or another safe evidence source.\n- Manual or source-controlled provider files are reported without being classified as cleanup-safe.\n- Output remains concise enough for agent consumption and does not include secrets or provider-global credentials.\n\nDependencies:\n- Depends on dev-nexus:local-105 and dev-nexus:local-106.\n\nBoundaries:\n- Reporting only; do not remove files in this slice.\n- Do not inspect provider-global app databases or credentials.\n\nVerification:\n- Focused status/setup tests for expected, missing, stale generated, manual, unsupported, and host-local override cases.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2719,8 +2719,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.844Z",
-      "updatedAt": "2026-05-19T05:21:22.035Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T06:22:31.833Z",
+      "closedAt": "2026-05-19T06:22:31.833Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -6502,6 +6502,17 @@
           "provider": "local",
           "itemId": "local-comment-304"
         }
+      },
+      {
+        "id": "local-comment-308",
+        "body": "Integrated and published through DevNexus main.\n\nSource branch: `bot/codex/dev-nexus/local-94` at `b07889d047f56fb7a45e80ae69d42ed9930ef068`\nMerge commit: `b21811823f88f7403501943379602c555a0bd9ed`\nPublished source main: `3753adf278cccc38c2d82bcbadb28ccbfe094c3a`\n\nVerification:\n- `npm run check` passed after integrating local-94 and local-107 (64 test files, 575 tests).\n\nPublication: pushed `main` through the `bot` remote and fetched `origin/main` afterward.",
+        "author": null,
+        "createdAt": "2026-05-19T06:22:31.833Z",
+        "updatedAt": "2026-05-19T06:22:31.833Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-308"
+        }
       }
     ],
     "local-95": [],
@@ -6764,6 +6775,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-307"
+        }
+      },
+      {
+        "id": "local-comment-309",
+        "body": "Integrated and published through DevNexus main.\n\nSource branch: `bot/codex/dev-nexus/local-107-projection-status-diagnostics` at `d9b26d55b7181af69388dc52f4baf85273c8039c`\nMerge commit / published source main: `3753adf278cccc38c2d82bcbadb28ccbfe094c3a`\n\nVerification:\n- `npm run check` passed after integrating local-94 and local-107 (64 test files, 575 tests).\n\nPublication: pushed `main` through the `bot` remote and fetched `origin/main` afterward. Next projection work should promote `local-109`; cleanup and Codex-only migration remain behind cleanup safety behavior.",
+        "author": null,
+        "createdAt": "2026-05-19T06:22:31.833Z",
+        "updatedAt": "2026-05-19T06:22:31.833Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-309"
         }
       }
     ],

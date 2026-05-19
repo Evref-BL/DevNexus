@@ -60,7 +60,11 @@ and ready for coordinator-driven work across its components.
   post-review import identity-matching fixes. The next heartbeat integration
   published `dev-nexus:local-92` and `dev-nexus:local-134` through `793a162`
   for coordination/provider mutation authority gates, policy-gated inbound
-  import execution, and integration import cleanup.
+  import execution, and integration import cleanup. The latest heartbeat
+  resolved the authority-profile integration hold, then published
+  `dev-nexus:local-94` as merge commit `b218118` for authority-role
+  documentation and `dev-nexus:local-107` through `3753adf` for stale and
+  unexpected provider-projection diagnostics.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -179,15 +183,13 @@ and ready for coordinator-driven work across its components.
 - Agent-target projection opt-in has been sliced. `dev-nexus:local-105` is
   complete for active target policy and compatibility normalization, and
   `local-106` is complete for active-target projection filtering.
-  `dev-nexus:local-107` now has a verified projection-status branch
-  `bot/codex/dev-nexus/local-107-projection-status-diagnostics` at `d9b26d5`
-  with read-only stale/unexpected provider projection diagnostics. Integration
-  is held with `local-94` on the current authority/profile mismatch. Promote
-  `local-109` worker context propagation next after integration, and keep
-  `local-108`, `local-110`, and `local-111` ordered behind the diagnostics and
-  cleanup behavior they require. Do not remove `.claude/skills` until
-  stale-projection diagnostics and cleanup safety behavior are integrated,
-  unless a separate manual cleanup is explicitly approved.
+  `dev-nexus:local-107` is published through DevNexus main `3753adf` with
+  read-only stale/unexpected provider projection diagnostics. Promote
+  `local-109` worker context propagation next, and keep `local-108`,
+  `local-110`, and `local-111` ordered behind the diagnostics and cleanup
+  behavior they require. Do not remove `.claude/skills` until cleanup safety
+  behavior is integrated, unless a separate manual cleanup is explicitly
+  approved.
 - DevNexus-Pharo MCP/plugin cleanup has completed source deletions
   `dev-nexus-pharo:local-15` through `local-19` and published commits
   `1ef5709`, `eb55b9c`, `c5f7a90`, `be1f866`, and `1dd2141` to
@@ -221,31 +223,21 @@ and ready for coordinator-driven work across its components.
   `local-127`, `local-81`, `local-87`, `local-129`, `local-114`, `local-115`,
   `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
   `local-90`, `local-91`, `local-133`, `local-92`, and `local-134` were
-  removed after publication.
+  removed after publication. `local-94` and `local-107` are now published;
+  their ready leases are closed as merged and remaining helper worktrees are
+  historical metadata only.
 
 ## Near-Term Direction
 
-- `dev-nexus:local-94` has a verified docs commit `b07889d` pushed to
-  `bot/codex/dev-nexus/local-94` with a ready handoff. Integration is held
-  because generated worker/coordination authority surfaces reported
-  `profile=none` while `automation_status` reported `profile=bot-github`, and
-  local tracker update/comment attempts blocked on GitHub-profile versus local
-  provider matching.
-- `dev-nexus:local-107` has a verified implementation commit `d9b26d5` pushed
-  to `bot/codex/dev-nexus/local-107-projection-status-diagnostics` with a ready
-  coordination handoff. Integration is held by the same authority/profile
-  mismatch as `local-94`: direct integration context reports no resolved auth
-  profile while `automation_status` reports `bot-github`, and local tracker
-  comment/status mutation remains blocked because `bot-github` is a GitHub
-  provider profile while the selected tracker provider is local.
-- The focused coordination auth-profile fix for that mismatch is published to
-  DevNexus main as `8735a73`. It makes coordination authority status load
-  host-local publication auth profiles; verification passed with
-  `npm test -- src/nexusCoordination.test.ts` and `npm run check` before
-  integration, and `npm run check` passed again after fast-forwarding
-  `C:\dev\code\sources\dev-nexus` and pushing `bot/main`. Next, re-check
-  coordination status with a refreshed DevNexus runtime and integrate
-  `local-94` plus `local-107` if authority now resolves `bot-github`.
+- `dev-nexus:local-94` and `dev-nexus:local-107` are now integrated and
+  published through `bot/main`. Project-local coordination planning resolved
+  `bot-github` authority for both branches; `local-94` merged as `b218118`,
+  `local-107` merged as `3753adf`, and post-merge `npm run check` passed in
+  `C:\dev\code\sources\dev-nexus` with 64 test files and 575 tests.
+- The focused coordination auth-profile fix for the previous mismatch remains
+  published as `8735a73`. Active MCP server processes may still need reload
+  before their coordination status surfaces reflect the fixed code; use the
+  project-local source CLI for authority-sensitive checks until then.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
