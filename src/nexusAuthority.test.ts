@@ -52,6 +52,8 @@ const publication: NexusAutomationPublicationConfig = {
   remoteUrl: "git@github.com-bot:Evref-BL/DevNexus.git",
   pushUrl: null,
   sshHostAlias: "github.com-bot",
+  packagePublish: true,
+  releasePublish: true,
   actor: {
     id: "example-bot-actor",
     kind: "machine_user",

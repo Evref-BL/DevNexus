@@ -1828,6 +1828,8 @@ describe("project config", () => {
         remoteUrl: null,
         pushUrl: null,
         sshHostAlias: null,
+        packagePublish: false,
+        releasePublish: false,
         actor: null,
         manualRemote: null,
         manualActor: null,
@@ -1877,6 +1879,8 @@ describe("project config", () => {
       remoteUrl: "git@github.com-bot:example/project.git",
       pushUrl: null,
       sshHostAlias: "github.com-bot",
+      packagePublish: false,
+      releasePublish: false,
       targetBranch: "main",
       push: true,
       actor: {

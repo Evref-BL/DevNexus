@@ -40,12 +40,14 @@ import {
 } from "./nexusRunnerProfile.js";
 import {
   getNexusPublicationStatuses,
+  loadNexusPublicationAuthProfiles,
   publicationCommandEnvironment,
   publicationEnvironmentVariables,
   publicationPreflightChecks,
   resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
 } from "./nexusPublicationPolicy.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -492,11 +494,17 @@ export async function runNexusAutomationAgentLaunchOnce(
       });
     }
 
+    const authProfiles = loadNexusPublicationAuthProfiles({
+      projectRoot,
+      projectConfig,
+      homePath: options.homePath,
+    });
     const publication = getNexusPublicationStatuses({
       projectRoot,
       projectConfig,
       components,
       action: "status",
+      authProfiles,
       gitRunner: options.gitRunner,
       actorRunner: options.publicationActorRunner,
     });
@@ -681,6 +689,7 @@ export async function runNexusAutomationAgentLaunchOnce(
         eligibleWorkWarnings,
         eligibleWorkBlockers,
         componentEligibleWorkItems,
+        authProfiles,
         resultFile: launchFiles.resultFile,
       }),
     });
@@ -1048,7 +1057,10 @@ function buildAgentLaunchContext(
   input: Omit<
     NexusAutomationAgentLaunchInput,
     "contextFile" | "resultFile"
-  > & { resultFile: string },
+  > & {
+    authProfiles: NexusHostingAuthProfileConfig[];
+    resultFile: string;
+  },
 ): NexusAutomationAgentLaunchContext {
   const authority = summarizeNexusAuthorityForProject({
     projectId: input.projectConfig.id,
@@ -1059,6 +1071,7 @@ function buildAgentLaunchContext(
       componentName: component.name,
       authority: input.projectConfig.authority,
       publication: resolveNexusPublicationPolicy(input.projectConfig, component),
+      authProfiles: input.authProfiles,
       safety: input.automationConfig.safety,
       tracker: component.defaultTrackerId,
       repository: component.remoteUrl,

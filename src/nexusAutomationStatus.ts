@@ -299,6 +299,8 @@ export async function getNexusAutomationStatus(
       projectConfig,
       components,
       action: "status",
+      authProfiles: options.authProfiles,
+      homePath: options.homePath,
       gitRunner: options.gitRunner,
       actorRunner: options.publicationActorRunner,
     });
@@ -468,6 +470,8 @@ export async function getNexusAutomationStatus(
     projectConfig,
     components,
     action: "status",
+    authProfiles: options.authProfiles,
+    homePath: options.homePath,
     gitRunner: options.gitRunner,
     actorRunner: options.publicationActorRunner,
   });
@@ -882,6 +886,8 @@ function localOnlyPublicationPolicy(): NexusAutomationPublicationConfig {
     remoteUrl: null,
     pushUrl: null,
     sshHostAlias: null,
+    packagePublish: false,
+    releasePublish: false,
     actor: null,
     manualRemote: null,
     manualActor: null,
