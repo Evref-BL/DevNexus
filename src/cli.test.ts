@@ -929,7 +929,6 @@ describe("dev-nexus cli", () => {
         },
       },
       lease: {
-        projectId: "demo-project",
         hostId: "windows-devbox",
         agentId: "codex",
         workItemId: "local-42",
@@ -943,24 +942,42 @@ describe("dev-nexus cli", () => {
         notes: ["Preparing component worktree."],
       },
       setup: {
-        dependencyProjections: [
-          {
-            id: "node-modules",
-            status: "linked",
-            sourceMetadata: {
+        dependencyProjections: {
+          total: 1,
+          linked: 1,
+          items: [
+            {
+              id: "node-modules",
+              status: "linked",
               pluginId: "typescript",
             },
-          },
-        ],
+          ],
+        },
+        skillProjections: {
+          agentCount: 0,
+          skillCount: 0,
+        },
         context: {
-          context: {
-            agentTargetPolicy: {
-              activeProviders: ["codex"],
-              assignedProvider: "codex",
-            },
-          },
+          contextJsonPath: path.join(
+            projectRoot,
+            "worktrees",
+            "primary",
+            "codex-primary-local-42",
+            ".dev-nexus",
+            "context",
+            "context.json",
+          ),
         },
       },
+    });
+    expect(componentPayload.setup.context.context).toBeUndefined();
+    expect(componentPayload.setup.context.briefingMarkdown).toBeUndefined();
+    const componentContext = JSON.parse(
+      fs.readFileSync(componentPayload.setup.context.contextJsonPath, "utf8"),
+    );
+    expect(componentContext.agentTargetPolicy).toMatchObject({
+      activeProviders: ["codex"],
+      assignedProvider: "codex",
     });
     expect(componentPayload.worktree.worktreePath).toBe(
       path.join(projectRoot, "worktrees", "primary", "codex-primary-local-42"),
@@ -1017,7 +1034,6 @@ describe("dev-nexus cli", () => {
         workItem: null,
       },
       lease: {
-        projectId: "demo-project",
         scope: {
           kind: "project_meta",
           componentId: null,

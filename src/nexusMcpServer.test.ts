@@ -12,6 +12,7 @@ import {
   handleDevNexusMcpJsonRpcMessage,
   listDevNexusMcpTools,
   listMcpInputSchemaProviderIssues,
+  maxNexusRemoteExecutionOutputTailLength,
   nexusWorkerContextJsonPath,
   readNexusAutomationRunLedger,
   saveProjectConfig,
@@ -263,6 +264,21 @@ describe("DevNexus MCP server", () => {
     expect(devNexusCoreMcpToolNames).toEqual(
       listDevNexusMcpTools().map((tool) => tool.name),
     );
+  });
+
+  it("advertises bounded MCP inputs for large text fields", () => {
+    const tool = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "remote_execution_result_record",
+    );
+
+    expect(tool?.inputSchema).toMatchObject({
+      properties: {
+        outputTail: {
+          type: "string",
+          maxLength: maxNexusRemoteExecutionOutputTailLength,
+        },
+      },
+    });
   });
 
   it("returns project hosting status and plan through MCP tools", async () => {
@@ -677,6 +693,19 @@ describe("DevNexus MCP server", () => {
     expect(prepared.worktree.worktreePath).toBe(
       path.join(projectRoot, "worktrees", "mcp-demo", "parallel-chat"),
     );
+    expect(prepared.setup.context.contextJsonPath).toBe(
+      path.join(
+        projectRoot,
+        "worktrees",
+        "mcp-demo",
+        "parallel-chat",
+        ".dev-nexus",
+        "context",
+        "context.json",
+      ),
+    );
+    expect(prepared.setup.context.context).toBeUndefined();
+    expect(prepared.setup.context.briefingMarkdown).toBeUndefined();
     expect(gitCalls[0]).toMatchObject({
       args: [
         "worktree",
@@ -796,6 +825,18 @@ describe("DevNexus MCP server", () => {
     expect(prepared.worktree.worktreePath).toBe(
       path.join(projectRoot, "worktrees", "addon", "codex-addon-local-1"),
     );
+    expect(prepared.component).toMatchObject({
+      id: "addon",
+      name: "Addon",
+      role: "addon",
+      sourceRoot: addonSourceRoot,
+    });
+    expect(prepared.component.workTrackers).toBeUndefined();
+    expect(prepared.setup.context.contextJsonPath).toBe(
+      nexusWorkerContextJsonPath(prepared.worktree.worktreePath),
+    );
+    expect(prepared.setup.context.context).toBeUndefined();
+    expect(prepared.setup.context.briefingMarkdown).toBeUndefined();
     const context = JSON.parse(
       fs.readFileSync(
         nexusWorkerContextJsonPath(prepared.worktree.worktreePath),

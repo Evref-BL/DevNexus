@@ -101,6 +101,7 @@ import {
 import {
   createNexusRemoteExecutionRequest,
   getNexusRemoteExecutionRecord,
+  maxNexusRemoteExecutionOutputTailLength,
   recordNexusRemoteExecutionResult,
   type NexusRemoteExecutionAttachmentRef,
 } from "./nexusRemoteExecution.js";
@@ -114,6 +115,7 @@ import {
 import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
+  summarizeNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
   assertNexusSharedCheckoutMutationAllowed,
@@ -551,7 +553,7 @@ const tools: McpTool[] = [
   },
   {
     name: "worktree_prepare",
-    description: "Prepare an isolated Git worktree and branch for manual parallel agent work.",
+    description: "Prepare an isolated Git worktree and branch for manual parallel agent work. Returns a compact summary with paths to generated context files.",
     inputSchema: {
       type: "object",
       properties: {
@@ -767,7 +769,10 @@ const tools: McpTool[] = [
           type: "string",
           enum: ["passed", "failed", "not_run", "blocked", "timed_out", "cancelled"],
         },
-        outputTail: { type: ["string", "null"] },
+        outputTail: {
+          type: ["string", "null"],
+          maxLength: maxNexusRemoteExecutionOutputTailLength,
+        },
         artifactRefs: { type: "array", items: { type: "string" } },
         cleanupStatus: {
           type: "string",
@@ -1429,34 +1434,33 @@ export async function callDevNexusMcpTool(
           topic,
           now: context.now,
         });
+        const prepared = prepareNexusManualWorktree({
+          projectRoot,
+          componentId: resolvedWorkItem.componentId ?? componentId,
+          projectMeta,
+          workItemId: resolvedWorkItem.itemId ?? workItemId,
+          workItemTitle:
+            workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
+          workItemDescription: resolvedWorkItem.workItem?.description ?? null,
+          topic,
+          branchName: optionalString(args, "branchName", "arguments"),
+          worktreeName: optionalString(args, "worktreeName", "arguments"),
+          baseRef: optionalNullableString(args, "baseRef", "arguments"),
+          hostId: optionalNullableString(args, "hostId", "arguments"),
+          agentId: optionalNullableString(args, "agentId", "arguments"),
+          workerAgentProvider: optionalNullableString(
+            args,
+            "workerAgentProvider",
+            "arguments",
+          ),
+          writeScope: optionalStringArray(args, "writeScope", "arguments") ?? [],
+          leaseNotes: optionalStringArray(args, "leaseNotes", "arguments") ?? [],
+          gitRunner: context.gitRunner,
+          now: context.now,
+        });
         return toolResult({
           ok: true,
-          ...prepareNexusManualWorktree({
-            projectRoot,
-            componentId: resolvedWorkItem.componentId ?? componentId,
-            projectMeta,
-            workItemId: resolvedWorkItem.itemId ?? workItemId,
-            workItemTitle:
-              workItemTitle ?? resolvedWorkItem.workItem?.title ?? null,
-            workItemDescription: resolvedWorkItem.workItem?.description ?? null,
-            topic,
-            branchName: optionalString(args, "branchName", "arguments"),
-            worktreeName: optionalString(args, "worktreeName", "arguments"),
-            baseRef: optionalNullableString(args, "baseRef", "arguments"),
-            hostId: optionalNullableString(args, "hostId", "arguments"),
-            agentId: optionalNullableString(args, "agentId", "arguments"),
-            workerAgentProvider: optionalNullableString(
-              args,
-              "workerAgentProvider",
-              "arguments",
-            ),
-            writeScope:
-              optionalStringArray(args, "writeScope", "arguments") ?? [],
-            leaseNotes:
-              optionalStringArray(args, "leaseNotes", "arguments") ?? [],
-            gitRunner: context.gitRunner,
-            now: context.now,
-          }),
+          ...summarizeNexusManualWorktreeResult(prepared),
         });
       }
       case "coordination_status":

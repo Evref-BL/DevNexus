@@ -159,6 +159,7 @@ import {
 import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
+  summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
@@ -7108,7 +7109,7 @@ function printWorktreePrepareResult(
   parsed: ParsedWorktreePrepareCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
+  const payload = { ok: true, ...summarizeNexusManualWorktreeResult(result) };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;

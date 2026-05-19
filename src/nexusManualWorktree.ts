@@ -88,6 +88,98 @@ export interface PrepareNexusManualWorktreeResult {
   nextActions: string[];
 }
 
+export interface NexusPreparedWorktreeSetupStatusCounts {
+  total: number;
+  linked: number;
+  present: number;
+  skipped: number;
+}
+
+export interface NexusPreparedWorktreeSummary {
+  scope: NexusManualWorktreeScope;
+  projectRoot: string;
+  project: {
+    id: string;
+    name: string;
+  };
+  component: {
+    id: string;
+    name: string;
+    role: string;
+    sourceRoot: string;
+    worktreesRoot: string;
+    defaultBranch: string | null;
+    defaultTrackerId: string | null;
+  } | null;
+  worktree: {
+    componentId: string;
+    sourceRoot: string;
+    worktreesRoot: string;
+    worktreePath: string;
+    branchName: string;
+    baseRef: string | null;
+    workItem: PrepareGitWorktreeResult["workItem"];
+    gitIdentity: PrepareGitWorktreeResult["gitIdentity"];
+    gitCommandCount: number;
+  };
+  lease: {
+    id: string;
+    status: NexusWorktreeLeaseRecord["status"];
+    scope: NexusWorktreeLeaseRecord["scope"];
+    hostId: string;
+    agentId: string | null;
+    workItemId: string | null;
+    branchName: string | null;
+    baseRef: string | null;
+    worktree: NexusWorktreeLeaseRecord["worktree"];
+    writeScope: string[];
+    notes: string[];
+  };
+  setup: {
+    links: NexusPreparedWorktreeSetupStatusCounts & {
+      items: Array<{
+        source: string;
+        target: string;
+        required: boolean;
+        status: string;
+      }>;
+    };
+    dependencyProjections: NexusPreparedWorktreeSetupStatusCounts & {
+      items: Array<{
+        id: string;
+        source: string;
+        target: string;
+        required: boolean;
+        sourceControl: string;
+        status: string;
+        pluginId: string;
+        capabilityId: string;
+      }>;
+    };
+    skillProjections: {
+      agentCount: number;
+      skillCount: number;
+      refreshedCount: number;
+      agents: Array<{
+        agent: string;
+        skillsDirectory: string;
+        sourceControl: string;
+        skillCount: number;
+        refreshedCount: number;
+        missingCount: number;
+        staleCount: number;
+        presentCount: number;
+      }>;
+    };
+    context: {
+      contextDirectoryPath: string;
+      contextJsonPath: string;
+      briefingPath: string;
+    } | null;
+  };
+  nextActions: string[];
+}
+
 export interface ResolvedNexusManualWorktreeWorkItem {
   componentId?: string;
   itemId?: string;
@@ -326,6 +418,139 @@ export function prepareNexusManualWorktree(
     lease,
     setup,
     nextActions: nextActions(target.scope, worktree),
+  };
+}
+
+export function summarizeNexusManualWorktreeResult(
+  result: PrepareNexusManualWorktreeResult,
+): NexusPreparedWorktreeSummary {
+  const links = countSetupStatuses(
+    result.setup.links.map((link) => link.status),
+  );
+  const dependencyProjections = countSetupStatuses(
+    result.setup.dependencyProjections.map((projection) => projection.status),
+  );
+  const skillAgents = result.setup.skillProjections.map((projection) => {
+    const missingCount = projection.skills.filter(
+      (skill) => skill.afterStatus === "missing",
+    ).length;
+    const staleCount = projection.skills.filter(
+      (skill) => skill.afterStatus === "stale",
+    ).length;
+    const presentCount = projection.skills.filter(
+      (skill) => skill.afterStatus === "present",
+    ).length;
+    const refreshedCount = projection.skills.filter((skill) => skill.refreshed)
+      .length;
+    return {
+      agent: projection.agent,
+      skillsDirectory: projection.skillsDirectory,
+      sourceControl: projection.sourceControl,
+      skillCount: projection.skills.length,
+      refreshedCount,
+      missingCount,
+      staleCount,
+      presentCount,
+    };
+  });
+
+  return {
+    scope: result.scope,
+    projectRoot: result.projectRoot,
+    project: {
+      id: result.projectId,
+      name: result.projectName,
+    },
+    component: result.component
+      ? {
+          id: result.component.id,
+          name: result.component.name,
+          role: result.component.role,
+          sourceRoot: result.component.sourceRoot,
+          worktreesRoot: result.component.worktreesRoot,
+          defaultBranch: result.component.defaultBranch,
+          defaultTrackerId: result.component.defaultTrackerId,
+        }
+      : null,
+    worktree: {
+      componentId: result.worktree.componentId,
+      sourceRoot: result.worktree.sourceRoot,
+      worktreesRoot: result.worktree.worktreesRoot,
+      worktreePath: result.worktree.worktreePath,
+      branchName: result.worktree.branchName,
+      baseRef: result.worktree.baseRef,
+      workItem: result.worktree.workItem,
+      gitIdentity: result.worktree.gitIdentity,
+      gitCommandCount: result.worktree.git.commands.length,
+    },
+    lease: {
+      id: result.lease.id,
+      status: result.lease.status,
+      scope: result.lease.scope,
+      hostId: result.lease.hostId,
+      agentId: result.lease.agentId,
+      workItemId: result.lease.workItemId,
+      branchName: result.lease.branchName,
+      baseRef: result.lease.baseRef,
+      worktree: result.lease.worktree,
+      writeScope: result.lease.writeScope,
+      notes: result.lease.notes,
+    },
+    setup: {
+      links: {
+        ...links,
+        items: result.setup.links.map((link) => ({
+          source: link.source,
+          target: link.target,
+          required: link.required,
+          status: link.status,
+        })),
+      },
+      dependencyProjections: {
+        ...dependencyProjections,
+        items: result.setup.dependencyProjections.map((projection) => ({
+          id: projection.id,
+          source: projection.source,
+          target: projection.target,
+          required: projection.required,
+          sourceControl: projection.sourceControl,
+          status: projection.status,
+          pluginId: projection.sourceMetadata.pluginId,
+          capabilityId: projection.sourceMetadata.capabilityId,
+        })),
+      },
+      skillProjections: {
+        agentCount: skillAgents.length,
+        skillCount: skillAgents.reduce(
+          (total, agent) => total + agent.skillCount,
+          0,
+        ),
+        refreshedCount: skillAgents.reduce(
+          (total, agent) => total + agent.refreshedCount,
+          0,
+        ),
+        agents: skillAgents,
+      },
+      context: result.setup.context
+        ? {
+            contextDirectoryPath: result.setup.context.contextDirectoryPath,
+            contextJsonPath: result.setup.context.contextJsonPath,
+            briefingPath: result.setup.context.briefingPath,
+          }
+        : null,
+    },
+    nextActions: result.nextActions,
+  };
+}
+
+function countSetupStatuses(
+  statuses: readonly string[],
+): NexusPreparedWorktreeSetupStatusCounts {
+  return {
+    total: statuses.length,
+    linked: statuses.filter((status) => status === "linked").length,
+    present: statuses.filter((status) => status === "present").length,
+    skipped: statuses.filter((status) => status === "skipped").length,
   };
 }
 
