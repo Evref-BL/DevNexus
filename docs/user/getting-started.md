@@ -93,6 +93,13 @@ each profile is required now, optional later, or only needed for provider
 mutations, and read-only host checks for provider CLI commands or environment
 variable presence. It never includes token values.
 
+If `hostingIntent` is present, setup JSON also includes
+`proposal.hostingHandoff`. That handoff is only for the DevNexus meta-project,
+not component repositories. It reports whether hosting is unconfigured,
+planned, or blocked on missing auth profiles, and it lists the exact follow-up
+commands for `project hosting status`, `project hosting plan`, and explicit
+`project hosting apply`. `project setup` does not perform provider mutations.
+
 ## Project Layout
 
 The shared project root contains `dev-nexus.project.json` and project support

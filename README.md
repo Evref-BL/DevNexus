@@ -84,6 +84,12 @@ needed now, later, or only for provider mutations, and it checks host-local
 credential handles such as provider CLIs or environment-variable names without
 recording raw secret values.
 
+When meta-project hosting intent is configured, setup previews include a
+hosting handoff with the exact `project hosting status`, `project hosting
+plan`, and `project hosting apply` commands. `project setup` never creates
+provider repositories, pushes branches, repairs collaborators, or accepts
+invitations.
+
 List registered projects:
 
 ```bash

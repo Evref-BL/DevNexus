@@ -20,6 +20,7 @@ import {
 } from "./nexusProjectConfig.js";
 import { analyzeNexusProjectSetupComponentTopology } from "./nexusProjectComponentTopology.js";
 import { buildNexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
+import { buildNexusProjectSetupHostingHandoff } from "./nexusProjectSetupHostingHandoff.js";
 import {
   defaultProjectGitRunner,
   pathForProjectConfig,
@@ -319,6 +320,7 @@ function withTopologyDiagnostics(
   proposal: NexusProjectSetupProposal,
 ): NexusProjectSetupProposal {
   const topology = analyzeNexusProjectSetupComponentTopology(proposal.answers);
+  const authInventory = buildNexusProjectSetupAuthInventory(proposal.answers);
   const diagnostics = [
     ...proposal.diagnostics,
     ...topology.diagnostics.map((diagnostic) => ({
@@ -334,7 +336,11 @@ function withTopologyDiagnostics(
       ? "blocked"
       : proposal.status,
     diagnostics,
-    authInventory: buildNexusProjectSetupAuthInventory(proposal.answers),
+    authInventory,
+    hostingHandoff: buildNexusProjectSetupHostingHandoff(
+      proposal.answers,
+      authInventory,
+    ),
   };
 }
 

@@ -1155,6 +1155,25 @@ describe("dev-nexus cli", () => {
           ]),
           missingProfiles: [],
         },
+        hostingHandoff: {
+          status: "planned",
+          provider: "github",
+          repositoryName: "guided-demo-meta",
+          providerMutationsDeferred: true,
+          commands: expect.arrayContaining([
+            expect.objectContaining({
+              id: "hosting-status",
+              providerMutation: false,
+              authProfileId: "human-github",
+            }),
+            expect.objectContaining({
+              id: "hosting-apply",
+              providerMutation: true,
+              allowedDuringProjectSetup: false,
+              authProfileId: "bot-github",
+            }),
+          ]),
+        },
         nextPhaseActions: [
           expect.objectContaining({
             id: "apply-hosting-intent",

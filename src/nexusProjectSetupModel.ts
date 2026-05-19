@@ -1,4 +1,5 @@
 import type { NexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
+import type { NexusProjectSetupHostingHandoff } from "./nexusProjectSetupHostingHandoff.js";
 
 export type NexusProjectSetupMutationClass =
   | "local_file_write"
@@ -214,6 +215,7 @@ export interface NexusProjectSetupProposal {
   diagnostics: NexusProjectSetupDiagnostic[];
   nextPhaseActions: NexusProjectSetupOperation[];
   authInventory?: NexusProjectSetupAuthInventory;
+  hostingHandoff?: NexusProjectSetupHostingHandoff;
 }
 
 export function buildNexusProjectSetupProposal(
