@@ -117,7 +117,6 @@ import {
   type NexusCheckoutMutationClass,
   type NexusSharedCheckoutGuardOverride,
 } from "./nexusSharedCheckoutGuard.js";
-import { resolveNexusCurrentAutomationActor } from "./nexusAuthority.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -147,7 +146,6 @@ import {
 import {
   createWorkItemTrackerLinkService,
 } from "./workItemTrackerLinks.js";
-import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type {

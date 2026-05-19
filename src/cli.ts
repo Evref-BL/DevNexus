@@ -55,7 +55,9 @@ import type {
   NexusAuthorityComponentSummary,
   NexusAuthorityProjectSummary,
 } from "./nexusAuthority.js";
-import type {
+import {
+  loadNexusPublicationAuthProfiles,
+  resolveNexusPublicationPolicy,
   NexusPublicationActorStatus,
   NexusPublicationStatus,
 } from "./nexusPublicationPolicy.js";
@@ -250,15 +252,7 @@ import {
   type UnlinkWorkItemTrackerReferenceResult,
 } from "./workItemTrackerLinks.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
-import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
-import {
-  resolveNexusCurrentAutomationActor,
-} from "./nexusAuthority.js";
-import {
-  loadNexusPublicationAuthProfiles,
-  resolveNexusPublicationPolicy,
-} from "./nexusPublicationPolicy.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 import type {
   WorkComment,
