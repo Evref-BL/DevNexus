@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T05:21:22.022Z",
+  "updatedAt": "2026-05-19T05:27:14.000Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -26,10 +26,10 @@
         "src/nexusCoordination.ts",
         "src/nexusCoordination.test.ts"
       ],
-      "status": "ready",
+      "status": "merged",
       "createdAt": "2026-05-19T05:21:22.022Z",
-      "lastSeenAt": "2026-05-19T05:21:22.022Z",
-      "updatedAt": "2026-05-19T05:21:22.022Z",
+      "lastSeenAt": "2026-05-19T05:27:14.000Z",
+      "updatedAt": "2026-05-19T05:27:14.000Z",
       "refreshCount": 0,
       "lastObservedHeadCommit": "8735a73c3f60b2c01078e125b6321f766c2f566a",
       "dirty": false,
@@ -41,7 +41,7 @@
           "componentId": "dev-nexus",
           "relativePath": null
         },
-        "upstream": "bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z",
+        "upstream": "bot/main",
         "ahead": 0,
         "behind": 0,
         "stagedCount": 0,
@@ -50,9 +50,9 @@
         "warnings": []
       },
       "notes": [
-        "Dogfood blocker fix prepared during heartbeat 2026-05-19T05:14:09.565Z. This branch should remove the auth-profile mismatch that prevented local-107 and related ready branches from using the configured direct-integration policy.",
-        "Verification: Passed: npm test -- src/nexusCoordination.test.ts (13 tests); npm run check (TypeScript build plus 64 Vitest files, 573 tests).",
-        "Integration preference: Branch pushed to bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z at 8735a73c3f60b2c01078e125b6321f766c2f566a. Direct integration intentionally held because the currently installed coordination status path is the stale path being fixed; integrate via trusted host or after this branch is available in the coordinator runtime."
+        "Coordination auth-profile status fix was fast-forwarded into DevNexus main and pushed to bot/main at 8735a73.",
+        "Verification after integration: npm run check passed in C:/dev/code/sources/dev-nexus.",
+        "Next cycle should re-check coordination status with a refreshed DevNexus runtime before integrating local-94 and local-107."
       ]
     },
     {

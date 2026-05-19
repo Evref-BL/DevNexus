@@ -238,13 +238,14 @@ and ready for coordinator-driven work across its components.
   profile while `automation_status` reports `bot-github`, and local tracker
   comment/status mutation remains blocked because `bot-github` is a GitHub
   provider profile while the selected tracker provider is local.
-- A focused coordination auth-profile fix for that mismatch is ready on
-  `bot/codex/dev-nexus/coordination-auth-profiles-20260519T051409Z` at
-  `8735a73`. It makes coordination authority status load host-local
-  publication auth profiles; verification passed with
-  `npm test -- src/nexusCoordination.test.ts` and `npm run check`. Integrate
-  this branch before taking more implementation work so `local-94` and
-  `local-107` can be evaluated through the corrected authority path.
+- The focused coordination auth-profile fix for that mismatch is published to
+  DevNexus main as `8735a73`. It makes coordination authority status load
+  host-local publication auth profiles; verification passed with
+  `npm test -- src/nexusCoordination.test.ts` and `npm run check` before
+  integration, and `npm run check` passed again after fast-forwarding
+  `C:\dev\code\sources\dev-nexus` and pushing `bot/main`. Next, re-check
+  coordination status with a refreshed DevNexus runtime and integrate
+  `local-94` plus `local-107` if authority now resolves `bot-github`.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
