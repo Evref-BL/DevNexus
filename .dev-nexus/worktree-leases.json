@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T04:24:04.196Z",
+  "updatedAt": "2026-05-19T04:31:19.504Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -30,12 +30,12 @@
         "CONTEXT.md",
         "PLAN.md"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-19T04:24:04.196Z",
-      "lastSeenAt": "2026-05-19T04:24:04.196Z",
-      "updatedAt": "2026-05-19T04:24:04.196Z",
+      "lastSeenAt": "2026-05-19T04:31:19.504Z",
+      "updatedAt": "2026-05-19T04:31:19.504Z",
       "refreshCount": 0,
-      "lastObservedHeadCommit": "e253a2542cc59f1d2048acd03abac3e4c8cfbec2",
+      "lastObservedHeadCommit": "ad5d3d9699218e64b4825b71a138b127d4ca904f",
       "dirty": false,
       "pushed": null,
       "git": {
@@ -51,11 +51,12 @@
         "stagedCount": 0,
         "unstagedCount": 0,
         "untrackedCount": 0,
-        "warnings": [
-          "Current branch has no upstream configured."
-        ]
+        "warnings": []
       },
-      "notes": []
+      "notes": [
+        "Project-meta helper worktree recorded local-107 handoff, target state, and planning updates.",
+        "Changes were integrated into dogfood main, and the helper worktree was removed after verifying it was clean."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",
@@ -85,10 +86,10 @@
         "CONTEXT.md",
         "PLAN.md"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-19T04:23:54.163Z",
-      "lastSeenAt": "2026-05-19T04:23:54.163Z",
-      "updatedAt": "2026-05-19T04:23:54.163Z",
+      "lastSeenAt": "2026-05-19T04:30:11.790Z",
+      "updatedAt": "2026-05-19T04:30:11.790Z",
       "refreshCount": 0,
       "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
       "dirty": false,
@@ -110,7 +111,10 @@
           "Current branch has no upstream configured."
         ]
       },
-      "notes": []
+      "notes": [
+        "No-op component helper worktree was accidentally prepared while recording local-107 metadata because projectMeta was omitted.",
+        "It carried no retained source or project changes and was verified clean before cleanup."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",
@@ -125,7 +129,7 @@
       "agentId": null,
       "workItemId": "local-107",
       "branchName": "codex/dev-nexus/local-107-projection-status-diagnostics",
-      "baseRef": "main",
+      "baseRef": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
       "worktree": {
         "kind": "component_worktree",
         "base": "componentWorktreesRoot",
@@ -145,14 +149,14 @@
         "src/cli.test.ts",
         "docs/agent-target-projection-opt-in-prd.md"
       ],
-      "status": "working",
+      "status": "ready",
       "createdAt": "2026-05-19T04:16:10.734Z",
-      "lastSeenAt": "2026-05-19T04:16:10.734Z",
-      "updatedAt": "2026-05-19T04:16:10.734Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
+      "lastSeenAt": "2026-05-19T04:25:55.359Z",
+      "updatedAt": "2026-05-19T04:25:55.359Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "d9b26d55b7181af69388dc52f4baf85273c8039c",
       "dirty": false,
-      "pushed": null,
+      "pushed": true,
       "git": {
         "repository": {
           "kind": "component_worktree",
@@ -160,17 +164,135 @@
           "componentId": "dev-nexus",
           "relativePath": "local-107-projection-status-diagnostics"
         },
-        "upstream": null,
-        "ahead": null,
-        "behind": null,
+        "upstream": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
+        "ahead": 0,
+        "behind": 0,
         "stagedCount": 0,
         "unstagedCount": 0,
         "untrackedCount": 0,
-        "warnings": [
-          "Current branch has no upstream configured."
-        ]
+        "warnings": []
       },
-      "notes": []
+      "notes": [
+        "Prepared local-107 implementation in isolated component worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-107-projection-status-diagnostics. Reporting only; no provider-native cleanup was attempted.",
+        "Verification: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts passed (34 tests); npm run build passed; npm run check passed (64 files, 574 tests); git diff --check passed.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-723b14449428dbab",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-107",
+      "branchName": "codex/dev-nexus/local-107-projection-status-diagnostics",
+      "baseRef": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAgentProjectionStatus.ts",
+        "src/nexusProjectRegistry.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/cli.ts",
+        "src/index.ts",
+        "src/nexusProjectRegistry.test.ts",
+        "src/nexusSetupAssistant.test.ts"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T04:25:55.359Z",
+      "lastSeenAt": "2026-05-19T04:25:55.359Z",
+      "updatedAt": "2026-05-19T04:25:55.359Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "d9b26d55b7181af69388dc52f4baf85273c8039c",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Accurate component-branch handoff for local-107. Reporting only; no provider-native cleanup was attempted.",
+        "Verification: Component worktree verification passed: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts (34 tests), npm run build, npm run check (64 files, 574 tests), and git diff --check.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b0aa98d231ffdb98",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-107",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAgentProjectionStatus.ts",
+        "src/nexusProjectRegistry.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/cli.ts",
+        "src/index.ts",
+        "src/nexusProjectRegistry.test.ts",
+        "src/nexusSetupAssistant.test.ts"
+      ],
+      "status": "ready",
+      "createdAt": "2026-05-19T04:25:31.855Z",
+      "lastSeenAt": "2026-05-19T04:25:31.855Z",
+      "updatedAt": "2026-05-19T04:25:31.855Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "e253a2542cc59f1d2048acd03abac3e4c8cfbec2",
+      "dirty": true,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 1,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Prepared local-107 implementation in isolated component worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-107-projection-status-diagnostics. Reporting only; no provider-native cleanup was attempted.",
+        "Verification: Component worktree verification passed: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts (34 tests), npm run build, npm run check (64 files, 574 tests), and git diff --check.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github."
+      ]
     },
     {
       "kind": "dev-nexus.worktree.lease",

@@ -178,13 +178,16 @@ and ready for coordinator-driven work across its components.
   ignored support state for this Codex-only workflow.
 - Agent-target projection opt-in has been sliced. `dev-nexus:local-105` is
   complete for active target policy and compatibility normalization, and
-  `local-106` is complete for active-target projection filtering. Promote
-  `local-107` stale projection diagnostics and `local-109` worker context
-  propagation next; keep `local-108`, `local-110`, and `local-111` ordered
-  behind the diagnostics and cleanup behavior they require. Do not remove
-  `.claude/skills` until stale-projection diagnostics and cleanup safety
-  behavior are available, unless a separate manual cleanup is explicitly
-  approved.
+  `local-106` is complete for active-target projection filtering.
+  `dev-nexus:local-107` now has a verified projection-status branch
+  `bot/codex/dev-nexus/local-107-projection-status-diagnostics` at `d9b26d5`
+  with read-only stale/unexpected provider projection diagnostics. Integration
+  is held with `local-94` on the current authority/profile mismatch. Promote
+  `local-109` worker context propagation next after integration, and keep
+  `local-108`, `local-110`, and `local-111` ordered behind the diagnostics and
+  cleanup behavior they require. Do not remove `.claude/skills` until
+  stale-projection diagnostics and cleanup safety behavior are integrated,
+  unless a separate manual cleanup is explicitly approved.
 - DevNexus-Pharo MCP/plugin cleanup has completed source deletions
   `dev-nexus-pharo:local-15` through `local-19` and published commits
   `1ef5709`, `eb55b9c`, `c5f7a90`, `be1f866`, and `1dd2141` to
@@ -228,10 +231,18 @@ and ready for coordinator-driven work across its components.
   `profile=none` while `automation_status` reported `profile=bot-github`, and
   local tracker update/comment attempts blocked on GitHub-profile versus local
   provider matching.
-- Return to ready follow-on work such as `dev-nexus:local-93`, `local-107`,
-  `local-109`, `local-135`, `local-136`, and `local-147`, subject to dependency
-  and concurrency limits. `local-107` is a strong next candidate because this
-  run produced concrete status/projection mismatch evidence.
+- `dev-nexus:local-107` has a verified implementation commit `d9b26d5` pushed
+  to `bot/codex/dev-nexus/local-107-projection-status-diagnostics` with a ready
+  coordination handoff. Integration is held by the same authority/profile
+  mismatch as `local-94`: direct integration context reports no resolved auth
+  profile while `automation_status` reports `bot-github`, and local tracker
+  comment/status mutation remains blocked because `bot-github` is a GitHub
+  provider profile while the selected tracker provider is local.
+- Before selecting more ready implementation work, resolve or slice the
+  authority/profile mismatch that blocks integrating `local-94` and
+  `local-107`. If that stays blocked, choose independent ready follow-ons such
+  as `dev-nexus:local-93`, `local-135`, `local-136`, or `local-147`, subject to
+  dependency and concurrency limits.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.
@@ -239,9 +250,10 @@ and ready for coordinator-driven work across its components.
   shared-checkout mutation enforcement (`local-98`) and read-only cleanup
   classification (`local-102`) before cleanup execution, and keep status
   expansion/start-adopt slices behind their authority dependencies.
-- Continue agent-target projection through stale projection diagnostics and
-  worker context filtering; `local-111` is the dogfood Codex-only migration and
-  should wait for active target filtering plus stale cleanup safety.
+- Continue agent-target projection through integration of stale projection
+  diagnostics and worker context filtering; `local-111` is the dogfood
+  Codex-only migration and should wait for active target filtering plus stale
+  cleanup safety.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
   runner approval is explicit.
 - Promote `local-73` through `local-75` only after their prerequisites are

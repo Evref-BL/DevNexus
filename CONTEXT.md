@@ -120,9 +120,10 @@ coordinator agent chooses and supervises implementation work.
   gating in `local-91` and inbound import planning in `local-133` through
   `08b700c`, including post-review import identity-matching fixes, then
   published coordination/provider mutation authority gates in `local-92` and
-  policy-gated inbound import execution in `local-134` through `793a162`. The
-  latest implementation worktrees and local branches were removed after
-  publication.
+  policy-gated inbound import execution in `local-134` through `793a162`.
+  Branches for `local-94` (`b07889d`) and `local-107` (`d9b26d5`) are verified
+  and pushed to the component `bot` remote, but integration is held while the
+  automation authority/profile mismatch is resolved.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

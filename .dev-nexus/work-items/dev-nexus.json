@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 305,
-  "updatedAt": "2026-05-19T03:21:46.568Z",
+  "nextCommentNumber": 307,
+  "updatedAt": "2026-05-19T04:25:55.371Z",
   "items": [
     {
       "id": "local-1",
@@ -2719,7 +2719,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:34:17.844Z",
-      "updatedAt": "2026-05-18T22:41:22.804Z",
+      "updatedAt": "2026-05-19T04:25:55.371Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -6731,6 +6731,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-263"
+        }
+      },
+      {
+        "id": "local-comment-305",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: main\nHead: e253a2542cc59f1d2048acd03abac3e4c8cfbec2\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T04:25:31.855Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-107-projection-status-meta-20260519T041416Z-project\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-107\",\n  \"logicalItemId\": \"local-107\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-107\",\n        \"itemNumber\": 107\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"e253a2542cc59f1d2048acd03abac3e4c8cfbec2\",\n  \"dirty\": true,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAgentProjectionStatus.ts\",\n    \"src/nexusProjectRegistry.ts\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/cli.ts\",\n    \"src/index.ts\",\n    \"src/nexusProjectRegistry.test.ts\",\n    \"src/nexusSetupAssistant.test.ts\"\n  ],\n  \"decisions\": [\n    \"Added read-only agent-target projection status model for setup and project status surfaces.\",\n    \"Status reports expected-present, expected-missing, present-stale-generated, present-manual, unsupported-provider, and locally-selected-but-not-allowed projection states.\",\n    \"No cleanup is performed in this slice; stale generated provider directories are reported for later policy-gated cleanup.\"\n  ],\n  \"verificationSummary\": \"Component worktree verification passed: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts (34 tests), npm run build, npm run check (64 files, 574 tests), and git diff --check.\",\n  \"integrationPreference\": \"Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github.\",\n  \"note\": \"Prepared local-107 implementation in isolated component worktree C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-107-projection-status-diagnostics. Reporting only; no provider-native cleanup was attempted.\",\n  \"leaseId\": \"lease-b0aa98d231ffdb98\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T04:25:31.868Z",
+        "updatedAt": "2026-05-19T04:25:31.868Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-305"
+        }
+      },
+      {
+        "id": "local-comment-306",
+        "body": "DevNexus coordination handoff\n\nStatus: ready\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-107-projection-status-diagnostics\nHead: d9b26d55b7181af69388dc52f4baf85273c8039c\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T04:25:55.359Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-107-projection-status-meta-20260519T041416Z-project\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-107\",\n  \"logicalItemId\": \"local-107\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-107\",\n    \"itemNumber\": 107,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-107\",\n      \"itemNumber\": 107,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-107\",\n        \"itemNumber\": 107\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"ready\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\local-107-projection-status-diagnostics\",\n  \"branch\": \"codex/dev-nexus/local-107-projection-status-diagnostics\",\n  \"upstream\": \"bot/codex/dev-nexus/local-107-projection-status-diagnostics\",\n  \"baseRef\": \"bot/codex/dev-nexus/local-107-projection-status-diagnostics\",\n  \"headCommit\": \"d9b26d55b7181af69388dc52f4baf85273c8039c\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAgentProjectionStatus.ts\",\n    \"src/nexusProjectRegistry.ts\",\n    \"src/nexusSetupAssistant.ts\",\n    \"src/cli.ts\",\n    \"src/index.ts\",\n    \"src/nexusProjectRegistry.test.ts\",\n    \"src/nexusSetupAssistant.test.ts\"\n  ],\n  \"decisions\": [\n    \"Added read-only agent-target projection status model for setup and project status surfaces.\",\n    \"Status reports expected-present, expected-missing, present-stale-generated, present-manual, unsupported-provider, and locally-selected-but-not-allowed projection states.\",\n    \"No cleanup is performed in this slice; stale generated provider directories are reported for later policy-gated cleanup.\"\n  ],\n  \"verificationSummary\": \"Component worktree verification passed: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts (34 tests), npm run build, npm run check (64 files, 574 tests), and git diff --check.\",\n  \"integrationPreference\": \"Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github.\",\n  \"note\": \"Accurate component-branch handoff for local-107. Reporting only; no provider-native cleanup was attempted.\",\n  \"leaseId\": \"lease-723b14449428dbab\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T04:25:55.371Z",
+        "updatedAt": "2026-05-19T04:25:55.371Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-306"
         }
       }
     ],
