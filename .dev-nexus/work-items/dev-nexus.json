@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 155,
-  "nextCommentNumber": 333,
-  "updatedAt": "2026-05-19T15:26:53.741Z",
+  "nextNumber": 162,
+  "nextCommentNumber": 334,
+  "updatedAt": "2026-05-19T17:23:24.607Z",
   "items": [
     {
       "id": "local-1",
@@ -1841,7 +1841,7 @@
       "id": "local-74",
       "title": "Document project-local component layout and onboarding defaults",
       "description": "Type: documentation/onboarding slice\nReadiness: todo/dependent on dev-nexus:local-71 and dev-nexus:local-72\nParent: dev-nexus:local-69\nSource: dogfood source-root cleanup decision. No external PRD is required; this work-item description is the contract.\n\nGoal: update user-facing DevNexus setup guidance so new users and new machines understand the project-local component layout as the default and know when external roots are an advanced exception.\n\nAcceptance criteria:\n- Getting-started and setup docs show the preferred layout with `components/<component-id>` stable source checkouts and `worktrees/<component-id>/<run-or-item>` generated implementation worktrees.\n- The docs explain why `.dev-nexus/` is internal support state and should not contain primary editable component clones.\n- Mac/Windows onboarding examples use a fresh meta project root and project-local component clones without sibling-directory guessing.\n- External roots are documented as explicit advanced overrides, with warnings about overlap with unrelated host activity.\n- Agent-facing guidance tells workers to treat generated worktrees as writable implementation checkouts and stable `components/` clones as canonical component source roots.\n\nBoundaries:\n- Do not document behavior as available until corresponding setup/path support exists.\n- Do not include this dogfood host's absolute paths as generic examples.\n\nVerification:\n- Static documentation review.\n- `npm run check` if docs are included in repository checks.\n\nPublication notes:\n- Direct integration to DevNexus origin/main after verification passes.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -1853,8 +1853,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T11:57:26.455Z",
-      "updatedAt": "2026-05-18T11:57:26.455Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T17:23:24.607Z",
+      "closedAt": "2026-05-19T17:23:24.607Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -3984,6 +3984,197 @@
         "provider": "local",
         "itemId": "local-154",
         "itemNumber": 154
+      }
+    },
+    {
+      "id": "local-155",
+      "title": "Define project setup answer model and local mutation boundary",
+      "description": "Type: design/model slice\nSource: Nicolas onboarding follow-up and 2026-05-19 setup discussion.\nOwner: dev-nexus component.\n\nProblem:\nFirst-time project creation exposes low-level commands before users or agents know which parameters are mandatory, optional, local-only, or provider-mutating. A giant `project create` command would preserve the friction in another form.\n\nDecision to encode:\n- Default first-project entry point should be `dev-nexus project setup`.\n- It may preview local writes and ask for confirmation, but it should not force a separate local `setup plan` / `setup apply` dance.\n- Provider mutations, especially meta-repo creation/push and access repair, stay outside the local setup wizard and continue through explicit hosting status/plan/apply surfaces.\n\nAcceptance criteria:\n- Define a typed setup answers/proposal model covering home, project identity, project root, components, source strategy, agent targets, local work tracking, optional hosting intent, auth profile references, publication posture, and readiness checks.\n- Mark each proposed operation with mutation class: local file write, local git operation, host-local auth check, provider read, or provider mutation.\n- Local project scaffold writes are allowed behind preview/confirmation; provider mutations are represented only as next-phase handoff actions.\n- The model can be rendered as JSON for agents and as concise human preview text.\n- No shared config field accepts raw tokens, private keys, or passwords.\n\nVerification:\n- Unit tests for model validation and mutation classification.\n- npm run check.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "project-setup",
+        "cli",
+        "design",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:21:20.920Z",
+      "updatedAt": "2026-05-19T17:21:20.920Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-155",
+        "itemNumber": 155
+      }
+    },
+    {
+      "id": "local-156",
+      "title": "Implement guided local project setup wizard",
+      "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nA first-time user or agent needs one guided local entry point after installation. Today the user must infer how to combine home init, project create/import, tracker configure, MCP refresh, skills projection, and next-step advice.\n\nAcceptance criteria:\n- Add `dev-nexus project setup` as the guided local project creation/configuration command.\n- In TTY mode, ask concise Gradle-style prompts with safe defaults; in non-TTY/agent mode, fail with a structured list of required answers or accept an answer file/JSON input.\n- Collect home path, project identity, project root, components, local source strategy, primary component, agent targets, local tracker choice, and whether to record hosting intent.\n- Show a local-write preview before mutating files; provider mutations are not executed by this command.\n- Create/regenerate the project scaffold, local tracker stores, agent support files, MCP config, and AGENTS.md/skill projections expected for the selected agent targets.\n- The flow is idempotent enough to resume or repair a partially scaffolded project.\n\nVerification:\n- CLI tests for interactive defaults and non-interactive JSON/error behavior.\n- Fake project smoke covering new-project and existing-directory setup.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "project-setup",
+        "cli",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:22:54.153Z",
+      "updatedAt": "2026-05-19T17:22:54.153Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-156",
+        "itemNumber": 156
+      }
+    },
+    {
+      "id": "local-157",
+      "title": "Add guided component topology and component-add flow",
+      "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nNicolas asked for one DevNexus project using several existing folders as components, but the current command vocabulary naturally led the agent to create separate DevNexus projects. The setup flow needs an explicit component topology model instead of relying on wording.\n\nAcceptance criteria:\n- Add guided component topology prompts that distinguish one DevNexus project with multiple components from multiple independent DevNexus projects.\n- Support component source strategies: reference existing checkout, clone into project-local `components/<id>`, and create a new empty/local component when appropriate.\n- Validate existing paths, Git repositories, container folders with nested repositories, default branches, remotes, and non-Git folders; surface warnings rather than silently choosing the wrong shape.\n- Require or infer exactly one primary component, while allowing dependency/extension/addon/support roles.\n- Provide an explicit follow-up command or setup subflow for adding components to an existing DevNexus project without manual JSON editing.\n- Keep generated worktrees separate from stable component source roots.\n\nVerification:\n- Unit tests for topology validation and container-folder detection.\n- CLI fake project tests for existing multi-component setup.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "components",
+        "source-roots",
+        "cli",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:22:54.375Z",
+      "updatedAt": "2026-05-19T17:22:54.375Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-157",
+        "itemNumber": 157
+      }
+    },
+    {
+      "id": "local-158",
+      "title": "Integrate provider auth profile inventory into project setup",
+      "description": "Type: implementation/design slice\nDepends on: dev-nexus:local-155\nSource: 2026-05-19 parameter inventory discussion.\nOwner: dev-nexus component.\n\nProblem:\nSetup needs to expose auth choices without teaching users to paste secrets into project config. It also needs to distinguish human accounts from bot/automation accounts across GitHub, GitLab, Jira, and future providers.\n\nAcceptance criteria:\n- Add setup/auth inventory surfaces for provider auth profiles referenced by hosting, work tracking, publication, and external issue discovery.\n- Support host-local credential methods such as provider CLI profiles, environment-variable references, token store references, and HTTP API token references without storing raw token values in shared project metadata.\n- Model actor kind and intent: human account, machine user/bot account, CI/service account, and unknown/manual-only.\n- Report which auth profiles are required now, optional later, or only needed for hosting apply/provider mutations.\n- Provide read-only capability checks where possible and provider-specific actionable next steps where credentials are missing.\n- Preserve the rule that agent-created Git/provider mutations use automation/bot profiles unless the user explicitly overrides it.\n\nVerification:\n- Tests for auth profile normalization and secret redaction.\n- CLI/setup report tests for missing and available provider auth profiles.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "auth-profiles",
+        "github",
+        "gitlab",
+        "jira",
+        "authority",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:22:54.606Z",
+      "updatedAt": "2026-05-19T17:22:54.606Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-158",
+        "itemNumber": 158
+      }
+    },
+    {
+      "id": "local-159",
+      "title": "Record hosting intent during setup and hand off to hosting plan/apply",
+      "description": "Type: implementation slice\nDepends on: dev-nexus:local-155\nRelated: dev-nexus:local-117 through dev-nexus:local-126\nSource: 2026-05-19 setup discussion.\nOwner: dev-nexus component.\n\nProblem:\nUsers need to decide whether and where the meta-repo should be hosted, but creating/pushing provider repositories is a different risk class from local setup. The setup flow should capture intent and route users to the explicit hosting workflow.\n\nAcceptance criteria:\n- Let setup record optional meta-repo hosting intent: provider, host, owner/group/project key, repository name, desired remotes, human account, automation/bot account, and access policy references.\n- Clearly separate DevNexus meta-project hosting from component repository hosting.\n- Do not create provider repositories, push branches, repair collaborators, or accept invitations from `project setup`.\n- After local setup, show the exact next hosting commands: status, plan, and apply, with the auth profile each would require.\n- Include JSON output so agents can report whether hosting is not configured, planned, blocked on auth, or ready for explicit apply.\n\nVerification:\n- Tests proving setup produces hosting handoff actions without provider mutations.\n- Fake GitHub hosting handoff test using existing hosting planner fixtures.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "hosting",
+        "github",
+        "gitlab",
+        "project-setup",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:22:54.832Z",
+      "updatedAt": "2026-05-19T17:22:54.832Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-159",
+        "itemNumber": 159
+      }
+    },
+    {
+      "id": "local-160",
+      "title": "Add setup readiness report and agent handoff summary",
+      "description": "Type: implementation slice\nDepends on: dev-nexus:local-155 and local setup wizard work.\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nAfter setup, the user should not have to ask \"is this ready?\" and receive a guess. DevNexus should produce a readiness report that both a human and an agent can use as the handoff into real work.\n\nAcceptance criteria:\n- Add or extend a setup readiness report covering project config validity, home registration, component source reachability, worktrees root, local tracker stores, MCP config, AGENTS.md, projected skills, active agent targets, Git remotes, auth profile state, hosting status, and eligible issue discovery where configured.\n- Produce a concise verdict: ready to work, ready with warnings, or blocked, with concrete blocker actions.\n- Include next steps for Codex/OpenCode/Claude as configured, including which directory to open as the agent project root.\n- Include optional provider issue/report summaries when GitHub/GitLab/Jira trackers are configured and credentials allow read-only access.\n- Emit structured JSON for agents and short human text for terminal use.\n\nVerification:\n- Unit tests for verdict aggregation.\n- CLI tests for missing AGENTS/MCP/skills, missing auth, and ready fake project.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "setup",
+        "diagnostics",
+        "agent-targets",
+        "trackers",
+        "dependent",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:22:55.049Z",
+      "updatedAt": "2026-05-19T17:22:55.049Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-160",
+        "itemNumber": 160
+      }
+    },
+    {
+      "id": "local-161",
+      "title": "Detect installed CLI and documentation version skew during onboarding",
+      "description": "Type: onboarding/release guard slice\nSource: Nicolas onboarding follow-up and observed npm-vs-repo README skew.\nOwner: dev-nexus component.\n\nProblem:\nA first-time agent may read the live repository README while installing an older published npm package, then suggest commands that do not exist in the installed CLI. This turns a successful install into confusing onboarding advice.\n\nAcceptance criteria:\n- The install/readiness flow reports installed package version, CLI command surface, and whether the docs being followed match that released version.\n- User-facing README guidance clearly separates released npm usage from source/main branch usage.\n- `dev-nexus --help`, setup readiness, or a dedicated diagnostic warns when expected documented commands are missing from the installed CLI.\n- The warning recommends one concrete fix: upgrade npm package, install from source, or follow the versioned docs for the installed release.\n- Tests cover a fake older CLI/doc command mismatch without network access.\n\nVerification:\n- CLI/readiness diagnostic tests.\n- Static docs review.\n- npm run check.",
+      "status": "todo",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "onboarding",
+        "npm",
+        "docs",
+        "diagnostics",
+        "release",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T17:23:15.913Z",
+      "updatedAt": "2026-05-19T17:23:15.913Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-161",
+        "itemNumber": 161
       }
     }
   ],
@@ -6122,7 +6313,19 @@
       }
     ],
     "local-73": [],
-    "local-74": [],
+    "local-74": [
+      {
+        "id": "local-comment-333",
+        "body": "Implemented in DevNexus source commit 6dc9d828b6f2038a9de468e4b9879ac5e2a67e4d (`Improve first-user onboarding docs`). The change added README first-project guidance, `docs/user/getting-started.md`, onboarding examples for project-local component layout, and setup assistant prompt updates. Verification recorded for the source change: `npm run check` passed before publication to `bot/main`.",
+        "author": null,
+        "createdAt": "2026-05-19T17:23:24.476Z",
+        "updatedAt": "2026-05-19T17:23:24.476Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-333"
+        }
+      }
+    ],
     "local-75": [],
     "local-76": [
       {
@@ -8043,6 +8246,13 @@
         }
       }
     ],
-    "local-154": []
+    "local-154": [],
+    "local-155": [],
+    "local-156": [],
+    "local-157": [],
+    "local-158": [],
+    "local-159": [],
+    "local-160": [],
+    "local-161": []
   }
 }
