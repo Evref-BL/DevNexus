@@ -124,6 +124,8 @@ describe("nexus publication policy", () => {
       gitRunner: publicationGitRunner(sourceRoot, {
         remoteUrl: "git@github.com-bot:example/project.git",
         pushUrl: "git@github.com-bot:example/project.git",
+        localUserName: "Example Bot",
+        localUserEmail: "bot@example.invalid",
       }),
       env: {
         GH_TOKEN: "ambient-gh-token",
@@ -158,6 +160,19 @@ describe("nexus publication policy", () => {
           GH_CONFIG_DIR: githubConfigDir,
         },
       },
+      gitIdentity: {
+        status: "matched",
+        expected: {
+          name: "Example Bot",
+          email: "bot@example.invalid",
+          source: "authProfile:bot-github",
+        },
+        observed: {
+          name: "Example Bot",
+          email: "bot@example.invalid",
+          source: "local",
+        },
+      },
     });
     expect(status.checks.every((check) => check.status === "passed")).toBe(true);
     expect(actorCommands).toEqual([
@@ -166,6 +181,10 @@ describe("nexus publication policy", () => {
         args: ["api", "user", "--jq", ".login", "--hostname", "github.com"],
         env: expect.objectContaining({
           GH_CONFIG_DIR: githubConfigDir,
+          GIT_AUTHOR_NAME: "Example Bot",
+          GIT_AUTHOR_EMAIL: "bot@example.invalid",
+          GIT_COMMITTER_NAME: "Example Bot",
+          GIT_COMMITTER_EMAIL: "bot@example.invalid",
         }),
       },
     ]);
@@ -201,6 +220,53 @@ describe("nexus publication policy", () => {
     );
     expect(() => assertNexusPublicationGuard(status)).toThrow(
       /example-human.*example-bot/u,
+    );
+  });
+
+  it("blocks when only inherited human Git identity is configured for automation publication", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "git_push",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(sourceRoot, {
+        effectiveUserName: "Gabriel Darbord",
+        effectiveUserEmail: "gabriel@example.invalid",
+      }),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(true);
+    expect(status.gitIdentity).toMatchObject({
+      status: "mismatched",
+      expected: {
+        name: "Example Bot",
+        email: "bot@example.invalid",
+      },
+      observed: {
+        name: "Gabriel Darbord",
+        email: "gabriel@example.invalid",
+        localName: null,
+        localEmail: null,
+        source: "inherited",
+      },
+    });
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:gitIdentity",
+        status: "failed",
+      }),
+    );
+    expect(() => assertNexusPublicationGuard(status)).toThrow(
+      /Gabriel Darbord.*Example Bot/u,
     );
   });
 
@@ -458,6 +524,8 @@ function automationAuthProfiles(): NexusHostingAuthProfileConfig[] {
       account: "example-bot",
       sshHost: "github.com-bot",
       githubCliConfigDir: "home:.config/gh-example-bot",
+      gitUserName: "Example Bot",
+      gitUserEmail: "bot@example.invalid",
       environmentKeys: ["GH_CONFIG_DIR"],
     },
   ];
@@ -468,6 +536,10 @@ function publicationGitRunner(
   options: {
     remoteUrl?: string;
     pushUrl?: string;
+    localUserName?: string | null;
+    localUserEmail?: string | null;
+    effectiveUserName?: string | null;
+    effectiveUserEmail?: string | null;
   } = {},
 ): GitRunner {
   const remoteUrl =
@@ -491,6 +563,30 @@ function publicationGitRunner(
     if (key === "remote get-url --push bot") {
       return gitResult(args, `${pushUrl}\n`, cwd);
     }
+    if (key === "config --local --get user.name") {
+      return options.localUserName
+        ? gitResult(args, `${options.localUserName}\n`, cwd)
+        : gitMissingResult(args, cwd);
+    }
+    if (key === "config --local --get user.email") {
+      return options.localUserEmail
+        ? gitResult(args, `${options.localUserEmail}\n`, cwd)
+        : gitMissingResult(args, cwd);
+    }
+    if (key === "config --get user.name") {
+      return gitResult(
+        args,
+        `${options.effectiveUserName ?? options.localUserName ?? "Example Bot"}\n`,
+        cwd,
+      );
+    }
+    if (key === "config --get user.email") {
+      return gitResult(
+        args,
+        `${options.effectiveUserEmail ?? options.localUserEmail ?? "bot@example.invalid"}\n`,
+        cwd,
+      );
+    }
 
     return {
       args: [...args],
@@ -498,6 +594,18 @@ function publicationGitRunner(
       stderr: `unexpected git command ${key} from ${cwd ?? ""}`,
       exitCode: 1,
     };
+  };
+}
+
+function gitMissingResult(
+  args: readonly string[],
+  _cwd: string | undefined,
+): GitCommandResult {
+  return {
+    args: [...args],
+    stdout: "",
+    stderr: "",
+    exitCode: 1,
   };
 }
 

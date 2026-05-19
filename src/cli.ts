@@ -66,6 +66,7 @@ import {
   NexusPublicationActorStatus,
   NexusPublicationStatus,
 } from "./nexusPublicationPolicy.js";
+import type { NexusGitIdentityStatus } from "./nexusGitIdentity.js";
 import {
   getNexusAutomationAgentProfileSummary,
   type NexusAutomationAgentProfileSummary,
@@ -7862,6 +7863,7 @@ function printAutomationStatusResult(
 
 function formatPublicationStatus(publication: NexusPublicationStatus): string {
   const actor = formatPublicationActor(publication.actor);
+  const gitIdentity = formatPublicationGitIdentity(publication.gitIdentity);
   const upstream = publication.git.upstream ?? "none";
   const pushUrl = publication.git.pushUrl ?? "unknown";
   const checkStatus = publication.blocking ? "blocked" : "ok";
@@ -7872,8 +7874,21 @@ function formatPublicationStatus(publication: NexusPublicationStatus): string {
     `upstream=${upstream}`,
     `pushUrl=${pushUrl}`,
     `actor=${actor}`,
+    `gitIdentity=${gitIdentity}`,
     `checks=${checkStatus}`,
   ].join(" ");
+}
+
+function formatPublicationGitIdentity(identity: NexusGitIdentityStatus): string {
+  const expected = identity.expected
+    ? `${identity.expected.name ?? "unknown"}<${identity.expected.email ?? "unknown"}>`
+    : "none";
+  const observed =
+    identity.observed.name || identity.observed.email
+      ? `${identity.observed.name ?? "unknown"}<${identity.observed.email ?? "unknown"}>`
+      : identity.observed.source;
+
+  return `${expected}->${observed}:${identity.status}`;
 }
 
 function formatPublicationActor(actor: NexusPublicationActorStatus): string {

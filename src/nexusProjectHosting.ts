@@ -94,6 +94,8 @@ export interface NexusHostingAuthProfileConfig {
   host?: string;
   sshHost?: string;
   githubCliConfigDir?: string;
+  gitUserName?: string;
+  gitUserEmail?: string;
   command?: string;
   environmentKeys?: string[];
 }

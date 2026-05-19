@@ -87,6 +87,37 @@ function saveProjectConfig(projectRoot: string, config: NexusProjectConfig): voi
   );
 }
 
+function saveHomeConfig(homePath: string): void {
+  fs.mkdirSync(homePath, { recursive: true });
+  fs.writeFileSync(
+    path.join(homePath, "dev-nexus.home.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles: [
+          {
+            id: "bot-github",
+            actorId: "example-bot-actor",
+            provider: "github",
+            kind: "automation",
+            account: "example-bot",
+            gitUserName: "Example Bot",
+            gitUserEmail: "bot@example.invalid",
+          },
+        ],
+        projects: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
 function prepareProject(
   overrides: Partial<NexusProjectConfig> = {},
 ): {
@@ -280,5 +311,63 @@ describe("nexus manual worktree worker target preparation", () => {
         gitRunner: fakeGitRunner(calls),
       }),
     ).toThrow(/Worker agent provider claude is not active/);
+  });
+
+  it("prepares worktrees with repo-local automation Git identity from auth profile", () => {
+    const { projectRoot, calls } = prepareProject({
+      home: "home",
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          push: true,
+          actor: {
+            kind: "machine_user",
+            provider: "github",
+            handle: "example-bot",
+            id: null,
+          },
+        },
+      },
+    });
+    saveHomeConfig(path.join(projectRoot, "home"));
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "bot git identity",
+      branchName: "codex/primary/bot-git-identity",
+      worktreeName: "bot-git-identity",
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(result.worktree.gitIdentity).toEqual({
+      name: "Example Bot",
+      email: "bot@example.invalid",
+    });
+    expect(calls).toContainEqual({
+      cwd: result.worktree.worktreePath,
+      args: ["config", "--local", "user.name", "Example Bot"],
+    });
+    expect(calls).toContainEqual({
+      cwd: result.worktree.worktreePath,
+      args: ["config", "--local", "user.email", "bot@example.invalid"],
+    });
+    expect(context.gitIdentity).toMatchObject({
+      name: "Example Bot",
+      email: "bot@example.invalid",
+      source: "authProfile:bot-github",
+    });
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "- automation Git identity: Example Bot <bot@example.invalid>",
+    );
   });
 });

@@ -102,6 +102,8 @@ function saveAutomationHomeConfig(homePath: string): void {
           account: "example-bot",
           sshHost: "github.com-bot",
           githubCliConfigDir: "home:.config/gh-example-bot",
+          gitUserName: "Example Bot",
+          gitUserEmail: "bot@example.invalid",
           environmentKeys: ["GH_CONFIG_DIR"],
         },
       ],
@@ -133,6 +135,18 @@ function publicationGitRunner(repositoryPath: string): GitRunner {
     }
     if (key === "remote get-url --push bot") {
       return gitResult(args, "git@github.com-bot:example/project.git\n", cwd);
+    }
+    if (key === "config --local --get user.name") {
+      return gitResult(args, "Example Bot\n", cwd);
+    }
+    if (key === "config --local --get user.email") {
+      return gitResult(args, "bot@example.invalid\n", cwd);
+    }
+    if (key === "config --get user.name") {
+      return gitResult(args, "Example Bot\n", cwd);
+    }
+    if (key === "config --get user.email") {
+      return gitResult(args, "bot@example.invalid\n", cwd);
     }
 
     return {
@@ -370,6 +384,10 @@ describe("nexus automation agent launch", () => {
         "commitIds,verification,publicationDecision,workItems,error",
       );
       expect(options.env.GH_CONFIG_DIR).toBe(githubConfigDir);
+      expect(options.env.GIT_AUTHOR_NAME).toBe("Example Bot");
+      expect(options.env.GIT_AUTHOR_EMAIL).toBe("bot@example.invalid");
+      expect(options.env.GIT_COMMITTER_NAME).toBe("Example Bot");
+      expect(options.env.GIT_COMMITTER_EMAIL).toBe("bot@example.invalid");
       expect(options.env.DEV_NEXUS_PUBLICATION_REMOTE).toBe("bot");
       expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_KIND).toBe("machine_user");
       expect(options.env.DEV_NEXUS_PUBLICATION_ACTOR_PROVIDER).toBe("github");

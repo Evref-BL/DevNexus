@@ -223,6 +223,7 @@ export interface NexusAutomationAgentLaunchInput {
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  authProfiles?: NexusHostingAuthProfileConfig[];
   contextFile: string;
   resultFile: string;
 }
@@ -721,6 +722,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       eligibleWorkWarnings,
       eligibleWorkBlockers,
       componentEligibleWorkItems,
+      authProfiles,
       contextFile,
       resultFile,
     });
@@ -1262,6 +1264,7 @@ function agentLaunchEnvironment(
     ...publicationProcessEnvironment(publication, {
       baseEnv,
       projectRoot: input.projectRoot,
+      authProfiles: input.authProfiles,
     }),
     ...publicationEnvironmentVariables(publication),
   };

@@ -36,7 +36,14 @@ import {
   projectPluginWorkerFragments,
 } from "./nexusPluginCapabilities.js";
 import { buildNexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
-import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
+import {
+  loadNexusPublicationAuthProfiles,
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
+import {
+  resolveExpectedAutomationGitIdentity,
+  type NexusExpectedGitIdentity,
+} from "./nexusGitIdentity.js";
 import {
   resolveComponentWorkItemRoute,
   throwWorkItemLookupFailure,
@@ -188,6 +195,14 @@ export function prepareNexusManualWorktree(
   const publication = target.component
     ? resolveNexusPublicationPolicy(projectConfig, target.component)
     : automationConfig.publication;
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot,
+    projectConfig,
+  });
+  const expectedGitIdentity = resolveExpectedAutomationGitIdentity({
+    publication,
+    authProfiles,
+  });
   const authority = target.component
     ? summarizeNexusAuthorityForComponent({
         projectId: projectConfig.id,
@@ -224,6 +239,7 @@ export function prepareNexusManualWorktree(
         .join("; ")}`,
     );
   }
+  const worktreeGitIdentity = preparedGitIdentity(expectedGitIdentity);
   const worktree = prepareGitWorktree({
     componentId: target.ownerId,
     sourceRoot: target.sourceRoot,
@@ -233,6 +249,7 @@ export function prepareNexusManualWorktree(
     ...(baseRef ? { baseRef } : {}),
     ...(workItemId ? { workItemId } : {}),
     ...(options.workItemTitle ? { workItemTitle: options.workItemTitle } : {}),
+    ...(worktreeGitIdentity ? { gitIdentity: worktreeGitIdentity } : {}),
     ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
   });
   const contextWorkItem =
@@ -273,6 +290,7 @@ export function prepareNexusManualWorktree(
           : { activeAgents: agentTargetSelection.policy.activeProviders }),
       }),
       publication,
+      gitIdentity: expectedGitIdentity,
       authority,
       runnerProfiles: buildNexusRunnerProfilePolicySummary(
         projectConfig.runnerProfiles,
@@ -308,6 +326,19 @@ export function prepareNexusManualWorktree(
     lease,
     setup,
     nextActions: nextActions(target.scope, worktree),
+  };
+}
+
+function preparedGitIdentity(
+  identity: NexusExpectedGitIdentity | null,
+): { name: string; email: string } | null {
+  if (!identity?.name || !identity.email) {
+    return null;
+  }
+
+  return {
+    name: identity.name,
+    email: identity.email,
   };
 }
 

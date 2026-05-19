@@ -37,6 +37,7 @@ import {
 } from "./nexusSkills.js";
 import type { NexusPluginWorkerFragmentsProjection } from "./nexusPluginCapabilities.js";
 import type { NexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
+import type { NexusExpectedGitIdentity } from "./nexusGitIdentity.js";
 
 export type NexusAutomationWorktreeSetupLinkStatus =
   | "linked"
@@ -120,6 +121,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  gitIdentity?: NexusExpectedGitIdentity | null;
   authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
 }
@@ -339,6 +341,7 @@ function materializeWorkerContext(options: {
     pluginFragments: options.context.pluginFragments,
     publication:
       options.context.publication ?? options.automationConfig.publication,
+    gitIdentity: options.context.gitIdentity,
     authority: options.context.authority ?? null,
     runnerProfiles: options.context.runnerProfiles,
     agentTargetPolicy: options.context.agentTargetPolicy,

@@ -17,6 +17,7 @@ import type {
   NexusPluginWorkerFragmentsProjection,
 } from "./nexusPluginCapabilities.js";
 import type { NexusRunnerProfilePolicySummary } from "./nexusRunnerProfile.js";
+import type { NexusExpectedGitIdentity } from "./nexusGitIdentity.js";
 
 export type NexusWorkerContextFileId =
   | "agents"
@@ -160,6 +161,7 @@ export interface NexusWorkerContextBundle {
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
   publication: NexusAutomationPublicationConfig | null;
+  gitIdentity: NexusExpectedGitIdentity | null;
   authority: NexusAuthorityComponentSummary | null;
   runnerProfiles: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy: NexusWorkerContextAgentTargetPolicy;
@@ -184,6 +186,7 @@ export interface NexusWorkerContextBundleOptions {
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
+  gitIdentity?: NexusExpectedGitIdentity | null;
   authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
@@ -274,6 +277,7 @@ export function buildNexusWorkerContextBundle(
     options.pluginFragments,
   );
   const publication = options.publication ?? null;
+  const gitIdentity = options.gitIdentity ?? null;
   const authority = options.authority ?? null;
   const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
   const agentTargetPolicy = normalizeWorkerAgentTargetPolicy(
@@ -306,6 +310,7 @@ export function buildNexusWorkerContextBundle(
     ownership: worktree,
     worktree,
     publication,
+    gitIdentity,
     authority,
     runnerProfiles,
     agentTargetPolicy,
@@ -372,6 +377,7 @@ export function renderNexusWorkerBriefing(
     "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
     "",
     ...renderPublicationPolicyLines(context.publication),
+    ...renderGitIdentityLines(context.gitIdentity),
     "",
     ...renderAuthorityPolicyLines(context.authority),
     "",
@@ -842,6 +848,20 @@ function renderPublicationPolicyLines(
     `- manual remote: ${publication.manualRemote ?? "none"}`,
     `- manual actor: ${publicationActorLabel(publication.manualActor)}`,
     `- command environment keys: ${commandEnvironmentKeys || "none"}`,
+  ];
+}
+
+function renderGitIdentityLines(
+  gitIdentity: NexusExpectedGitIdentity | null,
+): string[] {
+  if (!gitIdentity) {
+    return ["- automation Git identity: none"];
+  }
+
+  return [
+    `- automation Git identity: ${gitIdentity.name ?? "unknown"} <${gitIdentity.email ?? "unknown"}>`,
+    `- automation Git identity source: ${gitIdentity.source}`,
+    ...gitIdentity.warnings.map((warning) => `- automation Git identity warning: ${warning}`),
   ];
 }
 

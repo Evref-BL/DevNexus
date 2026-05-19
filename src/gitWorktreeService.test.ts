@@ -90,6 +90,50 @@ describe("git worktree service", () => {
     ]);
   });
 
+  it("sets repo-local Git identity when a prepared identity is provided", () => {
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
+    const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+
+    const result = prepareGitWorktree({
+      componentId: "core",
+      sourceRoot,
+      worktreesRoot,
+      branchName: "codex/demo/local-154",
+      gitIdentity: {
+        name: "Example Bot",
+        email: "bot@example.invalid",
+      },
+      gitRunner: fakeGitRunner(calls),
+    });
+
+    expect(result.gitIdentity).toEqual({
+      name: "Example Bot",
+      email: "bot@example.invalid",
+    });
+    expect(calls).toEqual([
+      {
+        cwd: sourceRoot,
+        args: [
+          "worktree",
+          "add",
+          "-b",
+          "codex/demo/local-154",
+          result.worktreePath,
+        ],
+      },
+      {
+        cwd: result.worktreePath,
+        args: ["config", "--local", "user.name", "Example Bot"],
+      },
+      {
+        cwd: result.worktreePath,
+        args: ["config", "--local", "user.email", "bot@example.invalid"],
+      },
+    ]);
+  });
+
   it("uses an explicit worktree name and removes worktrees", () => {
     const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Source");
     const worktreesRoot = path.join(makeTempDir("dev-nexus-worktrees-"), "worktrees");

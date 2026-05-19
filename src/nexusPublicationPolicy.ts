@@ -29,6 +29,13 @@ import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
+import {
+  compareGitIdentity,
+  gitIdentityEnvironment,
+  readObservedGitIdentity,
+  resolveExpectedAutomationGitIdentity,
+  type NexusGitIdentityStatus,
+} from "./nexusGitIdentity.js";
 
 export type NexusPublicationGuardAction =
   | "status"
@@ -101,6 +108,7 @@ export interface NexusPublicationStatus {
   action: NexusPublicationGuardAction;
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
+  gitIdentity: NexusGitIdentityStatus;
   actor: NexusPublicationActorStatus;
   authority: NexusEffectiveAuthorityResolution | null;
   checks: NexusPublicationPolicyCheck[];
@@ -167,14 +175,6 @@ export function getNexusPublicationStatus(options: {
     policy,
     gitRunner: options.gitRunner ?? defaultGitRunner,
   });
-  const actor = readPublicationActorStatus({
-    projectRoot: options.projectRoot,
-    component: options.component,
-    policy,
-    cwd: git.repositoryPath ?? options.component.sourceRoot,
-    actorRunner: options.actorRunner ?? defaultPublicationActorRunner,
-    baseEnv: options.env ?? process.env,
-  });
   const authProfiles =
     options.authProfiles ??
     loadNexusPublicationAuthProfiles({
@@ -182,6 +182,21 @@ export function getNexusPublicationStatus(options: {
       projectConfig: options.projectConfig,
       homePath: options.homePath,
     });
+  const gitIdentity = readPublicationGitIdentityStatus({
+    policy,
+    repositoryPath: git.repositoryPath ?? options.component.sourceRoot,
+    gitRunner: options.gitRunner ?? defaultGitRunner,
+    authProfiles,
+  });
+  const actor = readPublicationActorStatus({
+    projectRoot: options.projectRoot,
+    component: options.component,
+    policy,
+    cwd: git.repositoryPath ?? options.component.sourceRoot,
+    actorRunner: options.actorRunner ?? defaultPublicationActorRunner,
+    baseEnv: options.env ?? process.env,
+    authProfiles,
+  });
   const authority = resolvePublicationAuthority({
     projectConfig: options.projectConfig,
     component: options.component,
@@ -196,12 +211,18 @@ export function getNexusPublicationStatus(options: {
     component: options.component,
     policy,
     git,
+    gitIdentity,
     actor,
     authority,
     strict,
   });
   const warnings = [
     ...git.warnings,
+    ...(gitIdentity.status === "unchecked" ||
+    gitIdentity.status === "unavailable" ||
+    gitIdentity.status === "mismatched"
+      ? [gitIdentity.message]
+      : []),
     ...(actor.status === "unchecked" || actor.status === "unavailable"
       ? [actor.message]
       : []),
@@ -216,6 +237,7 @@ export function getNexusPublicationStatus(options: {
     action,
     policy,
     git,
+    gitIdentity,
     actor,
     authority,
     checks,
@@ -289,6 +311,7 @@ export function publicationProcessEnvironment(
   options: {
     baseEnv: NodeJS.ProcessEnv;
     projectRoot?: string;
+    authProfiles?: NexusHostingAuthProfileConfig[];
   },
 ): NodeJS.ProcessEnv {
   const commandEnvironment = publicationCommandEnvironment(policy, {
@@ -297,6 +320,12 @@ export function publicationProcessEnvironment(
   const env: NodeJS.ProcessEnv = {
     ...options.baseEnv,
     ...commandEnvironment,
+    ...gitIdentityEnvironment(
+      resolveExpectedAutomationGitIdentity({
+        publication: policy,
+        authProfiles: options.authProfiles,
+      }),
+    ),
   };
 
   if (shouldUseIsolatedGitHubCliProfile(policy, commandEnvironment)) {
@@ -483,6 +512,7 @@ function readPublicationActorStatus(options: {
   cwd: string;
   actorRunner: NexusPublicationActorRunner;
   baseEnv: NodeJS.ProcessEnv;
+  authProfiles: NexusHostingAuthProfileConfig[];
 }): NexusPublicationActorStatus {
   const expected = options.policy.actor;
   const commandEnvironment = publicationCommandEnvironment(options.policy, {
@@ -519,6 +549,7 @@ function readPublicationActorStatus(options: {
     env: publicationProcessEnvironment(options.policy, {
       baseEnv: options.baseEnv,
       projectRoot: options.projectRoot,
+      authProfiles: options.authProfiles,
     }),
   });
   if (result.status !== 0 || result.error) {
@@ -574,6 +605,24 @@ function readPublicationActorStatus(options: {
   };
 }
 
+function readPublicationGitIdentityStatus(options: {
+  policy: NexusAutomationPublicationConfig;
+  repositoryPath: string;
+  gitRunner: GitRunner;
+  authProfiles: NexusHostingAuthProfileConfig[];
+}): NexusGitIdentityStatus {
+  return compareGitIdentity({
+    expected: resolveExpectedAutomationGitIdentity({
+      publication: options.policy,
+      authProfiles: options.authProfiles,
+    }),
+    observed: readObservedGitIdentity({
+      repositoryPath: options.repositoryPath,
+      gitRunner: options.gitRunner,
+    }),
+  });
+}
+
 export function publicationPolicyRequiresGuard(
   policy: NexusAutomationPublicationConfig,
   action: NexusPublicationGuardAction,
@@ -595,6 +644,7 @@ function publicationPolicyChecks(options: {
   component: ResolvedNexusProjectComponent;
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
+  gitIdentity: NexusGitIdentityStatus;
   actor: NexusPublicationActorStatus;
   authority: NexusEffectiveAuthorityResolution | null;
   strict: boolean;
@@ -661,6 +711,20 @@ function publicationPolicyChecks(options: {
         options.actor.message,
       ),
     );
+    if (
+      options.policy.actor.kind !== "human" &&
+      options.gitIdentity.status !== "not_configured" &&
+      options.gitIdentity.status !== "unchecked"
+    ) {
+      checks.push(
+        check(
+          `${prefix}:gitIdentity`,
+          options.gitIdentity.status === "matched",
+          options.gitIdentity.message,
+          options.gitIdentity.message,
+        ),
+      );
+    }
   }
 
   if (options.authority && options.strict) {

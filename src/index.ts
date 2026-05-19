@@ -4,6 +4,7 @@ export * from "./codexAppServerInitializeProbe.js";
 export * from "./codexAppServerJsonRpc.js";
 export * from "./codexAppServerMcpRelay.js";
 export * from "./gitWorktreeService.js";
+export * from "./nexusGitIdentity.js";
 export * from "./nexusAutomation.js";
 export * from "./nexusAutomationHeartbeat.js";
 export * from "./nexusAuthority.js";

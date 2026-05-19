@@ -233,6 +233,8 @@ function validateHostingAuthProfile(
     "githubCliConfigDir",
     pathName,
   );
+  const gitUserName = optionalString(record, "gitUserName", pathName);
+  const gitUserEmail = optionalString(record, "gitUserEmail", pathName);
   const command = optionalString(record, "command", pathName);
   const environmentKeys = optionalStringArray(
     record,
@@ -249,6 +251,8 @@ function validateHostingAuthProfile(
     ...(host !== undefined ? { host } : {}),
     ...(sshHost !== undefined ? { sshHost } : {}),
     ...(githubCliConfigDir !== undefined ? { githubCliConfigDir } : {}),
+    ...(gitUserName !== undefined ? { gitUserName } : {}),
+    ...(gitUserEmail !== undefined ? { gitUserEmail } : {}),
     ...(command !== undefined ? { command } : {}),
     ...(environmentKeys !== undefined ? { environmentKeys } : {}),
   };

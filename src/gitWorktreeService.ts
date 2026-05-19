@@ -23,12 +23,18 @@ export interface PrepareGitWorktreeOptions {
   baseRef?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
+  gitIdentity?: PreparedGitWorktreeIdentity | null;
   gitRunner?: GitRunner;
 }
 
 export interface PreparedGitWorktreeWorkItem {
   id: string;
   title: string | null;
+}
+
+export interface PreparedGitWorktreeIdentity {
+  name: string;
+  email: string;
 }
 
 export interface PrepareGitWorktreeResult {
@@ -39,6 +45,7 @@ export interface PrepareGitWorktreeResult {
   branchName: string;
   baseRef: string | null;
   workItem: PreparedGitWorktreeWorkItem | null;
+  gitIdentity: PreparedGitWorktreeIdentity | null;
   git: {
     commands: GitCommandResult[];
   };
@@ -80,6 +87,7 @@ export function prepareGitWorktree(
     options.workItemId,
     options.workItemTitle,
   );
+  const gitIdentity = normalizePreparedGitIdentity(options.gitIdentity);
   const worktreePath = path.join(worktreesRoot, worktreeName);
   assertSafeWorktreePath(worktreesRoot, worktreePath);
   if (fs.existsSync(worktreePath)) {
@@ -104,6 +112,20 @@ export function prepareGitWorktree(
     ],
     sourceRoot,
   );
+  if (gitIdentity) {
+    runGitCommand(
+      gitRunner,
+      commands,
+      ["config", "--local", "user.name", gitIdentity.name],
+      worktreePath,
+    );
+    runGitCommand(
+      gitRunner,
+      commands,
+      ["config", "--local", "user.email", gitIdentity.email],
+      worktreePath,
+    );
+  }
 
   return {
     componentId,
@@ -113,6 +135,7 @@ export function prepareGitWorktree(
     branchName,
     baseRef,
     workItem,
+    gitIdentity,
     git: {
       commands,
     },
@@ -266,6 +289,19 @@ function normalizePreparedWorktreeWorkItem(
   return {
     id: requiredNonEmptyString(workItemId, "workItemId"),
     title: optionalNullableString(workItemTitle, "workItemTitle"),
+  };
+}
+
+function normalizePreparedGitIdentity(
+  value: PreparedGitWorktreeIdentity | null | undefined,
+): PreparedGitWorktreeIdentity | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return {
+    name: requiredNonEmptyString(value.name, "gitIdentity.name"),
+    email: requiredNonEmptyString(value.email, "gitIdentity.email"),
   };
 }
 
