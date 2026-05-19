@@ -1,7 +1,55 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T01:25:00.000Z",
+  "updatedAt": "2026-05-19T02:29:00.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a5f19e08f84b6252",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "dogfood-authority-bootstrap-20260519T021414Z",
+      "branchName": "codex/dev-nexus-dogfood/dogfood-authority-bootstrap-20260519-t021414-z",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/authority-bootstrap-20260519T021414Z"
+      },
+      "writeScope": [
+        "dev-nexus.project.json",
+        ".dev-nexus/automation/target-state.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T02:18:39.835Z",
+      "lastSeenAt": "2026-05-19T02:29:00.000Z",
+      "updatedAt": "2026-05-19T02:29:00.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "f24f194c6a5e6ec380e3017c43c5dc568bd4f64e",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": null,
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published project-meta commit f24f194 to bot/main and fast-forwarded the shared dogfood checkout.",
+        "Verification: project status JSON passed; automation status authority resolves dogfood-automation-bot with bot-github/maintainer; eligible-work is ready with 7 items.",
+        "Host-local dev-nexus.home.json binds bot-github to dogfood-automation-bot and keeps GH_CONFIG_DIR isolated."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
@@ -49,120 +97,6 @@
       "notes": [
         "Project-meta updates for local-92/local-134 completion were preserved on main, then the auxiliary project-meta worktree and local branch were removed.",
         "Verification: metadata JSON parsed successfully and git diff --check passed before publication."
-      ]
-    },
-    {
-      "kind": "dev-nexus.worktree.lease",
-      "version": 1,
-      "id": "lease-6a9c4a785cf3840c",
-      "projectId": "dev-nexus-dogfood",
-      "scope": {
-        "kind": "component",
-        "componentId": "dev-nexus"
-      },
-      "hostId": "BLPP-15398",
-      "agentId": null,
-      "workItemId": "local-134",
-      "branchName": "main",
-      "baseRef": "origin/main",
-      "worktree": {
-        "kind": "external",
-        "base": "external",
-        "componentId": "dev-nexus",
-        "relativePath": null
-      },
-      "writeScope": [
-        "src/workItemImportPlanner.ts",
-        "src/workItemImportPlanner.test.ts",
-        "src/cli.ts",
-        "src/nexusMcpServer.ts",
-        "src/nexusCoreMcpTools.ts",
-        "inbound import execution tests"
-      ],
-      "status": "merged",
-      "createdAt": "2026-05-19T01:18:29.261Z",
-      "lastSeenAt": "2026-05-19T01:18:29.261Z",
-      "updatedAt": "2026-05-19T01:18:29.261Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
-      "dirty": false,
-      "pushed": true,
-      "git": {
-        "repository": {
-          "kind": "external",
-          "base": "external",
-          "componentId": "dev-nexus",
-          "relativePath": null
-        },
-        "upstream": "origin/main",
-        "ahead": 0,
-        "behind": 0,
-        "stagedCount": 0,
-        "unstagedCount": 0,
-        "untrackedCount": 0,
-        "warnings": []
-      },
-      "notes": [
-        "local-134 is merged and published; worker branch content is preserved in source main at 793a162.",
-        "Verification: Worker focused suite passed (3 files, 86 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).",
-        "Integration preference: direct_integration"
-      ]
-    },
-    {
-      "kind": "dev-nexus.worktree.lease",
-      "version": 1,
-      "id": "lease-e0cdf0370aea8d06",
-      "projectId": "dev-nexus-dogfood",
-      "scope": {
-        "kind": "component",
-        "componentId": "dev-nexus"
-      },
-      "hostId": "BLPP-15398",
-      "agentId": null,
-      "workItemId": "local-92",
-      "branchName": "main",
-      "baseRef": "origin/main",
-      "worktree": {
-        "kind": "external",
-        "base": "external",
-        "componentId": "dev-nexus",
-        "relativePath": null
-      },
-      "writeScope": [
-        "src/nexusAuthority.ts",
-        "src/nexusCoordination.ts",
-        "src/nexusCoordinationRequest.ts",
-        "src/cli.ts",
-        "src/nexusMcpServer.ts",
-        "coordination authority tests"
-      ],
-      "status": "merged",
-      "createdAt": "2026-05-19T01:18:28.186Z",
-      "lastSeenAt": "2026-05-19T01:18:28.186Z",
-      "updatedAt": "2026-05-19T01:18:28.186Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
-      "dirty": false,
-      "pushed": true,
-      "git": {
-        "repository": {
-          "kind": "external",
-          "base": "external",
-          "componentId": "dev-nexus",
-          "relativePath": null
-        },
-        "upstream": "origin/main",
-        "ahead": 0,
-        "behind": 0,
-        "stagedCount": 0,
-        "unstagedCount": 0,
-        "untrackedCount": 0,
-        "warnings": []
-      },
-      "notes": [
-        "local-92 is merged and published; worker branch content is preserved in source main at 793a162.",
-        "Verification: Worker focused suite passed (4 files, 111 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).",
-        "Integration preference: direct_integration"
       ]
     },
     {
@@ -291,6 +225,120 @@
         "Worker commit a0d26de was merged into DevNexus main and published through bot/main as 793a162.",
         "Completed worktree and local branch were removed after clean status and ancestry verification.",
         "Verification: worker focused suite passed; integrated focused suite passed; npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-6a9c4a785cf3840c",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-134",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/workItemImportPlanner.ts",
+        "src/workItemImportPlanner.test.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusCoreMcpTools.ts",
+        "inbound import execution tests"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T01:18:29.261Z",
+      "lastSeenAt": "2026-05-19T01:18:29.261Z",
+      "updatedAt": "2026-05-19T01:18:29.261Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "local-134 is merged and published; worker branch content is preserved in source main at 793a162.",
+        "Verification: Worker focused suite passed (3 files, 86 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).",
+        "Integration preference: direct_integration"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-e0cdf0370aea8d06",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-92",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusAuthority.ts",
+        "src/nexusCoordination.ts",
+        "src/nexusCoordinationRequest.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "coordination authority tests"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T01:18:28.186Z",
+      "lastSeenAt": "2026-05-19T01:18:28.186Z",
+      "updatedAt": "2026-05-19T01:18:28.186Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "793a162b57645c8c0a268ed6c9ca12fa60dd9e4e",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "local-92 is merged and published; worker branch content is preserved in source main at 793a162.",
+        "Verification: Worker focused suite passed (4 files, 111 tests); integrated focused suite passed (5 files, 122 tests); npm run build passed; git diff --check HEAD~5..HEAD passed; npm run check passed (64 files, 572 tests).",
+        "Integration preference: direct_integration"
       ]
     },
     {
