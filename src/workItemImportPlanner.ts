@@ -930,7 +930,33 @@ function itemContainsFingerprint(item: WorkItem, fingerprint: string): boolean {
     item.milestone ?? "",
     ...(item.labels ?? []),
   ];
-  return values.some((value) => value.includes(fingerprint));
+  return values.some((value) =>
+    itemFingerprintTokens(value).includes(fingerprint),
+  );
+}
+
+function itemFingerprintTokens(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  return dedupeStrings([
+    trimmed,
+    ...[...trimmed.matchAll(/https?:\/\/[^\s<>"')\]}]+/gu)].map((match) =>
+      stripTrailingFingerprintPunctuation(match[0]!),
+    ),
+    ...[...trimmed.matchAll(/\bgithub:[^\s<>"')\]}]+/gu)].map((match) =>
+      stripTrailingFingerprintPunctuation(match[0]!),
+    ),
+    ...[...trimmed.matchAll(/\bgithub-node:[^\s<>"')\]}]+/gu)].map((match) =>
+      stripTrailingFingerprintPunctuation(match[0]!),
+    ),
+  ].filter(Boolean));
+}
+
+function stripTrailingFingerprintPunctuation(value: string): string {
+  return value.replace(/[.,;:!?]+$/u, "");
 }
 
 function sourceReferenceForItem(
@@ -981,9 +1007,28 @@ function plannedLinkFromSource(options: {
   };
 }
 
+type TrackerReferenceIdentity = Pick<
+  WorkItemTrackerReference,
+  | "trackerId"
+  | "provider"
+  | "host"
+  | "repositoryId"
+  | "repositoryOwner"
+  | "repositoryName"
+  | "projectId"
+  | "itemId"
+  | "itemNumber"
+  | "nodeId"
+>;
+
+type TrackerReferenceContext = Pick<
+  WorkItemTrackerReference,
+  "host" | "repositoryId" | "repositoryOwner" | "repositoryName" | "projectId"
+>;
+
 function trackerReferencesSameItem(
-  left: Pick<WorkItemTrackerReference, "trackerId" | "provider" | "itemId" | "itemNumber" | "nodeId">,
-  right: Pick<WorkItemTrackerReference, "trackerId" | "provider" | "itemId" | "itemNumber" | "nodeId">,
+  left: TrackerReferenceIdentity,
+  right: TrackerReferenceIdentity,
 ): boolean {
   if (left.trackerId !== right.trackerId || left.provider !== right.provider) {
     return false;
@@ -991,10 +1036,41 @@ function trackerReferencesSameItem(
   if (left.nodeId && right.nodeId && left.nodeId === right.nodeId) {
     return true;
   }
-  if (left.itemId && right.itemId && left.itemId === right.itemId) {
+  if (
+    left.itemId &&
+    right.itemId &&
+    left.itemId === right.itemId &&
+    trackerReferenceContextsSame(left, right)
+  ) {
     return true;
   }
-  return Boolean(left.itemNumber && right.itemNumber && left.itemNumber === right.itemNumber);
+  return Boolean(
+    left.itemNumber &&
+      right.itemNumber &&
+      left.itemNumber === right.itemNumber &&
+      trackerReferenceContextsSame(left, right),
+  );
+}
+
+function trackerReferenceContextsSame(
+  left: TrackerReferenceContext,
+  right: TrackerReferenceContext,
+): boolean {
+  const fields = [
+    "host",
+    "repositoryId",
+    "repositoryOwner",
+    "repositoryName",
+    "projectId",
+  ] as const;
+  return fields.every(
+    (field) =>
+      nullableContextValue(left[field]) === nullableContextValue(right[field]),
+  );
+}
+
+function nullableContextValue(value: string | null | undefined): string | null {
+  return value ?? null;
 }
 
 function targetItemId(item: WorkItem): string {

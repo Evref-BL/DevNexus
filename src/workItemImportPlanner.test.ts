@@ -491,6 +491,93 @@ describe("work item import planner", () => {
     ]);
   });
 
+  it("does not fingerprint-match repo-scoped external refs by substring", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider("github", [
+      githubIssue(1, { title: "Create issue one" }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider("local", [
+      workItem("local-10", {
+        title: "Imported issue ten",
+        description: "Imported from github:example/project#10",
+      }),
+    ]);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+
+    const plan = await createWorkItemImportPlan({
+      projectRoot,
+      componentId: "core",
+      policy: defaultPolicy,
+      resolveProject: createProjectResolver(project),
+      providerFactory: ((context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory,
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+
+    expect(plan.fingerprintMatches).toEqual([]);
+    expect(plan.updates).toEqual([]);
+    expect(plan.creates).toMatchObject([
+      {
+        source: { id: "github-1" },
+        targetDetection: "unlinked",
+      },
+    ]);
+  });
+
+  it("does not treat repo-scoped issue ids as linked when repository context differs", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider("github", [
+      githubIssue(42, { title: "Repo scoped source" }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider("local", [
+      workItem("local-42", { title: "Wrong repo linked target" }),
+    ]);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+    const resolveProject = createProjectResolver(project);
+    await createWorkItemTrackerLinkService({
+      resolveProject,
+      now: fixedClock("2026-05-18T08:10:00.000Z"),
+    }).linkReference({
+      projectRoot,
+      logicalItemId: "local-42",
+      trackerId: "github",
+      itemId: "42",
+      itemNumber: 42,
+      webUrl: "https://github.com/example/other-project/issues/42",
+    });
+    const storePath = defaultWorkItemTrackerLinkStorePath(projectRoot);
+    const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    store.records[0].references[0].repositoryName = "other-project";
+    fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+
+    const plan = await createWorkItemImportPlan({
+      projectRoot,
+      componentId: "core",
+      policy: defaultPolicy,
+      resolveProject,
+      providerFactory: ((context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory,
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+
+    expect(plan.updates).toEqual([]);
+    expect(plan.staleLinks).toEqual([]);
+    expect(plan.creates).toMatchObject([
+      {
+        source: { id: "github-42" },
+        targetDetection: "unlinked",
+      },
+    ]);
+  });
+
   it("reports source credential and provider-path blockers without reading local files", async () => {
     const projectRoot = makeTempDir("dev-nexus-import-");
     const project = createProjectContext(projectRoot);
