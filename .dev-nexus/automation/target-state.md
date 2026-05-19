@@ -81,7 +81,13 @@ and ready for coordinator-driven work across its components.
   checks that avoid raw secret values. `dev-nexus:local-159` is published as
   `4fbc4a4` for setup hosting handoff reporting, exact hosting status/plan/apply
   next commands, meta-project-only scope, and explicit deferral of provider
-  mutations out of `project setup`.
+  mutations out of `project setup`. `dev-nexus:local-161` is published as
+  `be3c30a` for installed CLI versus documentation command-surface skew
+  diagnostics, `dev-nexus:local-160` is published as `89f216a` for setup
+  readiness and agent handoff reporting, and `dev-nexus:local-154` is published
+  as `4556010` for automation Git identity derivation, worktree-local bot Git
+  config, worker-context identity briefing, and publication preflight blocking
+  when non-human automation would inherit a mismatched human Git identity.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -321,10 +327,11 @@ and ready for coordinator-driven work across its components.
   re-check eligible work and either promote the next dependency-satisfied
   bounded slice or record the blocker that keeps remaining items out of ready
   state.
-- Continue first-user onboarding from the now-complete setup proposal model,
-  guided setup CLI, component-add flow, auth inventory, and hosting handoff:
-  next implementation slices are `dev-nexus:local-160` for readiness reporting
-  and `local-161` for installed CLI versus docs version-skew diagnostics.
+- First-user onboarding repair from Nicolas' trial is now complete through the
+  local setup model, guided setup CLI, component-add flow, auth inventory,
+  hosting handoff, setup readiness report, and CLI/docs skew diagnostics. The
+  next cycle should re-check eligible work and pick the next dependency-ready
+  bounded slice rather than continuing the completed onboarding batch.
 
 ## Boundaries
 

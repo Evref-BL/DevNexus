@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 162,
-  "nextCommentNumber": 339,
-  "updatedAt": "2026-05-19T18:03:03.616Z",
+  "nextCommentNumber": 342,
+  "updatedAt": "2026-05-19T18:23:30.050Z",
   "items": [
     {
       "id": "local-1",
@@ -3964,7 +3964,7 @@
       "id": "local-154",
       "title": "Guard automation commits against human Git author identity",
       "description": "Type: publication/account safety defect\nReadiness: autonomous agent-ready (AFK)\nSource: investigation of Evref-BL/DevNexus-Pharo#2 on 2026-05-19.\n\nObserved failure:\nEvref-BL/DevNexus-Pharo#2 was opened and merged by the configured automation GitHub actor `Gabot-Darbot`, but the Git commits themselves were authored and committed as the human account `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`:\n- PR commit `c365351`: author/committer `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`.\n- Merge commit `998d5ce`: author/committer `Gabriel-Darbord <gabriel.darbord@berger-levrault.com>`.\nThe local DevNexus-Pharo checkout has no repo-local `user.name` or `user.email`, so Git falls back to the host global human identity. The `bot` remote and isolated `GH_CONFIG_DIR` control push/API authentication, but they do not set Git author/committer metadata.\n\nCurrent evidence:\n- DevNexus already has publication actor/remote guardrails (`dev-nexus:local-38`) and later fixed ambient GitHub token leakage in source commit `05928d6`.\n- Those fixes cover GitHub actor and provider credential selection, but not local Git author/committer identity.\n- The DevNexus and dogfood checkouts currently have repo-local bot `user.name`/`user.email`, but DevNexus-Pharo and DevNexus-TypeScript can still inherit the global human Git identity.\n\nGoal:\nPrevent DevNexus-owned automation commits, merge commits, and integration commits from being created with a human Git author/committer identity when the configured publication actor is a machine user.\n\nAcceptance criteria:\n- Publication/worker setup can derive expected Git author and committer identity from the configured automation actor/auth profile, without hard-coding dogfood-specific users in DevNexus core.\n- DevNexus prepares component worktrees with repo-local `user.name` and `user.email`, or sets equivalent `GIT_AUTHOR_*` and `GIT_COMMITTER_*` environment for DevNexus-owned commit/merge operations.\n- Publication preflight/status reports the observed Git author/committer config for each component checkout and flags mismatch with the configured automation actor.\n- DevNexus-owned commit or target-branch integration paths fail closed, or use the configured bot identity, when `git config user.name/user.email` would otherwise resolve to a human identity.\n- Tests cover a component checkout with only global human Git config and assert automation commit setup/preflight does not silently accept it.\n- Dogfood smoke evidence covers DevNexus-Pharo or a fixture equivalent where the configured bot actor would create commits as `Gabot-Darbot <285409735+Gabot-Darbot@users.noreply.github.com>` rather than the human account.\n\nBoundaries:\n- Do not rewrite or force-push existing public history from Evref-BL/DevNexus-Pharo#2 as part of this implementation.\n- Do not store secrets in shared project config.\n- Keep the model provider-neutral where possible; GitHub noreply email derivation may be a GitHub-specific adapter or explicit auth-profile field.\n- Do not conflate Git commit identity with GitHub API actor identity; both must be reported separately.\n\nVerification:\n- Focused tests around publication policy/status and worktree setup Git identity behavior.\n- Focused CLI/MCP preflight output test if the status surface changes.\n- `npm run check` in DevNexus when feasible.\n- Manual read-only verification of DevNexus-Pharo local config after setup, or fixture smoke, showing repo-local bot identity is configured.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -3977,8 +3977,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T15:26:53.741Z",
-      "updatedAt": "2026-05-19T15:26:53.741Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T18:23:30.050Z",
+      "closedAt": "2026-05-19T18:23:30.050Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4126,7 +4126,7 @@
       "id": "local-160",
       "title": "Add setup readiness report and agent handoff summary",
       "description": "Type: implementation slice\nDepends on: dev-nexus:local-155 and local setup wizard work.\nSource: Nicolas onboarding follow-up.\nOwner: dev-nexus component.\n\nProblem:\nAfter setup, the user should not have to ask \"is this ready?\" and receive a guess. DevNexus should produce a readiness report that both a human and an agent can use as the handoff into real work.\n\nAcceptance criteria:\n- Add or extend a setup readiness report covering project config validity, home registration, component source reachability, worktrees root, local tracker stores, MCP config, AGENTS.md, projected skills, active agent targets, Git remotes, auth profile state, hosting status, and eligible issue discovery where configured.\n- Produce a concise verdict: ready to work, ready with warnings, or blocked, with concrete blocker actions.\n- Include next steps for Codex/OpenCode/Claude as configured, including which directory to open as the agent project root.\n- Include optional provider issue/report summaries when GitHub/GitLab/Jira trackers are configured and credentials allow read-only access.\n- Emit structured JSON for agents and short human text for terminal use.\n\nVerification:\n- Unit tests for verdict aggregation.\n- CLI tests for missing AGENTS/MCP/skills, missing auth, and ready fake project.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4141,8 +4141,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:22:55.049Z",
-      "updatedAt": "2026-05-19T17:22:55.049Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T18:23:20.408Z",
+      "closedAt": "2026-05-19T18:23:20.408Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4154,7 +4154,7 @@
       "id": "local-161",
       "title": "Detect installed CLI and documentation version skew during onboarding",
       "description": "Type: onboarding/release guard slice\nSource: Nicolas onboarding follow-up and observed npm-vs-repo README skew.\nOwner: dev-nexus component.\n\nProblem:\nA first-time agent may read the live repository README while installing an older published npm package, then suggest commands that do not exist in the installed CLI. This turns a successful install into confusing onboarding advice.\n\nAcceptance criteria:\n- The install/readiness flow reports installed package version, CLI command surface, and whether the docs being followed match that released version.\n- User-facing README guidance clearly separates released npm usage from source/main branch usage.\n- `dev-nexus --help`, setup readiness, or a dedicated diagnostic warns when expected documented commands are missing from the installed CLI.\n- The warning recommends one concrete fix: upgrade npm package, install from source, or follow the versioned docs for the installed release.\n- Tests cover a fake older CLI/doc command mismatch without network access.\n\nVerification:\n- CLI/readiness diagnostic tests.\n- Static docs review.\n- npm run check.",
-      "status": "todo",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4168,8 +4168,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T17:23:15.913Z",
-      "updatedAt": "2026-05-19T17:23:15.913Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T18:23:12.334Z",
+      "closedAt": "2026-05-19T18:23:12.334Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8246,7 +8246,19 @@
         }
       }
     ],
-    "local-154": [],
+    "local-154": [
+      {
+        "id": "local-comment-341",
+        "body": "Implemented automation Git identity guard in DevNexus source commit 4556010258edacd0e4aa64533da634a8a84bdd64. Generated worktrees now get repo-local bot Git identity when configured; publication status reports observed Git identity and blocks mismatched non-human automation actors; worker context includes the expected identity. Published branch codex/dev-nexus/local-154-git-identity-guard and integrated to bot/main. Verification passed: npm test -- src/gitWorktreeService.test.ts src/nexusPublicationPolicy.test.ts src/nexusAutomationAgentLaunch.test.ts src/nexusManualWorktree.test.ts; npm run check; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T18:23:29.925Z",
+        "updatedAt": "2026-05-19T18:23:29.925Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-341"
+        }
+      }
+    ],
     "local-155": [
       {
         "id": "local-comment-334",
@@ -8312,7 +8324,31 @@
         }
       }
     ],
-    "local-160": [],
-    "local-161": []
+    "local-160": [
+      {
+        "id": "local-comment-340",
+        "body": "Implemented setup readiness report and agent handoff summary in DevNexus source commit 89f216a144ce3dc8efa35e4a838085bf5cf403ae. Published branch codex/dev-nexus/local-160-readiness-report and integrated to bot/main. Verification passed: npm test -- src/nexusProjectSetupReadiness.test.ts src/cli.test.ts; npm run check; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T18:23:20.281Z",
+        "updatedAt": "2026-05-19T18:23:20.281Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-340"
+        }
+      }
+    ],
+    "local-161": [
+      {
+        "id": "local-comment-339",
+        "body": "Implemented CLI/docs version-skew diagnostics in DevNexus source commit be3c30a33370366797ec89d6a2b12a7f5ce35741. Published branch codex/dev-nexus/local-161-version-skew and integrated to bot/main. Verification passed: npm test -- src/cli.test.ts; npm run check; git diff --check.",
+        "author": null,
+        "createdAt": "2026-05-19T18:23:12.199Z",
+        "updatedAt": "2026-05-19T18:23:12.199Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-339"
+        }
+      }
+    ]
   }
 }
