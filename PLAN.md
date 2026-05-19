@@ -79,24 +79,27 @@ target-cycle facts, commits, and the target report.
   remaining app-server event and capability facts.
 - Continue authority configuration after completed `dev-nexus:local-92`
   coordination and provider mutation gating. `local-94` role documentation is
-  complete; `local-93` is the next authority follow-on for provider approval
-  and branch-policy signals.
+  complete; `local-93` provider approval and branch-policy signal mapping is
+  complete. Keep `local-95` blocked for the remaining HITL role-policy
+  decisions.
 - Continue agent-target projection after completed `dev-nexus:local-106`
   active-target filtering and completed `local-107` stale projection
-  diagnostics. `local-109` worker context propagation is the next independent
-  implementation slice. Cleanup and dogfood migration remain later.
+  diagnostics. `local-109` worker context propagation is complete. Cleanup and
+  dogfood migration remain later.
 - Continue DevNexus-Research from `docs/dev-nexus-research-plugin-prd.md`.
   `dev-nexus:local-146` is the blocked human-in-the-loop license and upstream
-  ARS integration posture decision; `local-147` is ready for an original
+  ARS integration posture decision; `local-147` is complete for an original
   DevNexus-Research plugin skeleton. Promote `local-148` through `local-151`
-  after the skeleton and relevant setup/artifact prerequisites land.
+  after relevant setup/artifact prerequisites land.
 - Cross-tracker discovery and inbound GitHub-to-local import are sliced:
   `dev-nexus:local-129` is complete for tracker roles and discovery-policy
   defaults, and `local-130` is complete for read-only discovery status.
   `local-131` is complete for opt-in eligible-work aggregation, `local-132`
   is complete for linked-item deduplication, `local-133` is complete for
   inbound import planning, and `local-134` is complete for policy-gated import
-  execution. `local-135` and `local-136` are ready next.
+  execution. `local-135` is complete for compact external issue visibility
+  summaries, and `local-136` is complete for fake GitHub inbox discovery/import
+  smoke coverage.
   `local-137` is the blocked HITL policy decision for direct external
   selection, provider comments, scheduler import, and ordering.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean

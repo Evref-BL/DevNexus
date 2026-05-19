@@ -164,10 +164,12 @@ and ready for coordinator-driven work across its components.
   authority resolver, `local-90` is complete for scoped authority status and
   agent-context reporting, `local-91` is complete for publication action
   gating, and `local-92` is complete for coordination/provider mutation
-  authority gates. `local-93` is the ready follow-on for provider
-  approval/branch-policy signals, and `local-94` is complete for
-  authority-role documentation. `local-95` is a blocked HITL decision item for
-  self-approval, temporary elevation, and advanced role-policy questions.
+  authority gates. `local-93` is complete as DevNexus source commit
+  `8a97548` for mocked GitHub, GitLab, and Jira provider approval,
+  branch-policy, and issue-level decision signal summaries. `local-94` is
+  complete for authority-role documentation. `local-95` is a blocked HITL
+  decision item for self-approval, temporary elevation, and advanced role-policy
+  questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
   `local-103`. `local-97`, `local-98`, `local-99`, and `local-102` are
@@ -270,9 +272,10 @@ and ready for coordinator-driven work across its components.
 - Cross-tracker discovery implementation is complete through
   `dev-nexus:local-136`; keep `local-137` blocked until the user decides the
   dogfood external issue selection, provider-comment, scheduler-import, and
-  ordering policy. The next ready DevNexus source cycle should prioritize
-  `local-93` provider authority signals unless a new bounded research-plugin
-  slice is made ready.
+  ordering policy. The authority provider-signal follow-on `local-93` is
+  complete; the next cycle should re-check eligible work and either promote a
+  dependency-satisfied bounded slice or record the blocker that keeps remaining
+  items out of ready state.
 
 ## Boundaries
 

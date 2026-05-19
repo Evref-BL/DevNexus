@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 318,
-  "updatedAt": "2026-05-19T09:32:10.032Z",
+  "nextCommentNumber": 320,
+  "updatedAt": "2026-05-19T09:48:58.650Z",
   "items": [
     {
       "id": "local-1",
@@ -2333,7 +2333,7 @@
       "id": "local-93",
       "title": "Map provider approval and branch-policy signals into authority state",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) after the authority resolver and provider-neutral signal shape exist\nParent planning item: dev-nexus:local-78\nSource PRD: Coordination Roles And Authority PRD\n\nGoal: add mocked provider adapters or adapter helpers that translate provider-native review, check, branch-policy, issue-status, and workflow signals into neutral DevNexus authority signals.\n\nUser stories covered:\n- As an integration agent, I can understand whether provider approval, checks, branch policy, and DevNexus publication policy all allow merging.\n- As a worker agent, I can see that an issue-level design approval and a pull-request merge approval are different signals.\n\nAcceptance criteria:\n- Neutral provider authority signals include waiting_for_approval, approved, changes_requested, rejected, checks_pending, checks_failed, checks_passed, branch_policy_blocked, mergeable, merge_conflict, and timed_out.\n- GitHub-style mocked provider state maps pull request reviews, required checks, mergeability, branch protection, labels, and project-status signals into neutral signals.\n- GitLab-style mocked provider state maps merge request approvals, pipeline state, mergeability, labels, and status transitions into neutral signals.\n- Jira-style mocked provider state maps workflow transitions, assignees, comments, and status categories into neutral signals for issue-level decisions.\n- Assignment remains ownership or expected-responder metadata unless a project explicitly overrides it.\n- Provider signal summaries can be consumed by the effective authority resolver without provider-specific branching in command code.\n\nDependencies:\n- Depends on effective authority resolver concepts and provider abstraction points.\n\nBoundaries:\n- Mocked providers only for the first implementation.\n- Do not add webhooks or continuous polling.\n\nVerification:\n- Focused provider-signal mapping tests for GitHub, GitLab, Jira, ambiguous signals, assignment-not-approval, and branch-policy blockers.\n- npm run check when feasible.\n\nPublication notes:\n- Direct integration to DevNexus main after verification passes under configured dogfood policy.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -2349,8 +2349,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.871Z",
-      "updatedAt": "2026-05-19T01:18:16.242Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T09:48:58.650Z",
+      "closedAt": "2026-05-19T09:48:49.260Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -6477,6 +6477,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-298"
+        }
+      },
+      {
+        "id": "local-comment-318",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 8a9754819af705f246ab83a9f7eae28a7d75d0e9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T09:48:35.201Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\local-93-provider-authority-signals-closeout\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-93\",\n  \"logicalItemId\": \"local-93\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-93\",\n    \"itemNumber\": 93,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-93\",\n      \"itemNumber\": 93\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-93\",\n    \"itemNumber\": 93,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-93\",\n      \"itemNumber\": 93\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-93\",\n      \"itemNumber\": 93,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-93\",\n        \"itemNumber\": 93\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"8a9754819af705f246ab83a9f7eae28a7d75d0e9\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusAuthorityProviderSignals.ts\",\n    \"src/nexusAuthorityProviderSignals.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Implemented provider-native mocked signal summaries as a layer over the existing NexusAuthorityProviderState resolver input.\",\n    \"Kept assignees and expected responders as ownership metadata rather than approval signals.\",\n    \"Published direct integration to DevNexus bot/main at 8a97548 after full verification.\"\n  ],\n  \"verificationSummary\": \"Passed: npm test -- src/nexusAuthorityProviderSignals.test.ts; npm test -- src/nexusAuthorityProviderSignals.test.ts src/nexusAuthority.test.ts src/nexusPublicationPolicy.test.ts; npm run check in component worktree and shared source checkout.\",\n  \"integrationPreference\": null,\n  \"note\": null,\n  \"leaseId\": \"lease-1820c7a389f4360c\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T09:48:35.233Z",
+        "updatedAt": "2026-05-19T09:48:35.233Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-318"
+        }
+      },
+      {
+        "id": "local-comment-319",
+        "body": "Completed in DevNexus source commit 8a97548 on bot/main. Added mocked GitHub, GitLab, and Jira provider authority-signal mapping helpers, exported the provider-signal module, and covered resolver-ready summaries, branch-policy blockers, assignment-not-approval, and issue-vs-PR approval separation. Verification passed: npm test -- src/nexusAuthorityProviderSignals.test.ts; npm test -- src/nexusAuthorityProviderSignals.test.ts src/nexusAuthority.test.ts src/nexusPublicationPolicy.test.ts; npm run check in both the component worktree and shared source checkout.",
+        "author": null,
+        "createdAt": "2026-05-19T09:48:58.650Z",
+        "updatedAt": "2026-05-19T09:48:58.650Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-319"
         }
       }
     ],
