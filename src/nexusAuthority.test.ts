@@ -399,6 +399,10 @@ describe("nexus effective authority resolution", () => {
       actor: { id: "reviewer-bot" },
       requestedAction: "provider.review.approve",
     });
+    const requestChanges = resolveEffectiveAuthority({
+      actor: { id: "reviewer-bot" },
+      requestedAction: "provider.review.reject",
+    });
     const merge = resolveEffectiveAuthority({
       actor: { id: "reviewer-bot" },
       requestedAction: "provider.pull_request.merge",
@@ -410,6 +414,7 @@ describe("nexus effective authority resolution", () => {
     });
 
     expect(reviewApproval.status).toBe("allowed");
+    expect(requestChanges.status).toBe("allowed");
     expect(merge).toMatchObject({
       status: "blocked",
       missingRequiredActions: ["provider.pull_request.merge"],
@@ -797,8 +802,22 @@ describe("nexus authority summaries", () => {
         "git.push_branch",
         "provider.pull_request.open",
         "provider.review.request",
+        "provider.comment",
         "work_item.update",
+        "work_item.comment",
         "coordination.handoff",
+      ]),
+    );
+    expect(result.keyAllowedActions).not.toContain("provider.label");
+    expect(result.keyAllowedActions).not.toContain("provider.assign");
+    expect(result.keyAllowedActions).not.toContain("provider.transition");
+    expect(result.keyAllowedActions).not.toContain("provider.review.approve");
+    expect(result.keyAllowedActions).not.toContain("provider.review.reject");
+    expect(result.blockedActions).toEqual(
+      expect.arrayContaining([
+        "provider.label",
+        "provider.assign",
+        "provider.transition",
       ]),
     );
     expect(result.keyAllowedActions).not.toContain("git.push_target_branch");

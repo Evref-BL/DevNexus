@@ -6,12 +6,14 @@ import {
   coordinationRequestCommentMarker,
   createLocalWorkTrackerProvider,
   createNexusCoordinationRequest,
+  defaultNexusAutomationConfig,
   loadLocalWorkTrackingStore,
   parseNexusCoordinationRequestIntent,
   parseNexusCoordinationRequestStatus,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
+  type NexusAuthorityConfig,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -58,6 +60,64 @@ function projectConfig(
           storePath,
         },
         relationships: [],
+      },
+    ],
+  };
+}
+
+function authorityProjectConfig(
+  sourceRoot: string,
+  worktreesRoot: string,
+  storePath: string,
+  actorId: "observer-bot" | "contributor-bot",
+): NexusProjectConfig {
+  return {
+    ...projectConfig(sourceRoot, worktreesRoot, storePath),
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "local_only",
+        actor: {
+          id: actorId,
+          kind: "machine_user",
+          provider: "github",
+          handle: actorId,
+        },
+      },
+    },
+    authority: coordinationRequestAuthority(),
+  };
+}
+
+function coordinationRequestAuthority(): NexusAuthorityConfig {
+  return {
+    actors: [
+      {
+        id: "observer-bot",
+        kind: "machine_user",
+        provider: "github",
+        providerIdentity: "observer-bot",
+        displayName: "Observer Bot",
+      },
+      {
+        id: "contributor-bot",
+        kind: "machine_user",
+        provider: "github",
+        providerIdentity: "contributor-bot",
+        displayName: "Contributor Bot",
+      },
+    ],
+    roleBindings: [
+      {
+        actorId: "observer-bot",
+        roles: ["observer"],
+        scope: { component: "dev-nexus" },
+      },
+      {
+        actorId: "contributor-bot",
+        roles: ["contributor"],
+        scope: { component: "dev-nexus" },
       },
     ],
   };
@@ -512,6 +572,109 @@ describe("nexus coordination requests", () => {
       expect.arrayContaining([
         expect.stringContaining("live external provider posting is disabled"),
       ]),
+    );
+  });
+
+  it("keeps coordination request drafts when provider and comment authority are blocked", async () => {
+    const { projectRoot, sourceRoot, worktreePath, storePath } =
+      await createFixture();
+    saveProjectConfig(
+      projectRoot,
+      authorityProjectConfig(
+        sourceRoot,
+        "worktrees/dev-nexus",
+        storePath,
+        "observer-bot",
+      ),
+    );
+
+    const result = await createNexusCoordinationRequest({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-1",
+      intent: "feedback",
+      question: "Can an observer post this provider comment?",
+      target: "github-issue:17",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath),
+      now: () => "2026-05-18T08:20:00.000Z",
+    });
+
+    expect(result.record.provider).toMatchObject({
+      provider: "github",
+      surface: "issue",
+      mode: "draft",
+      posted: false,
+      postingDisposition: "draft_authority_blocked",
+      blockedMutation: {
+        action: "provider.comment",
+        fallbackAction: "coordination.handoff",
+      },
+    });
+    expect(result.comment).toBeNull();
+    expect(result.blockedMutations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "provider.comment" }),
+        expect.objectContaining({ action: "work_item.comment" }),
+      ]),
+    );
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("authority blocked provider.comment"),
+        expect.stringContaining("authority blocked work_item.comment"),
+      ]),
+    );
+    const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
+    expect(store.comments["local-1"]).toEqual([]);
+  });
+
+  it("allows coordination request comments while leaving permitted provider posting as a draft", async () => {
+    const { projectRoot, sourceRoot, worktreePath, storePath } =
+      await createFixture();
+    saveProjectConfig(
+      projectRoot,
+      authorityProjectConfig(
+        sourceRoot,
+        "worktrees/dev-nexus",
+        storePath,
+        "contributor-bot",
+      ),
+    );
+
+    const result = await createNexusCoordinationRequest({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-1",
+      intent: "feedback",
+      question: "Can a contributor draft this provider comment?",
+      target: "github-issue:17",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath),
+      now: () => "2026-05-18T08:25:00.000Z",
+    });
+
+    expect(result.record.provider).toMatchObject({
+      provider: "github",
+      surface: "issue",
+      mode: "draft",
+      posted: false,
+      postingDisposition: "draft_live_posting_disabled",
+      authority: {
+        allowed: true,
+        requestedAction: "provider.comment",
+      },
+      blockedMutation: null,
+    });
+    expect(result.comment?.body).toContain(coordinationRequestCommentMarker);
+    expect(result.blockedMutations).toEqual([]);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("live external provider posting is disabled"),
+      ]),
+    );
+    const store = loadLocalWorkTrackingStore(path.join(projectRoot, storePath));
+    expect(store.comments["local-1"]?.[0]?.body).toContain(
+      "DevNexus coordination request",
     );
   });
 

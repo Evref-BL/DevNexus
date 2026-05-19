@@ -1635,6 +1635,151 @@ describe("DevNexus MCP server", () => {
     ]);
   });
 
+  it("blocks provider work-item MCP mutations when the current actor lacks provider authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "local_only",
+            actor: {
+              id: "contributor-bot",
+              kind: "machine_user",
+              provider: "github",
+              handle: "contributor-bot",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "contributor-bot",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "contributor-bot",
+              displayName: "Contributor Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "contributor-bot",
+              roles: ["contributor"],
+              scope: { component: "primary" },
+            },
+          ],
+        },
+        components: [
+          {
+            id: "primary",
+            name: "MCP Demo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: { provider: "local" },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "mcp-demo",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const blockedLabels = await callDevNexusMcpTool("work_item_update", {
+      projectRoot,
+      componentId: "primary",
+      trackerId: "github",
+      id: "42",
+      labels: ["blocked"],
+    });
+    const blockedAssignments = await callDevNexusMcpTool("work_item_update", {
+      projectRoot,
+      componentId: "primary",
+      trackerId: "github",
+      id: "42",
+      assignees: ["maintainer"],
+    });
+    const blockedTransition = await callDevNexusMcpTool("work_item_set_status", {
+      projectRoot,
+      componentId: "primary",
+      trackerId: "github",
+      id: "42",
+      status: "done",
+    });
+
+    expect(blockedLabels.isError).toBe(true);
+    expect(toolJson(blockedLabels)).toMatchObject({
+      ok: false,
+      blockedMutation: {
+        action: "provider.label",
+        reason: expect.stringContaining("provider.label"),
+        fallbackAction: "coordination.handoff",
+      },
+    });
+    expect(blockedAssignments.isError).toBe(true);
+    expect(toolJson(blockedAssignments)).toMatchObject({
+      blockedMutation: {
+        action: "provider.assign",
+      },
+    });
+    expect(blockedTransition.isError).toBe(true);
+    expect(toolJson(blockedTransition)).toMatchObject({
+      blockedMutation: {
+        action: "provider.transition",
+      },
+    });
+
+    const item = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local" },
+      now: fixedClock("2026-05-18T08:30:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Local comment is allowed",
+      status: "ready",
+    });
+    const localComment = toolJson(
+      await callDevNexusMcpTool("work_item_comment", {
+        projectRoot,
+        componentId: "primary",
+        id: item.id,
+        body: "Contributor comment.",
+      }),
+    );
+
+    expect(localComment).toMatchObject({
+      ok: true,
+      comment: {
+        body: "Contributor comment.",
+      },
+    });
+  });
+
   it("records target cycle facts through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
