@@ -126,6 +126,11 @@ import {
   type NexusCleanupPlan,
 } from "./nexusCleanupPlan.js";
 import {
+  buildNexusCliVersionSkewDiagnostic,
+  parseDevNexusCommandLines,
+  type NexusCliVersionSkewDiagnostic,
+} from "./nexusCliVersionSkewDiagnostic.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -434,6 +439,14 @@ interface ParsedSetupRecordCommand {
   stepId: string;
   status: NexusSetupRecordedStepStatus;
   note?: string | null;
+  json?: boolean;
+}
+
+interface ParsedDiagnosticsCliVersionSkewCommand {
+  installedHelpFile?: string;
+  expectedFiles: string[];
+  expectedCommands: string[];
+  packageVersion?: string | null;
   json?: boolean;
 }
 
@@ -859,6 +872,7 @@ export function usage(): string {
     "  dev-nexus setup plan <project-root> <flow-id> [options]",
     "  dev-nexus setup check <project-root> <flow-id> [options]",
     "  dev-nexus setup record <project-root> <flow-id> <step-id> --status <status> [options]",
+    "  dev-nexus diagnostics cli-version-skew [options]",
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
@@ -964,6 +978,13 @@ export function usage(): string {
     "  --platform <auto|macos|windows|linux>",
     "  --status <pending|completed|blocked|skipped>",
     "  --note <text>",
+    "  --json",
+    "",
+    "Options for diagnostics cli-version-skew:",
+    "  --installed-help-file <path>  help text to inspect; defaults to this CLI help",
+    "  --expected-file <path>        documentation file to scan; repeatable",
+    "  --expected-command <command>  documented command to require; repeatable",
+    "  --package-version <version>   installed package version to report",
     "  --json",
     "",
     "Options for coordination status:",
@@ -1333,6 +1354,9 @@ export async function main(
   if (argv[0] === "setup") {
     return handleSetupCommand(argv, dependencies);
   }
+  if (argv[0] === "diagnostics") {
+    return handleDiagnosticsCommand(argv, dependencies);
+  }
   if (argv[0] === "coordination") {
     return handleCoordinationCommand(argv, dependencies);
   }
@@ -1354,7 +1378,7 @@ export async function main(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, coordination, remote-execution, worktree, work-item, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, work-item, automation, mcp-stdio, or --help",
   );
 }
 
@@ -1736,6 +1760,38 @@ async function handleSetupCommand(
   }
 
   throw new Error("setup requires list, plan, check, or record");
+}
+
+async function handleDiagnosticsCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "cli-version-skew") {
+    const parsed = parseDiagnosticsCliVersionSkewCommand(argv);
+    const diagnostic = buildNexusCliVersionSkewDiagnostic({
+      installedHelpText: parsed.installedHelpFile
+        ? fs.readFileSync(parsed.installedHelpFile, "utf8")
+        : usage(),
+      expectedCommands: resolveExpectedCliVersionSkewCommands(parsed),
+      installedPackageVersion:
+        parsed.packageVersion === undefined
+          ? readCurrentPackageVersion()
+          : parsed.packageVersion,
+      expectedSource:
+        parsed.expectedCommands.length > 0
+          ? "explicit expected commands"
+          : parsed.expectedFiles.join(", "),
+    });
+    printDiagnosticsCliVersionSkewResult(
+      diagnostic,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return diagnostic.status === "ok" ? 0 : 1;
+  }
+
+  throw new Error("diagnostics requires cli-version-skew");
 }
 
 async function handleCoordinationCommand(
@@ -3916,6 +3972,52 @@ function parseCoordinationStatusCommand(
       default:
         throw new Error(`Unknown coordination status option: ${arg}`);
     }
+  }
+
+  return parsed;
+}
+
+function parseDiagnosticsCliVersionSkewCommand(
+  argv: string[],
+): ParsedDiagnosticsCliVersionSkewCommand {
+  const parsed: ParsedDiagnosticsCliVersionSkewCommand = {
+    expectedFiles: [],
+    expectedCommands: [],
+  };
+  const rest = argv.slice(2);
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--installed-help-file":
+        parsed.installedHelpFile = next();
+        break;
+      case "--expected-file":
+        parsed.expectedFiles.push(next());
+        break;
+      case "--expected-command":
+        parsed.expectedCommands.push(next());
+        break;
+      case "--package-version":
+        parsed.packageVersion = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown diagnostics cli-version-skew option: ${arg}`);
+    }
+  }
+
+  if (parsed.expectedFiles.length === 0 && parsed.expectedCommands.length === 0) {
+    parsed.expectedFiles = defaultCliVersionSkewExpectedFiles();
   }
 
   return parsed;
@@ -6603,6 +6705,38 @@ function printSetupCheckResult(
   }
 }
 
+function printDiagnosticsCliVersionSkewResult(
+  diagnostic: NexusCliVersionSkewDiagnostic,
+  parsed: ParsedDiagnosticsCliVersionSkewCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: diagnostic.status === "ok", diagnostic };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus CLI version skew: ${diagnostic.status}.`);
+  writeLine(stdout, `  Verdict: ${diagnostic.verdict}`);
+  writeLine(
+    stdout,
+    `  Installed package version: ${diagnostic.installedPackageVersion ?? "unknown"}`,
+  );
+  writeLine(
+    stdout,
+    `  Expected command source: ${diagnostic.expectedSource ?? "unknown"}`,
+  );
+  if (diagnostic.missingDocumentedCommands.length > 0) {
+    writeLine(stdout, "  Missing documented commands:");
+    for (const command of diagnostic.missingDocumentedCommands) {
+      writeLine(stdout, `    ${command}`);
+    }
+  } else {
+    writeLine(stdout, "  Missing documented commands: none");
+  }
+  writeLine(stdout, `  Remediation: ${diagnostic.remediation.summary}`);
+}
+
 function printSetupRecordResult(
   result: RecordNexusSetupStepResult,
   parsed: ParsedSetupRecordCommand,
@@ -8641,6 +8775,46 @@ function cliSharedCheckoutGuardOverride(
   return parseNexusSharedCheckoutGuardOverride(
     process.env.DEV_NEXUS_SHARED_CHECKOUT_GUARD_OVERRIDE,
   );
+}
+
+function resolveExpectedCliVersionSkewCommands(
+  parsed: ParsedDiagnosticsCliVersionSkewCommand,
+): string[] {
+  return [
+    ...parsed.expectedCommands,
+    ...parsed.expectedFiles.flatMap((filePath) =>
+      parseDevNexusCommandLines(fs.readFileSync(filePath, "utf8")),
+    ),
+  ];
+}
+
+function defaultCliVersionSkewExpectedFiles(): string[] {
+  const root = packageRootPath();
+  return [
+    path.join(root, "README.md"),
+    path.join(root, "docs", "user", "getting-started.md"),
+  ].filter((filePath) => fs.existsSync(filePath));
+}
+
+function readCurrentPackageVersion(): string | null {
+  const packageJsonPath = path.join(packageRootPath(), "package.json");
+  if (!fs.existsSync(packageJsonPath)) {
+    return null;
+  }
+
+  const parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
+    version?: unknown;
+  };
+  return typeof parsed.version === "string" ? parsed.version : null;
+}
+
+function packageRootPath(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const moduleDirName = path.basename(moduleDir);
+  if (moduleDirName === "src" || moduleDirName === "dist") {
+    return path.dirname(moduleDir);
+  }
+  return moduleDir;
 }
 
 function isCliEntrypoint(): boolean {

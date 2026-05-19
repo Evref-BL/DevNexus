@@ -19,9 +19,16 @@ dev-nexus --help
 ```
 
 If you are reading documentation from the GitHub `main` branch while using an
-older npm release, verify each command with `dev-nexus --help`. The docs in
-the installed package and the CLI help are the authority for that installed
-version.
+older npm release, run:
+
+```bash
+dev-nexus diagnostics cli-version-skew --json
+```
+
+The diagnostic compares the installed CLI help with the documented command
+surface and reports missing commands, the installed package version when known,
+and one concrete remediation: upgrade the npm package, install from source, or
+follow documentation versioned for the installed CLI.
 
 ## Homes And Projects
 

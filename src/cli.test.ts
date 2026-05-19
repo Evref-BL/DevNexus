@@ -310,6 +310,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus project hosting apply");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
     expect(output.output()).toContain("dev-nexus setup plan");
+    expect(output.output()).toContain("dev-nexus diagnostics cli-version-skew");
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
@@ -346,6 +347,83 @@ describe("dev-nexus cli", () => {
     );
 
     expect(missing).toEqual([]);
+  });
+
+  it("reports installed CLI and documentation command skew without network access", async () => {
+    const tempDir = makeTempDir("dev-nexus-cli-skew-");
+    const olderHelpPath = path.join(tempDir, "older-help.txt");
+    fs.writeFileSync(
+      olderHelpPath,
+      [
+        "Usage:",
+        "  dev-nexus --help",
+        "  dev-nexus project status <project-id-or-root> [options]",
+      ].join("\n"),
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "diagnostics",
+          "cli-version-skew",
+          "--installed-help-file",
+          olderHelpPath,
+          "--expected-command",
+          "dev-nexus project status <project-id-or-root>",
+          "--expected-command",
+          "dev-nexus project setup <project-root> --answers <answers.json>",
+          "--package-version",
+          "0.1.0-alpha.10",
+          "--json",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(1);
+
+    const parsed = JSON.parse(output.output());
+    expect(parsed).toMatchObject({
+      ok: false,
+      diagnostic: {
+        status: "skew_detected",
+        installedPackageVersion: "0.1.0-alpha.10",
+        missingDocumentedCommands: ["dev-nexus project setup"],
+        remediation: {
+          action: "upgrade_npm_package",
+        },
+      },
+    });
+  });
+
+  it("prints a human CLI skew remediation when installed help misses documented commands", async () => {
+    const tempDir = makeTempDir("dev-nexus-cli-skew-human-");
+    const olderHelpPath = path.join(tempDir, "older-help.txt");
+    fs.writeFileSync(
+      olderHelpPath,
+      "Usage:\n  dev-nexus project status <project-id-or-root> [options]\n",
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "diagnostics",
+          "cli-version-skew",
+          "--installed-help-file",
+          olderHelpPath,
+          "--expected-command",
+          "dev-nexus project setup <project-root>",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(1);
+
+    expect(output.output()).toContain("DevNexus CLI version skew: skew_detected.");
+    expect(output.output()).toContain("Missing documented commands:");
+    expect(output.output()).toContain("dev-nexus project setup");
+    expect(output.output()).toContain("Remediation:");
   });
 
   it("prints project hosting status and plan through the CLI", async () => {

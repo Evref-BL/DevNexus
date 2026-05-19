@@ -21,7 +21,10 @@ dev-nexus --help
 
 The online README on `main` can move ahead of the latest npm release. When an
 agent installs from npm, verify the installed command surface with
-`dev-nexus --help` before following newer source-branch examples.
+`dev-nexus diagnostics cli-version-skew --json` before following newer
+source-branch examples. If the diagnostic reports missing documented commands,
+upgrade the npm package, install DevNexus from the source checkout, or use the
+docs that shipped with the installed package version.
 
 For source development:
 
