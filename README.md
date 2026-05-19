@@ -50,18 +50,17 @@ small JSON answer file, previews local writes by default, and applies only when
 `--yes` is present:
 
 ```bash
-dev-nexus home init
 dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --json
 dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --yes
 dev-nexus project status "$HOME/dev-nexus/example-suite"
 ```
 
 `project setup` defaults the DevNexus home to `DEV_NEXUS_HOME` or
-`~/.dev-nexus`, then collects the project root, component sources, primary
-component, agent targets, local tracker choice, hosting intent, auth-profile
-references, and publication posture. Provider mutations, such as creating a
-GitHub repository or repairing access, are left as explicit next-phase hosting
-actions.
+`~/.dev-nexus` and creates the local home registry when needed. It then collects
+the project root, component sources, primary component, agent targets, local
+tracker choice, hosting intent, auth-profile references, and publication
+posture. Provider mutations, such as creating a GitHub repository or repairing
+access, are left as explicit next-phase hosting actions.
 
 Use `project create` as a low-level local scaffold command. Use `project
 import` only when one existing source checkout should become the primary

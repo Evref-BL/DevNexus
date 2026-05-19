@@ -136,12 +136,25 @@ export interface NexusProjectSetupLocalWorkTrackingAnswers {
 
 export interface NexusProjectSetupWorkTrackerAnswers {
   id: string;
+  componentId?: string;
   provider: NexusProjectSetupWorkTrackingProvider;
-  role?: "primary" | "eligible_source" | "external_inbox" | "coordination";
+  role?:
+    | "primary"
+    | "eligible_source"
+    | "external_inbox"
+    | "mirror"
+    | "coordination"
+    | "planning"
+    | "external_feedback"
+    | "migration"
+    | "archive";
   authProfileId?: string;
+  host?: string;
   repositoryOwner?: string;
   repositoryName?: string;
+  repositoryId?: string;
   projectKey?: string;
+  issueType?: string;
 }
 
 export interface NexusProjectSetupAuthProfileAnswers {
@@ -331,6 +344,98 @@ export function validateNexusProjectSetupAnswers(
       diagnostics.push(errorDiagnostic(
         `authProfiles[${index}].credentialMethod`,
         "Auth profiles require a host-local credential method reference.",
+      ));
+    }
+  }
+
+  const authProfileIds = new Set<string>();
+  for (const [index, profile] of (answers.authProfiles ?? []).entries()) {
+    if (!nonEmptyString(profile.id)) {
+      continue;
+    }
+    if (authProfileIds.has(profile.id)) {
+      diagnostics.push(errorDiagnostic(
+        `authProfiles[${index}].id`,
+        `Duplicate auth profile id: ${profile.id}.`,
+      ));
+    }
+    authProfileIds.add(profile.id);
+  }
+
+  const componentIds = new Set(
+    (answers.components ?? [])
+      .map((component) => component.id)
+      .filter(nonEmptyString),
+  );
+  const workTrackerIds = new Set<string>();
+  for (const [index, tracker] of (answers.workTrackers ?? []).entries()) {
+    const pathPrefix = `workTrackers[${index}]`;
+    if (!nonEmptyString(tracker.id)) {
+      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, "Work tracker id is required."));
+    } else if (workTrackerIds.has(tracker.id)) {
+      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, `Duplicate work tracker id: ${tracker.id}.`));
+    } else {
+      workTrackerIds.add(tracker.id);
+    }
+    if (tracker.componentId && !componentIds.has(tracker.componentId)) {
+      diagnostics.push(errorDiagnostic(
+        `${pathPrefix}.componentId`,
+        `Work tracker references unknown component: ${tracker.componentId}.`,
+      ));
+    }
+    if (tracker.authProfileId && !authProfileIds.has(tracker.authProfileId)) {
+      diagnostics.push(errorDiagnostic(
+        `${pathPrefix}.authProfileId`,
+        `Work tracker references unknown auth profile: ${tracker.authProfileId}.`,
+      ));
+    }
+    switch (tracker.provider) {
+      case "local":
+        break;
+      case "github":
+        if (!nonEmptyString(tracker.repositoryOwner)) {
+          diagnostics.push(errorDiagnostic(`${pathPrefix}.repositoryOwner`, "GitHub trackers require repositoryOwner."));
+        }
+        if (!nonEmptyString(tracker.repositoryName)) {
+          diagnostics.push(errorDiagnostic(`${pathPrefix}.repositoryName`, "GitHub trackers require repositoryName."));
+        }
+        break;
+      case "gitlab":
+        if (
+          !nonEmptyString(tracker.repositoryId) &&
+          !(nonEmptyString(tracker.repositoryOwner) && nonEmptyString(tracker.repositoryName))
+        ) {
+          diagnostics.push(errorDiagnostic(
+            `${pathPrefix}.repositoryId`,
+            "GitLab trackers require repositoryId or repositoryOwner plus repositoryName.",
+          ));
+        }
+        break;
+      case "jira":
+        if (!nonEmptyString(tracker.projectKey)) {
+          diagnostics.push(errorDiagnostic(`${pathPrefix}.projectKey`, "Jira trackers require projectKey."));
+        }
+        break;
+      default:
+        diagnostics.push(errorDiagnostic(
+          `${pathPrefix}.provider`,
+          `Unsupported work tracker provider: ${String(tracker.provider)}.`,
+        ));
+        break;
+    }
+  }
+
+  for (const [pathName, profileId] of [
+    ["hostingIntent.humanAuthProfileId", answers.hostingIntent?.humanAuthProfileId],
+    ["hostingIntent.automationAuthProfileId", answers.hostingIntent?.automationAuthProfileId],
+    ["hostingIntent.providerMutationAuthProfileId", answers.hostingIntent?.providerMutationAuthProfileId],
+    ["publication.automationAuthProfileId", answers.publication?.automationAuthProfileId],
+    ["publication.humanAuthProfileId", answers.publication?.humanAuthProfileId],
+  ] as const) {
+    if (profileId && !authProfileIds.has(profileId)) {
+      diagnostics.push(errorDiagnostic(
+        pathName,
+        `Referenced auth profile is not defined: ${profileId}.`,
       ));
     }
   }
@@ -590,12 +695,16 @@ function normalizeNexusProjectSetupAnswers(
       ? {
           workTrackers: answers.workTrackers.map((tracker) => ({
             id: tracker.id,
+            ...(tracker.componentId ? { componentId: tracker.componentId } : {}),
             provider: tracker.provider,
             ...(tracker.role ? { role: tracker.role } : {}),
             ...(tracker.authProfileId ? { authProfileId: tracker.authProfileId } : {}),
+            ...(tracker.host ? { host: tracker.host } : {}),
             ...(tracker.repositoryOwner ? { repositoryOwner: tracker.repositoryOwner } : {}),
             ...(tracker.repositoryName ? { repositoryName: tracker.repositoryName } : {}),
+            ...(tracker.repositoryId ? { repositoryId: tracker.repositoryId } : {}),
             ...(tracker.projectKey ? { projectKey: tracker.projectKey } : {}),
+            ...(tracker.issueType ? { issueType: tracker.issueType } : {}),
           })),
         }
       : {}),

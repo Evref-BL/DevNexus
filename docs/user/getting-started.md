@@ -83,13 +83,15 @@ source root. It is not a command for adding a component to an existing project.
 If you have three existing repositories that should be worked on together, use
 one `project setup` answer file with three components.
 
-Minimum setup answers are `home.path`, `project.id`, `project.name`,
-`project.root`, at least one component, exactly one `primary` component, and a
-source strategy for each component. Optional setup answers cover whether to
-initialize the meta Git repository, component source defaults, agent targets,
-local work tracking, external work-tracker intent, host-local auth-profile
-references for GitHub/GitLab/Jira/generic Git providers, meta-repository
-hosting intent, publication posture, and read-only readiness reports. Raw
+Minimum setup answers are `project.id`, `project.name`, `project.root`, at
+least one component, exactly one `primary` component, and a source strategy for
+each component. `home.path` is optional; DevNexus resolves the home from
+`--home`, then answer-file `home.path`, then `DEV_NEXUS_HOME`, then
+`~/.dev-nexus`. Optional setup answers cover whether to initialize the meta Git
+repository, component source defaults, agent targets, local work tracking,
+external work-tracker intent, host-local auth-profile references for
+GitHub/GitLab/Jira/generic Git providers, meta-repository hosting intent,
+publication posture, and read-only readiness reports. Raw
 tokens, passwords, and private keys do not belong in the answer file; reference
 host-local credential context such as `gh`, `glab`, environment-variable names,
 or token-store ids instead.

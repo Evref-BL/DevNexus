@@ -73,7 +73,10 @@ import {
 import {
   appendNexusAutomationTargetCycleRecord,
   maxNexusAutomationTargetCycleNoteLength,
+  nexusAutomationTargetCycleLedgerPath,
   readNexusAutomationTargetCycleLedger,
+  type NexusAutomationTargetCycleLedger,
+  type NexusAutomationTargetCycleRecord,
   type NexusAutomationTargetCycleStatus,
   type NexusAutomationTargetCycleWorkItemInput,
 } from "./nexusAutomationTargetCycle.js";
@@ -155,6 +158,7 @@ import {
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type {
+  WorkItem,
   WorkItemPatch,
   WorkItemRef,
   WorkStatus,
@@ -213,7 +217,6 @@ const tools: McpTool[] = [
       type: "object",
       properties: {
         homePath: { type: "string" },
-        mode: { enum: ["default", "discovery"] },
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
@@ -266,6 +269,7 @@ const tools: McpTool[] = [
       type: "object",
       properties: {
         homePath: { type: "string" },
+        mode: { enum: ["default", "discovery"] },
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
@@ -428,6 +432,7 @@ const tools: McpTool[] = [
                   "in_progress",
                   "completed",
                   "blocked",
+                  "failed",
                   "skipped",
                   null,
                 ],
@@ -860,7 +865,8 @@ const tools: McpTool[] = [
         labels: { type: "array", items: { type: "string" } },
         assignees: { type: "array", items: { type: "string" } },
         search: { type: "string" },
-        limit: { type: "number" },
+        limit: { type: "number", default: 50, maximum: 100 },
+        detail: { type: "string", enum: ["summary", "full"], default: "summary" },
       },
       additionalProperties: false,
     },
@@ -1715,18 +1721,31 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
           }),
         });
-      case "work_item_list":
+      case "work_item_list": {
+        const detail = optionalString(args, "detail", "arguments") ?? "summary";
+        if (detail !== "summary" && detail !== "full") {
+          throw new Error("arguments.detail must be summary or full");
+        }
+        const limit = optionalPositiveInteger(args, "limit", "arguments") ?? 50;
+        if (limit > 100) {
+          throw new Error("arguments.limit must be at most 100");
+        }
+        const workItems = await workItemServiceFromArgs(args, context).listWorkItems({
+          ...projectSelectorFromArgs(args),
+          status: optionalWorkStatusQuery(args, "status", "arguments"),
+          labels: optionalStringArray(args, "labels", "arguments"),
+          assignees: optionalStringArray(args, "assignees", "arguments"),
+          search: optionalString(args, "search", "arguments"),
+          limit,
+        });
         return toolResult({
           ok: true,
-          workItems: await workItemServiceFromArgs(args, context).listWorkItems({
-            ...projectSelectorFromArgs(args),
-            status: optionalWorkStatusQuery(args, "status", "arguments"),
-            labels: optionalStringArray(args, "labels", "arguments"),
-            assignees: optionalStringArray(args, "assignees", "arguments"),
-            search: optionalString(args, "search", "arguments"),
-            limit: optionalPositiveInteger(args, "limit", "arguments"),
-          }),
+          detail,
+          limit,
+          workItems:
+            detail === "full" ? workItems : workItems.map(summarizeWorkItem),
         });
+      }
       case "work_item_get": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
         return toolResult({
@@ -2235,14 +2254,18 @@ function logicalWorkItemFromArgs(args: Record<string, unknown>): {
 function targetCycleLedgerFromArgs(args: Record<string, unknown>): {
   projectRoot: string;
   projectId: string;
-  ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>;
+  ledger: ReturnType<typeof summarizeTargetCycleLedger>;
 } {
   const { projectRoot, projectConfig, automationConfig } =
     targetCycleProjectFromArgs(args);
+  const ledger = readNexusAutomationTargetCycleLedger(projectRoot, automationConfig);
   return {
     projectRoot,
     projectId: projectConfig.id,
-    ledger: readNexusAutomationTargetCycleLedger(projectRoot, automationConfig),
+    ledger: summarizeTargetCycleLedger(
+      ledger,
+      nexusAutomationTargetCycleLedgerPath(projectRoot, automationConfig),
+    ),
   };
 }
 
@@ -3144,6 +3167,104 @@ function parseToolCallParams(value: unknown): { name: string; arguments?: unknow
     name: requiredString(params, "name", "params"),
     arguments: params.arguments,
   };
+}
+
+function summarizeWorkItem(item: WorkItem): Omit<WorkItem, "description"> & {
+  descriptionLength: number | null;
+} {
+  return {
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    provider: item.provider,
+    labels: item.labels ?? [],
+    assignees: item.assignees ?? [],
+    milestone: item.milestone ?? null,
+    createdAt: item.createdAt ?? null,
+    updatedAt: item.updatedAt ?? null,
+    closedAt: item.closedAt ?? null,
+    webUrl: item.webUrl ?? null,
+    ...(item.externalRef === undefined ? {} : { externalRef: item.externalRef }),
+    ...(item.trackerRef === undefined ? {} : { trackerRef: item.trackerRef }),
+    descriptionLength:
+      item.description === undefined || item.description === null
+        ? null
+        : item.description.length,
+  };
+}
+
+function summarizeTargetCycleLedger(
+  ledger: NexusAutomationTargetCycleLedger,
+  ledgerPath: string,
+): {
+  version: NexusAutomationTargetCycleLedger["version"];
+  ledgerPath: string;
+  updatedAt: string | null;
+  cycleCount: number;
+  cycles: Array<{
+    id: string;
+    status: NexusAutomationTargetCycleStatus;
+    startedAt: string;
+    finishedAt: string | null;
+    runId: string | null;
+    targetId: string | null;
+    summary: string | null;
+    eligibleWorkItemCount: number | null;
+    workItemCount: number;
+    workItemStatusCounts: Record<string, number>;
+    blockerCount: number;
+    noteCount: number;
+    nextCycleNotBefore: string | null;
+    workItemRefs: Array<{
+      componentId: string | null;
+      id: string;
+      cycleStatus: string | null;
+      agentProfileId: string | null;
+    }>;
+  }>;
+} {
+  return {
+    version: ledger.version,
+    ledgerPath,
+    updatedAt: ledger.updatedAt,
+    cycleCount: ledger.cycles.length,
+    cycles: ledger.cycles.map(summarizeTargetCycleRecord),
+  };
+}
+
+function summarizeTargetCycleRecord(record: NexusAutomationTargetCycleRecord) {
+  return {
+    id: record.id,
+    status: record.status,
+    startedAt: record.startedAt,
+    finishedAt: record.finishedAt,
+    runId: record.runId,
+    targetId: record.targetId,
+    summary: record.summary,
+    eligibleWorkItemCount: record.eligibleWorkItemCount,
+    workItemCount: record.workItems.length,
+    workItemStatusCounts: countTargetCycleWorkItemStatuses(record),
+    blockerCount: record.blockers.length,
+    noteCount: record.notes.length,
+    nextCycleNotBefore: record.nextCycleNotBefore,
+    workItemRefs: record.workItems.slice(0, 3).map((item) => ({
+      componentId: item.componentId,
+      id: item.id,
+      cycleStatus: item.cycleStatus,
+      agentProfileId: item.agentProfileId,
+    })),
+  };
+}
+
+function countTargetCycleWorkItemStatuses(
+  record: NexusAutomationTargetCycleRecord,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of record.workItems) {
+    const key = item.cycleStatus ?? "unknown";
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function toolResult(value: unknown, isError = false): DevNexusMcpToolResult {

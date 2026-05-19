@@ -18,6 +18,7 @@ import {
   type NexusProjectComponentConfig,
   type NexusProjectConfig,
   type NexusProjectWorkTrackerBindingConfig,
+  type NexusProjectWorkTrackerRole,
 } from "./nexusProjectConfig.js";
 import { analyzeNexusProjectSetupComponentTopology } from "./nexusProjectComponentTopology.js";
 import { buildNexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
@@ -36,9 +37,18 @@ import {
   renderNexusProjectSetupProposalSummary,
   type NexusProjectSetupAgentProvider,
   type NexusProjectSetupAnswers,
+  type NexusProjectSetupAuthProfileAnswers,
   type NexusProjectSetupProposal,
+  type NexusProjectSetupWorkTrackerAnswers,
 } from "./nexusProjectSetupModel.js";
 import { createLocalWorkTrackerProvider } from "./workTrackingLocalProvider.js";
+import type {
+  WorkTrackingConfig,
+} from "./workTrackingTypes.js";
+import type {
+  NexusHostingAuthProfileConfig,
+  NexusHostingAuthProfileKind,
+} from "./nexusProjectHosting.js";
 
 export const nexusProjectSetupRequiredAnswerPaths = [
   "project.id",
@@ -196,11 +206,17 @@ export async function applyNexusProjectSetup(
     projectConfig,
   });
 
-  if (proposal.answers.home.registerProject !== false) {
+  if (
+    proposal.answers.home.registerProject !== false ||
+    (proposal.answers.authProfiles?.length ?? 0) > 0
+  ) {
     const homeConfig = loadOrCreateProjectSetupHome(homePath);
-    upsertNexusProjectReference(homeConfig, projectRoot, projectConfig, {
-      vibeKanbanProjectId: null,
-    });
+    upsertSetupAuthProfiles(homeConfig, proposal.answers.authProfiles ?? []);
+    if (proposal.answers.home.registerProject !== false) {
+      upsertNexusProjectReference(homeConfig, projectRoot, projectConfig, {
+        vibeKanbanProjectId: null,
+      });
+    }
     saveNexusHomeConfigFile(homePath, homeConfig, validateNexusHomeConfigBase);
     writtenFiles.push(nexusHomeConfigPath(homePath));
   }
@@ -243,6 +259,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
       buildNexusProjectComponentConfigFromSetupAnswers(projectRoot, component, {
         localWorkTracking,
         publication: answers.publication,
+        workTrackers: answers.workTrackers ?? [],
       }),
     ),
     ...(localWorkTracking.enabled
@@ -448,6 +465,7 @@ export function buildNexusProjectComponentConfigFromSetupAnswers(
   options: {
     localWorkTracking: NonNullable<NexusProjectSetupAnswers["localWorkTracking"]>;
     publication?: NexusProjectSetupAnswers["publication"];
+    workTrackers: NexusProjectSetupWorkTrackerAnswers[];
   },
 ): NexusProjectComponentConfig {
   const workTrackers: NexusProjectWorkTrackerBindingConfig[] = [];
@@ -465,6 +483,12 @@ export function buildNexusProjectComponentConfigFromSetupAnswers(
       },
     });
   }
+  workTrackers.push(
+    ...options.workTrackers
+      .filter((tracker) => setupTrackerAppliesToComponent(tracker, component))
+      .filter((tracker) => tracker.id !== "local")
+      .map(setupWorkTrackerToProjectBinding),
+  );
 
   const sourceRoot = componentSourceRoot(projectRoot, component);
   const kind = component.source.kind === "create_local" &&
@@ -483,7 +507,9 @@ export function buildNexusProjectComponentConfigFromSetupAnswers(
     sourceRoot: pathForProjectConfig(projectRoot, sourceRoot),
     ...(workTrackers.length > 0
       ? {
-          defaultWorkTrackerId: "local",
+          defaultWorkTrackerId: workTrackers.some((tracker) => tracker.id === "local")
+            ? "local"
+            : workTrackers[0]!.id,
           workTrackers,
           workTracking: workTrackers[0]!.workTracking,
         }
@@ -503,6 +529,73 @@ export function buildNexusProjectComponentConfigFromSetupAnswers(
       : {}),
     relationships: [],
   };
+}
+
+function setupTrackerAppliesToComponent(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  component: NexusProjectSetupAnswers["components"][number],
+): boolean {
+  return tracker.componentId
+    ? tracker.componentId === component.id
+    : component.role === "primary";
+}
+
+function setupWorkTrackerToProjectBinding(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+): NexusProjectWorkTrackerBindingConfig {
+  return {
+    id: tracker.id,
+    name: tracker.id,
+    enabled: true,
+    roles: [setupWorkTrackerRole(tracker)],
+    workTracking: setupWorkTrackingConfig(tracker),
+  };
+}
+
+function setupWorkTrackerRole(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+): NexusProjectWorkTrackerRole {
+  return tracker.role ?? "eligible_source";
+}
+
+function setupWorkTrackingConfig(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+): WorkTrackingConfig {
+  switch (tracker.provider) {
+    case "local":
+      return {
+        provider: "local",
+        storePath: `.dev-nexus/work-items/${tracker.id}.json`,
+      };
+    case "github":
+      return {
+        provider: "github",
+        ...(tracker.host ? { host: tracker.host } : {}),
+        repository: {
+          owner: tracker.repositoryOwner as string,
+          name: tracker.repositoryName as string,
+        },
+      };
+    case "gitlab": {
+      const repositoryId =
+        tracker.repositoryId ??
+        `${tracker.repositoryOwner as string}/${tracker.repositoryName as string}`;
+      return {
+        provider: "gitlab",
+        ...(tracker.host ? { host: tracker.host } : {}),
+        repository: {
+          id: repositoryId,
+        },
+      };
+    }
+    case "jira":
+      return {
+        provider: "jira",
+        ...(tracker.host ? { host: tracker.host } : {}),
+        projectKey: tracker.projectKey as string,
+        ...(tracker.issueType ? { issueType: tracker.issueType } : {}),
+      };
+  }
 }
 
 function hostingRemotesFromSetupAnswers(answers: NexusProjectSetupAnswers) {
@@ -614,6 +707,62 @@ function loadOrCreateProjectSetupHome(homePath: string): NexusHomeConfigBase {
   }
 
   return createDefaultNexusHomeConfigBase(homePath);
+}
+
+function upsertSetupAuthProfiles(
+  homeConfig: NexusHomeConfigBase,
+  profiles: NexusProjectSetupAuthProfileAnswers[],
+): void {
+  if (profiles.length === 0) {
+    return;
+  }
+  const existing = new Map(
+    (homeConfig.authProfiles ?? []).map((profile) => [profile.id, profile]),
+  );
+  for (const profile of profiles) {
+    existing.set(profile.id, setupAuthProfileToHomeAuthProfile(profile));
+  }
+  homeConfig.authProfiles = [...existing.values()];
+}
+
+function setupAuthProfileToHomeAuthProfile(
+  profile: NexusProjectSetupAuthProfileAnswers,
+): NexusHostingAuthProfileConfig {
+  const credential = profile.credentialMethod;
+  const kind = setupAuthProfileKind(profile);
+  return {
+    id: profile.id,
+    actorId: profile.account ?? profile.id,
+    provider: profile.provider,
+    ...(kind ? { kind } : {}),
+    ...(profile.account ? { account: profile.account } : {}),
+    ...(profile.host ? { host: profile.host } : {}),
+    ...(credential.kind === "provider_cli" &&
+    credential.cli === "gh" &&
+    credential.configDir
+      ? { githubCliConfigDir: credential.configDir }
+      : {}),
+    ...(credential.kind === "provider_cli"
+      ? { command: credential.cli }
+      : {}),
+    ...(credential.kind === "environment_variable"
+      ? { environmentKeys: [credential.variable] }
+      : {}),
+  };
+}
+
+function setupAuthProfileKind(
+  profile: NexusProjectSetupAuthProfileAnswers,
+): NexusHostingAuthProfileKind | undefined {
+  switch (profile.actorKind) {
+    case "human":
+      return "human";
+    case "machine_user":
+    case "service_account":
+      return "automation";
+    case "unknown":
+      return undefined;
+  }
 }
 
 function runGitIfMissing(

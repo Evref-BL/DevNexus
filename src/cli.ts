@@ -14,6 +14,7 @@ import {
 } from "./nexusAutomationAgentLaunch.js";
 import {
   resolveNexusAutomationAgentCommand,
+  shellQuoteArgument,
 } from "./nexusAutomationAgentProfile.js";
 import {
   probeCodexAppServerInitialize,
@@ -1349,6 +1350,21 @@ export function usage(): string {
 }
 
 export async function main(
+  argv: string[],
+  dependencies: DevNexusCliDependencies = {},
+): Promise<number> {
+  try {
+    return await mainUnchecked(argv, dependencies);
+  } catch (error) {
+    if (!argvRequestsJson(argv)) {
+      throw error;
+    }
+    writeJson(dependencies.stdout ?? process.stdout, cliErrorPayload(error));
+    return 1;
+  }
+}
+
+async function mainUnchecked(
   argv: string[],
   dependencies: DevNexusCliDependencies = {},
 ): Promise<number> {
@@ -6254,11 +6270,7 @@ function printProjectSetupApplyResult(
     writtenFiles: result.writtenFiles,
     ensuredLocalTrackerStores: result.ensuredLocalTrackerStores,
     git: result.git,
-    nextActions: [
-      "Open the DevNexus project root in the configured agent application.",
-      "Run dev-nexus setup check . join-existing-project --json.",
-      "Run dev-nexus project hosting status . --json when hosting intent is configured.",
-    ],
+    nextActions: projectSetupApplyNextActions(result),
   };
   if (parsed.json) {
     writeJson(stdout, payload);
@@ -8792,6 +8804,53 @@ function printCliAuthorityBlock(
 
 function writeJson(stdout: TextWriter, value: unknown): void {
   stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function argvRequestsJson(argv: readonly string[]): boolean {
+  return argv.includes("--json");
+}
+
+function cliErrorPayload(error: unknown): {
+  ok: false;
+  error: { code: string; message: string };
+} | Record<string, unknown> {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    const parsed = JSON.parse(message) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      (parsed as { ok?: unknown }).ok === false
+    ) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Not a structured DevNexus error payload.
+  }
+
+  return {
+    ok: false,
+    error: {
+      code: "cli_error",
+      message,
+    },
+  };
+}
+
+function projectSetupApplyNextActions(
+  result: NexusProjectSetupApplyResult,
+): string[] {
+  const projectRoot = shellQuoteArgument(result.projectRoot);
+  const homePath = result.proposal.answers.home.path
+    ? shellQuoteArgument(result.proposal.answers.home.path)
+    : null;
+  const homeOption = homePath ? ` --home ${homePath}` : "";
+  return [
+    `Open the DevNexus project root in the configured agent application: ${result.projectRoot}`,
+    `Run dev-nexus setup check ${projectRoot} join-existing-project --json.`,
+    `Run dev-nexus project hosting status ${projectRoot}${homeOption} --json when hosting intent is configured.`,
+  ];
 }
 
 function assertCliMutationAllowed(

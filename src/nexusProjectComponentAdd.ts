@@ -77,6 +77,7 @@ export function previewNexusProjectComponentAdd(options: {
     buildNexusProjectComponentConfigFromSetupAnswers(projectRoot, component, {
       localWorkTracking,
       publication: options.answers.publication,
+      workTrackers: [],
     }),
   );
 

@@ -329,6 +329,24 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
+  it("prints JSON errors when --json is present", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "setup", "--bad-option", "--json"], {
+        stdout: output.writer,
+      }),
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        code: "cli_error",
+        message: "Unknown project setup option: --bad-option",
+      },
+    });
+  });
+
   it("keeps onboarding documentation command examples on the CLI surface", () => {
     const usagePrefixes = new Set(
       usage()
@@ -1267,6 +1285,7 @@ describe("dev-nexus cli", () => {
             id: "human-github",
             provider: "github",
             actorKind: "human",
+            account: "alice",
             credentialMethod: {
               kind: "provider_cli",
               cli: "gh",
@@ -1277,11 +1296,22 @@ describe("dev-nexus cli", () => {
             id: "bot-github",
             provider: "github",
             actorKind: "machine_user",
+            account: "guided-bot",
             credentialMethod: {
               kind: "provider_cli",
               cli: "gh",
               configDir: "home:.config/gh-bot",
             },
+          },
+        ],
+        workTrackers: [
+          {
+            id: "github",
+            provider: "github",
+            role: "eligible_source",
+            repositoryOwner: "ExampleOrg",
+            repositoryName: "guided-demo",
+            authProfileId: "bot-github",
           },
         ],
         hostingIntent: {
@@ -1387,6 +1417,11 @@ describe("dev-nexus cli", () => {
         ],
       },
     });
+    expect(applied.nextActions).toEqual([
+      `Open the DevNexus project root in the configured agent application: ${projectRoot}`,
+      `Run dev-nexus setup check ${projectRoot} join-existing-project --json.`,
+      `Run dev-nexus project hosting status ${projectRoot} --home ${homePath} --json when hosting intent is configured.`,
+    ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(true);
     expect(loadProjectConfig(projectRoot)).toMatchObject({
@@ -1395,6 +1430,26 @@ describe("dev-nexus cli", () => {
         expect.objectContaining({
           id: "core",
           defaultWorkTrackerId: "local",
+          workTrackers: expect.arrayContaining([
+            expect.objectContaining({
+              id: "local",
+              workTracking: {
+                provider: "local",
+                storePath: ".dev-nexus/work-items/core.json",
+              },
+            }),
+            expect.objectContaining({
+              id: "github",
+              roles: ["eligible_source"],
+              workTracking: {
+                provider: "github",
+                repository: {
+                  owner: "ExampleOrg",
+                  name: "guided-demo",
+                },
+              },
+            }),
+          ]),
         }),
       ],
       hosting: {
@@ -1410,12 +1465,33 @@ describe("dev-nexus cli", () => {
         path.join(projectRoot, ".dev-nexus", "work-items", "core.json"),
       ).items,
     ).toEqual([]);
-    expect(JSON.parse(
+    const homeConfig = JSON.parse(
       fs.readFileSync(path.join(homePath, "dev-nexus.home.json"), "utf8"),
-    ).projects).toEqual([
+    );
+    expect(homeConfig.projects).toEqual([
       expect.objectContaining({
         id: "guided-demo",
         projectRoot,
+      }),
+    ]);
+    expect(homeConfig.authProfiles).toEqual([
+      expect.objectContaining({
+        id: "human-github",
+        actorId: "alice",
+        provider: "github",
+        kind: "human",
+        account: "alice",
+        command: "gh",
+        githubCliConfigDir: "home:.config/gh",
+      }),
+      expect.objectContaining({
+        id: "bot-github",
+        actorId: "guided-bot",
+        provider: "github",
+        kind: "automation",
+        account: "guided-bot",
+        command: "gh",
+        githubCliConfigDir: "home:.config/gh-bot",
       }),
     ]);
   });
@@ -4192,6 +4268,7 @@ describe("dev-nexus cli", () => {
       },
     );
 
+    const duplicateOutput = captureOutput();
     await expect(
       main(
         [
@@ -4206,13 +4283,19 @@ describe("dev-nexus cli", () => {
           "--json",
         ],
         {
-          stdout: captureOutput().writer,
+          stdout: duplicateOutput.writer,
           now: fixedClock("2026-05-16T10:10:00.000Z"),
         },
       ),
-    ).rejects.toThrow(
-      /target cycle id already exists: cycle-1\. Choose a new --cycle-id or inspect the existing record/,
-    );
+    ).resolves.toBe(1);
+    expect(JSON.parse(duplicateOutput.output())).toMatchObject({
+      ok: false,
+      error: {
+        message: expect.stringMatching(
+          /target cycle id already exists: cycle-1\. Choose a new --cycle-id or inspect the existing record/,
+        ),
+      },
+    });
     expect(
       readNexusAutomationTargetCycleLedger(
         projectRoot,
@@ -4521,6 +4604,7 @@ describe("dev-nexus cli", () => {
       },
     });
 
+    const badStatusOutput = captureOutput();
     await expect(
       main(
         [
@@ -4534,10 +4618,18 @@ describe("dev-nexus cli", () => {
           "--json",
         ],
         {
-          stdout: captureOutput().writer,
+          stdout: badStatusOutput.writer,
         },
       ),
-    ).rejects.toThrow("--status must match automation selector statuses: ready");
+    ).resolves.toBe(1);
+    expect(JSON.parse(badStatusOutput.output())).toMatchObject({
+      ok: false,
+      error: {
+        message: "--status must match automation selector statuses: ready",
+      },
+    });
+
+    const excludedLabelOutput = captureOutput();
     await expect(
       main(
         [
@@ -4551,10 +4643,16 @@ describe("dev-nexus cli", () => {
           "--json",
         ],
         {
-          stdout: captureOutput().writer,
+          stdout: excludedLabelOutput.writer,
         },
       ),
-    ).rejects.toThrow("labels conflict with automation selector exclusions: blocked");
+    ).resolves.toBe(1);
+    expect(JSON.parse(excludedLabelOutput.output())).toMatchObject({
+      ok: false,
+      error: {
+        message: "labels conflict with automation selector exclusions: blocked",
+      },
+    });
   });
 
   it("runs automation once through the command executor", async () => {

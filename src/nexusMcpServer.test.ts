@@ -281,6 +281,52 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("advertises eligible work mode on the matching MCP tool", () => {
+    const hostingStatus = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "project_hosting_status",
+    );
+    const hostingPlan = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "project_hosting_plan",
+    );
+    const eligibleWork = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "eligible_work",
+    );
+    const targetCycleRecord = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "target_cycle_record",
+    );
+
+    expect(hostingStatus?.inputSchema).not.toMatchObject({
+      properties: {
+        mode: expect.anything(),
+      },
+    });
+    expect(hostingPlan?.inputSchema).not.toMatchObject({
+      properties: {
+        mode: expect.anything(),
+      },
+    });
+    expect(eligibleWork?.inputSchema).toMatchObject({
+      properties: {
+        mode: {
+          enum: ["default", "discovery"],
+        },
+      },
+    });
+    expect(targetCycleRecord?.inputSchema).toMatchObject({
+      properties: {
+        workItems: {
+          items: {
+            properties: {
+              cycleStatus: {
+                enum: expect.arrayContaining(["failed"]),
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it("returns project hosting status and plan through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-hosting-");
     saveProjectConfig(
@@ -1621,6 +1667,7 @@ describe("DevNexus MCP server", () => {
         {
           projectRoot,
           title: "Split the plan",
+          description: "Write PRD",
           status: "ready",
           labels: ["automation"],
         },
@@ -1755,12 +1802,44 @@ describe("DevNexus MCP server", () => {
         status: "in_progress",
       }),
     );
+    expect(listed).toMatchObject({
+      detail: "summary",
+      limit: 50,
+    });
     expect(listed.workItems).toMatchObject([
       {
         id: "local-1",
         status: "in_progress",
+        descriptionLength: "Write PRD".length,
       },
     ]);
+    expect(listed.workItems[0].description).toBeUndefined();
+
+    const fullList = toolJson(
+      await callDevNexusMcpTool("work_item_list", {
+        projectRoot,
+        status: "in_progress",
+        detail: "full",
+      }),
+    );
+    expect(fullList).toMatchObject({
+      detail: "full",
+      limit: 50,
+    });
+    expect(fullList.workItems[0]).toMatchObject({
+      id: "local-1",
+      description: "Write PRD",
+    });
+
+    const oversizedList = await callDevNexusMcpTool("work_item_list", {
+      projectRoot,
+      limit: 101,
+    });
+    expect(oversizedList.isError).toBe(true);
+    expect(toolJson(oversizedList)).toMatchObject({
+      ok: false,
+      error: "arguments.limit must be at most 100",
+    });
   });
 
   it("allows local work-item MCP mutations with a provider-scoped automation auth profile", async () => {
@@ -2140,7 +2219,53 @@ describe("DevNexus MCP server", () => {
         ],
       },
     });
-    expect(listed.ledger.cycles).toHaveLength(1);
+    expect(listed.ledger).toMatchObject({
+      version: 1,
+      cycleCount: 1,
+      cycles: [
+        {
+          id: "cycle-1",
+          status: "dispatched",
+          runId: "run-1",
+          targetId: "dogfood",
+          eligibleWorkItemCount: 2,
+          workItemCount: 6,
+          workItemStatusCounts: {
+            selected: 1,
+            dispatched: 1,
+            in_progress: 1,
+            completed: 1,
+            blocked: 1,
+            skipped: 1,
+          },
+          noteCount: 1,
+          blockerCount: 0,
+          workItemRefs: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              cycleStatus: "selected",
+              agentProfileId: "codex-coordinator",
+            },
+            {
+              componentId: "primary",
+              id: "local-2",
+              cycleStatus: "dispatched",
+              agentProfileId: "codex-local",
+            },
+            {
+              componentId: "addon",
+              id: "local-3",
+              cycleStatus: "in_progress",
+              agentProfileId: "codex-local",
+            },
+          ],
+        },
+      ],
+    });
+    expect(listed.ledger.cycles[0].workItems).toBeUndefined();
+    expect(listed.ledger.cycles[0].notes).toBeUndefined();
+    expect(listed.ledger.cycles[0].authority).toBeUndefined();
   });
 
   it("builds target reports through MCP tools", async () => {

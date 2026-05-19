@@ -10,7 +10,6 @@ import {
 import type {
   NexusHostingAuthProfileConfig,
   NexusHostingAuthProfileKind,
-  NexusProjectHostingProviderName,
 } from "./nexusProjectHosting.js";
 import type {
   NexusHomeHostOverlayConfig,
@@ -195,12 +194,12 @@ function validateHomeHostTransportKind(
 function validateHostingProviderName(
   value: unknown,
   pathName: string,
-): NexusProjectHostingProviderName {
-  if (value === "github") {
+): string {
+  if (typeof value === "string" && value.trim().length > 0) {
     return value;
   }
 
-  throw new NexusConfigError(`${pathName} must be github`);
+  throw new NexusConfigError(`${pathName} must be a non-empty string`);
 }
 
 function validateHostingAuthProfileKind(

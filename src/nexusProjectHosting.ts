@@ -88,7 +88,7 @@ export type NexusHostingAuthProfileKind = "human" | "automation" | "app";
 export interface NexusHostingAuthProfileConfig {
   id: string;
   actorId?: string;
-  provider: NexusProjectHostingProviderName;
+  provider: string;
   kind?: NexusHostingAuthProfileKind;
   account?: string;
   host?: string;
