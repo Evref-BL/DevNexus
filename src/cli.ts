@@ -2822,7 +2822,10 @@ function resolveCliWorkItemAuthority(
     authProfiles,
     project: config.id,
     component: component.id,
-    provider: cliWorkItemTrackerProvider(projectRoot, component.id, trackerId),
+    provider: cliWorkItemAuthorityProvider(
+      requestedAction,
+      cliWorkItemTrackerProvider(projectRoot, component.id, trackerId),
+    ),
     tracker: trackerId ?? component.defaultTrackerId,
     remote: publication.remote,
     repository: component.remoteUrl,
@@ -2831,6 +2834,13 @@ function resolveCliWorkItemAuthority(
     publication,
     safety: config.automation?.safety ?? null,
   });
+}
+
+function cliWorkItemAuthorityProvider(
+  requestedAction: NexusAuthorityAction,
+  trackerProvider: string,
+): string | null {
+  return requestedAction.startsWith("provider.") ? trackerProvider : null;
 }
 
 function cliWorkItemTrackerProvider(

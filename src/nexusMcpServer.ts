@@ -2065,7 +2065,10 @@ function resolveMcpWorkItemAuthority(
     authProfiles,
     project: config.id,
     component: component.id,
-    provider: workItemTrackerProviderFromResolved(resolved, selector),
+    provider: workItemAuthorityProvider(
+      requestedAction,
+      workItemTrackerProviderFromResolved(resolved, selector),
+    ),
     tracker: selector.trackerId ?? resolved.defaultTrackerId ?? null,
     remote: publication.remote,
     repository: component.remoteUrl,
@@ -2074,6 +2077,13 @@ function resolveMcpWorkItemAuthority(
     publication,
     safety: config.automation?.safety ?? null,
   });
+}
+
+function workItemAuthorityProvider(
+  requestedAction: NexusAuthorityAction,
+  trackerProvider: string,
+): string | null {
+  return requestedAction.startsWith("provider.") ? trackerProvider : null;
 }
 
 function workItemTrackerProviderFromArgs(

@@ -1697,6 +1697,118 @@ describe("DevNexus MCP server", () => {
     ]);
   });
 
+  it("allows local work-item MCP mutations with a provider-scoped automation auth profile", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const homePath = path.join(projectRoot, "home");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveHomeConfig(homePath, [
+      {
+        id: "bot-github",
+        kind: "automation",
+        provider: "github",
+        actorId: "local-tracker-bot",
+        account: "local-tracker-bot",
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        home: homePath,
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "local_only",
+            actor: {
+              id: "local-tracker-bot",
+              kind: "machine_user",
+              provider: "github",
+              handle: "local-tracker-bot",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "local-tracker-bot",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "local-tracker-bot",
+              displayName: "Local Tracker Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "local-tracker-bot",
+              roles: ["contributor"],
+              scope: { component: "primary" },
+            },
+          ],
+        },
+      }),
+    );
+
+    const created = toolJson(
+      await callDevNexusMcpTool("work_item_create", {
+        projectRoot,
+        homePath,
+        componentId: "primary",
+        title: "Local profile mismatch regression",
+        status: "todo",
+      }),
+    );
+    expect(created).toMatchObject({
+      ok: true,
+      workItem: {
+        id: "local-1",
+      },
+    });
+    const updated = toolJson(
+      await callDevNexusMcpTool("work_item_update", {
+        projectRoot,
+        homePath,
+        componentId: "primary",
+        id: created.workItem.id,
+        title: "Local profile mismatch fixed",
+        status: "ready",
+        labels: ["dogfood"],
+      }),
+    );
+    const comment = toolJson(
+      await callDevNexusMcpTool("work_item_comment", {
+        projectRoot,
+        homePath,
+        componentId: "primary",
+        id: created.workItem.id,
+        body: "Local tracker comment.",
+      }),
+    );
+    const closed = toolJson(
+      await callDevNexusMcpTool("work_item_set_status", {
+        projectRoot,
+        homePath,
+        componentId: "primary",
+        id: created.workItem.id,
+        status: "done",
+      }),
+    );
+
+    expect(updated.workItem).toMatchObject({
+      id: "local-1",
+      title: "Local profile mismatch fixed",
+      status: "ready",
+      labels: ["dogfood"],
+    });
+    expect(comment.comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Local tracker comment.",
+    });
+    expect(closed.workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
+    });
+  });
+
   it("blocks provider work-item MCP mutations when the current actor lacks provider authority", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

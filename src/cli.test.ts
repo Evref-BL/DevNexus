@@ -1885,6 +1885,156 @@ describe("dev-nexus cli", () => {
     expect(store.comments["local-1"]).toHaveLength(1);
   });
 
+  it("allows local work-item CLI mutations with a provider-scoped automation auth profile", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const homePath = path.join(projectRoot, "home");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveHomeConfig(homePath, [
+      {
+        id: "bot-github",
+        kind: "automation",
+        provider: "github",
+        actorId: "local-tracker-bot",
+        account: "local-tracker-bot",
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        home: homePath,
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "local_only",
+            actor: {
+              id: "local-tracker-bot",
+              kind: "machine_user",
+              provider: "github",
+              handle: "local-tracker-bot",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "local-tracker-bot",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "local-tracker-bot",
+              displayName: "Local Tracker Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "local-tracker-bot",
+              roles: ["contributor"],
+              scope: { component: "primary" },
+            },
+          ],
+        },
+      }),
+    );
+    const createOutput = captureOutput();
+    const updateOutput = captureOutput();
+    const commentOutput = captureOutput();
+    const statusOutput = captureOutput();
+
+    const createExit = await main(
+      [
+        "work-item",
+        "create",
+        projectRoot,
+        "--component",
+        "primary",
+        "--title",
+        "Local profile mismatch regression",
+        "--status",
+        "todo",
+        "--json",
+      ],
+      {
+        stdout: createOutput.writer,
+        now: fixedClock("2026-05-19T10:00:00.000Z"),
+      },
+    );
+    expect(createExit).toBe(0);
+    const itemId = JSON.parse(createOutput.output()).workItem.id;
+    const updateExit = await main(
+      [
+        "work-item",
+        "update",
+        projectRoot,
+        itemId,
+        "--component",
+        "primary",
+        "--title",
+        "Local profile mismatch fixed",
+        "--status",
+        "ready",
+        "--label",
+        "dogfood",
+        "--json",
+      ],
+      {
+        stdout: updateOutput.writer,
+        now: fixedClock("2026-05-19T10:01:00.000Z"),
+      },
+    );
+    const commentExit = await main(
+      [
+        "work-item",
+        "comment",
+        projectRoot,
+        itemId,
+        "--component",
+        "primary",
+        "--body",
+        "Local tracker comment.",
+        "--json",
+      ],
+      {
+        stdout: commentOutput.writer,
+        now: fixedClock("2026-05-19T10:02:00.000Z"),
+      },
+    );
+    const statusExit = await main(
+      [
+        "work-item",
+        "set-status",
+        projectRoot,
+        itemId,
+        "--component",
+        "primary",
+        "--status",
+        "done",
+        "--json",
+      ],
+      {
+        stdout: statusOutput.writer,
+        now: fixedClock("2026-05-19T10:03:00.000Z"),
+      },
+    );
+
+    expect([createExit, updateExit, commentExit, statusExit]).toEqual([
+      0, 0, 0, 0,
+    ]);
+    expect(JSON.parse(updateOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      title: "Local profile mismatch fixed",
+      status: "ready",
+      labels: ["dogfood"],
+    });
+    expect(JSON.parse(commentOutput.output()).comment).toMatchObject({
+      id: "local-comment-1",
+      body: "Local tracker comment.",
+    });
+    expect(JSON.parse(statusOutput.output()).workItem).toMatchObject({
+      id: "local-1",
+      status: "done",
+    });
+  });
+
   it("prints machine-readable authority blocks for provider work-item CLI mutations", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
