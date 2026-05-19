@@ -303,6 +303,7 @@ export type NexusAuthorityPullRequestReviewSignal =
 export type NexusAuthorityProviderChecksSignal =
   | "unknown"
   | "checks_pending"
+  | "checks_stale"
   | "checks_passed"
   | "checks_failed";
 
@@ -1937,6 +1938,9 @@ function pullRequestMergeProviderDecision(
     missingProviderSignals.push("checks.passed");
     if (checks === "checks_failed") {
       blockers.push("Required checks failed.");
+    }
+    if (checks === "checks_stale") {
+      blockers.push("Required checks are stale.");
     }
   }
   if (mergeability !== "mergeable") {

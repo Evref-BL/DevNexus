@@ -19,6 +19,9 @@ export type NexusAutomationGreenMainDirectTargetPushPolicy =
   | "exceptional"
   | "allowed";
 export type NexusAutomationGreenMainStaleCheckPolicy = "block" | "allow";
+export type NexusAutomationGreenMainMergeAuthorityPolicy =
+  | "handoff"
+  | "authorized_merge";
 export type NexusPublicationActorKind =
   | "human"
   | "machine_user"
@@ -159,6 +162,7 @@ export interface NexusAutomationGreenMainConfig {
   integrationPreference: NexusAutomationGreenMainIntegrationPreference;
   integrationBranch: string | null;
   directTargetPush: NexusAutomationGreenMainDirectTargetPushPolicy;
+  mergeAuthority: NexusAutomationGreenMainMergeAuthorityPolicy;
   requiredChecks: string[];
   staleChecks: NexusAutomationGreenMainStaleCheckPolicy;
 }
@@ -189,6 +193,7 @@ export interface NexusAutomationPublicationPolicySummary {
     | "local_only";
   integrationBranch: string | null;
   directTargetPush: NexusAutomationGreenMainDirectTargetPushPolicy;
+  mergeAuthority: NexusAutomationGreenMainMergeAuthorityPolicy | null;
   requiredChecks: string[];
   staleChecks: NexusAutomationGreenMainStaleCheckPolicy | null;
   summary: string;
@@ -301,6 +306,7 @@ export const defaultNexusAutomationGreenMainConfig:
     integrationPreference: "pull_request",
     integrationBranch: null,
     directTargetPush: "blocked",
+    mergeAuthority: "handoff",
     requiredChecks: [],
     staleChecks: "block",
   };
@@ -487,13 +493,15 @@ export function summarizeNexusAutomationPublicationPolicy(
       integrationPreference: greenMain.integrationPreference,
       integrationBranch: greenMain.integrationBranch,
       directTargetPush,
+      mergeAuthority: greenMain.mergeAuthority,
       requiredChecks: [...greenMain.requiredChecks],
       staleChecks: greenMain.staleChecks,
       summary:
         `green_main target=${policy.targetBranch ?? "none"} ` +
         `integration=${greenMain.integrationPreference}` +
         `${greenMain.integrationBranch ? ` branch=${greenMain.integrationBranch}` : ""} ` +
-        `directTargetPush=${directTargetPush} checks=${checks} ` +
+        `directTargetPush=${directTargetPush} ` +
+        `mergeAuthority=${greenMain.mergeAuthority} checks=${checks} ` +
         `staleChecks=${greenMain.staleChecks}`,
     };
   }
@@ -505,6 +513,7 @@ export function summarizeNexusAutomationPublicationPolicy(
       integrationPreference: "direct_push",
       integrationBranch: null,
       directTargetPush: policy.push ? "allowed" : "blocked",
+      mergeAuthority: null,
       requiredChecks: [],
       staleChecks: null,
       summary:
@@ -520,6 +529,7 @@ export function summarizeNexusAutomationPublicationPolicy(
       integrationPreference: "pull_request",
       integrationBranch: null,
       directTargetPush: "blocked",
+      mergeAuthority: null,
       requiredChecks: [],
       staleChecks: null,
       summary: `review_handoff target=${policy.targetBranch ?? "none"}`,
@@ -532,6 +542,7 @@ export function summarizeNexusAutomationPublicationPolicy(
     integrationPreference: "local_only",
     integrationBranch: null,
     directTargetPush: "blocked",
+    mergeAuthority: null,
     requiredChecks: [],
     staleChecks: null,
     summary: "local_only",
@@ -1481,6 +1492,10 @@ function validateGreenMainPublicationConfig(
     record.directTargetPush,
     `${pathName}.directTargetPush`,
   );
+  const mergeAuthority = validateGreenMainMergeAuthorityPolicy(
+    record.mergeAuthority,
+    `${pathName}.mergeAuthority`,
+  );
   const requiredChecks = optionalStringArray(
     record.requiredChecks,
     `${pathName}.requiredChecks`,
@@ -1500,6 +1515,9 @@ function validateGreenMainPublicationConfig(
     directTargetPush:
       directTargetPush ??
       defaultNexusAutomationGreenMainConfig.directTargetPush,
+    mergeAuthority:
+      mergeAuthority ??
+      defaultNexusAutomationGreenMainConfig.mergeAuthority,
     requiredChecks: [
       ...(requiredChecks ??
         defaultNexusAutomationGreenMainConfig.requiredChecks),
@@ -1589,6 +1607,22 @@ function validateGreenMainStaleCheckPolicy(
   }
 
   throw new NexusAutomationConfigError(`${pathName} must be block or allow`);
+}
+
+function validateGreenMainMergeAuthorityPolicy(
+  value: unknown,
+  pathName: string,
+): NexusAutomationGreenMainMergeAuthorityPolicy | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "handoff" || value === "authorized_merge") {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be handoff or authorized_merge`,
+  );
 }
 
 function optionalSafetyProfileField<Key extends string>(

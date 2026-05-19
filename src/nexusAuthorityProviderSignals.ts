@@ -15,6 +15,7 @@ export const nexusAuthorityProviderNeutralSignals = [
   "rejected",
   "timed_out",
   "checks_pending",
+  "checks_stale",
   "checks_failed",
   "checks_passed",
   "branch_policy_blocked",
@@ -328,6 +329,9 @@ function providerChecksSignal(
   if (signals.includes("checks_failed")) {
     return "checks_failed";
   }
+  if (signals.includes("checks_stale")) {
+    return "checks_stale";
+  }
   if (signals.includes("checks_pending")) {
     return "checks_pending";
   }
@@ -348,6 +352,15 @@ function checkSignal(check: NexusMockProviderCheck): NexusAuthorityProviderCheck
     ].includes(token)
   ) {
     return "checks_failed";
+  }
+  if (
+    [
+      "stale",
+      "outdated",
+      "expired",
+    ].includes(token)
+  ) {
+    return "checks_stale";
   }
   if (
     [

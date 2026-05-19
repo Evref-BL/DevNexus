@@ -63,6 +63,7 @@ describe("nexus authority provider signal mapping", () => {
         "changes_requested",
         "rejected",
         "checks_pending",
+        "checks_stale",
         "checks_failed",
         "checks_passed",
         "branch_policy_blocked",
@@ -170,6 +171,33 @@ describe("nexus authority provider signal mapping", () => {
         "checks.passed",
         "branch_policy.clear",
       ]),
+    });
+  });
+
+  it("maps stale GitHub checks as blocking merge evidence", () => {
+    const summary = mapGitHubAuthoritySignals({
+      pullRequest: {
+        reviewDecision: "APPROVED",
+        requiredChecks: [{ name: "ci", conclusion: "stale" }],
+        mergeable: true,
+        branchProtection: {
+          status: "clear",
+          requiredApprovingReviewCount: 1,
+        },
+      },
+    });
+
+    expect(summary.providerState).toMatchObject({
+      pullRequest: {
+        review: "approved",
+        checks: "checks_stale",
+        mergeability: "mergeable",
+        branchPolicy: "clear",
+      },
+    });
+    expect(resolveMerge(summary.providerState)).toMatchObject({
+      status: "blocked",
+      missingProviderSignals: expect.arrayContaining(["checks.passed"]),
     });
   });
 

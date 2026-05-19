@@ -852,6 +852,7 @@ function renderPublicationPolicyLines(
     `- integration preference: ${policySummary.integrationPreference}`,
     `- integration branch: ${policySummary.integrationBranch ?? "none"}`,
     `- direct target push: ${policySummary.directTargetPush}`,
+    `- merge authority: ${policySummary.mergeAuthority ?? "none"}`,
     `- required checks: ${policySummary.requiredChecks.join(", ") || "none"}`,
     `- stale checks: ${policySummary.staleChecks ?? "none"}`,
     `- automation remote: ${publication.remote ?? "none"}`,

@@ -684,6 +684,7 @@ describe("nexus automation target report", () => {
             integrationPreference: "pull_request",
             integrationBranch: null,
             directTargetPush: "blocked",
+            mergeAuthority: "handoff",
             requiredChecks: ["build"],
             staleChecks: "block",
           },
@@ -701,6 +702,7 @@ describe("nexus automation target report", () => {
       targetBranch: "main",
       integrationPreference: "pull_request",
       directTargetPush: "blocked",
+      mergeAuthority: "handoff",
       requiredChecks: ["build"],
       staleChecks: "block",
     });

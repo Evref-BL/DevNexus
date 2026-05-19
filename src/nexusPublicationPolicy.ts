@@ -16,6 +16,7 @@ import {
   type NexusEffectiveAuthorityResolution,
 } from "./nexusAuthority.js";
 import {
+  defaultNexusAutomationGreenMainConfig,
   defaultNexusAutomationConfig,
   normalizeNexusAutomationPublicationConfig,
   summarizeNexusAutomationPublicationPolicy,
@@ -105,12 +106,62 @@ export interface NexusPublicationPolicyCheck {
   message: string;
 }
 
+export type NexusGreenMainCandidateStatus =
+  | "not_on_candidate_branch"
+  | "candidate_branch_local"
+  | "candidate_branch_pushed";
+export type NexusGreenMainChecksStatus =
+  | "not_required"
+  | "unknown"
+  | "pending"
+  | "green"
+  | "stale"
+  | "failed";
+export type NexusGreenMainMergeabilityStatus =
+  | "not_applicable"
+  | "unknown"
+  | "clear"
+  | "blocked";
+export type NexusGreenMainHandoffStatus =
+  | "not_ready"
+  | "ready_for_handoff"
+  | "merge_authority_required"
+  | "merge_authorized";
+
+export interface NexusGreenMainPublicationStatus {
+  candidate: {
+    status: NexusGreenMainCandidateStatus;
+    branch: string | null;
+    upstream: string | null;
+    message: string;
+  };
+  checks: {
+    status: NexusGreenMainChecksStatus;
+    source: "branch" | "pull_request";
+    requiredChecks: string[];
+    staleChecks: "block" | "allow";
+    message: string;
+  };
+  mergeability: {
+    status: NexusGreenMainMergeabilityStatus;
+    message: string;
+  };
+  handoff: {
+    status: NexusGreenMainHandoffStatus;
+    mergeAuthority: "handoff" | "authorized_merge";
+    message: string;
+  };
+  mergeAuthority: NexusEffectiveAuthorityResolution | null;
+  summary: string;
+}
+
 export interface NexusPublicationStatus {
   componentId: string;
   sourceRoot: string;
   action: NexusPublicationGuardAction;
   policy: NexusAutomationPublicationConfig;
   policySummary: NexusAutomationPublicationPolicySummary;
+  greenMain: NexusGreenMainPublicationStatus | null;
   git: NexusPublicationGitStatus;
   gitIdentity: NexusGitIdentityStatus;
   actor: NexusPublicationActorStatus;
@@ -222,6 +273,14 @@ export function getNexusPublicationStatus(options: {
     authProfiles,
     providerState: options.providerState ?? null,
   });
+  const greenMain = greenMainPublicationStatus({
+    projectConfig: options.projectConfig,
+    component: options.component,
+    policy,
+    git,
+    authProfiles,
+    providerState: options.providerState ?? null,
+  });
   const strict = publicationPolicyRequiresGuard(policy, action);
   const checks = publicationPolicyChecks({
     component: options.component,
@@ -253,6 +312,7 @@ export function getNexusPublicationStatus(options: {
     action,
     policy,
     policySummary: summarizeNexusAutomationPublicationPolicy(policy),
+    greenMain,
     git,
     gitIdentity,
     actor,
@@ -391,6 +451,8 @@ export function publicationEnvironmentVariables(
       policySummary.integrationBranch ?? "",
     DEV_NEXUS_PUBLICATION_DIRECT_TARGET_PUSH:
       policySummary.directTargetPush,
+    DEV_NEXUS_PUBLICATION_MERGE_AUTHORITY:
+      policySummary.mergeAuthority ?? "",
     DEV_NEXUS_PUBLICATION_REQUIRED_CHECKS:
       policySummary.requiredChecks.join(","),
     DEV_NEXUS_PUBLICATION_STALE_CHECKS:
@@ -435,6 +497,232 @@ export function loadNexusPublicationAuthProfiles(options: {
   } catch {
     return [];
   }
+}
+
+function greenMainPublicationStatus(options: {
+  projectConfig: NexusProjectConfig;
+  component: ResolvedNexusProjectComponent;
+  policy: NexusAutomationPublicationConfig;
+  git: NexusPublicationGitStatus;
+  authProfiles: NexusHostingAuthProfileConfig[];
+  providerState: NexusAuthorityProviderState | null;
+}): NexusGreenMainPublicationStatus | null {
+  if (options.policy.strategy !== "green_main") {
+    return null;
+  }
+  const greenMain = {
+    ...defaultNexusAutomationGreenMainConfig,
+    ...(options.policy.greenMain ?? {}),
+  };
+  const candidate = greenMainCandidateStatus(options.git);
+  const checks = greenMainChecksStatus({
+    greenMain,
+    providerState: options.providerState,
+  });
+  const mergeability = greenMainMergeabilityStatus(options.providerState);
+  const mergeAuthority = resolvePublicationAuthority({
+    projectConfig: options.projectConfig,
+    component: options.component,
+    policy: options.policy,
+    git: options.git,
+    action: "provider_pull_request_merge",
+    authProfiles: options.authProfiles,
+    providerState: options.providerState,
+  });
+  const handoff = greenMainHandoffStatus({
+    candidate,
+    checks,
+    mergeability,
+    mergeAuthority,
+    mergeAuthorityPolicy: greenMain.mergeAuthority,
+  });
+
+  return {
+    candidate,
+    checks,
+    mergeability,
+    handoff,
+    mergeAuthority,
+    summary: [
+      `candidate=${candidate.status}`,
+      `checks=${checks.status}`,
+      `mergeability=${mergeability.status}`,
+      `handoff=${handoff.status}`,
+      `mergeAuthority=${greenMain.mergeAuthority}`,
+    ].join(" "),
+  };
+}
+
+function greenMainCandidateStatus(
+  git: NexusPublicationGitStatus,
+): NexusGreenMainPublicationStatus["candidate"] {
+  if (!git.branch || git.branch === git.targetBranch) {
+    return {
+      status: "not_on_candidate_branch",
+      branch: git.branch,
+      upstream: git.upstream,
+      message: git.branch
+        ? `Current branch ${git.branch} is the target branch, not a green-main candidate branch.`
+        : "No current branch was resolved for green-main candidate publication.",
+    };
+  }
+  if (!git.upstream) {
+    return {
+      status: "candidate_branch_local",
+      branch: git.branch,
+      upstream: null,
+      message: `Candidate branch ${git.branch} has no upstream; branch CI cannot be checked from provider signals yet.`,
+    };
+  }
+
+  return {
+    status: "candidate_branch_pushed",
+    branch: git.branch,
+    upstream: git.upstream,
+    message: `Candidate branch ${git.branch} is pushed as ${git.upstream}.`,
+  };
+}
+
+function greenMainChecksStatus(options: {
+  greenMain: NonNullable<NexusAutomationPublicationConfig["greenMain"]>;
+  providerState: NexusAuthorityProviderState | null;
+}): NexusGreenMainPublicationStatus["checks"] {
+  const signal = options.providerState?.pullRequest?.checks ?? "unknown";
+  const source = options.greenMain.integrationPreference;
+  const status: NexusGreenMainChecksStatus =
+    options.greenMain.requiredChecks.length === 0 && signal === "unknown"
+      ? "not_required"
+      : signal === "checks_passed"
+        ? "green"
+        : signal === "checks_failed"
+          ? "failed"
+          : signal === "checks_stale"
+            ? "stale"
+            : signal === "checks_pending"
+              ? "pending"
+              : "unknown";
+  const requiredChecks = [...options.greenMain.requiredChecks];
+  const checksLabel = requiredChecks.length > 0
+    ? requiredChecks.join(", ")
+    : "provider policy";
+
+  return {
+    status,
+    source,
+    requiredChecks,
+    staleChecks: options.greenMain.staleChecks,
+    message: greenMainChecksMessage({
+      status,
+      checksLabel,
+      staleChecks: options.greenMain.staleChecks,
+    }),
+  };
+}
+
+function greenMainChecksMessage(options: {
+  status: NexusGreenMainChecksStatus;
+  checksLabel: string;
+  staleChecks: "block" | "allow";
+}): string {
+  switch (options.status) {
+    case "green":
+      return `Required checks are green: ${options.checksLabel}.`;
+    case "failed":
+      return `Required checks failed: ${options.checksLabel}.`;
+    case "pending":
+      return `Required checks are pending: ${options.checksLabel}.`;
+    case "stale":
+      return options.staleChecks === "block"
+        ? `Required checks are stale and staleChecks=block: ${options.checksLabel}.`
+        : `Required checks are stale but staleChecks=allow: ${options.checksLabel}.`;
+    case "not_required":
+      return "No explicit required checks or provider check signal are configured.";
+    case "unknown":
+      return `Required check state is unknown: ${options.checksLabel}.`;
+  }
+}
+
+function greenMainMergeabilityStatus(
+  providerState: NexusAuthorityProviderState | null,
+): NexusGreenMainPublicationStatus["mergeability"] {
+  const pullRequest = providerState?.pullRequest ?? null;
+  const mergeability = pullRequest?.mergeability ?? "unknown";
+  const branchPolicy =
+    pullRequest?.branchPolicy ?? providerState?.branchPolicy ?? "unknown";
+  if (mergeability === "merge_conflict") {
+    return {
+      status: "blocked",
+      message: "Pull request has merge conflicts.",
+    };
+  }
+  if (branchPolicy === "branch_policy_blocked") {
+    return {
+      status: "blocked",
+      message: "Provider branch policy blocks integration.",
+    };
+  }
+  if (mergeability === "mergeable" && branchPolicy === "clear") {
+    return {
+      status: "clear",
+      message: "Pull request is mergeable and branch policy is clear.",
+    };
+  }
+  if (mergeability === "mergeable" && branchPolicy === "unknown") {
+    return {
+      status: "unknown",
+      message: "Pull request is mergeable but branch policy state is unknown.",
+    };
+  }
+
+  return {
+    status: "unknown",
+    message: "Mergeability or branch policy state is unknown.",
+  };
+}
+
+function greenMainHandoffStatus(options: {
+  candidate: NexusGreenMainPublicationStatus["candidate"];
+  checks: NexusGreenMainPublicationStatus["checks"];
+  mergeability: NexusGreenMainPublicationStatus["mergeability"];
+  mergeAuthority: NexusEffectiveAuthorityResolution | null;
+  mergeAuthorityPolicy: "handoff" | "authorized_merge";
+}): NexusGreenMainPublicationStatus["handoff"] {
+  const ready =
+    options.candidate.status === "candidate_branch_pushed" &&
+    (options.checks.status === "green" ||
+      (options.checks.status === "stale" &&
+        options.checks.staleChecks === "allow")) &&
+    options.mergeability.status === "clear";
+  if (!ready) {
+    return {
+      status: "not_ready",
+      mergeAuthority: options.mergeAuthorityPolicy,
+      message: "Green-main candidate is not ready for integration handoff.",
+    };
+  }
+  if (options.mergeAuthorityPolicy === "handoff") {
+    return {
+      status: "ready_for_handoff",
+      mergeAuthority: options.mergeAuthorityPolicy,
+      message:
+        "Green-main candidate is validated; hand off to a human or maintainer for integration.",
+    };
+  }
+  if (options.mergeAuthority?.allowed) {
+    return {
+      status: "merge_authorized",
+      mergeAuthority: options.mergeAuthorityPolicy,
+      message:
+        "Green-main candidate is validated and the current actor is authorized to merge.",
+    };
+  }
+
+  return {
+    status: "merge_authority_required",
+    mergeAuthority: options.mergeAuthorityPolicy,
+    message:
+      "Green-main candidate is validated, but the current actor lacks merge authority.",
+  };
 }
 
 function readPublicationGitStatus(options: {

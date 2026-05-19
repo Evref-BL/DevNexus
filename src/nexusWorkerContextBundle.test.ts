@@ -264,6 +264,7 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain(`- AGENTS.md: ${path.join(projectRoot, "AGENTS.md")}`);
     expect(briefing).toContain("- mode: review_handoff");
     expect(briefing).toContain("- direct target push: blocked");
+    expect(briefing).toContain("- merge authority: none");
     expect(briefing).toContain("- automation remote: bot");
     expect(briefing).toContain(
       "- automation actor: machine_user:github:example-bot",

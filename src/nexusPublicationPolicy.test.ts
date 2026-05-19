@@ -432,6 +432,7 @@ describe("nexus publication policy", () => {
             integrationPreference: "pull_request",
             integrationBranch: null,
             directTargetPush: "blocked",
+            mergeAuthority: "handoff",
             requiredChecks: ["build", "test"],
             staleChecks: "block",
           },
@@ -456,6 +457,7 @@ describe("nexus publication policy", () => {
       targetBranch: "main",
       integrationPreference: "pull_request",
       directTargetPush: "blocked",
+      mergeAuthority: "handoff",
       requiredChecks: ["build", "test"],
       staleChecks: "block",
     });
@@ -471,6 +473,129 @@ describe("nexus publication policy", () => {
         status: "failed",
       }),
     );
+  });
+
+  it("distinguishes green-main candidate validation and handoff readiness", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...projectConfig().automation!,
+        publication: {
+          ...projectConfig().automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          push: false,
+          greenMain: {
+            integrationPreference: "pull_request",
+            integrationBranch: null,
+            directTargetPush: "blocked",
+            mergeAuthority: "handoff",
+            requiredChecks: ["build", "test"],
+            staleChecks: "block",
+          },
+        },
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+    const readStatus = (
+      providerState: Parameters<typeof getNexusPublicationStatus>[0]["providerState"],
+      upstream: string | null = "bot/feature/local-38",
+    ) =>
+      getNexusPublicationStatus({
+        projectRoot,
+        projectConfig: config,
+        component,
+        action: "status",
+        authProfiles: automationAuthProfiles(),
+        providerState,
+        gitRunner: publicationGitRunner(sourceRoot, { upstream }),
+        actorRunner: actorRunnerWithHandle("example-bot"),
+      });
+
+    const ready = readStatus({
+      pullRequest: {
+        review: "approved",
+        checks: "checks_passed",
+        mergeability: "mergeable",
+        branchPolicy: "clear",
+      },
+    });
+    expect(ready.greenMain).toMatchObject({
+      candidate: {
+        status: "candidate_branch_pushed",
+      },
+      checks: {
+        status: "green",
+        requiredChecks: ["build", "test"],
+      },
+      mergeability: {
+        status: "clear",
+      },
+      handoff: {
+        status: "ready_for_handoff",
+        mergeAuthority: "handoff",
+      },
+    });
+    expect(ready.greenMain?.summary).toContain("handoff=ready_for_handoff");
+
+    const pending = readStatus({
+      pullRequest: {
+        checks: "checks_pending",
+        mergeability: "mergeable",
+        branchPolicy: "clear",
+      },
+    });
+    expect(pending.greenMain).toMatchObject({
+      checks: {
+        status: "pending",
+      },
+      handoff: {
+        status: "not_ready",
+      },
+    });
+
+    const stale = readStatus({
+      pullRequest: {
+        review: "approved",
+        checks: "checks_stale",
+        mergeability: "mergeable",
+        branchPolicy: "clear",
+      },
+    });
+    expect(stale.greenMain).toMatchObject({
+      checks: {
+        status: "stale",
+      },
+      handoff: {
+        status: "not_ready",
+      },
+    });
+
+    const failed = readStatus({
+      pullRequest: {
+        checks: "checks_failed",
+        mergeability: "merge_conflict",
+        branchPolicy: "branch_policy_blocked",
+      },
+    });
+    expect(failed.greenMain).toMatchObject({
+      checks: {
+        status: "failed",
+      },
+      mergeability: {
+        status: "blocked",
+      },
+    });
+
+    const localCandidate = readStatus(null, null);
+    expect(localCandidate.greenMain).toMatchObject({
+      candidate: {
+        status: "candidate_branch_local",
+      },
+    });
   });
 
   it("blocks pull request merge until provider approval checks and branch policy are clear", () => {
@@ -593,6 +718,7 @@ function publicationGitRunner(
   options: {
     remoteUrl?: string;
     pushUrl?: string;
+    upstream?: string | null;
     localUserName?: string | null;
     localUserEmail?: string | null;
     effectiveUserName?: string | null;
@@ -612,7 +738,10 @@ function publicationGitRunner(
       return gitResult(args, "feature/local-38\n", cwd);
     }
     if (key === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
-      return gitResult(args, "bot/main\n", cwd);
+      if (options.upstream === null) {
+        return gitMissingResult(args, cwd);
+      }
+      return gitResult(args, `${options.upstream ?? "bot/main"}\n`, cwd);
     }
     if (key === "remote get-url bot") {
       return gitResult(args, `${remoteUrl}\n`, cwd);

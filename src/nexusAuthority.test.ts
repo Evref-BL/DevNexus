@@ -717,6 +717,7 @@ describe("nexus effective authority resolution", () => {
           integrationPreference: "pull_request",
           integrationBranch: null,
           directTargetPush: "exceptional",
+          mergeAuthority: "authorized_merge",
           requiredChecks: ["build"],
           staleChecks: "block",
         },

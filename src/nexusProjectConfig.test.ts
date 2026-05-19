@@ -1932,6 +1932,7 @@ describe("project config", () => {
         integrationPreference: "pull_request",
         integrationBranch: null,
         directTargetPush: "blocked",
+        mergeAuthority: "handoff",
         requiredChecks: ["build", "test"],
         staleChecks: "block",
       },
@@ -2015,6 +2016,27 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/greenMain requires strategy green_main/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "green-main-project",
+        name: "Green Main Project",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            greenMain: {
+              mergeAuthority: "automatic",
+            },
+          },
+        },
+      }),
+    ).toThrow(/mergeAuthority must be handoff or authorized_merge/);
   });
 
   it("rejects secret-like publication command environment keys", () => {
