@@ -195,6 +195,10 @@ import {
   type NexusProjectSetupProposal,
 } from "./nexusProjectSetupWizard.js";
 import {
+  buildNexusProjectSetupReadinessReport,
+  type NexusProjectSetupReadinessReport,
+} from "./nexusProjectSetupReadiness.js";
+import {
   applyNexusProjectComponentAdd,
   previewNexusProjectComponentAdd,
   readNexusProjectComponentAddAnswersFile,
@@ -429,6 +433,12 @@ interface ParsedSetupPlanCommand {
 interface ParsedSetupCheckCommand {
   projectRoot: string;
   flowId: string;
+  platform?: NexusSetupPlatform;
+  json?: boolean;
+}
+
+interface ParsedSetupReadinessCommand {
+  projectRoot: string;
   platform?: NexusSetupPlatform;
   json?: boolean;
 }
@@ -871,6 +881,7 @@ export function usage(): string {
     "  dev-nexus setup list [options]",
     "  dev-nexus setup plan <project-root> <flow-id> [options]",
     "  dev-nexus setup check <project-root> <flow-id> [options]",
+    "  dev-nexus setup readiness <project-root> [options]",
     "  dev-nexus setup record <project-root> <flow-id> <step-id> --status <status> [options]",
     "  dev-nexus diagnostics cli-version-skew [options]",
     "  dev-nexus coordination status <project-root> [options]",
@@ -1740,6 +1751,16 @@ async function handleSetupCommand(
     return 0;
   }
 
+  if (command === "readiness") {
+    const parsed = parseSetupReadinessCommand(argv);
+    const report = buildNexusProjectSetupReadinessReport({
+      projectRoot: parsed.projectRoot,
+      platform: parsed.platform,
+    });
+    printSetupReadinessResult(report, parsed, stdout);
+    return report.verdict === "blocked" ? 2 : 0;
+  }
+
   if (command === "record") {
     const parsed = parseSetupRecordCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -1759,7 +1780,7 @@ async function handleSetupCommand(
     return 0;
   }
 
-  throw new Error("setup requires list, plan, check, or record");
+  throw new Error("setup requires list, plan, check, readiness, or record");
 }
 
 async function handleDiagnosticsCommand(
@@ -3851,6 +3872,17 @@ function parseSetupCheckCommand(argv: string[]): ParsedSetupCheckCommand {
   return parsed;
 }
 
+function parseSetupReadinessCommand(argv: string[]): ParsedSetupReadinessCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("setup readiness requires a project root");
+  }
+
+  const parsed: ParsedSetupReadinessCommand = { projectRoot };
+  parseSetupReadinessOptions(rest, parsed);
+  return parsed;
+}
+
 function parseSetupPlanOrCheckOptions(
   rest: string[],
   parsed: ParsedSetupPlanCommand | ParsedSetupCheckCommand,
@@ -3876,6 +3908,34 @@ function parseSetupPlanOrCheckOptions(
         break;
       default:
         throw new Error(`Unknown ${commandName} option: ${arg}`);
+    }
+  }
+}
+
+function parseSetupReadinessOptions(
+  rest: string[],
+  parsed: ParsedSetupReadinessCommand,
+): void {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--platform":
+        parsed.platform = parseSetupPlatform(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown setup readiness option: ${arg}`);
     }
   }
 }
@@ -6735,6 +6795,30 @@ function printDiagnosticsCliVersionSkewResult(
     writeLine(stdout, "  Missing documented commands: none");
   }
   writeLine(stdout, `  Remediation: ${diagnostic.remediation.summary}`);
+}
+
+function printSetupReadinessResult(
+  report: NexusProjectSetupReadinessReport,
+  parsed: ParsedSetupReadinessCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: report.verdict !== "blocked",
+    report,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus setup readiness: ${report.verdict}.`);
+  writeLine(stdout, `  Project root: ${report.projectRoot}`);
+  for (const check of report.checks) {
+    writeLine(stdout, `    ${check.id}: ${check.status} - ${check.summary}`);
+  }
+  if (report.actions.length > 0) {
+    writeLine(stdout, `  Next action: ${report.actions[0]!.action}`);
+  }
 }
 
 function printSetupRecordResult(

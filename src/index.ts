@@ -53,6 +53,7 @@ export * from "./nexusProjectScaffold.js";
 export * from "./nexusProjectSetupAuthInventory.js";
 export * from "./nexusProjectSetupHostingHandoff.js";
 export * from "./nexusProjectSetupModel.js";
+export * from "./nexusProjectSetupReadiness.js";
 export * from "./nexusProjectSetupWizard.js";
 export * from "./nexusProjectTemplate.js";
 export * from "./processSupervisor.js";
