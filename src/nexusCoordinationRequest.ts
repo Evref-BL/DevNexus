@@ -11,6 +11,15 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  nexusAuthorityMutationBlock,
+  resolveNexusCurrentAutomationActor,
+  resolveNexusEffectiveAuthorityForCurrentActor,
+  unconfiguredNexusAuthorityAllowedResolution,
+  type NexusAuthorityAction,
+  type NexusAuthorityMutationBlock,
+  type NexusEffectiveAuthorityResolution,
+} from "./nexusAuthority.js";
+import {
   type ResolvedNexusProjectWorkTracker,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
@@ -40,6 +49,7 @@ import type {
   NexusCoordinationTrackerSummary,
   NexusCoordinationWorkItemTrackerReference,
 } from "./nexusCoordination.js";
+import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 
 export const coordinationRequestCommentMarker = "DevNexus coordination request";
 export const coordinationRequestKind = "dev-nexus.coordination.request";
@@ -119,6 +129,12 @@ export interface NexusCoordinationRequestProviderRecord {
   credentialsUsed: false;
   externalRef: ExternalRef | null;
   webUrl: string | null;
+  authority: NexusEffectiveAuthorityResolution | null;
+  postingDisposition:
+    | "not_applicable"
+    | "draft_authority_blocked"
+    | "draft_live_posting_disabled";
+  blockedMutation: NexusAuthorityMutationBlock | null;
   draft: {
     title: string;
     body: string;
@@ -200,6 +216,7 @@ export interface NexusCoordinationRequestResult {
   requestTracker: NexusCoordinationTrackerSummary;
   record: NexusCoordinationRequestRecord;
   comment: WorkComment | null;
+  blockedMutations: NexusAuthorityMutationBlock[];
   warnings: string[];
 }
 
@@ -314,6 +331,7 @@ export async function createNexusCoordinationRequest(
     : null;
   const provider = providerRecordForTarget({
     context,
+    requestTracker,
     target,
     intent,
     question,
@@ -360,6 +378,17 @@ export async function createNexusCoordinationRequest(
   };
 
   const warnings = [...git.warnings];
+  const blockedMutations: NexusAuthorityMutationBlock[] = [];
+  if (provider.blockedMutation) {
+    blockedMutations.push(provider.blockedMutation);
+    warnings.push(
+      `Provider posting for ${provider.provider} ${provider.surface} remains a draft because authority blocked ${provider.blockedMutation.action}.`,
+    );
+  } else if (provider.postingDisposition === "draft_live_posting_disabled") {
+    warnings.push(
+      `Provider posting for ${provider.provider} ${provider.surface} remains a draft; live external provider posting is disabled by policy.`,
+    );
+  }
   if (recordTarget?.warning) {
     warnings.push(recordTarget.warning);
   }
@@ -371,6 +400,7 @@ export async function createNexusCoordinationRequest(
     body: formatCoordinationRequestComment(record),
     now: options.now,
     warnings,
+    blockedMutations,
   });
 
   return {
@@ -380,6 +410,7 @@ export async function createNexusCoordinationRequest(
     requestTracker: requestTracker.summary,
     record,
     comment,
+    blockedMutations,
     warnings,
   };
 }
@@ -714,6 +745,7 @@ function inferCoordinationRequestTarget(options: {
 
 function providerRecordForTarget(options: {
   context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedCoordinationRequestTracker;
   target: NexusCoordinationRequestTarget;
   intent: NexusCoordinationRequestIntent;
   question: string | null;
@@ -723,6 +755,9 @@ function providerRecordForTarget(options: {
 }): NexusCoordinationRequestProviderRecord {
   const provider = options.target.provider ?? "dev-nexus";
   const surface = providerSurfaceForTarget(options.target);
+  const authority = providerPostingAuthority(options);
+  const blockedMutation =
+    authority && !authority.allowed ? nexusAuthorityMutationBlock(authority) : null;
   const draft = {
     title: `${options.intent} request for ${options.target.label}`,
     body: draftRequestBody(options),
@@ -736,9 +771,54 @@ function providerRecordForTarget(options: {
     credentialsUsed: false,
     externalRef: options.target.externalRef,
     webUrl: options.target.externalRef?.webUrl ?? null,
+    authority,
+    postingDisposition: authority
+      ? blockedMutation
+        ? "draft_authority_blocked"
+        : "draft_live_posting_disabled"
+      : "not_applicable",
+    blockedMutation,
     draft,
     mockFlow: mockFlowForProviderSurface(provider, surface),
   };
+}
+
+function providerPostingAuthority(options: {
+  context: ResolvedCoordinationRequestContext;
+  requestTracker: ResolvedCoordinationRequestTracker;
+  target: NexusCoordinationRequestTarget;
+  intent: NexusCoordinationRequestIntent;
+}): NexusEffectiveAuthorityResolution | null {
+  const requestedAction = providerPostingAction(options.intent, options.target);
+  if (!requestedAction) {
+    return null;
+  }
+
+  return resolveCoordinationRequestAuthority({
+    context: options.context,
+    tracker: options.requestTracker,
+    requestedAction,
+    provider: options.target.provider,
+  });
+}
+
+function providerPostingAction(
+  intent: NexusCoordinationRequestIntent,
+  target: NexusCoordinationRequestTarget,
+): NexusAuthorityAction | null {
+  if (target.provider === "dev-nexus" || target.kind === "coordination_record") {
+    return null;
+  }
+  if (
+    intent === "review" ||
+    target.kind === "github_pull_request" ||
+    target.kind === "gitlab_merge_request" ||
+    target.kind === "reviewer"
+  ) {
+    return "provider.review.request";
+  }
+
+  return "provider.comment";
 }
 
 function providerSurfaceForTarget(
@@ -1038,6 +1118,7 @@ async function maybeAddRequestComment(options: {
   body: string;
   now?: () => Date | string;
   warnings: string[];
+  blockedMutations: NexusAuthorityMutationBlock[];
 }): Promise<WorkComment | null> {
   if (!options.workItemId) {
     options.warnings.push(
@@ -1054,6 +1135,22 @@ async function maybeAddRequestComment(options: {
   if (!options.targetWorkItemId) {
     options.warnings.push(
       `No tracker reference links logical work item "${options.context.component.id}:${options.workItemId}" to request tracker "${options.tracker.tracker.id}", so the coordination request was returned as a neutral record only.`,
+    );
+    return null;
+  }
+  const authority = resolveCoordinationRequestAuthority({
+    context: options.context,
+    tracker: options.tracker,
+    requestedAction:
+      options.tracker.tracker.workTracking.provider === "local"
+        ? "work_item.comment"
+        : "provider.comment",
+  });
+  if (!authority.allowed) {
+    const block = nexusAuthorityMutationBlock(authority);
+    options.blockedMutations.push(block);
+    options.warnings.push(
+      `Coordination request comment was not posted to tracker "${options.tracker.tracker.id}" because authority blocked ${block.action}.`,
     );
     return null;
   }
@@ -1111,6 +1208,42 @@ function workItemProjectContext(
     })),
     workTracking,
   };
+}
+
+function resolveCoordinationRequestAuthority(options: {
+  context: ResolvedCoordinationRequestContext;
+  tracker: ResolvedCoordinationRequestTracker;
+  requestedAction: NexusAuthorityAction;
+  provider?: string | null;
+}): NexusEffectiveAuthorityResolution {
+  if (!options.context.projectConfig.authority) {
+    return unconfiguredNexusAuthorityAllowedResolution(options.requestedAction);
+  }
+  const publication = resolveNexusPublicationPolicy(
+    options.context.projectConfig,
+    options.context.component,
+  );
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: options.context.projectConfig.authority,
+    componentId: options.context.component.id,
+    publication,
+    authProfiles: [],
+  });
+
+  return resolveNexusEffectiveAuthorityForCurrentActor({
+    authority: options.context.projectConfig.authority,
+    currentActor,
+    project: options.context.projectConfig.id,
+    component: options.context.component.id,
+    provider: options.provider ?? options.tracker.tracker.workTracking.provider,
+    tracker: options.tracker.tracker.id,
+    remote: publication.remote,
+    repository: options.context.component.remoteUrl,
+    targetBranch: publication.targetBranch,
+    requestedAction: options.requestedAction,
+    publication,
+    safety: options.context.projectConfig.automation?.safety ?? null,
+  });
 }
 
 function resolveCoordinationRequestTracker(

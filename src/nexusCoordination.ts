@@ -11,8 +11,16 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  NexusAuthorityMutationError,
+  nexusAuthorityMutationBlock,
+  resolveNexusCurrentAutomationActor,
+  resolveNexusEffectiveAuthorityForCurrentActor,
   summarizeNexusAuthorityForComponent,
+  unconfiguredNexusAuthorityAllowedResolution,
+  type NexusAuthorityAction,
+  type NexusAuthorityMutationBlock,
   type NexusAuthorityComponentSummary,
+  type NexusEffectiveAuthorityResolution,
 } from "./nexusAuthority.js";
 import {
   createOrRefreshNexusWorktreeLease,
@@ -364,9 +372,11 @@ export interface NexusCoordinationHandoffResult {
   project: NexusCoordinationStatus["project"];
   component: NexusCoordinationStatus["component"];
   record: NexusCoordinationHandoffRecord;
-  comment: WorkComment;
+  comment: WorkComment | null;
   git: NexusCoordinationGitStatus;
-  lease: NexusWorktreeLeaseRecord;
+  lease: NexusWorktreeLeaseRecord | null;
+  authority: NexusEffectiveAuthorityResolution;
+  blockedMutation: NexusAuthorityMutationBlock | null;
 }
 
 interface ResolvedCoordinationContext {
@@ -489,6 +499,66 @@ export async function createNexusCoordinationHandoff(
   }
   const hostId = optionalTrimmedString(options.hostId) ?? os.hostname();
   const agentId = optionalTrimmedString(options.agentId) ?? null;
+  const authority = resolveCoordinationMutationAuthority({
+    context,
+    tracker: coordinationTracker,
+    requestedAction: "coordination.handoff",
+  });
+  const recordBase: Omit<NexusCoordinationHandoffRecord, "leaseId"> = {
+    kind: coordinationHandoffKind,
+    version: 1,
+    createdAt: timestamp,
+    projectId: context.projectConfig.id,
+    projectRoot: context.projectRoot,
+    componentId: context.component.id,
+    componentName: context.component.name,
+    workItemId: logicalItemId,
+    logicalItemId,
+    selectedWorkItemRef: workItemTrackerReferenceFromWorkItem({
+      componentId: context.component.id,
+      workItem,
+    }),
+    coordinationTargetRef: target.reference,
+    trackerReferences: coordinationTrackerReferences({
+      componentId: context.component.id,
+      workItem,
+      linkReferences,
+    }),
+    hostId,
+    agentId,
+    status,
+    repositoryPath: git.repositoryPath,
+    branch: git.branch,
+    upstream: git.upstream,
+    baseRef: git.baseRef,
+    headCommit: git.headCommit,
+    dirty: git.dirty,
+    ahead: git.ahead,
+    behind: git.behind,
+    pushed: git.pushed,
+    changedAreas: normalizedStringArray(options.changedAreas, "changedAreas"),
+    decisions: normalizedStringArray(options.decisions, "decisions"),
+    verificationSummary:
+      optionalNullableTrimmedString(options.verificationSummary) ?? null,
+    integrationPreference:
+      optionalNullableTrimmedString(options.integrationPreference) ?? null,
+    note: optionalNullableTrimmedString(options.note) ?? null,
+  };
+  if (!authority.allowed) {
+    return {
+      project: projectSummary(context),
+      component: componentSummary(context.component),
+      record: {
+        ...recordBase,
+        leaseId: null,
+      },
+      comment: null,
+      git,
+      lease: null,
+      authority,
+      blockedMutation: nexusAuthorityMutationBlock(authority),
+    };
+  }
   const lease = createOrRefreshNexusWorktreeLease({
     projectRoot: context.projectRoot,
     componentId: context.component.id,
@@ -517,45 +587,8 @@ export async function createNexusCoordinationHandoff(
     now: timestamp,
   });
   const record: NexusCoordinationHandoffRecord = {
-    kind: coordinationHandoffKind,
-    version: 1,
-    createdAt: timestamp,
-    projectId: context.projectConfig.id,
-    projectRoot: context.projectRoot,
-    componentId: context.component.id,
-    componentName: context.component.name,
-    workItemId: logicalItemId,
-    logicalItemId,
-    selectedWorkItemRef: workItemTrackerReferenceFromWorkItem({
-      componentId: context.component.id,
-      workItem,
-    }),
-    coordinationTargetRef: target.reference,
-    trackerReferences: coordinationTrackerReferences({
-      componentId: context.component.id,
-      workItem,
-      linkReferences,
-    }),
-    hostId,
-    agentId,
-    status,
+    ...recordBase,
     leaseId: lease.id,
-    repositoryPath: git.repositoryPath,
-    branch: git.branch,
-    upstream: git.upstream,
-    baseRef: git.baseRef,
-    headCommit: git.headCommit,
-    dirty: git.dirty,
-    ahead: git.ahead,
-    behind: git.behind,
-    pushed: git.pushed,
-    changedAreas: normalizedStringArray(options.changedAreas, "changedAreas"),
-    decisions: normalizedStringArray(options.decisions, "decisions"),
-    verificationSummary:
-      optionalNullableTrimmedString(options.verificationSummary) ?? null,
-    integrationPreference:
-      optionalNullableTrimmedString(options.integrationPreference) ?? null,
-    note: optionalNullableTrimmedString(options.note) ?? null,
   };
   let comment: WorkComment;
   try {
@@ -582,6 +615,8 @@ export async function createNexusCoordinationHandoff(
     comment,
     git,
     lease,
+    authority,
+    blockedMutation: null,
   };
 }
 
@@ -733,11 +768,15 @@ export function nexusCoordinationDiagnosticsFromError(
 export function nexusCoordinationErrorPayload(error: unknown): {
   error: string;
   diagnostics?: NexusCoordinationDiagnostic[];
+  blockedMutation?: NexusAuthorityMutationBlock;
 } {
   const diagnostics = nexusCoordinationDiagnosticsFromError(error);
   return {
     error: error instanceof Error ? error.message : String(error),
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    ...(error instanceof NexusAuthorityMutationError
+      ? { blockedMutation: error.block }
+      : {}),
   };
 }
 
@@ -2349,6 +2388,41 @@ function coordinationAuthoritySummary(
     safety: context.projectConfig.automation?.safety ?? null,
     tracker: context.component.defaultTrackerId,
     repository: context.component.remoteUrl,
+  });
+}
+
+function resolveCoordinationMutationAuthority(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+  requestedAction: NexusAuthorityAction;
+}): NexusEffectiveAuthorityResolution {
+  if (!options.context.projectConfig.authority) {
+    return unconfiguredNexusAuthorityAllowedResolution(options.requestedAction);
+  }
+  const publication = resolveNexusPublicationPolicy(
+    options.context.projectConfig,
+    options.context.component,
+  );
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: options.context.projectConfig.authority,
+    componentId: options.context.component.id,
+    publication,
+    authProfiles: [],
+  });
+
+  return resolveNexusEffectiveAuthorityForCurrentActor({
+    authority: options.context.projectConfig.authority,
+    currentActor,
+    project: options.context.projectConfig.id,
+    component: options.context.component.id,
+    provider: options.tracker.tracker.workTracking.provider,
+    tracker: options.tracker.tracker.id,
+    remote: publication.remote,
+    repository: options.context.component.remoteUrl,
+    targetBranch: publication.targetBranch,
+    requestedAction: options.requestedAction,
+    publication,
+    safety: options.context.projectConfig.automation?.safety ?? null,
   });
 }
 

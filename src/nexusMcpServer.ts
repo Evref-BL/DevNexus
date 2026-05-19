@@ -2,6 +2,16 @@ import path from "node:path";
 import process from "node:process";
 import type { Readable, Writable } from "node:stream";
 import {
+  NexusAuthorityMutationError,
+  nexusAuthorityMutationBlock,
+  resolveNexusCurrentAutomationActor,
+  resolveNexusEffectiveAuthorityForCurrentActor,
+  unconfiguredNexusAuthorityAllowedResolution,
+  type NexusAuthorityAction,
+  type NexusAuthorityMutationBlock,
+  type NexusEffectiveAuthorityResolution,
+} from "./nexusAuthority.js";
+import {
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
   resolveNexusHome,
@@ -130,6 +140,7 @@ import {
 import {
   createWorkItemTrackerLinkService,
 } from "./workItemTrackerLinks.js";
+import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import type {
@@ -1588,6 +1599,12 @@ export async function callDevNexusMcpTool(
           mutationClass: "local_tracker",
           componentId: optionalString(args, "componentId", "arguments"),
         });
+        assertMcpWorkItemAuthorityAllowed(args, [
+          ...workItemCreateAuthorityActions(
+            args,
+            workItemTrackerProviderFromArgs(args),
+          ),
+        ]);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).createWorkItem({
@@ -1631,17 +1648,24 @@ export async function callDevNexusMcpTool(
       }
       case "work_item_update": {
         const { selector, ref } = workItemSelectorRefFromArgs(args);
+        const patch = workItemPatchFromArgs(args);
         assertMcpMutationAllowed(args, context, {
           command: "work_item_update",
           mutationClass: "local_tracker",
           componentId: selector.componentId,
         });
+        assertMcpWorkItemAuthorityAllowed(args, [
+          ...workItemPatchAuthorityActions(
+            patch,
+            workItemTrackerProviderFromArgs(args, selector),
+          ),
+        ]);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).updateWorkItem({
             ...selector,
             ref,
-            patch: workItemPatchFromArgs(args),
+            patch,
           }),
         });
       }
@@ -1652,6 +1676,9 @@ export async function callDevNexusMcpTool(
           mutationClass: "local_tracker",
           componentId: selector.componentId,
         });
+        assertMcpWorkItemAuthorityAllowed(args, [
+          workItemCommentAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+        ]);
         return toolResult({
           ok: true,
           comment: await workItemServiceFromArgs(args, context).addComment({
@@ -1668,6 +1695,9 @@ export async function callDevNexusMcpTool(
           mutationClass: "local_tracker",
           componentId: selector.componentId,
         });
+        assertMcpWorkItemAuthorityAllowed(args, [
+          workItemStatusAuthorityAction(workItemTrackerProviderFromArgs(args, selector)),
+        ]);
         return toolResult({
           ok: true,
           workItem: await workItemServiceFromArgs(args, context).setStatus({
@@ -1905,6 +1935,144 @@ function workItemServiceFromArgs(
     resolveProject: (selector) => resolveWorkItemProject(selector, homePath),
     now: context.now,
   });
+}
+
+function assertMcpWorkItemAuthorityAllowed(
+  args: Record<string, unknown>,
+  actions: NexusAuthorityAction[],
+): void {
+  for (const action of uniqueNexusAuthorityActions(actions)) {
+    const authority = resolveMcpWorkItemAuthority(args, action);
+    if (!authority.allowed) {
+      throw new NexusAuthorityMutationError(
+        nexusAuthorityMutationBlock(authority),
+      );
+    }
+  }
+}
+
+function resolveMcpWorkItemAuthority(
+  args: Record<string, unknown>,
+  requestedAction: NexusAuthorityAction,
+): NexusEffectiveAuthorityResolution {
+  const homePath = homePathFromArgs(args);
+  const selector = projectSelectorFromArgs(args);
+  const resolved = resolveWorkItemProject(selector, homePath);
+  const config = loadProjectConfig(resolved.projectRoot);
+  if (!config.authority) {
+    return unconfiguredNexusAuthorityAllowedResolution(requestedAction);
+  }
+  const component = resolveProjectComponents(resolved.projectRoot, config).find(
+    (candidate) => candidate.id === resolved.componentId,
+  );
+  if (!component) {
+    throw new Error(`Project component is not configured: ${resolved.componentId}`);
+  }
+  const publication = resolveNexusPublicationPolicy(config, component);
+  const authProfiles = projectHostingAuthProfiles(config, homePath);
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: config.authority,
+    componentId: component.id,
+    publication,
+    authProfiles,
+  });
+
+  return resolveNexusEffectiveAuthorityForCurrentActor({
+    authority: config.authority,
+    currentActor,
+    authProfiles,
+    project: config.id,
+    component: component.id,
+    provider: workItemTrackerProviderFromResolved(resolved, selector),
+    tracker: selector.trackerId ?? resolved.defaultTrackerId ?? null,
+    remote: publication.remote,
+    repository: component.remoteUrl,
+    targetBranch: publication.targetBranch,
+    requestedAction,
+    publication,
+    safety: config.automation?.safety ?? null,
+  });
+}
+
+function workItemTrackerProviderFromArgs(
+  args: Record<string, unknown>,
+  selector: WorkItemProjectSelector = projectSelectorFromArgs(args),
+): string {
+  return workItemTrackerProviderFromResolved(
+    resolveWorkItemProject(selector, homePathFromArgs(args)),
+    selector,
+  );
+}
+
+function workItemTrackerProviderFromResolved(
+  resolved: ResolvedWorkItemProjectContext,
+  selector: WorkItemProjectSelector,
+): string {
+  const trackerId = selector.trackerId ?? resolved.defaultTrackerId ?? null;
+  const tracker = trackerId
+    ? resolved.workTrackers?.find((candidate) => candidate.id === trackerId)
+    : null;
+  return tracker?.workTracking.provider ?? resolved.workTracking?.provider ?? "local";
+}
+
+function workItemCreateAuthorityActions(
+  args: Record<string, unknown>,
+  provider: string,
+): NexusAuthorityAction[] {
+  return workItemPatchAuthorityActions(
+    {
+      title: requiredString(args, "title", "arguments"),
+      status: optionalWorkStatus(args, "status", "arguments"),
+      labels: optionalStringArray(args, "labels", "arguments"),
+      assignees: optionalStringArray(args, "assignees", "arguments"),
+      milestone: optionalNullableString(args, "milestone", "arguments"),
+    },
+    provider,
+  );
+}
+
+function workItemPatchAuthorityActions(
+  patch: WorkItemPatch,
+  provider: string,
+): NexusAuthorityAction[] {
+  const actions: NexusAuthorityAction[] = [];
+  const providerBacked = provider !== "local";
+  if (
+    patch.title !== undefined ||
+    patch.description !== undefined ||
+    patch.milestone !== undefined ||
+    (!providerBacked &&
+      (patch.status !== undefined ||
+        patch.labels !== undefined ||
+        patch.assignees !== undefined))
+  ) {
+    actions.push("work_item.update");
+  }
+  if (providerBacked && patch.status !== undefined) {
+    actions.push("provider.transition");
+  }
+  if (providerBacked && patch.labels !== undefined) {
+    actions.push("provider.label");
+  }
+  if (providerBacked && patch.assignees !== undefined) {
+    actions.push("provider.assign");
+  }
+
+  return actions;
+}
+
+function workItemCommentAuthorityAction(provider: string): NexusAuthorityAction {
+  return provider === "local" ? "work_item.comment" : "provider.comment";
+}
+
+function workItemStatusAuthorityAction(provider: string): NexusAuthorityAction {
+  return provider === "local" ? "work_item.update" : "provider.transition";
+}
+
+function uniqueNexusAuthorityActions(
+  actions: NexusAuthorityAction[],
+): NexusAuthorityAction[] {
+  return [...new Set(actions)];
 }
 
 function workItemTrackerLinkServiceFromArgs(

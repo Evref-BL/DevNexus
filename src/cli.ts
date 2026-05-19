@@ -145,6 +145,15 @@ import {
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
+  nexusAuthorityMutationBlock,
+  resolveNexusCurrentAutomationActor,
+  resolveNexusEffectiveAuthorityForCurrentActor,
+  unconfiguredNexusAuthorityAllowedResolution,
+  type NexusAuthorityAction,
+  type NexusAuthorityMutationBlock,
+  type NexusEffectiveAuthorityResolution,
+} from "./nexusAuthority.js";
+import {
   createDefaultNexusHomeConfigBase,
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
@@ -238,6 +247,7 @@ import {
   type UnlinkWorkItemTrackerReferenceResult,
 } from "./workItemTrackerLinks.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
+import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 import type {
@@ -1888,6 +1898,29 @@ async function handleWorkItemCommand(
       mutationClass: "local_tracker",
       componentId: parsed.componentId,
     });
+    const authorityBlock = cliWorkItemAuthorityBlock(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+      workItemPatchAuthorityActions(
+        {
+          title: parsed.title,
+          status: parsed.status,
+          labels: parsed.labels.length > 0 ? parsed.labels : undefined,
+          assignees:
+            parsed.assignees.length > 0 ? parsed.assignees : undefined,
+          milestone: parsed.milestone,
+        },
+        cliWorkItemTrackerProvider(
+          parsed.projectRoot,
+          parsed.componentId,
+          parsed.trackerId,
+        ),
+      ),
+    );
+    if (authorityBlock) {
+      return printCliAuthorityBlock(authorityBlock, parsed, dependencies);
+    }
     const item = await workItemService(parsed.projectRoot, dependencies)
       .createWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
@@ -1967,6 +2000,22 @@ async function handleWorkItemCommand(
       parsed.trackerId,
       parsed.itemId,
     );
+    const authorityBlock = cliWorkItemAuthorityBlock(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+      workItemPatchAuthorityActions(
+        parsed.patch,
+        cliWorkItemTrackerProvider(
+          parsed.projectRoot,
+          reference.componentId,
+          reference.trackerId,
+        ),
+      ),
+    );
+    if (authorityBlock) {
+      return printCliAuthorityBlock(authorityBlock, parsed, dependencies);
+    }
     const item = await workItemService(parsed.projectRoot, dependencies)
       .updateWorkItem({
         projectRoot: path.resolve(parsed.projectRoot),
@@ -1993,6 +2042,23 @@ async function handleWorkItemCommand(
       parsed.trackerId,
       parsed.itemId,
     );
+    const authorityBlock = cliWorkItemAuthorityBlock(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+      [
+        workItemCommentAuthorityAction(
+          cliWorkItemTrackerProvider(
+            parsed.projectRoot,
+            reference.componentId,
+            reference.trackerId,
+          ),
+        ),
+      ],
+    );
+    if (authorityBlock) {
+      return printCliAuthorityBlock(authorityBlock, parsed, dependencies);
+    }
     const comment = await workItemService(parsed.projectRoot, dependencies)
       .addComment({
         projectRoot: path.resolve(parsed.projectRoot),
@@ -2023,6 +2089,23 @@ async function handleWorkItemCommand(
       parsed.trackerId,
       parsed.itemId,
     );
+    const authorityBlock = cliWorkItemAuthorityBlock(
+      parsed.projectRoot,
+      reference.componentId,
+      reference.trackerId,
+      [
+        workItemStatusAuthorityAction(
+          cliWorkItemTrackerProvider(
+            parsed.projectRoot,
+            reference.componentId,
+            reference.trackerId,
+          ),
+        ),
+      ],
+    );
+    if (authorityBlock) {
+      return printCliAuthorityBlock(authorityBlock, parsed, dependencies);
+    }
     const item = await workItemService(parsed.projectRoot, dependencies)
       .setStatus({
         projectRoot: path.resolve(parsed.projectRoot),
@@ -2640,6 +2723,129 @@ function workItemService(
       resolveDirectProject(projectRoot, selector.componentId),
     now: dependencies.now,
   });
+}
+
+function cliWorkItemAuthorityBlock(
+  projectRoot: string,
+  componentId: string | undefined,
+  trackerId: string | undefined,
+  actions: NexusAuthorityAction[],
+): NexusAuthorityMutationBlock | null {
+  for (const action of uniqueNexusAuthorityActions(actions)) {
+    const authority = resolveCliWorkItemAuthority(
+      projectRoot,
+      componentId,
+      trackerId,
+      action,
+    );
+    if (!authority.allowed) {
+      return nexusAuthorityMutationBlock(authority);
+    }
+  }
+
+  return null;
+}
+
+function resolveCliWorkItemAuthority(
+  projectRoot: string,
+  componentId: string | undefined,
+  trackerId: string | undefined,
+  requestedAction: NexusAuthorityAction,
+): NexusEffectiveAuthorityResolution {
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const config = loadProjectConfig(resolvedProjectRoot);
+  if (!config.authority) {
+    return unconfiguredNexusAuthorityAllowedResolution(requestedAction);
+  }
+  const component = componentId
+    ? resolveProjectComponents(resolvedProjectRoot, config).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  const publication = resolveNexusPublicationPolicy(config, component);
+  const authProfiles = hostingAuthProfilesForCli(config, undefined);
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: config.authority,
+    componentId: component.id,
+    publication,
+    authProfiles,
+  });
+
+  return resolveNexusEffectiveAuthorityForCurrentActor({
+    authority: config.authority,
+    currentActor,
+    authProfiles,
+    project: config.id,
+    component: component.id,
+    provider: cliWorkItemTrackerProvider(projectRoot, component.id, trackerId),
+    tracker: trackerId ?? component.defaultTrackerId,
+    remote: publication.remote,
+    repository: component.remoteUrl,
+    targetBranch: publication.targetBranch,
+    requestedAction,
+    publication,
+    safety: config.automation?.safety ?? null,
+  });
+}
+
+function cliWorkItemTrackerProvider(
+  projectRoot: string,
+  componentId: string | undefined,
+  trackerId: string | undefined,
+): string {
+  const context = resolveDirectProject(projectRoot, componentId);
+  const selectedTrackerId = trackerId ?? context.defaultTrackerId ?? null;
+  const tracker = selectedTrackerId
+    ? context.workTrackers?.find((candidate) => candidate.id === selectedTrackerId)
+    : null;
+  return tracker?.workTracking.provider ?? context.workTracking?.provider ?? "local";
+}
+
+function workItemPatchAuthorityActions(
+  patch: WorkItemPatch,
+  provider: string,
+): NexusAuthorityAction[] {
+  const actions: NexusAuthorityAction[] = [];
+  const providerBacked = provider !== "local";
+  if (
+    patch.title !== undefined ||
+    patch.description !== undefined ||
+    patch.milestone !== undefined ||
+    (!providerBacked &&
+      (patch.status !== undefined ||
+        patch.labels !== undefined ||
+        patch.assignees !== undefined))
+  ) {
+    actions.push("work_item.update");
+  }
+  if (providerBacked && patch.status !== undefined) {
+    actions.push("provider.transition");
+  }
+  if (providerBacked && patch.labels !== undefined) {
+    actions.push("provider.label");
+  }
+  if (providerBacked && patch.assignees !== undefined) {
+    actions.push("provider.assign");
+  }
+
+  return actions;
+}
+
+function workItemCommentAuthorityAction(provider: string): NexusAuthorityAction {
+  return provider === "local" ? "work_item.comment" : "provider.comment";
+}
+
+function workItemStatusAuthorityAction(provider: string): NexusAuthorityAction {
+  return provider === "local" ? "work_item.update" : "provider.transition";
+}
+
+function uniqueNexusAuthorityActions(
+  actions: NexusAuthorityAction[],
+): NexusAuthorityAction[] {
+  return [...new Set(actions)];
 }
 
 function workItemTrackerLinkService(
@@ -5932,7 +6138,7 @@ function printCoordinationHandoffResult(
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Component: ${result.component.id}`);
   writeLine(stdout, `  Work item: ${result.record.workItemId}`);
-  if (result.comment.trackerRef) {
+  if (result.comment?.trackerRef) {
     writeLine(
       stdout,
       `  Coordination tracker: ${result.comment.trackerRef.trackerId} (${result.comment.trackerRef.provider})`,
@@ -5940,8 +6146,18 @@ function printCoordinationHandoffResult(
   }
   writeLine(stdout, `  Status: ${result.record.status}`);
   writeLine(stdout, `  Branch: ${result.record.branch ?? "unknown"}`);
-  writeLine(stdout, `  Lease: ${result.lease.id}`);
-  writeLine(stdout, `  Comment: ${result.comment.id}`);
+  if (result.blockedMutation) {
+    writeLine(stdout, `  Blocked: ${result.blockedMutation.action}`);
+    if (result.blockedMutation.fallbackSuggestion) {
+      writeLine(stdout, `  Fallback: ${result.blockedMutation.fallbackSuggestion}`);
+    }
+  }
+  if (result.lease) {
+    writeLine(stdout, `  Lease: ${result.lease.id}`);
+  }
+  if (result.comment) {
+    writeLine(stdout, `  Comment: ${result.comment.id}`);
+  }
 }
 
 function printCoordinationIntegrationPlan(
@@ -7668,6 +7884,29 @@ function parseNonNegativeInteger(value: string, optionName: string): number {
 
 function writeLine(stdout: TextWriter, line = ""): void {
   stdout.write(`${line}\n`);
+}
+
+function printCliAuthorityBlock(
+  block: NexusAuthorityMutationBlock,
+  parsed: { json?: boolean },
+  dependencies: DevNexusCliDependencies,
+): 1 {
+  const payload = {
+    ok: false,
+    error: "authority_mutation_blocked",
+    blockedMutation: block,
+  };
+  if (parsed.json) {
+    writeJson(dependencies.stdout ?? process.stdout, payload);
+  } else {
+    const stderr = dependencies.stderr ?? process.stderr;
+    writeLine(stderr, block.reason);
+    if (block.fallbackSuggestion) {
+      writeLine(stderr, `Fallback: ${block.fallbackSuggestion}`);
+    }
+  }
+
+  return 1;
 }
 
 function writeJson(stdout: TextWriter, value: unknown): void {

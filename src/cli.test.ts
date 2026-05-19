@@ -1823,6 +1823,109 @@ describe("dev-nexus cli", () => {
     expect(store.comments["local-1"]).toHaveLength(1);
   });
 
+  it("prints machine-readable authority blocks for provider work-item CLI mutations", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "local_only",
+            actor: {
+              id: "contributor-bot",
+              kind: "machine_user",
+              provider: "github",
+              handle: "contributor-bot",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "contributor-bot",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "contributor-bot",
+              displayName: "Contributor Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "contributor-bot",
+              roles: ["contributor"],
+              scope: { component: "primary" },
+            },
+          ],
+        },
+        workTracking: undefined,
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "primary",
+            workTrackers: [
+              {
+                id: "primary",
+                name: "Primary",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: { provider: "local" },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["mirror"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "project",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const output = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "update",
+        projectRoot,
+        "42",
+        "--tracker",
+        "github",
+        "--label",
+        "blocked",
+        "--json",
+      ],
+      { stdout: output.writer },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: "authority_mutation_blocked",
+      blockedMutation: {
+        action: "provider.label",
+        fallbackAction: "coordination.handoff",
+      },
+    });
+  });
+
   it("records and reports coordination handoffs through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     const sourceRoot = path.join(projectRoot, "source");

@@ -395,6 +395,29 @@ export interface NexusEffectiveAuthorityResolution {
   explanation: string;
 }
 
+export interface NexusAuthorityMutationBlock {
+  kind: "authority_blocked_mutation";
+  action: NexusAuthorityAction;
+  status: NexusEffectiveAuthorityStatus;
+  reason: string;
+  fallbackAction: NexusAuthorityAction | null;
+  fallbackSuggestion: string | null;
+  missingRequiredActions: NexusAuthorityAction[];
+  missingProviderSignals: NexusAuthorityRequiredProviderSignal[];
+  blockingReasons: string[];
+  authority: NexusEffectiveAuthorityResolution;
+}
+
+export class NexusAuthorityMutationError extends Error {
+  readonly block: NexusAuthorityMutationBlock;
+
+  constructor(block: NexusAuthorityMutationBlock) {
+    super(block.reason);
+    this.name = "NexusAuthorityMutationError";
+    this.block = block;
+  }
+}
+
 export interface NexusAuthorityRoleBindingSummary {
   roles: string[];
   scope: NexusAuthorityScopeConfig;
@@ -526,7 +549,14 @@ const nexusAuthoritySummaryActionSpecs = [
   { key: "publish_package", action: "package.publish" },
   { key: "publish_release", action: "release.publish" },
   { key: "request_review", action: "provider.review.request" },
+  { key: "approve_review", action: "provider.review.approve" },
+  { key: "request_changes", action: "provider.review.reject" },
+  { key: "comment_work_item", action: "work_item.comment" },
   { key: "update_work_item", action: "work_item.update" },
+  { key: "comment_provider", action: "provider.comment" },
+  { key: "label_provider", action: "provider.label" },
+  { key: "assign_provider", action: "provider.assign" },
+  { key: "transition_provider", action: "provider.transition" },
   { key: "handoff", action: "coordination.handoff" },
 ] as const satisfies Array<{ key: string; action: NexusAuthorityAction }>;
 
@@ -680,6 +710,79 @@ export function resolveNexusAuthorityForActor(
     actions: expandNexusAuthorityRoles(roles, config),
     matchedBindings,
   };
+}
+
+export function nexusAuthorityMutationBlock(
+  authority: NexusEffectiveAuthorityResolution,
+): NexusAuthorityMutationBlock {
+  return {
+    kind: "authority_blocked_mutation",
+    action: authority.requestedAction,
+    status: authority.status,
+    reason: authority.explanation,
+    fallbackAction: authority.recommendedFallbackAction,
+    fallbackSuggestion: authority.fallbackSuggestion,
+    missingRequiredActions: [...authority.missingRequiredActions],
+    missingProviderSignals: [...authority.missingProviderSignals],
+    blockingReasons: [...authority.blockingReasons],
+    authority,
+  };
+}
+
+export function unconfiguredNexusAuthorityAllowedResolution(
+  requestedAction: NexusAuthorityAction,
+): NexusEffectiveAuthorityResolution {
+  return {
+    status: "allowed",
+    allowed: true,
+    requestedAction,
+    actorId: null,
+    knownActor: false,
+    authProfileId: null,
+    matchedActorId: null,
+    matchedRoles: [],
+    matchedRule: null,
+    matchedBindings: [],
+    missingRequiredActions: [],
+    missingProviderSignals: [],
+    recommendedFallbackAction: null,
+    blockingReasons: [],
+    fallbackSuggestion: null,
+    explanation:
+      `No authority policy is configured; ${requestedAction} is allowed by compatibility default.`,
+  };
+}
+
+export function assertNexusAuthorityMutationAllowed(
+  authority: NexusEffectiveAuthorityResolution,
+): void {
+  if (authority.allowed) {
+    return;
+  }
+
+  throw new NexusAuthorityMutationError(nexusAuthorityMutationBlock(authority));
+}
+
+export function resolveNexusEffectiveAuthorityForCurrentActor(
+  options: Omit<ResolveNexusEffectiveAuthorityOptions, "actor" | "authProfile"> & {
+    currentActor: NexusCurrentActorResolution;
+    authProfiles?: NexusHostingAuthProfileConfig[];
+  },
+): NexusEffectiveAuthorityResolution {
+  const authProfile = currentActorAuthProfile(
+    options.currentActor,
+    options.authProfiles ?? [],
+  );
+  return resolveNexusEffectiveAuthority({
+    ...options,
+    actor: {
+      id: options.currentActor.expectedActorId,
+      kind: options.currentActor.expectedActorKind,
+      provider: options.currentActor.expectedProvider,
+      providerIdentity: options.currentActor.expectedHandle,
+    },
+    authProfile,
+  });
 }
 
 export function resolveNexusCurrentAutomationActor(
@@ -2111,6 +2214,41 @@ function currentActorResolution(options: {
     roles: options.roles,
     actions: options.actions,
     warnings: options.warnings,
+  };
+}
+
+function currentActorAuthProfile(
+  currentActor: NexusCurrentActorResolution,
+  authProfiles: NexusHostingAuthProfileConfig[],
+): NexusEffectiveAuthorityAuthProfileInput | null {
+  if (!currentActor.profileId) {
+    return null;
+  }
+  const authProfile =
+    authProfiles.find((profile) => profile.id === currentActor.profileId) ??
+    null;
+  if (authProfile) {
+    return {
+      id: authProfile.id,
+      actorId: authProfile.actorId ?? null,
+      kind: authProfile.kind ?? null,
+      provider: authProfile.provider,
+      account: authProfile.account ?? null,
+    };
+  }
+  const currentActorProfile =
+    currentActor.profiles.find((profile) => profile.id === currentActor.profileId) ??
+    null;
+  if (!currentActorProfile) {
+    return null;
+  }
+
+  return {
+    id: currentActorProfile.id,
+    actorId: currentActorProfile.actorId,
+    kind: currentActorProfile.kind,
+    provider: null,
+    account: currentActorProfile.account,
   };
 }
 
