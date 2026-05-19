@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 166,
-  "nextCommentNumber": 349,
-  "updatedAt": "2026-05-19T19:48:49.309Z",
+  "nextCommentNumber": 352,
+  "updatedAt": "2026-05-19T20:02:23.713Z",
   "items": [
     {
       "id": "local-1",
@@ -4181,7 +4181,7 @@
       "id": "local-162",
       "title": "Add green-main branch-first publication policy model",
       "description": "Type: implementation tracer-bullet slice\nReadiness: autonomous agent-ready (AFK) with mocked provider/config tests.\nSource: dogfood CI/publication triage on 2026-05-19. User accepted the default decision that `main` should avoid red CI at all cost: agents should run CI on branches or pull requests, then merge to `main` only after required checks are green.\n\nGoal: make green-main branch-first publication an explicit DevNexus publication policy rather than an informal comment layered on top of `direct_integration`.\n\nSymptoms and motivation:\n- Current dogfood component publication config says `strategy: direct_integration`, which reads like target-branch push is the normal path.\n- The desired default is branch/worktree first, CI/checks on branch or PR, then merge to `main` only when green.\n- CI failure intake should be a recovery/intake mechanism, not the primary defense against red `main`.\n\nAcceptance criteria:\n- Component publication policy can declare a green-main or branch-first mode with target branch, integration branch or PR preference, direct-target-push default, required check selectors, and stale-check behavior.\n- Existing `direct_integration` configs remain compatible, but setup/status/reporting can distinguish direct target push from branch-first green-main publication.\n- Project status, agent context, and target report surfaces summarize the effective publication mode and whether direct target-branch push is allowed, exceptional, or blocked.\n- Invalid combinations produce clear validation errors, such as branch-first mode with no target branch or required checks that cannot be evaluated.\n- Tests cover existing direct-integration compatibility, green-main policy normalization, invalid policy combinations, status/context/report summaries, and a mocked provider branch/PR check requirement.\n\nBoundaries:\n- Do not perform live GitHub provider reads or writes in this slice.\n- Do not implement actual merge execution here; publication action enforcement stays owned by completed publication authority gating.\n- Do not duplicate provider check-signal mapping owned by completed provider branch-policy signal mapping.\n- Do not enable live CI triggers; CI intake remains a separate follow-up.\n\nRelated work:\n- Builds on completed publication authority gating and provider check/branch-policy signal mapping.\n- Aligns with branch/PR CI failure intake and treats red `main` as emergency recovery evidence, not the normal path.\n\nVerification:\n- Focused publication config/status/context tests.\n- Focused target-report tests for publication policy summaries.\n- npm run check when feasible.\n\nPublication notes:\n- Use branch-first publication once supported; until then publish through the current verified bot path with normal checks.",
-      "status": "blocked",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4194,8 +4194,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:06:51.862Z",
-      "updatedAt": "2026-05-19T19:48:49.309Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T20:02:07.207Z",
+      "closedAt": "2026-05-19T20:02:07.207Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4207,7 +4207,7 @@
       "id": "local-163",
       "title": "Migrate dogfood components to green-main publication defaults",
       "description": "Type: dogfood project-state migration slice\nReadiness: todo/dependent on green-main publication policy support and publication/check gating support.\nSource: dogfood CI/publication triage on 2026-05-19.\n\nGoal: update this dogfood project so configured components use the green-main branch-first publication policy as the default example once DevNexus can model and enforce it.\n\nDefault decision to apply:\n- `main` should avoid red CI at all cost.\n- Agents publish work to an implementation/integration branch or PR first.\n- Required CI/checks run on that branch or PR.\n- Merge to `main` only after required checks are green and publication authority allows the merge.\n- Direct target-branch push is blocked or explicitly exceptional for components with green-main protection.\n- CI failure intake handles branch/PR failures and emergency main recovery, but it is not the primary protection mechanism.\n\nAcceptance criteria:\n- The dogfood meta project config expresses green-main publication policy for the DevNexus, DevNexus-Pharo, and DevNexus-TypeScript components using the supported shared config shape.\n- Component policies name the target branch, branch/PR preference, expected bot remote/auth profile, required checks or provider branch-policy source, and direct-push exception policy.\n- Project status and target report show green-main publication mode for each component.\n- Existing automation/coordinator guidance points agents to branch-first CI-gated integration instead of assuming direct target push.\n- Any component that cannot yet support the policy records a concrete blocker rather than silently falling back to direct push.\n\nDependencies:\n- Depends on dev-nexus:local-162 for the publication policy model.\n- Depends on provider check and branch-policy signals if required checks are provider-resolved.\n- Depends on publication authority enforcement before live automation relies on the policy.\n\nBoundaries:\n- Do not mutate live provider branch protection in this slice unless a later explicit provider-write policy allows it.\n- Do not delete or rewrite remotes, branches, or component checkouts.\n- Do not store secrets in shared project state.\n\nVerification:\n- `dev-nexus project status` shows green-main policy summaries for all configured components.\n- `dev-nexus automation eligible-work` still works after the config migration.\n- Static review that target state and agent guidance no longer present direct push as the normal dogfood default.\n\nPublication notes:\n- Dogfood meta-project update through the configured bot profile after dependent source support lands.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4220,7 +4220,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:07:02.129Z",
-      "updatedAt": "2026-05-19T19:34:05.322Z",
+      "updatedAt": "2026-05-19T20:02:23.713Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -4233,7 +4233,7 @@
       "id": "local-164",
       "title": "Refine green-main into validation and protected handoff policy",
       "description": "Type: implementation refinement slice\nReadiness: autonomous agent-ready (AFK) with mocked provider/status tests; no live provider writes.\nSource: follow-up decision on 2026-05-19. User confirmed that green_main must not imply the bot owns merging to main or even has merge permission. Branch CI should still be checked explicitly.\n\nGoal: refine green_main from a branch-first publication flag into a protected target workflow that separates candidate production, branch or pull-request validation, and integration authority/handoff.\n\nDecision model:\n- Agents produce candidate work on branches and may push those branches through configured bot credentials.\n- DevNexus may check branch or pull-request CI/readiness through explicit read-only provider status workflows.\n- Merge to main is a separate authority decision. The bot may merge only when policy and credentials explicitly allow it.\n- Default green_main behavior is handoff-by-default after validation, not automatic merge.\n\nAcceptance criteria:\n- Publication policy expresses validation/readiness separately from integration authority, including default handoff behavior.\n- Green-main status distinguishes candidate branch pushed, branch/PR checks pending, checks green, checks stale, checks failed, mergeability unknown/clear/blocked, and ready-for-human-or-maintainer handoff.\n- Branch CI status checks are explicit actions or provider-signal inputs, not implicit background polling during unrelated agent work.\n- Agent context and target report explain whether the current actor may push a branch, open/update a PR, check CI/readiness, request review, or merge.\n- Direct target-branch push remains blocked by default and exceptional only when configured.\n- Tests use mocked provider signals and do not perform live GitHub reads or writes.\n\nBoundaries:\n- Do not automatically merge to main.\n- Do not add a permanent develop branch default.\n- Do not enable unsolicited CI polling or provider writes.\n- Do not implement release/version planning in this slice; that is tracked separately in the version-scoped planning PRD.\n\nDependencies:\n- Builds on dev-nexus:local-162 green_main model.\n- Should unblock or refine dev-nexus:local-163 dogfood component migration.\n\nVerification:\n- Focused publication policy/status/authority/provider-signal tests.\n- Focused agent context and target report tests.\n- npm run check when feasible.\n\nPublication notes:\n- Publish as branch/PR first; merge to main only after branch CI/review policy is satisfied.",
-      "status": "blocked",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4246,8 +4246,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:33:39.236Z",
-      "updatedAt": "2026-05-19T19:48:27.188Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T20:02:14.336Z",
+      "closedAt": "2026-05-19T20:02:14.336Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8487,6 +8487,17 @@
           "provider": "local",
           "itemId": "local-comment-348"
         }
+      },
+      {
+        "id": "local-comment-349",
+        "body": "Implemented and published in DevNexus source main as c0dc6d2. Source branch codex/dev-nexus/local-162-green-main-policy passed dispatched branch CI run 26121736764 on SHA c0dc6d2, then was fast-forwarded to bot/main and post-push main CI run 26121826141 passed. Local verification: npm run check and git diff --check passed.",
+        "author": null,
+        "createdAt": "2026-05-19T20:02:03.799Z",
+        "updatedAt": "2026-05-19T20:02:03.799Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-349"
+        }
       }
     ],
     "local-163": [
@@ -8499,6 +8510,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-345"
+        }
+      },
+      {
+        "id": "local-comment-351",
+        "body": "Dependency update: DevNexus source support for green-main publication policy and protected handoff is now published on main as c0dc6d2, with branch and main CI green. This migration item can move from dependent/todo toward implementation when selected.",
+        "author": null,
+        "createdAt": "2026-05-19T20:02:18.448Z",
+        "updatedAt": "2026-05-19T20:02:18.448Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-351"
         }
       }
     ],
@@ -8523,6 +8545,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-347"
+        }
+      },
+      {
+        "id": "local-comment-350",
+        "body": "Implemented and published in DevNexus source main as c0dc6d2. This included green-main readiness/handoff states, merge authority reporting, stale check signals, and the setup-check platform compatibility fix needed to make Windows CI green. Branch CI run 26121736764 and main CI run 26121826141 both passed on SHA c0dc6d2.",
+        "author": null,
+        "createdAt": "2026-05-19T20:02:11.156Z",
+        "updatedAt": "2026-05-19T20:02:11.156Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-350"
         }
       }
     ],

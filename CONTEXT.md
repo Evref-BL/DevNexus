@@ -131,7 +131,10 @@ coordinator agent chooses and supervises implementation work.
   policy-gated inbound import execution in `local-134` through `793a162`.
   The authority/profile mismatch fix landed as `8735a73`; `local-94`
   authority-role docs merged as `b218118`, and `local-107` stale projection
-  diagnostics merged through source main `3753adf`.
+  diagnostics merged through source main `3753adf`. Current source main
+  `c0dc6d2` adds green-main publication policy/readiness support for
+  `local-162` and `local-164`, fixes setup-check path-platform handling, and
+  passed both branch and post-publish `main` GitHub Actions CI.
 - DevNexus-Pharo no longer exposes delegated generic DevNexus MCP tools,
   generic tracker wrappers, generic worktree compatibility tools, MCP naming
   overlap with core `dev_nexus`, or old DevNexus-Pharo config migration paths.

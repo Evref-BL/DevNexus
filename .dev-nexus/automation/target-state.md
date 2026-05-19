@@ -88,6 +88,10 @@ and ready for coordinator-driven work across its components.
   as `4556010` for automation Git identity derivation, worktree-local bot Git
   config, worker-context identity briefing, and publication preflight blocking
   when non-human automation would inherit a mismatched human Git identity.
+  `dev-nexus:local-162` and `dev-nexus:local-164` are published through
+  `c0dc6d2` for the green-main publication policy model, protected
+  validation/handoff readiness, merge-authority reporting, stale check signals,
+  and the setup-check platform compatibility fix that restored Windows CI.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
@@ -116,10 +120,13 @@ and ready for coordinator-driven work across its components.
   configured bot/automation profile when permissions allow. Components that
   still have an explicit non-integration publication policy must be configured
   before automation treats them as direct-integration targets.
-- Reusable DevNexus support for join-existing auth checks and portable
-  `GH_CONFIG_DIR` resolution is proposed as
-  https://github.com/Evref-BL/DevNexus/pull/1 because the bot account has read
-  but not direct write access to `Evref-BL/DevNexus`.
+- User policy as of 2026-05-19: green-main publication means branch or pull
+  request validation first; merge to `main` only after required checks are
+  green and the current actor has explicit merge authority. Branch CI status
+  checks are explicit publication actions, not unsolicited background polling.
+- The current bot profile has direct write access for the active
+  `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
+  `c0dc6d2` after branch CI passed.
 - Windows and Mac bot publication paths are authenticated for the current
   dogfood flow. Agent-created Git/GitHub activity must continue to use the
   configured `bot` remotes and `Gabot-Darbot` automation profile.
@@ -158,15 +165,10 @@ and ready for coordinator-driven work across its components.
   `local-79`, `local-80`, and `local-81` are complete; follow-on host checks,
   SSH transport, verification execution, and live dogfood smokes should remain
   ordered behind the durable request/result record model.
-- DevNexus integrated verification for source main `ba9976e` passed the
-  focused local-81/local-87/local-127 suites, `npm run build`,
-  `git diff --check`, and `npm test -- --exclude src/nexusSetupAssistant.test.ts`
-  on Windows. Full Windows `npm run check` still fails only in the two known
-  `src/nexusSetupAssistant.test.ts` path-rendering assertions.
-  Mac verification after publishing DevNexus `c19b493` is green again:
-  `npm test -- src/nexusSetupAssistant.test.ts` passes 22 tests, and
-  DevNexus `npm run check` passes 57 files, 463 tests, and 1 skipped test.
-  The fix resolved `dev-nexus:local-138`, `local-139`, and `local-140`.
+- DevNexus source `c0dc6d2` passed local `npm run check` on Mac, dispatched
+  branch CI run `26121736764`, and post-publish `main` CI run `26121826141`.
+  The earlier Windows `src/nexusSetupAssistant.test.ts` path-platform failure
+  is resolved; `main` is green again for the configured GitHub Actions CI.
   DevNexus-Pharo and DevNexus-TypeScript `npm run check` also passed on this
   Mac after sync.
 - The focused hosting verification for `dev-nexus:local-123` through
