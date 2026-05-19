@@ -224,8 +224,8 @@ and ready for coordinator-driven work across its components.
   `local-106`, `local-88`, `local-130`, `local-89`, `local-131`, `local-132`,
   `local-90`, `local-91`, `local-133`, `local-92`, and `local-134` were
   removed after publication. `local-94` and `local-107` are now published;
-  their ready leases are closed as merged and remaining helper worktrees are
-  historical metadata only.
+  their ready leases are closed as merged and their generated helper
+  worktrees/local branches have been removed after cleanup.
 
 ## Near-Term Direction
 

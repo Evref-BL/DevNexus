@@ -78,16 +78,13 @@ target-cycle facts, commits, and the target report.
   safe initialize probes; keep provider-native worker orchestration behind the
   remaining app-server event and capability facts.
 - Continue authority configuration after completed `dev-nexus:local-92`
-  coordination and provider mutation gating. `local-93` and `local-94` are the
-  next authority follow-ons for provider approval/branch-policy signals and
-  role documentation; `local-94` has a verified branch ready, but integration
-  is held by the current automation auth-profile/provider mismatch.
+  coordination and provider mutation gating. `local-94` role documentation is
+  complete; `local-93` is the next authority follow-on for provider approval
+  and branch-policy signals.
 - Continue agent-target projection after completed `dev-nexus:local-106`
-  active-target filtering. `local-107` stale projection diagnostics now has a
-  verified branch ready, but integration is held by the same authority/profile
-  mismatch as `local-94`; `local-109` worker context propagation is the next
-  independent implementation slice after integration. Cleanup and dogfood
-  migration remain later.
+  active-target filtering and completed `local-107` stale projection
+  diagnostics. `local-109` worker context propagation is the next independent
+  implementation slice. Cleanup and dogfood migration remain later.
 - Continue DevNexus-Research from `docs/dev-nexus-research-plugin-prd.md`.
   `dev-nexus:local-146` is the blocked human-in-the-loop license and upstream
   ARS integration posture decision; `local-147` is ready for an original
