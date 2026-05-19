@@ -94,6 +94,33 @@ const sampleExtension: NexusExtension<NexusProjectConfig> = {
   }),
 };
 
+function writeInitializedProjectConfig(
+  projectRoot: string,
+  extensions: NexusProjectConfig["extensions"],
+): void {
+  fs.writeFileSync(
+    path.join(projectRoot, devNexusProjectConfigFileName),
+    `${JSON.stringify(
+      {
+        version: 1,
+        id: "initialized",
+        name: "Initialized",
+        home: null,
+        repo: {
+          kind: "git",
+          remoteUrl: null,
+          defaultBranch: "main",
+        },
+        worktreesRoot: "worktrees",
+        extensions,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+}
+
 describe("project operations", () => {
   it("creates a generic project and registers it", () => {
     const projectRegistry = registry();
@@ -314,6 +341,115 @@ describe("project operations", () => {
     });
     expect(result.scaffold.extensionResults["sample-extension"]).toEqual({
       markerPath: path.join(sourceRoot, "sample-extension.marker"),
+    });
+  });
+
+  it("preserves same-key DevNexus-Pharo extension metadata when importing with an empty marker", () => {
+    const projectRegistry = registry();
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Initialized");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    writeInitializedProjectConfig(sourceRoot, {
+      "dev-nexus-pharo": {
+        plexusProjectConfig: "plexus.project.json",
+        imageExecution: {
+          mode: "disabled",
+          requireDisposableImage: true,
+        },
+      },
+    });
+
+    importNexusProjectInRegistry({
+      homePath: makeTempDir("dev-nexus-home-"),
+      registry: projectRegistry,
+      root: sourceRoot,
+      gitRunner: fakeGitRunner([], {
+        branch: "main",
+        remoteUrl: "https://github.com/example/initialized.git",
+      }),
+      extensions: {
+        "dev-nexus-pharo": {},
+      },
+    });
+
+    expect(loadProjectConfig(sourceRoot).extensions).toEqual({
+      "dev-nexus-pharo": {
+        plexusProjectConfig: "plexus.project.json",
+        imageExecution: {
+          mode: "disabled",
+          requireDisposableImage: true,
+        },
+      },
+    });
+  });
+
+  it("merges same-key extension metadata when importing with override fields", () => {
+    const projectRegistry = registry();
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Initialized");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    writeInitializedProjectConfig(sourceRoot, {
+      "sample-extension": {
+        enabled: true,
+        mode: "old",
+      },
+    });
+
+    importNexusProjectInRegistry({
+      homePath: makeTempDir("dev-nexus-home-"),
+      registry: projectRegistry,
+      root: sourceRoot,
+      gitRunner: fakeGitRunner([], {
+        branch: "main",
+        remoteUrl: "https://github.com/example/initialized.git",
+      }),
+      extensions: {
+        "sample-extension": {
+          mode: "new",
+        },
+      },
+    });
+
+    expect(loadProjectConfig(sourceRoot).extensions).toEqual({
+      "sample-extension": {
+        enabled: true,
+        mode: "new",
+      },
+    });
+  });
+
+  it("replaces and clears extension metadata when importing with explicit options", () => {
+    const projectRegistry = registry();
+    const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Initialized");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    writeInitializedProjectConfig(sourceRoot, {
+      cleared: {
+        enabled: true,
+      },
+      "sample-extension": {
+        enabled: true,
+        mode: "old",
+      },
+    });
+
+    importNexusProjectInRegistry({
+      homePath: makeTempDir("dev-nexus-home-"),
+      registry: projectRegistry,
+      root: sourceRoot,
+      gitRunner: fakeGitRunner([], {
+        branch: "main",
+        remoteUrl: "https://github.com/example/initialized.git",
+      }),
+      replaceExtensions: {
+        "sample-extension": {
+          replacement: true,
+        },
+      },
+      clearExtensions: ["cleared"],
+    });
+
+    expect(loadProjectConfig(sourceRoot).extensions).toEqual({
+      "sample-extension": {
+        replacement: true,
+      },
     });
   });
 

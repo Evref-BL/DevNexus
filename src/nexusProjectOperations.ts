@@ -73,6 +73,8 @@ export interface ImportNexusProjectInRegistryOptions {
   vibeKanbanProjectId?: string;
   gitRunner?: ProjectGitRunner;
   extensions?: NexusProjectExtensionsConfig;
+  replaceExtensions?: NexusProjectExtensionsConfig;
+  clearExtensions?: readonly string[];
   scaffoldExtensions?: NexusExtension<NexusProjectConfig>[];
 }
 
@@ -191,6 +193,67 @@ export function buildProjectConfig(
           },
         }
       : {}),
+    ...(extensions ? { extensions } : {}),
+  };
+}
+
+function hasExtensionUpdates(
+  options: Pick<
+    ImportNexusProjectInRegistryOptions,
+    "extensions" | "replaceExtensions" | "clearExtensions"
+  >,
+): boolean {
+  return Boolean(
+    options.extensions ||
+      options.replaceExtensions ||
+      (options.clearExtensions?.length ?? 0) > 0,
+  );
+}
+
+function mergeProjectExtensionUpdates(
+  existingExtensions: NexusProjectExtensionsConfig | undefined,
+  options: Pick<
+    ImportNexusProjectInRegistryOptions,
+    "extensions" | "replaceExtensions" | "clearExtensions"
+  >,
+): NexusProjectExtensionsConfig | undefined {
+  const extensions: NexusProjectExtensionsConfig = {};
+  for (const [key, value] of Object.entries(existingExtensions ?? {})) {
+    extensions[key] = { ...value };
+  }
+
+  for (const key of options.clearExtensions ?? []) {
+    const extensionKey = optionalNonEmptyString(key, "clearExtensions entry");
+    if (extensionKey) {
+      delete extensions[extensionKey];
+    }
+  }
+
+  for (const [key, value] of Object.entries(options.extensions ?? {})) {
+    extensions[key] = {
+      ...(extensions[key] ?? {}),
+      ...value,
+    };
+  }
+
+  for (const [key, value] of Object.entries(options.replaceExtensions ?? {})) {
+    extensions[key] = { ...value };
+  }
+
+  return Object.keys(extensions).length > 0 ? extensions : undefined;
+}
+
+function mergeExistingProjectExtensions(
+  projectConfig: NexusProjectConfig,
+  options: Pick<
+    ImportNexusProjectInRegistryOptions,
+    "extensions" | "replaceExtensions" | "clearExtensions"
+  >,
+): NexusProjectConfig {
+  const { extensions: _extensions, ...projectConfigWithoutExtensions } = projectConfig;
+  const extensions = mergeProjectExtensionUpdates(projectConfig.extensions, options);
+  return {
+    ...projectConfigWithoutExtensions,
     ...(extensions ? { extensions } : {}),
   };
 }
@@ -416,15 +479,10 @@ export function importNexusProjectInRegistry(
     runProjectGitCommand(gitRunner, gitCommands, ["init", projectRoot]);
   }
 
+  const projectExtensionUpdates = hasExtensionUpdates(options);
   const projectConfig = existingProjectConfig
-    ? options.extensions
-      ? {
-          ...existingProjectConfig,
-          extensions: {
-            ...existingProjectConfig.extensions,
-            ...options.extensions,
-          },
-        }
+    ? projectExtensionUpdates
+      ? mergeExistingProjectExtensions(existingProjectConfig, options)
       : existingProjectConfig
     : buildProjectConfig(
         projectName,
@@ -434,7 +492,7 @@ export function importNexusProjectInRegistry(
         vibeKanbanProjectId,
         pathForProjectConfig(projectRoot, sourceRoot),
         true,
-        options.extensions,
+        mergeProjectExtensionUpdates(undefined, options),
       );
   if (existingProjectConfig && vibeKanbanProjectId) {
     projectConfig.kanban = {
@@ -444,7 +502,7 @@ export function importNexusProjectInRegistry(
   }
 
   const devNexusProjectConfigPath = projectConfigPath(projectRoot);
-  if (!existingProjectConfig || vibeKanbanProjectId || options.extensions) {
+  if (!existingProjectConfig || vibeKanbanProjectId || projectExtensionUpdates) {
     saveProjectConfig(projectRoot, projectConfig);
   }
 
