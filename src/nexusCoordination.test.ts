@@ -4,16 +4,19 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   coordinationHandoffCommentMarker,
+  createDefaultNexusHomeConfigBase,
   createLocalWorkTrackerProvider,
   createNexusCoordinationHandoff,
   defaultNexusAutomationConfig,
   getNexusCoordinationStatus,
   getNexusCoordinationIntegrationPlan,
   loadLocalWorkTrackingStore,
+  saveNexusHomeConfigFile,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
+  validateNexusHomeConfigBase,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -22,6 +25,29 @@ function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
   return tempDir;
+}
+
+function saveCoordinationAuthHomeConfig(homePath: string): void {
+  saveNexusHomeConfigFile(
+    homePath,
+    createDefaultNexusHomeConfigBase(homePath, {
+      projectsRoot: path.join(homePath, "projects"),
+      workspacesRoot: path.join(homePath, "workspaces"),
+      authProfiles: [
+        {
+          id: "bot-github",
+          actorId: "coordination-bot",
+          provider: "github",
+          kind: "automation",
+          account: "coordination-bot",
+          sshHost: "github.com-bot",
+          githubCliConfigDir: "home:.config/gh-coordination-bot",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        },
+      ],
+    }),
+    validateNexusHomeConfigBase,
+  );
 }
 
 function projectConfig(
@@ -813,6 +839,91 @@ describe("nexus coordination", () => {
       },
       nextAction: "Ready for review or integration.",
     });
+  });
+
+  it("uses host-local auth profiles in coordination authority status", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const homePath = makeTempDir("dev-nexus-coordination-home-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-15");
+    const storePath = ".dev-nexus/work-items-dev-nexus.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveCoordinationAuthHomeConfig(homePath);
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(sourceRoot, "worktrees/dev-nexus", storePath),
+      home: homePath,
+      automation: {
+        ...defaultNexusAutomationConfig,
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          targetBranch: "main",
+          actor: {
+            id: "coordination-bot",
+            kind: "machine_user",
+            provider: "github",
+            handle: "coordination-bot",
+          },
+        },
+      },
+      authority: {
+        actors: [
+          {
+            id: "coordination-bot",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "coordination-bot",
+            displayName: "Coordination Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "coordination-bot",
+            roles: ["maintainer"],
+            scope: {
+              component: "dev-nexus",
+            },
+          },
+        ],
+      },
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath },
+      now: () => "2026-05-16T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Shared coordination",
+      status: "in_progress",
+    });
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: "local-1",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-16T10:15:00.000Z",
+    });
+
+    expect(status.authority).toMatchObject({
+      componentId: "dev-nexus",
+      actor: {
+        status: "matched",
+        actorId: "coordination-bot",
+      },
+      authProfile: {
+        id: "bot-github",
+        provider: "github",
+        kind: "automation",
+      },
+      roles: ["maintainer"],
+    });
+    expect(status.authority.warnings).not.toContain(
+      "No host-local auth profile is bound to automation actor coordination-bot.",
+    );
   });
 
   it("writes and reads handoffs from a linked coordination-role tracker", async () => {

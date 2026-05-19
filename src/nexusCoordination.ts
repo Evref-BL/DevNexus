@@ -38,6 +38,7 @@ import {
   throwWorkItemLookupFailure,
 } from "./nexusWorkItemRouting.js";
 import {
+  loadNexusPublicationAuthProfiles,
   resolveNexusPublicationPolicy,
 } from "./nexusPublicationPolicy.js";
 import {
@@ -2376,11 +2377,17 @@ function componentSummary(
 function coordinationAuthoritySummary(
   context: ResolvedCoordinationContext,
 ): NexusAuthorityComponentSummary {
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot: context.projectRoot,
+    projectConfig: context.projectConfig,
+  });
+
   return summarizeNexusAuthorityForComponent({
     projectId: context.projectConfig.id,
     componentId: context.component.id,
     componentName: context.component.name,
     authority: context.projectConfig.authority,
+    authProfiles,
     publication: resolveNexusPublicationPolicy(
       context.projectConfig,
       context.component,
