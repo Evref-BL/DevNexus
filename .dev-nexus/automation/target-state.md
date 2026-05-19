@@ -161,9 +161,9 @@ and ready for coordinator-driven work across its components.
   authority resolver, `local-90` is complete for scoped authority status and
   agent-context reporting, `local-91` is complete for publication action
   gating, and `local-92` is complete for coordination/provider mutation
-  authority gates. `local-93` and `local-94` are ready follow-ons for provider
-  approval/branch-policy signals and authority-role documentation.
-  `local-95` is a blocked HITL decision item for
+  authority gates. `local-93` is the ready follow-on for provider
+  approval/branch-policy signals, and `local-94` is complete for
+  authority-role documentation. `local-95` is a blocked HITL decision item for
   self-approval, temporary elevation, and advanced role-policy questions.
 - Parallel-agent Git workflow slicing is complete. `dev-nexus:local-96`
   recorded the authority cross-check and created `local-97` through
