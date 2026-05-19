@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 152,
-  "nextCommentNumber": 292,
-  "updatedAt": "2026-05-19T00:20:16.650Z",
+  "nextCommentNumber": 294,
+  "updatedAt": "2026-05-19T00:34:03.886Z",
   "items": [
     {
       "id": "local-1",
@@ -2294,7 +2294,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T13:08:01.456Z",
-      "updatedAt": "2026-05-19T00:19:53.676Z",
+      "updatedAt": "2026-05-19T00:34:03.865Z",
       "closedAt": "2026-05-19T00:19:04.177Z",
       "webUrl": null,
       "externalRef": {
@@ -3421,7 +3421,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-18T19:39:09.878Z",
-      "updatedAt": "2026-05-19T00:20:16.650Z",
+      "updatedAt": "2026-05-19T00:34:03.886Z",
       "closedAt": "2026-05-19T00:19:14.436Z",
       "webUrl": null,
       "externalRef": {
@@ -6408,6 +6408,17 @@
           "provider": "local",
           "itemId": "local-comment-290"
         }
+      },
+      {
+        "id": "local-comment-292",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 08b700c75c3454a9883a28aef86bf78e29485cb5\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T00:34:02.762Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-91\",\n  \"logicalItemId\": \"local-91\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-91\",\n    \"itemNumber\": 91,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-91\",\n    \"itemNumber\": 91,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-91\",\n      \"itemNumber\": 91,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-91\",\n        \"itemNumber\": 91\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-7a73aae49d12db39\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"08b700c75c3454a9883a28aef86bf78e29485cb5\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusPublicationPolicy.ts\",\n    \"src/nexusAuthority.ts\",\n    \"src/nexusAutomationConfig.ts\",\n    \"src/nexusAutomationAgentLaunch.ts\",\n    \"src/nexusAutomationCurrentAgentAdoption.ts\",\n    \"src/nexusAutomationRunOnce.ts\",\n    \"src/nexusAutomationStatus.ts\",\n    \"tests\"\n  ],\n  \"decisions\": [\n    \"Published helper-level authority gating for direct push, PR open, PR merge, package publish, and release publish.\",\n    \"Added explicit packagePublish/releasePublish policy opt-ins separate from merge authority.\",\n    \"Kept bot auth profile resolution as a required publication preflight input.\"\n  ],\n  \"verificationSummary\": \"npm test focused local-91 suite passed (9 files, 132 tests); npm run build passed; git diff --check passed; npm run check passed (63 files, 557 tests); source npm run check after integration passed (64 files, 562 tests).\",\n  \"integrationPreference\": null,\n  \"note\": \"Merged and published via bot/main. Published commits include 91b960e and 08b700c; local-91 branch/worktree removed after verifying no diff remained.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T00:34:02.776Z",
+        "updatedAt": "2026-05-19T00:34:02.776Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-292"
+        }
       }
     ],
     "local-92": [
@@ -7305,6 +7316,17 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-291"
+        }
+      },
+      {
+        "id": "local-comment-293",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: main\nHead: 08b700c75c3454a9883a28aef86bf78e29485cb5\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-19T00:34:03.830Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-133\",\n  \"logicalItemId\": \"local-133\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-133\",\n    \"itemNumber\": 133,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"default\",\n    \"trackerName\": \"Default\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-133\",\n    \"itemNumber\": 133,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"default\",\n      \"trackerName\": \"Default\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-133\",\n      \"itemNumber\": 133,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-133\",\n        \"itemNumber\": 133\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"leaseId\": \"lease-02e897f7d6b31c5b\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\pharo-nexus\\\\PharoNexus-Control\\\\worktrees\\\\DevNexus\",\n  \"branch\": \"main\",\n  \"upstream\": \"origin/main\",\n  \"baseRef\": \"origin/main\",\n  \"headCommit\": \"08b700c75c3454a9883a28aef86bf78e29485cb5\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/workItemImportPlanner.ts\",\n    \"src/workItemImportPlanner.test.ts\",\n    \"src/cli.ts\",\n    \"src/nexusMcpServer.ts\",\n    \"src/nexusCoreMcpTools.ts\",\n    \"src/nexusMcpServer.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Published read-only inbound import planning CLI/MCP surface.\",\n    \"Corrected fingerprint matching to exact extracted tokens, not substring matching.\",\n    \"Required host/repository/project context for repo-scoped item id and number link matches.\"\n  ],\n  \"verificationSummary\": \"Worker npm run check passed before review; post-review npm test -- src/workItemImportPlanner.test.ts passed; source npm run check passed (64 files, 562 tests); git diff --check passed.\",\n  \"integrationPreference\": null,\n  \"note\": \"Merged and published via bot/main. Old local-133 merge was corrected by follow-up commit 08b700c; local-133 branch/worktree removed after verifying relevant file diffs against main were empty.\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-19T00:34:03.844Z",
+        "updatedAt": "2026-05-19T00:34:03.844Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-293"
         }
       }
     ],

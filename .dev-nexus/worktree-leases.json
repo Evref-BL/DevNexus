@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T00:20:16.628Z",
+  "updatedAt": "2026-05-19T00:34:03.830Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -27,16 +27,16 @@
         "src/workItemImportPlanner.test.ts",
         "src/cli.ts",
         "src/nexusMcpServer.ts",
-        "src/nexusMcpServer.test.ts",
         "src/nexusCoreMcpTools.ts",
+        "src/nexusMcpServer.test.ts",
         "src/index.ts"
       ],
       "status": "merged",
       "createdAt": "2026-05-19T00:20:16.628Z",
-      "lastSeenAt": "2026-05-19T00:20:16.628Z",
-      "updatedAt": "2026-05-19T00:20:16.628Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
+      "lastSeenAt": "2026-05-19T00:34:03.830Z",
+      "updatedAt": "2026-05-19T00:34:03.830Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "08b700c75c3454a9883a28aef86bf78e29485cb5",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -55,9 +55,8 @@
         "warnings": []
       },
       "notes": [
-        "Merged local-133 worker commit 4b9e192 into DevNexus main after local-91.",
-        "Verification: Worker focused tests passed: npm test -- src/workItemImportPlanner.test.ts src/nexusMcpServer.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.",
-        "Integration preference: Published direct integration to DevNexus bot/main as 1ce46f2."
+        "Merged and published via bot/main. Old local-133 merge was corrected by follow-up commit 08b700c; local-133 branch/worktree removed after verifying relevant file diffs against main were empty.",
+        "Verification: Worker npm run check passed before review; post-review npm test -- src/workItemImportPlanner.test.ts passed; source npm run check passed (64 files, 562 tests); git diff --check passed."
       ]
     },
     {
@@ -81,16 +80,21 @@
         "relativePath": null
       },
       "writeScope": [
+        "src/nexusPublicationPolicy.ts",
         "src/nexusAuthority.ts",
-        "src/nexusAuthority.test.ts",
-        "src/nexusAutomationAgentLaunch.test.ts"
+        "src/nexusAutomationConfig.ts",
+        "src/nexusAutomationAgentLaunch.ts",
+        "src/nexusAutomationCurrentAgentAdoption.ts",
+        "src/nexusAutomationRunOnce.ts",
+        "src/nexusAutomationStatus.ts",
+        "tests"
       ],
       "status": "merged",
       "createdAt": "2026-05-19T00:19:53.662Z",
-      "lastSeenAt": "2026-05-19T00:19:53.662Z",
-      "updatedAt": "2026-05-19T00:19:53.662Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "1ce46f2cab9ccfaa334cc884c0cc8fd62bcc1c1a",
+      "lastSeenAt": "2026-05-19T00:34:02.762Z",
+      "updatedAt": "2026-05-19T00:34:02.762Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "08b700c75c3454a9883a28aef86bf78e29485cb5",
       "dirty": false,
       "pushed": true,
       "git": {
@@ -109,9 +113,8 @@
         "warnings": []
       },
       "notes": [
-        "Merged local-91 worker commit 644f356 into DevNexus main before local-133.",
-        "Verification: Worker focused tests passed: npm test -- src/nexusAuthority.test.ts src/nexusAutomationAgentLaunch.test.ts. Integrated verification passed: focused 5-file suite with 108 tests, npm run build, git diff --check HEAD~2..HEAD, and npm run check with 64 files and 556 tests.",
-        "Integration preference: Published direct integration to DevNexus bot/main as 1ce46f2."
+        "Merged and published via bot/main. Published commits include 91b960e and 08b700c; local-91 branch/worktree removed after verifying no diff remained.",
+        "Verification: npm test focused local-91 suite passed (9 files, 132 tests); npm run build passed; git diff --check passed; npm run check passed (63 files, 557 tests); source npm run check after integration passed (64 files, 562 tests)."
       ]
     },
     {

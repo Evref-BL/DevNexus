@@ -55,9 +55,9 @@ and ready for coordinator-driven work across its components.
   `dev-nexus:local-132` as `d3df60c` for linked tracker work-item
   deduplication and `dev-nexus:local-90` as `f315a66` for scoped authority
   summaries in status/report/agent-context surfaces. The latest integration
-  published `dev-nexus:local-91` and `dev-nexus:local-133` together as
-  `1ce46f2` for publication authority gating and read-only inbound import
-  planning.
+  published `dev-nexus:local-91` and `dev-nexus:local-133` through `08b700c`
+  for publication authority gating, read-only inbound import planning, and the
+  post-review import identity-matching fixes.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
