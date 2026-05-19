@@ -33,6 +33,7 @@ export const nexusAuthorityActionNames = [
   "provider.label",
   "provider.assign",
   "provider.transition",
+  "package.publish",
   "release.publish",
   "runtime.mutate",
 ] as const;
@@ -202,6 +203,7 @@ export const recommendedNexusAuthorityRoleDefinitions: NexusAuthorityRoleDefinit
       "project.read",
       "work_item.read",
       "coordination.handoff",
+      "package.publish",
       "release.publish",
     ],
   },
@@ -388,6 +390,8 @@ export interface NexusEffectiveAuthorityResolution {
   missingRequiredActions: NexusAuthorityAction[];
   missingProviderSignals: NexusAuthorityRequiredProviderSignal[];
   recommendedFallbackAction: NexusAuthorityAction | null;
+  blockingReasons: string[];
+  fallbackSuggestion: string | null;
   explanation: string;
 }
 
@@ -519,6 +523,8 @@ const nexusAuthoritySummaryActionSpecs = [
   { key: "direct_integration", action: "git.push_target_branch" },
   { key: "open_pull_request", action: "provider.pull_request.open" },
   { key: "merge_pull_request", action: "provider.pull_request.merge" },
+  { key: "publish_package", action: "package.publish" },
+  { key: "publish_release", action: "release.publish" },
   { key: "request_review", action: "provider.review.request" },
   { key: "update_work_item", action: "work_item.update" },
   { key: "handoff", action: "coordination.handoff" },
@@ -564,14 +570,20 @@ export function resolveNexusEffectiveAuthority(
   const profileBlocker = authProfileAuthorityBlocker({
     actorId,
     actorKind: options.actor.kind ?? actor?.kind ?? null,
+    provider: options.provider ?? options.authProfile?.provider ?? null,
+    authProfile: options.authProfile ?? null,
+  });
+  const publicationProfileBlocker = publicationActionAuthProfileBlocker({
+    actorId,
+    requestedAction: options.requestedAction,
     authProfile: options.authProfile ?? null,
   });
   const hasRequestedAction =
     scopedAuthority.actions.includes(options.requestedAction);
-  const directIntegrationBlocker = directIntegrationPolicyBlocker(options);
+  const publicationPolicyBlockerMessages = publicationPolicyBlockers(options);
   const runtimeSafetyBlockerMessage = runtimeSafetyBlocker(options);
   const policyBlockers = [
-    ...(directIntegrationBlocker ? [directIntegrationBlocker] : []),
+    ...publicationPolicyBlockerMessages,
     ...(runtimeSafetyBlockerMessage ? [runtimeSafetyBlockerMessage] : []),
   ];
   const providerDecision = providerAuthorityDecision(
@@ -583,6 +595,7 @@ export function resolveNexusEffectiveAuthority(
     : [options.requestedAction];
   const hardBlockers = [
     ...(profileBlocker ? [profileBlocker] : []),
+    ...(publicationProfileBlocker ? [publicationProfileBlocker] : []),
     ...policyBlockers,
     ...(missingRequiredActions.length > 0
       ? [`Actor ${actorId} lacks action ${options.requestedAction}.`]
@@ -606,7 +619,12 @@ export function resolveNexusEffectiveAuthority(
         options.requestedAction,
         scopedAuthority.actions,
         missingProviderSignals,
+        options.publication ?? null,
       );
+  const fallbackSuggestion = publicationFallbackSuggestion(
+    options.requestedAction,
+    recommendedFallbackAction,
+  );
 
   return {
     status,
@@ -624,6 +642,8 @@ export function resolveNexusEffectiveAuthority(
     missingRequiredActions,
     missingProviderSignals,
     recommendedFallbackAction,
+    blockingReasons: hardBlockers,
+    fallbackSuggestion,
     explanation: effectiveAuthorityExplanation({
       status,
       actorId,
@@ -1562,6 +1582,7 @@ function authorityScopePrecedence(
 function authProfileAuthorityBlocker(options: {
   actorId: string;
   actorKind: NexusAuthorityActorKind | null;
+  provider: string | null;
   authProfile: NexusEffectiveAuthorityAuthProfileInput | null;
 }): string | null {
   const profile = options.authProfile;
@@ -1582,8 +1603,63 @@ function authProfileAuthorityBlocker(options: {
   ) {
     return `Auth profile ${profile.id} with kind ${profile.kind} cannot act as ${options.actorKind}.`;
   }
+  if (
+    profile.provider &&
+    options.provider &&
+    !providerMatches(profile.provider, options.provider)
+  ) {
+    return `Auth profile ${profile.id} is for provider ${profile.provider}, not requested provider ${options.provider}.`;
+  }
 
   return null;
+}
+
+function publicationActionAuthProfileBlocker(options: {
+  actorId: string;
+  requestedAction: NexusAuthorityAction;
+  authProfile: NexusEffectiveAuthorityAuthProfileInput | null;
+}): string | null {
+  if (!publicationActionRequiresResolvedAuthProfile(options.requestedAction)) {
+    return null;
+  }
+  if (!options.authProfile) {
+    return `No resolved auth profile is available for publication action ${options.requestedAction}.`;
+  }
+  if (!options.authProfile.actorId) {
+    return `Auth profile ${options.authProfile.id} is not bound to an authority actor for publication action ${options.requestedAction}.`;
+  }
+  if (
+    options.actorId !== "unknown" &&
+    options.authProfile.actorId !== options.actorId
+  ) {
+    return null;
+  }
+
+  return null;
+}
+
+function publicationActionRequiresResolvedAuthProfile(
+  action: NexusAuthorityAction,
+): boolean {
+  return (
+    action === "git.push_target_branch" ||
+    action === "provider.pull_request.open" ||
+    action === "provider.pull_request.merge" ||
+    action === "package.publish" ||
+    action === "release.publish"
+  );
+}
+
+function publicationPolicyBlockers(
+  options: ResolveNexusEffectiveAuthorityOptions,
+): string[] {
+  const blockers = [
+    directIntegrationPolicyBlocker(options),
+    pullRequestOpenPolicyBlocker(options),
+    pullRequestMergePolicyBlocker(options),
+    packageOrReleasePublicationPolicyBlocker(options),
+  ];
+  return blockers.filter((blocker): blocker is string => Boolean(blocker));
 }
 
 function directIntegrationPolicyBlocker(
@@ -1612,6 +1688,60 @@ function directIntegrationPolicyBlocker(
     !authorityScopeValueMatches(publication.targetBranch, options.targetBranch)
   ) {
     return `Requested target branch ${options.targetBranch} does not match publication target branch ${publication.targetBranch}.`;
+  }
+
+  return null;
+}
+
+function pullRequestOpenPolicyBlocker(
+  options: ResolveNexusEffectiveAuthorityOptions,
+): string | null {
+  if (options.requestedAction !== "provider.pull_request.open") {
+    return null;
+  }
+  const publication = options.publication;
+  if (!publication) {
+    return "Component publication policy is unavailable; review request publication is blocked.";
+  }
+  if (publication.strategy === "local_only") {
+    return "Component publication policy is local_only; pull request or merge request publication is not configured.";
+  }
+
+  return null;
+}
+
+function pullRequestMergePolicyBlocker(
+  options: ResolveNexusEffectiveAuthorityOptions,
+): string | null {
+  if (options.requestedAction !== "provider.pull_request.merge") {
+    return null;
+  }
+  const publication = options.publication;
+  if (!publication) {
+    return "Component publication policy is unavailable; pull request or merge request merge is blocked.";
+  }
+  if (publication.strategy === "local_only") {
+    return "Component publication policy is local_only; pull request or merge request merge is blocked.";
+  }
+
+  return null;
+}
+
+function packageOrReleasePublicationPolicyBlocker(
+  options: ResolveNexusEffectiveAuthorityOptions,
+): string | null {
+  if (
+    options.requestedAction !== "package.publish" &&
+    options.requestedAction !== "release.publish"
+  ) {
+    return null;
+  }
+  const publication = options.publication;
+  if (!publication) {
+    return `Component publication policy is unavailable; ${options.requestedAction} is blocked.`;
+  }
+  if (publication.strategy === "local_only") {
+    return `Component publication policy is local_only; ${options.requestedAction} is blocked.`;
   }
 
   return null;
@@ -1664,7 +1794,8 @@ function pullRequestMergeProviderDecision(
   const review = pullRequest?.review ?? "unknown";
   const checks = pullRequest?.checks ?? "unknown";
   const mergeability = pullRequest?.mergeability ?? "unknown";
-  const branchPolicy = pullRequest?.branchPolicy ?? "unknown";
+  const branchPolicy =
+    pullRequest?.branchPolicy ?? providerState?.branchPolicy ?? "unknown";
   const missingProviderSignals: NexusAuthorityRequiredProviderSignal[] = [];
   const blockers: string[] = [];
 
@@ -1690,9 +1821,11 @@ function pullRequestMergeProviderDecision(
       blockers.push("Pull request has merge conflicts.");
     }
   }
-  if (branchPolicy === "branch_policy_blocked") {
+  if (branchPolicy !== "clear") {
     missingProviderSignals.push("branch_policy.clear");
-    blockers.push("Provider branch policy blocks merge.");
+    if (branchPolicy === "branch_policy_blocked") {
+      blockers.push("Provider branch policy blocks merge.");
+    }
   }
 
   if (blockers.length > 0) {
@@ -1750,12 +1883,16 @@ function recommendedAuthorityFallbackAction(
   requestedAction: NexusAuthorityAction,
   availableActions: NexusAuthorityAction[],
   missingProviderSignals: NexusAuthorityRequiredProviderSignal[],
+  publication: NexusAutomationPublicationConfig | null,
 ): NexusAuthorityAction | null {
   const preferences = authorityFallbackPreferences(
     requestedAction,
     missingProviderSignals,
   );
-  return preferences.find((action) => availableActions.includes(action)) ?? null;
+  return preferences.find((action) =>
+    availableActions.includes(action) &&
+    publicationAllowsFallbackAction(action, publication)
+  ) ?? null;
 }
 
 function authorityFallbackPreferences(
@@ -1776,6 +1913,8 @@ function authorityFallbackPreferences(
         "provider.review.request",
         "coordination.handoff",
       ];
+    case "provider.pull_request.open":
+      return ["coordination.handoff"];
     case "provider.pull_request.merge":
       return [
         "provider.review.request",
@@ -1788,6 +1927,7 @@ function authorityFallbackPreferences(
     case "provider.issue.design_reject":
       return ["provider.comment", "coordination.handoff"];
     case "runtime.mutate":
+    case "package.publish":
     case "release.publish":
     case "git.push_branch":
     case "git.commit":
@@ -1802,6 +1942,46 @@ function authorityFallbackPreferences(
     default:
       return [];
   }
+}
+
+function publicationAllowsFallbackAction(
+  action: NexusAuthorityAction,
+  publication: NexusAutomationPublicationConfig | null,
+): boolean {
+  if (
+    action === "provider.pull_request.open" ||
+    action === "provider.review.request"
+  ) {
+    return Boolean(publication && publication.strategy !== "local_only");
+  }
+
+  return true;
+}
+
+function publicationFallbackSuggestion(
+  requestedAction: NexusAuthorityAction,
+  fallbackAction: NexusAuthorityAction | null,
+): string | null {
+  if (!fallbackAction) {
+    return null;
+  }
+  if (
+    requestedAction === "git.push_target_branch" &&
+    fallbackAction === "provider.pull_request.open"
+  ) {
+    return "Open a pull request or merge request for review instead of pushing the target branch directly.";
+  }
+  if (fallbackAction === "provider.review.request") {
+    return "Request provider review and wait for approval before continuing publication.";
+  }
+  if (fallbackAction === "provider.comment") {
+    return "Leave a provider comment with the blocker and required follow-up.";
+  }
+  if (fallbackAction === "coordination.handoff") {
+    return "Record a coordination handoff with the blocker and required human or maintainer action.";
+  }
+
+  return `Use fallback action ${fallbackAction}.`;
 }
 
 function effectiveAuthorityExplanation(options: {

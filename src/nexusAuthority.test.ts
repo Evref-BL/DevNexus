@@ -332,11 +332,64 @@ describe("nexus effective authority resolution", () => {
       status: "blocked",
       missingRequiredActions: ["git.push_target_branch"],
       recommendedFallbackAction: "provider.pull_request.open",
+      fallbackSuggestion:
+        "Open a pull request or merge request for review instead of pushing the target branch directly.",
     });
     expect(pullRequest).toMatchObject({
       status: "allowed",
       matchedRoles: ["contributor"],
     });
+  });
+
+  it("blocks direct target-branch publication without a resolved auth profile", () => {
+    const result = resolveEffectiveAuthority({
+      actor: { id: "maintainer-bot" },
+      authProfile: null,
+      requestedAction: "git.push_target_branch",
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      missingRequiredActions: [],
+      recommendedFallbackAction: "provider.pull_request.open",
+    });
+    expect(result.blockingReasons).toContain(
+      "No resolved auth profile is available for publication action git.push_target_branch.",
+    );
+  });
+
+  it("allows contributor pull request publication only when component publication policy configures provider review", () => {
+    const allowed = resolveEffectiveAuthority({
+      actor: { id: "contributor-bot" },
+      requestedAction: "provider.pull_request.open",
+      publication: {
+        ...publication,
+        strategy: "review_handoff",
+        push: false,
+      },
+    });
+    const blocked = resolveEffectiveAuthority({
+      actor: { id: "contributor-bot" },
+      requestedAction: "provider.pull_request.open",
+      publication: {
+        ...publication,
+        strategy: "local_only",
+        push: false,
+      },
+    });
+
+    expect(allowed).toMatchObject({
+      status: "allowed",
+      matchedRoles: ["contributor"],
+    });
+    expect(blocked).toMatchObject({
+      status: "blocked",
+      missingRequiredActions: [],
+      recommendedFallbackAction: "coordination.handoff",
+      fallbackSuggestion:
+        "Record a coordination handoff with the blocker and required human or maintainer action.",
+    });
+    expect(blocked.explanation).toContain("local_only");
   });
 
   it("allows reviewer approval without granting merge or issue-level design approval", () => {
@@ -408,6 +461,10 @@ describe("nexus effective authority resolution", () => {
   });
 
   it("allows a release operator to publish releases without implementation authority", () => {
+    const packagePublish = resolveEffectiveAuthority({
+      actor: { id: "release-bot" },
+      requestedAction: "package.publish",
+    });
     const publish = resolveEffectiveAuthority({
       actor: { id: "release-bot" },
       requestedAction: "release.publish",
@@ -416,7 +473,16 @@ describe("nexus effective authority resolution", () => {
       actor: { id: "release-bot" },
       requestedAction: "git.commit",
     });
+    const merge = resolveEffectiveAuthority({
+      actor: { id: "release-bot" },
+      requestedAction: "provider.pull_request.merge",
+      providerState: approvedPullRequestState(),
+    });
 
+    expect(packagePublish).toMatchObject({
+      status: "allowed",
+      matchedRoles: ["release_operator"],
+    });
     expect(publish).toMatchObject({
       status: "allowed",
       matchedRoles: ["release_operator"],
@@ -425,6 +491,10 @@ describe("nexus effective authority resolution", () => {
       status: "blocked",
       missingRequiredActions: ["git.commit"],
       recommendedFallbackAction: "coordination.handoff",
+    });
+    expect(merge).toMatchObject({
+      status: "blocked",
+      missingRequiredActions: ["provider.pull_request.merge"],
     });
   });
 
@@ -535,12 +605,39 @@ describe("nexus effective authority resolution", () => {
 
     expect(result).toMatchObject({
       status: "waiting",
-      missingProviderSignals: ["pull_request_review.approved"],
+      missingProviderSignals: [
+        "pull_request_review.approved",
+        "branch_policy.clear",
+      ],
       recommendedFallbackAction: "provider.review.request",
+      fallbackSuggestion:
+        "Request provider review and wait for approval before continuing publication.",
     });
     expect(silentResult).toMatchObject({
       status: "waiting",
-      missingProviderSignals: ["pull_request_review.approved"],
+      missingProviderSignals: [
+        "pull_request_review.approved",
+        "branch_policy.clear",
+      ],
+    });
+  });
+
+  it("waits for explicit branch policy clearance before merging an otherwise approved pull request", () => {
+    const result = resolveEffectiveAuthority({
+      actor: { id: "maintainer-bot" },
+      requestedAction: "provider.pull_request.merge",
+      providerState: {
+        pullRequest: {
+          review: "approved",
+          checks: "checks_passed",
+          mergeability: "mergeable",
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "waiting",
+      missingProviderSignals: ["branch_policy.clear"],
     });
   });
 
@@ -555,6 +652,31 @@ describe("nexus effective authority resolution", () => {
       status: "allowed",
       missingProviderSignals: [],
     });
+  });
+
+  it("blocks pull request merge when component publication policy does not allow provider integration", () => {
+    const result = resolveEffectiveAuthority({
+      actor: { id: "maintainer-bot" },
+      requestedAction: "provider.pull_request.merge",
+      providerState: approvedPullRequestState(),
+      publication: {
+        ...publication,
+        strategy: "local_only",
+        push: false,
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      missingRequiredActions: [],
+      missingProviderSignals: [],
+      recommendedFallbackAction: "provider.comment",
+      fallbackSuggestion:
+        "Leave a provider comment with the blocker and required follow-up.",
+    });
+    expect(result.blockingReasons).toContain(
+      "Component publication policy is local_only; pull request or merge request merge is blocked.",
+    );
   });
 
   it("blocks direct integration when component publication policy is not direct integration", () => {
