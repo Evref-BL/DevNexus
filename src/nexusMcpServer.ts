@@ -56,6 +56,10 @@ import {
   getNexusAutomationAgentProfileSummary,
 } from "./nexusAutomationAgentSurface.js";
 import {
+  loadNexusPublicationAuthProfiles,
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
+import {
   getNexusEligibleWorkSummary,
   type NexusEligibleWorkMode,
 } from "./nexusEligibleWorkSummary.js";
@@ -113,6 +117,7 @@ import {
   type NexusCheckoutMutationClass,
   type NexusSharedCheckoutGuardOverride,
 } from "./nexusSharedCheckoutGuard.js";
+import { resolveNexusCurrentAutomationActor } from "./nexusAuthority.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -133,8 +138,10 @@ import {
 import {
   createWorkItemImportPlan,
   defaultWorkItemImportPolicy,
+  executeWorkItemImport,
   parseWorkItemImportDirection,
   parseWorkItemImportFingerprint,
+  type WorkItemImportExecutionAuthorityInput,
   type WorkItemImportPolicyConfig,
 } from "./workItemImportPlanner.js";
 import {
@@ -1069,6 +1076,57 @@ const tools: McpTool[] = [
     },
   },
   {
+    name: "work_item_import_execute",
+    description: "Execute a policy-gated inbound GitHub-to-local work-item import without provider writes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        sourceTrackerId: { type: "string" },
+        targetTrackerId: { type: "string" },
+        direction: { type: "string", enum: ["external_to_local"] },
+        filters: { type: "object" },
+        fieldSet: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "title",
+              "description",
+              "status",
+              "labels",
+              "assignees",
+              "milestone",
+            ],
+          },
+        },
+        statusMapping: { type: "object" },
+        conflictPolicy: {
+          type: "string",
+          enum: ["block", "source_wins", "target_wins"],
+        },
+        writePolicy: { type: "object" },
+        fingerprints: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["external_ref", "web_url", "title"],
+          },
+        },
+      },
+      required: [
+        "sourceTrackerId",
+        "targetTrackerId",
+        "direction",
+        "writePolicy",
+      ],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "work_item_sync_execute",
     description: "Execute an explicitly policy-gated one-way local-to-GitHub work-item sync and record a run summary.",
     inputSchema: {
@@ -1809,6 +1867,26 @@ export async function callDevNexusMcpTool(
           plan: await createWorkItemImportPlan({
             ...projectSelectorFromArgs(args),
             policy: workItemImportPolicyFromArgs(args),
+            resolveProject: (selector) =>
+              resolveWorkItemProject(selector, homePath),
+            now: context.now,
+          }),
+        });
+      }
+      case "work_item_import_execute": {
+        const homePath = homePathFromArgs(args);
+        requiredString(args, "direction", "arguments");
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_import_execute",
+          mutationClass: "local_tracker",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+        return toolResult({
+          ok: true,
+          run: await executeWorkItemImport({
+            ...projectSelectorFromArgs(args),
+            policy: workItemImportPolicyFromArgs(args),
+            authority: workItemImportExecutionAuthorityFromArgs(args, homePath),
             resolveProject: (selector) =>
               resolveWorkItemProject(selector, homePath),
             now: context.now,
@@ -2963,6 +3041,57 @@ function workItemImportWritePolicyFromArgs(
           ),
         }
       : {}),
+  };
+}
+
+function workItemImportExecutionAuthorityFromArgs(
+  args: Record<string, unknown>,
+  homePath: string,
+): WorkItemImportExecutionAuthorityInput {
+  const projectRoot = projectRootFromArgs(args);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const componentId = optionalString(args, "componentId", "arguments");
+  const component = componentId
+    ? resolveProjectComponents(projectRoot, projectConfig).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  const publication = resolveNexusPublicationPolicy(projectConfig, component);
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot,
+    projectConfig,
+    homePath,
+  });
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: projectConfig.authority,
+    componentId: component.id,
+    publication,
+    authProfiles,
+  });
+  const authProfile = currentActor.profileId
+    ? authProfiles.find((profile) => profile.id === currentActor.profileId) ?? null
+    : null;
+
+  return {
+    authority: projectConfig.authority,
+    actor: {
+      id: currentActor.expectedActorId,
+      kind: currentActor.expectedActorKind,
+      provider: currentActor.expectedProvider,
+      providerIdentity: currentActor.expectedHandle,
+    },
+    authProfile: authProfile
+      ? {
+          id: authProfile.id,
+          actorId: authProfile.actorId ?? null,
+          kind: authProfile.kind ?? null,
+          provider: authProfile.provider,
+          account: authProfile.account ?? null,
+        }
+      : null,
   };
 }
 

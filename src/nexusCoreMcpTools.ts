@@ -38,6 +38,7 @@ export const devNexusCoreMcpToolNames = [
   "work_item_unlink",
   "work_item_sync_plan",
   "work_item_import_plan",
+  "work_item_import_execute",
   "work_item_sync_execute",
 ] as const;
 

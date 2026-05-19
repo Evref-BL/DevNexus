@@ -253,6 +253,7 @@ describe("DevNexus MCP server", () => {
       "work_item_unlink",
       "work_item_sync_plan",
       "work_item_import_plan",
+      "work_item_import_execute",
       "work_item_sync_execute",
     ]);
   });
@@ -546,6 +547,62 @@ describe("DevNexus MCP server", () => {
       {
         gitRunner: fakeGitRunner(projectRoot),
         sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).toBe(true);
+    expect(payload).toMatchObject({
+      ok: false,
+      guard: {
+        ok: false,
+        classification: "shared_project_checkout",
+        mutationClass: "local_tracker",
+      },
+    });
+    expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
+  it("returns guard details for guarded inbound import execution", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "mcp-demo",
+      "worker",
+    );
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${path.resolve(cwd ?? projectRoot)}\n`);
+      }
+      if (joined === "worktree list --porcelain") {
+        return ok(argsArray, `worktree ${projectRoot}\nHEAD abc123\nbranch refs/heads/main\n`);
+      }
+
+      return ok(argsArray, "");
+    };
+
+    const result = await callDevNexusMcpTool(
+      "work_item_import_execute",
+      {
+        projectRoot,
+        sourceTrackerId: "github",
+        targetTrackerId: "local",
+        direction: "external_to_local",
+        writePolicy: {
+          mode: "execute",
+          credentials: "available",
+        },
+      },
+      {
+        gitRunner,
+        sharedCheckoutGuard: "enforce",
+        currentPath: generatedMetaWorktree,
       },
     );
     const payload = toolJson(result);

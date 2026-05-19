@@ -4,11 +4,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createWorkItemImportPlan,
+  executeWorkItemImport,
   type WorkItemImportPolicyConfig,
 } from "./workItemImportPlanner.js";
 import {
   createWorkItemTrackerLinkService,
   defaultWorkItemTrackerLinkStorePath,
+  loadWorkItemTrackerLinkStore,
 } from "./workItemTrackerLinks.js";
 import type {
   ResolvedWorkItemProjectContext,
@@ -17,6 +19,7 @@ import type {
 import {
   resolveLocalWorkTrackingStorePath,
 } from "./workTrackingLocalProvider.js";
+import type { NexusAuthorityConfig } from "./nexusAuthority.js";
 import type {
   CreateWorkItemInput,
   TrackerCapabilities,
@@ -59,6 +62,8 @@ function fixedClock(...timestamps: string[]): () => string {
 class MemoryWorkTrackerProvider implements WorkTrackerProvider {
   readonly capabilities: TrackerCapabilities;
   readonly mutations: string[] = [];
+  readonly patches: WorkItemPatch[] = [];
+  private nextNumber = 1;
 
   constructor(
     readonly provider: string,
@@ -69,9 +74,27 @@ class MemoryWorkTrackerProvider implements WorkTrackerProvider {
     this.capabilities = { ...fullCapabilities, ...capabilities };
   }
 
-  async createWorkItem(_input: CreateWorkItemInput): Promise<WorkItem> {
+  async createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
     this.mutations.push("create");
-    throw new Error("createWorkItem should not be called by import planning");
+    const number = this.nextNumber;
+    this.nextNumber += 1;
+    const id = `local-${number}`;
+    const item = workItem(id, {
+      title: input.title,
+      description: input.description ?? null,
+      status: input.status ?? "todo",
+      labels: input.labels ?? [],
+      assignees: input.assignees ?? [],
+      milestone: input.milestone ?? null,
+      updatedAt: "2026-05-18T09:00:00.000Z",
+      externalRef: {
+        provider: "local",
+        itemId: id,
+        itemNumber: number,
+      },
+    });
+    this.items.push(item);
+    return item;
   }
 
   async listWorkItems(query: WorkItemQuery): Promise<WorkItem[]> {
@@ -120,9 +143,23 @@ class MemoryWorkTrackerProvider implements WorkTrackerProvider {
     return item;
   }
 
-  async updateWorkItem(_ref: WorkItemRef, _patch: WorkItemPatch): Promise<WorkItem> {
+  async updateWorkItem(ref: WorkItemRef, patch: WorkItemPatch): Promise<WorkItem> {
     this.mutations.push("update");
-    throw new Error("updateWorkItem should not be called by import planning");
+    this.patches.push(patch);
+    const id = ref.id ?? ref.externalRef?.itemId;
+    const item = this.items.find(
+      (candidate) => candidate.id === id || candidate.externalRef?.itemId === id,
+    );
+    if (!item) {
+      throw new Error(`Work item not found: ${id}`);
+    }
+    const updated = {
+      ...item,
+      ...patch,
+      updatedAt: "2026-05-18T09:00:00.000Z",
+    };
+    this.items[this.items.indexOf(item)] = updated;
+    return updated;
   }
 
   async addComment(_ref: WorkItemRef, _body: string): Promise<WorkComment> {
@@ -252,6 +289,53 @@ const defaultPolicy: WorkItemImportPolicyConfig = {
   },
   fingerprints: ["external_ref", "web_url"],
 };
+
+const importAuthority: NexusAuthorityConfig = {
+  actors: [
+    {
+      id: "import-bot",
+      kind: "machine_user",
+      provider: "github",
+      providerIdentity: "import-bot",
+      displayName: "Import Bot",
+    },
+  ],
+  roles: [
+    {
+      id: "importer",
+      actions: ["provider.state.read", "work_item.update"],
+    },
+  ],
+  roleBindings: [
+    {
+      actorId: "import-bot",
+      roles: ["importer"],
+      scope: {
+        project: "import-project",
+        component: "core",
+      },
+    },
+  ],
+};
+
+function allowedImportAuthority() {
+  return {
+    authority: importAuthority,
+    actor: {
+      id: "import-bot",
+      kind: "machine_user" as const,
+      provider: "github",
+      providerIdentity: "import-bot",
+    },
+    authProfile: {
+      id: "bot-github",
+      actorId: "import-bot",
+      kind: "automation" as const,
+      provider: "github",
+      account: "import-bot",
+    },
+  };
+}
 
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
@@ -625,5 +709,232 @@ describe("work item import planner", () => {
         provider: "gitlab",
       },
     ]);
+  });
+
+  it("executes allowed inbound imports idempotently without provider writes", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider("github", [
+      githubIssue(1, { title: "Create local", description: "New body" }),
+      githubIssue(2, { title: "Update local", description: "Fresh body" }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider("local", [
+      workItem("local-2", {
+        title: "Old local",
+        description: "Old body",
+        status: "todo",
+        labels: ["old"],
+      }),
+    ]);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+    const resolveProject = createProjectResolver(project);
+    await createWorkItemTrackerLinkService({
+      resolveProject,
+      now: fixedClock("2026-05-18T08:10:00.000Z"),
+    }).linkReference({
+      projectRoot,
+      logicalItemId: "local-2",
+      trackerId: "github",
+      itemId: "2",
+      itemNumber: 2,
+      nodeId: "I_node_2",
+    });
+    const policy: WorkItemImportPolicyConfig = {
+      ...defaultPolicy,
+      filters: {},
+      writePolicy: {
+        mode: "execute",
+        creates: "plan",
+        updates: "plan",
+        links: "plan",
+        credentials: "available",
+      },
+    };
+    const input = {
+      projectRoot,
+      componentId: "core",
+      policy,
+      authority: allowedImportAuthority(),
+      resolveProject,
+      providerFactory: ((context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory,
+    };
+
+    const firstRun = await executeWorkItemImport({
+      ...input,
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+    const secondRun = await executeWorkItemImport({
+      ...input,
+      now: fixedClock("2026-05-18T09:05:00.000Z"),
+    });
+
+    expect(firstRun.blockers).toEqual([]);
+    expect(firstRun.status).toBe("completed");
+    expect(firstRun.summary.counts).toMatchObject({
+      created: 1,
+      updated: 1,
+      blocked: 0,
+      links: 2,
+    });
+    expect(secondRun.status).toBe("completed");
+    expect(secondRun.summary.counts).toMatchObject({
+      created: 0,
+      updated: 0,
+      skipped: 2,
+      links: 0,
+    });
+    expect(sourceProvider.mutations).toEqual([]);
+    expect(targetProvider.mutations).toEqual(["create", "update"]);
+    expect(targetProvider.items.map((item) => item.title).sort()).toEqual([
+      "Create local",
+      "Update local",
+    ]);
+    expect(
+      loadWorkItemTrackerLinkStore(defaultWorkItemTrackerLinkStorePath(projectRoot)).records,
+    ).toHaveLength(2);
+  });
+
+  it("blocks execution without execute policy, available credentials, and write authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider("github", [
+      githubIssue(1, { title: "Needs approval" }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider("local", []);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+
+    const { direction: _direction, ...noDirectionPolicy } = defaultPolicy;
+    const run = await executeWorkItemImport({
+      projectRoot,
+      componentId: "core",
+      policy: noDirectionPolicy,
+      resolveProject: createProjectResolver(project),
+      providerFactory: ((context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory,
+    });
+
+    expect(run.status).toBe("blocked");
+    expect(run.blockers.map((blocker) => blocker.operation)).toEqual(
+      expect.arrayContaining([
+        "write_policy",
+        "direction",
+        "credentials",
+        "authority.work_item_update",
+      ]),
+    );
+    expect(sourceProvider.mutations).toEqual([]);
+    expect(targetProvider.mutations).toEqual([]);
+  });
+
+  it("blocks execution when write dispositions are configured to block", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider("github", [
+      githubIssue(1, { title: "Blocked create" }),
+    ]);
+    const targetProvider = new MemoryWorkTrackerProvider("local", []);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+
+    const run = await executeWorkItemImport({
+      projectRoot,
+      componentId: "core",
+      policy: {
+        ...defaultPolicy,
+        filters: {},
+        writePolicy: {
+          mode: "execute",
+          creates: "block",
+          updates: "plan",
+          links: "plan",
+          credentials: "available",
+        },
+      },
+      authority: allowedImportAuthority(),
+      resolveProject: createProjectResolver(project),
+      providerFactory: ((context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory,
+    });
+
+    expect(run.status).toBe("blocked");
+    expect(run.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          operation: "create",
+          message: "Write policy is configured to block create plans.",
+        }),
+      ]),
+    );
+    expect(sourceProvider.mutations).toEqual([]);
+    expect(targetProvider.mutations).toEqual([]);
+  });
+
+  it("refuses stale, conflicting, and ambiguous execution plans before mutation", async () => {
+    const projectRoot = makeTempDir("dev-nexus-import-");
+    const project = createProjectContext(projectRoot);
+    const sourceItems = [
+      githubIssue(1, { title: "Create one" }),
+    ];
+    const sourceProvider = new MemoryWorkTrackerProvider("github", sourceItems);
+    const targetProvider = new MemoryWorkTrackerProvider("local", [
+      workItem("local-a", { title: "github:example/project#2" }),
+      workItem("local-b", { description: "github:example/project#2" }),
+    ]);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["local", targetProvider],
+    ]);
+    const resolveProject = createProjectResolver(project);
+    const providerFactory = ((context) =>
+      providers.get(context.trackerId ?? "") ?? targetProvider) as WorkItemProviderFactory;
+    const executePolicy: WorkItemImportPolicyConfig = {
+      ...defaultPolicy,
+      filters: {},
+      writePolicy: {
+        mode: "execute",
+        creates: "plan",
+        updates: "plan",
+        links: "plan",
+        credentials: "available",
+      },
+    };
+    const plan = await createWorkItemImportPlan({
+      projectRoot,
+      componentId: "core",
+      policy: {
+        ...executePolicy,
+        writePolicy: { ...executePolicy.writePolicy!, mode: "dry_run" },
+      },
+      resolveProject,
+      providerFactory,
+      now: fixedClock("2026-05-18T09:00:00.000Z"),
+    });
+    sourceItems.push(githubIssue(2, { title: "Ambiguous two" }));
+
+    const run = await executeWorkItemImport({
+      projectRoot,
+      componentId: "core",
+      policy: executePolicy,
+      plan,
+      authority: allowedImportAuthority(),
+      resolveProject,
+      providerFactory,
+      now: fixedClock("2026-05-18T09:05:00.000Z"),
+    });
+
+    expect(run.status).toBe("blocked");
+    expect(run.blockers.map((blocker) => blocker.operation)).toEqual(
+      expect.arrayContaining(["stale_plan", "ambiguous_duplicate"]),
+    );
+    expect(targetProvider.mutations).toEqual([]);
   });
 });

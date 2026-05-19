@@ -641,6 +641,58 @@ describe("dev-nexus cli", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("fails guarded inbound import execution from a shared checkout before writing local state", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    saveProjectConfig(projectRoot, projectConfig());
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "demo-project",
+      "worker",
+    );
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    const gitRunner: GitRunner = (args: readonly string[], cwd?: string) => {
+      const argsArray = [...args];
+      const joined = argsArray.join(" ");
+      if (joined === "rev-parse --show-toplevel") {
+        return ok(argsArray, `${path.resolve(cwd ?? projectRoot)}\n`);
+      }
+      if (joined === "worktree list --porcelain") {
+        return ok(argsArray, `worktree ${projectRoot}\nHEAD abc123\nbranch refs/heads/main\n`);
+      }
+
+      return ok(argsArray, "");
+    };
+    const originalCwd = process.cwd();
+    process.chdir(generatedMetaWorktree);
+    try {
+      await expect(
+        main(
+          [
+            "work-item",
+            "import-execute",
+            projectRoot,
+            "--source-tracker",
+            "github",
+            "--target-tracker",
+            "local",
+            "--direction",
+            "external_to_local",
+            "--credentials",
+            "available",
+          ],
+          {
+            gitRunner,
+            sharedCheckoutGuard: "enforce",
+          },
+        ),
+      ).rejects.toThrow(/shared_project_checkout/u);
+    } finally {
+      process.chdir(originalCwd);
+    }
+    expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
+  });
+
   it("allows guarded bootstrap worktree preparation", async () => {
     const calls: Array<{ args: string[]; cwd?: string }> = [];
     const projectRoot = makeTempDir("dev-nexus-cli-project-");

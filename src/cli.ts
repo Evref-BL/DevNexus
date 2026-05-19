@@ -233,12 +233,15 @@ import {
 import {
   createWorkItemImportPlan,
   defaultWorkItemImportPolicy,
+  executeWorkItemImport,
   parseWorkItemImportDirection,
   parseWorkItemImportFingerprint,
+  type WorkItemImportExecutionAuthorityInput,
   type WorkItemImportDirection,
   type WorkItemImportFingerprint,
   type WorkItemImportPlan,
   type WorkItemImportPolicyConfig,
+  type WorkItemImportRun,
 } from "./workItemImportPlanner.js";
 import {
   createWorkItemTrackerLinkService,
@@ -249,6 +252,13 @@ import {
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
+import {
+  resolveNexusCurrentAutomationActor,
+} from "./nexusAuthority.js";
+import {
+  loadNexusPublicationAuthProfiles,
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 import type {
   WorkComment,
@@ -819,6 +829,7 @@ export function usage(): string {
     "  dev-nexus work-item show-links <project-root> <logical-item-id> [options]",
     "  dev-nexus work-item unlink <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
     "  dev-nexus work-item import-plan <project-root> --source-tracker <github-id> --target-tracker <local-id> [options]",
+    "  dev-nexus work-item import-execute <project-root> --source-tracker <github-id> --target-tracker <local-id> --direction external_to_local --credentials available [options]",
     "  dev-nexus work-item sync-plan <project-root> --source-tracker <id> --target-tracker <id> [options]",
     "  dev-nexus work-item sync-execute <project-root> --source-tracker <id> --target-tracker <id> --credentials available [options]",
     "  dev-nexus automation status <project-root> [options]",
@@ -1084,7 +1095,7 @@ export function usage(): string {
     "  --reason <text>",
     "  --json",
     "",
-    "Options for work-item import-plan:",
+    "Options for work-item import-plan and import-execute:",
     "  --component <id>          defaults to the primary component",
     "  --source-tracker <id>     GitHub tracker binding id",
     "  --target-tracker <id>     local tracker binding id",
@@ -2231,13 +2242,44 @@ async function handleWorkItemCommand(
     const plan = await createWorkItemImportPlan({
       projectRoot: path.resolve(parsed.projectRoot),
       componentId: parsed.componentId,
-      policy: workItemImportPolicyFromParsed(parsed),
+      policy: workItemImportPolicyFromParsed(parsed, "dry_run"),
       resolveProject: (selector) =>
         resolveDirectProject(parsed.projectRoot, selector.componentId),
       now: dependencies.now,
     });
     printWorkItemImportPlanResult(
       plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "import-execute") {
+    const parsed = parseWorkItemImportPlanCommand(argv);
+    if (!parsed.direction) {
+      throw new Error("work-item import-execute requires --direction external_to_local");
+    }
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item import-execute",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
+    const run = await executeWorkItemImport({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: parsed.componentId,
+      policy: workItemImportPolicyFromParsed(parsed, "execute"),
+      authority: workItemImportExecutionAuthorityFromProject(
+        parsed.projectRoot,
+        parsed.componentId,
+      ),
+      resolveProject: (selector) =>
+        resolveDirectProject(parsed.projectRoot, selector.componentId),
+      now: dependencies.now,
+    });
+    printWorkItemImportExecuteResult(
+      run,
       parsed,
       dependencies.stdout ?? process.stdout,
     );
@@ -2269,7 +2311,7 @@ async function handleWorkItemCommand(
   }
 
   throw new Error(
-    "work-item requires create, discovery-status, list, get, update, comment, set-status, link, show-links, unlink, import-plan, sync-plan, or sync-execute",
+    "work-item requires create, discovery-status, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
   );
 }
 
@@ -6622,6 +6664,29 @@ function printWorkItemImportPlanResult(
   }
 }
 
+function printWorkItemImportExecuteResult(
+  run: WorkItemImportRun,
+  parsed: ParsedWorkItemImportPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, run };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus inbound work item import execution.");
+  writeLine(stdout, `  Status: ${run.status}`);
+  writeLine(stdout, `  Created: ${run.summary.counts.created}`);
+  writeLine(stdout, `  Updated: ${run.summary.counts.updated}`);
+  writeLine(stdout, `  Skipped: ${run.summary.counts.skipped}`);
+  writeLine(stdout, `  Conflicted: ${run.summary.counts.conflicted}`);
+  writeLine(stdout, `  Ambiguous duplicates: ${run.summary.counts.ambiguousDuplicates}`);
+  writeLine(stdout, `  Stale links: ${run.summary.counts.staleLinks}`);
+  writeLine(stdout, `  Blocked: ${run.summary.counts.blocked}`);
+  writeLine(stdout, `  Links: ${run.summary.counts.links}`);
+}
+
 function printWorkItemSyncExecuteResult(
   run: WorkItemSyncRun,
   parsed: ParsedWorkItemSyncPlanCommand,
@@ -7545,6 +7610,7 @@ function workItemSyncPolicyFromParsed(
 
 function workItemImportPolicyFromParsed(
   parsed: ParsedWorkItemImportPlanCommand,
+  mode: "dry_run" | "execute",
 ): WorkItemImportPolicyConfig {
   return defaultWorkItemImportPolicy({
     sourceTrackerId: parsed.sourceTrackerId,
@@ -7565,7 +7631,7 @@ function workItemImportPolicyFromParsed(
       ? { conflictPolicy: { mode: parsed.conflictPolicy } }
       : {}),
     writePolicy: {
-      mode: "dry_run",
+      mode,
       ...(parsed.writeCreates ? { creates: parsed.writeCreates } : {}),
       ...(parsed.writeUpdates ? { updates: parsed.writeUpdates } : {}),
       ...(parsed.writeLinks ? { links: parsed.writeLinks } : {}),
@@ -7578,6 +7644,55 @@ function workItemImportPolicyFromParsed(
       ? { fingerprints: parsed.fingerprints }
       : {}),
   });
+}
+
+function workItemImportExecutionAuthorityFromProject(
+  projectRoot: string,
+  componentId?: string,
+): WorkItemImportExecutionAuthorityInput {
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const projectConfig = loadProjectConfig(resolvedProjectRoot);
+  const component = componentId
+    ? resolveProjectComponents(resolvedProjectRoot, projectConfig).find(
+        (candidate) => candidate.id === componentId,
+      )
+    : resolvePrimaryProjectComponent(resolvedProjectRoot, projectConfig);
+  if (!component) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  const publication = resolveNexusPublicationPolicy(projectConfig, component);
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot: resolvedProjectRoot,
+    projectConfig,
+  });
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: projectConfig.authority,
+    componentId: component.id,
+    publication,
+    authProfiles,
+  });
+  const authProfile = currentActor.profileId
+    ? authProfiles.find((profile) => profile.id === currentActor.profileId) ?? null
+    : null;
+
+  return {
+    authority: projectConfig.authority,
+    actor: {
+      id: currentActor.expectedActorId,
+      kind: currentActor.expectedActorKind,
+      provider: currentActor.expectedProvider,
+      providerIdentity: currentActor.expectedHandle,
+    },
+    authProfile: authProfile
+      ? {
+          id: authProfile.id,
+          actorId: authProfile.actorId ?? null,
+          kind: authProfile.kind ?? null,
+          provider: authProfile.provider,
+          account: authProfile.account ?? null,
+        }
+      : null,
+  };
 }
 
 function parseWorkStatus(value: string, optionName: string): WorkStatus {
