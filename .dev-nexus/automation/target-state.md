@@ -95,11 +95,15 @@ and ready for coordinator-driven work across its components.
 - The dogfood meta-project now records GitHub hosting remotes and automation
   publication actors explicitly: human manual work uses `origin`, while
   agent-created Git/GitHub activity uses the `bot` remote and
-  `Gabot-Darbot` machine-user profile. Direct-integration components also use
-  component `bot` remotes for publication. The dogfood project authority model
-  binds `dogfood-automation-bot` to the `Gabot-Darbot` machine-user profile
-  with maintainer authority, and host-local DevNexus home config binds
-  `bot-github` to that actor.
+  `Gabot-Darbot` machine-user profile. `dev-nexus:local-163` migrated dogfood
+  component publication config to green-main: component publication uses the
+  `bot` remote, `GH_CONFIG_DIR=home:.config/gh-automation-github`,
+  pull-request validation, `Windows Node 24 check` as the required check, stale
+  checks blocked, direct target-branch push blocked, and authorized merge only
+  after checks are green. The dogfood project authority model binds
+  `dogfood-automation-bot` to the `Gabot-Darbot` machine-user profile with
+  maintainer authority, and host-local DevNexus home config binds `bot-github`
+  to that actor.
 - `docs/project-hosting-provisioning-prd.md` records the desired DevNexus
   hosting provisioning workflow: keep the API minimal while the tool owns
   repository creation, collaborator repair, pending invitation detection, and
@@ -124,6 +128,9 @@ and ready for coordinator-driven work across its components.
   request validation first; merge to `main` only after required checks are
   green and the current actor has explicit merge authority. Branch CI status
   checks are explicit publication actions, not unsolicited background polling.
+- `dev-nexus:local-166` is ready for CI failure intake and coordinator wakeup
+  policy: allowed scopes, webhook/poll/manual replay rollout, dedupe/backoff,
+  failure-to-work-item mapping, and policy-gated coordinator wakeups.
 - The current bot profile has direct write access for the active
   `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
   `c0dc6d2` after branch CI passed.

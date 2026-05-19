@@ -67,10 +67,10 @@ target-cycle facts, commits, and the target report.
 
 ## Next Work Candidates
 
-- Apply the new green-main model to this dogfood project through
-  `dev-nexus:local-163`: migrate component publication config to branch-first
-  validation/handoff defaults now that source support is published and CI is
-  green. Keep `dev-nexus:local-165` as the separate version-scoped planning
+- Continue green-main operationalization with `dev-nexus:local-166`: CI failure
+  intake and coordinator wakeup policy, including allowed scopes,
+  webhook/poll/manual replay rollout, dedupe/backoff, and failure-to-work-item
+  mapping. Keep `dev-nexus:local-165` as the separate version-scoped planning
   follow-up from `docs/version-scoped-planning-prd.md`.
 - Continue remote-host execution after the durable `dev-nexus:local-81`
   request/result record model; keep host checks, SSH transport, and live

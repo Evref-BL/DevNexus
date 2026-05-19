@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 166,
-  "nextCommentNumber": 352,
-  "updatedAt": "2026-05-19T20:02:23.713Z",
+  "nextNumber": 167,
+  "nextCommentNumber": 353,
+  "updatedAt": "2026-05-19T20:10:58.670Z",
   "items": [
     {
       "id": "local-1",
@@ -4207,7 +4207,7 @@
       "id": "local-163",
       "title": "Migrate dogfood components to green-main publication defaults",
       "description": "Type: dogfood project-state migration slice\nReadiness: todo/dependent on green-main publication policy support and publication/check gating support.\nSource: dogfood CI/publication triage on 2026-05-19.\n\nGoal: update this dogfood project so configured components use the green-main branch-first publication policy as the default example once DevNexus can model and enforce it.\n\nDefault decision to apply:\n- `main` should avoid red CI at all cost.\n- Agents publish work to an implementation/integration branch or PR first.\n- Required CI/checks run on that branch or PR.\n- Merge to `main` only after required checks are green and publication authority allows the merge.\n- Direct target-branch push is blocked or explicitly exceptional for components with green-main protection.\n- CI failure intake handles branch/PR failures and emergency main recovery, but it is not the primary protection mechanism.\n\nAcceptance criteria:\n- The dogfood meta project config expresses green-main publication policy for the DevNexus, DevNexus-Pharo, and DevNexus-TypeScript components using the supported shared config shape.\n- Component policies name the target branch, branch/PR preference, expected bot remote/auth profile, required checks or provider branch-policy source, and direct-push exception policy.\n- Project status and target report show green-main publication mode for each component.\n- Existing automation/coordinator guidance points agents to branch-first CI-gated integration instead of assuming direct target push.\n- Any component that cannot yet support the policy records a concrete blocker rather than silently falling back to direct push.\n\nDependencies:\n- Depends on dev-nexus:local-162 for the publication policy model.\n- Depends on provider check and branch-policy signals if required checks are provider-resolved.\n- Depends on publication authority enforcement before live automation relies on the policy.\n\nBoundaries:\n- Do not mutate live provider branch protection in this slice unless a later explicit provider-write policy allows it.\n- Do not delete or rewrite remotes, branches, or component checkouts.\n- Do not store secrets in shared project state.\n\nVerification:\n- `dev-nexus project status` shows green-main policy summaries for all configured components.\n- `dev-nexus automation eligible-work` still works after the config migration.\n- Static review that target state and agent guidance no longer present direct push as the normal dogfood default.\n\nPublication notes:\n- Dogfood meta-project update through the configured bot profile after dependent source support lands.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4220,8 +4220,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T19:07:02.129Z",
-      "updatedAt": "2026-05-19T20:02:23.713Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-19T20:10:58.670Z",
+      "closedAt": "2026-05-19T20:10:58.670Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4279,6 +4279,32 @@
         "provider": "local",
         "itemId": "local-165",
         "itemNumber": 165
+      }
+    },
+    {
+      "id": "local-166",
+      "title": "Add CI failure intake and coordinator wakeup policy",
+      "description": "Type: implementation planning slice\nReadiness: autonomous agent-ready after green-main config migration.\nSource: 2026-05-19 green-main discussion. The desired model is branch or PR CI first, then merge only when green; CI failures should create bounded recovery work rather than leaving main red or silently polling.\n\nGoal: add a DevNexus CI failure intake design and first implementation path that can turn GitHub Actions failures into deduplicated work items and optional coordinator wakeups.\n\nAcceptance criteria:\n- Model allowed repositories, branches, workflows, events, and check names for CI failure intake without granting broad provider write authority.\n- Support at least a dry-run/manual replay input for a GitHub Actions failure payload or run id; webhook and polling rollout can be selected by policy.\n- Create or update one deduplicated work item per failing head SHA/workflow/job with run URL, branch, PR when known, failure summary, and current owner/status.\n- Apply backoff and dedupe so repeated failures do not spam work items or wakeups.\n- Wake the DevNexus coordinator only when policy allows it and the work item is eligible; otherwise leave a clear tracker item for manual scheduling.\n- Keep branch/PR CI checking explicit and publication-scoped; do not introduce unsolicited global CI polling during unrelated agent work.\n- Tests use mocked GitHub/provider data; no live webhooks or provider writes in the first implementation slice.\n\nBoundaries:\n- Do not automatically merge to main.\n- Do not require a permanent develop branch.\n- Do not mutate GitHub branch protection.\n- Do not run agents on arbitrary external repositories.\n\nVerification:\n- Focused unit tests for dedupe keys, allowed-scope filtering, failure-to-work-item mapping, backoff, and wakeup decision.\n- A dry-run CLI or report can show what would be created from a sample failed run.\n- npm run check when feasible.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "ci",
+        "github",
+        "automation",
+        "intake",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-19T20:09:54.077Z",
+      "updatedAt": "2026-05-19T20:10:10.371Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-166",
+        "itemNumber": 166
       }
     }
   ],
@@ -8522,6 +8548,17 @@
           "provider": "local",
           "itemId": "local-comment-351"
         }
+      },
+      {
+        "id": "local-comment-352",
+        "body": "Migrated dogfood component publication config to green_main. DevNexus, DevNexus-Pharo, and DevNexus-TypeScript now use bot remote, GH_CONFIG_DIR=home:.config/gh-automation-github, pull-request validation, required check Windows Node 24 check, staleChecks=block, directTargetPush=blocked, and mergeAuthority=authorized_merge. Project automation publication also uses green_main with direct push disabled.",
+        "author": null,
+        "createdAt": "2026-05-19T20:10:58.657Z",
+        "updatedAt": "2026-05-19T20:10:58.657Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-352"
+        }
       }
     ],
     "local-164": [
@@ -8571,6 +8608,7 @@
           "itemId": "local-comment-344"
         }
       }
-    ]
+    ],
+    "local-166": []
   }
 }

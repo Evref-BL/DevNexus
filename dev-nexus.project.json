@@ -150,10 +150,22 @@
         "requirePassing": true
       },
       "publication": {
-        "strategy": "direct_integration",
+        "strategy": "green_main",
         "remote": "bot",
         "targetBranch": "main",
-        "push": true
+        "push": false,
+        "commandEnvironment": {
+          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+        },
+        "greenMain": {
+          "integrationPreference": "pull_request",
+          "directTargetPush": "blocked",
+          "mergeAuthority": "authorized_merge",
+          "requiredChecks": [
+            "Windows Node 24 check"
+          ],
+          "staleChecks": "block"
+        }
       },
       "relationships": []
     },
@@ -216,10 +228,22 @@
         }
       ],
       "publication": {
-        "strategy": "direct_integration",
+        "strategy": "green_main",
         "remote": "bot",
         "targetBranch": "main",
-        "push": true
+        "push": false,
+        "commandEnvironment": {
+          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+        },
+        "greenMain": {
+          "integrationPreference": "pull_request",
+          "directTargetPush": "blocked",
+          "mergeAuthority": "authorized_merge",
+          "requiredChecks": [
+            "Windows Node 24 check"
+          ],
+          "staleChecks": "block"
+        }
       },
       "relationships": [
         {
@@ -296,10 +320,22 @@
         "requirePassing": true
       },
       "publication": {
-        "strategy": "direct_integration",
+        "strategy": "green_main",
         "remote": "bot",
         "targetBranch": "main",
-        "push": true
+        "push": false,
+        "commandEnvironment": {
+          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+        },
+        "greenMain": {
+          "integrationPreference": "pull_request",
+          "directTargetPush": "blocked",
+          "mergeAuthority": "authorized_merge",
+          "requiredChecks": [
+            "Windows Node 24 check"
+          ],
+          "staleChecks": "block"
+        }
       },
       "relationships": [
         {
@@ -766,10 +802,10 @@
       "allowLiveServices": true
     },
     "publication": {
-      "strategy": "direct_integration",
+      "strategy": "green_main",
       "remote": "bot",
       "targetBranch": "main",
-      "push": true,
+      "push": false,
       "actor": {
         "kind": "machine_user",
         "provider": "github",
@@ -785,6 +821,13 @@
       },
       "commandEnvironment": {
         "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+      },
+      "greenMain": {
+        "integrationPreference": "pull_request",
+        "directTargetPush": "blocked",
+        "mergeAuthority": "authorized_merge",
+        "requiredChecks": [],
+        "staleChecks": "block"
       }
     }
   }

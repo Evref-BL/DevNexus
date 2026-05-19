@@ -37,13 +37,14 @@ coordinator agent chooses and supervises implementation work.
   `Gabot-Darbot` with `GH_CONFIG_DIR=home:.config/gh-automation-github`;
   manual human work remains `Gabriel-Darbord` through the normal `origin`
   remote.
-- Direct-integration component publication policies use component `bot`
-  remotes; `origin` remains the normal human/manual remote.
+- Green-main component publication policies use component `bot` remotes,
+  branch or pull-request validation, and configured required checks; `origin`
+  remains the normal human/manual remote.
 - User policy as of 2026-05-18: agents may integrate verified dogfood
   component work into main without waiting for manual human review, using the
-  configured bot/automation profile when permissions allow. Components that
-  still have an explicit non-integration publication policy must be updated
-  before automation treats them as direct-integration targets.
+  configured bot/automation profile when permissions allow. Current dogfood
+  components use green-main policy, so target-branch publication must remain
+  branch/PR CI-gated even when merge authority exists.
 - The active scheduler path is DevNexus `automation coordinator-loop`.
   Heartbeats may wake that loop, but DevNexus owns lock, backoff, run facts, and
   relaunch decisions.
