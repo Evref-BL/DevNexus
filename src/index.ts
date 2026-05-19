@@ -6,6 +6,7 @@ export * from "./codexAppServerMcpRelay.js";
 export * from "./gitWorktreeService.js";
 export * from "./nexusAutomation.js";
 export * from "./nexusAuthority.js";
+export * from "./nexusAuthorityProviderSignals.js";
 export * from "./nexusAutomationAgentLaunch.js";
 export * from "./nexusAutomationCodexAppServerLaunch.js";
 export * from "./nexusAutomationAgentProfile.js";
