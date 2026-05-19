@@ -1,7 +1,127 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T06:22:31.833Z",
+  "updatedAt": "2026-05-19T07:46:09.876Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-d8892ac1db380a71",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-109",
+      "branchName": "main",
+      "baseRef": "origin/main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusManualWorktree.ts",
+        "src/nexusAutomationWorktreeSetup.ts",
+        "src/nexusWorkerContextBundle.ts",
+        "src/nexusAutomationRunOnce.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusManualWorktree.test.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T07:46:09.876Z",
+      "lastSeenAt": "2026-05-19T07:46:09.876Z",
+      "updatedAt": "2026-05-19T07:46:09.876Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "721fbd99fc0f1a9afa3f9abf906075750aa2c91d",
+      "dirty": false,
+      "pushed": false,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "origin/main",
+        "ahead": 1,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published dev-nexus:local-109 to DevNexus main as 721fbd9 via bot remote and verified the fast-forwarded shared source checkout.",
+        "Verification: npm run check passed pre-publication in the component worktree and post-publication in C:\\dev\\code\\sources\\dev-nexus; post-publication run covered build plus 65 Vitest files and 578 tests.",
+        "Integration preference: direct_integration"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3a6d111f5c7b2a0f",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-109",
+      "branchName": "codex/dev-nexus/local-109-worker-context-targets",
+      "baseRef": "bot/codex/dev-nexus/local-109-worker-context-targets",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusManualWorktree.ts",
+        "src/nexusAutomationWorktreeSetup.ts",
+        "src/nexusWorkerContextBundle.ts",
+        "src/nexusAutomationRunOnce.ts",
+        "src/cli.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusManualWorktree.test.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T07:42:19.480Z",
+      "lastSeenAt": "2026-05-19T07:44:43.172Z",
+      "updatedAt": "2026-05-19T07:44:43.172Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "721fbd99fc0f1a9afa3f9abf906075750aa2c91d",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus/local-109-worker-context-targets",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Published dev-nexus:local-109 to DevNexus main as 721fbd9 via bot remote. Local tracker status mutation is authority-blocked for provider local, so this merged handoff records completion.",
+        "Verification: Pre-publication npm run check passed in component worktree with 65 test files and 578 tests. Post-publication source checkout sync and verification is pending in this same run.",
+        "Integration preference: direct_integration"
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
@@ -58,6 +178,127 @@
       "notes": [
         "Project-meta worktree for recording DevNexus local-94/local-107 source integration and heartbeat cycle facts.",
         "Project-meta scope recorded the local-94/local-107 publication, target direction, and closed ready leases during the 2026-05-19T06:14:10Z heartbeat."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c2491ae28c200bdf",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-107",
+      "branchName": "codex/dev-nexus/local-107-projection-status-diagnostics",
+      "baseRef": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-107-projection-status-diagnostics"
+      },
+      "writeScope": [
+        "src/nexusProjectStatus.ts",
+        "src/nexusProjectStatus.test.ts",
+        "src/nexusSetupCheck.ts",
+        "src/nexusSetupCheck.test.ts",
+        "src/nexusSetupAssistant.ts",
+        "src/nexusSetupAssistant.test.ts",
+        "src/agentTargets.ts",
+        "src/agentTargets.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "docs/agent-target-projection-opt-in-prd.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T04:16:10.734Z",
+      "lastSeenAt": "2026-05-19T06:22:31.833Z",
+      "updatedAt": "2026-05-19T06:22:31.833Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "d9b26d55b7181af69388dc52f4baf85273c8039c",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-107-projection-status-diagnostics"
+        },
+        "upstream": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Prepared local-107 implementation in isolated component worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-107-projection-status-diagnostics. Reporting only; no provider-native cleanup was attempted.",
+        "Verification: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts passed (34 tests); npm run build passed; npm run check passed (64 files, 574 tests); git diff --check passed.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github.",
+        "Published to DevNexus bot/main in merge commit 3753adf278cccc38c2d82bcbadb28ccbfe094c3a.",
+        "Verification after integrating local-94 and local-107: npm run check passed in C:/dev/code/sources/dev-nexus with 64 test files and 575 tests."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3d8c32e2d3f06e3d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-94",
+      "branchName": "codex/dev-nexus/local-94",
+      "baseRef": "bot/codex/dev-nexus/local-94",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "local-94-authority-roles-docs"
+      },
+      "writeScope": [
+        "README.md",
+        "docs/user/authority-roles.md",
+        "docs/user/getting-started.md",
+        "docs/user/agent-workflows.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-19T03:16:50.995Z",
+      "lastSeenAt": "2026-05-19T06:22:31.833Z",
+      "updatedAt": "2026-05-19T06:22:31.833Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "b07889d047f56fb7a45e80ae69d42ed9930ef068",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "local-94-authority-roles-docs"
+        },
+        "upstream": "bot/codex/dev-nexus/local-94",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Commit b07889d documents authority roles for local-94. Evidence for follow-up: work-item update/comment from project-meta worktree were blocked with authority_mutation_blocked because auth profile bot-github is provider github while requested provider is local; coordination/status context generated profile=none while automation_status generated profile=bot-github.",
+        "Verification: npm run check passed (64 files, 572 tests); git diff --check passed; generic docs scan found no new dogfood-specific account names.",
+        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-94. Direct integration held because generated worker/coordination authority surfaces disagreed with automation_status and work-item update/comment blocked on local tracker provider/profile matching.",
+        "Published to DevNexus bot/main in merge commit b21811823f88f7403501943379602c555a0bd9ed; final source main after the local-107 merge is 3753adf278cccc38c2d82bcbadb28ccbfe094c3a.",
+        "Verification after integrating local-94 and local-107: npm run check passed in C:/dev/code/sources/dev-nexus with 64 test files and 575 tests."
       ]
     },
     {
@@ -452,70 +693,6 @@
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
-      "id": "lease-c2491ae28c200bdf",
-      "projectId": "dev-nexus-dogfood",
-      "scope": {
-        "kind": "component",
-        "componentId": "dev-nexus"
-      },
-      "hostId": "BLPP-15398",
-      "agentId": null,
-      "workItemId": "local-107",
-      "branchName": "codex/dev-nexus/local-107-projection-status-diagnostics",
-      "baseRef": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
-      "worktree": {
-        "kind": "component_worktree",
-        "base": "componentWorktreesRoot",
-        "componentId": "dev-nexus",
-        "relativePath": "local-107-projection-status-diagnostics"
-      },
-      "writeScope": [
-        "src/nexusProjectStatus.ts",
-        "src/nexusProjectStatus.test.ts",
-        "src/nexusSetupCheck.ts",
-        "src/nexusSetupCheck.test.ts",
-        "src/nexusSetupAssistant.ts",
-        "src/nexusSetupAssistant.test.ts",
-        "src/agentTargets.ts",
-        "src/agentTargets.test.ts",
-        "src/cli.ts",
-        "src/cli.test.ts",
-        "docs/agent-target-projection-opt-in-prd.md"
-      ],
-      "status": "merged",
-      "createdAt": "2026-05-19T04:16:10.734Z",
-      "lastSeenAt": "2026-05-19T06:22:31.833Z",
-      "updatedAt": "2026-05-19T06:22:31.833Z",
-      "refreshCount": 1,
-      "lastObservedHeadCommit": "d9b26d55b7181af69388dc52f4baf85273c8039c",
-      "dirty": false,
-      "pushed": true,
-      "git": {
-        "repository": {
-          "kind": "component_worktree",
-          "base": "componentWorktreesRoot",
-          "componentId": "dev-nexus",
-          "relativePath": "local-107-projection-status-diagnostics"
-        },
-        "upstream": "bot/codex/dev-nexus/local-107-projection-status-diagnostics",
-        "ahead": 0,
-        "behind": 0,
-        "stagedCount": 0,
-        "unstagedCount": 0,
-        "untrackedCount": 0,
-        "warnings": []
-      },
-      "notes": [
-        "Prepared local-107 implementation in isolated component worktree C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus\\local-107-projection-status-diagnostics. Reporting only; no provider-native cleanup was attempted.",
-        "Verification: npm test -- src/nexusProjectRegistry.test.ts src/nexusSetupAssistant.test.ts passed (34 tests); npm run build passed; npm run check passed (64 files, 574 tests); git diff --check passed.",
-        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-107-projection-status-diagnostics at d9b26d5. Direct integration held because coordination/worktree authority context still reports no resolved auth profile for git.push_target_branch while automation_status reports bot-github.",
-        "Published to DevNexus bot/main in merge commit 3753adf278cccc38c2d82bcbadb28ccbfe094c3a.",
-        "Verification after integrating local-94 and local-107: npm run check passed in C:/dev/code/sources/dev-nexus with 64 test files and 575 tests."
-      ]
-    },
-    {
-      "kind": "dev-nexus.worktree.lease",
-      "version": 1,
       "id": "lease-52dc2eb6db36d4af",
       "projectId": "dev-nexus-dogfood",
       "scope": {
@@ -625,63 +802,6 @@
       "notes": [
         "No-op helper worktree created during local-94 metadata recording attempts; it carried no retained source or project changes.",
         "The helper worktree and local branch were removed after the useful records were written to the shared dogfood checkout with an explicit integration override."
-      ]
-    },
-    {
-      "kind": "dev-nexus.worktree.lease",
-      "version": 1,
-      "id": "lease-3d8c32e2d3f06e3d",
-      "projectId": "dev-nexus-dogfood",
-      "scope": {
-        "kind": "component",
-        "componentId": "dev-nexus"
-      },
-      "hostId": "BLPP-15398",
-      "agentId": null,
-      "workItemId": "local-94",
-      "branchName": "codex/dev-nexus/local-94",
-      "baseRef": "bot/codex/dev-nexus/local-94",
-      "worktree": {
-        "kind": "component_worktree",
-        "base": "componentWorktreesRoot",
-        "componentId": "dev-nexus",
-        "relativePath": "local-94-authority-roles-docs"
-      },
-      "writeScope": [
-        "README.md",
-        "docs/user/authority-roles.md",
-        "docs/user/getting-started.md",
-        "docs/user/agent-workflows.md"
-      ],
-      "status": "merged",
-      "createdAt": "2026-05-19T03:16:50.995Z",
-      "lastSeenAt": "2026-05-19T06:22:31.833Z",
-      "updatedAt": "2026-05-19T06:22:31.833Z",
-      "refreshCount": 1,
-      "lastObservedHeadCommit": "b07889d047f56fb7a45e80ae69d42ed9930ef068",
-      "dirty": false,
-      "pushed": true,
-      "git": {
-        "repository": {
-          "kind": "component_worktree",
-          "base": "componentWorktreesRoot",
-          "componentId": "dev-nexus",
-          "relativePath": "local-94-authority-roles-docs"
-        },
-        "upstream": "bot/codex/dev-nexus/local-94",
-        "ahead": 0,
-        "behind": 0,
-        "stagedCount": 0,
-        "unstagedCount": 0,
-        "untrackedCount": 0,
-        "warnings": []
-      },
-      "notes": [
-        "Commit b07889d documents authority roles for local-94. Evidence for follow-up: work-item update/comment from project-meta worktree were blocked with authority_mutation_blocked because auth profile bot-github is provider github while requested provider is local; coordination/status context generated profile=none while automation_status generated profile=bot-github.",
-        "Verification: npm run check passed (64 files, 572 tests); git diff --check passed; generic docs scan found no new dogfood-specific account names.",
-        "Integration preference: Branch pushed to bot/codex/dev-nexus/local-94. Direct integration held because generated worker/coordination authority surfaces disagreed with automation_status and work-item update/comment blocked on local tracker provider/profile matching.",
-        "Published to DevNexus bot/main in merge commit b21811823f88f7403501943379602c555a0bd9ed; final source main after the local-107 merge is 3753adf278cccc38c2d82bcbadb28ccbfe094c3a.",
-        "Verification after integrating local-94 and local-107: npm run check passed in C:/dev/code/sources/dev-nexus with 64 test files and 575 tests."
       ]
     },
     {

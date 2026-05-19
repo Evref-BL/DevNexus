@@ -184,12 +184,13 @@ and ready for coordinator-driven work across its components.
   complete for active target policy and compatibility normalization, and
   `local-106` is complete for active-target projection filtering.
   `dev-nexus:local-107` is published through DevNexus main `3753adf` with
-  read-only stale/unexpected provider projection diagnostics. Promote
-  `local-109` worker context propagation next, and keep `local-108`,
-  `local-110`, and `local-111` ordered behind the diagnostics and cleanup
-  behavior they require. Do not remove `.claude/skills` until cleanup safety
-  behavior is integrated, unless a separate manual cleanup is explicitly
-  approved.
+  read-only stale/unexpected provider projection diagnostics.
+  `dev-nexus:local-109` is published through DevNexus main `721fbd9` for
+  assigned worker-provider target propagation into worker context and worktree
+  setup. Keep `local-108`, `local-110`, and `local-111` ordered behind the
+  diagnostics and cleanup behavior they require. Do not remove `.claude/skills`
+  until cleanup safety behavior is integrated, unless a separate manual cleanup
+  is explicitly approved.
 - DevNexus-Pharo MCP/plugin cleanup has completed source deletions
   `dev-nexus-pharo:local-15` through `local-19` and published commits
   `1ef5709`, `eb55b9c`, `c5f7a90`, `be1f866`, and `1dd2141` to
@@ -246,10 +247,9 @@ and ready for coordinator-driven work across its components.
   shared-checkout mutation enforcement (`local-98`) and read-only cleanup
   classification (`local-102`) before cleanup execution, and keep status
   expansion/start-adopt slices behind their authority dependencies.
-- Continue agent-target projection through integration of stale projection
-  diagnostics and worker context filtering; `local-111` is the dogfood
-  Codex-only migration and should wait for active target filtering plus stale
-  cleanup safety.
+- Continue agent-target projection after published `local-109`; `local-111` is
+  the dogfood Codex-only migration and should wait for active target filtering
+  plus stale cleanup safety.
 - Keep `dev-nexus:local-52` and live runtime items blocked until policy or
   runner approval is explicit.
 - Promote `local-73` through `local-75` only after their prerequisites are
