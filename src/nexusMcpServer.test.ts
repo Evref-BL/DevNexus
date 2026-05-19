@@ -767,6 +767,7 @@ describe("DevNexus MCP server", () => {
         {
           projectRoot,
           workItemId: "addon:local-1",
+          workerAgentProvider: "codex",
         },
         {
           gitRunner,
@@ -804,6 +805,10 @@ describe("DevNexus MCP server", () => {
       id: "local-1",
       title: "Prepare addon worker",
       description: "Carry this description into worker context.",
+    });
+    expect(context.agentTargetPolicy).toMatchObject({
+      activeProviders: ["codex"],
+      assignedProvider: "codex",
     });
     expect(gitCalls[0]).toMatchObject({
       args: [

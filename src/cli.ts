@@ -734,6 +734,7 @@ interface ParsedWorktreePrepareCommand {
   workItemTitle?: string | null;
   hostId?: string | null;
   agentId?: string | null;
+  workerAgentProvider?: string | null;
   writeScope: string[];
   leaseNotes: string[];
   json?: boolean;
@@ -1000,6 +1001,7 @@ export function usage(): string {
     "  --no-base-ref             create the branch from the source checkout HEAD",
     "  --host <id>               lease host id; defaults to local hostname",
     "  --agent <id>              optional lease agent/chat id",
+    "  --worker-agent <provider> assigned worker provider target, such as codex or claude",
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
     "  --json",
@@ -1855,6 +1857,7 @@ async function handleWorktreeCommand(
       workItemDescription: resolvedWorkItem.workItem?.description ?? null,
       hostId: parsed.hostId,
       agentId: parsed.agentId,
+      workerAgentProvider: parsed.workerAgentProvider,
       writeScope: parsed.writeScope,
       leaseNotes: parsed.leaseNotes,
       gitRunner: dependencies.gitRunner,
@@ -4185,6 +4188,9 @@ function parseWorktreePrepareCommand(
         break;
       case "--agent":
         parsed.agentId = next();
+        break;
+      case "--worker-agent":
+        parsed.workerAgentProvider = next();
         break;
       case "--write-scope":
         parsed.writeScope.push(next());

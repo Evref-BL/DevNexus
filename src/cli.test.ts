@@ -760,6 +760,8 @@ describe("dev-nexus cli", () => {
         "windows-devbox",
         "--agent",
         "codex",
+        "--worker-agent",
+        "codex",
         "--write-scope",
         "src",
         "--lease-note",
@@ -812,6 +814,14 @@ describe("dev-nexus cli", () => {
             },
           },
         ],
+        context: {
+          context: {
+            agentTargetPolicy: {
+              activeProviders: ["codex"],
+              assignedProvider: "codex",
+            },
+          },
+        },
       },
     });
     expect(componentPayload.worktree.worktreePath).toBe(

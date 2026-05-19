@@ -27,7 +27,9 @@ import {
 } from "./nexusAutomationWorktreeSetup.js";
 import {
   activeNexusProjectAgentProviders,
+  activeNexusProjectSkillAgentTargets,
   loadProjectConfig,
+  normalizeNexusProjectAgentTargets,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -428,6 +430,11 @@ export async function runNexusAutomationOnce(
       workItemTitle: workItem.title,
       ...(options.gitRunner ? { gitRunner: options.gitRunner } : {}),
     });
+    const normalizedAgentTargets =
+      normalizeNexusProjectAgentTargets(projectConfig);
+    const activeAgentProviders = activeNexusProjectAgentProviders(projectConfig);
+    const assignedAgentProvider =
+      activeAgentProviders.length === 1 ? activeAgentProviders[0]! : null;
     setup = materializeNexusAutomationWorktreeSetup({
       sourceRoot,
       worktreesRoot: primaryComponent.worktreesRoot,
@@ -435,6 +442,7 @@ export async function runNexusAutomationOnce(
       automationConfig,
       pluginDependencyProjections,
       skillsConfig: projectConfig.skills,
+      skillAgentTargets: activeNexusProjectSkillAgentTargets(projectConfig),
       context: {
         project: {
           id: projectConfig.id,
@@ -450,9 +458,23 @@ export async function runNexusAutomationOnce(
           baseRef: worktree.baseRef,
           workItem,
         },
+        agentTargetPolicy: {
+          explicit: normalizedAgentTargets.explicit,
+          activeProviders: activeAgentProviders,
+          assignedProvider: assignedAgentProvider,
+          recommendations: normalizedAgentTargets.recommendations,
+          warnings:
+            assignedAgentProvider === null && activeAgentProviders.length > 1
+              ? [
+                  "No assigned worker provider was selected; worktree setup includes all active provider projections.",
+                ]
+              : [],
+        },
         pluginFragments: projectPluginWorkerFragments(projectConfig, {
           componentId: primaryComponent.id,
-          activeAgents: activeNexusProjectAgentProviders(projectConfig),
+          ...(assignedAgentProvider
+            ? { agent: assignedAgentProvider }
+            : { activeAgents: activeAgentProviders }),
         }),
         publication: resolveNexusPublicationPolicy(
           projectConfig,

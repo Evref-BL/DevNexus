@@ -79,6 +79,14 @@ export interface NexusWorkerContextSkills {
   agentNativeProjections: NexusWorkerContextAgentSkillProjection[];
 }
 
+export interface NexusWorkerContextAgentTargetPolicy {
+  explicit: boolean;
+  activeProviders: string[];
+  assignedProvider: string | null;
+  recommendations: string[];
+  warnings: string[];
+}
+
 export type NexusWorkerContextDependencyProjectionSourceControl =
   | "support"
   | "source";
@@ -154,6 +162,7 @@ export interface NexusWorkerContextBundle {
   publication: NexusAutomationPublicationConfig | null;
   authority: NexusAuthorityComponentSummary | null;
   runnerProfiles: NexusRunnerProfilePolicySummary[];
+  agentTargetPolicy: NexusWorkerContextAgentTargetPolicy;
   projectContext: NexusWorkerProjectContextReferences;
   pluginFragments: NexusPluginWorkerFragmentsProjection;
   boundaries: NexusWorkerContextBoundaries;
@@ -177,6 +186,7 @@ export interface NexusWorkerContextBundleOptions {
   publication?: NexusAutomationPublicationConfig | null;
   authority?: NexusAuthorityComponentSummary | null;
   runnerProfiles?: NexusRunnerProfilePolicySummary[];
+  agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
 }
 
 export interface MaterializeNexusWorkerContextBundleResult {
@@ -266,6 +276,9 @@ export function buildNexusWorkerContextBundle(
   const publication = options.publication ?? null;
   const authority = options.authority ?? null;
   const runnerProfiles = normalizeWorkerRunnerProfiles(options.runnerProfiles);
+  const agentTargetPolicy = normalizeWorkerAgentTargetPolicy(
+    options.agentTargetPolicy,
+  );
   const worktree = {
     componentId,
     sourceRoot,
@@ -295,6 +308,7 @@ export function buildNexusWorkerContextBundle(
     publication,
     authority,
     runnerProfiles,
+    agentTargetPolicy,
     projectContext,
     pluginFragments,
     boundaries: {
@@ -335,6 +349,8 @@ export function renderNexusWorkerBriefing(
     `Branch: ${context.worktree.branchName}`,
     `Base ref: ${baseRefLine}`,
     "",
+    ...renderAgentTargetPolicyLines(context.agentTargetPolicy),
+    "",
     `Run source and git commands in: ${context.worktree.worktreePath}`,
     "Source and Git commands run from the component checkout root shown above.",
     "Write source changes only inside this component worktree unless the coordinator assigns another boundary.",
@@ -363,6 +379,21 @@ export function renderNexusWorkerBriefing(
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
+}
+
+function renderAgentTargetPolicyLines(
+  policy: NexusWorkerContextAgentTargetPolicy,
+): string[] {
+  return [
+    "Agent target policy:",
+    `- source: ${policy.explicit ? "explicit" : "compatibility"}`,
+    `- active providers: ${policy.activeProviders.join(", ") || "none"}`,
+    `- assigned worker provider: ${policy.assignedProvider ?? "none"}`,
+    ...policy.recommendations.map(
+      (recommendation) => `- recommendation: ${recommendation}`,
+    ),
+    ...policy.warnings.map((warning) => `- warning: ${warning}`),
+  ];
 }
 
 export function materializeNexusWorkerContextBundle(
@@ -598,6 +629,31 @@ function normalizeWorkerContextSkills(
                 ),
         })),
       }),
+    ),
+  };
+}
+
+function normalizeWorkerAgentTargetPolicy(
+  policy: NexusWorkerContextAgentTargetPolicy | undefined,
+): NexusWorkerContextAgentTargetPolicy {
+  return {
+    explicit: policy?.explicit === true,
+    activeProviders: normalizeStringArray(
+      policy?.activeProviders ?? [],
+      "agentTargetPolicy.activeProviders",
+    ),
+    assignedProvider:
+      optionalNullableString(
+        policy?.assignedProvider,
+        "agentTargetPolicy.assignedProvider",
+      ) ?? null,
+    recommendations: normalizeStringArray(
+      policy?.recommendations ?? [],
+      "agentTargetPolicy.recommendations",
+    ),
+    warnings: normalizeStringArray(
+      policy?.warnings ?? [],
+      "agentTargetPolicy.warnings",
     ),
   };
 }

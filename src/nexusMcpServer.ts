@@ -545,6 +545,7 @@ const tools: McpTool[] = [
         baseRef: { type: ["string", "null"] },
         hostId: { type: ["string", "null"] },
         agentId: { type: ["string", "null"] },
+        workerAgentProvider: { type: ["string", "null"] },
         writeScope: { type: "array", items: { type: "string" } },
         leaseNotes: { type: "array", items: { type: "string" } },
       },
@@ -1407,6 +1408,11 @@ export async function callDevNexusMcpTool(
             baseRef: optionalNullableString(args, "baseRef", "arguments"),
             hostId: optionalNullableString(args, "hostId", "arguments"),
             agentId: optionalNullableString(args, "agentId", "arguments"),
+            workerAgentProvider: optionalNullableString(
+              args,
+              "workerAgentProvider",
+              "arguments",
+            ),
             writeScope:
               optionalStringArray(args, "writeScope", "arguments") ?? [],
             leaseNotes:

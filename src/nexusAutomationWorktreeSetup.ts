@@ -22,6 +22,7 @@ import {
   type NexusWorkerContextAgentSkillProjection,
   type NexusWorkerContextSkillReference,
   type NexusWorkerContextBundleWorktree,
+  type NexusWorkerContextAgentTargetPolicy,
 } from "./nexusWorkerContextBundle.js";
 import {
   nexusSkillManifestFileName,
@@ -116,6 +117,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
   };
   ownership: NexusWorkerContextBundleWorktree;
   targetStatePath?: string | null;
+  agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
   publication?: NexusAutomationPublicationConfig | null;
   authority?: NexusAuthorityComponentSummary | null;
@@ -129,6 +131,7 @@ export interface NexusAutomationWorktreeSetupOptions {
   automationConfig: NexusAutomationConfig;
   pluginDependencyProjections?: NexusAutomationPluginDependencyProjection[];
   skillsConfig?: NexusProjectSkillsConfig;
+  skillAgentTargets?: NexusProjectSkillAgentTarget[];
   context?: NexusAutomationWorktreeSetupContextInput;
   gitRunner?: GitRunner;
   platform?: NodeJS.Platform;
@@ -240,6 +243,7 @@ export function materializeNexusAutomationWorktreeSetup(
         projectRoot: options.context.project.root,
         worktreePath,
         skillsConfig: options.skillsConfig,
+        agentTargets: options.skillAgentTargets,
         gitRunner,
         platform,
       })
@@ -337,6 +341,7 @@ function materializeWorkerContext(options: {
       options.context.publication ?? options.automationConfig.publication,
     authority: options.context.authority ?? null,
     runnerProfiles: options.context.runnerProfiles,
+    agentTargetPolicy: options.context.agentTargetPolicy,
   });
   addGitInfoExclude({
     worktreePath: options.worktreePath,
@@ -358,10 +363,13 @@ function materializeWorkerSkillProjections(options: {
   projectRoot: string;
   worktreePath: string;
   skillsConfig?: NexusProjectSkillsConfig;
+  agentTargets?: NexusProjectSkillAgentTarget[];
   gitRunner: GitRunner;
   platform: NodeJS.Platform;
 }): NexusAutomationWorktreeSkillProjectionResult[] {
-  const enabledTargets = (options.skillsConfig?.agentTargets ?? []).filter(
+  const enabledTargets = (
+    options.agentTargets ?? options.skillsConfig?.agentTargets ?? []
+  ).filter(
     (target) => target.enabled !== false,
   );
   if (enabledTargets.length === 0) {

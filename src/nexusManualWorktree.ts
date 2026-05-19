@@ -15,10 +15,13 @@ import {
 } from "./nexusAutomationWorktreeSetup.js";
 import {
   activeNexusProjectAgentProviders,
+  activeNexusProjectSkillAgentTargets,
   loadProjectConfig,
+  normalizeNexusProjectAgentTargets,
   projectWorktreesRootPath,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import type { NexusProjectSkillAgentTarget } from "./nexusSkills.js";
 import {
   createOrRefreshNexusWorktreeLease,
   type NexusWorktreeLeaseRecord,
@@ -59,6 +62,7 @@ export interface PrepareNexusManualWorktreeOptions {
   workItemDescription?: string | null;
   hostId?: string | null;
   agentId?: string | null;
+  workerAgentProvider?: string | null;
   writeScope?: string[];
   leaseNotes?: string[];
   gitRunner?: GitRunner;
@@ -196,10 +200,16 @@ export function prepareNexusManualWorktree(
         repository: target.component.remoteUrl,
       })
     : null;
+  const agentTargetSelection = manualWorktreeAgentTargetSelection({
+    projectConfig,
+    workerAgentProvider: options.workerAgentProvider,
+  });
   const pluginDependencyProjections = manualWorktreePluginDependencyProjections({
     projectRoot,
     projectConfig,
     componentId: target.ownerId,
+    workerAgentProvider: agentTargetSelection.assignedProvider,
+    activeProviders: agentTargetSelection.policy.activeProviders,
   });
   const failedPreflight = preflightNexusAutomationWorktreeSetup({
     sourceRoot: target.sourceRoot,
@@ -239,6 +249,7 @@ export function prepareNexusManualWorktree(
     automationConfig,
     pluginDependencyProjections,
     skillsConfig: projectConfig.skills,
+    skillAgentTargets: agentTargetSelection.skillTargets,
     context: {
       project: {
         id: projectConfig.id,
@@ -254,9 +265,12 @@ export function prepareNexusManualWorktree(
         baseRef: worktree.baseRef,
         workItem: contextWorkItem,
       },
+      agentTargetPolicy: agentTargetSelection.policy,
       pluginFragments: projectPluginWorkerFragments(projectConfig, {
         componentId: target.ownerId,
-        activeAgents: activeNexusProjectAgentProviders(projectConfig),
+        ...(agentTargetSelection.assignedProvider
+          ? { agent: agentTargetSelection.assignedProvider }
+          : { activeAgents: agentTargetSelection.policy.activeProviders }),
       }),
       publication,
       authority,
@@ -389,6 +403,8 @@ function manualWorktreePluginDependencyProjections(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   componentId: string | null;
+  workerAgentProvider: string | null;
+  activeProviders: string[];
 }): NexusAutomationPluginDependencyProjection[] {
   const componentsById = new Map(
     resolveProjectComponents(options.projectRoot, options.projectConfig).map(
@@ -398,7 +414,9 @@ function manualWorktreePluginDependencyProjections(options: {
 
   return projectPluginDependencyProjections(options.projectConfig, {
     componentId: options.componentId,
-    activeAgents: activeNexusProjectAgentProviders(options.projectConfig),
+    ...(options.workerAgentProvider
+      ? { agent: options.workerAgentProvider }
+      : { activeAgents: options.activeProviders }),
   }).map((projection) => {
     const sourceComponent = projection.sourceComponentId
       ? componentsById.get(projection.sourceComponentId)
@@ -434,6 +452,63 @@ function manualWorktreePluginDependencyProjections(options: {
   });
 }
 
+function manualWorktreeAgentTargetSelection(options: {
+  projectConfig: NexusProjectConfig;
+  workerAgentProvider?: string | null;
+}): {
+  assignedProvider: string | null;
+  skillTargets: NexusProjectSkillAgentTarget[];
+  policy: {
+    explicit: boolean;
+    activeProviders: string[];
+    assignedProvider: string | null;
+    recommendations: string[];
+    warnings: string[];
+  };
+} {
+  const normalized = normalizeNexusProjectAgentTargets(options.projectConfig);
+  const activeProviders = activeNexusProjectAgentProviders(options.projectConfig);
+  const selectedProvider =
+    optionalNullableString(
+      options.workerAgentProvider,
+      "workerAgentProvider",
+    )?.toLowerCase() ?? null;
+  const assignedProvider =
+    selectedProvider ??
+    (activeProviders.length === 1 ? activeProviders[0]! : null);
+  const warnings: string[] = [];
+  if (assignedProvider && !activeProviders.includes(assignedProvider)) {
+    throw new Error(
+      `Worker agent provider ${assignedProvider} is not active in project agent target policy: ` +
+        `${activeProviders.join(", ") || "none"}`,
+    );
+  }
+  if (!assignedProvider && activeProviders.length > 1) {
+    warnings.push(
+      "No assigned worker provider was selected; worktree setup includes all active provider projections.",
+    );
+  }
+
+  const activeSkillTargets = activeNexusProjectSkillAgentTargets(
+    options.projectConfig,
+  );
+  const skillTargets = assignedProvider
+    ? activeSkillTargets.filter((target) => target.agent === assignedProvider)
+    : activeSkillTargets;
+
+  return {
+    assignedProvider,
+    skillTargets,
+    policy: {
+      explicit: normalized.explicit,
+      activeProviders,
+      assignedProvider,
+      recommendations: normalized.recommendations,
+      warnings,
+    },
+  };
+}
+
 function compactTimestamp(value: Date | string): string {
   const date = value instanceof Date ? value : new Date(value);
   return date
@@ -459,6 +534,21 @@ function requiredNonEmptyString(value: string, name: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
     throw new Error(`${name} must be a non-empty string`);
+  }
+
+  return trimmed;
+}
+
+function optionalNullableString(
+  value: string | null | undefined,
+  name: string,
+): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`${name} must be a non-empty string when provided`);
   }
 
   return trimmed;
