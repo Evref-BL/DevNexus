@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import path from "node:path";
 import {
   createWorkItemService,
@@ -6,6 +7,14 @@ import {
   type WorkItemProviderFactory,
 } from "./workItemService.js";
 import {
+  resolveNexusEffectiveAuthority,
+  type NexusAuthorityConfig,
+  type NexusEffectiveAuthorityActorInput,
+  type NexusEffectiveAuthorityAuthProfileInput,
+  type NexusEffectiveAuthorityResolution,
+} from "./nexusAuthority.js";
+import {
+  createWorkItemTrackerLinkService,
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
   type WorkItemTrackerReference,
@@ -19,7 +28,9 @@ import {
 } from "./workTrackingProviderService.js";
 import type {
   LocalWorkTrackingConfig,
+  WorkComment,
   WorkItem,
+  WorkItemPatch,
   WorkItemQuery,
   WorkStatus,
   WorkTrackerCapabilityName,
@@ -230,6 +241,78 @@ export interface WorkItemImportPlan {
   fingerprintMatches: WorkItemImportFingerprintMatch[];
 }
 
+export interface WorkItemImportExecutionAuthorityInput {
+  authority?: NexusAuthorityConfig;
+  actor?: NexusEffectiveAuthorityActorInput | null;
+  authProfile?: NexusEffectiveAuthorityAuthProfileInput | null;
+}
+
+export interface ExecuteWorkItemImportInput extends CreateWorkItemImportPlanInput {
+  plan?: WorkItemImportPlan;
+  authority?: WorkItemImportExecutionAuthorityInput | null;
+}
+
+export type WorkItemImportRunStatus = "completed" | "blocked" | "failed";
+
+export interface WorkItemImportLocalLink {
+  action: "created" | "updated" | "linked";
+  source: WorkItemSyncItemSummary;
+  target: WorkItemSyncItemSummary;
+  linkAction: "linked" | "updated" | "unchanged";
+  reference: WorkItemTrackerReference;
+}
+
+export interface WorkItemImportRunCounts {
+  created: number;
+  updated: number;
+  skipped: number;
+  conflicted: number;
+  blocked: number;
+  links: number;
+  ambiguousDuplicates: number;
+  staleLinks: number;
+}
+
+export interface WorkItemImportRunBlocker {
+  operation: string;
+  message: string;
+  source?: WorkItemSyncItemSummary;
+  target?: WorkItemSyncItemSummary;
+}
+
+export interface WorkItemImportRunSummary {
+  id: string;
+  status: WorkItemImportRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  projectRoot: string;
+  projectId: string;
+  componentId: string;
+  sourceTrackerId: string;
+  targetTrackerId: string;
+  planGeneratedAt: string;
+  counts: WorkItemImportRunCounts;
+}
+
+export interface WorkItemImportAuthorityDecisionSummary {
+  sourceRead: NexusEffectiveAuthorityResolution;
+  targetWrite: NexusEffectiveAuthorityResolution;
+}
+
+export interface WorkItemImportRun {
+  summary: WorkItemImportRunSummary;
+  status: WorkItemImportRunStatus;
+  plan: WorkItemImportPlan;
+  localLinks: WorkItemImportLocalLink[];
+  comments: WorkComment[];
+  blockers: WorkItemImportRunBlocker[];
+  skipped: WorkItemImportSkipPlan[];
+  conflicts: WorkItemImportConflictPlan[];
+  ambiguousDuplicates: WorkItemImportAmbiguousDuplicatePlan[];
+  staleLinks: WorkItemImportStaleLinkPlan[];
+  authority: WorkItemImportAuthorityDecisionSummary;
+}
+
 interface MutableWorkItemImportPlan extends WorkItemImportPlan {
   counts: WorkItemImportPlanCounts;
 }
@@ -430,6 +513,163 @@ export async function createWorkItemImportPlan(
   refreshWouldChangeFiles(plan, targetContext);
   refreshCounts(plan);
   return plan;
+}
+
+export async function executeWorkItemImport(
+  input: ExecuteWorkItemImportInput,
+): Promise<WorkItemImportRun> {
+  const startedAt = nowString(input.now);
+  const freshPlan = await createWorkItemImportPlan({
+    ...input,
+    policy: plannerPolicyForImportExecution(input.policy),
+  });
+  const stalePlanBlockers = input.plan
+    ? stalePlanBlockersForConsumedPlan(input.plan, freshPlan, input.policy)
+    : [];
+  const plan = freshPlan;
+  validateConsumedImportExecutionPlan(plan, input.policy);
+
+  const selector = executionSelector(input, plan);
+  const service = createWorkItemService({
+    resolveProject: input.resolveProject,
+    providerFactory: input.providerFactory,
+    providerOptions: input.providerOptions,
+    now: input.now,
+  });
+  const linkService = createWorkItemTrackerLinkService({
+    resolveProject: input.resolveProject,
+    now: input.now,
+  });
+  const authority = importExecutionAuthorityDecisions(plan, input.authority);
+  const localLinks: WorkItemImportLocalLink[] = [];
+  const comments: WorkComment[] = [];
+  const blockers: WorkItemImportRunBlocker[] = [
+    ...stalePlanBlockers,
+    ...executionPolicyBlockers(plan, input.policy, authority),
+    ...plan.blockers.map((blocker) => ({
+      operation: blocker.operation,
+      message: blocker.message,
+    })),
+    ...plan.conflicts.map((conflict) => ({
+      operation: "conflict",
+      message: `Import source "${conflict.source.id}" conflicts with local target "${conflict.target.id}".`,
+      source: conflict.source,
+      target: conflict.target,
+    })),
+    ...plan.ambiguousDuplicates.map((duplicate) => ({
+      operation: "ambiguous_duplicate",
+      message: duplicate.message,
+      source: duplicate.source,
+    })),
+    ...plan.staleLinks.map((stale) => ({
+      operation: "stale_link",
+      message: stale.message,
+      source: stale.source,
+    })),
+  ];
+
+  if (blockers.length === 0) {
+    for (const createPlan of plan.creates) {
+      try {
+        const target = await service.createWorkItem({
+          ...selector,
+          trackerId: plan.policy.targetTrackerId,
+          ...createInputFromImportPlan(createPlan),
+        });
+        const link = await linkService.linkReference({
+          ...selector,
+          logicalItemId: target.id,
+          trackerId: createPlan.plannedLink.trackerId,
+          ...linkInputFromPlannedLink(createPlan.plannedLink),
+        });
+        localLinks.push({
+          action: "created",
+          source: createPlan.source,
+          target: summarizeWorkItem(target, plan.policy.targetTrackerId),
+          linkAction: link.action,
+          reference: link.reference,
+        });
+      } catch (error) {
+        blockers.push({
+          operation: "create",
+          message: errorMessage(error),
+          source: createPlan.source,
+        });
+      }
+    }
+
+    for (const updatePlan of plan.updates) {
+      try {
+        const target = updatePlan.fields.length > 0
+          ? await service.updateWorkItem({
+              ...selector,
+              trackerId: plan.policy.targetTrackerId,
+              ref: { id: updatePlan.target.id },
+              patch: patchFromChanges(updatePlan.fields),
+            })
+          : await service.getWorkItem({
+              ...selector,
+              trackerId: plan.policy.targetTrackerId,
+              id: updatePlan.target.id,
+            });
+        const link = await linkService.linkReference({
+          ...selector,
+          logicalItemId: target.id,
+          trackerId: updatePlan.plannedLink.trackerId,
+          ...linkInputFromPlannedLink(updatePlan.plannedLink),
+        });
+        localLinks.push({
+          action: updatePlan.fields.length > 0 ? "updated" : "linked",
+          source: updatePlan.source,
+          target: summarizeWorkItem(target, plan.policy.targetTrackerId),
+          linkAction: link.action,
+          reference: link.reference,
+        });
+      } catch (error) {
+        blockers.push({
+          operation: updatePlan.fields.length > 0 ? "update" : "link",
+          message: errorMessage(error),
+          source: updatePlan.source,
+          target: updatePlan.target,
+        });
+      }
+    }
+  }
+
+  const finishedAt = nowString(input.now);
+  const summary = importRunSummary({
+    plan,
+    status:
+      blockers.length > 0
+        ? localLinks.length > 0
+          ? "failed"
+          : "blocked"
+        : "completed",
+    startedAt,
+    finishedAt,
+    created: localLinks.filter((link) => link.action === "created").length,
+    updated: localLinks.filter((link) => link.action === "updated").length,
+    skipped: plan.skips.length,
+    conflicted: plan.conflicts.length,
+    blocked: blockers.length,
+    links: localLinks.length,
+    ambiguousDuplicates: plan.ambiguousDuplicates.length,
+    staleLinks: plan.staleLinks.length,
+  });
+
+  return {
+    summary,
+    status: summary.status,
+    plan,
+    localLinks,
+    comments,
+    blockers,
+    skipped: plan.skips,
+    conflicts: plan.conflicts,
+    ambiguousDuplicates: plan.ambiguousDuplicates,
+    staleLinks: plan.staleLinks,
+    authority,
+  };
 }
 
 export function parseWorkItemImportDirection(
@@ -1239,7 +1479,7 @@ function handleWriteDisposition(options: {
     options.reason ??
     `Write policy is configured to ${options.disposition} ${options.operation} plans.`;
   if (options.disposition === "block") {
-    options.plan.policyBlocks.push({
+    addPolicyBlock(options.plan, {
       operation: options.operation,
       reason: message,
     });
@@ -1394,6 +1634,333 @@ function normalizeFingerprints(
     seen.add(parsed);
     return parsed;
   });
+}
+
+function plannerPolicyForImportExecution(
+  policy: WorkItemImportPolicyConfig,
+): WorkItemImportPolicyConfig {
+  const normalized = normalizeWorkItemImportPolicy(policy);
+  return {
+    ...normalized,
+    writePolicy: {
+      ...normalized.writePolicy,
+      mode: "dry_run",
+    },
+  };
+}
+
+function validateConsumedImportExecutionPlan(
+  plan: WorkItemImportPlan,
+  policy: WorkItemImportPolicyConfig,
+): void {
+  const normalized = normalizeWorkItemImportPolicy(policy);
+  if (!plan.dryRun) {
+    throw new Error("work item import execution requires a dry-run plan");
+  }
+  if (plan.policy.sourceTrackerId !== normalized.sourceTrackerId) {
+    throw new Error("work item import plan source tracker does not match policy");
+  }
+  if (plan.policy.targetTrackerId !== normalized.targetTrackerId) {
+    throw new Error("work item import plan target tracker does not match policy");
+  }
+  if (plan.policy.direction !== normalized.direction) {
+    throw new Error("work item import plan direction does not match policy");
+  }
+}
+
+function stalePlanBlockersForConsumedPlan(
+  consumed: WorkItemImportPlan,
+  fresh: WorkItemImportPlan,
+  policy: WorkItemImportPolicyConfig,
+): WorkItemImportRunBlocker[] {
+  validateConsumedImportExecutionPlan(consumed, policy);
+  return importPlanFingerprint(consumed) === importPlanFingerprint(fresh)
+    ? []
+    : [
+        {
+          operation: "stale_plan",
+          message:
+            "Inbound import plan changed when recomputed immediately before execution.",
+        },
+      ];
+}
+
+function importPlanFingerprint(plan: WorkItemImportPlan): string {
+  return JSON.stringify({
+    projectId: plan.projectId,
+    componentId: plan.componentId,
+    sourceTrackerId: plan.sourceTracker.trackerId,
+    targetTrackerId: plan.targetTracker.trackerId,
+    policy: plan.policy,
+    creates: plan.creates.map((create) => ({
+      sourceId: create.source.id,
+      fields: create.fields,
+      plannedLink: create.plannedLink,
+    })),
+    updates: plan.updates.map((update) => ({
+      sourceId: update.source.id,
+      targetId: update.target.id,
+      targetDetection: update.targetDetection,
+      fields: update.fields,
+      plannedLink: update.plannedLink,
+      fingerprints: update.fingerprints,
+    })),
+    skips: plan.skips.map((skip) => ({
+      reason: skip.reason,
+      sourceId: skip.source?.id,
+      targetId: skip.target?.id,
+      targetReference: skip.targetReference,
+    })),
+    conflicts: plan.conflicts.map((conflict) => ({
+      sourceId: conflict.source.id,
+      targetId: conflict.target.id,
+      fields: conflict.fields,
+    })),
+    ambiguousDuplicates: plan.ambiguousDuplicates.map((duplicate) => ({
+      sourceId: duplicate.source.id,
+      candidates: duplicate.candidates.map((candidate) => candidate.id),
+      fingerprints: duplicate.fingerprints,
+    })),
+    staleLinks: plan.staleLinks.map((stale) => ({
+      sourceId: stale.source.id,
+      targetReference: stale.targetReference,
+    })),
+    blockers: plan.blockers,
+  });
+}
+
+function executionSelector(
+  input: ExecuteWorkItemImportInput,
+  plan: WorkItemImportPlan,
+): { project?: string; projectRoot?: string; componentId?: string } {
+  return {
+    ...(input.project
+      ? { project: input.project }
+      : { projectRoot: path.resolve(input.projectRoot ?? plan.projectRoot) }),
+    componentId: input.componentId ?? plan.componentId,
+  };
+}
+
+function importExecutionAuthorityDecisions(
+  plan: WorkItemImportPlan,
+  authority: WorkItemImportExecutionAuthorityInput | null | undefined,
+): WorkItemImportAuthorityDecisionSummary {
+  const actor = authority?.actor ?? {};
+  const authProfile = authority?.authProfile ?? null;
+  return {
+    sourceRead: resolveNexusEffectiveAuthority({
+      authority: authority?.authority,
+      actor,
+      authProfile,
+      project: plan.projectId,
+      component: plan.componentId,
+      provider: plan.sourceTracker.provider,
+      tracker: plan.sourceTracker.trackerId,
+      requestedAction: "provider.state.read",
+    }),
+    targetWrite: resolveNexusEffectiveAuthority({
+      authority: authority?.authority,
+      actor,
+      authProfile: null,
+      project: plan.projectId,
+      component: plan.componentId,
+      provider: plan.targetTracker.provider,
+      tracker: plan.targetTracker.trackerId,
+      requestedAction: "work_item.update",
+    }),
+  };
+}
+
+function executionPolicyBlockers(
+  plan: WorkItemImportPlan,
+  policy: WorkItemImportPolicyConfig,
+  authority: WorkItemImportAuthorityDecisionSummary,
+): WorkItemImportRunBlocker[] {
+  const normalized = normalizeWorkItemImportPolicy(policy);
+  const blockers: WorkItemImportRunBlocker[] = [];
+  if (policy.direction !== "external_to_local") {
+    blockers.push({
+      operation: "direction",
+      message:
+        "Inbound import execution requires explicit direction external_to_local.",
+    });
+  } else if (normalized.direction !== "external_to_local") {
+    blockers.push({
+      operation: "direction",
+      message: `Import direction "${normalized.direction}" is not supported for execution.`,
+    });
+  }
+  if (normalized.writePolicy.mode !== "execute") {
+    blockers.push({
+      operation: "write_policy",
+      message: `Write policy mode "${normalized.writePolicy.mode}" is not allowed for execution.`,
+    });
+  }
+  if (
+    plan.sourceTracker.provider !== "github" ||
+    plan.targetTracker.provider !== "local"
+  ) {
+    blockers.push({
+      operation: "provider_path",
+      message:
+        "Work item import execution currently supports only GitHub source trackers to local target trackers.",
+    });
+  }
+  if (normalized.writePolicy.credentials !== "available") {
+    blockers.push({
+      operation: "credentials",
+      message:
+        "Inbound import execution requires explicit available source provider credentials policy.",
+    });
+  }
+  if (!authority.sourceRead.allowed) {
+    blockers.push({
+      operation: "authority.provider_read",
+      message: authority.sourceRead.explanation,
+    });
+  }
+  if (!authority.targetWrite.allowed) {
+    blockers.push({
+      operation: "authority.work_item_update",
+      message: authority.targetWrite.explanation,
+    });
+  }
+
+  return blockers;
+}
+
+function createInputFromImportPlan(createPlan: WorkItemImportCreatePlan): {
+  title: string;
+  description?: string | null;
+  status?: WorkStatus;
+  labels?: string[];
+  assignees?: string[];
+  milestone?: string | null;
+} {
+  const patch = patchFromFieldValues(createPlan.fields);
+  if (patch.title === undefined) {
+    throw new Error(
+      `Create plan for source item "${createPlan.source.id}" does not include owned title field.`,
+    );
+  }
+
+  return {
+    title: patch.title,
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.labels !== undefined ? { labels: patch.labels } : {}),
+    ...(patch.assignees !== undefined ? { assignees: patch.assignees } : {}),
+    ...(patch.milestone !== undefined ? { milestone: patch.milestone } : {}),
+  };
+}
+
+function patchFromChanges(changes: WorkItemSyncFieldChange[]): WorkItemPatch {
+  return patchFromFieldValues(
+    changes.map((change) => ({
+      field: change.field,
+      value: change.plannedValue,
+    })),
+  );
+}
+
+function patchFromFieldValues(
+  values: WorkItemSyncFieldValue[],
+): WorkItemPatch {
+  const patch: WorkItemPatch = {};
+  for (const value of values) {
+    assignPatchValue(patch, value.field, value.value);
+  }
+
+  return patch;
+}
+
+function assignPatchValue(
+  patch: WorkItemPatch,
+  field: WorkItemSyncField,
+  value: unknown,
+): void {
+  switch (field) {
+    case "title":
+      patch.title = String(value);
+      break;
+    case "description":
+      patch.description = value === null ? null : String(value);
+      break;
+    case "status":
+      patch.status = value as WorkStatus;
+      break;
+    case "labels":
+      patch.labels = Array.isArray(value) ? value.map(String) : [];
+      break;
+    case "assignees":
+      patch.assignees = Array.isArray(value) ? value.map(String) : [];
+      break;
+    case "milestone":
+      patch.milestone = value === null ? null : String(value);
+      break;
+  }
+}
+
+function linkInputFromPlannedLink(
+  plannedLink: WorkItemImportPlannedLink,
+): Omit<
+  WorkItemTrackerReference,
+  "trackerId" | "trackerName" | "firstObservedAt" | "lastObservedAt"
+> & { observedAt?: string | null } {
+  return {
+    ...plannedLink.reference,
+  };
+}
+
+function importRunSummary(options: {
+  plan: WorkItemImportPlan;
+  status: WorkItemImportRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  created: number;
+  updated: number;
+  skipped: number;
+  conflicted: number;
+  blocked: number;
+  links: number;
+  ambiguousDuplicates: number;
+  staleLinks: number;
+}): WorkItemImportRunSummary {
+  const id = `import-run-${crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectId: options.plan.projectId,
+        componentId: options.plan.componentId,
+        sourceTrackerId: options.plan.sourceTracker.trackerId,
+        targetTrackerId: options.plan.targetTracker.trackerId,
+        startedAt: options.startedAt,
+      }),
+    )
+    .digest("hex")
+    .slice(0, 12)}`;
+  return {
+    id,
+    status: options.status,
+    startedAt: options.startedAt,
+    finishedAt: options.finishedAt,
+    projectRoot: options.plan.projectRoot,
+    projectId: options.plan.projectId,
+    componentId: options.plan.componentId,
+    sourceTrackerId: options.plan.sourceTracker.trackerId,
+    targetTrackerId: options.plan.targetTracker.trackerId,
+    planGeneratedAt: options.plan.generatedAt,
+    counts: {
+      created: options.created,
+      updated: options.updated,
+      skipped: options.skipped,
+      conflicted: options.conflicted,
+      blocked: options.blocked,
+      links: options.links,
+      ambiguousDuplicates: options.ambiguousDuplicates,
+      staleLinks: options.staleLinks,
+    },
+  };
 }
 
 function fieldValues(
