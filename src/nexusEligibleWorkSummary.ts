@@ -10,6 +10,13 @@ import {
   buildNexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  buildNexusExternalIssueVisibilitySummary,
+  type NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
+import {
+  getNexusWorkItemDiscoveryStatus,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
   summarizeNexusAutomationWorkTrackers,
   type NexusAutomationWorkTrackerSummary,
 } from "./nexusAutomationWorkTrackerSummary.js";
@@ -76,6 +83,7 @@ export interface NexusEligibleWorkSummary {
   staleInProgressWorkItemCount: number;
   warnings: string[];
   blockers: string[];
+  externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   components: NexusEligibleWorkComponentSummary[];
 }
 
@@ -218,6 +226,17 @@ export async function getNexusEligibleWorkSummary(
     ),
     warnings: status.eligibleWorkWarnings,
     blockers: status.eligibleWorkBlockers,
+    externalIssueVisibility:
+      status.externalIssueVisibility ??
+      buildNexusExternalIssueVisibilitySummary({
+        components: status.components,
+        componentEligibleWorkItems: grouped,
+        discoveryStatus: getNexusWorkItemDiscoveryStatus({
+          projectRoot: status.projectRoot,
+          env: options.env,
+          credentialResolver: options.credentialResolver,
+        }),
+      }),
     components,
   };
 }

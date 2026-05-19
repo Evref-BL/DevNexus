@@ -22,6 +22,13 @@ import {
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
+  buildNexusExternalIssueVisibilitySummary,
+  type NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
+import {
+  getNexusWorkItemDiscoveryStatus,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
   resolveNexusPublicationPolicy,
 } from "./nexusPublicationPolicy.js";
 import {
@@ -209,6 +216,7 @@ export interface NexusAutomationTargetReport {
   runSummary: NexusAutomationTargetReportRunSummary | null;
   workItemSummary: NexusAutomationTargetReportWorkItemSummary | null;
   executionSummary: NexusAutomationTargetReportExecutionSummary | null;
+  externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   authority: NexusAuthorityProjectSummary | null;
   componentProgress: NexusAutomationTargetReportComponentProgressSummary[];
   relaunchDecision: NexusAutomationTargetReportRelaunchDecision;
@@ -232,6 +240,10 @@ export function buildNexusAutomationTargetReport(
   const automationConfig = projectConfig.automation ?? null;
   const generatedAt = isoString(options.now ?? new Date());
   const components = resolveProjectComponents(projectRoot, projectConfig);
+  const externalIssueVisibility = buildNexusExternalIssueVisibilitySummary({
+    components,
+    discoveryStatus: getNexusWorkItemDiscoveryStatus({ projectRoot }),
+  });
   const authority = summarizeNexusAuthorityForProject({
     projectId: projectConfig.id,
     authority: projectConfig.authority,
@@ -259,6 +271,7 @@ export function buildNexusAutomationTargetReport(
       runSummary: null,
       workItemSummary: null,
       executionSummary: null,
+      externalIssueVisibility,
       authority,
       componentProgress: [],
       relaunchDecision: {
@@ -318,6 +331,7 @@ export function buildNexusAutomationTargetReport(
     runSummary,
     workItemSummary,
     executionSummary,
+    externalIssueVisibility,
     authority,
     componentProgress: summarizeComponentProgress({
       components,

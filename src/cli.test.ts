@@ -2590,6 +2590,17 @@ describe("dev-nexus cli", () => {
       lock: {
         status: "none",
       },
+      externalIssueVisibility: {
+        componentCount: 1,
+        defaultTrackerOnlyComponentCount: 1,
+        importOnlyWorkItemCount: 0,
+        components: [
+          {
+            componentId: "primary",
+            mode: "default_tracker_only",
+          },
+        ],
+      },
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
   });
@@ -2697,6 +2708,21 @@ describe("dev-nexus cli", () => {
       },
       status: "ready",
       eligibleWorkItemCount: 2,
+      externalIssueVisibility: {
+        componentCount: 2,
+        defaultTrackerOnlyComponentCount: 2,
+        importOnlyWorkItemCount: 0,
+        components: [
+          {
+            componentId: "primary",
+            mode: "default_tracker_only",
+          },
+          {
+            componentId: "addon",
+            mode: "default_tracker_only",
+          },
+        ],
+      },
       selector: {
         statuses: ["ready"],
         labels: ["automation"],
@@ -2858,6 +2884,19 @@ describe("dev-nexus cli", () => {
       mode: "discovery",
       eligibleWorkItemCount: 1,
       importCandidateWorkItemCount: 1,
+      externalIssueVisibility: {
+        componentCount: 1,
+        importRequiredComponentCount: 1,
+        importOnlyWorkItemCount: 1,
+        components: [
+          {
+            componentId: "primary",
+            mode: "external_import_required",
+            selectedExternalTrackerCount: 1,
+            importOnlyWorkItemCount: 1,
+          },
+        ],
+      },
       components: [
         {
           componentId: "primary",
@@ -2888,6 +2927,13 @@ describe("dev-nexus cli", () => {
         },
       ],
     });
+    const textOutput = captureOutput();
+    await main(["automation", "eligible-work", projectRoot, "--discovery"], {
+      stdout: textOutput.writer,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+    expect(textOutput.output()).toContain("External issue visibility:");
+    expect(textOutput.output()).toContain("1 import-required");
   });
 
   it("prints read-only work item discovery status as json", async () => {
@@ -3601,6 +3647,16 @@ describe("dev-nexus cli", () => {
         cycleSummary: {
           cycleCount: 1,
           completedCycleCount: 1,
+        },
+        externalIssueVisibility: {
+          componentCount: 1,
+          defaultTrackerOnlyComponentCount: 1,
+          components: [
+            {
+              componentId: "primary",
+              mode: "default_tracker_only",
+            },
+          ],
         },
         workItemSummary: {
           uniqueReferences: [

@@ -70,6 +70,9 @@ import {
   type NexusEligibleWorkMode,
   type NexusEligibleWorkSummary,
 } from "./nexusEligibleWorkSummary.js";
+import type {
+  NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
 import {
   appendNexusAutomationTargetCycleRecord,
   readNexusAutomationTargetCycleLedger,
@@ -6856,6 +6859,7 @@ function printAutomationTargetReportResult(
   if (result.runSummary) {
     writeLine(stdout, `  Automation runs: ${result.runSummary.runCount}`);
   }
+  printExternalIssueVisibilitySummary(result.externalIssueVisibility, stdout);
   writeLine(
     stdout,
     `  Relaunch decision: ${result.relaunchDecision.type} (${result.relaunchDecision.reason})`,
@@ -7103,6 +7107,9 @@ function printAutomationStatusResult(
     }
   }
   printAuthorityProjectSummary(result.authority, stdout);
+  if (result.externalIssueVisibility) {
+    printExternalIssueVisibilitySummary(result.externalIssueVisibility, stdout);
+  }
   if (result.selectedWorkItem) {
     writeLine(
       stdout,
@@ -7233,6 +7240,7 @@ function printAutomationEligibleWorkResult(
   }
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(stdout, `  Status: ${result.status}`);
+  printExternalIssueVisibilitySummary(result.externalIssueVisibility, stdout);
   for (const warning of result.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
   }
@@ -7263,6 +7271,13 @@ function printAutomationEligibleWorkResult(
       );
     }
   }
+}
+
+function printExternalIssueVisibilitySummary(
+  visibility: NexusExternalIssueVisibilitySummary,
+  stdout: TextWriter,
+): void {
+  writeLine(stdout, `  External issue visibility: ${visibility.summary}`);
 }
 
 function printAutomationAgentProfilesResult(

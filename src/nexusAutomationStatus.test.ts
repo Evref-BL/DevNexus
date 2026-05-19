@@ -395,6 +395,28 @@ describe("nexus automation status", () => {
           ],
         },
       ],
+      externalIssueVisibility: {
+        componentCount: 2,
+        defaultTrackerOnlyComponentCount: 1,
+        externalIgnoredComponentCount: 1,
+        importRequiredComponentCount: 0,
+        directSelectableComponentCount: 0,
+        importOnlyWorkItemCount: 0,
+        providerAccessWarningCount: 0,
+        providerAccessBlockerCount: 0,
+        components: [
+          {
+            componentId: "primary",
+            mode: "external_ignored",
+            sourceRoles: ["eligible_source", "external_inbox"],
+          },
+          {
+            componentId: "addon",
+            mode: "default_tracker_only",
+            sourceRoles: ["primary"],
+          },
+        ],
+      },
     });
   });
 

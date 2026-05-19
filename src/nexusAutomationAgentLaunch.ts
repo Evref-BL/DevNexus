@@ -71,6 +71,10 @@ import {
   type NexusEligibleWorkProviderFactory,
   type NexusEligibleWorkTrackerQueryResult,
 } from "./nexusEligibleWork.js";
+import {
+  buildNexusExternalIssueVisibilitySummary,
+  type NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
 import type {
   NexusWorkItemDiscoveryCredentialResolver,
 } from "./nexusWorkItemDiscoveryStatus.js";
@@ -185,6 +189,7 @@ export interface NexusAutomationAgentLaunchContext {
   importCandidateWorkItems: NexusEligibleWorkItem[];
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
+  externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
@@ -1113,6 +1118,10 @@ function buildAgentLaunchContext(
     importCandidateWorkItems: input.importCandidateWorkItems,
     eligibleWorkWarnings: input.eligibleWorkWarnings,
     eligibleWorkBlockers: input.eligibleWorkBlockers,
+    externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
+      components: input.components,
+      componentEligibleWorkItems: input.componentEligibleWorkItems,
+    }),
     componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
     publication: input.automationConfig.publication,

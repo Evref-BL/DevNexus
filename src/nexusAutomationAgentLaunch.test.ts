@@ -577,6 +577,19 @@ describe("nexus automation agent launch", () => {
             title: "Let an agent choose",
           },
         ],
+        externalIssueVisibility: {
+          componentCount: 1,
+          defaultTrackerOnlyComponentCount: 1,
+          importOnlyWorkItemCount: 0,
+          providerAccessWarningCount: 0,
+          providerAccessBlockerCount: 0,
+          components: [
+            {
+              componentId: "primary",
+              mode: "default_tracker_only",
+            },
+          ],
+        },
         publication: {
           remote: "bot",
           actor: {

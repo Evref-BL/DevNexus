@@ -28,8 +28,15 @@ import {
   type NexusEligibleWorkMode,
   type NexusEligibleWorkProviderFactory,
 } from "./nexusEligibleWork.js";
+import {
+  buildNexusExternalIssueVisibilitySummary,
+  type NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
 import type {
   NexusWorkItemDiscoveryCredentialResolver,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
+  getNexusWorkItemDiscoveryStatus,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
   resolveNexusCurrentAutomationActor,
@@ -154,6 +161,7 @@ export interface NexusAutomationStatus {
   importCandidateWorkItems: NexusEligibleWorkItem[] | null;
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
+  externalIssueVisibility: NexusExternalIssueVisibilitySummary | null;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] | null;
   selectedWorkItem: WorkItem | null;
 }
@@ -174,6 +182,15 @@ export async function getNexusAutomationStatus(
   const components = resolveProjectComponents(projectRoot, projectConfig);
   const primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);
   const sourceRoot = primaryComponent.sourceRoot;
+  const discoveryStatus = getNexusWorkItemDiscoveryStatus({
+    projectRoot,
+    env: options.env,
+    credentialResolver: options.credentialResolver,
+  });
+  const externalIssueVisibility = buildNexusExternalIssueVisibilitySummary({
+    components,
+    discoveryStatus,
+  });
   if (!automationConfig?.enabled) {
     return statusResult({
       projectRoot,
@@ -190,6 +207,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
     });
   }
@@ -213,6 +231,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
     });
   }
@@ -232,6 +251,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
     });
   }
@@ -257,6 +277,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
     });
   }
@@ -291,6 +312,7 @@ export async function getNexusAutomationStatus(
         selectorQuery: null,
         candidateCount: null,
         eligibleWorkItems: null,
+        externalIssueVisibility,
         selectedWorkItem: null,
       });
     }
@@ -336,6 +358,7 @@ export async function getNexusAutomationStatus(
         selectorQuery: null,
         candidateCount: null,
         eligibleWorkItems: null,
+        externalIssueVisibility,
         selectedWorkItem: null,
         publication,
         currentActors,
@@ -391,6 +414,11 @@ export async function getNexusAutomationStatus(
         importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
         eligibleWorkWarnings: eligibleWork.warnings,
         eligibleWorkBlockers: eligibleWork.blockers,
+        externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
+          components,
+          componentEligibleWorkItems,
+          discoveryStatus,
+        }),
         componentEligibleWorkItems,
         selectedWorkItem: null,
         publication,
@@ -423,6 +451,11 @@ export async function getNexusAutomationStatus(
       importCandidateWorkItems: eligibleWork.importCandidateWorkItems,
       eligibleWorkWarnings: eligibleWork.warnings,
       eligibleWorkBlockers: eligibleWork.blockers,
+      externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
+        components,
+        componentEligibleWorkItems,
+        discoveryStatus,
+      }),
       componentEligibleWorkItems,
       selectedWorkItem: null,
       publication,
@@ -453,6 +486,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
     });
   }
@@ -509,6 +543,7 @@ export async function getNexusAutomationStatus(
       selectorQuery: null,
       candidateCount: null,
       eligibleWorkItems: null,
+      externalIssueVisibility,
       selectedWorkItem: null,
       publication,
       currentActors,
@@ -542,6 +577,7 @@ export async function getNexusAutomationStatus(
     selectorQuery,
     candidateCount: candidates.length,
     eligibleWorkItems: null,
+    externalIssueVisibility,
     selectedWorkItem,
     publication,
     currentActors,
@@ -703,6 +739,7 @@ type AutomationStatusInput = Omit<
   | "eligibleWorkBlockers"
   | "eligibleWorkMode"
   | "eligibleWorkWarnings"
+  | "externalIssueVisibility"
   | "importCandidateWorkItems"
   | "publication"
   | "runnerProfiles"
@@ -720,6 +757,7 @@ type AutomationStatusInput = Omit<
       | "eligibleWorkBlockers"
       | "eligibleWorkMode"
       | "eligibleWorkWarnings"
+      | "externalIssueVisibility"
       | "importCandidateWorkItems"
       | "publication"
       | "runnerProfiles"
@@ -797,6 +835,7 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     importCandidateWorkItems: result.importCandidateWorkItems ?? null,
     eligibleWorkWarnings: result.eligibleWorkWarnings ?? [],
     eligibleWorkBlockers: result.eligibleWorkBlockers ?? [],
+    externalIssueVisibility: result.externalIssueVisibility ?? null,
   };
 }
 

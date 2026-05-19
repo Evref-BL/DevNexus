@@ -58,6 +58,10 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  buildNexusExternalIssueVisibilitySummary,
+  type NexusExternalIssueVisibilitySummary,
+} from "./nexusExternalIssueVisibility.js";
+import {
   getNexusPublicationStatuses,
   loadNexusPublicationAuthProfiles,
   publicationCommandEnvironment,
@@ -178,6 +182,7 @@ export interface NexusAutomationCurrentAgentAdoptionContext {
   authority: NexusAuthorityProjectSummary;
   result: NexusAutomationCurrentAgentResultContract;
   eligibleWorkItems: WorkItem[];
+  externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
@@ -1212,6 +1217,10 @@ function buildCurrentAgentAdoptionContext(input: {
     authority,
     result: currentAgentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
+    externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
+      components: input.components,
+      componentEligibleWorkItems: input.componentEligibleWorkItems,
+    }),
     componentEligibleWorkItems: input.componentEligibleWorkItems,
     safety: input.automationConfig.safety,
     publication: input.automationConfig.publication,

@@ -187,6 +187,19 @@ describe("nexus automation target report", () => {
           blocked: 1,
         },
       },
+      externalIssueVisibility: {
+        componentCount: 1,
+        defaultTrackerOnlyComponentCount: 1,
+        importOnlyWorkItemCount: 0,
+        providerAccessWarningCount: 0,
+        providerAccessBlockerCount: 0,
+        components: [
+          {
+            componentId: "primary",
+            mode: "default_tracker_only",
+          },
+        ],
+      },
       relaunchDecision: {
         type: "report_blocked",
         reason: "Latest target cycle cycle-2 is blocked",
