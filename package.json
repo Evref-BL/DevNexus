@@ -4,6 +4,10 @@
   "private": false,
   "description": "Language-neutral project/work tracking and local execution core.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Evref-BL/DevNexus.git"
+  },
   "type": "module",
   "bin": {
     "dev-nexus": "dist/cli.js"
