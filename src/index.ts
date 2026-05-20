@@ -35,6 +35,7 @@ export * from "./nexusEligibleWork.js";
 export * from "./nexusEligibleWorkSummary.js";
 export * from "./nexusExternalIssueVisibility.js";
 export * from "./nexusWorkItemDiscoveryStatus.js";
+export * from "./nexusWorkItemClaim.js";
 export * from "./nexusWorkItemRouting.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAgentProjectionCleanup.js";
