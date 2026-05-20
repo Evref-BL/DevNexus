@@ -135,6 +135,10 @@ import {
   type NexusRemoteExecutionVerificationOutcome,
 } from "./nexusRemoteExecution.js";
 import {
+  planNexusSshExecution,
+  type NexusSshExecutionPlan,
+} from "./nexusSshExecutionPlan.js";
+import {
   checkNexusHostCapabilities,
   type NexusHostCheckMode,
   type NexusHostCheckMockFacts,
@@ -884,6 +888,13 @@ interface ParsedRemoteExecutionResultGetCommand {
   json?: boolean;
 }
 
+interface ParsedRemoteExecutionSshPlanCommand {
+  projectRoot: string;
+  requestId: string;
+  homePath?: string;
+  json?: boolean;
+}
+
 interface ParsedWorktreePrepareCommand {
   projectRoot: string;
   componentId?: string;
@@ -1018,6 +1029,7 @@ export function usage(): string {
     "  dev-nexus remote-execution request create <project-root> [options]",
     "  dev-nexus remote-execution result record <project-root> <request-id> [options]",
     "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
+    "  dev-nexus remote-execution ssh-plan <project-root> <request-id> [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
     "  dev-nexus publication green-main plan <project-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus quick-fix plan <project-root> --work-item <id> [options]",
@@ -1232,6 +1244,10 @@ export function usage(): string {
     "  --json",
     "",
     "Options for remote-execution result get:",
+    "  --json",
+    "",
+    "Options for remote-execution ssh-plan:",
+    "  --home <path>            DevNexus home path with host-local overlays",
     "  --json",
     "",
     "Options for worktree prepare:",
@@ -2368,8 +2384,19 @@ async function handleRemoteExecutionCommand(
     return 0;
   }
 
+  if (scope === "ssh-plan") {
+    const parsed = parseRemoteExecutionSshPlanCommand(argv);
+    const plan = planNexusSshExecution({
+      projectRoot: parsed.projectRoot,
+      requestId: parsed.requestId,
+      homePath: parsed.homePath,
+    });
+    printRemoteExecutionSshPlanResult(plan, parsed, stdout);
+    return 0;
+  }
+
   throw new Error(
-    "remote-execution requires request create, result record, or result get",
+    "remote-execution requires request create, result record, result get, or ssh-plan",
   );
 }
 
@@ -5160,6 +5187,47 @@ function parseRemoteExecutionResultGetCommand(
       continue;
     }
     throw new Error(`Unknown remote-execution result get option: ${arg}`);
+  }
+
+  return parsed;
+}
+
+function parseRemoteExecutionSshPlanCommand(
+  argv: string[],
+): ParsedRemoteExecutionSshPlanCommand {
+  const [, , projectRoot, requestId, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("remote-execution ssh-plan requires a project root");
+  }
+  if (!requestId || requestId.startsWith("--")) {
+    throw new Error("remote-execution ssh-plan requires a request id");
+  }
+
+  const parsed: ParsedRemoteExecutionSshPlanCommand = {
+    projectRoot,
+    requestId,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown remote-execution ssh-plan option: ${arg}`);
+    }
   }
 
   return parsed;
@@ -8253,6 +8321,30 @@ function printRemoteExecutionResultGetResult(
     stdout,
     `  Result: ${record.result ? record.result.verificationOutcome : "none"}`,
   );
+}
+
+function printRemoteExecutionSshPlanResult(
+  plan: NexusSshExecutionPlan,
+  parsed: ParsedRemoteExecutionSshPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, localOnly: true, plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus SSH execution plan: ${plan.status}.`);
+  writeLine(stdout, `  Request: ${plan.requestId}`);
+  writeLine(stdout, `  Host: ${plan.target.hostId ?? "unresolved"}`);
+  writeLine(stdout, `  Command profile: ${plan.command.commandProfileId}`);
+  writeLine(
+    stdout,
+    `  Working directory: ${plan.workingDirectory.sanitizedPath ?? "unresolved"}`,
+  );
+  for (const blocker of plan.blockers) {
+    writeLine(stdout, `  Blocker: ${blocker}`);
+  }
 }
 
 function printWorktreePrepareResult(

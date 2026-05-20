@@ -119,6 +119,9 @@ import {
   type NexusRemoteExecutionAttachmentRef,
 } from "./nexusRemoteExecution.js";
 import {
+  planNexusSshExecution,
+} from "./nexusSshExecutionPlan.js";
+import {
   checkNexusHostCapabilities,
   type NexusHostCheckMode,
   type NexusHostCheckMockFacts,
@@ -868,6 +871,20 @@ const tools: McpTool[] = [
       properties: {
         projectRoot: { type: "string" },
         requestId: { type: "string" },
+      },
+      required: ["projectRoot", "requestId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "remote_execution_ssh_plan",
+    description: "Build a sanitized SSH/Tailscale execution plan for a recorded request without running network commands.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        requestId: { type: "string" },
+        homePath: { type: "string" },
       },
       required: ["projectRoot", "requestId"],
       additionalProperties: false,
@@ -1815,6 +1832,16 @@ export async function callDevNexusMcpTool(
           record: getNexusRemoteExecutionRecord({
             projectRoot: projectRootFromArgs(args),
             requestId: requiredString(args, "requestId", "arguments"),
+          }),
+        });
+      case "remote_execution_ssh_plan":
+        return toolResult({
+          ok: true,
+          localOnly: true,
+          plan: planNexusSshExecution({
+            projectRoot: projectRootFromArgs(args),
+            requestId: requiredString(args, "requestId", "arguments"),
+            homePath: optionalString(args, "homePath", "arguments"),
           }),
         });
       case "work_item_create":
