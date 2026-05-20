@@ -22,6 +22,7 @@ import {
 } from "./nexusAutomationWorkTrackerSummary.js";
 import type {
   NexusEligibleWorkDedupeInfo,
+  NexusEligibleWorkExclusionFinding,
   NexusEligibleWorkExcludedItem,
   NexusEligibleWorkItem,
   NexusEligibleWorkMode,
@@ -68,6 +69,7 @@ export interface NexusExcludedWorkItemSummary {
   webUrl: string | null;
   sourceTrackerRef: WorkTrackerRef | null;
   reasons: string[];
+  exclusionFindings: NexusEligibleWorkExclusionFinding[];
 }
 
 export interface NexusEligibleWorkComponentSummary {
@@ -81,6 +83,8 @@ export interface NexusEligibleWorkComponentSummary {
   workItems: NexusEligibleWorkItemSummary[];
   importCandidateWorkItems: NexusEligibleWorkItemSummary[];
   excludedWorkItemCount: number;
+  excludedReasonCounts: Record<string, number>;
+  excludedCategoryCounts: Record<string, number>;
   excludedWorkItems: NexusExcludedWorkItemSummary[];
   staleInProgressWorkItems: NexusEligibleWorkItemSummary[];
   warnings: string[];
@@ -98,6 +102,8 @@ export interface NexusEligibleWorkSummary {
   eligibleWorkItemCount: number;
   importCandidateWorkItemCount: number;
   excludedWorkItemCount: number;
+  excludedReasonCounts: Record<string, number>;
+  excludedCategoryCounts: Record<string, number>;
   staleInProgressWorkItemCount: number;
   warnings: string[];
   blockers: string[];
@@ -153,6 +159,8 @@ export async function getNexusEligibleWorkSummary(
       workItems: [],
       importCandidateWorkItems: [],
       excludedWorkItemCount: 0,
+      excludedReasonCounts: {},
+      excludedCategoryCounts: {},
       excludedWorkItems: [],
       staleInProgressWorkItems: [],
       warnings: [],
@@ -220,6 +228,9 @@ export async function getNexusEligibleWorkSummary(
 
   for (const component of summariesByComponent.values()) {
     component.excludedWorkItemCount = countExcludedWorkItems(component);
+    component.excludedReasonCounts = excludedReasonCountsForComponent(component);
+    component.excludedCategoryCounts =
+      excludedCategoryCountsForComponent(component);
   }
 
   const components = [...summariesByComponent.values()].filter(
@@ -253,6 +264,12 @@ export async function getNexusEligibleWorkSummary(
     excludedWorkItemCount: components.reduce(
       (total, component) => total + component.excludedWorkItemCount,
       0,
+    ),
+    excludedReasonCounts: mergeCountRecords(
+      components.map((component) => component.excludedReasonCounts),
+    ),
+    excludedCategoryCounts: mergeCountRecords(
+      components.map((component) => component.excludedCategoryCounts),
     ),
     staleInProgressWorkItemCount: components.reduce(
       (total, component) => total + component.staleInProgressWorkItems.length,
@@ -336,6 +353,7 @@ function summarizeExcludedWorkItem(
     webUrl: item.webUrl ?? item.externalRef?.webUrl ?? null,
     sourceTrackerRef: item.sourceTrackerRef,
     reasons: [...item.reasons],
+    exclusionFindings: [...item.exclusionFindings],
   };
 }
 
@@ -351,4 +369,56 @@ function countExcludedWorkItems(
   ).length;
 
   return visibleExcludedCount + finalLimitExcludedCount;
+}
+
+function excludedReasonCountsForComponent(
+  component: NexusEligibleWorkComponentSummary,
+): Record<string, number> {
+  const counts = mergeCountRecords(
+    component.trackerResults.map((tracker) => tracker.exclusionReasonCounts),
+  );
+  for (const item of finalLimitExcludedItems(component)) {
+    for (const reason of item.reasons) {
+      counts[reason] = (counts[reason] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function excludedCategoryCountsForComponent(
+  component: NexusEligibleWorkComponentSummary,
+): Record<string, number> {
+  const counts = mergeCountRecords(
+    component.trackerResults.map(
+      (tracker) => tracker.exclusionCategoryCounts ?? {},
+    ),
+  );
+  for (const item of finalLimitExcludedItems(component)) {
+    for (const finding of item.exclusionFindings) {
+      counts[finding.category] = (counts[finding.category] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function finalLimitExcludedItems(
+  component: NexusEligibleWorkComponentSummary,
+): NexusExcludedWorkItemSummary[] {
+  return component.excludedWorkItems.filter((item) =>
+    item.reasons.includes("final limit reached"),
+  );
+}
+
+function mergeCountRecords(
+  records: Array<Record<string, number> | undefined>,
+): Record<string, number> {
+  const merged: Record<string, number> = {};
+  for (const record of records) {
+    for (const [key, value] of Object.entries(record ?? {})) {
+      merged[key] = (merged[key] ?? 0) + value;
+    }
+  }
+  return merged;
 }

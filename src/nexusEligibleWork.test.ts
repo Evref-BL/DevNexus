@@ -56,6 +56,10 @@ describe("eligible work discovery", () => {
           status: "ready",
           labels: ["automation"],
         }),
+        workItem("local-2", "Todo local task", {
+          status: "todo",
+          labels: ["automation"],
+        }),
       ],
       inbox: [
         workItem("inbox-1", "External task", {
@@ -77,7 +81,9 @@ describe("eligible work discovery", () => {
     });
 
     expect(result.mode).toBe("default");
-    expect(providers.queries.map((query) => query.trackerId)).toEqual(["local"]);
+    expect(new Set(providers.queries.map((query) => query.trackerId))).toEqual(
+      new Set(["local"]),
+    );
     expect(result.componentEligibleWorkItems).toMatchObject([
       {
         componentId: "core",
@@ -92,6 +98,28 @@ describe("eligible work discovery", () => {
           },
         ],
         importCandidateWorkItems: [],
+        excludedWorkItems: [
+          {
+            id: "local-2",
+            reasons: ["status todo not selected"],
+            exclusionFindings: [
+              {
+                category: "status",
+                reason: "status todo not selected",
+                value: "todo",
+              },
+            ],
+          },
+        ],
+        trackerResults: [
+          {
+            trackerId: "local",
+            excludedCount: 1,
+            exclusionCategoryCounts: {
+              status: 1,
+            },
+          },
+        ],
       },
     ]);
   });
@@ -545,6 +573,87 @@ describe("eligible work discovery", () => {
         "excluded label blocked": 1,
         "missing assignee bot": 1,
         "missing milestone": 1,
+      },
+      exclusionCategoryCounts: {
+        status: 1,
+        required_label: 1,
+        excluded_label: 1,
+        assignee: 1,
+        milestone: 1,
+      },
+    });
+  });
+
+  it("reports selector search mismatches as visible excluded work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const automation = {
+      ...automationConfig(),
+      selector: {
+        ...automationConfig().selector,
+        search: "needle",
+      },
+    };
+    const config = projectConfig({
+      trackerDiscovery: {
+        scannedRoles: ["primary"],
+        directExternalSelection: "allowed",
+        importRequiredFirst: false,
+        providerFilters: ["local"],
+        queryLimit: 10,
+        conflictWinner: "scanned_tracker",
+        missingCredentialBehavior: "skip",
+      },
+    });
+    saveProjectConfig(projectRoot, { ...config, automation });
+    const providers = providerFactory({
+      local: [
+        workItem("local-1", "Needle task", {
+          status: "ready",
+          labels: ["automation"],
+        }),
+        workItem("local-2", "Visible but not matching search", {
+          status: "ready",
+          labels: ["automation"],
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: { ...config, automation },
+      components: resolveProjectComponents(projectRoot, { ...config, automation }),
+      automationConfig: automation,
+      selectorQuery: buildNexusAutomationWorkItemQuery(automation),
+      mode: "discovery",
+      providerFactory: providers.factory,
+    });
+
+    expect(providers.queries.map((entry) => entry.query)).toMatchObject([
+      {
+        search: "needle",
+      },
+      {},
+    ]);
+    expect(result.eligibleWorkItems.map((item) => item.id)).toEqual([
+      "local-1",
+    ]);
+    expect(result.excludedWorkItems).toMatchObject([
+      {
+        id: "local-2",
+        reasons: ["search mismatch needle"],
+        exclusionFindings: [
+          {
+            category: "search",
+            reason: "search mismatch needle",
+            value: "needle",
+          },
+        ],
+      },
+    ]);
+    expect(result.componentEligibleWorkItems[0].trackerResults[0]).toMatchObject({
+      excludedCount: 1,
+      exclusionCategoryCounts: {
+        search: 1,
       },
     });
   });

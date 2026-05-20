@@ -8318,6 +8318,10 @@ function printAutomationEligibleWorkResult(
   }
   if (result.excludedWorkItemCount > 0) {
     writeLine(stdout, `  Visible excluded: ${result.excludedWorkItemCount}`);
+    const categorySummary = formatCountRecord(result.excludedCategoryCounts);
+    if (categorySummary) {
+      writeLine(stdout, `  Excluded categories: ${categorySummary}`);
+    }
   }
   if (result.staleInProgressWorkItemCount > 0) {
     writeLine(
@@ -8389,15 +8393,24 @@ function printAutomationEligibleWorkResult(
 function formatExclusionReasonCounts(
   reasonCounts: Record<string, number>,
 ): string {
-  const entries = Object.entries(reasonCounts);
+  const summary = formatCountRecord(reasonCounts);
+  if (!summary) {
+    return "";
+  }
+
+  return ` (${summary})`;
+}
+
+function formatCountRecord(counts: Record<string, number>): string {
+  const entries = Object.entries(counts);
   if (entries.length === 0) {
     return "";
   }
 
-  return ` (${entries
+  return entries
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([reason, count]) => `${reason}: ${count}`)
-    .join(", ")})`;
+    .join(", ");
 }
 
 function printExternalIssueVisibilitySummary(

@@ -77,8 +77,24 @@ export interface NexusEligibleWorkTrackerQueryResult {
   importCandidateCount: number;
   excludedCount: number;
   exclusionReasonCounts: Record<string, number>;
+  exclusionCategoryCounts: Record<string, number>;
   warnings: string[];
   blockers: string[];
+}
+
+export type NexusEligibleWorkExclusionCategory =
+  | "status"
+  | "required_label"
+  | "excluded_label"
+  | "assignee"
+  | "milestone"
+  | "search"
+  | "limit";
+
+export interface NexusEligibleWorkExclusionFinding {
+  category: NexusEligibleWorkExclusionCategory;
+  reason: string;
+  value: string | null;
 }
 
 export type NexusEligibleWorkDedupeReason =
@@ -110,6 +126,7 @@ export interface NexusEligibleWorkExcludedItem extends WorkItem {
   componentId: string;
   sourceTrackerRef: WorkTrackerRef | null;
   reasons: string[];
+  exclusionFindings: NexusEligibleWorkExclusionFinding[];
 }
 
 export interface NexusEligibleWorkComponentResult {
@@ -199,6 +216,23 @@ async function listDefaultEligibleWork(
       ...options.selectorQuery,
       projectRoot: options.projectRoot,
     });
+    const result: NexusEligibleWorkComponentResult = {
+      componentId: component.id,
+      workItems: [],
+      importCandidateWorkItems: [],
+      excludedWorkItems: [],
+      finalLimit: null,
+      warnings: [],
+      blockers: [],
+      trackerResults: [],
+    };
+    const trackerResult = emptyTrackerResult({
+      tracker,
+      selected: true,
+      warnings: [],
+      blockers: [],
+    });
+    result.trackerResults.push(trackerResult);
     const workItems = eligibleNexusAutomationWorkItems(
       listed,
       options.automationConfig,
@@ -216,29 +250,31 @@ async function listDefaultEligibleWork(
         warnings: [],
       }),
     );
-    componentEligibleWorkItems.push({
-      componentId: component.id,
-      workItems,
-      importCandidateWorkItems: [],
-      excludedWorkItems: [],
-      finalLimit: null,
-      warnings: [],
-      blockers: [],
-      trackerResults: [
-        {
-          trackerId: tracker.id,
-          trackerName: tracker.name,
-          provider: tracker.provider,
-          selected: true,
-          selectableCount: workItems.length,
-          importCandidateCount: 0,
-          excludedCount: 0,
-          exclusionReasonCounts: {},
-          warnings: [],
-          blockers: [],
-        },
-      ],
+    result.workItems = workItems;
+    trackerResult.selectableCount = workItems.length;
+    await recordVisibleExcludedWork({
+      options,
+      component,
+      tracker,
+      provider,
+      query: options.selectorQuery,
+      listed,
+      matchingKeys: new Set(
+        workItems.flatMap((item) => observedReferenceKeys(tracker, item)),
+      ),
+      trackerResult,
+      result,
+      otherwiseSelectableFinding:
+        options.selectorQuery.limit === null ||
+        options.selectorQuery.limit === undefined
+          ? null
+          : {
+              category: "limit",
+              reason: "selector limit reached",
+              value: String(options.selectorQuery.limit),
+            },
     });
+    componentEligibleWorkItems.push(result);
   }
 
   return eligibleWorkResult("default", componentEligibleWorkItems);
@@ -396,6 +432,8 @@ async function scanDiscoveryTracker(options: {
     listed,
     matchingKeys,
     trackerResult,
+    result: options.state.result,
+    otherwiseSelectableFinding: null,
   });
   options.state.successfulTrackerIds.add(options.tracker.id);
   for (const item of matchingItems) {
@@ -428,7 +466,8 @@ async function recordVisibleExcludedWork(options: {
   listed: WorkItem[];
   matchingKeys: Set<string>;
   trackerResult: NexusEligibleWorkTrackerQueryResult;
-  state: ComponentScanState;
+  result: NexusEligibleWorkComponentResult;
+  otherwiseSelectableFinding: NexusEligibleWorkExclusionFinding | null;
 }): Promise<void> {
   const visibleQuery = visibleDiscoveryQuery(
     options.options.selectorQuery,
@@ -444,7 +483,7 @@ async function recordVisibleExcludedWork(options: {
       });
     } catch (error) {
       const warning = `Component ${options.component.id} tracker ${options.tracker.id} could not read visible excluded work: ${errorMessage(error)}`;
-      options.state.result.warnings.push(warning);
+      options.result.warnings.push(warning);
       options.trackerResult.warnings.push(warning);
       return;
     }
@@ -455,29 +494,37 @@ async function recordVisibleExcludedWork(options: {
     if (keys.some((key) => options.matchingKeys.has(key))) {
       continue;
     }
-    const reasons = eligibleWorkExclusionReasons({
+    let findings = eligibleWorkExclusionFindings({
       item,
       selectorQuery: options.options.selectorQuery,
       automationConfig: options.options.automationConfig,
       policy: options.component.trackerDiscovery,
     });
-    if (reasons.length === 0) {
+    if (findings.length === 0 && options.otherwiseSelectableFinding) {
+      findings = [options.otherwiseSelectableFinding];
+    }
+    if (findings.length === 0) {
       continue;
     }
 
+    const reasons = findings.map((finding) => finding.reason);
     options.trackerResult.excludedCount += 1;
-    for (const reason of reasons) {
-      options.trackerResult.exclusionReasonCounts[reason] =
-        (options.trackerResult.exclusionReasonCounts[reason] ?? 0) + 1;
+    for (const finding of findings) {
+      options.trackerResult.exclusionReasonCounts[finding.reason] =
+        (options.trackerResult.exclusionReasonCounts[finding.reason] ?? 0) + 1;
+      options.trackerResult.exclusionCategoryCounts[finding.category] =
+        (options.trackerResult.exclusionCategoryCounts[finding.category] ?? 0) +
+        1;
     }
-    if (options.state.result.excludedWorkItems.length >= 10) {
+    if (options.result.excludedWorkItems.length >= 10) {
       continue;
     }
-    options.state.result.excludedWorkItems.push({
+    options.result.excludedWorkItems.push({
       ...item,
       componentId: options.component.id,
       sourceTrackerRef: trackerRef(options.component, options.tracker),
       reasons,
+      exclusionFindings: findings,
     });
   }
 }
@@ -945,13 +992,12 @@ function discoveryQuery(
 }
 
 function visibleDiscoveryQuery(
-  selectorQuery: WorkItemQuery,
+  _selectorQuery: WorkItemQuery,
   policy: ResolvedNexusProjectComponent["trackerDiscovery"],
   tracker: ResolvedNexusProjectWorkTracker,
 ): WorkItemQuery {
-  const search = policy.providerQuery ?? selectorQuery.search;
   const query: WorkItemQuery = {
-    ...(search ? { search } : {}),
+    ...(policy.providerQuery ? { search: policy.providerQuery } : {}),
   };
   const limit = policy.trackerLimits[tracker.id] ?? policy.queryLimit;
   if (limit !== null) {
@@ -978,13 +1024,13 @@ function normalizedQuery(query: WorkItemQuery): WorkItemQuery {
   };
 }
 
-function eligibleWorkExclusionReasons(options: {
+function eligibleWorkExclusionFindings(options: {
   item: WorkItem;
   selectorQuery: WorkItemQuery;
   automationConfig: NexusAutomationConfig;
   policy: ResolvedNexusProjectComponent["trackerDiscovery"];
-}): string[] {
-  const reasons: string[] = [];
+}): NexusEligibleWorkExclusionFinding[] {
+  const findings: NexusEligibleWorkExclusionFinding[] = [];
   const labels = lowerSet(options.item.labels);
   const assignees = lowerSet(options.item.assignees);
   const statuses = mergedStatuses(
@@ -992,7 +1038,11 @@ function eligibleWorkExclusionReasons(options: {
     options.policy.statuses,
   );
   if (statuses.length > 0 && !statuses.includes(options.item.status)) {
-    reasons.push(`status ${options.item.status} not selected`);
+    findings.push({
+      category: "status",
+      reason: `status ${options.item.status} not selected`,
+      value: options.item.status,
+    });
   }
 
   for (const label of uniqueStrings([
@@ -1000,13 +1050,21 @@ function eligibleWorkExclusionReasons(options: {
     ...options.policy.labels,
   ])) {
     if (!labels.has(label.toLowerCase())) {
-      reasons.push(`missing label ${label}`);
+      findings.push({
+        category: "required_label",
+        reason: `missing label ${label}`,
+        value: label,
+      });
     }
   }
 
   for (const label of options.automationConfig.selector.excludeLabels) {
     if (labels.has(label.toLowerCase())) {
-      reasons.push(`excluded label ${label}`);
+      findings.push({
+        category: "excluded_label",
+        reason: `excluded label ${label}`,
+        value: label,
+      });
     }
   }
 
@@ -1015,7 +1073,11 @@ function eligibleWorkExclusionReasons(options: {
     ...options.policy.assignees,
   ])) {
     if (!assignees.has(assignee.toLowerCase())) {
-      reasons.push(`missing assignee ${assignee}`);
+      findings.push({
+        category: "assignee",
+        reason: `missing assignee ${assignee}`,
+        value: assignee,
+      });
     }
   }
 
@@ -1024,15 +1086,27 @@ function eligibleWorkExclusionReasons(options: {
     (!options.item.milestone ||
       !options.policy.milestones.includes(options.item.milestone))
   ) {
-    reasons.push("missing milestone");
+    findings.push({
+      category: "milestone",
+      reason: "missing milestone",
+      value: options.item.milestone ?? null,
+    });
   }
 
-  const search = options.policy.providerQuery ?? options.selectorQuery.search;
-  if (search && !matchesSearch(options.item, search)) {
-    reasons.push(`search mismatch ${search}`);
+  for (const search of uniqueStrings([
+    options.policy.providerQuery ?? "",
+    options.selectorQuery.search ?? "",
+  ]).filter((value) => value.length > 0)) {
+    if (!matchesSearch(options.item, search)) {
+      findings.push({
+        category: "search",
+        reason: `search mismatch ${search}`,
+        value: search,
+      });
+    }
   }
 
-  return uniqueStrings(reasons);
+  return uniqueExclusionFindings(findings);
 }
 
 function matchesSearch(item: WorkItem, search: string): boolean {
@@ -1054,7 +1128,28 @@ function excludedFromEligibleItem(
     ...item,
     sourceTrackerRef: item.sourceTrackerRef,
     reasons: [reason],
+    exclusionFindings: [
+      {
+        category: "limit",
+        reason,
+        value: null,
+      },
+    ],
   };
+}
+
+function uniqueExclusionFindings(
+  findings: NexusEligibleWorkExclusionFinding[],
+): NexusEligibleWorkExclusionFinding[] {
+  const seen = new Set<string>();
+  return findings.filter((finding) => {
+    const key = `${finding.category}\u0000${finding.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function itemMatchesDiscoveryFilters(
@@ -1193,6 +1288,7 @@ function emptyTrackerResult(options: {
     importCandidateCount: 0,
     excludedCount: 0,
     exclusionReasonCounts: {},
+    exclusionCategoryCounts: {},
     warnings: options.warnings,
     blockers: options.blockers,
   };
