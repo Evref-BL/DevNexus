@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 173,
+  "nextNumber": 182,
   "nextCommentNumber": 380,
-  "updatedAt": "2026-05-20T05:26:07.906Z",
+  "updatedAt": "2026-05-20T07:47:49.982Z",
   "items": [
     {
       "id": "local-1",
@@ -4459,6 +4459,242 @@
         "provider": "local",
         "itemId": "local-172",
         "itemNumber": 172
+      }
+    },
+    {
+      "id": "local-173",
+      "title": "Add quick-fix mode for one provider-native issue",
+      "description": "Type: workflow/product slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20, case study Evref-BL/DevNexus#14.\n\nGoal:\nAdd an explicit quick-fix mode for one provider-native issue that preserves bot identity, isolated source worktree, publication policy, and cleanup safety without forcing full heartbeat-cycle bookkeeping.\n\nAcceptance criteria:\n- Operator can start one GitHub issue with component, provider ref, branch topic, and optional write scope, then get bot identity validation, source worktree/branch setup, and concise run context.\n- Operator can finish the issue through focused verification, PR creation/update, required checks, merge, provider issue close/comment, and cleanup in one guided path or small MCP/CLI pair.\n- Routine quick fixes do not require dogfood metadata PRs unless project config, policy, plan, target state, or durable coordination changed.\n- Finish output reports issue ref, PR URL, merge commit, verification, cleanup actions, and skipped bookkeeping.\n- Existing heartbeat and batch automation paths continue to work unchanged.\n\nVerification:\n- Add focused unit or fixture tests for provider-native GitHub quick start/finish planning without requiring live provider writes.\n- Add a CLI or MCP smoke test proving compact quick-fix summary output.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "workflow",
+        "quick-fix",
+        "github",
+        "publication",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:46:49.851Z",
+      "updatedAt": "2026-05-20T07:46:49.851Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-173",
+        "itemNumber": 173
+      }
+    },
+    {
+      "id": "local-174",
+      "title": "Define mode-aware closeout rules for quick fixes and heartbeat runs",
+      "description": "Type: policy/agent-context slice\nReadiness: human-in-the-loop (HITL) for final policy wording; implementation can be AFK after the policy is chosen.\nSource: DevNexus workflow audit notes 2026-05-20.\n\nGoal:\nMake DevNexus distinguish interactive quick-fix work from autonomous heartbeat, cleanup, investigation, and release modes so agents do not apply the full project-cycle checklist to small manual requests.\n\nAcceptance criteria:\n- Agent context or automation status exposes the active workflow mode and the required closeout checklist for that mode.\n- Quick-fix mode keeps identity, worktree, verification, publication, and provider issue closure, but skips dogfood metadata PRs and lease PRs unless durable project state changed.\n- Heartbeat mode keeps the broader target-cycle, target-state, coordination, and batch-selection expectations.\n- The mode and skipped artifacts are reported in the final run summary.\n- Existing heartbeat behavior remains available when the automation explicitly asks for it.\n\nBlockers:\n- Decide which artifacts are mandatory, optional, or forbidden for each mode.\n\nVerification:\n- Fixture tests or snapshots cover generated context/checklists for quick, heartbeat, cleanup, investigation, and release modes.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "workflow-modes",
+        "policy",
+        "agent-context",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:46:56.254Z",
+      "updatedAt": "2026-05-20T07:46:56.254Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-174",
+        "itemNumber": 174
+      }
+    },
+    {
+      "id": "local-175",
+      "title": "Report why visible work is excluded from eligible-work selection",
+      "description": "Type: reporting/work-tracking slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20 and the user question about visible GitHub issues not appearing as eligible work.\n\nGoal:\nWhen automation eligible-work returns zero or a surprisingly small set, explain which visible local or provider-native work items were excluded and why.\n\nAcceptance criteria:\n- Eligible-work summary reports visible-but-excluded items grouped by missing ready status, missing required labels, excluded labels, component mismatch, tracker role, assignee, milestone, or policy boundary.\n- GitHub issues visible through configured discovery are included when provider reads are allowed.\n- The report distinguishes no visible work from visible work that fails selector criteria such as `dogfood` or `status:ready`.\n- The concise output answers the common operator question without requiring a separate `gh issue list` or full target-report dump.\n- Existing eligible-work selection behavior is preserved unless explicitly changed by config.\n\nVerification:\n- Unit tests cover local and GitHub-like provider fixtures for selected, excluded, blocked, unsafe, and missing-label work.\n- CLI/MCP smoke confirms zero-eligible output includes useful exclusion counts and examples.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "reporting",
+        "work-tracking",
+        "github",
+        "selector",
+        "eligible-work",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:03.084Z",
+      "updatedAt": "2026-05-20T07:47:03.084Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-175",
+        "itemNumber": 175
+      }
+    },
+    {
+      "id": "local-176",
+      "title": "Make automation and coordination outputs compact by default",
+      "description": "Type: CLI/MCP ergonomics slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20. Existing completed item `local-9` should be checked first so this slice extends rather than duplicates low-token status work.\n\nGoal:\nReduce operator and model overhead by making common automation, target-report, coordination, and target-cycle outputs concise by default, with full ledgers available only through explicit detail flags.\n\nAcceptance criteria:\n- Default outputs for automation status, target-report, coordination status, and target-cycle result paths fit in one screen for normal dogfood projects.\n- Concise output includes current decision, eligible count, excluded/stale counts when available, active blockers, active leases, selected work, and warnings.\n- Full config, ledgers, embedded target-state markdown, large handoff JSON, and historical notes require explicit full-detail flags or equivalent MCP detail options.\n- Existing full-detail behavior remains available for diagnostics.\n- Agent-facing instructions prefer compact commands unless full detail is needed.\n\nVerification:\n- Snapshot or fixture tests cover compact and full output modes.\n- Run focused CLI/MCP tests and ensure existing low-token status behavior from `local-9` is preserved.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "cli",
+        "mcp",
+        "reporting",
+        "ergonomics",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:10.083Z",
+      "updatedAt": "2026-05-20T07:47:10.083Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-176",
+        "itemNumber": 176
+      }
+    },
+    {
+      "id": "local-177",
+      "title": "Split worktree lease storage between coordination and runtime state",
+      "description": "Type: state-model/worktree slice\nReadiness: human-in-the-loop (HITL) before implementation\nSource: DevNexus workflow audit notes 2026-05-20.\n\nGoal:\nKeep useful active worktree ownership visible while preventing routine terminal lease refreshes, dirty flags, ahead/behind counts, and cleanup facts from forcing project-metadata PRs.\n\nAcceptance criteria:\n- The design separates reviewable coordination state from local runtime/process state.\n- Active lease ownership remains discoverable by coordinators and agents.\n- Terminal lease transitions and routine cleanup facts do not require committed project metadata changes during normal quick fixes.\n- Reports can still explain what worktrees exist, which branches are active, and which leases are stale or merged.\n- Migration behavior is documented for existing `.dev-nexus/worktree-leases.json` data.\n\nBlockers:\n- Decide whether active leases belong in Git, ignored local storage, provider-backed coordination, generated reports, or a hybrid model.\n\nVerification:\n- Add fixture tests for active, terminal, stale, dirty, and cleaned-up leases across the chosen storage split.\n- Confirm quick-fix closeout no longer creates lease-only project-meta diffs.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "worktrees",
+        "coordination",
+        "state-model",
+        "leases",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:18.579Z",
+      "updatedAt": "2026-05-20T07:47:18.579Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-177",
+        "itemNumber": 177
+      }
+    },
+    {
+      "id": "local-178",
+      "title": "Add green-main publication helper with CI failure classification",
+      "description": "Type: publication automation slice\nReadiness: autonomous agent-ready (AFK) for an initial conservative helper\nSource: DevNexus workflow audit notes 2026-05-20, case study Evref-BL/DevNexus#14.\n\nGoal:\nMake the common green-main PR loop a first-class DevNexus operation instead of requiring ad hoc GitHub CLI checks, log inspection, reruns, merge, and local sync steps.\n\nAcceptance criteria:\n- One operation can open or update a PR through the configured automation identity and wait for required checks.\n- Failed required jobs are summarized with job name, platform, failing test or step when available, and URL.\n- The helper refuses merge while required checks are failing or pending.\n- The helper supports one configured rerun only when policy allows it and records the rerun reason.\n- On green checks, the helper can merge according to publication authority, sync local main, and report PR URL, merge commit, verification, and residual risk.\n- The first implementation can be conservative: classify unknown failures as manual investigation required.\n\nBlockers:\n- Confirm the policy for automatic rerun of transient or unrelated CI failures before enabling reruns by default.\n\nVerification:\n- Unit tests cover check summaries, failing/pending/green states, and rerun policy decisions with mocked GitHub data.\n- CLI/MCP smoke uses mocked provider responses where live GitHub mutation is not safe.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "publication",
+        "github",
+        "ci",
+        "green-main",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:25.932Z",
+      "updatedAt": "2026-05-20T07:47:25.932Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-178",
+        "itemNumber": 178
+      }
+    },
+    {
+      "id": "local-179",
+      "title": "Complete or hide provider-native coordination handoff paths",
+      "description": "Type: provider integration/coordination slice\nReadiness: autonomous agent-ready (AFK) for diagnostics and hiding incomplete paths; HITL if live provider write/read policy changes\nSource: DevNexus workflow audit notes 2026-05-20. Related existing items include shared coordination and provider policy work such as `local-14`, `local-16`, `local-18`, and `local-52`.\n\nGoal:\nProvider-native coordination should either be reliable enough to use in recommended workflows or clearly marked as incomplete so agents avoid it in the hot path.\n\nAcceptance criteria:\n- When GitHub is configured as a coordination tracker, DevNexus can write and read enough handoff records to make coordination status and integration planning useful.\n- If provider comment reads or writes are unavailable, status output says provider coordination is incomplete and names the missing capability.\n- Recommended cycle and quick-fix checklists do not require provider coordination when the configured provider path is write-only, read-only, or mocked.\n- Tool errors distinguish tracker lookup failures from provider capability failures.\n- Existing local coordination behavior remains available.\n\nBlockers:\n- Confirm live provider comment read/write policy and credentials before enabling live provider-backed records by default.\n\nVerification:\n- Mocked provider tests cover read/write available, write-only, read-only, unavailable, and local-only coordination trackers.\n- CLI/MCP smoke verifies incomplete provider coordination is not presented as a required next action.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "coordination",
+        "github",
+        "provider",
+        "work-tracking",
+        "afk"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:33.444Z",
+      "updatedAt": "2026-05-20T07:47:33.444Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-179",
+        "itemNumber": 179
+      }
+    },
+    {
+      "id": "local-180",
+      "title": "Add target-state compaction from durable project facts",
+      "description": "Type: project-state/reporting slice\nReadiness: human-in-the-loop (HITL) for policy choice, then AFK implementation\nSource: DevNexus workflow audit notes 2026-05-20.\n\nGoal:\nKeep `.dev-nexus/automation/target-state.md` focused on current objective, active blockers, current decisions, next direction, and exceptional recent changes, while deriving completed history from target cycles, PRs, issues, and run records.\n\nAcceptance criteria:\n- DevNexus provides a compaction command or report mode that rewrites or proposes a concise target-state document from durable facts.\n- Completed historical narrative is removed from required target-state closeout and generated on demand instead.\n- The compactor preserves active blockers, current direction, unresolved decisions, and exceptional recent changes.\n- The command can run in preview mode before mutating project state.\n- The heartbeat checklist tells agents when target-state edits are required versus skipped.\n\nBlockers:\n- Decide which target-state fields are authoritative active state and which are generated history.\n\nVerification:\n- Fixture tests cover compacting verbose target-state examples with completed cycles, active blockers, current decisions, and no active work.\n- CLI/MCP smoke demonstrates preview and apply behavior on a temporary project fixture.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "target-state",
+        "project-state",
+        "reporting",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:41.517Z",
+      "updatedAt": "2026-05-20T07:47:41.517Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-180",
+        "itemNumber": 180
+      }
+    },
+    {
+      "id": "local-181",
+      "title": "Support risk-scaled verification policies by workflow mode",
+      "description": "Type: component policy/verification slice\nReadiness: human-in-the-loop (HITL) for default thresholds, then AFK implementation\nSource: DevNexus workflow audit notes 2026-05-20.\n\nGoal:\nLet components define which verification levels are mandatory for quick fixes, heartbeat batches, investigations, cleanup, and releases, so agents do not run disproportionate checks for small low-risk changes.\n\nAcceptance criteria:\n- Component configuration can distinguish focused regression, adjacent suite, package build, full local check, required branch CI, post-merge smoke, and post-merge full local check.\n- Workflow mode and change risk determine which checks are required, optional, or skipped with reason.\n- Publication refuses unsafe merges when required verification for that mode has not passed.\n- Run summaries record which verification levels ran, which were skipped, and why.\n- Defaults preserve current conservative behavior until a project opts into lighter quick-fix policy.\n\nBlockers:\n- Choose default risk categories and default verification requirements for quick, heartbeat, investigation, cleanup, and release modes.\n\nVerification:\n- Unit tests cover policy resolution for low-risk quick fixes, normal heartbeat batches, high-risk source changes, and release paths.\n- Fixture or CLI smoke confirms skipped checks are explicit in the final summary.",
+      "status": "blocked",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "verification",
+        "policy",
+        "workflow-modes",
+        "hitl",
+        "blocked"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T07:47:49.982Z",
+      "updatedAt": "2026-05-20T07:47:49.982Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-181",
+        "itemNumber": 181
       }
     }
   ],
@@ -9073,6 +9309,15 @@
           "itemId": "local-comment-379"
         }
       }
-    ]
+    ],
+    "local-173": [],
+    "local-174": [],
+    "local-175": [],
+    "local-176": [],
+    "local-177": [],
+    "local-178": [],
+    "local-179": [],
+    "local-180": [],
+    "local-181": []
   }
 }
