@@ -42,6 +42,12 @@ Use the existing folder paths as component source roots when prompted. Pick one
 primary component. Other components can be dependencies, addons, or support
 components.
 
+`setup check` classifies each component source root as project-local, explicit
+external, legacy external, missing, incompatible with the current host, or a
+project-local-looking symlink/junction escape. External layouts are allowed
+when intentional, but project-local component clones under `componentsRoot:` are
+the cleanest default for repeatable agent work.
+
 After setup, open this directory in the agent:
 
 ```text

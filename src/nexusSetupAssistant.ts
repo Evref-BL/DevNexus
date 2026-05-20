@@ -34,6 +34,10 @@ import {
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
 import { analyzeNexusProjectPath, resolveNexusProjectPath } from "./nexusPathResolver.js";
+import {
+  classifyNexusComponentSourceRootTopology,
+  type NexusComponentSourceRootTopology,
+} from "./nexusSourceRootTopology.js";
 import type {
   NexusPluginMcpServerCapability,
   NexusPluginProjectedSkillCapability,
@@ -121,6 +125,7 @@ export interface NexusSetupCheckResult {
   status: NexusSetupCheckStatus;
   summary: string;
   nextAction: string | null;
+  details?: Record<string, unknown>;
 }
 
 interface ConfiguredMcpServerCommandLine {
@@ -325,18 +330,9 @@ export function buildNexusSetupCheck(options: {
         platform,
         localPathPlatform,
       );
-
-      checks.push(pathCheck({
-        id: `component-${component.id}-source-root`,
-        title: `${component.name} source root`,
-        pathName: sourceRootPlan.path,
-        passedSummary: `Component source root exists: ${sourceRootPlan.path}`,
-        blockedSummary:
-          `${sourceRootPlan.reason} Component source root is missing: ${sourceRootPlan.path}`,
-        nextAction: component.remoteUrl
-          ? `Clone or fetch ${component.remoteUrl} into ${sourceRootPlan.path}.`
-          : `Create or configure ${sourceRootPlan.path}.`,
-        missingStatus: "blocked",
+      checks.push(componentSourceRootTopologyCheck({
+        component,
+        topology: sourceRootPlan.topology,
       }));
       checks.push(...componentGitSafetyChecks(component, sourceRootPlan.path));
     }
@@ -2234,6 +2230,36 @@ function pathCheck(options: {
   };
 }
 
+function componentSourceRootTopologyCheck(options: {
+  component: NexusProjectConfig["components"][number];
+  topology: NexusComponentSourceRootTopology;
+}): NexusSetupCheckResult {
+  const { component, topology } = options;
+  const status: NexusSetupCheckStatus =
+    topology.state === "missing" || topology.state === "incompatible-platform"
+      ? "blocked"
+      : topology.layout === "project-local" && topology.state === "present"
+        ? "passed"
+        : "warning";
+  return {
+    id: `component-${component.id}-source-root`,
+    title: `${component.name} source root`,
+    status,
+    summary:
+      `${topology.summary} layout=${topology.layout}; state=${topology.state}; ` +
+      `base=${topology.configuredBase}.`,
+    nextAction: status === "passed"
+      ? null
+      : topology.nextAction ??
+        (component.remoteUrl
+          ? `Clone or fetch ${component.remoteUrl} into ${topology.effectivePath}.`
+          : `Create or configure ${topology.effectivePath}.`),
+    details: {
+      sourceRootTopology: topology,
+    },
+  };
+}
+
 function componentGitSafetyChecks(
   component: NexusProjectConfig["components"][number],
   sourceRoot: string,
@@ -2812,7 +2838,7 @@ function componentCheckSourceRoot(
   projectRoot: string,
   platform: NexusSetupPlatform,
   pathPlatform: NexusSetupPlatform,
-): { path: string; reason: string } {
+): { path: string; reason: string; topology: NexusComponentSourceRootTopology } {
   return componentSetupSourceRoot({
     component,
     platform,
@@ -2826,8 +2852,14 @@ function componentSetupSourceRoot(options: {
   platform: NexusSetupPlatform;
   projectRoot: string;
   pathPlatform: NexusSetupPlatform;
-}): { path: string; reason: string } {
+}): { path: string; reason: string; topology: NexusComponentSourceRootTopology } {
   const { component, platform, projectRoot, pathPlatform } = options;
+  const topology = classifyNexusComponentSourceRootTopology({
+    projectRoot,
+    component,
+    platform,
+    pathPlatform,
+  });
   const projectLocalPath = componentProjectLocalSourceRoot(
     component,
     pathPlatform,
@@ -2837,6 +2869,7 @@ function componentSetupSourceRoot(options: {
   if (!component.sourceRoot) {
     return {
       path: projectLocalPath,
+      topology,
       reason:
         `No sourceRoot is configured for ${component.id}; using the project-local components root.`,
     };
@@ -2857,12 +2890,14 @@ function componentSetupSourceRoot(options: {
         });
     return {
       path: pathAnalysis.path,
+      topology,
       reason: `Using configured sourceRoot for ${component.id}.`,
     };
   }
 
   return {
     path: projectLocalPath,
+    topology,
     reason:
       `Configured sourceRoot ${component.sourceRoot} is not compatible with ${platform}; using the project-local components root.`,
   };

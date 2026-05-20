@@ -540,6 +540,12 @@ describe("project registry helpers", () => {
     expect(buildNexusProjectStatusForPath(root).components[0]).toMatchObject({
       id: "dev-nexus",
       sourceRoot: path.join(path.dirname(root), "sources", "dev-nexus"),
+      sourceRootTopology: expect.objectContaining({
+        layout: "explicit-external",
+        state: "missing",
+        configuredBase: "sourcesRoot",
+        exists: false,
+      }),
     });
   });
 

@@ -703,7 +703,9 @@ describe("nexus setup assistant", () => {
   });
 
   it("uses portable component source roots in Mac setup commands", () => {
-    const projectRoot = makeTempDir("dev-nexus-setup-portable-paths-");
+    const fixtureRoot = makeTempDir("dev-nexus-setup-portable-paths-");
+    const projectRoot = path.join(fixtureRoot, "Project");
+    fs.mkdirSync(projectRoot, { recursive: true });
     writeProject(projectRoot, {
       components: [
         {
@@ -746,6 +748,52 @@ describe("nexus setup assistant", () => {
       expect.objectContaining({
         id: "component-dev-nexus-source-root",
         summary: expect.stringContaining("another OS"),
+      }),
+    );
+  });
+
+  it("reports structured component source-root topology in setup checks", () => {
+    const fixtureRoot = makeTempDir("dev-nexus-setup-source-root-topology-");
+    const projectRoot = path.join(fixtureRoot, "Project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "dev-nexus",
+          name: "DevNexus",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
+          defaultBranch: "main",
+          sourceRoot: "sourcesRoot:dev-nexus",
+          relationships: [],
+        },
+      ],
+    });
+    fs.mkdirSync(path.join(path.dirname(projectRoot), "sources", "dev-nexus"), {
+      recursive: true,
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-dev-nexus-source-root",
+        status: "warning",
+        summary: expect.stringContaining("explicit external"),
+        details: expect.objectContaining({
+          sourceRootTopology: expect.objectContaining({
+            layout: "explicit-external",
+            state: "present",
+            configuredBase: "sourcesRoot",
+            exists: true,
+            insideProjectRoot: false,
+          }),
+        }),
       }),
     );
   });
