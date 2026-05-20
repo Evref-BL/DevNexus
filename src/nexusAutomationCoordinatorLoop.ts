@@ -5,6 +5,7 @@ import {
 } from "./nexusAutomation.js";
 import {
   runNexusAutomationAgentLaunchOnce,
+  type NexusAutomationAgentLaunchWorkItemClaim,
   type NexusAutomationAgentLauncher,
   type NexusAutomationAgentResultWorkItem,
   type NexusAutomationAgentResultWorkItemStatus,
@@ -29,6 +30,7 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
+import type { NexusWorkItemClaimOwnerInput } from "./nexusWorkItemClaim.js";
 import type {
   NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
@@ -148,6 +150,8 @@ export interface RunNexusAutomationCoordinatorLoopOptions {
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
+  workItemClaimOwner?: NexusWorkItemClaimOwnerInput;
+  workItemClaimLeaseTokenFactory?: () => string;
   now?: () => Date | string;
   sleep?: (ms: number) => Promise<void>;
   onTick?: (tick: NexusAutomationCoordinatorLoopTick) => void | Promise<void>;
@@ -465,6 +469,8 @@ export async function runNexusAutomationCoordinatorLoop(
         providerOptions: options.providerOptions,
         gitRunner: options.gitRunner,
         mcpRuntimeProcesses: options.mcpRuntimeProcesses,
+        workItemClaimOwner: options.workItemClaimOwner,
+        workItemClaimLeaseTokenFactory: options.workItemClaimLeaseTokenFactory,
         owner: options.owner ?? "coordinator-loop",
         now: options.now,
         runId,
@@ -762,7 +768,10 @@ async function finalizeCoordinatorRun(options: {
   gitRunner?: GitRunner;
   now?: () => Date | string;
 }): Promise<FinalizeCoordinatorRunResult> {
-  const selectedItems = selectedCoordinatorWorkItems(options.initialStatus);
+  const selectedItems = selectedCoordinatorWorkItems(
+    options.initialStatus,
+    options.run,
+  );
   const resultMapping = mapCoordinatorResultWorkItems(
     options.run,
     selectedItems,
@@ -839,13 +848,54 @@ async function finalizeCoordinatorRun(options: {
 
 function selectedCoordinatorWorkItems(
   status: NexusAutomationStatus,
+  run?: RunNexusAutomationAgentLaunchOnceResult,
 ): SelectedCoordinatorWorkItem[] {
+  const claimed = selectedCoordinatorClaimWorkItem(status, run?.workItemClaim);
+  if (run?.workItemClaim && run.workItemClaim.status !== "disabled") {
+    return claimed ? [claimed] : [];
+  }
+
   return targetCycleWorkItems(status).map((item) => ({
     ...item,
     componentId: item.componentId ?? primaryComponentId(status),
     trackerId: item.trackerId ?? "default",
     trackerProvider: item.trackerProvider ?? null,
   }));
+}
+
+function selectedCoordinatorClaimWorkItem(
+  status: NexusAutomationStatus,
+  claim: NexusAutomationAgentLaunchWorkItemClaim | null | undefined,
+): SelectedCoordinatorWorkItem | null {
+  if (!claim || claim.status === "disabled") {
+    return null;
+  }
+  if (claim.status !== "claimed" || !claim.workItemId || !claim.componentId) {
+    return null;
+  }
+
+  const cycleItems = targetCycleWorkItems(status);
+  const matched = cycleItems.find(
+    (item) =>
+      item.id === claim.workItemId &&
+      (item.componentId ?? primaryComponentId(status)) === claim.componentId,
+  );
+  const component = status.components.find(
+    (candidate) => candidate.id === claim.componentId,
+  );
+  return {
+    ...matched,
+    componentId: claim.componentId,
+    trackerId: claim.trackerId ?? matched?.trackerId ?? component?.defaultTrackerId ?? "default",
+    trackerProvider:
+      matched?.trackerProvider ?? component?.workTracking?.provider ?? null,
+    id: claim.workItemId,
+    logicalItemId:
+      claim.logicalWorkItemId ?? matched?.logicalItemId ?? claim.workItemId,
+    title: claim.workItemTitle ?? matched?.title ?? null,
+    status: "in_progress",
+    cycleStatus: "selected",
+  };
 }
 
 function mapCoordinatorResultWorkItems(
@@ -1351,12 +1401,15 @@ function targetCycleWorkItems(
 function agentLaunchTargetCycleNotes(
   run: RunNexusAutomationAgentLaunchOnceResult,
 ): string[] {
+  const claimNote = agentLaunchWorkItemClaimNote(run.workItemClaim);
   const appServer = run.launch?.codexAppServer;
+  const notes = claimNote ? [claimNote] : [];
   if (!appServer) {
-    return [];
+    return notes;
   }
 
   return [
+    ...notes,
     boundedTargetCycleNote(
       [
         "agent-launch: provider=codex-app-server",
@@ -1376,6 +1429,37 @@ function agentLaunchTargetCycleNotes(
         ]
       : []),
   ];
+}
+
+function agentLaunchWorkItemClaimNote(
+  claim: NexusAutomationAgentLaunchWorkItemClaim | null,
+): string | null {
+  if (!claim || claim.status === "disabled") {
+    return null;
+  }
+  if (claim.status === "claimed") {
+    return boundedTargetCycleNote(
+      [
+        "agent-launch: work-item-claim=claimed",
+        `component=${claim.componentId ?? "none"}`,
+        `tracker=${claim.trackerId ?? "none"}`,
+        `item=${claim.workItemId ?? "none"}`,
+        `host=${claim.owner?.hostId ?? "none"}`,
+        `agent=${claim.owner?.agentId ?? "none"}`,
+        `expires=${claim.owner?.expiresAt ?? "none"}`,
+      ].join(" "),
+    );
+  }
+
+  return boundedTargetCycleNote(
+    [
+      `agent-launch: work-item-claim=${claim.status}`,
+      `reason=${claim.reason ?? "none"}`,
+      `activeClaims=${claim.activeClaims.length}`,
+      `staleClaims=${claim.staleClaims.length}`,
+      `skippedCandidates=${claim.skippedCandidates.length}`,
+    ].join(" "),
+  );
 }
 
 function boundedTargetCycleNote(note: string): string {

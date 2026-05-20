@@ -12,6 +12,7 @@ import {
   buildNexusAutomationTargetReport,
   runNexusAutomationCoordinatorLoop as runNexusAutomationCoordinatorLoopBase,
   saveProjectConfig,
+  type NexusAutomationConfig,
   type NexusProjectConfig,
 } from "./index.js";
 import type { WorkTrackerProvider } from "./workTrackingTypes.js";
@@ -92,6 +93,18 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     },
     ...overrides,
+  };
+}
+
+function withDisabledWorkItemClaims(
+  config: NexusAutomationConfig = projectConfig().automation!,
+): NexusAutomationConfig {
+  return {
+    ...config,
+    workItemClaims: {
+      ...config.workItemClaims,
+      enabled: false,
+    },
   };
 }
 
@@ -258,10 +271,26 @@ describe("nexus automation coordinator loop", () => {
       projectRoot,
       maxRuns: 1,
       runIdPrefix: "loop",
+      workItemClaimOwner: { hostId: "host-a" },
+      workItemClaimLeaseTokenFactory: () => "lease-loop-1",
       now: fixedClock("2026-05-17T10:00:00.000Z"),
-      launcher: ({ eligibleWorkItems }) => {
+      launcher: ({ eligibleWorkItems, workItemClaim }) => {
         launchCount += 1;
         expect(eligibleWorkItems).toHaveLength(1);
+        expect(eligibleWorkItems[0]).toMatchObject({
+          id: "local-1",
+          status: "in_progress",
+        });
+        expect(workItemClaim).toMatchObject({
+          status: "claimed",
+          componentId: "primary",
+          trackerId: "default",
+          workItemId: "local-1",
+          owner: {
+            hostId: "host-a",
+            leaseToken: "lease-loop-1",
+          },
+        });
         return {
           status: "completed",
           summary: "Coordinator completed a bounded batch",
@@ -316,6 +345,7 @@ describe("nexus automation coordinator loop", () => {
               "managed-loop: decision=launch",
               "managed-loop: coordinator launched",
               "managed-loop: coordinator completed",
+              expect.stringContaining("agent-launch: work-item-claim=claimed"),
               "managed-loop: target-report=not_ready",
             ]),
           },
@@ -327,6 +357,8 @@ describe("nexus automation coordinator loop", () => {
     ).toMatchObject({
       id: "loop-20260517-t100000-000-z-1",
         status: "completed",
+        componentId: "primary",
+        workItemId: "local-1",
         commitIds: ["abc123"],
       });
     expect(await tracker.getWorkItem({ id: "local-1" })).toMatchObject({
@@ -349,6 +381,150 @@ describe("nexus automation coordinator loop", () => {
         },
       },
     ]);
+  });
+
+  it("skips launch finalization when the coordinator loses the claim race", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Claim-raced task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const racingProvider: WorkTrackerProvider = {
+      provider: tracker.provider,
+      capabilities: tracker.capabilities,
+      createWorkItem: tracker.createWorkItem.bind(tracker),
+      listWorkItems: tracker.listWorkItems.bind(tracker),
+      getWorkItem: tracker.getWorkItem.bind(tracker),
+      updateWorkItem: async (ref, patch) =>
+        tracker.updateWorkItem(ref, {
+          ...patch,
+          description: "another host claimed this item first",
+        }),
+      addComment: tracker.addComment.bind(tracker),
+      setStatus: tracker.setStatus?.bind(tracker),
+    };
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "claim-race-loop",
+      providerFactory: () => racingProvider,
+      workItemClaimOwner: { hostId: "host-a" },
+      workItemClaimLeaseTokenFactory: () => "lease-raced",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      stoppedReason: "max_runs",
+      runs: [
+        {
+          status: "skipped",
+          workItemClaim: {
+            status: "lost_race",
+            workItemId: "local-1",
+          },
+        },
+      ],
+      ticks: [
+        {
+          action: "launched",
+          targetCycle: {
+            status: "skipped",
+            eligibleWorkItemCount: 1,
+            notes: expect.arrayContaining([
+              "managed-loop: coordinator skipped",
+              expect.stringContaining("agent-launch: work-item-claim=lost_race"),
+            ]),
+            workItems: [
+              {
+                id: "local-1",
+                status: "ready",
+                cycleStatus: "eligible",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  it("records a provider blocker when claim coordination cannot update work", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Read-only tracker task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const readOnlyProvider: WorkTrackerProvider = {
+      provider: tracker.provider,
+      capabilities: {
+        ...tracker.capabilities,
+        updateItem: false,
+      },
+      createWorkItem: tracker.createWorkItem.bind(tracker),
+      listWorkItems: tracker.listWorkItems.bind(tracker),
+      getWorkItem: tracker.getWorkItem.bind(tracker),
+      updateWorkItem: tracker.updateWorkItem.bind(tracker),
+      addComment: tracker.addComment.bind(tracker),
+      setStatus: tracker.setStatus?.bind(tracker),
+    };
+
+    const result = await runNexusAutomationCoordinatorLoop({
+      projectRoot,
+      maxRuns: 1,
+      runIdPrefix: "claim-blocker-loop",
+      providerFactory: () => readOnlyProvider,
+      workItemClaimOwner: { hostId: "host-a" },
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result.ticks[0]?.targetCycle).toMatchObject({
+      status: "blocked",
+      blockers: [
+        expect.stringContaining("Work-item claim coordination blocked"),
+      ],
+      notes: expect.arrayContaining([
+        "managed-loop: coordinator blocked",
+        expect.stringContaining("agent-launch: work-item-claim=blocked"),
+      ]),
+      workItems: [
+        {
+          id: "local-1",
+          status: "ready",
+          cycleStatus: "eligible",
+        },
+      ],
+    });
+    expect(result.runs[0]).toMatchObject({
+      status: "blocked",
+      launch: null,
+      workItemClaim: {
+        status: "blocked",
+      },
+    });
   });
 
   it("records no eligible work after a completed coordinator closes selected work", async () => {
@@ -409,7 +585,9 @@ describe("nexus automation coordinator loop", () => {
   it("records partial multi-item completion without forcing skipped work done", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    const config = projectConfig();
+    const config = projectConfig({
+      automation: withDisabledWorkItemClaims(),
+    });
     saveProjectConfig(projectRoot, config);
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
@@ -484,7 +662,9 @@ describe("nexus automation coordinator loop", () => {
   it("records blocked item results without closing every selected item", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    const config = projectConfig();
+    const config = projectConfig({
+      automation: withDisabledWorkItemClaims(),
+    });
     saveProjectConfig(projectRoot, config);
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
@@ -558,7 +738,9 @@ describe("nexus automation coordinator loop", () => {
   it("records failed item results distinctly from blocked and skipped work", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    const config = projectConfig();
+    const config = projectConfig({
+      automation: withDisabledWorkItemClaims(),
+    });
     saveProjectConfig(projectRoot, config);
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,
@@ -627,7 +809,9 @@ describe("nexus automation coordinator loop", () => {
   it("records a reconciliation blocker when tracker completion update fails", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordinator-loop-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    const config = projectConfig();
+    const config = projectConfig({
+      automation: withDisabledWorkItemClaims(),
+    });
     saveProjectConfig(projectRoot, config);
     const tracker = createLocalWorkTrackerProvider({
       projectRoot,

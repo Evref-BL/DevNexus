@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -76,6 +77,14 @@ import {
   type NexusEligibleWorkProviderFactory,
   type NexusEligibleWorkTrackerQueryResult,
 } from "./nexusEligibleWork.js";
+import {
+  claimNexusEligibleWorkItem,
+  type NexusWorkItemClaimObservation,
+  type NexusWorkItemClaimOwner,
+  type NexusWorkItemClaimOwnerInput,
+  type NexusWorkItemClaimResult,
+  type NexusWorkItemClaimSkippedCandidate,
+} from "./nexusWorkItemClaim.js";
 import {
   buildNexusExternalIssueVisibilitySummary,
   type NexusExternalIssueVisibilitySummary,
@@ -170,6 +179,24 @@ export interface NexusAutomationComponentEligibleWorkItems {
   trackerResults?: NexusEligibleWorkTrackerQueryResult[];
 }
 
+export type NexusAutomationAgentLaunchWorkItemClaimStatus =
+  NexusWorkItemClaimResult["status"] | "blocked" | "disabled";
+
+export interface NexusAutomationAgentLaunchWorkItemClaim {
+  status: NexusAutomationAgentLaunchWorkItemClaimStatus;
+  reason: string | null;
+  componentId: string | null;
+  trackerId: string | null;
+  workItemId: string | null;
+  logicalWorkItemId: string | null;
+  workItemTitle: string | null;
+  owner: NexusWorkItemClaimOwner | null;
+  reclaimedFrom: NexusWorkItemClaimObservation | null;
+  skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+  activeClaims: NexusWorkItemClaimObservation[];
+  staleClaims: NexusWorkItemClaimObservation[];
+}
+
 export interface NexusAutomationAgentLaunchContext {
   version: 1;
   runId: string;
@@ -200,6 +227,7 @@ export interface NexusAutomationAgentLaunchContext {
   authority: NexusAuthorityProjectSummary;
   result: NexusAutomationAgentResultContract;
   eligibleWorkItems: WorkItem[];
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
   importCandidateWorkItems: NexusEligibleWorkItem[];
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
@@ -230,6 +258,7 @@ export interface NexusAutomationAgentLaunchInput {
   automationConfig: NexusAutomationConfig;
   selectorQuery: WorkItemQuery;
   eligibleWorkItems: WorkItem[];
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
   importCandidateWorkItems: NexusEligibleWorkItem[];
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
@@ -282,6 +311,8 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   publicationActorRunner?: NexusPublicationActorRunner;
   runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
+  workItemClaimOwner?: NexusWorkItemClaimOwnerInput;
+  workItemClaimLeaseTokenFactory?: () => string;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
 }
@@ -299,6 +330,7 @@ export interface RunNexusAutomationAgentLaunchOnceResult {
   preflight: NexusAutomationPreflightCheck[];
   selectorQuery: WorkItemQuery | null;
   eligibleWorkItems: WorkItem[];
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
   importCandidateWorkItems: NexusEligibleWorkItem[];
   eligibleWorkWarnings: string[];
   eligibleWorkBlockers: string[];
@@ -347,6 +379,7 @@ export async function runNexusAutomationAgentLaunchOnce(
   let eligibleWorkWarnings: string[] = [];
   let eligibleWorkBlockers: string[] = [];
   let componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] = [];
+  let workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null = null;
   let contextFile: string | null = null;
   let resultFile: string | null = null;
 
@@ -677,6 +710,135 @@ export async function runNexusAutomationAgentLaunchOnce(
       });
     }
 
+    if (automationConfig.workItemClaims.enabled) {
+      try {
+        const claim = await claimNexusEligibleWorkItem({
+          projectRoot,
+          projectConfig,
+          components,
+          automationConfig,
+          selectorQuery,
+          mode: options.eligibleWorkMode ?? automationConfig.eligibleWorkMode,
+          provider: options.provider,
+          providerFactory: agentLaunchEligibleWorkProviderFactory({
+            options,
+            projectRoot,
+            projectConfig,
+          }),
+          providerOptions: options.providerOptions,
+          env: options.env,
+          owner: workItemClaimOwner({
+            options,
+            runId,
+          }),
+          leaseDurationMs: automationConfig.workItemClaims.leaseDurationMs,
+          staleClaimPolicy: automationConfig.workItemClaims.staleClaimPolicy,
+          leaseTokenFactory: options.workItemClaimLeaseTokenFactory,
+          now: options.now,
+        });
+        workItemClaim = agentLaunchWorkItemClaim(claim);
+        if (claim.status === "claimed") {
+          eligibleWorkItems = [claim.workItem];
+          componentEligibleWorkItems = componentEligibleWorkItemsForClaim({
+            componentEligibleWorkItems,
+            claim,
+          });
+        } else {
+          const finishedAt = currentIso(options.now);
+          const summary = workItemClaimSkipSummary(workItemClaim);
+          ledger = appendNexusAutomationRunRecord({
+            projectRoot,
+            config: automationConfig,
+            now: finishedAt,
+            record: {
+              id: runId,
+              projectId: projectConfig.id,
+              status: "skipped",
+              startedAt,
+              finishedAt,
+              sourceRoot,
+              summary,
+            },
+          });
+          return launchResult({
+            runId,
+            projectRoot,
+            sourceRoot,
+            projectConfig,
+            automationConfig,
+            status: "skipped",
+            summary,
+            ledger,
+            lock,
+            preflight,
+            selectorQuery,
+            eligibleWorkItems,
+            workItemClaim,
+            importCandidateWorkItems,
+            eligibleWorkWarnings,
+            eligibleWorkBlockers,
+            componentEligibleWorkItems,
+            components,
+            contextFile,
+            resultFile,
+            launch: null,
+          });
+        }
+      } catch (error) {
+        const finishedAt = currentIso(options.now);
+        const summary =
+          `Work-item claim coordination blocked: ${errorMessage(error)}`;
+        workItemClaim = blockedWorkItemClaim(summary);
+        ledger = appendNexusAutomationRunRecord({
+          projectRoot,
+          config: automationConfig,
+          now: finishedAt,
+          record: {
+            id: runId,
+            projectId: projectConfig.id,
+            status: "blocked",
+            startedAt,
+            finishedAt,
+            sourceRoot,
+            summary,
+            error: summary,
+          },
+        });
+        return launchResult({
+          runId,
+          projectRoot,
+          sourceRoot,
+          projectConfig,
+          automationConfig,
+          status: "blocked",
+          summary,
+          ledger,
+          lock,
+          preflight: [
+            ...preflight,
+            {
+              name: "workItemClaim",
+              status: "failed",
+              message: summary,
+            },
+          ],
+          selectorQuery,
+          eligibleWorkItems,
+          workItemClaim,
+          importCandidateWorkItems,
+          eligibleWorkWarnings,
+          eligibleWorkBlockers,
+          componentEligibleWorkItems,
+          components,
+          contextFile,
+          resultFile,
+          launch: null,
+        });
+      }
+    } else {
+      workItemClaim = disabledWorkItemClaim();
+    }
+
     const launchFiles = nexusAutomationAgentLaunchFiles({
       projectRoot,
       runId,
@@ -693,6 +855,7 @@ export async function runNexusAutomationAgentLaunchOnce(
         automationConfig,
         selectorQuery,
         eligibleWorkItems,
+        workItemClaim,
         importCandidateWorkItems,
         eligibleWorkWarnings,
         eligibleWorkBlockers,
@@ -714,6 +877,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       automationConfig,
       selectorQuery,
       eligibleWorkItems,
+      workItemClaim,
       importCandidateWorkItems,
       eligibleWorkWarnings,
       eligibleWorkBlockers,
@@ -736,6 +900,9 @@ export async function runNexusAutomationAgentLaunchOnce(
         startedAt,
         finishedAt,
         sourceRoot,
+        componentId: workItemClaim?.componentId ?? null,
+        workItemId: workItemClaim?.workItemId ?? null,
+        workItemTitle: workItemClaim?.workItemTitle ?? null,
         commitIds: agentResult.commitIds ?? [],
         summary,
         verification: verificationRecords(agentResult.verification, finishedAt),
@@ -761,6 +928,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      workItemClaim,
       importCandidateWorkItems,
       eligibleWorkWarnings,
       eligibleWorkBlockers,
@@ -805,6 +973,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      workItemClaim,
       importCandidateWorkItems,
       eligibleWorkWarnings,
       eligibleWorkBlockers,
@@ -1098,6 +1267,150 @@ function createAgentLaunchProvider(options: {
   });
 }
 
+function workItemClaimOwner(options: {
+  options: RunNexusAutomationAgentLaunchOnceOptions;
+  runId: string;
+}): NexusWorkItemClaimOwnerInput {
+  const configured = options.options.workItemClaimOwner;
+  return {
+    hostId: configured?.hostId ?? os.hostname(),
+    agentId: configured?.agentId ?? options.runId,
+    ownerId: configured?.ownerId ?? options.options.owner ?? null,
+  };
+}
+
+function agentLaunchWorkItemClaim(
+  claim: NexusWorkItemClaimResult,
+): NexusAutomationAgentLaunchWorkItemClaim {
+  if (claim.status === "claimed") {
+    return {
+      status: "claimed",
+      reason: null,
+      componentId: claim.componentId,
+      trackerId: claim.trackerId,
+      workItemId: claim.workItem.id,
+      logicalWorkItemId: claim.workItem.externalRef?.itemId ?? claim.workItem.id,
+      workItemTitle: claim.workItem.title,
+      owner: claim.owner,
+      reclaimedFrom: claim.reclaimedFrom ?? null,
+      skippedCandidates: claim.skippedCandidates,
+      activeClaims: claim.activeClaims ?? [],
+      staleClaims: claim.staleClaims ?? [],
+    };
+  }
+
+  if (claim.status === "lost_race") {
+    return {
+      status: "lost_race",
+      reason: claim.reason,
+      componentId: claim.componentId,
+      trackerId: claim.trackerId,
+      workItemId: claim.candidate.id,
+      logicalWorkItemId: claim.candidate.externalRef?.itemId ?? claim.candidate.id,
+      workItemTitle: claim.candidate.title,
+      owner: claim.owner,
+      reclaimedFrom: claim.reclaimedFrom ?? null,
+      skippedCandidates: claim.skippedCandidates,
+      activeClaims: claim.activeClaims ?? [],
+      staleClaims: claim.staleClaims ?? [],
+    };
+  }
+
+  return {
+    status: "no_claim",
+    reason: claim.reason,
+    componentId: null,
+    trackerId: null,
+    workItemId: null,
+    logicalWorkItemId: null,
+    workItemTitle: null,
+    owner: null,
+    reclaimedFrom: null,
+    skippedCandidates: claim.skippedCandidates,
+    activeClaims: claim.activeClaims ?? [],
+    staleClaims: claim.staleClaims ?? [],
+  };
+}
+
+function disabledWorkItemClaim(): NexusAutomationAgentLaunchWorkItemClaim {
+  return {
+    status: "disabled",
+    reason: "disabled_by_project_policy",
+    componentId: null,
+    trackerId: null,
+    workItemId: null,
+    logicalWorkItemId: null,
+    workItemTitle: null,
+    owner: null,
+    reclaimedFrom: null,
+    skippedCandidates: [],
+    activeClaims: [],
+    staleClaims: [],
+  };
+}
+
+function blockedWorkItemClaim(
+  reason: string,
+): NexusAutomationAgentLaunchWorkItemClaim {
+  return {
+    status: "blocked",
+    reason,
+    componentId: null,
+    trackerId: null,
+    workItemId: null,
+    logicalWorkItemId: null,
+    workItemTitle: null,
+    owner: null,
+    reclaimedFrom: null,
+    skippedCandidates: [],
+    activeClaims: [],
+    staleClaims: [],
+  };
+}
+
+function componentEligibleWorkItemsForClaim(options: {
+  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  claim: Extract<NexusWorkItemClaimResult, { status: "claimed" }>;
+}): NexusAutomationComponentEligibleWorkItems[] {
+  const existing = options.componentEligibleWorkItems.find(
+    (component) => component.componentId === options.claim.componentId,
+  );
+  return [
+    {
+      componentId: options.claim.componentId,
+      workItems: [options.claim.workItem],
+      ...(existing?.importCandidateWorkItems
+        ? { importCandidateWorkItems: existing.importCandidateWorkItems }
+        : {}),
+      ...(existing?.excludedWorkItems
+        ? { excludedWorkItems: existing.excludedWorkItems }
+        : {}),
+      ...(existing?.warnings ? { warnings: existing.warnings } : {}),
+      ...(existing?.blockers ? { blockers: existing.blockers } : {}),
+      ...(existing?.trackerResults ? { trackerResults: existing.trackerResults } : {}),
+    },
+  ];
+}
+
+function workItemClaimSkipSummary(
+  claim: NexusAutomationAgentLaunchWorkItemClaim,
+): string {
+  if (claim.status === "lost_race") {
+    return `Work-item claim lost race for ${claim.workItemId ?? "candidate"}; coordinator launch skipped`;
+  }
+  if (claim.reason === "active_claims") {
+    return "Eligible work is already claimed by another owner";
+  }
+  if (claim.reason === "stale_claims") {
+    return "Eligible work has stale claims and reclaim policy is disabled";
+  }
+  if (claim.reason === "candidates_not_claimable") {
+    return "Eligible work items were not claimable";
+  }
+
+  return "No eligible work item could be claimed";
+}
+
 function buildAgentLaunchContext(
   input: Omit<
     NexusAutomationAgentLaunchInput,
@@ -1167,6 +1480,7 @@ function buildAgentLaunchContext(
     authority,
     result: agentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
+    workItemClaim: input.workItemClaim,
     importCandidateWorkItems: input.importCandidateWorkItems,
     eligibleWorkWarnings: input.eligibleWorkWarnings,
     eligibleWorkBlockers: input.eligibleWorkBlockers,
@@ -1328,6 +1642,15 @@ function agentLaunchEnvironment(
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS: input.eligibleWorkItems
       .map((item) => item.id)
       .join(","),
+    DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: input.workItemClaim?.status ?? "none",
+    DEV_NEXUS_CLAIMED_WORK_ITEM_ID: input.workItemClaim?.workItemId ?? "",
+    DEV_NEXUS_CLAIM_COMPONENT_ID: input.workItemClaim?.componentId ?? "",
+    DEV_NEXUS_CLAIM_TRACKER_ID: input.workItemClaim?.trackerId ?? "",
+    DEV_NEXUS_CLAIM_LEASE_TOKEN: input.workItemClaim?.owner?.leaseToken ?? "",
+    DEV_NEXUS_CLAIM_HOST_ID: input.workItemClaim?.owner?.hostId ?? "",
+    DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",
+    DEV_NEXUS_CLAIM_OWNER_ID: input.workItemClaim?.owner?.ownerId ?? "",
+    DEV_NEXUS_CLAIM_EXPIRES_AT: input.workItemClaim?.owner?.expiresAt ?? "",
   };
 }
 
@@ -1660,6 +1983,7 @@ type AgentLaunchResultInput = Omit<
   | "eligibleWorkBlockers"
   | "eligibleWorkWarnings"
   | "importCandidateWorkItems"
+  | "workItemClaim"
 > &
   Partial<
     Pick<
@@ -1669,6 +1993,7 @@ type AgentLaunchResultInput = Omit<
       | "eligibleWorkBlockers"
       | "eligibleWorkWarnings"
       | "importCandidateWorkItems"
+      | "workItemClaim"
     >
   >;
 
@@ -1682,6 +2007,7 @@ function launchResult(
     eligibleWorkBlockers: result.eligibleWorkBlockers ?? [],
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? [],
     components: result.components ?? [],
+    workItemClaim: result.workItemClaim ?? null,
   };
 }
 

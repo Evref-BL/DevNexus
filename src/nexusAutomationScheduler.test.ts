@@ -244,6 +244,10 @@ describe("nexus automation scheduler", () => {
       automation: {
         ...config.automation!,
         mode: "agent_launch",
+        workItemClaims: {
+          ...config.automation!.workItemClaims,
+          enabled: false,
+        },
         agent: {
           command: "codex run",
           timeoutMs: null,
