@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 181,
-  "nextCommentNumber": 380,
-  "updatedAt": "2026-05-20T07:53:47.016Z",
+  "nextCommentNumber": 384,
+  "updatedAt": "2026-05-20T08:06:30.845Z",
   "items": [
     {
       "id": "local-1",
@@ -4465,7 +4465,7 @@
       "id": "local-173",
       "title": "Rewrite README front door around human mental model",
       "description": "Context:\nThe current README reads like a broad reference and fails the first-time human onboarding path. Users need a concrete mental model before they see DevNexus-specific terms or advanced workflows.\n\nReadiness: AFK.\n\nAcceptance:\n- README opens with a plain-language definition of DevNexus as infrastructure for working with agents on real projects.\n- Core terms are introduced before use: DevNexus project, component, work item, home, agent files, and generated skills/context.\n- The fast path is short: install, set up first project, add/select components, generate/open agent files, verify readiness, then start work.\n- Advanced auth, hosting, MCP, automation, worktree, and provider-sync details are moved behind documentation links.\n- Low-level project create/import commands do not appear before the recommended setup path except as an advanced note.\n\nVerification:\n- Review README diff for first-time-reader flow and command order.\n- Run existing docs or package checks that cover README formatting/examples.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4476,8 +4476,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.124Z",
-      "updatedAt": "2026-05-20T07:53:46.124Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:06:30.105Z",
+      "closedAt": "2026-05-20T08:06:30.105Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4489,7 +4489,7 @@
       "id": "local-174",
       "title": "Harden interactive setup as the human quickstart",
       "description": "Context:\nThe setup wizard exists, but the public quickstart should rely on an interactive human path by default instead of requiring users or agents to infer many low-level command arguments.\n\nReadiness: AFK.\n\nAcceptance:\n- Running dev-nexus project setup <project-root> in a TTY asks only essential first-project questions.\n- Non-interactive mode keeps the structured answer-file path and errors clearly when answers are required.\n- The default DevNexus home is ~/.dev-nexus when the user does not care.\n- First-project defaults favor local tracking and a practical agent target, with concise prompts for choices that cannot be inferred.\n- Tests cover the TTY prompt path and non-interactive answer-file path.\n\nVerification:\n- Run focused CLI/setup tests.\n- Manually smoke-test an interactive setup transcript if test harness coverage cannot fully emulate TTY behavior.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4500,8 +4500,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.264Z",
-      "updatedAt": "2026-05-20T07:53:46.264Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:06:30.348Z",
+      "closedAt": "2026-05-20T08:06:30.348Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4513,7 +4513,7 @@
       "id": "local-175",
       "title": "Improve setup completion output and generated AGENTS handoff",
       "description": "Context:\nAfter a project is created, users need to know where to work and what to ask the agent next. Setup should hand off cleanly to Codex or another configured agent.\n\nReadiness: AFK.\n\nAcceptance:\n- Setup completion output tells the user to open the DevNexus project root, not the source component root.\n- Output includes a short next-step sequence: verify readiness, inspect components, create or triage first work item, start work.\n- Generated AGENTS.md explains DevNexus project vs components and includes a first-run checklist.\n- Output references the readiness/status command or report generated for the project.\n- Tests cover setup output and generated AGENTS.md wording at a stable, non-brittle level.\n\nVerification:\n- Run setup/project scaffold tests.\n- Inspect generated AGENTS.md from a temporary project fixture.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4524,8 +4524,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.378Z",
-      "updatedAt": "2026-05-20T07:53:46.378Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:06:30.597Z",
+      "closedAt": "2026-05-20T08:06:30.597Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4537,7 +4537,7 @@
       "id": "local-176",
       "title": "Split advanced onboarding docs out of README",
       "description": "Context:\nThe README should be the front door, not the full manual. Advanced setup and operational details need discoverable documentation without blocking first contact.\n\nReadiness: AFK.\n\nAcceptance:\n- Create or reshape documentation pages for concepts, first project from existing components, providers/auth/hosting, and agent workflows.\n- README links to those pages without duplicating dense reference sections.\n- Getting-started documentation puts the simple first-project path before answer-file and automation-heavy examples.\n- Documentation distinguishes human quickstart, agent/CI reproducible setup, and advanced provider setup.\n\nVerification:\n- Review docs information architecture and link paths.\n- Run docs/package checks that validate markdown links where available.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4548,8 +4548,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.493Z",
-      "updatedAt": "2026-05-20T07:53:46.493Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:06:30.845Z",
+      "closedAt": "2026-05-20T08:06:30.845Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9268,10 +9268,58 @@
         }
       }
     ],
-    "local-173": [],
-    "local-174": [],
-    "local-175": [],
-    "local-176": [],
+    "local-173": [
+      {
+        "id": "local-comment-380",
+        "body": "Implemented in DevNexus branch codex/dev-nexus/readme-onboarding-front-door commit 295f920, integrated by merge commit 2780c7a. README now opens with a human mental model, defines terms before the fast path, and moves reference detail behind focused docs. Verification: npm run check passed on the combined source branch.",
+        "author": null,
+        "createdAt": "2026-05-20T08:06:29.976Z",
+        "updatedAt": "2026-05-20T08:06:29.976Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-380"
+        }
+      }
+    ],
+    "local-174": [
+      {
+        "id": "local-comment-381",
+        "body": "Implemented in DevNexus branch codex/dev-nexus/setup-human-quickstart commit 310b054, integrated by merge commit 2780c7a. TTY setup now presents a human quickstart, hides the default home prompt, keeps answer files for automation, and has focused setup tests. Verification: focused setup tests, build, and full npm run check passed on the combined source branch.",
+        "author": null,
+        "createdAt": "2026-05-20T08:06:30.229Z",
+        "updatedAt": "2026-05-20T08:06:30.229Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-381"
+        }
+      }
+    ],
+    "local-175": [
+      {
+        "id": "local-comment-382",
+        "body": "Implemented in DevNexus branch codex/dev-nexus/setup-human-quickstart commit 310b054, integrated by merge commit 2780c7a. Setup completion output now tells users to open the DevNexus project root, run readiness/status checks, and create or triage the first component work item. Generated AGENTS.md includes project/component guidance and a first-run checklist. Verification: focused setup tests, build, and full npm run check passed.",
+        "author": null,
+        "createdAt": "2026-05-20T08:06:30.474Z",
+        "updatedAt": "2026-05-20T08:06:30.474Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-382"
+        }
+      }
+    ],
+    "local-176": [
+      {
+        "id": "local-comment-383",
+        "body": "Implemented in DevNexus branch codex/dev-nexus/readme-onboarding-front-door commit 295f920, integrated by merge commit 2780c7a. README is now a front door, getting-started is trimmed, and advanced concepts/examples/provider-auth-hosting details moved to focused docs. Verification: markdown local link check, git diff --check, build, and full npm run check passed on the combined source branch.",
+        "author": null,
+        "createdAt": "2026-05-20T08:06:30.723Z",
+        "updatedAt": "2026-05-20T08:06:30.723Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-383"
+        }
+      }
+    ],
     "local-177": [],
     "local-178": [],
     "local-179": [],
