@@ -48,7 +48,7 @@ export function buildNexusProjectSetupHostingHandoff(
       metaProjectOnly: true,
       componentRepositoryHosting: "not_configured_by_project_setup",
       summary:
-        "Meta-project hosting intent is not configured; project setup will only write local DevNexus files.",
+        "Workspace repository hosting intent is not configured; workspace setup will only write local DevNexus files.",
       commands: [],
       missingAuthProfileIds: [],
       providerMutationsDeferred: true,
@@ -72,13 +72,13 @@ export function buildNexusProjectSetupHostingHandoff(
     metaProjectOnly: true,
     componentRepositoryHosting: "not_configured_by_project_setup",
     summary: status === "blocked_on_auth"
-      ? `Meta-project hosting intent is configured for ${answers.hostingIntent.namespace}/${answers.hostingIntent.repositoryName}, but referenced auth profile(s) are missing: ${missingAuthProfileIds.join(", ")}.`
-      : `Meta-project hosting intent is configured for ${answers.hostingIntent.namespace}/${answers.hostingIntent.repositoryName}; provider mutations are deferred to explicit hosting plan/apply commands.`,
+      ? `Workspace repository hosting intent is configured for ${answers.hostingIntent.namespace}/${answers.hostingIntent.repositoryName}, but referenced auth profile(s) are missing: ${missingAuthProfileIds.join(", ")}.`
+      : `Workspace repository hosting intent is configured for ${answers.hostingIntent.namespace}/${answers.hostingIntent.repositoryName}; provider mutations are deferred to explicit hosting plan/apply commands.`,
     commands: [
       {
         id: "hosting-status",
         title: "Inspect hosting status",
-        command: `dev-nexus project hosting status ${projectRoot} --json`,
+        command: `dev-nexus workspace hosting status ${projectRoot} --json`,
         providerMutation: false,
         allowedDuringProjectSetup: false,
         authProfileId:
@@ -89,7 +89,7 @@ export function buildNexusProjectSetupHostingHandoff(
       {
         id: "hosting-plan",
         title: "Plan hosting changes",
-        command: `dev-nexus project hosting plan ${projectRoot} --json`,
+        command: `dev-nexus workspace hosting plan ${projectRoot} --json`,
         providerMutation: false,
         allowedDuringProjectSetup: false,
         authProfileId:
@@ -100,7 +100,7 @@ export function buildNexusProjectSetupHostingHandoff(
       {
         id: "hosting-apply",
         title: "Apply explicit hosting plan",
-        command: `dev-nexus project hosting apply ${projectRoot} --json`,
+        command: `dev-nexus workspace hosting apply ${projectRoot} --json`,
         providerMutation: true,
         allowedDuringProjectSetup: false,
         authProfileId: answers.hostingIntent.providerMutationAuthProfileId ?? null,

@@ -68,7 +68,7 @@ export async function enqueueNexusAutomationWorkItem(
   const automationConfig = projectConfig.automation;
   if (!automationConfig?.enabled) {
     throw new NexusAutomationEnqueueError(
-      "Project automation is not enabled",
+      "Workspace automation is not enabled",
     );
   }
   const primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);

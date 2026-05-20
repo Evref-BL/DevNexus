@@ -368,7 +368,7 @@ describe("project lifecycle helpers", () => {
     });
   });
 
-  it("loads project config only when one exists", () => {
+  it("loads workspace config only when one exists", () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     expect(loadProjectConfigIfExists(projectRoot)).toBeUndefined();
 
@@ -411,7 +411,7 @@ describe("project lifecycle helpers", () => {
 
     expect(() =>
       ensureUniqueProject(config, "existing", path.join(projectsRoot, "Other")),
-    ).toThrow(/Project is already registered/);
+    ).toThrow(/Workspace is already registered/);
 
     const sourceRoot = path.join(projectsRoot, "Imported");
     expect(defaultImportedProjectRoot(config, "Imported", sourceRoot)).toBe(

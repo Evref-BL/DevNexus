@@ -340,7 +340,7 @@ describe("nexus project scaffold", () => {
     ).toBe(true);
     expect(
       fs.readFileSync(path.join(projectRoot, ".dev-nexus", "README.md"), "utf8"),
-    ).toContain("Project Template Layout");
+    ).toContain("Workspace Template Layout");
     expect(
       fs.existsSync(
         path.join(projectRoot, ".dev-nexus", "automation", "target-state.md"),
@@ -348,7 +348,7 @@ describe("nexus project scaffold", () => {
     ).toBe(true);
     expect(result.template.entries.map((entry) => entry.area)).toEqual(
       expect.arrayContaining([
-        "project_state",
+        "workspace_state",
         "component_configuration",
         "target_state",
         "skills",
@@ -363,7 +363,7 @@ describe("nexus project scaffold", () => {
           path: "components/core",
         }),
         expect.objectContaining({
-          area: "project_state",
+          area: "workspace_state",
           owner: "local_runtime",
           path: "worktrees/core/",
         }),

@@ -515,7 +515,7 @@ function resolveLeaseComponent(
     );
     if (!component) {
       throw new NexusWorktreeLeaseError(
-        `Project component is not configured: ${componentId}`,
+        `Workspace component is not configured: ${componentId}`,
       );
     }
     return component;
@@ -832,7 +832,7 @@ function leaseAppliesToFilter(
 function leaseLabel(lease: NexusWorktreeLeaseRecord): string {
   const scope =
     lease.scope.kind === "project_meta"
-      ? "project-meta"
+      ? "workspace-meta"
       : `component ${lease.scope.componentId ?? "unknown"}`;
   const workItem = lease.workItemId ? ` ${lease.workItemId}` : "";
   const branch = lease.branchName ? ` ${lease.branchName}` : "";

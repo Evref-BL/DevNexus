@@ -77,7 +77,7 @@ describe("version planning config", () => {
       },
       {
         componentIds,
-        pathName: "project config.versionPlanning",
+        pathName: "workspace config.versionPlanning",
       },
     );
 
@@ -177,7 +177,7 @@ describe("version planning config", () => {
     ));
   });
 
-  it("validates version planning inside project config", () => {
+  it("validates version planning inside workspace config", () => {
     const config = validateProjectConfig({
       version: 1,
       id: "versioned-project",

@@ -207,7 +207,7 @@ function inspectProjectLocalClone(
       component: options.component,
       sourceRoot: fact.sourceRoot,
       message:
-        "Project-local clone target already exists; setup will not replace it automatically.",
+        "Workspace-local clone target already exists; setup will not replace it automatically.",
     }));
   }
 }

@@ -538,7 +538,7 @@ function resolveRemoteExecutionContext(
     : resolvePrimaryProjectComponent(projectRoot, projectConfig);
   if (!component) {
     throw new NexusRemoteExecutionError(
-      `Project component is not configured: ${componentId}`,
+      `Workspace component is not configured: ${componentId}`,
     );
   }
 

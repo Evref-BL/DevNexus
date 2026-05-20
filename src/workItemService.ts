@@ -149,7 +149,7 @@ export class WorkItemService {
     } catch (error) {
       if (error instanceof WorkTrackingProviderServiceError) {
         throw new WorkItemServiceError(
-          `Project "${projectContext.projectId}" component ` +
+          `Workspace "${projectContext.projectId}" component ` +
             `"${projectContext.componentId ?? "primary"}" tracker ` +
             `"${selectedTracker.tracker.id}" uses work tracking provider ` +
             `"${workTracking.provider}", but it is not available: ${error.message}`,

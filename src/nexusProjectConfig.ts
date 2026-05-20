@@ -624,7 +624,7 @@ export function normalizeNexusProjectAgentTargets(
     targets,
     recommendations: targets.length > 0
       ? [
-          "Project uses legacy mcp.agentTargets and skills.agentTargets compatibility; add project config.agentTargets.active to make active provider selection explicit.",
+          "Workspace uses legacy mcp.agentTargets and skills.agentTargets compatibility; add workspace config.agentTargets.active to make active provider selection explicit.",
         ]
       : [],
   };
@@ -879,7 +879,7 @@ function validateNexusAuthorityActor(
   value: unknown,
   index: number,
 ): NexusAuthorityActorConfig {
-  const pathName = `project config.authority.actors[${index}]`;
+  const pathName = `workspace config.authority.actors[${index}]`;
   const record = assertRecord(value, pathName);
   const handles = optionalStringRecord(record, "handles", pathName);
 
@@ -900,7 +900,7 @@ function validateNexusAuthorityActors(
     return undefined;
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.authority.actors must be an array");
+    throw new NexusConfigError("workspace config.authority.actors must be an array");
   }
 
   const actors = value.map(validateNexusAuthorityActor);
@@ -908,7 +908,7 @@ function validateNexusAuthorityActors(
   for (const actor of actors) {
     if (actorIds.has(actor.id)) {
       throw new NexusConfigError(
-        `project config.authority.actors contains duplicate id: ${actor.id}`,
+        `workspace config.authority.actors contains duplicate id: ${actor.id}`,
       );
     }
     actorIds.add(actor.id);
@@ -953,7 +953,7 @@ function validateNexusAuthorityRoleDefinition(
   value: unknown,
   index: number,
 ): NexusAuthorityRoleDefinitionConfig {
-  const pathName = `project config.authority.roles[${index}]`;
+  const pathName = `workspace config.authority.roles[${index}]`;
   const record = assertRecord(value, pathName);
   const name = optionalString(record, "name", pathName);
   const description = optionalString(record, "description", pathName);
@@ -973,7 +973,7 @@ function validateNexusAuthorityRoles(
     return undefined;
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.authority.roles must be an array");
+    throw new NexusConfigError("workspace config.authority.roles must be an array");
   }
 
   const roles = value.map(validateNexusAuthorityRoleDefinition);
@@ -981,7 +981,7 @@ function validateNexusAuthorityRoles(
   for (const role of roles) {
     if (roleIds.has(role.id)) {
       throw new NexusConfigError(
-        `project config.authority.roles contains duplicate id: ${role.id}`,
+        `workspace config.authority.roles contains duplicate id: ${role.id}`,
       );
     }
     roleIds.add(role.id);
@@ -1051,7 +1051,7 @@ function validateNexusAuthorityRoleBinding(
   index: number,
   knownRoleIds: Set<string>,
 ): NexusAuthorityRoleBindingConfig {
-  const pathName = `project config.authority.roleBindings[${index}]`;
+  const pathName = `workspace config.authority.roleBindings[${index}]`;
   const record = assertRecord(value, pathName);
 
   return {
@@ -1074,7 +1074,7 @@ function validateNexusAuthorityRoleBindings(
   }
   if (!Array.isArray(value)) {
     throw new NexusConfigError(
-      "project config.authority.roleBindings must be an array",
+      "workspace config.authority.roleBindings must be an array",
     );
   }
 
@@ -1090,7 +1090,7 @@ function validateNexusAuthorityConfig(
     return undefined;
   }
 
-  const pathName = "project config.authority";
+  const pathName = "workspace config.authority";
   const record = assertRecord(value, pathName);
   const actors = validateNexusAuthorityActors(record.actors);
   const roles = validateNexusAuthorityRoles(record.roles);
@@ -1152,12 +1152,12 @@ function validateProjectExtensionsConfig(
     return undefined;
   }
 
-  const record = assertRecord(value, "project config.extensions");
+  const record = assertRecord(value, "workspace config.extensions");
   const extensions: NexusProjectExtensionsConfig = {};
   for (const [key, extensionValue] of Object.entries(record)) {
     if (!key.trim()) {
       throw new NexusConfigError(
-        "project config.extensions keys must be non-empty strings",
+        "workspace config.extensions keys must be non-empty strings",
       );
     }
     if (
@@ -1166,7 +1166,7 @@ function validateProjectExtensionsConfig(
       Array.isArray(extensionValue)
     ) {
       throw new NexusConfigError(
-        `project config.extensions.${key} must be an object`,
+        `workspace config.extensions.${key} must be an object`,
       );
     }
 
@@ -1180,7 +1180,7 @@ function validateProjectHostConfig(
   value: unknown,
   index: number,
 ): NexusProjectHostConfig {
-  const pathName = `project config.hosts[${index}]`;
+  const pathName = `workspace config.hosts[${index}]`;
   const record = assertRecord(value, pathName);
   const id = requiredString(record, "id", pathName);
   const notes = optionalString(record, "notes", pathName);
@@ -1200,7 +1200,7 @@ function validateProjectHostsConfig(value: unknown): NexusProjectHostConfig[] {
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.hosts must be an array");
+    throw new NexusConfigError("workspace config.hosts must be an array");
   }
 
   const hosts = value.map(validateProjectHostConfig);
@@ -1208,7 +1208,7 @@ function validateProjectHostsConfig(value: unknown): NexusProjectHostConfig[] {
   for (const host of hosts) {
     if (ids.has(host.id)) {
       throw new NexusConfigError(
-        `project config.hosts contains duplicate id: ${host.id}`,
+        `workspace config.hosts contains duplicate id: ${host.id}`,
       );
     }
     ids.add(host.id);
@@ -1224,7 +1224,7 @@ function validateRunnerProfilesConfig(
     return undefined;
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.runnerProfiles must be an array");
+    throw new NexusConfigError("workspace config.runnerProfiles must be an array");
   }
 
   const profiles = value.map(validateRunnerProfileConfig);
@@ -1232,7 +1232,7 @@ function validateRunnerProfilesConfig(
   for (const profile of profiles) {
     if (ids.has(profile.id)) {
       throw new NexusConfigError(
-        `project config.runnerProfiles contains duplicate id: ${profile.id}`,
+        `workspace config.runnerProfiles contains duplicate id: ${profile.id}`,
       );
     }
     ids.add(profile.id);
@@ -1245,7 +1245,7 @@ function validateRunnerProfileConfig(
   value: unknown,
   index: number,
 ): NexusRunnerProfileConfig {
-  const pathName = `project config.runnerProfiles[${index}]`;
+  const pathName = `workspace config.runnerProfiles[${index}]`;
   const record = assertRecord(value, pathName);
   const id = requiredString(record, "id", pathName);
   const allowedOperationClasses = validateRunnerOperationClasses(
@@ -1576,7 +1576,7 @@ function validateProjectSkillSelection(
   value: unknown,
   index: number,
 ): NexusProjectSkillSelection {
-  const pathName = `project config.skills.items[${index}]`;
+  const pathName = `workspace config.skills.items[${index}]`;
   const record = assertRecord(value, pathName);
   const enabled = record.enabled;
   if (enabled !== undefined && typeof enabled !== "boolean") {
@@ -1605,7 +1605,7 @@ function validateProjectSkillAgentTarget(
   value: unknown,
   index: number,
 ): NexusProjectSkillAgentTarget {
-  const pathName = `project config.skills.agentTargets[${index}]`;
+  const pathName = `workspace config.skills.agentTargets[${index}]`;
   const record = assertRecord(value, pathName);
   const enabled = record.enabled;
   if (enabled !== undefined && typeof enabled !== "boolean") {
@@ -1632,30 +1632,30 @@ function validateProjectSkillsConfig(
     return undefined;
   }
 
-  const record = assertRecord(value, "project config.skills");
+  const record = assertRecord(value, "workspace config.skills");
   const defaultCorePack = record.defaultCorePack;
   if (defaultCorePack !== undefined && typeof defaultCorePack !== "boolean") {
     throw new NexusConfigError(
-      "project config.skills.defaultCorePack must be a boolean",
+      "workspace config.skills.defaultCorePack must be a boolean",
     );
   }
   const items = record.items;
   if (items !== undefined && !Array.isArray(items)) {
-    throw new NexusConfigError("project config.skills.items must be an array");
+    throw new NexusConfigError("workspace config.skills.items must be an array");
   }
   const agentTargets = record.agentTargets;
   if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
     throw new NexusConfigError(
-      "project config.skills.agentTargets must be an array",
+      "workspace config.skills.agentTargets must be an array",
     );
   }
   const materialization = validateSkillMaterialization(
     record.materialization,
-    "project config.skills.materialization",
+    "workspace config.skills.materialization",
   );
   const sourceControl = validateSkillSourceControl(
     record.sourceControl,
-    "project config.skills.sourceControl",
+    "workspace config.skills.sourceControl",
   );
 
   return {
@@ -1913,7 +1913,7 @@ function validateProjectPluginConfig(
   value: unknown,
   index: number,
 ): NexusProjectPluginConfig {
-  const pathName = `project config.plugins[${index}]`;
+  const pathName = `workspace config.plugins[${index}]`;
   const record = assertRecord(value, pathName);
   const enabled = optionalBoolean(record, "enabled", pathName) ?? true;
   const name = optionalString(record, "name", pathName);
@@ -1951,7 +1951,7 @@ function validateProjectPluginsConfig(
     return undefined;
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.plugins must be an array");
+    throw new NexusConfigError("workspace config.plugins must be an array");
   }
 
   const plugins = value.map((plugin, index) =>
@@ -1961,7 +1961,7 @@ function validateProjectPluginsConfig(
   for (const plugin of plugins) {
     if (ids.has(plugin.id)) {
       throw new NexusConfigError(
-        `project config.plugins contains duplicate id: ${plugin.id}`,
+        `workspace config.plugins contains duplicate id: ${plugin.id}`,
       );
     }
     ids.add(plugin.id);
@@ -1976,16 +1976,16 @@ function validateProjectAgentTargetsConfig(
   if (value === undefined) {
     return undefined;
   }
-  const record = assertRecord(value, "project config.agentTargets");
+  const record = assertRecord(value, "workspace config.agentTargets");
   const active = record.active;
   if (!Array.isArray(active)) {
     throw new NexusConfigError(
-      "project config.agentTargets.active must be an array",
+      "workspace config.agentTargets.active must be an array",
     );
   }
   if (active.length === 0) {
     throw new NexusConfigError(
-      "project config.agentTargets.active must not be empty",
+      "workspace config.agentTargets.active must not be empty",
     );
   }
 
@@ -1994,7 +1994,7 @@ function validateProjectAgentTargetsConfig(
   for (const target of targets) {
     if (providers.has(target.provider)) {
       throw new NexusConfigError(
-        `project config.agentTargets.active contains duplicate provider: ${target.provider}`,
+        `workspace config.agentTargets.active contains duplicate provider: ${target.provider}`,
       );
     }
     providers.add(target.provider);
@@ -2007,7 +2007,7 @@ function validateProjectActiveAgentTargetConfig(
   value: unknown,
   index: number,
 ): NexusProjectActiveAgentTargetConfig {
-  const pathName = `project config.agentTargets.active[${index}]`;
+  const pathName = `workspace config.agentTargets.active[${index}]`;
   const record = assertRecord(value, pathName);
   const provider = validateActiveAgentProvider(record.provider, `${pathName}.provider`);
   const enabled = optionalBoolean(record, "enabled", pathName);
@@ -2135,7 +2135,7 @@ function validateProjectMcpAgentTarget(
   value: unknown,
   index: number,
 ): NexusProjectAgentMcpTarget {
-  const pathName = `project config.mcp.agentTargets[${index}]`;
+  const pathName = `workspace config.mcp.agentTargets[${index}]`;
   const record = assertRecord(value, pathName);
   const enabled = optionalBoolean(record, "enabled", pathName);
   const provider = optionalString(record, "provider", pathName);
@@ -2209,24 +2209,24 @@ function validateProjectMcpConfig(
     return undefined;
   }
 
-  const record = assertRecord(value, "project config.mcp");
-  const enabled = optionalBoolean(record, "enabled", "project config.mcp");
+  const record = assertRecord(value, "workspace config.mcp");
+  const enabled = optionalBoolean(record, "enabled", "workspace config.mcp");
   const sourceControl = validateSkillSourceControl(
     record.sourceControl,
-    "project config.mcp.sourceControl",
+    "workspace config.mcp.sourceControl",
   );
-  const serverName = optionalString(record, "serverName", "project config.mcp");
-  const command = optionalString(record, "command", "project config.mcp");
-  const args = optionalStringArray(record, "args", "project config.mcp");
+  const serverName = optionalString(record, "serverName", "workspace config.mcp");
+  const command = optionalString(record, "command", "workspace config.mcp");
+  const args = optionalStringArray(record, "args", "workspace config.mcp");
   const defaultToolsApprovalMode = optionalString(
     record,
     "defaultToolsApprovalMode",
-    "project config.mcp",
+    "workspace config.mcp",
   );
   const agentTargets = record.agentTargets;
   if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
     throw new NexusConfigError(
-      "project config.mcp.agentTargets must be an array",
+      "workspace config.mcp.agentTargets must be an array",
     );
   }
 
@@ -2381,7 +2381,7 @@ function validateProjectHostingInvitationPolicy(
 function validateProjectHostingRepositoryConfig(
   value: unknown,
 ): NexusProjectHostingConfig["repository"] {
-  const pathName = "project config.hosting.repository";
+  const pathName = "workspace config.hosting.repository";
   const record =
     value === undefined ? {} : assertRecord(value, pathName);
   const name = optionalString(record, "name", pathName);
@@ -2408,7 +2408,7 @@ function validateProjectHostingRemoteConfig(
   value: unknown,
   index: number,
 ): NexusProjectHostingConfig["remotes"][number] {
-  const pathName = `project config.hosting.remotes[${index}]`;
+  const pathName = `workspace config.hosting.remotes[${index}]`;
   const record = assertRecord(value, pathName);
   const protocol = validateProjectHostingRemoteProtocol(
     record.protocol,
@@ -2446,11 +2446,11 @@ function validateProjectHostingRemotes(
     ];
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.hosting.remotes must be an array");
+    throw new NexusConfigError("workspace config.hosting.remotes must be an array");
   }
   if (value.length === 0) {
     throw new NexusConfigError(
-      "project config.hosting.remotes must not be empty",
+      "workspace config.hosting.remotes must not be empty",
     );
   }
 
@@ -2461,7 +2461,7 @@ function validateProjectHostingRemotes(
   for (const remote of remotes) {
     if (names.has(remote.name)) {
       throw new NexusConfigError(
-        `project config.hosting.remotes contains duplicate name: ${remote.name}`,
+        `workspace config.hosting.remotes contains duplicate name: ${remote.name}`,
       );
     }
     names.add(remote.name);
@@ -2474,7 +2474,7 @@ function validateProjectHostingAccessPrincipalConfig(
   value: unknown,
   index: number,
 ): NexusProjectHostingConfig["access"][number] {
-  const pathName = `project config.hosting.access[${index}]`;
+  const pathName = `workspace config.hosting.access[${index}]`;
   const record = assertRecord(value, pathName);
   const authProfile = optionalString(record, "authProfile", pathName);
 
@@ -2504,7 +2504,7 @@ function validateProjectHostingAccess(
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.hosting.access must be an array");
+    throw new NexusConfigError("workspace config.hosting.access must be an array");
   }
 
   const access = value.map((principal, index) =>
@@ -2516,7 +2516,7 @@ function validateProjectHostingAccess(
       `${principal.kind}:${principal.providerIdentity}`.toLowerCase();
     if (identities.has(identityKey)) {
       throw new NexusConfigError(
-        `project config.hosting.access contains duplicate principal: ` +
+        `workspace config.hosting.access contains duplicate principal: ` +
           `${principal.kind}:${principal.providerIdentity}`,
       );
     }
@@ -2529,7 +2529,7 @@ function validateProjectHostingAccess(
 function validateProjectHostingProvisioningConfig(
   value: unknown,
 ): NexusProjectHostingConfig["provisioning"] {
-  const pathName = "project config.hosting.provisioning";
+  const pathName = "workspace config.hosting.provisioning";
   const record =
     value === undefined ? {} : assertRecord(value, pathName);
   const providerMutationAuthProfile = optionalString(
@@ -2602,7 +2602,7 @@ function validateProjectHostingConfig(
     return undefined;
   }
 
-  const pathName = "project config.hosting";
+  const pathName = "workspace config.hosting";
   const record = assertRecord(value, pathName);
   rejectSharedHostingSecretFields(record, pathName);
   const authProfile = optionalString(record, "authProfile", pathName);
@@ -3691,7 +3691,7 @@ function validateProjectComponent(
   value: unknown,
   index: number,
 ): NexusProjectComponentConfig {
-  const pathName = `project config.components[${index}]`;
+  const pathName = `workspace config.components[${index}]`;
   const record = assertRecord(value, pathName);
   const id = requiredString(record, "id", pathName);
   const kind = record.kind;
@@ -3765,10 +3765,10 @@ function validateProjectComponentsConfig(
   }
 
   if (!Array.isArray(value)) {
-    throw new NexusConfigError("project config.components must be an array");
+    throw new NexusConfigError("workspace config.components must be an array");
   }
   if (value.length === 0) {
-    throw new NexusConfigError("project config.components must not be empty");
+    throw new NexusConfigError("workspace config.components must not be empty");
   }
 
   const components = value.map((entry, index) =>
@@ -3778,7 +3778,7 @@ function validateProjectComponentsConfig(
   for (const component of components) {
     if (ids.has(component.id)) {
       throw new NexusConfigError(
-        `project config.components contains duplicate id: ${component.id}`,
+        `workspace config.components contains duplicate id: ${component.id}`,
       );
     }
     ids.add(component.id);
@@ -3788,14 +3788,14 @@ function validateProjectComponentsConfig(
   );
   if (primaryComponents.length !== 1) {
     throw new NexusConfigError(
-      "project config.components must contain exactly one primary component",
+      "workspace config.components must contain exactly one primary component",
     );
   }
   for (const component of components) {
     for (const relationship of component.relationships) {
       if (!ids.has(relationship.componentId)) {
         throw new NexusConfigError(
-          `project config.components.${component.id} relationship references unknown component: ${relationship.componentId}`,
+          `workspace config.components.${component.id} relationship references unknown component: ${relationship.componentId}`,
         );
       }
     }
@@ -3817,7 +3817,7 @@ function validatePluginDependencyProjectionSourceComponents(
         !componentIds.has(capability.sourceComponentId)
       ) {
         throw new NexusConfigError(
-          `project config.plugins.${plugin.id}.${capability.id} sourceComponentId references unknown component: ${capability.sourceComponentId}`,
+          `workspace config.plugins.${plugin.id}.${capability.id} sourceComponentId references unknown component: ${capability.sourceComponentId}`,
         );
       }
     }
@@ -3872,11 +3872,11 @@ function validatePluginMcpToolOwnership(
 }
 
 export function validateProjectConfig(value: unknown): NexusProjectConfig {
-  const record = assertRecord(value, "project config");
+  const record = assertRecord(value, "workspace config");
   if (record.version !== 1) {
-    throw new NexusConfigError("project config.version must be 1");
+    throw new NexusConfigError("workspace config.version must be 1");
   }
-  const agent = validateNexusAgentConfig(record.agent, "project config.agent");
+  const agent = validateNexusAgentConfig(record.agent, "workspace config.agent");
   const workTracking = validateWorkTrackingConfig(record.workTracking);
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
@@ -3891,13 +3891,13 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   const repo = validateRepoConfig(record.repo);
   const kanban = validateKanbanConfig(record.kanban);
   const worktreesRoot =
-    optionalString(record, "worktreesRoot", "project config") ??
+    optionalString(record, "worktreesRoot", "workspace config") ??
     nexusProjectWorktreesDirectoryName;
   const common = {
     version: 1 as const,
-    id: requiredString(record, "id", "project config"),
-    name: requiredString(record, "name", "project config"),
-    home: nullableString(record, "home", "project config"),
+    id: requiredString(record, "id", "workspace config"),
+    name: requiredString(record, "name", "workspace config"),
+    home: nullableString(record, "home", "workspace config"),
     repo,
     worktreesRoot,
     ...(kanban ? { kanban } : {}),
@@ -3908,7 +3908,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     record.versionPlanning,
     {
       componentIds: new Set(components.map((component) => component.id)),
-      pathName: "project config.versionPlanning",
+      pathName: "workspace config.versionPlanning",
     },
   );
   validatePluginDependencyProjectionSourceComponents(plugins, components);
@@ -3936,7 +3936,7 @@ export function loadProjectConfig(projectRootPath: string): NexusProjectConfig {
   const configPath = projectConfigPath(projectRootPath);
   if (!fs.existsSync(configPath)) {
     throw new NexusConfigError(
-      `DevNexus project is not initialized: ${configPath}`,
+      `DevNexus workspace is not initialized: ${configPath}`,
     );
   }
 

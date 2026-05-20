@@ -675,7 +675,7 @@ describe("nexus automation worktree setup", () => {
     ]);
   });
 
-  it("refreshes missing and stale worker skill projections from project-managed skills", () => {
+  it("refreshes missing and stale worker skill projections from workspace-managed skills", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-project-");
     const sourceRoot = path.join(projectRoot, "source");
     const worktreesRoot = path.join(projectRoot, "worktrees", "primary");

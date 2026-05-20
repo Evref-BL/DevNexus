@@ -93,7 +93,7 @@ export async function probeCodexAppServerInitialize(
   const projectConfig = loadProjectConfig(options.projectRoot);
   const automationConfig = projectConfig.automation;
   if (!automationConfig) {
-    throw new Error("Project automation is not configured");
+    throw new Error("Workspace automation is not configured");
   }
   const policy = normalizeNexusAutomationAgentPolicy(automationConfig);
   const profileId = options.profileId ?? policy.coordinatorProfileId;

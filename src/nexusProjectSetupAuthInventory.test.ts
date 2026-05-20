@@ -95,7 +95,7 @@ function answers(): NexusProjectSetupAnswers {
   };
 }
 
-describe("project setup auth inventory", () => {
+describe("workspace setup auth inventory", () => {
   it("classifies required, optional, and provider mutation auth profiles", () => {
     const inventory = buildNexusProjectSetupAuthInventory(answers(), {
       env: {

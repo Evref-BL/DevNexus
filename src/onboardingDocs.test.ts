@@ -95,7 +95,7 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toBeGreaterThan(termsStart);
 
     const requiredDefinitions = [
-      { term: "DevNexus project", marker: "**DevNexus project**" },
+      { term: "DevNexus workspace", marker: "**DevNexus workspace**" },
       { term: "component", marker: "**component**" },
       { term: "provider", marker: "**provider**" },
       { term: "work item", marker: "**work item**" },
@@ -116,20 +116,20 @@ describe("README onboarding guardrails", () => {
 
   it("keeps the user quickstart before automation-only setup examples", () => {
     const readme = repoFile("README.md");
-    const userSetup = readme.indexOf("dev-nexus project setup");
+    const userSetup = readme.indexOf("dev-nexus workspace setup");
     const answerFileSetup = readme.indexOf("--answers ./dev-nexus.setup.json");
     expect(userSetup).toBeGreaterThan(-1);
     expect(answerFileSetup).toBeGreaterThan(userSetup);
 
     const firstSetupLine = readme
       .split(/\r?\n/u)
-      .find((line) => line.includes("dev-nexus project setup"))!;
-    expect(firstSetupLine.trim()).toBe("dev-nexus project setup");
+      .find((line) => line.includes("dev-nexus workspace setup"))!;
+    expect(firstSetupLine.trim()).toBe("dev-nexus workspace setup");
     expect(firstSetupLine).not.toContain("--answers");
     expect(firstSetupLine).not.toContain("--json");
     expect(firstSetupLine).not.toContain("--yes");
-    expect(readme).not.toContain("dev-nexus project import");
-    expect(readme).not.toContain("dev-nexus project create");
+    expect(readme).not.toContain("dev-nexus workspace import");
+    expect(readme).not.toContain("dev-nexus workspace create");
     expect(readme).not.toContain("gh pr checks");
     expect(readme).not.toContain("github-50");
   });
@@ -142,9 +142,9 @@ describe("README onboarding guardrails", () => {
 
     expect(quickStart).toContain("Copy-paste prompt");
     expect(quickStart).toContain("Codex or Claude");
-    expect(quickStart).toContain("DevNexus project root");
+    expect(quickStart).toContain("DevNexus workspace root");
     expect(quickStart).toContain("AGENTS.md");
-    expect(quickStart).toContain("dev-nexus project status");
+    expect(quickStart).toContain("dev-nexus workspace status");
     expect(quickStart).toContain("dev-nexus setup check");
     expect(quickStart).toContain("inspect the components");
     expect(quickStart).toContain("create or triage the first component work item");
@@ -155,8 +155,8 @@ describe("README onboarding guardrails", () => {
 
   it("uses a general industry example instead of dogfood or research-specific names", () => {
     const readme = repoFile("README.md");
-    const firstProjectGuide = repoFile("docs/user/first-project-existing-components.md");
-    const combined = `${readme}\n${firstProjectGuide}`;
+    const firstWorkspaceGuide = repoFile("docs/user/first-workspace-existing-components.md");
+    const combined = `${readme}\n${firstWorkspaceGuide}`;
 
     for (const expected of ["rocket-shop-suite", "checkout-api", "storefront", "shared-kernel"]) {
       expect(combined).toContain(expected);
@@ -183,7 +183,7 @@ describe("README onboarding guardrails", () => {
       "docs/user/getting-started.md",
       "docs/user/concepts.md",
       "docs/user/agent-targets.md",
-      "docs/user/first-project-existing-components.md",
+      "docs/user/first-workspace-existing-components.md",
       "docs/user/providers-auth-hosting.md",
     ]) {
       assertLocalMarkdownLinksExist(file);
@@ -207,7 +207,7 @@ describe("README onboarding guardrails", () => {
       "Agent-native skill directories",
       "present-stale-generated",
       "present-manual",
-      "project status",
+      "workspace status",
       "setup check",
     ]) {
       expect(guide, `agent target guide must mention ${required}`).toContain(required);
@@ -220,8 +220,8 @@ describe("README onboarding guardrails", () => {
   });
 });
 
-describe("first-project quickstart smoke", () => {
-  it("creates a ready local project from the no-answer-file user setup path", async () => {
+describe("first-workspace quickstart smoke", () => {
+  it("creates a ready local workspace from the no-answer-file user setup path", async () => {
     const projectRoot = makeTempDir("dev-nexus-quickstart-project-");
     const homePath = makeTempDir("dev-nexus-quickstart-home-");
     fs.mkdirSync(path.join(projectRoot, "packages", "api"), { recursive: true });

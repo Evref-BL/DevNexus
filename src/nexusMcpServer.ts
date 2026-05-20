@@ -245,7 +245,7 @@ const devNexusMcpServerStartedAt = new Date();
 const tools: McpTool[] = [
   {
     name: "project_status",
-    description: "Show one DevNexus project by registered id or filesystem path.",
+    description: "Show one DevNexus workspace by registered id or filesystem path.",
     inputSchema: {
       type: "object",
       properties: {
@@ -259,7 +259,7 @@ const tools: McpTool[] = [
   },
   {
     name: "project_hosting_status",
-    description: "Report read-only DevNexus project hosting status without mutating local remotes or provider state.",
+    description: "Report read-only DevNexus workspace hosting status without mutating local remotes or provider state.",
     inputSchema: {
       type: "object",
       properties: {
@@ -272,7 +272,7 @@ const tools: McpTool[] = [
   },
   {
     name: "project_hosting_plan",
-    description: "Build a deterministic dry-run DevNexus project hosting plan without applying repairs.",
+    description: "Build a deterministic dry-run DevNexus workspace hosting plan without applying repairs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -285,7 +285,7 @@ const tools: McpTool[] = [
   },
   {
     name: "project_hosting_apply",
-    description: "Apply policy-gated DevNexus project hosting repairs.",
+    description: "Apply policy-gated DevNexus workspace hosting repairs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -326,7 +326,7 @@ const tools: McpTool[] = [
   },
   {
     name: "agent_profiles",
-    description: "Inspect concise DevNexus coordinator and subagent profile policy without dumping full project config.",
+    description: "Inspect concise DevNexus coordinator and subagent profile policy without dumping full workspace config.",
     inputSchema: {
       type: "object",
       properties: {
@@ -353,7 +353,7 @@ const tools: McpTool[] = [
   },
   {
     name: "automation_heartbeat_prepare",
-    description: "Prepare a Codex heartbeat automation recipe and prompt for a DevNexus project without mutating Codex or provider state.",
+    description: "Prepare a Codex heartbeat automation recipe and prompt for a DevNexus workspace without mutating Codex or provider state.",
     inputSchema: {
       type: "object",
       properties: {
@@ -381,7 +381,7 @@ const tools: McpTool[] = [
   },
   {
     name: "setup_plan",
-    description: "Build a guided setup plan for a DevNexus project without reading secrets or mutating host state.",
+    description: "Build a guided setup plan for a DevNexus workspace without reading secrets or mutating host state.",
     inputSchema: {
       type: "object",
       properties: {
@@ -398,7 +398,7 @@ const tools: McpTool[] = [
   },
   {
     name: "setup_check",
-    description: "Check safe local setup facts for a DevNexus project without contacting external providers.",
+    description: "Check safe local setup facts for a DevNexus workspace without contacting external providers.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2309,7 +2309,7 @@ function resolveMcpWorkItemAuthority(
     (candidate) => candidate.id === resolved.componentId,
   );
   if (!component) {
-    throw new Error(`Project component is not configured: ${resolved.componentId}`);
+    throw new Error(`Workspace component is not configured: ${resolved.componentId}`);
   }
   const publication = resolveNexusPublicationPolicy(config, component);
   const authProfiles = projectHostingAuthProfiles(config, homePath);
@@ -2674,7 +2674,7 @@ function targetCycleProjectFromArgs(args: Record<string, unknown>): {
   const projectConfig = loadProjectConfig(projectRoot);
   const automationConfig = projectConfig.automation;
   if (!automationConfig) {
-    throw new Error("Project automation is not configured");
+    throw new Error("Workspace automation is not configured");
   }
 
   return { projectRoot, projectConfig, automationConfig };
@@ -2699,7 +2699,7 @@ function resolveWorkItemProject(
       )
     : resolvePrimaryProjectComponent(projectRoot, config);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   if (!component.workTracking) {
     throw new Error(`Component ${component.id} work tracking is not configured`);
@@ -2754,7 +2754,7 @@ function mcpRuntimeSummaryForProject(
     warnings.push(
       `DevNexus MCP server started before ${source.componentId} source HEAD ` +
         `${source.headCommit ?? "unknown"} at ${source.headCommitDate}; reload or ` +
-        "restart the agent MCP session, or use the project-local DevNexus CLI for source-current results.",
+        "restart the agent MCP session, or use the workspace-local DevNexus CLI for source-current results.",
     );
   }
 
@@ -3500,7 +3500,7 @@ function workItemImportExecutionAuthorityFromArgs(
       )
     : resolvePrimaryProjectComponent(projectRoot, projectConfig);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
   const authProfiles = loadNexusPublicationAuthProfiles({

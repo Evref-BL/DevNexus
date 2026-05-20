@@ -392,7 +392,7 @@ function materializeWorkerSkillProjections(options: {
   );
   if (!fs.existsSync(projectManagedSkillsRoot)) {
     throw new NexusAutomationWorktreeSetupError(
-      `Project-managed skills root does not exist: ${projectManagedSkillsRoot}`,
+      `Workspace-managed skills root does not exist: ${projectManagedSkillsRoot}`,
     );
   }
 
@@ -494,14 +494,14 @@ function readProjectManagedSkill(skillRoot: string): ProjectManagedSkillEntry {
   const manifestPath = path.join(skillRoot, nexusSkillManifestFileName);
   if (!fs.existsSync(manifestPath)) {
     throw new NexusAutomationWorktreeSetupError(
-      `Project-managed skill manifest is missing: ${manifestPath}`,
+      `Workspace-managed skill manifest is missing: ${manifestPath}`,
     );
   }
 
   const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   if (!isNexusSkillManifest(parsed)) {
     throw new NexusAutomationWorktreeSetupError(
-      `Project-managed skill manifest is invalid: ${manifestPath}`,
+      `Workspace-managed skill manifest is invalid: ${manifestPath}`,
     );
   }
 

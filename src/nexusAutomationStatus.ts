@@ -199,7 +199,7 @@ export async function getNexusAutomationStatus(
       projectConfig,
       automationConfig,
       status: "disabled",
-      summary: "Automation is not enabled for this project",
+      summary: "Automation is not enabled for this workspace",
       lock: null,
       ledger: null,
       backoff: null,
@@ -290,7 +290,7 @@ export async function getNexusAutomationStatus(
       components,
     });
     if (componentProviders.length === 0) {
-      const summary = "No project component has work tracking configured";
+      const summary = "No workspace component has work tracking configured";
       return statusResult({
         projectRoot,
         sourceRoot,

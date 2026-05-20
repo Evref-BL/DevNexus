@@ -59,7 +59,7 @@ choose one enabled tracker as `defaultWorkTrackerId`.
 }
 ```
 
-`workTracking` remains accepted for older projects. When `workTrackers` is not
+`workTracking` remains accepted for older workspaces. When `workTrackers` is not
 configured, DevNexus normalizes the legacy `workTracking` value into one
 enabled default tracker named `default` with role `primary`.
 
@@ -90,23 +90,23 @@ Work-item commands and MCP tools use the component default tracker when
 `--tracker` or `trackerId` is omitted.
 
 ```bash
-dev-nexus work-item create <project-root> --component core --title "Implement focused task" --status ready
-dev-nexus work-item list <project-root> --component core
-dev-nexus work-item update <project-root> local-1 --component core --status in_progress
+dev-nexus work-item create <workspace-root> --component core --title "Implement focused task" --status ready
+dev-nexus work-item list <workspace-root> --component core
+dev-nexus work-item update <workspace-root> local-1 --component core --status in_progress
 ```
 
 Use `--tracker` when intentionally reading or mutating a non-default tracker:
 
 ```bash
-dev-nexus work-item list <project-root> --component core --tracker github --status ready
-dev-nexus work-item get <project-root> github:42 --component core
-dev-nexus work-item comment <project-root> github:42 --component core --body "Shared coordination note."
+dev-nexus work-item list <workspace-root> --component core --tracker github --status ready
+dev-nexus work-item get <workspace-root> github:42 --component core
+dev-nexus work-item comment <workspace-root> github:42 --component core --body "Shared coordination note."
 ```
 
 Tracker-qualified ids use `<tracker-id>:<provider-local-id>`. If a command also
 passes `--tracker`, the id and option must agree.
 
-`dev-nexus project status <project-root>` reports each tracker id, provider,
+`dev-nexus workspace status <workspace-root>` reports each tracker id, provider,
 roles, enabled state, default state, and unsupported provider capabilities.
 
 ## Link Records
@@ -118,7 +118,7 @@ instead of creating a duplicate.
 Link an existing GitHub issue before enabling sync:
 
 ```bash
-dev-nexus work-item link <project-root> local-46 \
+dev-nexus work-item link <workspace-root> local-46 \
   --component core \
   --tracker github \
   --item-id 42 \
@@ -129,8 +129,8 @@ dev-nexus work-item link <project-root> local-46 \
 Inspect and repair links:
 
 ```bash
-dev-nexus work-item show-links <project-root> local-46 --component core
-dev-nexus work-item unlink <project-root> local-46 --component core --tracker github --item-id 42 --reason "Wrong external issue"
+dev-nexus work-item show-links <workspace-root> local-46 --component core
+dev-nexus work-item unlink <workspace-root> local-46 --component core --tracker github --item-id 42 --reason "Wrong external issue"
 ```
 
 Repeated `link` calls for the same tracker and item update the stored metadata
@@ -145,7 +145,7 @@ credentials, and reports creates, updates, skips, conflicts, stale links, and
 unlinked target items without mutating providers.
 
 ```bash
-dev-nexus work-item sync-plan <project-root> \
+dev-nexus work-item sync-plan <workspace-root> \
   --component core \
   --source-tracker primary \
   --target-tracker github \
@@ -198,8 +198,8 @@ target items immediately, records a sync run summary, and uses stable markers
 for DevNexus-generated sync comments so repeated runs do not duplicate them.
 
 Do not treat sync execution as a default migration step or as proof that live
-external writes are available in every project. Run and review `sync-plan`
-first, link existing external issues first, and execute only when the project
+external writes are available in every workspace. Run and review `sync-plan`
+first, link existing external issues first, and execute only when the workspace
 policy, provider target, and automation identity explicitly allow that external
 mutation.
 
@@ -210,7 +210,7 @@ Jira is introduced as a mirror, coordination tracker, or migration tracker.
 
 1. Add the external tracker binding with `enabled: true` and an explicit role,
    but keep `defaultWorkTrackerId` pointed at the current local primary.
-2. Run `dev-nexus project status <project-root>` and confirm the tracker id,
+2. Run `dev-nexus workspace status <workspace-root>` and confirm the tracker id,
    provider, roles, default state, and capability report.
 3. Decide the migration scope with labels, statuses, explicit item ids, or a
    search query. Do not mirror every local runtime note by default.
@@ -227,7 +227,7 @@ Jira is introduced as a mirror, coordination tracker, or migration tracker.
 
 For a future cutover, change the default tracker only after all active local
 items have either been linked to the external provider, closed locally, or
-intentionally left local. Record the decision in the project handoff or target
+intentionally left local. Record the decision in the workspace handoff or target
 state so agents know which tracker is canonical.
 
 ## Safety Notes
@@ -244,7 +244,7 @@ state so agents know which tracker is canonical.
   identity or host-local auth profile, not whichever browser, Git CLI, or
   credential helper happens to be active.
 - Secrets stay local. Tokens, private keys, browser state, and absolute
-  credential paths belong in host-local configuration, not shared project
+  credential paths belong in host-local configuration, not shared workspace
   config.
 - Capability gaps are meaningful. If a provider cannot create, update, comment,
   label, assign, or represent a status, the plan should report a skip or
@@ -257,11 +257,11 @@ target or work item explicitly says otherwise. Treat items from mirror,
 coordination, planning, external-feedback, migration, or archive trackers as
 supporting records.
 
-Projects that intentionally allow selected external trackers into automation can
+Workspaces that intentionally allow selected external trackers into automation can
 set `automation.eligibleWorkMode` to `discovery`. In that mode, configured
 component `trackerDiscovery` policy decides which tracker roles are scanned and
 whether non-default tracker items are directly selectable or import-only. Keep
-the default mode for projects that want automation to read only the component
+the default mode for workspaces that want automation to read only the component
 default tracker.
 
 `automation eligible-work --discovery` also reports bounded examples of visible

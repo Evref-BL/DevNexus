@@ -340,22 +340,22 @@ export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "dev-nexus",
     "dev-nexus",
-    "DevNexus-managed project workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus project, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
+    "DevNexus-managed workspace workflow for using DevNexus infrastructure to plan, triage, slice, implement, verify, publish, automate, coordinate isolated worktrees, and advance work items across components. Use when an agent is asked to work in a DevNexus workspace, use DevNexus, run a DevNexus workflow, advance tracker work, coordinate parallel chats or subagents, or combine DevNexus with companion skills such as to-prd, to-issues, triage, tdd, diagnose, or architecture review.",
     `
 # DevNexus
 
-Use this skill when working inside a DevNexus-managed project.
+Use this skill when working inside a DevNexus-managed workspace.
 
-1. Read project instructions first: agent context file when set, \`AGENTS.md\` or equivalent, durable project context, plan, and target state.
-2. Use DevNexus MCP or CLI surfaces for project status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
+1. Read project instructions first: agent context file when set, \`AGENTS.md\` or equivalent, durable workspace context, plan, and target state.
+2. Use DevNexus MCP or CLI surfaces for workspace status, component metadata, work-item services, eligible work, agent profiles, worktrees, target-cycle facts, and result contracts. Avoid ad hoc discovery when DevNexus already exposes the fact.
 3. Select the right companion skill for the current mode: \`to-prd\` for Product Requirements Document (PRD) synthesis, \`to-issues\` for issue slicing, \`triage\` for vague work, \`tdd\` for Test-Driven Development (TDD), \`diagnose\` for defects, and architecture skills for boundary or refactor decisions.
-4. Work through configured component work-item services. Prefer component-qualified work-item ids when a project has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
+4. Work through configured component work-item services. Prefer component-qualified work-item ids when a workspace has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
 5. Run a Git freshness preflight before editing a checkout: inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, fast-forward clean branches with an upstream, and record blockers.
 6. Preserve unrelated changes. Treat a shared checkout as read-mostly context unless the task is clearly read-only or already owns that checkout.
-7. For mutating parallel work, prepare an isolated Git worktree before editing. Use component-scoped worktrees for component source changes, and use a project/meta worktree for DevNexus project files such as \`AGENTS.md\`, \`PLAN.md\`, \`CONTEXT.md\`, \`.dev-nexus/**\`, projected skills, target state, or dogfood docs. Prefer DevNexus worktree tools such as \`worktree_prepare\` or \`dev-nexus worktree prepare\` over hand-rolled \`git worktree\` commands.
+7. For mutating parallel work, prepare an isolated Git worktree before editing. Use component-scoped worktrees for component source changes, and use a workspace/meta worktree for DevNexus workspace files such as \`AGENTS.md\`, \`PLAN.md\`, \`CONTEXT.md\`, \`.dev-nexus/**\`, projected skills, target state, or dogfood docs. Prefer DevNexus worktree tools such as \`worktree_prepare\` or \`dev-nexus worktree prepare\` over hand-rolled \`git worktree\` commands.
 8. Let configured setup make prepared worktrees usable. For example, JavaScript/TypeScript projects should expose reusable dependencies through a plugin \`dependency_projection\` such as \`node_modules\` -> \`node_modules\`, instead of teaching every agent to repair missing dependencies manually.
 9. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
-10. Run source and Git commands from the assigned worktree. Stage only files owned by that worktree and avoid committing unrelated project-state or tracker files from another chat.
+10. Run source and Git commands from the assigned worktree. Stage only files owned by that worktree and avoid committing unrelated workspace-state or tracker files from another chat.
 11. Record progress through DevNexus: set work-item state when starting or finishing, add concise progress or blocker comments, record target-cycle facts, and use coordination handoffs for \`working\`, \`ready\`, \`blocked\`, or \`merged\` worktree branches.
 12. Before integrating parallel chat branches, use DevNexus coordination status or integration planning to check related branches, stale handoffs, unpushed commits, conflicts, and verification order.
 13. Verify with focused checks first, then broader relevant checks when feasible. Publish only according to component publication policy.
@@ -366,7 +366,7 @@ Use this skill when working inside a DevNexus-managed project.
   curatedCoreSkill(
     "diagnose",
     "diagnose",
-    "Systematic debugging workflow for reproducing, isolating, fixing, and verifying defects in managed projects.",
+    "Systematic debugging workflow for reproducing, isolating, fixing, and verifying defects in managed workspaces.",
     `
 # Diagnose
 
@@ -423,7 +423,7 @@ Use this skill when work needs to survive a context switch, automation run, or h
 
 Use this skill when a request, issue, or finding needs to become actionable work.
 
-1. Identify the owning project component, source root, and work-item service.
+1. Identify the owning workspace component, source root, and work-item service.
 2. Separate symptoms, suspected causes, acceptance criteria, and constraints.
 3. Check for duplicate or related existing work before creating new items.
 4. Slice work so each item has one owner, one verification path, and a clear done state.
@@ -459,7 +459,7 @@ Use this skill when a project first enables curated agent skills, or when skills
 
 1. Inspect the relevant component source roots before writing: Git remotes, existing \`AGENTS.md\` or \`CLAUDE.md\`, \`docs/agents\`, \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, \`docs/adr\`, and any local issue or work-item directories.
 2. Present what exists and what is missing, then confirm setup decisions one at a time instead of asking for every choice at once.
-3. Record where work items live for each relevant component: configured DevNexus tracker, GitHub Issues, GitLab Issues, Jira, Linear, local work items, or another project-specific tracker.
+3. Record where work items live for each relevant component: configured DevNexus tracker, GitHub Issues, GitLab Issues, Jira, Linear, local work items, or another workspace-specific tracker.
 4. Record triage labels or status values for the canonical flow: needs triage, needs information, autonomous agent-ready (AFK), ready for human, and will not fix.
 5. Record domain-document layout: single-context \`CONTEXT.md\`, multi-context \`CONTEXT-MAP.md\`, and where Architecture Decision Records (ADRs) live.
 6. Draft the exact changes before writing: an \`Agent skills\` section in the existing agent instruction file, plus \`docs/agents/issue-tracker.md\`, \`docs/agents/triage-labels.md\`, and \`docs/agents/domain.md\`.
@@ -485,7 +485,7 @@ Use this skill when a plan, design, or feature direction needs to be challenged 
 6. Offer an Architecture Decision Record only for decisions that are hard to reverse, surprising without context, and based on a real trade-off.
 7. Keep documentation updates small and inline with the conversation so decisions are not lost between runs.
 
-Glossary entries should define project-specific concepts in one sentence, list avoided aliases where useful, and describe important relationships. Architecture Decision Records should briefly state the context, decision, and reason; optional sections belong only when they add real value.
+Glossary entries should define workspace-specific concepts in one sentence, list avoided aliases where useful, and describe important relationships. Architecture Decision Records should briefly state the context, decision, and reason; optional sections belong only when they add real value.
 `,
   ),
   curatedCoreSkill(
@@ -534,7 +534,7 @@ Long architecture, all command variants, provider-specific auth, historical desi
 - Preserve necessary repetition when it helps readers succeed. Documentation is allowed to repeat important facts that code already encodes.
 - Link with descriptive text. Avoid "click here" and broken multiline links.
 - Keep version-sensitive facts either generated, tested, or clearly scoped.
-- When using an external style guide, follow project-specific style first, then the external guide.
+- When using an external style guide, follow workspace-specific style first, then the external guide.
 
 ## Humanizer Pairing
 
@@ -548,7 +548,7 @@ support, or project vocabulary.
 - [GitHub Docs, "About READMEs"](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes): README files should explain what the project does, why it is useful, how to get started, where to get help, and who maintains it.
 - [Google README guidance](https://google.github.io/styleguide/docguide/READMEs.html): README files are short directory summaries; package READMEs should explain use, status, contacts, and links to deeper docs.
 - [Write the Docs documentation principles](https://www.writethedocs.org/guide/writing/docs-principles/): docs should be skimmable, current, discoverable, addressable, and close to the code they describe.
-- [Google developer documentation style guide](https://developers.google.com/style): prefer project-specific style first; clarity and consistency matter more than rigid rules.
+- [Google developer documentation style guide](https://developers.google.com/style): prefer workspace-specific style first; clarity and consistency matter more than rigid rules.
 - [Google documentation best practices](https://google.github.io/styleguide/docguide/best_practices.html): update docs with code, keep minimum viable documentation fresh, and treat design docs as archives once implementation lands.
 - [blader/humanizer](https://github.com/blader/humanizer) and [Wikipedia "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing): use the vendored \`humanizer\` companion skill to remove inflated, vague, formulaic, and chatbot-like prose.
 `,
@@ -1167,7 +1167,7 @@ function installedOnlySkillStatus(
     skillPath: skillPathForManifest(installed.skillRoot, manifest),
     reasons: [
       manifest
-        ? "skill is installed but is not selected by project configuration"
+        ? "skill is installed but is not selected by workspace configuration"
         : installed.error ?? "skill manifest is invalid",
     ],
   };

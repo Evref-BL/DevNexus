@@ -58,7 +58,7 @@ afterEach(() => {
   }
 });
 
-describe("project component topology analysis", () => {
+describe("workspace component topology analysis", () => {
   it("detects container folders with nested repositories", () => {
     const projectRoot = makeTempDir("dev-nexus-topology-");
     const container = path.join(projectRoot, "GraphRag-Projects");

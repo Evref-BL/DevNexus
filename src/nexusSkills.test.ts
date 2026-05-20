@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("nexus skills", () => {
-  it("materializes the curated core skill pack as project support state", () => {
+  it("materializes the curated core skill pack as workspace support state", () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     fs.mkdirSync(path.join(projectRoot, ".git", "info"), { recursive: true });
 
@@ -214,7 +214,7 @@ describe("nexus skills", () => {
       "delete merged local and remote review branches",
     );
     expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
-    expect(skillMarkdown["dev-nexus"]).toContain("project/meta worktree");
+    expect(skillMarkdown["dev-nexus"]).toContain("workspace/meta worktree");
     expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(

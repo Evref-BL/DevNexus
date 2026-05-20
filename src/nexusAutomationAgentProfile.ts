@@ -104,7 +104,7 @@ export function resolveNexusAutomationAgentCommand(
     options.automationConfig.agent.coordinatorProfileId;
   if (!coordinatorProfileId) {
     throw new NexusAutomationAgentProfileError(
-      `automation ${options.commandName ?? "run"} requires --command, project config automation.agent.command, or automation.agent.coordinatorProfileId with a command-capable profile`,
+      `automation ${options.commandName ?? "run"} requires --command, workspace config automation.agent.command, or automation.agent.coordinatorProfileId with a command-capable profile`,
     );
   }
 

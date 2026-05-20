@@ -8,7 +8,7 @@ import {
 import type { NexusProjectComponentConfig } from "./nexusProjectConfig.js";
 
 export type NexusComponentSourceRootTopologyLayout =
-  | "project-local"
+  | "workspace-local"
   | "explicit-external"
   | "legacy-external"
   | "incompatible-platform";
@@ -16,7 +16,7 @@ export type NexusComponentSourceRootTopologyLayout =
 export type NexusComponentSourceRootTopologyState =
   | "present"
   | "missing"
-  | "project-local-escape"
+  | "workspace-local-escape"
   | "incompatible-platform";
 
 export interface NexusComponentSourceRootTopology {
@@ -73,7 +73,7 @@ export function classifyNexusComponentSourceRootTopology(
       layout: "incompatible-platform",
       stateOverride: "incompatible-platform",
       summary:
-        `Configured sourceRoot ${sourceRootValue} is incompatible with ${platform}; using project-local fallback ${fallback.path}.`,
+        `Configured sourceRoot ${sourceRootValue} is incompatible with ${platform}; using workspace-local fallback ${fallback.path}.`,
       nextAction:
         "Use a portable sourceRoot such as componentsRoot:<component-id> or sourcesRoot:<name>, or document an intentional host-local override.",
     });
@@ -157,7 +157,7 @@ function sourceRootLayout(
       configuredAnalysis.base === "projectRoot") &&
     pathInside(projectRoot, effectiveAnalysis.path)
   ) {
-    return "project-local";
+    return "workspace-local";
   }
   if (
     configuredAnalysis.base === "sourcesRoot" ||
@@ -177,8 +177,8 @@ function sourceRootState(options: {
   if (!options.exists) {
     return "missing";
   }
-  if (options.layout === "project-local" && options.realInsideProjectRoot === false) {
-    return "project-local-escape";
+  if (options.layout === "workspace-local" && options.realInsideProjectRoot === false) {
+    return "workspace-local-escape";
   }
   return "present";
 }
@@ -191,8 +191,8 @@ function sourceRootSummary(options: {
   if (options.state === "missing") {
     return `${layoutLabel(options.layout)} source root is missing: ${options.path}.`;
   }
-  if (options.state === "project-local-escape") {
-    return `Project-local-looking source root resolves outside the DevNexus project root: ${options.path}.`;
+  if (options.state === "workspace-local-escape") {
+    return `Workspace-local-looking source root resolves outside the DevNexus workspace root: ${options.path}.`;
   }
   return `${layoutLabel(options.layout)} source root is present: ${options.path}.`;
 }
@@ -202,18 +202,18 @@ function sourceRootNextAction(
   state: NexusComponentSourceRootTopologyState,
 ): string | null {
   if (state === "missing") {
-    return layout === "project-local"
-      ? "Clone the component into the project-local components root before assigning work."
+    return layout === "workspace-local"
+      ? "Clone the component into the workspace-local components root before assigning work."
       : "Confirm this external layout is intentional, or migrate the checkout into componentsRoot:<component-id>.";
   }
-  if (state === "project-local-escape") {
-    return "Replace the symlink or junction with a real project-local clone, or configure an explicit external sourceRoot.";
+  if (state === "workspace-local-escape") {
+    return "Replace the symlink or junction with a real workspace-local clone, or configure an explicit external sourceRoot.";
   }
   if (state === "incompatible-platform") {
     return "Use a portable sourceRoot or configure this host through host-local setup instead of shared absolute paths.";
   }
   if (layout === "explicit-external") {
-    return "Confirm this external source-root layout is intentional; migrate to project-local components when ready.";
+    return "Confirm this external source-root layout is intentional; migrate to workspace-local components when ready.";
   }
   if (layout === "legacy-external") {
     return "Treat this as legacy host-local checkout reuse; prefer migrating to componentsRoot:<component-id>.";
@@ -222,8 +222,8 @@ function sourceRootNextAction(
 }
 
 function layoutLabel(layout: NexusComponentSourceRootTopologyLayout): string {
-  if (layout === "project-local") {
-    return "project-local";
+  if (layout === "workspace-local") {
+    return "workspace-local";
   }
   if (layout === "explicit-external") {
     return "explicit external";

@@ -1,6 +1,6 @@
 # Agent Workflows
 
-DevNexus gives agents a concise project surface: read project state, inspect
+DevNexus gives agents a concise workspace surface: read workspace state, inspect
 eligible work, prepare worktrees, record progress, and report factual results.
 It does not decide what should be implemented. The user or launched
 coordinator agent owns that judgment.
@@ -46,7 +46,7 @@ work_item_sync_plan
 work_item_sync_execute
 ```
 
-Work-item tools accept a component id when a project has multiple component
+Work-item tools accept a component id when a workspace has multiple component
 trackers. Omitting it uses the primary component for compatibility. When a
 component has multiple tracker bindings, work-item tools use the component
 default tracker unless a tracker id is explicit.
@@ -56,21 +56,21 @@ default tracker unless a tracker id is explicit.
 A coordinator can start with these read-only commands:
 
 ```bash
-dev-nexus automation eligible-work <project-root> --json
-dev-nexus automation agent-profiles <project-root> --json
-dev-nexus automation target-report <project-root> --json
+dev-nexus automation eligible-work <workspace-root> --json
+dev-nexus automation agent-profiles <workspace-root> --json
+dev-nexus automation target-report <workspace-root> --json
 ```
 
 These JSON commands are compact by default. Use `--full --json` only when you
-need raw project config, full ledgers, target-state markdown, or complete
+need raw workspace config, full ledgers, target-state markdown, or complete
 handoff details for diagnostics.
 
 Then record the work it selected:
 
 ```bash
-dev-nexus work-item update <project-root> local-1 --component core --status in_progress
-dev-nexus work-item comment <project-root> local-1 --component core --body "Started focused verification."
-dev-nexus automation target-cycle record <project-root> --status dispatched --work-item core:local-1 --work-item-status in_progress
+dev-nexus work-item update <workspace-root> local-1 --component core --status in_progress
+dev-nexus work-item comment <workspace-root> local-1 --component core --body "Started focused verification."
+dev-nexus automation target-cycle record <workspace-root> --status dispatched --work-item core:local-1 --work-item-status in_progress
 ```
 
 Target-cycle facts are caller-reported. DevNexus stores them for durable
@@ -89,19 +89,19 @@ Agents can use link records to connect a canonical item to existing provider
 issues before any sync plan:
 
 ```bash
-dev-nexus work-item link <project-root> local-1 --component core --tracker forge --item-id 42 --item-number 42
-dev-nexus work-item show-links <project-root> local-1 --component core
+dev-nexus work-item link <workspace-root> local-1 --component core --tracker forge --item-id 42 --item-number 42
+dev-nexus work-item show-links <workspace-root> local-1 --component core
 ```
 
 Use dry-run sync planning as the review surface for mirrored fields:
 
 ```bash
-dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker forge --open --label onboarding --field title --field status
+dev-nexus work-item sync-plan <workspace-root> --component core --source-tracker primary --target-tracker forge --open --label onboarding --field title --field status
 ```
 
 Do not update a mirror as if it were canonical unless the assignment names that
 tracker. Do not run sync execution unless the dry-run plan has been reviewed
-and the project policy explicitly allows the provider mutation and automation
+and the workspace policy explicitly allows the provider mutation and automation
 identity. See [multi-tracker work tracking](multi-tracker.md) for configuration
 and migration guidance.
 
@@ -117,7 +117,7 @@ Before editing a Git checkout, run a freshness preflight:
 Prepare a component-scoped worktree when implementation should be isolated:
 
 ```bash
-dev-nexus worktree prepare <project-root> --component core --work-item local-1
+dev-nexus worktree prepare <workspace-root> --component core --work-item local-1
 ```
 
 For a single provider-native issue, keep the default workflow provider-neutral:
@@ -126,8 +126,8 @@ verification, then record the provider request and check facts through the
 configured tracker or publication policy:
 
 ```bash
-dev-nexus worktree prepare <project-root> --component core --work-item local-1
-dev-nexus work-item comment <project-root> local-1 --component core --body "Prepared an isolated worktree and started verification."
+dev-nexus worktree prepare <workspace-root> --component core --work-item local-1
+dev-nexus work-item comment <workspace-root> local-1 --component core --body "Prepared an isolated worktree and started verification."
 ```
 
 The older `quick-fix` helper is a specialized GitHub path. Keep it in
@@ -140,7 +140,7 @@ provider-specific until DevNexus has a neutral collector adapter, but the
 DevNexus planning surface should consume saved check facts:
 
 ```bash
-dev-nexus publication green-main plan <project-root> --component core --pr <pr-number> --checks-file checks.json
+dev-nexus publication green-main plan <workspace-root> --component core --pr <pr-number> --checks-file checks.json
 ```
 
 Use the configured provider CLI, provider API, or CI system export to produce
@@ -162,7 +162,7 @@ the target in the worktree Git exclude file, and does not run an installer.
 
 Generated worktrees also receive `.dev-nexus/context/` support files:
 
-- `context.json` for machine-readable project, component, ownership, and plugin
+- `context.json` for machine-readable workspace, component, ownership, and plugin
   capability facts.
 - `briefing.md` for agent-readable setup notes and worker briefing fragments.
 
@@ -173,23 +173,23 @@ component checkout root.
 
 Mutating interactive DevNexus or Codex chats should prepare or adopt an
 isolated worktree before editing. Use a component worktree for component source
-changes. Use a project-meta worktree for durable project files such as
+changes. Use a workspace-meta worktree for durable workspace files such as
 `dev-nexus.project.json`, `.dev-nexus/**`, target state, planning documents, or
 agent instructions. A chat that starts in a shared checkout can read status,
 inspect Git state, and prepare or adopt the right worktree, but it should not
-make source or project-state edits there unless it explicitly owns integration
-or project-state mutation.
+make source or workspace-state edits there unless it explicitly owns integration
+or workspace-state mutation.
 
 The workflow uses a small checkout vocabulary:
 
 - Stable component source root: the configured component `sourceRoot`. Treat it
   as the durable baseline and normal user checkout, not as disposable worker
   state.
-- Shared checkout: any project or component checkout opened by multiple chats.
+- Shared checkout: any workspace or component checkout opened by multiple chats.
   Treat it as a read-mostly control room for status, coordination, setup, and
   integration planning.
 - Worker worktree: an isolated branch and filesystem path for one bounded work
-  item, component, or project-meta surface. Run edits, verification, and Git
+  item, component, or workspace-meta surface. Run edits, verification, and Git
   commands for that work from this path.
 - Integration branch: a temporary branch used to serialize or batch ready
   worker branches before publishing to a target branch.
@@ -230,19 +230,19 @@ Coordination commands record advisory handoff facts in the configured
 component work-item service and inspect Git state.
 
 ```bash
-dev-nexus coordination status <project-root> --component core --work-item local-1 --worktree <path>
-dev-nexus coordination handoff <project-root> local-1 --component core --status ready --worktree <path>
-dev-nexus coordination integrate <project-root> --component core --work-item local-1 --target-branch main --worktree <path>
+dev-nexus coordination status <workspace-root> --component core --work-item local-1 --worktree <path>
+dev-nexus coordination handoff <workspace-root> local-1 --component core --status ready --worktree <path>
+dev-nexus coordination integrate <workspace-root> --component core --work-item local-1 --target-branch main --worktree <path>
 ```
 
 `coordination integrate` builds a read-only plan from related handoff branches,
 recorded decisions, merge bases, merge-tree output, changed files, and
 range-diff output when useful. `--fetch` fetches the configured remote only
-when project automation safety allows host mutation.
+when workspace automation safety allows host mutation.
 
 ## Automation
 
-Projects opt into automation through `dev-nexus.project.json`. The automation
+Workspaces opt into automation through `dev-nexus.project.json`. The automation
 schema describes launch gates, selector filters, verification hints, ledgers,
 locks, retry backoff, safety policy, publication policy, targets, and agent
 profiles.
@@ -250,19 +250,19 @@ profiles.
 Useful commands:
 
 ```bash
-dev-nexus automation status <project-root>
-dev-nexus automation enqueue <project-root> --title "Implement focused task"
-dev-nexus automation heartbeat prepare <project-root> --json
-dev-nexus automation run-once <project-root>
-dev-nexus automation schedule <project-root> --max-runs 1
-dev-nexus automation coordinator-loop <project-root> --max-runs 1
+dev-nexus automation status <workspace-root>
+dev-nexus automation enqueue <workspace-root> --title "Implement focused task"
+dev-nexus automation heartbeat prepare <workspace-root> --json
+dev-nexus automation run-once <workspace-root>
+dev-nexus automation schedule <workspace-root> --max-runs 1
+dev-nexus automation coordinator-loop <workspace-root> --max-runs 1
 ```
 
 Use `--progress-jsonl` with `--json` when the caller needs final JSON on
 stdout but should still see that a long nested coordinator run is alive:
 
 ```bash
-dev-nexus automation coordinator-loop <project-root> --max-runs 1 --json --progress-jsonl
+dev-nexus automation coordinator-loop <workspace-root> --max-runs 1 --json --progress-jsonl
 ```
 
 The progress stream is JSON Lines on stderr. It is intentionally low-volume and
@@ -280,14 +280,14 @@ filter and refuses inputs that would be invisible to that filter.
 `automation heartbeat prepare` renders a Codex heartbeat automation recipe
 without mutating Codex or any provider state. The recipe includes a suggested
 heartbeat name, thread destination, hourly default schedule, active/paused state,
-and a self-contained prompt generated from project metadata. The prompt tells a
-wake-up agent to read DevNexus project context, use automation and tracker
+and a self-contained prompt generated from workspace metadata. The prompt tells a
+wake-up agent to read DevNexus workspace context, use automation and tracker
 surfaces, prepare isolated worktrees, respect component tracker roles including
 direct external issue selection, record target-cycle facts, verify work, and use
 the idle path to remove blockers or capture focused component-owned issues.
 
 `automation run-once` and `automation coordinator-loop` launch the configured
-agent command when the project is ready. The launched agent receives
+agent command when the workspace is ready. The launched agent receives
 `DEV_NEXUS_AGENT_CONTEXT_FILE` and `DEV_NEXUS_AGENT_RESULT_FILE`.
 
 ## Result File Contract
@@ -327,8 +327,8 @@ Current-agent adoption uses the same result contract without starting a child
 process.
 
 ```bash
-dev-nexus automation current-agent adopt <project-root> --run-id current-1 --json
-dev-nexus automation current-agent record <project-root> --run-id current-1 --status completed --summary "Completed requested work."
+dev-nexus automation current-agent adopt <workspace-root> --run-id current-1 --json
+dev-nexus automation current-agent record <workspace-root> --run-id current-1 --status completed --summary "Completed requested work."
 ```
 
 If adoption returns `shouldProceed: false`, the current agent must not continue
@@ -341,7 +341,7 @@ Publication policy can separate manual and automation identities. For example,
 `origin` can remain the user remote while `bot` points at an SSH host alias for
 an automation account. Tokens, private keys, GitHub CLI state, app keys, and
 absolute credential paths should stay in host-local configuration, not in
-shared project config.
+shared workspace config.
 
 Before a DevNexus-owned push or live provider mutation, mismatched remotes, SSH
 aliases, push URLs, or observed actors become blocking preflight failures.

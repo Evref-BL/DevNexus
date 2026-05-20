@@ -199,7 +199,7 @@ describe("nexus automation target cycles", () => {
     });
   });
 
-  it("records target cycle facts with retention inside the project root", () => {
+  it("records target cycle facts with retention inside the workspace root", () => {
     const projectRoot = makeTempDir("dev-nexus-target-cycles-");
     const config = automationConfig({
       ledger: {
@@ -330,7 +330,7 @@ describe("nexus automation target cycles", () => {
       });
   });
 
-  it("rejects cycle ledger paths outside the project root", () => {
+  it("rejects cycle ledger paths outside the workspace root", () => {
     expect(() =>
       automationConfig({
         target: {

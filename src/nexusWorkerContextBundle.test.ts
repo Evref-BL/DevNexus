@@ -259,7 +259,7 @@ describe("nexus worker context bundle", () => {
     expect(briefing).toContain("# DevNexus Worker Context");
     expect(briefing).toContain(`Run source and git commands in: ${worktreePath}`);
     expect(briefing).toContain(
-      "Treat project context files as read-only unless the coordinator explicitly assigns project-state ownership.",
+      "Treat workspace context files as read-only unless the coordinator explicitly assigns project-state ownership.",
     );
     expect(briefing).toContain(`- AGENTS.md: ${path.join(projectRoot, "AGENTS.md")}`);
     expect(briefing).toContain("- mode: review_handoff");
@@ -435,7 +435,7 @@ describe("nexus worker context bundle", () => {
     ).toThrow(/Referenced context file is missing/);
   });
 
-  it("records project-managed skills and worker-local agent projections", () => {
+  it("records workspace-managed skills and worker-local agent workspaceions", () => {
     const projectRoot = makeTempDir("dev-nexus-worker-project-");
     const sourceRoot = path.join(projectRoot, "components", "dev-nexus");
     const worktreesRoot = path.join(projectRoot, "worktrees", "dev-nexus");
@@ -449,7 +449,7 @@ describe("nexus worker context bundle", () => {
       sourceRoot,
       worktreesRoot,
       worktreePath,
-      branchName: "codex/local-20-project-local-skills",
+      branchName: "codex/local-20-workspace-local-skills",
       baseRef: "origin/main",
       workItem: null,
       skills: {
@@ -501,7 +501,7 @@ describe("nexus worker context bundle", () => {
       sourceControl: "support",
     });
     expect(fs.readFileSync(nexusWorkerBriefingPath(worktreePath), "utf8"))
-      .toContain(`Project-managed skills: ${projectManagedRoot}`);
+      .toContain(`Workspace-managed skills: ${projectManagedRoot}`);
     expect(result.briefingMarkdown).toContain(
       `- codex skills: ${skillsDirectory}`,
     );

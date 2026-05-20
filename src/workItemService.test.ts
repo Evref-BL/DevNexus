@@ -485,7 +485,7 @@ describe("work item service", () => {
     ).toThrow(/does not match configured provider/);
   });
 
-  it("wraps unavailable provider diagnostics with project context", async () => {
+  it("wraps unavailable provider diagnostics with workspace context", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-");
     const project = createProjectContext(projectRoot, {
       workTracking: {

@@ -21,7 +21,7 @@ describe("Vibe Kanban workspace setup script", () => {
     expect(script).toContain("Add-GitInfoExclude '.codex/'");
     expect(script).toContain("Add-GitInfoExclude 'node_modules/'");
     expect(script).toContain(
-      "Vibe workspace setup complete for DevNexus-managed project.",
+      "Vibe workspace setup complete for DevNexus-managed workspace.",
     );
   });
 
@@ -42,7 +42,7 @@ describe("Vibe Kanban workspace setup script", () => {
     expect(script).toContain("add_git_info_exclude '.codex/'");
     expect(script).toContain("add_git_info_exclude 'node_modules/'");
     expect(script).toContain(
-      "Vibe workspace setup complete for DevNexus-managed project.",
+      "Vibe workspace setup complete for DevNexus-managed workspace.",
     );
   });
 });

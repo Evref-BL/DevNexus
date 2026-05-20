@@ -103,12 +103,12 @@ describe("nexus setup assistant", () => {
     expect(listNexusSetupFlows()).toContainEqual(
       expect.objectContaining({
         id: "join-existing-project",
-        title: "Join an existing DevNexus project on this machine",
+        title: "Join an existing DevNexus workspace on this machine",
       }),
     );
   });
 
-  it("builds a GitHub meta-project setup plan without automatic creation or secrets", () => {
+  it("builds a GitHub workspace repository setup plan without automatic creation or secrets", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-github-meta-");
     writeProject(projectRoot, {
       hosting: {
@@ -142,14 +142,14 @@ describe("nexus setup assistant", () => {
 
     const plan = buildNexusSetupPlan({
       projectRoot,
-      flowId: "github-meta-project",
+      flowId: "github-workspace-repository",
       platform: "macos",
     });
 
     expect(plan.steps.map((step) => step.id)).toEqual([
       "choose-hosting-namespace",
       "configure-auth-profile",
-      "connect-meta-repository",
+      "connect-workspace-repository",
       "configure-publication-guardrails",
       "write-setup-report",
     ]);
@@ -165,9 +165,9 @@ describe("nexus setup assistant", () => {
       'GH_CONFIG_DIR="$HOME/.config/gh-bot-github" gh auth login --hostname github.com --git-protocol ssh --web',
     );
     expect(authStep.checks).toContain("ssh -T git@github.com-example-bot");
-    const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
-    expect(connectStep.commands).toContain("dev-nexus project hosting status . --json");
-    expect(connectStep.commands).toContain("dev-nexus project hosting plan . --json");
+    const connectStep = plan.steps.find((step) => step.id === "connect-workspace-repository")!;
+    expect(connectStep.commands).toContain("dev-nexus workspace hosting status . --json");
+    expect(connectStep.commands).toContain("dev-nexus workspace hosting plan . --json");
     expect(connectStep.commands.some((command) => command.includes("gh repo view")))
       .toBe(false);
     expect(connectStep.commands.some((command) => command.includes("gh repo create")))
@@ -185,7 +185,7 @@ describe("nexus setup assistant", () => {
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
   });
 
-  it("marks GitHub meta-project repository creation as approval-required when policy allows creation", () => {
+  it("marks GitHub workspace repository repository creation as approval-required when policy allows creation", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-github-create-");
     writeProject(projectRoot, {
       hosting: {
@@ -218,14 +218,14 @@ describe("nexus setup assistant", () => {
 
     const plan = buildNexusSetupPlan({
       projectRoot,
-      flowId: "github-meta-project",
+      flowId: "github-workspace-repository",
       platform: "macos",
     });
-    const connectStep = plan.steps.find((step) => step.id === "connect-meta-repository")!;
+    const connectStep = plan.steps.find((step) => step.id === "connect-workspace-repository")!;
 
-    expect(connectStep.commands).toContain("dev-nexus project hosting status . --json");
-    expect(connectStep.commands).toContain("dev-nexus project hosting plan . --json");
-    expect(connectStep.commands).toContain("dev-nexus project hosting apply . --json");
+    expect(connectStep.commands).toContain("dev-nexus workspace hosting status . --json");
+    expect(connectStep.commands).toContain("dev-nexus workspace hosting plan . --json");
+    expect(connectStep.commands).toContain("dev-nexus workspace hosting apply . --json");
     expect(connectStep.commands.some((command) => command.includes("gh repo create")))
       .toBe(false);
     expect(connectStep.summary).toContain("requires explicit approval");
@@ -235,7 +235,7 @@ describe("nexus setup assistant", () => {
     expect(connectStep.commands).not.toContain("git push bot main");
   });
 
-  it("builds a Mac setup plan from project metadata without secrets", () => {
+  it("builds a Mac setup plan from workspace metadata without secrets", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-plan-");
     writeProject(projectRoot);
 
@@ -251,10 +251,10 @@ describe("nexus setup assistant", () => {
     });
     expect(plan.steps.map((step) => step.id)).toEqual([
       "install-prerequisites",
-      "clone-or-update-meta-repo",
+      "clone-or-update-workspace-repository",
       "configure-human-github-auth",
       "configure-automation-auth-profile",
-      "configure-meta-remotes",
+      "configure-workspace-remotes",
       "prepare-component-checkouts",
       "refresh-agent-mcp-and-skills",
       "open-agent-project-session",
@@ -269,20 +269,20 @@ describe("nexus setup assistant", () => {
         kind: "manual",
         scope: "host-local",
       });
-    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-meta-repo")!;
-    expect(cloneStep.summary).toContain("DevNexus project root");
+    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-workspace-repository")!;
+    expect(cloneStep.summary).toContain("DevNexus workspace root");
     expect(cloneStep.summary).toContain("not a component source checkout");
     expect(cloneStep.commands).toContain("mkdir -p $HOME/dev-nexus");
     expect(cloneStep.commands).toContain(
       "git clone git@github.com:ExampleOrg/mac-demo.git $HOME/dev-nexus/mac-demo",
     );
     expect(cloneStep.manualInstructions).toContain(
-      "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
+      "The cloned workspace repository root becomes the DevNexus workspace root for later setup, MCP refresh, automation, and work-item commands.",
     );
     const refreshStep = plan.steps.find(
       (step) => step.id === "refresh-agent-mcp-and-skills",
     )!;
-    expect(refreshStep.commands).toContain("dev-nexus project mcp refresh .");
+    expect(refreshStep.commands).toContain("dev-nexus workspace mcp refresh .");
     expect(refreshStep.checks).toContain("test -f .codex/config.toml");
     expect(refreshStep.checks.join("\n")).not.toContain(".codex\\config.toml");
     const agentStep = plan.steps.find(
@@ -297,17 +297,17 @@ describe("nexus setup assistant", () => {
       'dev-nexus setup record . join-existing-project open-agent-project-session --status completed --note "DevNexus MCP tools visible in the configured agent application."',
     );
     expect(agentStep.manualInstructions.join("\n")).toContain(
-      "create, open, or select a project/session rooted at $HOME/dev-nexus/mac-demo",
+      "create, open, or select a workspace/session rooted at $HOME/dev-nexus/mac-demo",
     );
     expect(agentStep.manualInstructions.join("\n")).toContain(
-      "other providers may use a different project/session model",
+      "other providers may use a different workspace/session model",
     );
     expect(agentStep.manualInstructions.join("\n")).toContain(
       "Do not edit provider global state or app databases directly",
     );
     expect(JSON.stringify(plan)).not.toContain("gho_");
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
-    expect(plan.nextActions[0]).toContain("fresh DevNexus project root");
+    expect(plan.nextActions[0]).toContain("fresh DevNexus workspace root");
   });
 
   it("resolves automatic platform selection to the current host", () => {
@@ -322,7 +322,7 @@ describe("nexus setup assistant", () => {
     expect(plan.platform).not.toBe("auto");
   });
 
-  it("uses configured meta-project hosting remotes in setup guidance", () => {
+  it("uses configured workspace repository hosting remotes in setup guidance", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-hosting-remotes-");
     writeProject(projectRoot, {
       hosting: {
@@ -358,8 +358,8 @@ describe("nexus setup assistant", () => {
       flowId: "join-existing-project",
       platform: "macos",
     });
-    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-meta-repo")!;
-    const remotesStep = plan.steps.find((step) => step.id === "configure-meta-remotes")!;
+    const cloneStep = plan.steps.find((step) => step.id === "clone-or-update-workspace-repository")!;
+    const remotesStep = plan.steps.find((step) => step.id === "configure-workspace-remotes")!;
 
     expect(cloneStep.commands).toContain(
       "git clone git@github.com:ExampleOrg/mac-demo.git $HOME/dev-nexus/mac-demo",
@@ -372,7 +372,7 @@ describe("nexus setup assistant", () => {
     );
   });
 
-  it("reports GitHub meta-project remote and host-local auth profile readiness", () => {
+  it("reports GitHub workspace repository remote and host-local auth profile readiness", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-github-check-");
     const homeRoot = path.join(projectRoot, "home");
     writeHome(homeRoot, [
@@ -428,20 +428,20 @@ describe("nexus setup assistant", () => {
 
     const check = buildNexusSetupCheck({
       projectRoot,
-      flowId: "github-meta-project",
+      flowId: "github-workspace-repository",
       platform: "windows",
     });
 
     expect(check.checks).toContainEqual(
       expect.objectContaining({
-        id: "meta-remote-origin",
+        id: "workspace-remote-origin",
         status: "blocked",
         summary: expect.stringContaining("WrongOrg"),
       }),
     );
     expect(check.checks).toContainEqual(
       expect.objectContaining({
-        id: "meta-remote-bot",
+        id: "workspace-remote-bot",
         status: "passed",
       }),
     );
@@ -463,7 +463,7 @@ describe("nexus setup assistant", () => {
         id: "github-hosting-status",
         status: "blocked",
         summary: expect.stringContaining("repository=unchecked"),
-        nextAction: expect.stringContaining("dev-nexus project hosting status"),
+        nextAction: expect.stringContaining("dev-nexus workspace hosting status"),
       }),
     );
     expect(check.checks).toContainEqual(
@@ -471,7 +471,7 @@ describe("nexus setup assistant", () => {
         id: "github-hosting-plan",
         status: "blocked",
         summary: expect.stringContaining("blocked="),
-        nextAction: expect.stringContaining("dev-nexus project hosting plan"),
+        nextAction: expect.stringContaining("dev-nexus workspace hosting plan"),
       }),
     );
     expect(check.checks).not.toContainEqual(
@@ -487,7 +487,7 @@ describe("nexus setup assistant", () => {
     });
     expect(joinCheck.checks).toContainEqual(
       expect.objectContaining({
-        id: "meta-remote-origin",
+        id: "workspace-remote-origin",
         status: "blocked",
         summary: expect.stringContaining("WrongOrg"),
       }),
@@ -507,7 +507,7 @@ describe("nexus setup assistant", () => {
     );
     expect(joinCheck.checks).not.toContainEqual(
       expect.objectContaining({
-        id: "github-meta-final-report",
+        id: "github-workspace-repository-final-report",
       }),
     );
   });
@@ -631,7 +631,7 @@ describe("nexus setup assistant", () => {
     );
   });
 
-  it("falls back to project-local components when sourceRoot is absent", () => {
+  it("falls back to workspace-local components when sourceRoot is absent", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-missing-source-root-");
     writeProject(projectRoot, {
       components: [
@@ -798,7 +798,7 @@ describe("nexus setup assistant", () => {
     );
   });
 
-  it("uses project-local componentsRoot source roots in setup commands", () => {
+  it("uses workspace-local componentsRoot source roots in setup commands", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-components-root-");
     writeProject(projectRoot, {
       components: [
@@ -869,7 +869,7 @@ describe("nexus setup assistant", () => {
     const normalizedChecks = refreshStep.checks.map((check) =>
       check.replace(/\\/gu, "/"),
     );
-    expect(refreshStep.commands).toContain("dev-nexus project mcp refresh .");
+    expect(refreshStep.commands).toContain("dev-nexus workspace mcp refresh .");
     expect(normalizedChecks).toContain("test -f .codex/config.toml");
     expect(normalizedChecks).toContain("test -f .mcp.json");
 
@@ -1033,7 +1033,7 @@ describe("nexus setup assistant", () => {
     expect(checks).not.toContain(".agents/skills");
   });
 
-  it("reports expected, stale, manual, unsupported, and disallowed agent projections", () => {
+  it("reports expected, stale, manual, unsupported, and disallowed agent workspaceions", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-agent-projections-");
     writeProject(projectRoot, {
       agentTargets: {
@@ -1172,7 +1172,7 @@ describe("nexus setup assistant", () => {
         id: "agent-mcp-server-codex-dev_nexus",
         status: "warning",
         summary: expect.stringContaining("stale or unexpected"),
-        nextAction: expect.stringContaining("dev-nexus project mcp refresh"),
+        nextAction: expect.stringContaining("dev-nexus workspace mcp refresh"),
       }),
     );
     expect(
@@ -1537,7 +1537,7 @@ describe("nexus setup assistant", () => {
         summary: expect.stringContaining(
           "plugin id workflow-tools server workflow_tools duplicate tools: project_status, work_item_list",
         ),
-        nextAction: expect.stringContaining("project root"),
+        nextAction: expect.stringContaining("workspace root"),
       }),
     );
     expect(check.checks).toContainEqual(
@@ -1669,7 +1669,7 @@ describe("nexus setup assistant", () => {
     expect(check.nextActions.join("\n")).toContain("host-local overlays");
   });
 
-  it("records host-local setup progress outside shared project config", () => {
+  it("records host-local setup progress outside shared workspace config", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-record-");
     writeProject(projectRoot);
 

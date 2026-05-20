@@ -4,10 +4,10 @@ DevNexus separates supported agent providers from active agent targets.
 
 A supported provider is a provider DevNexus knows how to describe or project
 for, such as Codex, Claude, OpenCode, manual, or custom. An active target is a
-provider this project currently wants generated support for. A Codex-only
-project should not need Claude files just because DevNexus supports Claude.
+provider this workspace currently wants generated support for. A Codex-only
+workspace should not need Claude files just because DevNexus supports Claude.
 
-Use `agentTargets.active` in `dev-nexus.project.json` when the project needs an
+Use `agentTargets.active` in `dev-nexus.project.json` when the workspace needs an
 explicit policy:
 
 ```json
@@ -22,9 +22,9 @@ explicit policy:
 }
 ```
 
-Older projects may still use `mcp.agentTargets` and `skills.agentTargets`.
+Older workspaces may still use `mcp.agentTargets` and `skills.agentTargets`.
 DevNexus treats those as compatibility input and recommends adding
-`agentTargets.active` when the project should make provider selection explicit.
+`agentTargets.active` when the workspace should make provider selection explicit.
 
 ## What Gets Projected
 
@@ -37,7 +37,7 @@ Active targets control generated agent support:
 - Plugin capabilities and worker context fragments that declare matching
   target agents.
 
-Generated support is still local project support. It is not a promise that a
+Generated support is still local workspace support. It is not a promise that a
 provider is installed, logged in, trusted, or connected to a live session.
 Provider credentials, account profiles, and runtime approval remain host-local
 setup concerns.
@@ -45,14 +45,14 @@ setup concerns.
 Refresh generated support after changing targets:
 
 ```bash
-dev-nexus project mcp refresh <project-root>
+dev-nexus workspace mcp refresh <workspace-root>
 ```
 
 Pass `--agent <provider>` only when you intentionally want to refresh one
 provider surface:
 
 ```bash
-dev-nexus project mcp refresh <project-root> --agent codex
+dev-nexus workspace mcp refresh <workspace-root> --agent codex
 ```
 
 ## Common Policies
@@ -131,14 +131,14 @@ Multi-provider:
 }
 ```
 
-Manual or custom targets are useful when a team wants the project status to
+Manual or custom targets are useful when a team wants the workspace status to
 record intent but no built-in generated projection adapter exists. Treat those
 targets as documented setup obligations rather than automatic provider
 configuration.
 
 ## Choosing Targets During Setup
 
-For interactive setup, choose only the agent providers this project will
+For interactive setup, choose only the agent providers this workspace will
 actually use first. For answer-file setup, list the desired providers in the
 setup answers and review the generated `dev-nexus.project.json` before applying
 with `--yes`.
@@ -146,11 +146,11 @@ with `--yes`.
 After setup, verify the selected target surfaces:
 
 ```bash
-dev-nexus project status <project-root>
-dev-nexus setup check <project-root> join-existing-project
+dev-nexus workspace status <workspace-root>
+dev-nexus setup check <workspace-root> join-existing-project
 ```
 
-`project status` reports active providers, expected MCP files, expected skill
+`workspace status` reports active providers, expected MCP files, expected skill
 directories, missing generated support, unsupported targets, and stale or
 manual provider directories.
 
@@ -158,8 +158,8 @@ manual provider directories.
 
 Stale generated support is a provider-native file or directory that is present
 but no longer selected by the active target policy. Examples include a
-generated `.claude/skills` directory left behind after a project moves to
-Codex-only, or an old `.codex/config.toml` after a project moves to another
+generated `.claude/skills` directory left behind after a workspace moves to
+Codex-only, or an old `.codex/config.toml` after a workspace moves to another
 provider.
 
 DevNexus classifies stale support conservatively:
@@ -173,18 +173,18 @@ DevNexus classifies stale support conservatively:
 Do a dry-run style review before removing anything:
 
 ```bash
-dev-nexus project status <project-root>
-dev-nexus setup check <project-root> join-existing-project
-dev-nexus project agent-projection cleanup <project-root> --dry-run
+dev-nexus workspace status <workspace-root>
+dev-nexus setup check <workspace-root> join-existing-project
+dev-nexus workspace agent-projection cleanup <workspace-root> --dry-run
 ```
 
 Only apply cleanup after the dry-run identifies removable generated support:
 
 ```bash
-dev-nexus project agent-projection cleanup <project-root> --apply
+dev-nexus workspace agent-projection cleanup <workspace-root> --apply
 ```
 
 The cleanup command removes only paths classified as cleanup-safe stale
 generated support. It skips active provider support, source-controlled files,
 manual provider configuration, credentials, and user-local profile state.
-Do not delete provider-global files outside the project.
+Do not delete provider-global files outside the workspace.

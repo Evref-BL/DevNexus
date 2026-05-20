@@ -250,7 +250,7 @@ describe("nexus automation agent launch", () => {
               {
                 kind: "setup_obligation",
                 id: "review-local-docs",
-                description: "Review project-local setup notes before editing.",
+                description: "Review workspace-local setup notes before editing.",
                 required: true,
               },
               {
@@ -577,7 +577,7 @@ describe("nexus automation agent launch", () => {
               {
                 kind: "setup_obligation",
                 id: "review-local-docs",
-                description: "Review project-local setup notes before editing.",
+                description: "Review workspace-local setup notes before editing.",
                 required: true,
               },
               {
@@ -1085,7 +1085,7 @@ describe("nexus automation agent launch", () => {
     );
   });
 
-  it("blocks before launching when project-local runtime npm packages are damaged and repair is not approved", async () => {
+  it("blocks before launching when workspace-local runtime npm packages are damaged and repair is not approved", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(

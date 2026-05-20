@@ -849,7 +849,7 @@ function worktreeCandidateSlug(worktreePath: string | null): string | null {
 
 function scopeLabel(scope: CleanupScope): string {
   return scope.scope === "project_meta"
-    ? "project meta worktrees"
+    ? "workspace meta worktrees"
     : `component ${scope.component?.id ?? "unknown"}`;
 }
 

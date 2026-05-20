@@ -332,16 +332,16 @@ export function validateNexusAutomationConfig(
     return undefined;
   }
 
-  const record = assertRecord(value, "project config.automation");
+  const record = assertRecord(value, "workspace config.automation");
   const enabled = optionalBoolean(
     record,
     "enabled",
-    "project config.automation",
+    "workspace config.automation",
   );
-  const mode = validateMode(record.mode, "project config.automation.mode");
+  const mode = validateMode(record.mode, "workspace config.automation.mode");
   const eligibleWorkMode = validateEligibleWorkMode(
     record.eligibleWorkMode,
-    "project config.automation.eligibleWorkMode",
+    "workspace config.automation.eligibleWorkMode",
   );
   const selector = validateSelectorConfig(record.selector);
   const verification = validateVerificationConfig(record.verification);
@@ -356,7 +356,7 @@ export function validateNexusAutomationConfig(
   const safety = validateSafetyConfig(record.safety);
   const publication = validatePartialNexusAutomationPublicationConfig(
     record.publication,
-    "project config.automation.publication",
+    "workspace config.automation.publication",
   );
 
   return {
@@ -421,14 +421,14 @@ export function validateNexusAutomationConfig(
           ...publication.commandEnvironment,
         },
       },
-      "project config.automation.publication",
+      "workspace config.automation.publication",
     ),
   };
 }
 
 export function normalizeNexusAutomationPublicationConfig(
   value: NexusAutomationPublicationConfig,
-  pathName = "project config.automation.publication",
+  pathName = "workspace config.automation.publication",
 ): NexusAutomationPublicationConfig {
   if (value.strategy === "green_main") {
     const greenMain = {
@@ -591,7 +591,7 @@ function validateSelectorConfig(
     return {};
   }
 
-  const pathName = "project config.automation.selector";
+  const pathName = "workspace config.automation.selector";
   const record = assertRecord(value, pathName);
   return {
     ...optionalArrayField(record, "statuses", pathName, validateWorkStatus),
@@ -615,7 +615,7 @@ function validateVerificationConfig(
     return {};
   }
 
-  const pathName = "project config.automation.verification";
+  const pathName = "workspace config.automation.verification";
   const record = assertRecord(value, pathName);
   return {
     ...optionalArrayField(
@@ -641,7 +641,7 @@ function validateLedgerConfig(
     return {};
   }
 
-  const pathName = "project config.automation.ledger";
+  const pathName = "workspace config.automation.ledger";
   const record = assertRecord(value, pathName);
   return {
     ...optionalStringField(record, "path", pathName),
@@ -654,7 +654,7 @@ function validateLockConfig(value: unknown): Partial<NexusAutomationLockConfig> 
     return {};
   }
 
-  const pathName = "project config.automation.lock";
+  const pathName = "workspace config.automation.lock";
   const record = assertRecord(value, pathName);
   return {
     ...optionalStringField(record, "path", pathName),
@@ -669,7 +669,7 @@ function validateBackoffConfig(
     return {};
   }
 
-  const pathName = "project config.automation.backoff";
+  const pathName = "workspace config.automation.backoff";
   const record = assertRecord(value, pathName);
   return {
     ...optionalPositiveIntegerField(record, "failureLimit", pathName),
@@ -685,7 +685,7 @@ function validateScheduleConfig(
     return {};
   }
 
-  const pathName = "project config.automation.schedule";
+  const pathName = "workspace config.automation.schedule";
   const record = assertRecord(value, pathName);
   return {
     ...optionalBooleanField(record, "enabled", pathName),
@@ -700,7 +700,7 @@ function validateSetupConfig(
     return {};
   }
 
-  const pathName = "project config.automation.setup";
+  const pathName = "workspace config.automation.setup";
   const record = assertRecord(value, pathName);
   const dependencyLinks = record.dependencyLinks;
   if (dependencyLinks === undefined) {
@@ -729,7 +729,7 @@ function validateExecutorConfig(
     return {};
   }
 
-  const pathName = "project config.automation.executor";
+  const pathName = "workspace config.automation.executor";
   const record = assertRecord(value, pathName);
   return {
     ...optionalNullableStringField(record, "command", pathName),
@@ -745,7 +745,7 @@ function validateAgentConfig(
     return {};
   }
 
-  const pathName = "project config.automation.agent";
+  const pathName = "workspace config.automation.agent";
   const record = assertRecord(value, pathName);
   const coordinatorProfileId = optionalNullableStringField(
     record,
@@ -1134,7 +1134,7 @@ function validateAgentRelaunchConfig(
     return {};
   }
 
-  const pathName = "project config.automation.agent.relaunch";
+  const pathName = "workspace config.automation.agent.relaunch";
   const record = assertRecord(value, pathName);
   return {
     relaunch: {
@@ -1151,7 +1151,7 @@ function validateTargetConfig(
     return {};
   }
 
-  const pathName = "project config.automation.target";
+  const pathName = "workspace config.automation.target";
   const record = assertRecord(value, pathName);
   return {
     ...optionalNullableStringField(record, "id", pathName),
@@ -1180,7 +1180,7 @@ function validateDependencyLinkConfig(
 function validateSafetyConfig(
   value: unknown,
 ): Partial<NexusAutomationSafetyConfig> {
-  return validateSafetyConfigAt(value, "project config.automation.safety");
+  return validateSafetyConfigAt(value, "workspace config.automation.safety");
 }
 
 function validateSafetyConfigAt(
@@ -1202,7 +1202,7 @@ function validateSafetyConfigAt(
 
 export function validatePartialNexusAutomationPublicationConfig(
   value: unknown,
-  pathName = "project config.automation.publication",
+  pathName = "workspace config.automation.publication",
 ): Partial<NexusAutomationPublicationConfig> {
   if (value === undefined) {
     return {};

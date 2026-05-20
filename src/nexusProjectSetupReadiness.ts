@@ -72,7 +72,7 @@ export function buildNexusProjectSetupReadinessReport(options: {
     projectConfig = loadProjectConfig(projectRoot);
     checks.push({
       id: "project-config",
-      title: "Project config",
+      title: "Workspace config",
       status: "passed",
       summary: `Loaded ${projectConfigPath(projectRoot)}.`,
       nextAction: null,
@@ -80,11 +80,11 @@ export function buildNexusProjectSetupReadinessReport(options: {
   } catch (error) {
     checks.push({
       id: "project-config",
-      title: "Project config",
+      title: "Workspace config",
       status: "blocked",
       summary: error instanceof Error ? error.message : String(error),
       nextAction:
-        "Run project setup from a DevNexus project root or restore dev-nexus.project.json.",
+        "Run workspace setup from a DevNexus workspace root or restore dev-nexus.project.json.",
     });
   }
 
@@ -94,7 +94,7 @@ export function buildNexusProjectSetupReadinessReport(options: {
     pathName: path.join(projectRoot, "AGENTS.md"),
     missingStatus: "blocked",
     passedSummary: "Agent instructions are present.",
-    missingSummary: "AGENTS.md is missing from the project root.",
+    missingSummary: "AGENTS.md is missing from the workspace root.",
     nextAction: "Add AGENTS.md with project operating boundaries and handoff rules.",
   }));
 
@@ -149,7 +149,7 @@ function componentSourceChecks(
       title: "Component source roots",
       status: "blocked",
       summary: error instanceof Error ? error.message : String(error),
-      nextAction: "Fix project component configuration before assigning component work.",
+      nextAction: "Fix workspace component configuration before assigning component work.",
     }];
   }
 
@@ -158,7 +158,7 @@ function componentSourceChecks(
       id: "component-source-roots",
       title: "Component source roots",
       status: "blocked",
-      summary: "No project components are configured.",
+      summary: "No workspace components are configured.",
       nextAction: "Add at least one component with a reachable source root.",
     }];
   }
@@ -269,7 +269,7 @@ function agentProjectionChecks(
         : `Missing active-agent MCP config file(s): ${mcpMissing.map((target) => target.path).join(", ")}.`,
       nextAction: mcpMissing.length === 0
         ? null
-        : "Run dev-nexus project mcp refresh <project-root> for active agent targets.",
+        : "Run dev-nexus workspace mcp refresh <workspace-root> for active agent targets.",
     },
     {
       id: "projected-skills-presence",
@@ -280,7 +280,7 @@ function agentProjectionChecks(
         : `Missing active-agent skill projection directories: ${skillsMissing.map((target) => target.path).join(", ")}.`,
       nextAction: skillsMissing.length === 0
         ? null
-        : "Refresh project support projection so active agent skills are available.",
+        : "Refresh workspace support projection so active agent skills are available.",
     },
     {
       id: "agent-target-policy",
@@ -291,7 +291,7 @@ function agentProjectionChecks(
         : diagnostics.map((diagnostic) => diagnostic.reason).join(" "),
       nextAction: diagnostics.length === 0
         ? null
-        : "Update project config.agentTargets.active or remove stale legacy target selections.",
+        : "Update workspace config.agentTargets.active or remove stale legacy target selections.",
     },
   ];
 }
@@ -313,7 +313,7 @@ function activeAgentNextStepsCheck(
       id: "active-agent-next-steps",
       title: "Active agent next steps",
       status: "passed",
-      summary: "No active agent project/session step is required by current setup policy.",
+      summary: "No active agent workspace/session step is required by current setup policy.",
       nextAction: null,
     };
   }
@@ -335,7 +335,7 @@ function authInventoryCheck(
       id: "auth-inventory",
       title: "Auth inventory",
       status: "passed",
-      summary: "Project config does not reference host-local auth profiles.",
+      summary: "Workspace config does not reference host-local auth profiles.",
       nextAction: null,
     };
   }
@@ -347,9 +347,9 @@ function authInventoryCheck(
       title: "Auth inventory",
       status: "warning",
       summary:
-        `Project references auth profile(s) ${referencedProfiles.join(", ")}, but project config.home is not set.`,
+        `Workspace references auth profile(s) ${referencedProfiles.join(", ")}, but workspace config.home is not set.`,
       nextAction:
-        "Set project config.home or verify these auth profiles in the host-local DevNexus home before provider or publication operations.",
+        "Set workspace config.home or verify these auth profiles in the host-local DevNexus home before provider or publication operations.",
     };
   }
 
@@ -394,9 +394,9 @@ function hostingHandoffCheck(
       title: "Hosting handoff",
       status: "warning",
       summary:
-        "Meta-project hosting is not configured; local readiness is possible, but provider publication handoff is manual.",
+        "Workspace repository hosting is not configured; local readiness is possible, but provider publication handoff is manual.",
       nextAction:
-        "Configure project hosting or record that this project is intentionally local-only.",
+        "Configure workspace hosting or record that this workspace is intentionally local-only.",
     };
   }
 

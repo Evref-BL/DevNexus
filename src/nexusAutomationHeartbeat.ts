@@ -65,7 +65,7 @@ export function prepareNexusAutomationHeartbeat(
   );
   const warnings = automationConfig
     ? []
-    : ["Project automation is not configured; heartbeat should record that blocker before launching work."];
+    : ["Workspace automation is not configured; heartbeat should record that blocker before launching work."];
   const prompt = renderNexusAutomationHeartbeatPrompt({
     projectRoot,
     projectConfig,
@@ -108,8 +108,8 @@ export function prepareNexusAutomationHeartbeat(
     warnings,
     nextActions: [
       "Create or update a Codex heartbeat automation with the prepared recipe.",
-      "Keep the heartbeat attached to the current project thread so follow-up work continues with project context.",
-      "Review project-specific safety boundaries before enabling live provider or runtime mutations.",
+      "Keep the heartbeat attached to the current workspace thread so follow-up work continues with workspace context.",
+      "Review workspace-specific safety boundaries before enabling live provider or runtime mutations.",
     ],
   };
 }
@@ -140,9 +140,9 @@ function renderNexusAutomationHeartbeatPrompt(
   const mode = input.automationConfig?.mode ?? "not configured";
 
   return [
-    `Continue the DevNexus project heartbeat for ${input.projectConfig.name} (${input.projectConfig.id}).`,
+    `Continue the DevNexus workspace heartbeat for ${input.projectConfig.name} (${input.projectConfig.id}).`,
     "",
-    `Project root: ${input.projectRoot}`,
+    `Workspace root: ${input.projectRoot}`,
     `Target state file: ${input.targetStatePath}`,
     `Automation mode: ${mode}`,
     `Automation selector: ${selectorLine}`,
@@ -171,7 +171,7 @@ function renderNexusAutomationHeartbeatPrompt(
     "",
     "Before ending a wake-up:",
     "- Record a target-cycle summary and any work-item comments or handoffs needed for durable continuation.",
-    "- Leave the project in a recoverable state with useful source changes committed or clearly handed off.",
+    "- Leave the workspace in a recoverable state with useful source changes committed or clearly handed off.",
   ].join("\n");
 }
 
@@ -182,7 +182,7 @@ function normalizeHeartbeatName(
   const trimmed = requestedName?.trim();
   return trimmed && trimmed.length > 0
     ? trimmed
-    : `DevNexus heartbeat: ${projectName}`;
+    : `DevNexus workspace heartbeat: ${projectName}`;
 }
 
 function normalizeIntervalMinutes(value: number | null | undefined): number {

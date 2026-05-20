@@ -269,7 +269,7 @@ function componentForRequest(
   );
   if (!component) {
     throw new NexusSshExecutionPlanError(
-      `Project component is not configured: ${request.componentId}`,
+      `Workspace component is not configured: ${request.componentId}`,
     );
   }
 

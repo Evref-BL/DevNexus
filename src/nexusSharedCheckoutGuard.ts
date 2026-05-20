@@ -155,7 +155,7 @@ export function classifyNexusCheckout(
         targetPath,
         repositoryPath: targetRepositoryPath,
         componentId: null,
-        reason: "Target repository is inside the configured project/meta worktrees root.",
+        reason: "Target repository is inside the configured workspace/meta worktrees root.",
       };
     }
 
@@ -182,7 +182,7 @@ export function classifyNexusCheckout(
         targetPath,
         repositoryPath: targetRepositoryPath,
         componentId: null,
-        reason: "Target repository is the shared DevNexus project checkout.",
+        reason: "Target repository is the shared DevNexus workspace checkout.",
       };
     }
   }
@@ -323,25 +323,25 @@ function saferNextAction(
   classification: NexusCheckoutClassification,
 ): string {
   if (classification === "shared_project_checkout") {
-    return "Prepare a project/meta worktree and rerun the project-state mutation there, or use an explicit integration/bootstrap override.";
+    return "Prepare a workspace/meta worktree and rerun the project-state mutation there, or use an explicit integration/bootstrap override.";
   }
   if (classification === "shared_component_checkout") {
     return "Prepare a component worktree and rerun the source mutation there, or use an explicit integration/bootstrap override.";
   }
   if (classification === "unknown") {
-    return "Run from a configured DevNexus project checkout or prepare an owned generated worktree before mutating.";
+    return "Run from a configured DevNexus workspace checkout or prepare an owned generated worktree before mutating.";
   }
   if (
     classification === "generated_component_worktree" &&
     mutationClass !== "component_source"
   ) {
-    return "Use a project/meta worktree for project-state mutations; component worktrees are for component source changes.";
+    return "Use a workspace/meta worktree for project-state mutations; component worktrees are for component source changes.";
   }
   if (
     classification === "generated_project_meta_worktree" &&
     mutationClass === "component_source"
   ) {
-    return "Use a component worktree for component source mutations; project/meta worktrees are for project state.";
+    return "Use a component worktree for component source mutations; workspace/meta worktrees are for workspace state.";
   }
 
   return "Use an owned generated worktree or an explicit integration/bootstrap override before mutating.";

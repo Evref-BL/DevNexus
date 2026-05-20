@@ -39,7 +39,7 @@ export function resolveComponentWorkItemRoute(options: {
       ? componentById(components, requestedComponentId)
       : null;
     if (requestedComponentId && !requestedComponent) {
-      throw new Error(`Project component is not configured: ${requestedComponentId}`);
+      throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
     }
     if (requestedComponent && requestedComponent.id !== qualified.component.id) {
       throw new Error(
@@ -58,7 +58,7 @@ export function resolveComponentWorkItemRoute(options: {
   if (requestedComponentId) {
     const component = componentById(components, requestedComponentId);
     if (!component) {
-      throw new Error(`Project component is not configured: ${requestedComponentId}`);
+      throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
     }
 
     return {
@@ -120,7 +120,7 @@ export function resolveComponentForCurrentPath(options: {
   if (requestedComponentId) {
     const component = componentById(components, requestedComponentId);
     if (!component) {
-      throw new Error(`Project component is not configured: ${requestedComponentId}`);
+      throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
     }
 
     return component;

@@ -50,7 +50,7 @@ function buildWindowsVibeKanbanWorkspaceSetupScript(
     "  Write-Host \"Source checkout has no node_modules at $sourceNodeModules; skipping dependency junction.\"",
     "}",
     "",
-    "Write-Host 'Vibe workspace setup complete for DevNexus-managed project.'",
+    "Write-Host 'Vibe workspace setup complete for DevNexus-managed workspace.'",
   ].join("\n");
 }
 
@@ -96,7 +96,7 @@ function buildPosixVibeKanbanWorkspaceSetupScript(
     "  printf '%s\\n' \"Source checkout has no node_modules at $source_root/node_modules; skipping dependency link.\"",
     "fi",
     "",
-    "printf '%s\\n' 'Vibe workspace setup complete for DevNexus-managed project.'",
+    "printf '%s\\n' 'Vibe workspace setup complete for DevNexus-managed workspace.'",
   ].join("\n");
 }
 

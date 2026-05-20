@@ -82,14 +82,14 @@ const localWorkTrackingCapabilityReport = {
 };
 
 describe("project registry helpers", () => {
-  it("normalizes project config file input to the project root", () => {
+  it("normalizes workspace config file input to the workspace root", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
 
     expect(projectRootFromInput(path.join(root, devNexusProjectConfigFileName))).toBe(root);
     expect(projectRootFromInput(root)).toBe(root);
   });
 
-  it("finds project references by registry id, config id, or path", () => {
+  it("finds workspace references by registry id, config id, or path", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
     fs.mkdirSync(root, { recursive: true });
     saveProjectConfig(root, projectConfig("config-id", "Config Project"));
@@ -122,7 +122,7 @@ describe("project registry helpers", () => {
     });
   });
 
-  it("builds status from project config when present", () => {
+  it("builds status from workspace config when present", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
     fs.mkdirSync(path.join(root, "worktrees"), { recursive: true });
     saveProjectConfig(root, {
@@ -335,7 +335,7 @@ describe("project registry helpers", () => {
     ]);
   });
 
-  it("reports host overlay readiness in project status", () => {
+  it("reports host overlay readiness in workspace status", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
     fs.mkdirSync(root, { recursive: true });
     saveProjectConfig(root, {
@@ -410,7 +410,7 @@ describe("project registry helpers", () => {
     ]);
   });
 
-  it("summarizes active agent target projections in project status", () => {
+  it("summarizes active agent target projections in workspace status", () => {
     const root = path.join(makeTempDir("dev-nexus-project-"), "Project");
     fs.mkdirSync(path.join(root, ".codex"), { recursive: true });
     fs.mkdirSync(path.join(root, ".agents", "skills"), { recursive: true });
@@ -554,7 +554,7 @@ describe("project registry helpers", () => {
 
     expect(() => buildNexusProjectStatusForPath(root)).toThrow(NexusProjectError);
     expect(() => buildNexusProjectStatusForPath(root)).toThrow(
-      `DevNexus project is not initialized: ${path.join(
+      `DevNexus workspace is not initialized: ${path.join(
         root,
         devNexusProjectConfigFileName,
       )}`,
@@ -596,6 +596,6 @@ describe("project registry helpers", () => {
         secondRoot,
         projectConfig("first", "Duplicate"),
       ),
-    ).toThrow(/Project id is already registered/);
+    ).toThrow(/Workspace id is already registered/);
   });
 });

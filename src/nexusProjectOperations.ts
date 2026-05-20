@@ -377,7 +377,7 @@ function scaffoldNexusProjectWithRecovery(options: {
 
     throw new NexusProjectError(
       [
-        `Project scaffold failed during extension/template setup: ${errorMessage(error)}.`,
+      `Workspace scaffold failed during extension/template setup: ${errorMessage(error)}.`,
         recoveryFailure ? `Recovery also failed: ${recoveryFailure}.` : null,
         `Safe next action: ${options.safeNextAction}`,
       ]
@@ -496,7 +496,7 @@ export function createNexusProjectInRegistry(
   const projectRootExistedBeforeCreate = fs.existsSync(projectRoot);
   if (directoryExistsAndIsNonEmpty(projectRoot)) {
     throw new NexusProjectError(
-      `Project root already exists and is not empty: ${projectRoot}`,
+      `Workspace root already exists and is not empty: ${projectRoot}`,
     );
   }
 
@@ -550,7 +550,7 @@ export function createNexusProjectInRegistry(
         preserveRootDirectory: projectRootExistedBeforeCreate,
       }),
     safeNextAction:
-      "fix the scaffold extension failure and rerun project create; the partial project root was cleaned up.",
+      "fix the scaffold extension failure and rerun project create; the partial workspace root was cleaned up.",
   });
 
   const reference = upsertNexusProjectReference(
@@ -585,7 +585,7 @@ export function importNexusProjectInRegistry(
   const sourceRoot = path.resolve(options.root);
   if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
     throw new NexusProjectError(
-      `Project source root must be an existing directory: ${sourceRoot}`,
+      `Workspace source root must be an existing directory: ${sourceRoot}`,
     );
   }
 
@@ -608,7 +608,7 @@ export function importNexusProjectInRegistry(
   const projectRootExistedBeforeImport = fs.existsSync(projectRoot);
   if (!existingProjectConfig && directoryExistsAndIsNonEmpty(projectRoot)) {
     throw new NexusProjectError(
-      `Project root already exists and is not empty: ${projectRoot}`,
+      `Workspace root already exists and is not empty: ${projectRoot}`,
     );
   }
   if (!existingProjectConfig) {
@@ -673,8 +673,8 @@ export function importNexusProjectInRegistry(
       });
     },
     safeNextAction: existingProjectConfig
-      ? "fix the scaffold extension failure and rerun project import; the existing project checkout was not deleted and its project config was restored."
-      : "fix the scaffold extension failure and rerun project import; the partial managed project root was cleaned up and the source checkout was left intact.",
+      ? "fix the scaffold extension failure and rerun project import; the existing project checkout was not deleted and its workspace config was restored."
+      : "fix the scaffold extension failure and rerun project import; the partial managed workspace root was cleaned up and the source checkout was left intact.",
   });
 
   const reference = upsertNexusProjectReference(
@@ -713,7 +713,7 @@ export function configureNexusProjectTrackerInRegistry(
   const projectConfig = loadProjectConfigIfExists(projectRoot);
   if (!projectConfig) {
     throw new NexusProjectError(
-      `DevNexus project is not initialized: ${projectConfigPath(projectRoot)}`,
+      `DevNexus workspace is not initialized: ${projectConfigPath(projectRoot)}`,
     );
   }
   const workTracking = buildConfiguredWorkTracking(options);

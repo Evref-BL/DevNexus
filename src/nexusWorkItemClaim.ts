@@ -597,7 +597,7 @@ function claimSelectableComponents(
     ? options.components.filter((component) => component.id === componentId)
     : options.components;
   if (componentId && components.length === 0) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   if (!trackerId) {
     return components;

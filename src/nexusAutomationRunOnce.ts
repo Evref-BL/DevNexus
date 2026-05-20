@@ -193,7 +193,7 @@ export async function runNexusAutomationOnce(
       projectConfig,
       automationConfig,
       status: "skipped",
-      summary: "Automation is not enabled for this project",
+      summary: "Automation is not enabled for this workspace",
       ledger,
       lock,
       preflight: [],
@@ -703,8 +703,8 @@ export function preflightNexusAutomationRunOnce(options: {
     check(
       "worktreesRoot",
       pathIsInside(options.projectRoot, worktreesRoot),
-      "Project worktrees root stays inside the project root",
-      `Automation worktreesRoot must resolve inside the project root: ${worktreesRoot}`,
+      "Workspace worktrees root stays inside the workspace root",
+      `Automation worktreesRoot must resolve inside the workspace root: ${worktreesRoot}`,
     ),
     ...preflightNexusAutomationWorktreeSetup({
       sourceRoot: options.sourceRoot,

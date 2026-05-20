@@ -7,9 +7,9 @@ the files agents need to understand the work, the list of source folders or
 artifacts they may need, a task list, and the support configuration for tools
 such as Codex or Claude.
 
-Think of it like a Maven or Gradle project root, but for agent-assisted work
-instead of a single build. You open the DevNexus project root in your agent, and
-the project root points to the repositories, documents, or other folders you
+Think of it like a Maven or Gradle workspace root, but for agent-assisted work
+instead of a single build. You open the DevNexus workspace root in your agent, and
+the workspace root points to the repositories, documents, or other folders you
 want to work on.
 
 DevNexus records structure and facts. A user or agent still chooses the work,
@@ -33,12 +33,12 @@ dev-nexus diagnostics cli-version-skew --json
 
 ## Terms
 
-- A **DevNexus project** is the directory you open in Codex, Claude, or another
+- A **DevNexus workspace** is the directory you open in Codex, Claude, or another
   agent. It contains `dev-nexus.project.json`, `AGENTS.md`, generated agent
   files, and `.dev-nexus/` support state.
-- A **component** is something the project works on, such as a Git repository,
+- A **component** is something the workspace works on, such as a Git repository,
   service, library, documentation folder, dataset, spreadsheet, or support
-  folder. One DevNexus project can have many components.
+  folder. One DevNexus workspace can have many components.
 - A **provider** is an external tool or service DevNexus can reference, such as
   GitHub, GitLab, Jira, Codex, or Claude.
 - A **work item** is a task or issue owned by a component. Work items can live
@@ -47,53 +47,53 @@ dev-nexus diagnostics cli-version-skew --json
   users do not need to choose or manage it.
 - **Agent files** are generated files such as `AGENTS.md`, skills, context, and
   Model Context Protocol configuration. Model Context Protocol, or MCP, is how
-  agents can call DevNexus tools from a project session.
+  agents can call DevNexus tools from a workspace session.
 - A **worktree** is an isolated Git checkout for a focused change. Agents use
   worktrees so parallel chats do not edit the same checkout.
 
 ## Quick Start
 
-Create or choose a directory for the DevNexus project. From that directory,
+Create or choose a directory for the DevNexus workspace. From that directory,
 run:
 
 ```bash
-dev-nexus project setup
+dev-nexus workspace setup
 ```
 
-The setup command guides you through the first project. It uses `~/.dev-nexus`
-as the default home, uses or asks for the project root, asks for the primary
+The setup command guides you through the first workspace. It uses `~/.dev-nexus`
+as the default home, uses or asks for the workspace root, asks for the primary
 component and any extra components, creates local work tracking by default, and
 generates agent files.
 
 After setup:
 
 ```bash
-dev-nexus project status .
+dev-nexus workspace status .
 ```
 
-Do not open the component repository as the agent project when you want
-DevNexus support. Open the DevNexus project root. The component repositories
+Do not open the component repository as the agent workspace when you want
+DevNexus support. Open the DevNexus workspace root. The component repositories
 are the things DevNexus points to.
 
 Copy-paste prompt for Codex or Claude:
 
 ```text
-Open this directory as the DevNexus project root. Read AGENTS.md.
-Run dev-nexus project status . and dev-nexus setup check . join-existing-project.
+Open this directory as the DevNexus workspace root. Read AGENTS.md.
+Run dev-nexus workspace status . and dev-nexus setup check . join-existing-project.
 Then inspect the components and create or triage the first component work item. Treat DevNexus as infrastructure; I still choose the work.
 ```
 
-Ready means `dev-nexus project status` succeeds, `dev-nexus setup check` is not
+Ready means `dev-nexus workspace status` succeeds, `dev-nexus setup check` is not
 blocked, `AGENTS.md` exists, and an agent MCP config such as
 `.codex/config.toml` or `.mcp.json` was generated.
 
 ## Example
 
 If you want one agent workspace for an API, a frontend, a shared library, and a
-load-test harness, create one DevNexus project with four components:
+load-test harness, create one DevNexus workspace with four components:
 
 ```text
-DevNexus project: ~/dev-nexus/rocket-shop-suite
+DevNexus workspace: ~/dev-nexus/rocket-shop-suite
 
 Components:
 - checkout-api
@@ -102,25 +102,25 @@ Components:
 - load-test-lab
 ```
 
-Use one `project setup` run for that shape. Do not create four DevNexus
-projects unless you truly want four separate agent workspaces.
+Use one `workspace setup` run for that shape. Do not create four DevNexus
+workspaces unless you truly want four separate agent workspaces.
 
 For a detailed version of this example, see
-[First project from existing components](docs/user/first-project-existing-components.md).
+[First workspace from existing components](docs/user/first-workspace-existing-components.md).
 
 ## Agent And CI Setup
 
 Users should usually start with the interactive command:
 
 ```bash
-dev-nexus project setup
+dev-nexus workspace setup
 ```
 
 Agents, CI jobs, and reproducible onboarding scripts can use answer files:
 
 ```bash
-dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --json
-dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --yes
+dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --json
+dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --yes
 ```
 
 The first command previews local writes. The second applies them. Provider
@@ -129,12 +129,12 @@ access, stay behind separate hosting commands.
 
 ## Common Next Steps
 
-Check that the project is ready:
+Check that the workspace is ready:
 
 ```bash
-dev-nexus project status <project-root>
-dev-nexus setup check <project-root> join-existing-project
-dev-nexus host check <project-root> --json
+dev-nexus workspace status <workspace-root>
+dev-nexus setup check <workspace-root> join-existing-project
+dev-nexus host check <workspace-root> --json
 ```
 
 `host check` is read-only. It summarizes the current or configured host's
@@ -144,34 +144,34 @@ visible MCP server configuration without printing host-local paths.
 Create a component-scoped work item:
 
 ```bash
-dev-nexus work-item create <project-root> --component <component-id> --title "Implement focused task" --status ready
-dev-nexus work-item list <project-root> --component <component-id>
+dev-nexus work-item create <workspace-root> --component <component-id> --title "Implement focused task" --status ready
+dev-nexus work-item list <workspace-root> --component <component-id>
 ```
 
 Prepare an isolated worktree for implementation:
 
 ```bash
-dev-nexus worktree prepare <project-root> --component <component-id> --work-item <work-item-id>
+dev-nexus worktree prepare <workspace-root> --component <component-id> --work-item <work-item-id>
 ```
 
 For provider-native issue fixes, pull requests, required checks, automation, and
 publication policy, see [Agent workflows](docs/user/agent-workflows.md).
 
-Refresh generated agent configuration when project settings change:
+Refresh generated agent configuration when workspace settings change:
 
 ```bash
-dev-nexus project mcp refresh <project-root> --agent codex
+dev-nexus workspace mcp refresh <workspace-root> --agent codex
 ```
 
 ## Documentation
 
-- [Getting started](docs/user/getting-started.md) gives the full first-project
+- [Getting started](docs/user/getting-started.md) gives the full first-workspace
   path.
-- [Concepts](docs/user/concepts.md) explains the project model and vocabulary.
-- [First project from existing components](docs/user/first-project-existing-components.md)
-  shows how to coordinate several existing folders in one project.
+- [Concepts](docs/user/concepts.md) explains the workspace model and vocabulary.
+- [First workspace from existing components](docs/user/first-workspace-existing-components.md)
+  shows how to coordinate several existing folders in one workspace.
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
-  GitHub, GitLab, Jira, bot accounts, user accounts, and meta-repository
+  GitHub, GitLab, Jira, bot accounts, user accounts, and workspace repository
   hosting.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
@@ -190,5 +190,5 @@ npm run check
 ```
 
 DevNexus is infrastructure. It gives agents a shared operating context; it does
-not replace user judgment, project ownership, verification, or publication
+not replace user judgment, workspace ownership, verification, or publication
 policy.

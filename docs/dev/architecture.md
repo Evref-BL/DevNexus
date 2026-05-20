@@ -1,12 +1,12 @@
 # Architecture Notes
 
-These notes describe the source-project boundaries behind the user-facing CLI.
+These notes describe the workspace boundaries behind the user-facing CLI.
 They are intended for contributors changing DevNexus itself or adding provider
 adapters and plugins.
 
 ## Product Boundary
 
-DevNexus is orchestration infrastructure. It owns project metadata, component
+DevNexus is orchestration infrastructure. It owns workspace metadata, component
 graphs, work-tracker access, setup projections, agent launch context, locks,
 run ledgers, target-cycle facts, verification records, publication policy, and
 handoff records.
@@ -18,9 +18,9 @@ human operator or the launched coordinator agent.
 This boundary keeps the core generic. Runtime, language, framework, tracker,
 and provider-specific behavior belongs in adapters or plugins.
 
-## Project Config
+## Workspace Config
 
-`dev-nexus.project.json` is the shared project contract. Important top-level
+`dev-nexus.project.json` is the shared workspace contract. Important top-level
 areas are:
 
 - `components`: source, tracker, verification, publication, and relationship
@@ -35,7 +35,7 @@ areas are:
   such as repository creation, collaborator repair, pending invitations, and
   invitation acceptance stay behind hosting adapters.
 
-Project support state lives under `.dev-nexus/`. Shared user-authored state and
+Workspace support state lives under `.dev-nexus/`. Shared user-authored state and
 generated local/runtime state should stay distinguishable so refresh commands
 do not overwrite durable user intent.
 
@@ -53,7 +53,7 @@ Components are first-class. Each component can have its own:
 
 Commands that predate multi-component support target the primary component
 when no component id is provided. New code should preserve component ownership
-and avoid collapsing component work into project-level state.
+and avoid collapsing component work into workspace-level state.
 
 ## Work-Tracking Providers
 
@@ -69,24 +69,24 @@ supporting a board-status field.
 ## MCP Server
 
 The generic MCP server should stay low-token and provider-neutral. It exposes
-project status, setup, automation, coordination, target-cycle, target-report,
+workspace status, setup, automation, coordination, target-cycle, target-report,
 and work-item tools. It should report factual state and caller-submitted facts,
 not infer hidden work or choose next actions.
 
 When adding an MCP tool, keep the same boundary as the CLI:
 
-- Validate project and component selection explicitly.
+- Validate workspace and component selection explicitly.
 - Prefer stable ids and component-qualified refs.
 - Return concise structured data that agents can use directly.
-- Avoid live provider mutation unless the project policy and command path make
+- Avoid live provider mutation unless the workspace policy and command path make
   that mutation explicit.
 
 ## Plugin Capabilities
 
-Plugins are additive capability records inside a DevNexus project. They do not
+Plugins are additive capability records inside a DevNexus workspace. They do not
 replace the core and they do not own orchestration decisions. Plugin MCP
 servers expose additive domain surfaces; they are not alternate generic
-DevNexus servers. Generic project, setup, coordination, worktree, automation,
+DevNexus servers. Generic workspace, setup, coordination, worktree, automation,
 and work-item operations belong to the core `dev_nexus` MCP server.
 
 Supported capability kinds include:
@@ -149,7 +149,7 @@ with their source metadata.
 ## Generated Worktree Setup
 
 Generated worktrees are component-scoped and must remain inside the configured
-component worktrees root. Worktree setup can project support-only dependencies,
+component worktrees root. Worktree setup can workspace support-only dependencies,
 agent skills, and worker context files without changing tracked source.
 
 Dependency projections link existing reviewed paths such as `node_modules`
@@ -159,7 +159,7 @@ are checked before mutation so setup failures are visible early.
 Worker context is written under `.dev-nexus/context/` in the generated
 worktree:
 
-- `context.json` contains project, component, ownership, setup, and plugin
+- `context.json` contains workspace, component, ownership, setup, and plugin
   capability facts.
 - `briefing.md` contains concise agent-readable setup and policy notes.
 
@@ -224,7 +224,7 @@ project them into agent-native locations such as:
 
 Prepared component worktrees receive their own generated skill projection when
 configured. Generated skill and context files are support state and should be
-excluded from component Git indexes unless project config explicitly requests
+excluded from component Git indexes unless workspace config explicitly requests
 source-controlled projection.
 
 The default core pack includes skills for DevNexus usage, diagnosis,

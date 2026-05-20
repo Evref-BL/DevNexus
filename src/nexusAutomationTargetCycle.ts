@@ -453,7 +453,7 @@ function resolveProjectRelativePath(
   const relative = path.relative(root, target);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new NexusAutomationTargetCycleError(
-      `${fieldName} must resolve inside the project root: ${target}`,
+      `${fieldName} must resolve inside the workspace root: ${target}`,
     );
   }
 
