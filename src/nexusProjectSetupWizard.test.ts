@@ -44,8 +44,8 @@ function captureOutput(options: {
 }
 
 describe("nexus project setup wizard", () => {
-  it("uses the TTY path as the human quickstart without prompting for home", async () => {
-    const defaultHome = path.join(os.tmpdir(), "dev-nexus-human-quickstart-home");
+  it("uses the TTY path as the user quickstart without prompting for home", async () => {
+    const defaultHome = path.join(os.tmpdir(), "dev-nexus-user-quickstart-home");
     process.env.DEV_NEXUS_HOME = defaultHome;
     const stdin = ttyInput();
     const promptAnswers = [
@@ -105,7 +105,7 @@ describe("nexus project setup wizard", () => {
         },
       ],
     });
-    expect(stdout.output()).toContain("DevNexus human quickstart");
+    expect(stdout.output()).toContain("DevNexus user quickstart");
     expect(stdout.output()).toContain("~/.dev-nexus unless --home is supplied");
     expect(stdout.output()).not.toContain("DevNexus home [");
   });

@@ -12,28 +12,8 @@ instead of a single build. You open the DevNexus project root in your agent, and
 the project root points to the repositories, documents, or other folders you
 want to work on.
 
-DevNexus records structure and facts. A human or agent still chooses the work,
+DevNexus records structure and facts. A user or agent still chooses the work,
 edits code, reviews changes, verifies results, and decides what to publish.
-
-## Terms
-
-- A **DevNexus project** is the directory you open in Codex, Claude, or another
-  agent. It contains `dev-nexus.project.json`, `AGENTS.md`, generated agent
-  files, and `.dev-nexus/` support state.
-- A **component** is something the project works on, such as a Git repository,
-  paper, dataset, spreadsheet, or support folder. One DevNexus project can have
-  many components.
-- A **provider** is an external tool or service DevNexus can reference, such as
-  GitHub, GitLab, Jira, Codex, or Claude.
-- A **work item** is a task or issue owned by a component. Work items can live
-  in DevNexus' local tracker or in providers such as GitHub, GitLab, or Jira.
-- The **DevNexus home** is user-local state, normally `~/.dev-nexus`. Most
-  users do not need to choose or manage it.
-- **Agent files** are generated files such as `AGENTS.md`, skills, context, and
-  Model Context Protocol configuration. Model Context Protocol, or MCP, is how
-  agents can call DevNexus tools from a project session.
-- A **worktree** is an isolated Git checkout for a focused change. Agents use
-  worktrees so parallel chats do not edit the same checkout.
 
 ## Install
 
@@ -51,28 +31,44 @@ it to check for command skew before following examples:
 dev-nexus diagnostics cli-version-skew --json
 ```
 
+## Terms
+
+- A **DevNexus project** is the directory you open in Codex, Claude, or another
+  agent. It contains `dev-nexus.project.json`, `AGENTS.md`, generated agent
+  files, and `.dev-nexus/` support state.
+- A **component** is something the project works on, such as a Git repository,
+  service, library, documentation folder, dataset, spreadsheet, or support
+  folder. One DevNexus project can have many components.
+- A **provider** is an external tool or service DevNexus can reference, such as
+  GitHub, GitLab, Jira, Codex, or Claude.
+- A **work item** is a task or issue owned by a component. Work items can live
+  in DevNexus' local tracker or in providers such as GitHub, GitLab, or Jira.
+- The **DevNexus home** is user-local state, normally `~/.dev-nexus`. Most
+  users do not need to choose or manage it.
+- **Agent files** are generated files such as `AGENTS.md`, skills, context, and
+  Model Context Protocol configuration. Model Context Protocol, or MCP, is how
+  agents can call DevNexus tools from a project session.
+- A **worktree** is an isolated Git checkout for a focused change. Agents use
+  worktrees so parallel chats do not edit the same checkout.
+
 ## Quick Start
 
-Create one DevNexus project for the work you want agents to understand.
+Create or choose a directory for the DevNexus project. From that directory,
+run:
 
 ```bash
-dev-nexus project setup "$HOME/dev-nexus/example-suite"
+dev-nexus project setup
 ```
 
 The setup command guides you through the first project. It uses `~/.dev-nexus`
-as the default home, asks for the project root, asks which components belong to
-the project, creates local work tracking by default, and generates agent files.
+as the default home, uses or asks for the project root, asks for the primary
+component and any extra components, creates local work tracking by default, and
+generates agent files.
 
 After setup:
 
 ```bash
-dev-nexus project status "$HOME/dev-nexus/example-suite"
-```
-
-Then open this directory in Codex, Claude, or your agent:
-
-```text
-$HOME/dev-nexus/example-suite
+dev-nexus project status .
 ```
 
 Do not open the component repository as the agent project when you want
@@ -82,8 +78,8 @@ are the things DevNexus points to.
 Copy-paste prompt for Codex or Claude:
 
 ```text
-Open $HOME/dev-nexus/example-suite as the DevNexus project root. Read AGENTS.md.
-Run dev-nexus project status "$HOME/dev-nexus/example-suite" and dev-nexus setup check "$HOME/dev-nexus/example-suite" join-existing-project.
+Open this directory as the DevNexus project root. Read AGENTS.md.
+Run dev-nexus project status . and dev-nexus setup check . join-existing-project.
 Then inspect the components and create or triage the first component work item. Treat DevNexus as infrastructure; I still choose the work.
 ```
 
@@ -93,17 +89,17 @@ blocked, `AGENTS.md` exists, and an agent MCP config such as
 
 ## Example
 
-If you want one agent workspace for a benchmark repository, two supporting
-repositories, and a paper, create one DevNexus project with four components:
+If you want one agent workspace for an API, a frontend, a shared library, and a
+load-test harness, create one DevNexus project with four components:
 
 ```text
-DevNexus project: ~/dev-nexus/graphrag-research-suite
+DevNexus project: ~/dev-nexus/rocket-shop-suite
 
 Components:
-- benchmark-graphrag
-- json-java-moose
-- json-java-no-moose
-- iwst-paper
+- checkout-api
+- storefront
+- shared-kernel
+- load-test-lab
 ```
 
 Use one `project setup` run for that shape. Do not create four DevNexus
@@ -114,10 +110,10 @@ For a detailed version of this example, see
 
 ## Agent And CI Setup
 
-Humans should usually start with the interactive command:
+Users should usually start with the interactive command:
 
 ```bash
-dev-nexus project setup <project-root>
+dev-nexus project setup
 ```
 
 Agents, CI jobs, and reproducible onboarding scripts can use answer files:
@@ -128,7 +124,7 @@ dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --yes
 ```
 
 The first command previews local writes. The second applies them. Provider
-mutations, such as creating GitHub repositories or repairing collaborator
+mutations, such as creating provider repositories or repairing collaborator
 access, stay behind separate hosting commands.
 
 ## Common Next Steps
@@ -158,25 +154,8 @@ Prepare an isolated worktree for implementation:
 dev-nexus worktree prepare <project-root> --component <component-id> --work-item <work-item-id>
 ```
 
-For a one-issue provider-native fix, preview the compact quick-fix path:
-
-```bash
-dev-nexus quick-fix plan <project-root> --component <component-id> --work-item github-50
-dev-nexus quick-fix start <project-root> --component <component-id> --work-item github-50
-dev-nexus quick-fix finish <project-root> --component <component-id> --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
-```
-
-After opening a green-main pull request, evaluate required checks from saved
-GitHub check data before merging:
-
-```bash
-gh pr checks <pr-number> --repo <owner/repo> --required --json name,state,bucket,conclusion,link,workflow > checks.json
-dev-nexus publication green-main plan <project-root> --component <component-id> --pr <pr-number> --checks-file checks.json
-```
-
-The helper refuses merge commands while required checks are pending, failed,
-stale, missing, or unknown. A single failed-run rerun is proposed only when the
-caller passes `--allow-rerun --rerun-reason <text>`.
+For provider-native issue fixes, pull requests, required checks, automation, and
+publication policy, see [Agent workflows](docs/user/agent-workflows.md).
 
 Refresh generated agent configuration when project settings change:
 
@@ -192,7 +171,7 @@ dev-nexus project mcp refresh <project-root> --agent codex
 - [First project from existing components](docs/user/first-project-existing-components.md)
   shows how to coordinate several existing folders in one project.
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
-  GitHub, GitLab, Jira, bot accounts, human accounts, and meta-repository
+  GitHub, GitLab, Jira, bot accounts, user accounts, and meta-repository
   hosting.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
@@ -211,5 +190,5 @@ npm run check
 ```
 
 DevNexus is infrastructure. It gives agents a shared operating context; it does
-not replace human judgment, project ownership, verification, or publication
+not replace user judgment, project ownership, verification, or publication
 policy.

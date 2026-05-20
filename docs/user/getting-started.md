@@ -28,15 +28,16 @@ dev-nexus diagnostics cli-version-skew --json
 
 ## Create The First Project
 
-Start with the guided setup command:
+Create or choose the directory you want to use as the DevNexus project root.
+From that directory, start the guided setup command:
 
 ```bash
-dev-nexus project setup "$HOME/dev-nexus/example-suite"
+dev-nexus project setup
 ```
 
-For a human in a terminal, setup should ask the minimum first-project
-questions. The DevNexus home defaults to `~/.dev-nexus`, so most users do not
-need to choose one.
+For a user in a terminal, setup asks the minimum first-project questions. The
+DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
+one.
 
 Setup creates or updates:
 
@@ -47,7 +48,7 @@ Setup creates or updates:
 - local work-item stores when local tracking is enabled
 - the home registry entry under `~/.dev-nexus`
 
-Provider mutations are not part of setup. Creating GitHub repositories,
+Provider mutations are not part of setup. Creating provider repositories,
 repairing collaborators, accepting invitations, pushing branches, or publishing
 packages are explicit later steps.
 
@@ -56,7 +57,7 @@ packages are explicit later steps.
 Open the DevNexus project root in the agent:
 
 ```text
-$HOME/dev-nexus/example-suite
+the directory where you ran dev-nexus project setup
 ```
 
 Do not open a component repository when you expect DevNexus tools and generated
@@ -73,16 +74,16 @@ After opening the project, ask the agent to:
 Copy-paste prompt:
 
 ```text
-Open $HOME/dev-nexus/example-suite as the DevNexus project root. Read AGENTS.md.
-Run dev-nexus project status "$HOME/dev-nexus/example-suite" and dev-nexus setup check "$HOME/dev-nexus/example-suite" join-existing-project.
+Open this directory as the DevNexus project root. Read AGENTS.md.
+Run dev-nexus project status . and dev-nexus setup check . join-existing-project.
 Then inspect the components and create or triage the first component work item. Treat DevNexus as infrastructure; I still choose the work.
 ```
 
 Useful checks:
 
 ```bash
-dev-nexus project status "$HOME/dev-nexus/example-suite"
-dev-nexus setup check "$HOME/dev-nexus/example-suite" join-existing-project
+dev-nexus project status .
+dev-nexus setup check . join-existing-project
 ```
 
 The project is ready when `project status` succeeds, setup check is not
@@ -92,8 +93,8 @@ blocked, `AGENTS.md` exists, and your agent config was generated, such as
 ## Add Existing Components
 
 A DevNexus project can coordinate several existing folders. For example, one
-project might point to a benchmark repository, two support repositories, and a
-paper.
+project might point to an API repository, a frontend repository, a shared
+library, and a load-test harness.
 
 Use one DevNexus project with several components. Do not run `project import`
 once per repository if the goal is one shared agent workspace.
@@ -184,5 +185,5 @@ become the primary component of a new DevNexus project.
   providers, active targets, generated support, and stale provider files.
 - [Multi-tracker work tracking](multi-tracker.md) explains local and provider
   trackers, link records, and sync planning.
-- [Providers, auth, and hosting](providers-auth-hosting.md) explains human
+- [Providers, auth, and hosting](providers-auth-hosting.md) explains user
   accounts, bot accounts, provider CLI profiles, and meta-repository hosting.

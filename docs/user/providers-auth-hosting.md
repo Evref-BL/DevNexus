@@ -8,11 +8,12 @@ intent. Host-local credential details stay on each machine.
 
 Projects often need two kinds of provider accounts:
 
-- A **human account** for manual human actions.
+- A **user account** for manual user actions. The current config model may call
+  this actor kind `human`.
 - A **bot or machine account** for agent-created provider activity, such as
   pushing branches, opening issues, commenting, or creating pull requests.
 
-Do not let an agent silently fall back to a human account when project policy
+Do not let an agent silently fall back to a user account when project policy
 expects a bot account. Configure the bot profile explicitly.
 
 ## Credential Methods
@@ -96,6 +97,19 @@ Example GitHub tracker intent:
 Read [Multi-tracker work tracking](multi-tracker.md) before linking local work
 items to provider issues or planning sync.
 
+## Provider Commands And APIs
+
+DevNexus should prefer neutral provider records over hard-coded forge commands.
+When a command needs live provider facts, collect those facts through the
+configured provider adapter, provider CLI, or provider API, then pass the saved
+facts to DevNexus for classification.
+
+For example, GitHub users may collect pull-request checks with `gh`. GitLab,
+Jira, or another forge may need a provider-specific CLI or API call instead.
+The durable DevNexus surface should be the normalized tracker item, request,
+check report, or publication decision, not a README workflow that only works on
+one forge.
+
 ## Meta-Repository Hosting
 
 The DevNexus project root is often a Git repository. Hosting that repository
@@ -143,7 +157,7 @@ Publication policy describes what agents may do after verification.
 Common postures:
 
 - `local_only`: record work locally, no publication.
-- `review_handoff`: prepare a branch or handoff for human review.
+- `review_handoff`: prepare a branch or handoff for user review.
 - `direct_integration`: integrate directly when policy allows.
 - `green_main`: validate through required checks before merging to the target
   branch.
@@ -157,6 +171,6 @@ Auth profiles say how a machine can authenticate. Authority roles say whether
 the current actor may use that authentication for a specific action.
 
 Use authority roles to separate maintainers, contributors, reviewers, runtime
-operators, release operators, human accounts, and bot accounts.
+operators, release operators, user accounts, and bot accounts.
 
 See [Authority roles](authority-roles.md) for full examples.

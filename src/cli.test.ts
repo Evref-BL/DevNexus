@@ -351,6 +351,9 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("Usage:");
     expect(output.output()).toContain("dev-nexus project setup [project-root] [options]");
+    expect(output.output()).toContain("User quickstart:");
+    expect(output.output()).toContain("dev-nexus project setup");
+    expect(output.output()).toContain("Run from the directory you want to use");
     expect(output.output()).toContain("DevNexus home defaults to");
     expect(output.output()).toContain("--answers <json-file>");
     expect(output.output()).toContain("--yes");

@@ -393,7 +393,7 @@ async function promptForNexusProjectSetupAnswers(options: {
   try {
     options.stdout.write(
       [
-        "DevNexus human quickstart",
+        "DevNexus user quickstart",
         "Answer the project and primary component prompts. Add more components when the first project has more than one source folder. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),

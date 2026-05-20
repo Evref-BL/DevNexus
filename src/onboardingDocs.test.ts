@@ -86,9 +86,12 @@ afterEach(() => {
 describe("README onboarding guardrails", () => {
   it("defines core onboarding terms before the quickstart", () => {
     const readme = repoFile("README.md");
+    const installStart = readme.indexOf("## Install");
     const termsStart = readme.indexOf("## Terms");
     const quickStart = readme.indexOf("## Quick Start");
+    expect(installStart).toBeGreaterThan(-1);
     expect(termsStart).toBeGreaterThan(-1);
+    expect(installStart).toBeLessThan(termsStart);
     expect(quickStart).toBeGreaterThan(termsStart);
 
     const requiredDefinitions = [
@@ -111,21 +114,24 @@ describe("README onboarding guardrails", () => {
     expect(readme.indexOf("Model Context Protocol, or MCP")).toBeLessThan(quickStart);
   });
 
-  it("keeps the human quickstart before automation-only setup examples", () => {
+  it("keeps the user quickstart before automation-only setup examples", () => {
     const readme = repoFile("README.md");
-    const humanSetup = readme.indexOf('dev-nexus project setup "$HOME/dev-nexus/example-suite"');
+    const userSetup = readme.indexOf("dev-nexus project setup");
     const answerFileSetup = readme.indexOf("--answers ./dev-nexus.setup.json");
-    expect(humanSetup).toBeGreaterThan(-1);
-    expect(answerFileSetup).toBeGreaterThan(humanSetup);
+    expect(userSetup).toBeGreaterThan(-1);
+    expect(answerFileSetup).toBeGreaterThan(userSetup);
 
     const firstSetupLine = readme
       .split(/\r?\n/u)
       .find((line) => line.includes("dev-nexus project setup"))!;
+    expect(firstSetupLine.trim()).toBe("dev-nexus project setup");
     expect(firstSetupLine).not.toContain("--answers");
     expect(firstSetupLine).not.toContain("--json");
     expect(firstSetupLine).not.toContain("--yes");
     expect(readme).not.toContain("dev-nexus project import");
     expect(readme).not.toContain("dev-nexus project create");
+    expect(readme).not.toContain("gh pr checks");
+    expect(readme).not.toContain("github-50");
   });
 
   it("includes an agent prompt and concrete readiness criteria in Quick Start", () => {
@@ -144,6 +150,31 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toContain("create or triage the first component work item");
     expect(quickStart).toContain(".codex/config.toml");
     expect(quickStart).toContain(".mcp.json");
+    expect(quickStart).not.toContain("gh pr checks");
+  });
+
+  it("uses a general industry example instead of dogfood or research-specific names", () => {
+    const readme = repoFile("README.md");
+    const firstProjectGuide = repoFile("docs/user/first-project-existing-components.md");
+    const combined = `${readme}\n${firstProjectGuide}`;
+
+    for (const expected of ["rocket-shop-suite", "checkout-api", "storefront", "shared-kernel"]) {
+      expect(combined).toContain(expected);
+    }
+
+    for (const stale of ["graphrag", "GraphRAG", "json-java-moose", "iwst-paper"]) {
+      expect(combined).not.toContain(stale);
+    }
+  });
+
+  it("keeps the general workflow guide provider-neutral by default", () => {
+    const guide = repoFile("docs/user/agent-workflows.md");
+    expect(guide).toContain("keep the default workflow provider-neutral");
+    expect(guide).toContain("provider-specific until DevNexus has a neutral collector adapter");
+    expect(guide).toContain("--tracker forge");
+    expect(guide).toContain("The older `quick-fix` helper is a specialized GitHub path.");
+    expect(guide).not.toContain("gh pr checks");
+    expect(guide).not.toContain("github-50");
   });
 
   it("keeps README local documentation links valid", () => {
@@ -190,11 +221,11 @@ describe("README onboarding guardrails", () => {
 });
 
 describe("first-project quickstart smoke", () => {
-  it("creates a ready local project from the no-answer-file human setup path", async () => {
+  it("creates a ready local project from the no-answer-file user setup path", async () => {
     const projectRoot = makeTempDir("dev-nexus-quickstart-project-");
     const homePath = makeTempDir("dev-nexus-quickstart-home-");
     fs.mkdirSync(path.join(projectRoot, "packages", "api"), { recursive: true });
-    fs.mkdirSync(path.join(projectRoot, "docs", "paper"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "docs", "runbooks"), { recursive: true });
     process.env.DEV_NEXUS_HOME = homePath;
 
     const stdin = ttyInput();
@@ -209,8 +240,8 @@ describe("first-project quickstart smoke", () => {
       "packages/api",
       "dependency",
       "yes",
-      "paper",
-      "docs/paper",
+      "runbooks",
+      "docs/runbooks",
       "optional",
       "",
       "",
@@ -229,7 +260,7 @@ describe("first-project quickstart smoke", () => {
     const projectConfig = loadProjectConfig(projectRoot);
     const readiness = buildNexusProjectSetupReadinessReport({ projectRoot });
 
-    expect(stdout.output()).toContain("DevNexus human quickstart");
+    expect(stdout.output()).toContain("DevNexus user quickstart");
     expect(result.projectConfigPath).toBe(path.join(projectRoot, "dev-nexus.project.json"));
     expect(projectConfig.id).toBe("quickstart-smoke");
     expect(
@@ -241,7 +272,7 @@ describe("first-project quickstart smoke", () => {
     ).toEqual([
       { id: "core", role: "primary", defaultWorkTrackerId: "local" },
       { id: "api", role: "dependency", defaultWorkTrackerId: "local" },
-      { id: "paper", role: "optional", defaultWorkTrackerId: "local" },
+      { id: "runbooks", role: "optional", defaultWorkTrackerId: "local" },
     ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     expect(fs.readFileSync(path.join(projectRoot, "AGENTS.md"), "utf8")).toContain(
@@ -260,7 +291,7 @@ describe("first-project quickstart smoke", () => {
     ).toEqual([]);
     expect(
       loadLocalWorkTrackingStore(
-        path.join(projectRoot, ".dev-nexus", "work-items", "paper.json"),
+        path.join(projectRoot, ".dev-nexus", "work-items", "runbooks.json"),
       ).items,
     ).toEqual([]);
     expect(readiness.verdict).not.toBe("blocked");
