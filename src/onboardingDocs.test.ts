@@ -133,11 +133,41 @@ describe("README onboarding guardrails", () => {
       "README.md",
       "docs/user/getting-started.md",
       "docs/user/concepts.md",
+      "docs/user/agent-targets.md",
       "docs/user/first-project-existing-components.md",
       "docs/user/providers-auth-hosting.md",
     ]) {
       assertLocalMarkdownLinksExist(file);
     }
+  });
+
+  it("documents opt-in agent targets and projection cleanup", () => {
+    const guide = repoFile("docs/user/agent-targets.md");
+    const gettingStarted = repoFile("docs/user/getting-started.md");
+    const readme = repoFile("README.md");
+
+    for (const required of [
+      "supported agent providers",
+      "active agent targets",
+      "agentTargets.active",
+      "Codex-only",
+      "Claude-only",
+      "OpenCode",
+      "Multi-provider",
+      "MCP configuration",
+      "Agent-native skill directories",
+      "present-stale-generated",
+      "present-manual",
+      "project status",
+      "setup check",
+    ]) {
+      expect(guide, `agent target guide must mention ${required}`).toContain(required);
+    }
+
+    expect(guide).toContain("Do not delete provider-global files");
+    expect(guide).toContain("manual provider configuration");
+    expect(gettingStarted).toContain("Agent targets and projection cleanup");
+    expect(readme).toContain("docs/user/agent-targets.md");
   });
 });
 

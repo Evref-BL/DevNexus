@@ -73,6 +73,19 @@ Examples include:
 Model Context Protocol, or MCP, is how agents call DevNexus tools from inside a
 project session.
 
+## Agent Target
+
+An agent target is a provider this project actively prepares generated support
+for. DevNexus can support several providers, but a project can intentionally
+select only Codex, only Claude, OpenCode/manual setup, or several providers.
+
+Active targets decide which MCP config files, skill directories, and
+provider-specific setup notes should exist in the project. Stale generated
+support for inactive providers should be reviewed before cleanup instead of
+deleted blindly.
+
+See [Agent targets and projection cleanup](agent-targets.md).
+
 ## Worktree
 
 A worktree is an isolated Git checkout for a focused change.
