@@ -14,6 +14,7 @@ import type {
   WorkItemQuery,
   WorkItemRef,
   WorkStatus,
+  WorkStatusQuery,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
 
@@ -23,13 +24,16 @@ export const localWorkTrackingStoreVersion = 1;
 const localWorkTrackingStoreLockTimeoutMs = 30_000;
 const localWorkTrackingStoreLockRetryMs = 10;
 
-const workStatuses = new Set<WorkStatus>([
+const openStatuses = new Set<WorkStatus>([
   "todo",
   "ready",
   "in_progress",
   "blocked",
-  "done",
-  "wont_do",
+]);
+const closedStatuses = new Set<WorkStatus>(["done", "wont_do"]);
+const workStatuses = new Set<WorkStatus>([
+  ...openStatuses,
+  ...closedStatuses,
 ]);
 
 export interface LocalWorkTrackingStore {
@@ -218,15 +222,7 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
 
   async listWorkItems(query: WorkItemQuery = {}): Promise<WorkItem[]> {
     const projectRoot = this.resolveProjectRoot(query.projectRoot);
-    const statuses =
-      query.status === undefined
-        ? undefined
-        : new Set(Array.isArray(query.status) ? query.status : [query.status]);
-    if (statuses) {
-      for (const status of statuses) {
-        assertWorkStatus(status);
-      }
-    }
+    const statuses = normalizeStatusFilter(query.status);
 
     const labels = normalizeStringArray(query.labels, "labels");
     const assignees = normalizeStringArray(query.assignees, "assignees");
@@ -799,6 +795,35 @@ function assertWorkStatus(status: string): asserts status is WorkStatus {
       `Invalid local work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`,
     );
   }
+}
+
+function normalizeStatusFilter(
+  status: WorkStatusQuery | WorkStatusQuery[] | undefined,
+): Set<WorkStatus> | undefined {
+  if (status === undefined) {
+    return undefined;
+  }
+
+  const values = Array.isArray(status) ? status : [status];
+  const normalized = new Set<WorkStatus>();
+  for (const value of values) {
+    if (value === "open") {
+      for (const openStatus of openStatuses) {
+        normalized.add(openStatus);
+      }
+      continue;
+    }
+    if (value === "closed") {
+      for (const closedStatus of closedStatuses) {
+        normalized.add(closedStatus);
+      }
+      continue;
+    }
+    assertWorkStatus(value);
+    normalized.add(value);
+  }
+
+  return normalized;
 }
 
 function workStatus(value: unknown, pathName: string): WorkStatus {

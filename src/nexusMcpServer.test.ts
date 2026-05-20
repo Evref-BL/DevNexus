@@ -2295,10 +2295,14 @@ describe("DevNexus MCP server", () => {
       projectRoot,
       status: "open",
     });
-    expect(localOpenList.isError).toBe(true);
     expect(toolJson(localOpenList)).toMatchObject({
-      ok: false,
-      error: expect.stringContaining("Invalid local work status: open"),
+      ok: true,
+      workItems: expect.arrayContaining([
+        expect.objectContaining({
+          id: "local-1",
+          status: "in_progress",
+        }),
+      ]),
     });
 
     const fullList = toolJson(

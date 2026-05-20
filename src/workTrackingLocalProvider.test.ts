@@ -141,9 +141,11 @@ describe("local work tracker provider", () => {
     });
 
     await expect(provider.listWorkItems({ status: "in_progress" })).resolves.toHaveLength(1);
-    await expect(provider.listWorkItems({ status: "open" })).rejects.toThrow(
-      /Invalid local work status: open/,
-    );
+    await expect(provider.listWorkItems({ status: "open" })).resolves.toMatchObject([
+      { id: "local-1", status: "in_progress" },
+      { id: "local-2", status: "ready" },
+    ]);
+    await expect(provider.listWorkItems({ status: "closed" })).resolves.toHaveLength(0);
     await expect(
       provider.listWorkItems({
         labels: ["bug"],
@@ -162,12 +164,18 @@ describe("local work tracker provider", () => {
       status: "done",
     });
     expect(closed.closedAt).toBeTruthy();
+    await expect(provider.listWorkItems({ status: "closed" })).resolves.toMatchObject([
+      { id: "local-1", status: "done" },
+    ]);
 
     await expect(provider.setStatus({ id: "local-1" }, "todo")).resolves.toMatchObject({
       id: "local-1",
       status: "todo",
       closedAt: null,
     });
+    await expect(
+      provider.listWorkItems({ status: "not_real" as any }),
+    ).rejects.toThrow(/Invalid local work status: not_real/);
   });
 
   it("adds durable comments and updates the item timestamp", async () => {
