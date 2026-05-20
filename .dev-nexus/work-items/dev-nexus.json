@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 362,
-  "updatedAt": "2026-05-19T23:34:11.155Z",
+  "nextCommentNumber": 368,
+  "updatedAt": "2026-05-20T00:34:08.276Z",
   "items": [
     {
       "id": "local-1",
@@ -4361,7 +4361,7 @@
       "id": "local-169",
       "title": "Report version readiness from existing project facts",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-167 and dev-nexus:local-168.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: compute factual version readiness from existing DevNexus work-item, target-cycle, verification, publication, authority, and release-policy facts.\n\nAcceptance criteria:\n- Produce per-version progress counts by component, work status, scope status, blocker state, failed work, deferred work, and stretch work.\n- Evaluate readiness gates from configured gates plus existing facts such as work completion, target-cycle history, verification records, publication decisions, authority summaries, and green-main validation state.\n- Represent green-main branch or pull-request validation as readiness evidence only; do not grant merge authority or release authority through the version model.\n- Summarize package and release readiness as policy and authority state without publishing packages, tags, provider releases, or changelogs.\n- Include stable warnings when a gate cannot be evaluated from available facts.\n\nVerification:\n- Focused unit tests for complete, blocked, failed, deferred, stretch, and warning-heavy version states.\n- Coverage that green-main validation can satisfy a readiness gate without allowing target-branch push, merge, package publish, or release publish.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4374,8 +4374,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:21:57.239Z",
-      "updatedAt": "2026-05-19T23:33:36.504Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T00:34:08.276Z",
+      "closedAt": "2026-05-20T00:33:08.948Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4387,7 +4387,7 @@
       "id": "local-170",
       "title": "Expose version planning in agent and report surfaces",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-169.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: expose compact version scope and readiness facts through existing read-only DevNexus agent, target report, CLI, and MCP-facing surfaces.\n\nAcceptance criteria:\n- Add a compact version section to target reports with objective, target branch, owning components, scope counts, readiness state, blockers, and gate warnings.\n- Add version planning context to agent-facing surfaces so agents can tell whether selected work is in committed, candidate, stretch, deferred, excluded, or unrelated scope.\n- Keep output low-token by default and omit unrelated future versions unless an explicit version or verbose/detail option asks for them.\n- Preserve existing target-report and automation-status output when no version configuration is present.\n- Expose only read-only facts; no provider milestone creation, provider comments, merge action, package publish, or release publish.\n\nVerification:\n- Focused CLI text and JSON tests for version report output.\n- MCP/schema or target-report serialization tests for the new version section.\n- Agent-context regression coverage for projects with and without version configuration.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4402,7 +4402,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:22:03.839Z",
-      "updatedAt": "2026-05-19T22:22:03.839Z",
+      "updatedAt": "2026-05-20T00:33:10.015Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -8843,9 +8843,76 @@
           "provider": "local",
           "itemId": "local-comment-360"
         }
+      },
+      {
+        "id": "local-comment-362",
+        "body": "Heartbeat 2026-05-20T00:18Z selected this item. Source worktree `codex/dev-nexus/local-169-version-readiness-reporting` is prepared for the pure readiness reporter; project-state companion branch `codex/dev-nexus-dogfood/local-169-project-state` will record durable tracker/target-state updates.",
+        "author": null,
+        "createdAt": "2026-05-20T00:20:47.712Z",
+        "updatedAt": "2026-05-20T00:20:47.712Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-362"
+        }
+      },
+      {
+        "id": "local-comment-363",
+        "body": "DevNexus coordination handoff\n\nStatus: working\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-169-version-readiness-reporting\nHead: bf45196eece526112f9c1aed3cba4e6ab39540df\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-20T00:28:56.937Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-169-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-169\",\n  \"logicalItemId\": \"local-169\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-169\",\n    \"itemNumber\": 169,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-169\",\n    \"itemNumber\": 169,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-169\",\n        \"itemNumber\": 169\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"working\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-169-version-readiness-reporting\",\n  \"branch\": \"codex/dev-nexus/local-169-version-readiness-reporting\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"bf45196eece526112f9c1aed3cba4e6ab39540df\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusVersionReadiness.ts\",\n    \"src/nexusVersionReadiness.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Added a pure readiness reporter over resolved version scope plus target-cycle, verification, publication-decision, authority, release-policy, and green-main validation facts.\",\n    \"Green-main branch/PR validation is reported as evidence only; the readiness model always reports grantsAuthority=false and separately summarizes blocked publication/release actions.\"\n  ],\n  \"verificationSummary\": \"Passed npm test -- src/nexusVersionReadiness.test.ts; npm run build; npm test -- src/nexusVersionPlanningConfig.test.ts src/nexusVersionScopeResolver.test.ts src/nexusVersionReadiness.test.ts; npm run check; git diff --check (only Git line-ending warning for src/index.ts).\",\n  \"integrationPreference\": null,\n  \"note\": \"Ready to commit and publish through the configured green-main PR path.\",\n  \"leaseId\": \"lease-c5c4a9136713399a\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-20T00:28:56.951Z",
+        "updatedAt": "2026-05-20T00:28:56.951Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-363"
+        }
+      },
+      {
+        "id": "local-comment-364",
+        "body": "Source commit `4ede54e` is pushed to `bot/codex/dev-nexus/local-169-version-readiness-reporting` and green-main PR #17 is open: https://github.com/Evref-BL/DevNexus/pull/17. Local verification passed: readiness test, build, related version suites, full `npm run check`, and `git diff --check` with only the standard line-ending warning.",
+        "author": null,
+        "createdAt": "2026-05-20T00:30:02.181Z",
+        "updatedAt": "2026-05-20T00:30:02.181Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-364"
+        }
+      },
+      {
+        "id": "local-comment-365",
+        "body": "Completed through DevNexus PR #17, merged to `main` as `3c441a0`. The implementation adds `reportNexusVersionReadiness`, exports it, and covers complete, blocked, failed-cycle, deferred/stretch, warning-heavy, publication-decision, and green-main validation-only readiness states. Verification passed locally before PR and post-merge in the shared source checkout with `npm run check`.",
+        "author": null,
+        "createdAt": "2026-05-20T00:33:09.301Z",
+        "updatedAt": "2026-05-20T00:33:09.301Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-365"
+        }
+      },
+      {
+        "id": "local-comment-367",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-169-version-readiness-reporting\nHead: 4ede54e1c6bcf0610b7899f07ef2beedad072be0\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-20T00:34:08.262Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-169-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-169\",\n  \"logicalItemId\": \"local-169\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-169\",\n    \"itemNumber\": 169,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-169\",\n    \"itemNumber\": 169,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-169\",\n      \"itemNumber\": 169,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-169\",\n        \"itemNumber\": 169\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-169-version-readiness-reporting\",\n  \"branch\": \"codex/dev-nexus/local-169-version-readiness-reporting\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"4ede54e1c6bcf0610b7899f07ef2beedad072be0\",\n  \"dirty\": false,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusVersionReadiness.ts\",\n    \"src/nexusVersionReadiness.test.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"DevNexus PR #17 merged to main as 3c441a0 after all required Node 24 checks passed.\",\n    \"Shared DevNexus checkout fast-forwarded to 3c441a0 and post-merge npm run check passed.\",\n    \"Green-main validation was used only as readiness evidence; package, release, tag, provider release, and changelog publication remain out of scope.\"\n  ],\n  \"verificationSummary\": \"Passed npm test -- src/nexusVersionReadiness.test.ts; npm run build; npm test -- src/nexusVersionPlanningConfig.test.ts src/nexusVersionScopeResolver.test.ts src/nexusVersionReadiness.test.ts; npm run check in source worktree; all PR #17 required checks passed; post-merge npm run check passed in C:\\\\dev\\\\code\\\\sources\\\\dev-nexus.\",\n  \"integrationPreference\": null,\n  \"note\": \"Source branch is merged and can be cleaned after dogfood metadata is published.\",\n  \"leaseId\": \"lease-c5c4a9136713399a\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-20T00:34:08.276Z",
+        "updatedAt": "2026-05-20T00:34:08.276Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-367"
+        }
       }
     ],
-    "local-170": [],
+    "local-170": [
+      {
+        "id": "local-comment-366",
+        "body": "Promoted to ready after dependency `dev-nexus:local-169` merged as `3c441a0`. The readiness reporter is now available for the target-report, CLI/MCP, and agent-context exposure slice.",
+        "author": null,
+        "createdAt": "2026-05-20T00:33:10.015Z",
+        "updatedAt": "2026-05-20T00:33:10.015Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-366"
+        }
+      }
+    ],
     "local-171": []
   }
 }

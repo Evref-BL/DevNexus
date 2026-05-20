@@ -1,7 +1,62 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19T23:35:25.088Z",
+  "updatedAt": "2026-05-20T00:34:08.262Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c5c4a9136713399a",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-169",
+      "branchName": "codex/dev-nexus/local-169-version-readiness-reporting",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusVersionReadiness.ts",
+        "src/nexusVersionReadiness.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T00:28:56.937Z",
+      "lastSeenAt": "2026-05-20T00:34:08.262Z",
+      "updatedAt": "2026-05-20T00:34:08.262Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "4ede54e1c6bcf0610b7899f07ef2beedad072be0",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Source branch is merged and can be cleaned after dogfood metadata is published.",
+        "Verification: Passed npm test -- src/nexusVersionReadiness.test.ts; npm run build; npm test -- src/nexusVersionPlanningConfig.test.ts src/nexusVersionScopeResolver.test.ts src/nexusVersionReadiness.test.ts; npm run check in source worktree; all PR #17 required checks passed; post-merge npm run check passed in C:\\dev\\code\\sources\\dev-nexus."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
