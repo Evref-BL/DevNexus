@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 190,
-  "nextCommentNumber": 384,
-  "updatedAt": "2026-05-20T08:14:30.000Z",
+  "nextCommentNumber": 386,
+  "updatedAt": "2026-05-20T08:40:33.681Z",
   "items": [
     {
       "id": "local-1",
@@ -4797,7 +4797,7 @@
       "id": "local-186",
       "title": "Add README terminology and example guardrails",
       "description": "Context:\nThe README can regress into undefined jargon or stale command examples unless there is a lightweight guardrail. This should be robust enough to help without making docs impossible to edit.\n\nReadiness: AFK.\n\nAcceptance:\n- Add a lightweight docs check for core terms appearing before their first explanation, covering at least project, component, work item, home, MCP, worktree, and agent files where practical.\n- Add smoke coverage or validation for README fast-path commands when feasible without network/provider mutations.\n- The check fails with actionable messages and avoids brittle full-text snapshots.\n- CI or the standard package check runs the guardrail.\n\nVerification:\n- Run the new docs guardrail.\n- Confirm a deliberate bad ordering or stale command fails in a focused test if practical.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4809,8 +4809,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.617Z",
-      "updatedAt": "2026-05-20T07:53:46.617Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:40:23.655Z",
+      "closedAt": "2026-05-20T08:40:23.655Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4822,7 +4822,7 @@
       "id": "local-187",
       "title": "Add first-project quickstart smoke fixture",
       "description": "Context:\nThe README fast path should be tested like a new user or agent would run it, using a fixture that does not mutate external providers.\n\nReadiness: AFK.\n\nAcceptance:\n- Add a temporary first-project fixture that follows the README fast path.\n- Verify generated dev-nexus.project.json, AGENTS.md, local tracker configuration, selected agent projection, and readiness/status output.\n- The fixture does not require network, GitHub/GitLab/Jira credentials, or live provider writes.\n- The smoke test is wired into an appropriate focused test command or documented as a runnable verification target.\n\nVerification:\n- Run the new quickstart smoke test.\n- Run nearby setup/scaffold tests.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "onboarding",
@@ -4834,8 +4834,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:53:46.749Z",
-      "updatedAt": "2026-05-20T07:53:46.749Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T08:40:33.681Z",
+      "closedAt": "2026-05-20T08:40:33.681Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9562,6 +9562,32 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-383"
+        }
+      }
+    ],
+    "local-186": [
+      {
+        "id": "local-comment-384",
+        "body": "Implemented in Evref-BL/DevNexus#62, merged as d261db6a9d8ebac3f6795c3bcbc2ea27709e5b58. Added README terminology/order guardrails plus local markdown link checks in src/onboardingDocs.test.ts. Verification: npx vitest run src/onboardingDocs.test.ts; focused setup/docs vitest command; git diff --check; npm run check; GitHub Node 24 checks passed.",
+        "author": null,
+        "createdAt": "2026-05-20T08:40:18.091Z",
+        "updatedAt": "2026-05-20T08:40:18.091Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-384"
+        }
+      }
+    ],
+    "local-187": [
+      {
+        "id": "local-comment-385",
+        "body": "Implemented in Evref-BL/DevNexus#62, merged as d261db6a9d8ebac3f6795c3bcbc2ea27709e5b58. Added a first-project quickstart smoke test that drives the interactive setup wizard through a fake TTY and verifies dev-nexus.project.json, AGENTS.md, .codex/config.toml, local tracker storage, and readiness output without network or provider credentials. Verification: npx vitest run src/onboardingDocs.test.ts; focused setup/docs vitest command; npm run check; GitHub Node 24 checks passed.",
+        "author": null,
+        "createdAt": "2026-05-20T08:40:28.526Z",
+        "updatedAt": "2026-05-20T08:40:28.526Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-385"
         }
       }
     ]
