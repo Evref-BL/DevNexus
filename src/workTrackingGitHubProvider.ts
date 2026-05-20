@@ -10,6 +10,7 @@ import type {
   WorkItemQuery,
   WorkItemRef,
   WorkStatus,
+  WorkStatusQuery,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
 
@@ -852,7 +853,7 @@ function issueNumberFromRef(ref: WorkItemRef): number {
 }
 
 function normalizeStatusFilter(
-  status: WorkStatus | WorkStatus[] | undefined,
+  status: WorkStatusQuery | WorkStatusQuery[] | undefined,
 ): Set<WorkStatus> | undefined {
   if (status === undefined) {
     return undefined;
@@ -861,6 +862,18 @@ function normalizeStatusFilter(
   const values = Array.isArray(status) ? status : [status];
   const normalized = new Set<WorkStatus>();
   for (const value of values) {
+    if (value === "open") {
+      for (const openStatus of openStatuses) {
+        normalized.add(openStatus);
+      }
+      continue;
+    }
+    if (value === "closed") {
+      for (const closedStatus of closedStatuses) {
+        normalized.add(closedStatus);
+      }
+      continue;
+    }
     assertWorkStatus(value);
     normalized.add(value);
   }
@@ -956,9 +969,11 @@ function dedupeStrings(values: string[]): string[] {
   return result;
 }
 
-function assertWorkStatus(status: WorkStatus): void {
-  if (!workStatuses.has(status)) {
-    throw new GitHubWorkTrackerProviderError(`Invalid work status: ${status}`);
+function assertWorkStatus(status: string): asserts status is WorkStatus {
+  if (!workStatuses.has(status as WorkStatus)) {
+    throw new GitHubWorkTrackerProviderError(
+      `Invalid GitHub work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do; list filters also accept open or closed`,
+    );
   }
 }
 

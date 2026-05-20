@@ -165,6 +165,7 @@ import type {
   WorkItemPatch,
   WorkItemRef,
   WorkStatus,
+  WorkStatusQuery,
 } from "./workTrackingTypes.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
 
@@ -3204,7 +3205,11 @@ function workItemSyncFiltersFromArgs(
     ? asRecord(args.filters, "arguments.filters")
     : args;
   return {
-    status: optionalWorkStatusQuery(filters, "status", "arguments.filters"),
+    status: optionalNeutralWorkStatusQuery(
+      filters,
+      "status",
+      "arguments.filters",
+    ),
     labels: optionalStringArray(filters, "labels", "arguments.filters"),
     assignees: optionalStringArray(filters, "assignees", "arguments.filters"),
     search: optionalString(filters, "search", "arguments.filters"),
@@ -4918,6 +4923,14 @@ function parseWorkStatus(value: string, pathName: string): WorkStatus {
   return value as WorkStatus;
 }
 
+function parseWorkStatusQuery(value: string, pathName: string): WorkStatusQuery {
+  if (value === "open" || value === "closed") {
+    return value;
+  }
+
+  return parseWorkStatus(value, pathName);
+}
+
 function parseNexusSetupRecordedStepStatus(
   value: string,
   pathName: string,
@@ -4960,6 +4973,31 @@ function optionalWorkStatus(
 }
 
 function optionalWorkStatusQuery(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): WorkStatusQuery | WorkStatusQuery[] | undefined {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return parseWorkStatusQuery(value, `${pathName}.${key}`);
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${pathName}.${key} must be a status or array of statuses`);
+  }
+
+  return value.map((item, index) => {
+    if (typeof item !== "string") {
+      throw new Error(`${pathName}.${key}[${index}] must be a status`);
+    }
+
+    return parseWorkStatusQuery(item, `${pathName}.${key}[${index}]`);
+  });
+}
+
+function optionalNeutralWorkStatusQuery(
   record: Record<string, unknown>,
   key: string,
   pathName: string,

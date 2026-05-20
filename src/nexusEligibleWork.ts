@@ -34,6 +34,7 @@ import type {
   WorkItem,
   WorkItemQuery,
   WorkStatus,
+  WorkStatusQuery,
   WorkTrackerProvider,
   WorkTrackerRef,
   WorkTrackingConfig,
@@ -1191,14 +1192,26 @@ function mergedStatuses(
     : selectorStatus
       ? [selectorStatus]
       : [];
+  const neutralSelectorStatuses = selectorStatuses.filter(isWorkStatus);
   if (selectorStatuses.length === 0) {
     return [...policyStatuses];
   }
   if (policyStatuses.length === 0) {
-    return [...selectorStatuses];
+    return [...neutralSelectorStatuses];
   }
   const policySet = new Set(policyStatuses);
-  return selectorStatuses.filter((status) => policySet.has(status));
+  return neutralSelectorStatuses.filter((status) => policySet.has(status));
+}
+
+function isWorkStatus(status: WorkStatusQuery): status is WorkStatus {
+  return (
+    status === "todo" ||
+    status === "ready" ||
+    status === "in_progress" ||
+    status === "blocked" ||
+    status === "done" ||
+    status === "wont_do"
+  );
 }
 
 function listCapabilityBlocker(

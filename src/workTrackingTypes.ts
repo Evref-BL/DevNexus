@@ -13,6 +13,8 @@ export type WorkStatus =
   | "done"
   | "wont_do";
 
+export type WorkStatusQuery = WorkStatus | "open" | "closed";
+
 export interface WorkTrackingRepositoryConfig {
   owner?: string;
   name?: string;
@@ -145,7 +147,7 @@ export interface WorkItemRef {
 
 export interface WorkItemQuery {
   projectRoot?: string;
-  status?: WorkStatus | WorkStatus[];
+  status?: WorkStatusQuery | WorkStatusQuery[];
   labels?: string[];
   assignees?: string[];
   search?: string;

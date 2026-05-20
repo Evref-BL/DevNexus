@@ -793,9 +793,11 @@ function isClosedStatus(status: WorkStatus): boolean {
   return status === "done" || status === "wont_do";
 }
 
-function assertWorkStatus(status: WorkStatus): void {
-  if (!workStatuses.has(status)) {
-    throw new LocalWorkTrackerProviderError(`Invalid work status: ${status}`);
+function assertWorkStatus(status: string): asserts status is WorkStatus {
+  if (!workStatuses.has(status as WorkStatus)) {
+    throw new LocalWorkTrackerProviderError(
+      `Invalid local work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`,
+    );
   }
 }
 

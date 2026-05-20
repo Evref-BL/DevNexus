@@ -2261,6 +2261,16 @@ describe("DevNexus MCP server", () => {
     ]);
     expect(listed.workItems[0].description).toBeUndefined();
 
+    const localOpenList = await callDevNexusMcpTool("work_item_list", {
+      projectRoot,
+      status: "open",
+    });
+    expect(localOpenList.isError).toBe(true);
+    expect(toolJson(localOpenList)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("Invalid local work status: open"),
+    });
+
     const fullList = toolJson(
       await callDevNexusMcpTool("work_item_list", {
         projectRoot,
