@@ -92,7 +92,7 @@ dev-nexus work-item show-links <project-root> local-1 --component core
 Use dry-run sync planning as the review surface for mirrored fields:
 
 ```bash
-dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker github --label dogfood --field title --field status
+dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker github --open --label dogfood --field title --field status
 ```
 
 Do not update a mirror as if it were canonical unless the assignment names that

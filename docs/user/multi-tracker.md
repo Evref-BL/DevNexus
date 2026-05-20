@@ -145,7 +145,7 @@ dev-nexus work-item sync-plan <project-root> \
   --component core \
   --source-tracker primary \
   --target-tracker github \
-  --status ready \
+  --open \
   --label dogfood \
   --field title \
   --field description \
@@ -163,7 +163,7 @@ The command-line sync policy is explicit:
 | Policy area | Supported values |
 | --- | --- |
 | Direction | `source_to_target` only. |
-| Filters | `--status`, `--label`, `--assignee`, `--search`, and `--limit`. |
+| Filters | `--open`, `--status`, `--label`, `--assignee`, `--search`, and `--limit`. |
 | Fields | `title`, `description`, `status`, `labels`, `assignees`, and `milestone`. |
 | Comments | `ignore` or `plan`. Planned comments are append-only sync comments. |
 | Conflicts | `block`, `source_wins`, or `target_wins`. Use `block` for migration review. |
@@ -173,6 +173,10 @@ The command-line sync policy is explicit:
 The dry-run planner is the review surface. Treat blockers, missing capabilities,
 missing credentials, stale links, unlinked targets, and conflicts as work to
 resolve before any execution.
+
+Use `--open` for normal active-work migrations. It expands to `todo`, `ready`,
+`in_progress`, and `blocked`, and cannot be combined with explicit `--status`
+filters.
 
 ## One-Way Execution Limits
 
