@@ -1,4 +1,21 @@
 import { spawnSync } from "node:child_process";
+import {
+  assertWorkStatus as assertSharedWorkStatus,
+  dedupeStrings,
+  expandWorkStatusQuery,
+  isClosedWorkStatus,
+  isOpenWorkStatus,
+  isWorkStatus,
+  matchesRequiredStrings,
+  matchesWorkItemSearch,
+  matchesWorkStatusFilter,
+  normalizeWorkItemLimit,
+  normalizeWorkItemSearch,
+  normalizeWorkItemStringArray,
+  requiredNonEmptyWorkItemString,
+  workStatusSetHasClosed,
+  workStatusSetHasOpen,
+} from "./workTrackingQuery.js";
 import type {
   CreateWorkItemInput,
   ExternalRef,
@@ -16,18 +33,6 @@ import type {
 
 export const defaultGitLabApiBaseUrl = "https://gitlab.com/api/v4";
 export const gitLabStatusLabelPrefix = "status:";
-
-const openStatuses = new Set<WorkStatus>([
-  "todo",
-  "ready",
-  "in_progress",
-  "blocked",
-]);
-const closedStatuses = new Set<WorkStatus>(["done", "wont_do"]);
-const workStatuses = new Set<WorkStatus>([
-  ...openStatuses,
-  ...closedStatuses,
-]);
 
 export interface GitLabWorkTrackerProviderOptions {
   config: GitLabWorkTrackingConfig;
@@ -105,6 +110,11 @@ export class GitLabWorkTrackerProviderError extends Error {
   }
 }
 
+const gitLabWorkStatusValidationOptions = {
+  errorFactory: gitLabProviderError,
+  invalidStatusMessage: invalidGitLabWorkStatusMessage,
+};
+
 export const gitLabWorkTrackerCapabilities: TrackerCapabilities = {
   createItem: true,
   listItems: true,
@@ -172,7 +182,7 @@ export class GitLabWorkTrackerProvider implements WorkTrackerProvider {
       ...requestMilestone(input.milestone),
     });
 
-    if (closedStatuses.has(status)) {
+    if (isClosedWorkStatus(status)) {
       return this.updateWorkItem({ id: String(created.iid) }, { status });
     }
 
@@ -198,12 +208,12 @@ export class GitLabWorkTrackerProvider implements WorkTrackerProvider {
       `${this.issuePath()}?${params.toString()}`,
     );
     const assignees = normalizeStringArray(query.assignees, "assignees");
-    const search = query.search?.trim().toLowerCase();
+    const search = normalizeWorkItemSearch(query.search);
     const items = issues
       .map((issue) => this.issueToWorkItem(issue))
       .filter((item) => matchesStatusFilter(item, statuses))
       .filter((item) => matchesStringFilter(item.assignees, assignees))
-      .filter((item) => !search || matchesSearch(item, search));
+      .filter((item) => !search || matchesWorkItemSearch(item, search));
 
     return limit === undefined ? items : items.slice(0, limit);
   }
@@ -230,7 +240,7 @@ export class GitLabWorkTrackerProvider implements WorkTrackerProvider {
     }
     if (patch.status !== undefined) {
       assertWorkStatus(patch.status);
-      body.state_event = closedStatuses.has(patch.status) ? "close" : "reopen";
+      body.state_event = isClosedWorkStatus(patch.status) ? "close" : "reopen";
     }
     if (patch.labels !== undefined || patch.status !== undefined) {
       const baseLabels =
@@ -514,8 +524,8 @@ function workStatusFromIssue(issue: GitLabIssue): WorkStatus {
   );
   if (statusLabel) {
     const candidate = statusLabel.slice(gitLabStatusLabelPrefix.length);
-    if (workStatuses.has(candidate as WorkStatus)) {
-      return candidate as WorkStatus;
+    if (isWorkStatus(candidate)) {
+      return candidate;
     }
   }
 
@@ -529,13 +539,8 @@ function gitLabStateForQuery(
     return "all";
   }
 
-  let hasOpen = false;
-  let hasClosed = false;
-  for (const status of statuses) {
-    hasOpen ||= openStatuses.has(status);
-    hasClosed ||= closedStatuses.has(status);
-  }
-
+  const hasOpen = workStatusSetHasOpen(statuses);
+  const hasClosed = workStatusSetHasClosed(statuses);
   return hasOpen && hasClosed ? "all" : hasClosed ? "closed" : "opened";
 }
 
@@ -548,7 +553,7 @@ function labelsWithStatus(
   );
   if (
     status &&
-    ((openStatuses.has(status) && status !== "todo") || status === "wont_do")
+    ((isOpenWorkStatus(status) && status !== "todo") || status === "wont_do")
   ) {
     normalized.push(`${gitLabStatusLabelPrefix}${status}`);
   }
@@ -606,50 +611,21 @@ function issueIidFromRef(ref: WorkItemRef): number {
 function normalizeStatusFilter(
   status: WorkStatusQuery | WorkStatusQuery[] | undefined,
 ): Set<WorkStatus> | undefined {
-  if (status === undefined) {
-    return undefined;
-  }
-
-  const values = Array.isArray(status) ? status : [status];
-  const normalized = new Set<WorkStatus>();
-  for (const value of values) {
-    if (value === "open") {
-      for (const openStatus of openStatuses) {
-        normalized.add(openStatus);
-      }
-      continue;
-    }
-    if (value === "closed") {
-      for (const closedStatus of closedStatuses) {
-        normalized.add(closedStatus);
-      }
-      continue;
-    }
-    assertWorkStatus(value);
-    normalized.add(value);
-  }
-
-  return normalized;
+  return expandWorkStatusQuery(status, gitLabWorkStatusValidationOptions);
 }
 
 function matchesStatusFilter(
   item: WorkItem,
   statuses: Set<WorkStatus> | undefined,
 ): boolean {
-  return !statuses || statuses.size === 0 || statuses.has(item.status);
+  return matchesWorkStatusFilter(item, statuses);
 }
 
 function matchesStringFilter(
   itemValues: string[] | undefined,
   requiredValues: string[],
 ): boolean {
-  return requiredValues.every((value) => itemValues?.includes(value));
-}
-
-function matchesSearch(item: WorkItem, search: string): boolean {
-  return [item.id, item.title, item.description ?? ""].some((value) =>
-    value.toLowerCase().includes(search),
-  );
+  return matchesRequiredStrings(itemValues, requiredValues);
 }
 
 function requestLabels(labels: string[]): Record<string, string> {
@@ -677,34 +653,16 @@ function requestMilestone(
 }
 
 function normalizeLimit(limit: number | undefined): number | undefined {
-  if (limit === undefined) {
-    return undefined;
-  }
-  if (!Number.isInteger(limit) || limit < 0) {
-    throw new GitLabWorkTrackerProviderError(
-      "limit must be a non-negative integer",
-    );
-  }
-
-  return limit;
+  return normalizeWorkItemLimit(limit, { errorFactory: gitLabProviderError });
 }
 
 function normalizeStringArray(
   values: string[] | undefined,
   pathName: string,
 ): string[] {
-  if (values === undefined) {
-    return [];
-  }
-  if (!Array.isArray(values)) {
-    throw new GitLabWorkTrackerProviderError(`${pathName} must be an array`);
-  }
-
-  return dedupeStrings(
-    values.map((value, index) =>
-      requiredNonEmptyString(value, `${pathName}[${index}]`),
-    ),
-  );
+  return normalizeWorkItemStringArray(values, pathName, {
+    errorFactory: gitLabProviderError,
+  });
 }
 
 function normalizePositiveIntegerArray(
@@ -716,25 +674,8 @@ function normalizePositiveIntegerArray(
   );
 }
 
-function dedupeStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    if (!seen.has(value)) {
-      seen.add(value);
-      result.push(value);
-    }
-  }
-
-  return result;
-}
-
 function assertWorkStatus(status: string): asserts status is WorkStatus {
-  if (!workStatuses.has(status as WorkStatus)) {
-    throw new GitLabWorkTrackerProviderError(
-      `Invalid GitLab work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`,
-    );
-  }
+  assertSharedWorkStatus(status, gitLabWorkStatusValidationOptions);
 }
 
 function positiveInteger(value: number, pathName: string): number {
@@ -748,13 +689,9 @@ function positiveInteger(value: number, pathName: string): number {
 }
 
 function requiredNonEmptyString(value: unknown, pathName: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new GitLabWorkTrackerProviderError(
-      `${pathName} must be a non-empty string`,
-    );
-  }
-
-  return value.trim();
+  return requiredNonEmptyWorkItemString(value, pathName, {
+    errorFactory: gitLabProviderError,
+  });
 }
 
 function optionalNonEmptyString(
@@ -773,6 +710,14 @@ function optionalNonEmptyString(
 
 function encodePathSegment(value: string): string {
   return encodeURIComponent(requiredNonEmptyString(value, "path segment"));
+}
+
+function gitLabProviderError(message: string): GitLabWorkTrackerProviderError {
+  return new GitLabWorkTrackerProviderError(message);
+}
+
+function invalidGitLabWorkStatusMessage(status: string): string {
+  return `Invalid GitLab work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`;
 }
 
 async function gitLabErrorMessage(
