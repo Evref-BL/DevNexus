@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 372,
-  "updatedAt": "2026-05-20T01:37:20.439Z",
+  "nextCommentNumber": 374,
+  "updatedAt": "2026-05-20T02:26:37.762Z",
   "items": [
     {
       "id": "local-1",
@@ -4415,7 +4415,7 @@
       "id": "local-171",
       "title": "Dogfood version planning with a read-only project version",
       "description": "Type: dogfood configuration and smoke slice\nReadiness: autonomous agent-ready after dev-nexus:local-170.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: configure one read-only DevNexus Dogfood version plan and prove the version reporting path works against real dogfood project metadata.\n\nAcceptance criteria:\n- Add a dogfood version plan that names the objective, owning components, target branch, readiness gates, release policy posture, and initial committed or candidate scope.\n- Use existing work-item fields such as labels, milestones, or explicit local item references; do not create provider milestones or require rich provider version objects.\n- Confirm the normal eligible-work selector is unchanged unless a later implementation explicitly opts into version-filtered work selection.\n- Confirm target reports and agent context show the configured version with useful readiness and blocker information.\n- Do not publish tags, packages, provider releases, changelogs, or merge work as part of this dogfood configuration.\n\nVerification:\n- Run a read-only DevNexus target report or equivalent CLI/MCP smoke showing the configured version.\n- Run focused tests touched by the version config/reporting path, and `npm run check` when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4428,8 +4428,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:22:11.709Z",
-      "updatedAt": "2026-05-20T01:36:15.088Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T02:26:37.762Z",
+      "closedAt": "2026-05-20T02:26:25.572Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8956,6 +8956,28 @@
         "externalRef": {
           "provider": "local",
           "itemId": "local-comment-370"
+        }
+      },
+      {
+        "id": "local-comment-372",
+        "body": "Heartbeat agent started local-171 in isolated project-meta worktree codex/dev-nexus-dogfood/local-171-version-planning-config. Scope: add read-only dogfood versionPlanning config, smoke target-report/agent context surfaces, and leave eligible-work selection unchanged.",
+        "author": null,
+        "createdAt": "2026-05-20T02:20:03.842Z",
+        "updatedAt": "2026-05-20T02:20:03.842Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-372"
+        }
+      },
+      {
+        "id": "local-comment-373",
+        "body": "Completed dogfood read-only version planning configuration. Added dogfood-version-planning to dev-nexus.project.json, scoped local-167 through local-171, kept release actions disabled, and verified the target-report version-planning smoke resolves all five scoped items. Focused version/report/agent/CLI tests and full npm run check passed.",
+        "author": null,
+        "createdAt": "2026-05-20T02:26:37.762Z",
+        "updatedAt": "2026-05-20T02:26:37.762Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-373"
         }
       }
     ]

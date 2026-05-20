@@ -80,6 +80,88 @@
     ],
     "unknownActorFallbackRole": "observer"
   },
+  "versionPlanning": {
+    "versions": [
+      {
+        "id": "dogfood-version-planning",
+        "objective": "Dogfood the read-only version planning model through config, scope resolution, readiness reporting, agent context, and target-report surfaces.",
+        "owningComponents": [
+          "dev-nexus"
+        ],
+        "targetBranch": "main",
+        "scope": [
+          {
+            "kind": "work_item",
+            "status": "committed",
+            "componentId": "dev-nexus",
+            "workItemId": "local-167"
+          },
+          {
+            "kind": "work_item",
+            "status": "committed",
+            "componentId": "dev-nexus",
+            "workItemId": "local-168"
+          },
+          {
+            "kind": "work_item",
+            "status": "committed",
+            "componentId": "dev-nexus",
+            "workItemId": "local-169"
+          },
+          {
+            "kind": "work_item",
+            "status": "committed",
+            "componentId": "dev-nexus",
+            "workItemId": "local-170"
+          },
+          {
+            "kind": "work_item",
+            "status": "committed",
+            "componentId": "dev-nexus",
+            "workItemId": "local-171"
+          }
+        ],
+        "readinessGates": [
+          {
+            "kind": "work_items_done",
+            "components": [
+              "dev-nexus"
+            ]
+          },
+          {
+            "kind": "no_blockers",
+            "required": false,
+            "components": [
+              "dev-nexus"
+            ]
+          },
+          {
+            "kind": "checks_green",
+            "components": [
+              "dev-nexus"
+            ],
+            "checkNames": [
+              "Node 24 check"
+            ]
+          },
+          {
+            "kind": "release_authority",
+            "required": false,
+            "components": [
+              "dev-nexus"
+            ]
+          }
+        ],
+        "releasePolicy": {
+          "tags": "none",
+          "packages": "none",
+          "providerRelease": "none",
+          "releaseNotes": "optional",
+          "changelog": "optional"
+        }
+      }
+    ]
+  },
   "worktreesRoot": "worktrees",
   "components": [
     {

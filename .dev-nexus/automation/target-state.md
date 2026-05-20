@@ -156,11 +156,12 @@ and ready for coordinator-driven work across its components.
   is complete through DevNexus PR #19 as merge commit `1c3e0b0`, adding the
   compact version-planning surface, target-report/CLI version summaries,
   eligible-work and agent-launch version-scope annotations, and regression
-  coverage for no-config projects. `dev-nexus:local-171` is now ready to add a
-  read-only dogfood version configuration and smoke the new reporting path
-  against this project. Keep provider milestone writes, automatic release
-  publishing, package publishing, and merge automation out of the first
-  dogfood configuration path.
+  coverage for no-config projects. `dev-nexus:local-171` is complete as dogfood
+  metadata for the read-only `dogfood-version-planning` project version,
+  explicitly scoping `local-167` through `local-171`, recording non-publishing
+  release policy posture, and smoking the target-report version-planning path.
+  Provider milestone writes, automatic release publishing, package publishing,
+  and merge automation remain out of this dogfood configuration path.
 - The current bot profile has direct write access for the active
   `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
   `1c3e0b0` after PR #19 branch CI passed. PR #18 was closed because it was
