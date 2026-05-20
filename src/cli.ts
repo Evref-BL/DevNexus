@@ -178,6 +178,10 @@ import {
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
 import {
+  refreshNexusProjectPlugin,
+  type RefreshNexusProjectPluginResult,
+} from "./nexusProjectPluginRefresh.js";
+import {
   applyNexusAgentProjectionCleanup,
   planNexusAgentProjectionCleanup,
   type NexusAgentProjectionCleanupApplyResult,
@@ -455,6 +459,17 @@ interface ParsedProjectHostingCommand {
 interface ParsedProjectMcpRefreshCommand {
   projectRoot: string;
   agents: string[];
+  json?: boolean;
+}
+
+interface ParsedProjectPluginRefreshCommand {
+  projectRoot: string;
+  from: string;
+  exportName?: string;
+  skillsExportName?: string;
+  agents: string[];
+  components: string[];
+  dryRun?: boolean;
   json?: boolean;
 }
 
@@ -1013,6 +1028,7 @@ export function usage(): string {
     "  dev-nexus project hosting plan <project-root> [options]",
     "  dev-nexus project hosting apply <project-root> [options]",
     "  dev-nexus project mcp refresh <project-root> [options]",
+    "  dev-nexus project plugin refresh <project-root> --from <package|path> [options]",
     "  dev-nexus project agent-projection cleanup <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
@@ -1112,6 +1128,15 @@ export function usage(): string {
     "",
     "Options for project mcp refresh:",
     "  --agent <agent>           repeatable; defaults to project mcp.agentTargets or codex",
+    "  --json",
+    "",
+    "Options for project plugin refresh:",
+    "  --from <package|path>     npm package name, local package directory, or module file",
+    "  --export <name>           plugin config export; auto-detected when unambiguous",
+    "  --skills-export <name>    skill definitions export; package skills/ is also discovered",
+    "  --agent <agent>           repeatable; limit materialization to active agent targets",
+    "  --component <component>   repeatable; pass target component ids to plugin factories",
+    "  --dry-run                 resolve and validate without writing config or projections",
     "  --json",
     "",
     "Options for project agent-projection cleanup:",
@@ -1803,6 +1828,10 @@ async function handleProjectCommand(
     return handleProjectMcpCommand(argv, dependencies);
   }
 
+  if (command === "plugin") {
+    return await handleProjectPluginCommand(argv, dependencies);
+  }
+
   if (command === "agent-projection") {
     return handleProjectAgentProjectionCommand(argv, dependencies);
   }
@@ -1811,7 +1840,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, agent-projection, or tracker");
+  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -1947,6 +1976,41 @@ async function handleProjectMcpCommand(
     ),
   });
   printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
+  return 0;
+}
+
+async function handleProjectPluginCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  if (command !== "refresh") {
+    throw new Error("project plugin requires refresh");
+  }
+
+  const parsed = parseProjectPluginRefreshCommand(argv);
+  const projectRoot = path.resolve(parsed.projectRoot);
+  assertCliMutationAllowed(dependencies, {
+    projectRoot,
+    command: "project plugin refresh",
+    mutationClass: "skill_mcp_projection",
+  });
+  const result = await refreshNexusProjectPlugin({
+    projectRoot,
+    from: parsed.from,
+    ...(parsed.exportName ? { exportName: parsed.exportName } : {}),
+    ...(parsed.skillsExportName
+      ? { skillsExportName: parsed.skillsExportName }
+      : {}),
+    targetAgents: parsed.agents,
+    targetComponents: parsed.components,
+    dryRun: parsed.dryRun === true,
+  });
+  printProjectPluginRefreshResult(
+    result,
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
   return 0;
 }
 
@@ -4262,6 +4326,65 @@ function parseProjectMcpRefreshCommand(
       default:
         throw new Error(`Unknown project mcp refresh option: ${arg}`);
     }
+  }
+
+  return parsed;
+}
+
+function parseProjectPluginRefreshCommand(
+  argv: string[],
+): ParsedProjectPluginRefreshCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("project plugin refresh requires a project root");
+  }
+
+  const parsed: ParsedProjectPluginRefreshCommand = {
+    projectRoot,
+    from: "",
+    agents: [],
+    components: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--from":
+        parsed.from = next();
+        break;
+      case "--export":
+        parsed.exportName = next();
+        break;
+      case "--skills-export":
+        parsed.skillsExportName = next();
+        break;
+      case "--agent":
+        parsed.agents.push(next());
+        break;
+      case "--component":
+        parsed.components.push(next());
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project plugin refresh option: ${arg}`);
+    }
+  }
+
+  if (!parsed.from) {
+    throw new Error("project plugin refresh requires --from <package|path>");
   }
 
   return parsed;
@@ -7781,6 +7904,41 @@ function printProjectMcpRefreshResult(
   }
   if (result.gitExcludeEntries.length > 0) {
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
+  }
+}
+
+function printProjectPluginRefreshResult(
+  result: RefreshNexusProjectPluginResult,
+  parsed: ParsedProjectPluginRefreshCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(
+    stdout,
+    `DevNexus project plugin ${result.applied ? "refreshed" : "refresh dry-run"}.`,
+  );
+  writeLine(stdout, `  Plugin: ${result.plugin.id}`);
+  writeLine(stdout, `  Version: ${result.plugin.version ?? "not specified"}`);
+  writeLine(stdout, `  Config: ${result.configWritten ? "written" : "not written"}`);
+  writeLine(stdout, `  Capabilities: ${result.plugin.capabilityCount}`);
+  writeLine(
+    stdout,
+    `  Projected skills: ${result.skillProjection.materializedSkillCount} support, ${result.skillProjection.materializedAgentSkillCount} agent`,
+  );
+  writeLine(
+    stdout,
+    `  MCP servers: ${result.mcpProjection.materializedServerCount} materialized, ${result.mcpProjection.skippedServers.length} skipped`,
+  );
+  for (const skipped of result.mcpProjection.skippedServers) {
+    writeLine(
+      stdout,
+      `    Skipped ${skipped.serverName}: ${skipped.reason} (${skipped.capabilityIds.join(", ")})`,
+    );
   }
 }
 

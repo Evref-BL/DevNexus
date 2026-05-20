@@ -51,6 +51,7 @@ export * from "./nexusProjectComponentAdd.js";
 export * from "./nexusProjectComponentTopology.js";
 export * from "./nexusProjectHosting.js";
 export * from "./nexusProjectHostingIntegrationFixture.js";
+export * from "./nexusProjectPluginRefresh.js";
 export * from "./nexusGreenMainPublication.js";
 export * from "./nexusPublicationPolicy.js";
 export * from "./nexusQuickFix.js";
