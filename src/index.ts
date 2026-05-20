@@ -77,6 +77,7 @@ export * from "./nexusHomeConfig.js";
 export * from "./nexusHostRegistry.js";
 export * from "./nexusHostCheck.js";
 export * from "./nexusRunnerProfile.js";
+export * from "./nexusSshExecutionPlan.js";
 export * from "./nexusProjectConfig.js";
 export * from "./nexusProjectHomeService.js";
 export * from "./nexusProjectLifecycle.js";

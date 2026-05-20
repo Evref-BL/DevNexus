@@ -99,6 +99,46 @@ function makeTempProject(): string {
   return projectRoot;
 }
 
+function makeTempHome(): string {
+  const homePath = fs.mkdtempSync(
+    path.join(os.tmpdir(), "dev-nexus-remote-home-"),
+  );
+  fs.writeFileSync(
+    path.join(homePath, "dev-nexus.home.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        paths: {
+          projectsRoot: "/Users/alice/dev/projects",
+          workspacesRoot: "/Users/alice/dev/workspaces",
+        },
+        hostOverlays: [
+          {
+            hostId: "mac-runner",
+            transport: {
+              kind: "ssh",
+              sshHost: "mac-runner.tailnet.example",
+              sshUser: "alice",
+              shell: "zsh",
+            },
+            workspaceRoots: {
+              componentRoots: {
+                "dev-nexus": "/Users/alice/dev/sources/dev-nexus",
+              },
+            },
+          },
+        ],
+        projects: [],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
+  return homePath;
+}
+
 function parsedJson(writer: CapturingWriter): any {
   return JSON.parse(writer.output());
 }
@@ -314,6 +354,33 @@ describe("Nexus remote execution records", () => {
     expect(requestPayload.request.status).toBe("queued");
     expect(requestPayload.localOnly).toBe(true);
 
+    const planOutput = new CapturingWriter();
+    await expect(
+      main(
+        [
+          "remote-execution",
+          "ssh-plan",
+          projectRoot,
+          "remote-exec-1",
+          "--home",
+          makeTempHome(),
+          "--json",
+        ],
+        { stdout: planOutput },
+      ),
+    ).resolves.toBe(0);
+    const planPayload = parsedJson(planOutput);
+    expect(planPayload.plan.status).toBe("ready");
+    expect(planPayload.plan.command.sshArgvShape).toEqual([
+      "ssh",
+      "<ssh-user>@<ssh-host>",
+      "--",
+      "sh",
+      "-lc",
+      "<command-profile:npm-check>",
+    ]);
+    expect(JSON.stringify(planPayload.plan)).not.toContain("/Users/alice");
+
     const resultOutput = new CapturingWriter();
     await expect(
       main(
@@ -413,6 +480,16 @@ describe("Nexus remote execution records", () => {
     );
     expect(createPayload.request.status).toBe("accepted");
     expect(createPayload.localOnly).toBe(true);
+
+    const planPayload = mcpPayload(
+      await callDevNexusMcpTool("remote_execution_ssh_plan", {
+        projectRoot,
+        requestId: "remote-exec-1",
+        homePath: makeTempHome(),
+      }),
+    );
+    expect(planPayload.plan.status).toBe("ready");
+    expect(planPayload.localOnly).toBe(true);
 
     const recordPayload = mcpPayload(
       await callDevNexusMcpTool(

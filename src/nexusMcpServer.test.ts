@@ -244,6 +244,7 @@ describe("DevNexus MCP server", () => {
       "remote_execution_request_create",
       "remote_execution_result_record",
       "remote_execution_result_get",
+      "remote_execution_ssh_plan",
       "work_item_create",
       "work_item_discovery_status",
       "work_item_list",
