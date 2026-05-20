@@ -14,6 +14,9 @@ pull requests, and generated reports.
 - DevNexus projects are multi-component by default. Each component can have its
   own source root, generated worktree root, tracker, verification policy,
   publication policy, and relationships.
+- Dependency components can be kept manual-only: available for explicit
+  coordination or source work without becoming heartbeat-selected development
+  surfaces.
 - Plugins compose into one DevNexus project. Plugins contribute setup policy,
   skills, MCP wiring, and domain affordances without replacing DevNexus.
 - GitHub Issues is the dogfood default shared tracker. Local stores remain
@@ -38,6 +41,9 @@ pull requests, and generated reports.
 - Plugin projection: DevNexus-Pharo and DevNexus-TypeScript should set up
   workers with domain tools and skills without leaking plugin concepts into
   DevNexus core.
+- Manual dependency components: keep PLexus and pharo-launcher-mcp available
+  for explicit cross-project maintenance such as npm publishing setup, while
+  preserving `dev-nexus-plexus` as their default implementation backlog.
 - DevNexus-Research: prove DevNexus can support research/writing workflows
   through additive skills, setup checks, artifact conventions, integrity gates,
   and human checkpoints.
@@ -72,6 +78,8 @@ pull requests, and generated reports.
 - Remote-host execution: keep host checks, SSH transport, verification
   execution, and live smokes ordered behind completed request/result records and
   explicit runner policy.
+- Npm trusted publishing: extend the same tokenless publishing posture to
+  PLexus and pharo-launcher-mcp when explicitly selected.
 - DevNexus-Research: keep license and ARS integration posture blocked until the
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
@@ -85,6 +93,9 @@ pull requests, and generated reports.
 - Do not run live Pharo images, PLexus open/close, Docker, package installs,
   process kills, image deletion, or destructive host cleanup without a current
   approved isolated runner profile.
+- Do not select PLexus or pharo-launcher-mcp automatically through heartbeat
+  discovery; work them only when explicitly chosen or when their GitHub tracker
+  item is directly named.
 - Preserve component source roots and source branches unless a work item
   explicitly owns their migration or deletion.
 - Prefer DevNexus CLI/MCP surfaces for project state, work items, target facts,
