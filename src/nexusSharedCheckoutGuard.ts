@@ -60,6 +60,25 @@ export interface NexusSharedCheckoutGuardDecision
   command: string;
   saferNextAction: string;
   override: NexusSharedCheckoutGuardOverride | null;
+  recoveryAction: NexusSharedCheckoutGuardRecoveryAction | null;
+}
+
+export interface NexusSharedCheckoutGuardRecoveryAction {
+  kind:
+    | "prepare_workspace_meta_worktree"
+    | "prepare_component_worktree"
+    | "use_configured_workspace";
+  summary: string;
+  mcpTool?: {
+    name: "worktree_prepare";
+    arguments: {
+      projectRoot: string;
+      projectMeta?: true;
+      componentId?: string;
+      topic: string;
+    };
+  };
+  cliCommand?: string;
 }
 
 export interface ClassifyNexusCheckoutOptions {
@@ -276,9 +295,15 @@ export function parseNexusSharedCheckoutGuardOverride(
 }
 
 function guardDecision(
-  decision: NexusSharedCheckoutGuardDecision,
+  decision: Omit<NexusSharedCheckoutGuardDecision, "recoveryAction"> & {
+    recoveryAction?: NexusSharedCheckoutGuardRecoveryAction | null;
+  },
 ): NexusSharedCheckoutGuardDecision {
-  return decision;
+  return {
+    ...decision,
+    recoveryAction:
+      decision.recoveryAction ?? recoveryActionForGuardDecision(decision),
+  };
 }
 
 function mutationAllowed(
@@ -335,6 +360,9 @@ function saferNextAction(
     classification === "generated_component_worktree" &&
     mutationClass !== "component_source"
   ) {
+    if (mutationClass === "coordination_record") {
+      return "coordination_record requires a workspace/meta worktree; component worktrees are only valid for component_source mutations.";
+    }
     return "Use a workspace/meta worktree for project-state mutations; component worktrees are for component source changes.";
   }
   if (
@@ -345,6 +373,105 @@ function saferNextAction(
   }
 
   return "Use an owned generated worktree or an explicit integration/bootstrap override before mutating.";
+}
+
+function recoveryActionForGuardDecision(
+  decision: Omit<NexusSharedCheckoutGuardDecision, "recoveryAction">,
+): NexusSharedCheckoutGuardRecoveryAction | null {
+  if (decision.ok) {
+    return null;
+  }
+
+  if (
+    decision.classification === "shared_project_checkout" ||
+    (decision.classification === "generated_component_worktree" &&
+      decision.mutationClass !== "component_source")
+  ) {
+    return workspaceMetaRecoveryAction(decision.projectRoot, decision.command);
+  }
+
+  if (
+    decision.classification === "shared_component_checkout" ||
+    (decision.classification === "generated_project_meta_worktree" &&
+      decision.mutationClass === "component_source")
+  ) {
+    return componentWorktreeRecoveryAction(
+      decision.projectRoot,
+      decision.componentId,
+      decision.command,
+    );
+  }
+
+  if (decision.classification === "unknown") {
+    return {
+      kind: "use_configured_workspace",
+      summary:
+        "Run the mutation from a configured DevNexus workspace or generated worktree.",
+    };
+  }
+
+  return null;
+}
+
+function workspaceMetaRecoveryAction(
+  projectRoot: string,
+  command: string,
+): NexusSharedCheckoutGuardRecoveryAction {
+  return {
+    kind: "prepare_workspace_meta_worktree",
+    summary:
+      "Prepare a workspace/meta worktree, then rerun the coordination or project-state mutation from that worktree.",
+    mcpTool: {
+      name: "worktree_prepare",
+      arguments: {
+        projectRoot,
+        projectMeta: true,
+        topic: recoveryTopic(command),
+      },
+    },
+    cliCommand: `dev-nexus worktree prepare ${quoteCliArg(projectRoot)} --workspace-meta --topic ${quoteCliArg(recoveryTopic(command))}`,
+  };
+}
+
+function componentWorktreeRecoveryAction(
+  projectRoot: string,
+  componentId: string | null,
+  command: string,
+): NexusSharedCheckoutGuardRecoveryAction {
+  return {
+    kind: "prepare_component_worktree",
+    summary:
+      "Prepare a component worktree, then rerun the component source mutation from that worktree.",
+    mcpTool: {
+      name: "worktree_prepare",
+      arguments: {
+        projectRoot,
+        ...(componentId ? { componentId } : {}),
+        topic: recoveryTopic(command),
+      },
+    },
+    cliCommand: [
+      "dev-nexus",
+      "worktree",
+      "prepare",
+      quoteCliArg(projectRoot),
+      ...(componentId ? ["--component", quoteCliArg(componentId)] : []),
+      "--topic",
+      quoteCliArg(recoveryTopic(command)),
+    ].join(" "),
+  };
+}
+
+function recoveryTopic(command: string): string {
+  return `${command} recovery`;
+}
+
+function quoteCliArg(value: string): string {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(value)) {
+    return value;
+  }
+
+  return `'${value.replace(/'/gu, "'\\''")}'`;
 }
 
 function projectContexts(options: {

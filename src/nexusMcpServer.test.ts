@@ -1017,6 +1017,120 @@ describe("DevNexus MCP server", () => {
     expect(fs.existsSync(defaultLocalWorkTrackingStorePath(projectRoot))).toBe(false);
   });
 
+  it("allows guarded coordination handoffs from generated workspace-meta worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const generatedMetaWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "mcp-demo",
+      "coordination-meta",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(generatedMetaWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate from meta worktree",
+      status: "in_progress",
+    });
+
+    const result = await callDevNexusMcpTool(
+      "coordination_handoff",
+      {
+        projectRoot,
+        workItemId: "local-1",
+        status: "ready",
+        changedAreas: ["src/nexusMcpServer.ts"],
+        verificationSummary: "focused tests passed",
+        currentPath: generatedMetaWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(generatedMetaWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(payload).toMatchObject({
+      ok: true,
+      record: {
+        status: "ready",
+        workItemId: "local-1",
+        branch: "codex/shared-coordination",
+      },
+      comment: {
+        id: "local-comment-1",
+      },
+    });
+  });
+
+  it("classifies guarded coordination handoff currentPath component worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const componentWorktree = path.join(
+      projectRoot,
+      "worktrees",
+      "primary",
+      "component-handoff",
+    );
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(componentWorktree, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate from component worktree",
+      status: "in_progress",
+    });
+
+    const result = await callDevNexusMcpTool(
+      "coordination_handoff",
+      {
+        projectRoot,
+        workItemId: "local-1",
+        status: "ready",
+        changedAreas: ["src/nexusMcpServer.ts"],
+        currentPath: componentWorktree,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        gitRunner: fakeGitRunner(componentWorktree),
+        sharedCheckoutGuard: "enforce",
+      },
+    );
+    const payload = toolJson(result);
+
+    expect(result.isError).toBe(true);
+    expect(payload).toMatchObject({
+      ok: false,
+      guard: {
+        ok: false,
+        classification: "generated_component_worktree",
+        mutationClass: "coordination_record",
+        targetPath: componentWorktree,
+        recoveryAction: {
+          kind: "prepare_workspace_meta_worktree",
+          mcpTool: {
+            name: "worktree_prepare",
+            arguments: {
+              projectRoot,
+              projectMeta: true,
+            },
+          },
+        },
+      },
+    });
+    expect(payload.guard.saferNextAction).toContain(
+      "coordination_record requires a workspace/meta worktree",
+    );
+  });
+
   it("lists provider-compatible tool input schemas", () => {
     const issues = listDevNexusMcpTools().flatMap((tool) =>
       listMcpInputSchemaProviderIssues(tool.inputSchema).map((issue) => ({

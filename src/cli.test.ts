@@ -3855,6 +3855,61 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("uses coordination handoff --worktree for shared-checkout guard classification", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-118");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-20T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Coordinate guarded handoff",
+      status: "in_progress",
+    });
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "coordination",
+          "handoff",
+          projectRoot,
+          "local-1",
+          "--status",
+          "ready",
+          "--changed-area",
+          "src/cli.ts",
+          "--worktree",
+          worktreePath,
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          gitRunner: fakeCoordinationIntegrationGitRunner(worktreePath),
+          sharedCheckoutGuard: "enforce",
+          now: fixedClock("2026-05-20T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: "shared_checkout_mutation_refused",
+      guard: {
+        ok: false,
+        classification: "generated_component_worktree",
+        mutationClass: "coordination_record",
+        targetPath: worktreePath,
+        recoveryAction: {
+          kind: "prepare_workspace_meta_worktree",
+        },
+      },
+    });
+  });
+
   it("prints coordination integration plans through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-15");

@@ -124,6 +124,16 @@ describe("shared checkout mutation guard", () => {
       ok: false,
       classification: "shared_project_checkout",
       mutationClass: "local_tracker",
+      recoveryAction: {
+        kind: "prepare_workspace_meta_worktree",
+        mcpTool: {
+          name: "worktree_prepare",
+          arguments: {
+            projectRoot,
+            projectMeta: true,
+          },
+        },
+      },
     });
     expect(decision.saferNextAction).toContain("workspace/meta worktree");
   });
@@ -185,6 +195,42 @@ describe("shared checkout mutation guard", () => {
       classification: "generated_component_worktree",
       componentId: "core",
     });
+  });
+
+  it("refuses coordination records from generated component worktrees with meta recovery", () => {
+    const projectRoot = makeTempDir("dev-nexus-guard-project-");
+    const worktreePath = path.join(projectRoot, "worktrees", "core", "codex-core-1");
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner = fakeGitRunner(new Map([[canonical(worktreePath), worktreePath]]));
+
+    const decision = evaluateNexusSharedCheckoutMutation({
+      projectRoot,
+      targetPath: worktreePath,
+      mutationClass: "coordination_record",
+      command: "coordination handoff",
+      gitRunner,
+    });
+
+    expect(decision).toMatchObject({
+      ok: false,
+      classification: "generated_component_worktree",
+      componentId: "core",
+      targetPath: worktreePath,
+      recoveryAction: {
+        kind: "prepare_workspace_meta_worktree",
+        mcpTool: {
+          name: "worktree_prepare",
+          arguments: {
+            projectRoot,
+            projectMeta: true,
+          },
+        },
+      },
+    });
+    expect(decision.saferNextAction).toContain(
+      "coordination_record requires a workspace/meta worktree",
+    );
   });
 
   it("allows project-state mutation in a generated workspace-meta worktree", () => {

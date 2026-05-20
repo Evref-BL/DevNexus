@@ -2254,6 +2254,8 @@ async function handleCoordinationCommand(
       projectRoot: path.resolve(parsed.projectRoot),
       command: "coordination handoff",
       mutationClass: "coordination_record",
+      targetPath: parsed.currentPath,
+      componentId: parsed.componentId,
     });
     const result = await createNexusCoordinationHandoff({
       projectRoot: parsed.projectRoot,
@@ -2346,6 +2348,8 @@ async function handleCoordinationCommand(
       projectRoot: path.resolve(parsed.projectRoot),
       command: "coordination request",
       mutationClass: "coordination_record",
+      targetPath: parsed.currentPath,
+      componentId: parsed.componentId,
     });
     const result = await createNexusCoordinationRequest({
       projectRoot: parsed.projectRoot,
