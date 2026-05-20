@@ -57,6 +57,7 @@ describe("nexus project setup wizard", () => {
       "",
       "",
       "",
+      "",
     ];
     const stdout = captureOutput({
       onWrite(chunk) {
@@ -107,6 +108,81 @@ describe("nexus project setup wizard", () => {
     expect(stdout.output()).toContain("DevNexus human quickstart");
     expect(stdout.output()).toContain("~/.dev-nexus unless --home is supplied");
     expect(stdout.output()).not.toContain("DevNexus home [");
+  });
+
+  it("collects additional components through an explicit repeat prompt", async () => {
+    const stdin = ttyInput();
+    const promptAnswers = [
+      "",
+      "Multi Component Demo",
+      "",
+      "core",
+      ".",
+      "yes",
+      "api",
+      "packages/api",
+      "primary",
+      "dependency",
+      "yes",
+      "paper",
+      "docs/paper",
+      "optional",
+      "",
+      "",
+      "",
+      "",
+    ];
+    const stdout = captureOutput({
+      onWrite(chunk) {
+        if (!chunk.includes(": ") || promptAnswers.length === 0) {
+          return;
+        }
+        const answer = promptAnswers.shift()!;
+        queueMicrotask(() => {
+          stdin.write(`${answer}\n`);
+        });
+      },
+    });
+
+    const answers = await loadNexusProjectSetupAnswers({
+      projectRoot: "/tmp/multi-component-project",
+      stdin,
+      stdout: stdout.stream,
+    });
+    stdin.destroy();
+
+    expect(answers?.components).toEqual([
+      {
+        id: "core",
+        name: "core",
+        role: "primary",
+        source: {
+          kind: "reference_existing",
+          path: ".",
+        },
+      },
+      {
+        id: "api",
+        name: "api",
+        role: "dependency",
+        source: {
+          kind: "reference_existing",
+          path: "packages/api",
+        },
+      },
+      {
+        id: "paper",
+        name: "paper",
+        role: "optional",
+        source: {
+          kind: "reference_existing",
+          path: "docs/paper",
+        },
+      },
+    ]);
+    expect(stdout.output()).toContain("Add another component? (yes/no)");
+    expect(stdout.output()).toContain("Additional component role");
+    expect(stdout.output()).toContain("Additional components cannot use role primary.");
   });
 
   it("builds first-run next actions from the applied project config", () => {
