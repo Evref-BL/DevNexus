@@ -4247,6 +4247,7 @@ describe("dev-nexus cli", () => {
     });
     const recordOutput = captureOutput();
     const listOutput = captureOutput();
+    const listFullOutput = captureOutput();
 
     await main(
       [
@@ -4285,29 +4286,40 @@ describe("dev-nexus cli", () => {
         stdout: listOutput.writer,
       },
     );
+    await main(
+      ["automation", "target-cycle", "list", projectRoot, "--json", "--full"],
+      {
+        stdout: listFullOutput.writer,
+      },
+    );
 
     expect(JSON.parse(recordOutput.output())).toMatchObject({
       ok: true,
+      detail: "summary",
       record: {
         id: "cycle-1",
-        projectId: "demo-project",
         targetId: "dogfood",
         runId: "run-1",
         status: "dispatched",
         summary: "Dispatched one subagent.",
         eligibleWorkItemCount: 1,
-        workItems: [
-          {
-            componentId: "primary",
-            id: "local-1",
-            logicalItemId: "local-1",
-            trackerId: "primary",
-            cycleStatus: "selected",
-          },
-        ],
+        workItemCount: 1,
       },
     });
+    expect(JSON.parse(recordOutput.output()).record.workItems).toBeUndefined();
     expect(JSON.parse(listOutput.output()).ledger.cycles).toHaveLength(1);
+    expect(JSON.parse(listOutput.output()).ledger.cycles[0].workItemRefs).toHaveLength(
+      1,
+    );
+    expect(JSON.parse(listFullOutput.output()).ledger.cycles[0].workItems).toEqual([
+      expect.objectContaining({
+        componentId: "primary",
+        id: "local-1",
+        logicalItemId: "local-1",
+        trackerId: "primary",
+        cycleStatus: "selected",
+      }),
+    ]);
   });
 
   it("rejects duplicate explicit target cycle ids through the CLI", async () => {
@@ -4459,50 +4471,14 @@ describe("dev-nexus cli", () => {
 
     expect(JSON.parse(output.output())).toMatchObject({
       ok: true,
+      detail: "summary",
       record: {
         id: "cycle-dispatch",
         status: "dispatched",
-        workItems: [
-          {
-            componentId: "primary",
-            id: "local-1",
-            cycleStatus: "selected",
-            agentProfileId: "codex-coordinator",
-            notes: "Selected for the bounded batch.",
-          },
-          {
-            componentId: "primary",
-            id: "local-2",
-            cycleStatus: "dispatched",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "addon",
-            id: "local-3",
-            cycleStatus: "in_progress",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "addon",
-            id: "local-4",
-            cycleStatus: "completed",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "tools",
-            id: "local-5",
-            cycleStatus: "blocked",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "tools",
-            id: "local-6",
-            cycleStatus: "skipped",
-            agentProfileId: "codex-local",
-          },
-        ],
+        workItemCount: 6,
       },
     });
+    expect(JSON.parse(output.output()).record.workItems).toBeUndefined();
   });
 
   it("builds target reports through the CLI", async () => {
