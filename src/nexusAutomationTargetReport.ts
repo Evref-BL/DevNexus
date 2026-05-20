@@ -931,8 +931,18 @@ function workItemProgressBucket(
   reference: NexusAutomationTargetReportWorkItemReference,
 ): keyof NexusAutomationTargetReportWorkItemProgressSummary | null {
   switch (reference.latestCycleStatus) {
-    case "eligible":
+    case "eligible": {
+      const currentStatusBucket = workItemCurrentStatusProgressBucket(
+        reference.status,
+      );
+      if (
+        currentStatusBucket &&
+        currentStatusBucket !== "readyEligibleWork"
+      ) {
+        return currentStatusBucket;
+      }
       return "readyEligibleWork";
+    }
     case "selected":
     case "dispatched":
     case "in_progress":
@@ -949,7 +959,13 @@ function workItemProgressBucket(
       break;
   }
 
-  switch (reference.status) {
+  return workItemCurrentStatusProgressBucket(reference.status);
+}
+
+function workItemCurrentStatusProgressBucket(
+  status: WorkStatus | null,
+): keyof NexusAutomationTargetReportWorkItemProgressSummary | null {
+  switch (status) {
     case "ready":
       return "readyEligibleWork";
     case "in_progress":
