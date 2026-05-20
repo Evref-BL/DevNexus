@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 190,
-  "nextCommentNumber": 387,
-  "updatedAt": "2026-05-20T09:09:34.806Z",
+  "nextCommentNumber": 388,
+  "updatedAt": "2026-05-20T09:47:06.907Z",
   "items": [
     {
       "id": "local-1",
@@ -4517,7 +4517,7 @@
       "id": "local-175",
       "title": "Report why visible work is excluded from eligible-work selection",
       "description": "Type: reporting/work-tracking slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20 and the user question about visible GitHub issues not appearing as eligible work.\n\nGoal:\nWhen automation eligible-work returns zero or a surprisingly small set, explain which visible local or provider-native work items were excluded and why.\n\nAcceptance criteria:\n- Eligible-work summary reports visible-but-excluded items grouped by missing ready status, missing required labels, excluded labels, component mismatch, tracker role, assignee, milestone, or policy boundary.\n- GitHub issues visible through configured discovery are included when provider reads are allowed.\n- The report distinguishes no visible work from visible work that fails selector criteria such as `dogfood` or `status:ready`.\n- The concise output answers the common operator question without requiring a separate `gh issue list` or full target-report dump.\n- Existing eligible-work selection behavior is preserved unless explicitly changed by config.\n\nVerification:\n- Unit tests cover local and GitHub-like provider fixtures for selected, excluded, blocked, unsafe, and missing-label work.\n- CLI/MCP smoke confirms zero-eligible output includes useful exclusion counts and examples.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4531,8 +4531,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:47:03.084Z",
-      "updatedAt": "2026-05-20T07:47:03.084Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T09:47:06.907Z",
+      "closedAt": "2026-05-20T09:47:06.773Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9506,7 +9506,19 @@
     ],
     "local-173": [],
     "local-174": [],
-    "local-175": [],
+    "local-175": [
+      {
+        "id": "local-comment-387",
+        "body": "Completed in DevNexus PR #65, merged as 15184fa. Eligible-work now reports visible excluded items in default mode, preserves selector search mismatches in discovery mode, adds structured exclusion categories/reason counts, and includes compact excluded summaries in automation_status MCP output. Verification passed: npm run check, git diff --check, GitHub CI on macOS/Ubuntu/Windows.",
+        "author": null,
+        "createdAt": "2026-05-20T09:47:06.907Z",
+        "updatedAt": "2026-05-20T09:47:06.907Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-387"
+        }
+      }
+    ],
     "local-176": [
       {
         "id": "local-comment-386",
