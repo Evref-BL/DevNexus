@@ -1,6 +1,6 @@
 # Concepts
 
-DevNexus is infrastructure for agent-assisted project work. It gives humans and
+DevNexus is infrastructure for agent-assisted project work. It gives users and
 agents one place to find project structure, component relationships, work
 items, generated agent context, setup checks, and recorded coordination facts.
 
@@ -24,8 +24,8 @@ One DevNexus project can coordinate one component or many components.
 ## Component
 
 A component is something the project works on. Common components are Git
-repositories, documentation folders, research papers, datasets, spreadsheets,
-or generated support folders.
+repositories, documentation folders, datasets, spreadsheets, release assets, or
+generated support folders.
 
 Each component can have its own:
 

@@ -2,7 +2,7 @@
 
 DevNexus gives agents a concise project surface: read project state, inspect
 eligible work, prepare worktrees, record progress, and report factual results.
-It does not decide what should be implemented. The human or launched
+It does not decide what should be implemented. The user or launched
 coordinator agent owns that judgment.
 
 ## MCP Server
@@ -89,14 +89,14 @@ Agents can use link records to connect a canonical item to existing provider
 issues before any sync plan:
 
 ```bash
-dev-nexus work-item link <project-root> local-1 --component core --tracker github --item-id 42 --item-number 42
+dev-nexus work-item link <project-root> local-1 --component core --tracker forge --item-id 42 --item-number 42
 dev-nexus work-item show-links <project-root> local-1 --component core
 ```
 
 Use dry-run sync planning as the review surface for mirrored fields:
 
 ```bash
-dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker github --open --label dogfood --field title --field status
+dev-nexus work-item sync-plan <project-root> --component core --source-tracker primary --target-tracker forge --open --label onboarding --field title --field status
 ```
 
 Do not update a mirror as if it were canonical unless the assignment names that
@@ -120,24 +120,32 @@ Prepare a component-scoped worktree when implementation should be isolated:
 dev-nexus worktree prepare <project-root> --component core --work-item local-1
 ```
 
-For a single provider-native GitHub issue, preview the short quick-fix path
-before starting. The plan names the bot identity check, isolated worktree
-command, issue status command, verification, pull request, merge, issue close,
-and cleanup steps without requiring heartbeat-cycle bookkeeping:
+For a single provider-native issue, keep the default workflow provider-neutral:
+select the canonical work item, prepare an isolated worktree, run the component
+verification, then record the provider request and check facts through the
+configured tracker or publication policy:
 
 ```bash
-dev-nexus quick-fix plan <project-root> --component core --work-item github-50
-dev-nexus quick-fix start <project-root> --component core --work-item github-50
-dev-nexus quick-fix finish <project-root> --component core --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
+dev-nexus worktree prepare <project-root> --component core --work-item local-1
+dev-nexus work-item comment <project-root> local-1 --component core --body "Prepared an isolated worktree and started verification."
 ```
+
+The older `quick-fix` helper is a specialized GitHub path. Keep it in
+provider-specific runbooks or CLI help until DevNexus has a neutral provider
+facade for issue status, request creation, checks, and merge decisions.
 
 For green-main publication, save provider check data and let DevNexus classify
-the PR before any merge attempt:
+the pull request or merge request before any merge attempt. Check collection is
+provider-specific until DevNexus has a neutral collector adapter, but the
+DevNexus planning surface should consume saved check facts:
 
 ```bash
-gh pr checks <pr-number> --repo <owner/repo> --required --json name,state,bucket,conclusion,link,workflow > checks.json
 dev-nexus publication green-main plan <project-root> --component core --pr <pr-number> --checks-file checks.json
 ```
+
+Use the configured provider CLI, provider API, or CI system export to produce
+equivalent saved check facts. DevNexus should classify those facts rather than
+making onboarding depend on one forge command.
 
 The plan reports required-check state, failed job names, platform labels,
 available failing step or test details, merge refusal reasons, and the exact
@@ -175,7 +183,7 @@ or project-state mutation.
 The workflow uses a small checkout vocabulary:
 
 - Stable component source root: the configured component `sourceRoot`. Treat it
-  as the durable baseline and normal human checkout, not as disposable worker
+  as the durable baseline and normal user checkout, not as disposable worker
   state.
 - Shared checkout: any project or component checkout opened by multiple chats.
   Treat it as a read-mostly control room for status, coordination, setup, and
@@ -330,7 +338,7 @@ the automation run. If it returns `true`, the agent proceeds under the returned
 ## Publication Boundary
 
 Publication policy can separate manual and automation identities. For example,
-`origin` can remain the human remote while `bot` points at an SSH host alias for
+`origin` can remain the user remote while `bot` points at an SSH host alias for
 an automation account. Tokens, private keys, GitHub CLI state, app keys, and
 absolute credential paths should stay in host-local configuration, not in
 shared project config.

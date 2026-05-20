@@ -8,23 +8,23 @@ DevNexus project that lets an agent work across them.
 Suppose you have these existing folders:
 
 ```text
-/Users/alice/projects/benchmark-graphRag
-/Users/alice/projects/GraphRag-Projects/json-java-moose
-/Users/alice/projects/GraphRag-Projects/json-java-no-moose
-/Users/alice/papers/2026-iwst-modelsandllms
+/Users/alice/projects/rocket-shop/checkout-api
+/Users/alice/projects/rocket-shop/storefront
+/Users/alice/projects/rocket-shop/shared-kernel
+/Users/alice/projects/rocket-shop/load-test-lab
 ```
 
 The right DevNexus shape is usually one project with several components:
 
 ```text
 DevNexus project root:
-  /Users/alice/dev-nexus/graphrag-research-suite
+  /Users/alice/dev-nexus/rocket-shop-suite
 
 Components:
-  benchmark-graphrag
-  json-java-moose
-  json-java-no-moose
-  iwst-paper
+  checkout-api
+  storefront
+  shared-kernel
+  load-test-lab
 ```
 
 Do not create one DevNexus project per folder unless you want separate agent
@@ -32,10 +32,11 @@ workspaces and separate project state.
 
 ## Interactive Setup
 
-For a human, start with:
+For a user in a terminal, create or choose the DevNexus project directory, then
+run setup from that directory:
 
 ```bash
-dev-nexus project setup "/Users/alice/dev-nexus/graphrag-research-suite"
+dev-nexus project setup
 ```
 
 Use the existing folder paths as component source roots when prompted. Pick one
@@ -48,10 +49,10 @@ project-local-looking symlink/junction escape. External layouts are allowed
 when intentional, but project-local component clones under `componentsRoot:` are
 the cleanest default for repeatable agent work.
 
-After setup, open this directory in the agent:
+After setup, open the DevNexus project directory in the agent:
 
 ```text
-/Users/alice/dev-nexus/graphrag-research-suite
+/Users/alice/dev-nexus/rocket-shop-suite
 ```
 
 ## Answer-File Setup
@@ -61,50 +62,50 @@ Agents and repeatable setup flows can use an answer file.
 ```json
 {
   "project": {
-    "id": "graphrag-research-suite",
-    "name": "GraphRAG Research Suite",
-    "root": "/Users/alice/dev-nexus/graphrag-research-suite",
+    "id": "rocket-shop-suite",
+    "name": "Rocket Shop Suite",
+    "root": "/Users/alice/dev-nexus/rocket-shop-suite",
     "initializeGit": true,
     "defaultBranch": "main"
   },
   "components": [
     {
-      "id": "benchmark-graphrag",
-      "name": "Benchmark GraphRAG",
+      "id": "checkout-api",
+      "name": "Checkout API",
       "role": "primary",
       "source": {
         "kind": "reference_existing",
-        "path": "/Users/alice/projects/benchmark-graphRag",
+        "path": "/Users/alice/projects/rocket-shop/checkout-api",
         "defaultBranch": "main"
       }
     },
     {
-      "id": "json-java-moose",
-      "name": "JSON Java Moose",
+      "id": "storefront",
+      "name": "Storefront",
       "role": "dependency",
       "source": {
         "kind": "reference_existing",
-        "path": "/Users/alice/projects/GraphRag-Projects/json-java-moose",
+        "path": "/Users/alice/projects/rocket-shop/storefront",
         "defaultBranch": "main"
       }
     },
     {
-      "id": "json-java-no-moose",
-      "name": "JSON Java No Moose",
+      "id": "shared-kernel",
+      "name": "Shared Kernel",
       "role": "dependency",
       "source": {
         "kind": "reference_existing",
-        "path": "/Users/alice/projects/GraphRag-Projects/json-java-no-moose",
+        "path": "/Users/alice/projects/rocket-shop/shared-kernel",
         "defaultBranch": "main"
       }
     },
     {
-      "id": "iwst-paper",
-      "name": "IWST Paper",
+      "id": "load-test-lab",
+      "name": "Load Test Lab",
       "role": "addon",
       "source": {
         "kind": "reference_existing",
-        "path": "/Users/alice/papers/2026-iwst-modelsandllms",
+        "path": "/Users/alice/projects/rocket-shop/load-test-lab",
         "defaultBranch": "main"
       }
     }
@@ -125,13 +126,13 @@ Agents and repeatable setup flows can use an answer file.
 Preview local writes:
 
 ```bash
-dev-nexus project setup "/Users/alice/dev-nexus/graphrag-research-suite" --answers ./graphrag.setup.json --json
+dev-nexus project setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --json
 ```
 
 Apply the local setup:
 
 ```bash
-dev-nexus project setup "/Users/alice/dev-nexus/graphrag-research-suite" --answers ./graphrag.setup.json --yes
+dev-nexus project setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --yes
 ```
 
 ## Project-Local Components
@@ -140,15 +141,17 @@ For new projects, the easiest long-term layout is usually project-local
 components:
 
 ```text
-graphrag-research-suite/
+rocket-shop-suite/
   components/
-    benchmark-graphrag/
-    json-java-moose/
-    json-java-no-moose/
+    checkout-api/
+    storefront/
+    shared-kernel/
+    load-test-lab/
   worktrees/
-    benchmark-graphrag/
-    json-java-moose/
-    json-java-no-moose/
+    checkout-api/
+    storefront/
+    shared-kernel/
+    load-test-lab/
 ```
 
 Use existing absolute paths only when you deliberately want DevNexus to
@@ -157,12 +160,12 @@ reference those external checkouts in place.
 ## Verify Readiness
 
 ```bash
-dev-nexus project status "/Users/alice/dev-nexus/graphrag-research-suite"
-dev-nexus setup check "/Users/alice/dev-nexus/graphrag-research-suite" join-existing-project
+dev-nexus project status "/Users/alice/dev-nexus/rocket-shop-suite"
+dev-nexus setup check "/Users/alice/dev-nexus/rocket-shop-suite" join-existing-project
 ```
 
 Then create the first component-scoped work item:
 
 ```bash
-dev-nexus work-item create "/Users/alice/dev-nexus/graphrag-research-suite" --component benchmark-graphrag --title "Define GraphRAG benchmark protocol" --status ready
+dev-nexus work-item create "/Users/alice/dev-nexus/rocket-shop-suite" --component checkout-api --title "Define checkout retry policy" --status ready
 ```
