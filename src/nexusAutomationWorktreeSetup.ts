@@ -898,6 +898,13 @@ function materializePluginDependencyProjection(options: {
   }
 
   const sourceStats = fs.statSync(sourcePath);
+  const warnings = pluginDependencyProjectionWarnings({
+    projection,
+    sourceRoot: projectionSourceRoot,
+    sourcePath,
+    targetPath,
+    worktreePath: options.worktreePath,
+  });
   if (fs.existsSync(targetPath)) {
     if (
       projection.sourceControl === "support" &&
@@ -917,6 +924,7 @@ function materializePluginDependencyProjection(options: {
       targetPath,
       status: "present",
       message: `Plugin dependency projection target already exists: ${targetPath}`,
+      warnings,
     });
   }
 
@@ -944,6 +952,7 @@ function materializePluginDependencyProjection(options: {
     targetPath,
     status: "linked",
     message: `Linked plugin dependency projection ${sourcePath} -> ${targetPath}`,
+    warnings,
   });
 }
 
@@ -1042,7 +1051,10 @@ function dependencyProjectionResult(options: {
   targetPath: string;
   status: NexusWorkerContextDependencyProjectionStatus;
   message: string;
+  warnings?: string[];
 }): NexusAutomationWorktreeDependencyProjectionResult {
+  const warnings = options.warnings ?? [];
+
   return {
     id: options.projection.id,
     source: options.projection.source,
@@ -1054,11 +1066,126 @@ function dependencyProjectionResult(options: {
     reason: options.projection.reason,
     status: options.status,
     message: options.message,
+    ...(warnings.length > 0 ? { warnings } : {}),
     sourceMetadata: options.projection.sourceMetadata,
     ...(options.projection.sourceComponent
       ? { sourceComponent: options.projection.sourceComponent }
       : {}),
   };
+}
+
+function pluginDependencyProjectionWarnings(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourceRoot: string;
+  sourcePath: string;
+  targetPath: string;
+  worktreePath: string;
+}): string[] {
+  if (!isProjectedNodeModules(options.projection)) {
+    return [];
+  }
+
+  const sourceRoot = path.resolve(options.sourceRoot);
+  const sourcePath = path.resolve(options.sourcePath);
+  const targetPath = path.resolve(options.targetPath);
+  const worktreePath = path.resolve(options.worktreePath);
+  if (
+    sourcePath !== path.resolve(sourceRoot, "node_modules") ||
+    targetPath !== path.resolve(worktreePath, "node_modules") ||
+    pathIsAtOrInsideRoot(worktreePath, sourcePath)
+  ) {
+    return [];
+  }
+
+  const linkSamples = workspacePackageLinkSamples({
+    nodeModulesPath: sourcePath,
+    sourceRoot,
+  });
+  const sampleText =
+    linkSamples.length > 0
+      ? ` Workspace package link sample: ${linkSamples.join("; ")}.`
+      : "";
+
+  return [
+    `Projected node_modules is shared from ${sourcePath} into ${targetPath}.${sampleText} ` +
+      `Workspace package imports can resolve to the source checkout ${sourceRoot} instead of this worktree ${worktreePath}; ` +
+      "use a worktree-local install/link mode before source-changing verification, or treat package-importing commands as advisory.",
+  ];
+}
+
+function isProjectedNodeModules(
+  projection: NexusAutomationPluginDependencyProjection,
+): boolean {
+  return (
+    normalizedProjectionPath(projection.source) === "node_modules" &&
+    normalizedProjectionPath(projection.target) === "node_modules"
+  );
+}
+
+function normalizedProjectionPath(value: string): string {
+  return value.split(/[\\/]+/u).filter(Boolean).join("/");
+}
+
+function workspacePackageLinkSamples(options: {
+  nodeModulesPath: string;
+  sourceRoot: string;
+}): string[] {
+  const samples: string[] = [];
+  for (const candidatePath of nodeModulePackageCandidatePaths(options.nodeModulesPath)) {
+    let stats: fs.Stats;
+    try {
+      stats = fs.lstatSync(candidatePath);
+    } catch {
+      continue;
+    }
+    if (!stats.isSymbolicLink()) {
+      continue;
+    }
+
+    let realPath: string;
+    try {
+      realPath = fs.realpathSync(candidatePath);
+    } catch {
+      continue;
+    }
+    if (
+      pathIsAtOrInsideRoot(options.sourceRoot, realPath) &&
+      !pathIsAtOrInsideRoot(options.nodeModulesPath, realPath)
+    ) {
+      samples.push(`${candidatePath} -> ${realPath}`);
+      if (samples.length >= 3) {
+        break;
+      }
+    }
+  }
+
+  return samples;
+}
+
+function nodeModulePackageCandidatePaths(nodeModulesPath: string): string[] {
+  const candidates: string[] = [];
+  for (const entry of safeDirectoryEntries(nodeModulesPath)) {
+    const entryPath = path.join(nodeModulesPath, entry.name);
+    if (entry.name.startsWith("@") && entry.isDirectory()) {
+      for (const scopedEntry of safeDirectoryEntries(entryPath)) {
+        candidates.push(path.join(entryPath, scopedEntry.name));
+      }
+      continue;
+    }
+    if (entry.name !== ".bin") {
+      candidates.push(entryPath);
+    }
+  }
+
+  return candidates;
+}
+
+function safeDirectoryEntries(directoryPath: string): fs.Dirent[] {
+  try {
+    return fs.readdirSync(directoryPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
 }
 
 function pluginDependencyProjectionSourceRoot(
@@ -1330,6 +1457,11 @@ function resolveInsideOrAtRoot(root: string, value: string, name: string): strin
 function pathIsInsideRoot(root: string, value: string): boolean {
   const relative = path.relative(path.resolve(root), path.resolve(value));
   return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function pathIsAtOrInsideRoot(root: string, value: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(value));
+  return !relative || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function assertWorktreePathInsideRoot(

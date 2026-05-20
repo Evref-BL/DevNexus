@@ -514,6 +514,8 @@ describe("nexus worker context bundle", () => {
     const worktreePath = path.join(worktreesRoot, "local-23");
     const sourceDependency = path.join(sourceRoot, "node_modules");
     const targetDependency = path.join(worktreePath, "node_modules");
+    const dependencyWarning =
+      "Projected node_modules may resolve workspace packages from the source checkout.";
 
     const result = materializeNexusWorkerContextBundle({
       projectRoot,
@@ -539,6 +541,7 @@ describe("nexus worker context bundle", () => {
           reason: "Reuse already-installed JavaScript dependencies.",
           status: "linked",
           message: `Linked plugin dependency projection ${sourceDependency} -> ${targetDependency}`,
+          warnings: [dependencyWarning],
           sourceMetadata: {
             pluginId: "typescript-dev-nexus",
             pluginName: "TypeScript DevNexus",
@@ -561,6 +564,7 @@ describe("nexus worker context bundle", () => {
         reason: "Reuse already-installed JavaScript dependencies.",
         status: "linked",
         message: `Linked plugin dependency projection ${sourceDependency} -> ${targetDependency}`,
+        warnings: [dependencyWarning],
         sourceMetadata: {
           pluginId: "typescript-dev-nexus",
           pluginName: "TypeScript DevNexus",
@@ -577,6 +581,7 @@ describe("nexus worker context bundle", () => {
       .toMatchObject({
         id: "typescript-node-modules",
         status: "linked",
+        warnings: [dependencyWarning],
         sourceMetadata: {
           pluginId: "typescript-dev-nexus",
           capabilityId: "node-modules",
@@ -589,6 +594,7 @@ describe("nexus worker context bundle", () => {
     expect(result.briefingMarkdown).toContain(
       "Source: typescript-dev-nexus:node-modules",
     );
+    expect(result.briefingMarkdown).toContain(`Warning: ${dependencyWarning}`);
     expect(result.briefingMarkdown).toContain(
       "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
     );
