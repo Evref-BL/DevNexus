@@ -80,6 +80,7 @@ export * from "./nexusSetupAssistant.js";
 export * from "./nexusSharedCheckoutGuard.js";
 export * from "./nexusSkills.js";
 export * from "./nexusVersionPlanningConfig.js";
+export * from "./nexusVersionPlanningSurface.js";
 export * from "./nexusVersionReadiness.js";
 export * from "./nexusVersionScopeResolver.js";
 export * from "./workTrackingLocalProvider.js";

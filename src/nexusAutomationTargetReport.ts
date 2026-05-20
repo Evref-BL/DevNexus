@@ -32,6 +32,11 @@ import {
   resolveNexusPublicationPolicy,
 } from "./nexusPublicationPolicy.js";
 import {
+  buildNexusVersionPlanningSurface,
+  type NexusVersionPlanningSurface,
+  type NexusVersionPlanningSurfaceWorkItemInput,
+} from "./nexusVersionPlanningSurface.js";
+import {
   readNexusAutomationTargetContext,
   type NexusAutomationTargetContext,
 } from "./nexusAutomationTarget.js";
@@ -226,6 +231,7 @@ export interface NexusAutomationTargetReport {
   externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   authority: NexusAuthorityProjectSummary | null;
   componentProgress: NexusAutomationTargetReportComponentProgressSummary[];
+  versionPlanning?: NexusVersionPlanningSurface;
   relaunchDecision: NexusAutomationTargetReportRelaunchDecision;
   activeBlockers: NexusAutomationTargetReportActiveBlocker[];
   blockers: string[];
@@ -325,6 +331,15 @@ export function buildNexusAutomationTargetReport(
     workItemResolver,
     staleInProgressWorkItems,
   });
+  const versionPlanning = buildNexusVersionPlanningSurface({
+    projectConfig,
+    components,
+    workItems: workItemSummary.uniqueReferences.map(versionSurfaceWorkItemInput),
+    targetCycles: cycleLedger.cycles,
+    verification: executionSummary.verification,
+    publicationDecisions: executionSummary.publicationDecisions,
+    authority,
+  });
 
   return {
     version: 1,
@@ -348,6 +363,7 @@ export function buildNexusAutomationTargetReport(
       activeBlockers,
       authority,
     }),
+    ...(versionPlanning ? { versionPlanning } : {}),
     relaunchDecision: relaunchDecision({
       automationConfig,
       lastCycle: cycleSummary.lastCycle,
@@ -357,6 +373,32 @@ export function buildNexusAutomationTargetReport(
     activeBlockers,
     blockers: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.blockers)),
     notes: uniqueStrings(cycleLedger.cycles.flatMap((cycle) => cycle.notes)),
+  };
+}
+
+function versionSurfaceWorkItemInput(
+  reference: NexusAutomationTargetReportWorkItemReference,
+): NexusVersionPlanningSurfaceWorkItemInput {
+  const trackerRef =
+    reference.trackerId && reference.trackerProvider
+      ? {
+          ...(reference.componentId ? { componentId: reference.componentId } : {}),
+          trackerId: reference.trackerId,
+          provider: reference.trackerProvider,
+        }
+      : undefined;
+  return {
+    componentId: reference.componentId ?? "",
+    trackerId: reference.trackerId,
+    trackerProvider: reference.trackerProvider,
+    logicalItemId: reference.id,
+    workItem: {
+      id: reference.id,
+      title: reference.title ?? reference.id,
+      status: reference.status ?? "todo",
+      provider: reference.trackerProvider ?? "local",
+      ...(trackerRef ? { trackerRef } : {}),
+    },
   };
 }
 

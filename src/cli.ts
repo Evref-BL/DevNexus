@@ -7595,6 +7595,26 @@ function printAutomationTargetReportResult(
   if (result.authority) {
     printAuthorityProjectSummary(result.authority, stdout);
   }
+  if (result.versionPlanning) {
+    writeLine(
+      stdout,
+      `  Version planning: ${result.versionPlanning.shownVersionCount} shown, ${result.versionPlanning.omittedVersionCount} omitted.`,
+    );
+    for (const version of result.versionPlanning.versions) {
+      writeLine(
+        stdout,
+        `    ${version.id}: ${version.readiness.state}; scope ${version.scopeCounts.resolvedItemCount}/${version.scopeCounts.configuredEntryCount} resolved; target ${version.targetBranch}.`,
+      );
+      if (version.gateWarnings.length > 0) {
+        writeLine(
+          stdout,
+          `      Gate warnings: ${version.gateWarnings
+            .map((gate) => `${gate.kind}=${gate.status}`)
+            .join(", ")}`,
+        );
+      }
+    }
+  }
   if (result.workItemSummary) {
     writeLine(
       stdout,

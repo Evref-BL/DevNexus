@@ -30,6 +30,12 @@ import {
   buildNexusRunnerProfilePolicySummary,
   type NexusRunnerProfilePolicySummary,
 } from "./nexusRunnerProfile.js";
+import {
+  buildNexusVersionPlanningSurface,
+  type NexusVersionPlanningSurface,
+  type NexusVersionPlanningSurfaceWorkItemInput,
+  type NexusVersionPlanningWorkItemVersionScope,
+} from "./nexusVersionPlanningSurface.js";
 import type { WorkItem, WorkTrackerRef } from "./workTrackingTypes.js";
 
 export interface NexusAutomationProjectSummary {
@@ -49,6 +55,7 @@ export interface NexusAutomationEligibleWorkItemSummary {
   updatedAt: string | null;
   webUrl: string | null;
   trackerRef: WorkTrackerRef | null;
+  versionScopes?: NexusVersionPlanningWorkItemVersionScope[];
 }
 
 export interface NexusAutomationEligibleWorkComponentSummary {
@@ -73,6 +80,7 @@ export interface NexusAutomationEligibleWorkSummary {
   staleInProgressWorkItemCount: number;
   externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   components: NexusAutomationEligibleWorkComponentSummary[];
+  versionPlanning?: NexusVersionPlanningSurface;
 }
 
 export interface NexusAutomationAgentProfilePolicySummary {
@@ -205,6 +213,35 @@ export async function getNexusAutomationEligibleWorkSummary(
       component.workItems.length > 0 ||
       component.staleInProgressWorkItems.length > 0,
   );
+  const versionPlanning = buildNexusVersionPlanningSurface({
+    projectConfig: status.projectConfig,
+    components: status.components,
+    workItems: components.flatMap((component) =>
+      component.workItems.map((item) =>
+        versionSurfaceWorkItemInput(component.componentId, item),
+      )
+    ),
+    includeWorkItems: true,
+    includeUnrelatedWorkItems: true,
+  });
+  if (versionPlanning?.workItems) {
+    const scopesByWorkItem = new Map(
+      versionPlanning.workItems.map((item) => [
+        `${item.componentId}\0${item.id}`,
+        item.scopes,
+      ]),
+    );
+    for (const component of components) {
+      for (const item of component.workItems) {
+        const scopes = scopesByWorkItem.get(
+          `${component.componentId}\0${item.id}`,
+        );
+        if (scopes) {
+          item.versionScopes = scopes;
+        }
+      }
+    }
+  }
 
   return {
     projectRoot: status.projectRoot,
@@ -230,6 +267,7 @@ export async function getNexusAutomationEligibleWorkSummary(
         componentEligibleWorkItems: grouped,
       }),
     components,
+    ...(versionPlanning ? { versionPlanning } : {}),
   };
 }
 
@@ -319,5 +357,33 @@ function summarizeEligibleWorkItem(
     updatedAt: item.updatedAt ?? null,
     webUrl: item.webUrl ?? null,
     trackerRef: item.trackerRef ?? null,
+  };
+}
+
+function versionSurfaceWorkItemInput(
+  componentId: string,
+  item: NexusAutomationEligibleWorkItemSummary,
+): NexusVersionPlanningSurfaceWorkItemInput {
+  return {
+    componentId,
+    trackerId: item.trackerRef?.trackerId ?? null,
+    trackerProvider: item.trackerRef?.provider ?? null,
+    logicalItemId: item.logicalItemId,
+    workItem: {
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      provider: item.trackerRef?.provider ?? "local",
+      labels: item.labels,
+      assignees: item.assignees,
+      milestone: item.milestone,
+      updatedAt: item.updatedAt,
+      webUrl: item.webUrl,
+      ...(item.trackerRef ? { trackerRef: item.trackerRef } : {}),
+      externalRef: {
+        provider: item.trackerRef?.provider ?? "local",
+        itemId: item.logicalItemId,
+      },
+    },
   };
 }
