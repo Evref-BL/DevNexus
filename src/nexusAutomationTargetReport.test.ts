@@ -869,6 +869,62 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("keeps currently done work out of ready eligible progress when cycle facts are stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local" },
+      now: () => "2026-05-16T09:00:00.000Z",
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Already finished work",
+      status: "done",
+    });
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "cycle-with-stale-eligible-fact",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        status: "completed",
+        summary: "The selector used to consider this item eligible.",
+        eligibleWorkItemCount: 0,
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "eligible",
+          },
+        ],
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:10:00.000Z",
+    });
+
+    expect(report.workItemSummary?.progress).toMatchObject({
+      readyEligibleWork: [],
+      completedWork: [{ componentId: "primary", id: "local-1" }],
+    });
+    expect(report.componentProgress).toMatchObject([
+      {
+        componentId: "primary",
+        workItems: {
+          readyEligibleWork: [],
+          completedWork: [{ id: "local-1" }],
+        },
+      },
+    ]);
+  });
+
   it("summarizes effective green-main publication policy in component progress", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
