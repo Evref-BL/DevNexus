@@ -120,6 +120,17 @@ Prepare a component-scoped worktree when implementation should be isolated:
 dev-nexus worktree prepare <project-root> --component core --work-item local-1
 ```
 
+For a single provider-native GitHub issue, preview the short quick-fix path
+before starting. The plan names the bot identity check, isolated worktree
+command, issue status command, verification, pull request, merge, issue close,
+and cleanup steps without requiring heartbeat-cycle bookkeeping:
+
+```bash
+dev-nexus quick-fix plan <project-root> --component core --work-item github-50
+dev-nexus quick-fix start <project-root> --component core --work-item github-50
+dev-nexus quick-fix finish <project-root> --component core --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
+```
+
 Prepared worktrees carry ownership metadata: component id, source root,
 generated path, branch, base ref, and owning work item. The generated path must
 resolve inside the component worktrees root.

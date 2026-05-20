@@ -179,6 +179,10 @@ import {
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import {
+  buildNexusQuickFixPlan,
+  type NexusQuickFixPlan,
+} from "./nexusQuickFix.js";
+import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthorityForCurrentActor,
@@ -850,6 +854,23 @@ interface ParsedWorktreePrepareCommand {
   json?: boolean;
 }
 
+interface ParsedQuickFixPlanCommand {
+  command: "plan" | "start" | "finish";
+  projectRoot: string;
+  componentId?: string;
+  workItemId: string;
+  topic?: string | null;
+  branchName?: string | null;
+  worktreeName?: string | null;
+  writeScope: string[];
+  verificationCommands: string[];
+  prUrl?: string | null;
+  mergeCommit?: string | null;
+  verificationSummary?: string | null;
+  cleanupActions: string[];
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -927,6 +948,9 @@ export function usage(): string {
     "  dev-nexus remote-execution result record <project-root> <request-id> [options]",
     "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
+    "  dev-nexus quick-fix plan <project-root> --work-item <id> [options]",
+    "  dev-nexus quick-fix start <project-root> --work-item <id> [options]",
+    "  dev-nexus quick-fix finish <project-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item discovery-status <project-root> [options]",
     "  dev-nexus work-item list <project-root> [options]",
@@ -1141,6 +1165,20 @@ export function usage(): string {
     "  --worker-agent <provider> assigned worker provider target, such as codex or claude",
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
+    "  --json",
+    "",
+    "Options for quick-fix plan/start/finish:",
+    "  --component <id>          defaults to the primary component",
+    "  --work-item <id>          provider-native issue id, for example github-50",
+    "  --topic <text>",
+    "  --branch <name>",
+    "  --worktree-name <name>",
+    "  --write-scope <path>      repeatable",
+    "  --verification-command <command>  repeatable; defaults to component verification",
+    "  --pr-url <url>            finish summary only",
+    "  --merge-commit <sha>      finish summary only",
+    "  --verification <text>     finish summary only",
+    "  --cleanup-action <text>   finish summary only; repeatable",
     "  --json",
     "",
     "Options for work-item create:",
@@ -1432,6 +1470,9 @@ async function mainUnchecked(
   if (argv[0] === "worktree") {
     return handleWorktreeCommand(argv, dependencies);
   }
+  if (argv[0] === "quick-fix") {
+    return handleQuickFixCommand(argv, dependencies);
+  }
   if (argv[0] === "work-item") {
     return handleWorkItemCommand(argv, dependencies);
   }
@@ -1447,7 +1488,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
   );
 }
 
@@ -2156,6 +2197,61 @@ async function handleWorktreeCommand(
   }
 
   throw new Error("worktree requires prepare");
+}
+
+async function handleQuickFixCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  if (argv[1] === "plan" || argv[1] === "start" || argv[1] === "finish") {
+    const parsed = parseQuickFixPlanCommand(argv);
+    const plan = buildNexusQuickFixPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      workItemId: parsed.workItemId,
+      topic: parsed.topic,
+      branchName: parsed.branchName,
+      worktreeName: parsed.worktreeName,
+      writeScope: parsed.writeScope,
+      verificationCommands: parsed.verificationCommands,
+    });
+    if (parsed.command === "start") {
+      assertCliMutationAllowed(dependencies, {
+        projectRoot: path.resolve(parsed.projectRoot),
+        command: "quick-fix start",
+        mutationClass: "worktree_bootstrap",
+        componentId: parsed.componentId,
+      });
+      const prepared = prepareNexusManualWorktree({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        workItemId: parsed.workItemId,
+        topic: plan.branch.topic,
+        branchName: plan.branch.name,
+        worktreeName: plan.branch.worktreeName,
+        writeScope: parsed.writeScope,
+        leaseNotes: [`Quick-fix work for ${plan.issue.repository}#${plan.issue.number}.`],
+        gitRunner: dependencies.gitRunner,
+        now: dependencies.now,
+      });
+      printQuickFixStart(
+        plan,
+        prepared,
+        parsed,
+        dependencies.stdout ?? process.stdout,
+      );
+      return 0;
+    }
+    if (parsed.command === "finish") {
+      printQuickFixFinish(plan, parsed, dependencies.stdout ?? process.stdout);
+      return 0;
+    }
+
+    printQuickFixPlan(plan, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  throw new Error("quick-fix requires plan, start, or finish");
 }
 
 async function resolveWorktreePrepareWorkItem(
@@ -4748,6 +4844,92 @@ function parseWorktreePrepareCommand(
   }
 
   return parsed;
+}
+
+function parseQuickFixPlanCommand(argv: string[]): ParsedQuickFixPlanCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "plan" && command !== "start" && command !== "finish") {
+    throw new Error("quick-fix requires plan, start, or finish");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error(`quick-fix ${command} requires a project root`);
+  }
+
+  const parsed: Partial<ParsedQuickFixPlanCommand> = {
+    command,
+    projectRoot,
+    writeScope: [],
+    verificationCommands: [],
+    cleanupActions: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--work-item":
+        parsed.workItemId = next();
+        break;
+      case "--topic":
+        parsed.topic = next();
+        break;
+      case "--branch":
+        parsed.branchName = next();
+        break;
+      case "--worktree-name":
+        parsed.worktreeName = next();
+        break;
+      case "--write-scope":
+        parsed.writeScope!.push(next());
+        break;
+      case "--verification-command":
+        parsed.verificationCommands!.push(next());
+        break;
+      case "--pr-url":
+        parsed.prUrl = next();
+        break;
+      case "--merge-commit":
+        parsed.mergeCommit = next();
+        break;
+      case "--verification":
+        parsed.verificationSummary = next();
+        break;
+      case "--cleanup-action":
+        parsed.cleanupActions!.push(next());
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown quick-fix plan option: ${arg}`);
+    }
+  }
+  if (!parsed.workItemId) {
+    throw new Error(`quick-fix ${command} requires --work-item`);
+  }
+  if (command === "finish") {
+    if (!parsed.prUrl) {
+      throw new Error("quick-fix finish requires --pr-url");
+    }
+    if (!parsed.mergeCommit) {
+      throw new Error("quick-fix finish requires --merge-commit");
+    }
+    if (!parsed.verificationSummary) {
+      throw new Error("quick-fix finish requires --verification");
+    }
+  }
+
+  return parsed as ParsedQuickFixPlanCommand;
 }
 
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
@@ -7385,6 +7567,149 @@ function printWorktreePrepareResult(
   for (const action of result.nextActions) {
     writeLine(stdout, `  Next: ${action}`);
   }
+}
+
+function printQuickFixPlan(
+  plan: NexusQuickFixPlan,
+  parsed: ParsedQuickFixPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus quick-fix plan.");
+  writeLine(
+    stdout,
+    `  Issue: ${plan.issue.repository}#${plan.issue.number} (${plan.issue.workItemId})`,
+  );
+  writeLine(stdout, `  Component: ${plan.component.id}`);
+  writeLine(stdout, `  Branch: ${plan.branch.name}`);
+  writeLine(stdout, `  Worktree name: ${plan.branch.worktreeName}`);
+  writeLine(
+    stdout,
+    `  Publication: ${plan.publication.strategy} remote=${plan.publication.remote ?? "none"} target=${plan.publication.targetBranch ?? "none"}`,
+  );
+  if (plan.warnings.length > 0) {
+    for (const warning of plan.warnings) {
+      writeLine(stdout, `  Warning: ${warning}`);
+    }
+  }
+  writeLine(stdout, "  Start:");
+  for (const step of plan.startSteps) {
+    writeLine(stdout, `    ${step.title}: ${formatQuickFixStep(step)}`);
+  }
+  writeLine(stdout, "  Finish:");
+  for (const step of plan.finishSteps) {
+    writeLine(stdout, `    ${step.title}: ${formatQuickFixStep(step)}`);
+  }
+  writeLine(stdout, "  Skipped bookkeeping:");
+  for (const item of plan.skippedBookkeeping) {
+    writeLine(stdout, `    ${item}`);
+  }
+}
+
+function printQuickFixStart(
+  plan: NexusQuickFixPlan,
+  prepared: PrepareNexusManualWorktreeResult,
+  parsed: ParsedQuickFixPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    mode: "start",
+    ...plan,
+    preparedWorktree: summarizeNexusManualWorktreeResult(prepared),
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus quick-fix started.");
+  writeLine(
+    stdout,
+    `  Issue: ${plan.issue.repository}#${plan.issue.number} (${plan.issue.workItemId})`,
+  );
+  writeLine(stdout, `  Worktree: ${prepared.worktree.worktreePath}`);
+  writeLine(stdout, `  Branch: ${prepared.worktree.branchName}`);
+  writeLine(stdout, `  Lease: ${prepared.lease.id}`);
+  writeLine(stdout, "  Next:");
+  for (const step of plan.startSteps.filter((step) => step.id !== "prepare-worktree")) {
+    writeLine(stdout, `    ${step.title}: ${formatQuickFixStep(step)}`);
+  }
+  writeLine(stdout, "  Finish:");
+  for (const step of plan.finishSteps) {
+    writeLine(stdout, `    ${step.title}: ${formatQuickFixStep(step)}`);
+  }
+  writeLine(stdout, "  Skipped bookkeeping:");
+  for (const item of plan.skippedBookkeeping) {
+    writeLine(stdout, `    ${item}`);
+  }
+}
+
+function printQuickFixFinish(
+  plan: NexusQuickFixPlan,
+  parsed: ParsedQuickFixPlanCommand,
+  stdout: TextWriter,
+): void {
+  const result = {
+    prUrl: parsed.prUrl!,
+    mergeCommit: parsed.mergeCommit!,
+    verification: parsed.verificationSummary!,
+    cleanupActions: parsed.cleanupActions,
+    skippedBookkeeping: plan.skippedBookkeeping,
+  };
+  const payload = {
+    ok: true,
+    mode: "finish",
+    issue: plan.issue,
+    component: plan.component,
+    branch: plan.branch,
+    result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus quick-fix finished.");
+  writeLine(
+    stdout,
+    `  Issue: ${plan.issue.repository}#${plan.issue.number} (${plan.issue.workItemId})`,
+  );
+  writeLine(stdout, `  PR: ${result.prUrl}`);
+  writeLine(stdout, `  Merge commit: ${result.mergeCommit}`);
+  writeLine(stdout, `  Verification: ${result.verification}`);
+  if (result.cleanupActions.length > 0) {
+    writeLine(stdout, "  Cleanup:");
+    for (const action of result.cleanupActions) {
+      writeLine(stdout, `    ${action}`);
+    }
+  }
+  writeLine(stdout, "  Skipped bookkeeping:");
+  for (const item of result.skippedBookkeeping) {
+    writeLine(stdout, `    ${item}`);
+  }
+}
+
+function formatQuickFixStep(step: NexusQuickFixCommandStepLike): string {
+  const environment = Object.entries(step.environment);
+  const envPrefix =
+    environment.length === 0
+      ? ""
+      : `${environment
+          .map(([key, value]) => `${key}=${value}`)
+          .join(" ")} `;
+  return `${envPrefix}${step.command}${step.note ? ` (${step.note})` : ""}`;
+}
+
+interface NexusQuickFixCommandStepLike {
+  command: string;
+  environment: Record<string, string>;
+  note: string | null;
 }
 
 function printWorkItemCreateResult(
