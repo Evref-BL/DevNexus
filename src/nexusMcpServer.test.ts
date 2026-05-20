@@ -570,6 +570,51 @@ describe("DevNexus MCP server", () => {
     }
   });
 
+  it("warns when the MCP server started before the project DevNexus source head", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-runtime-stale-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const gitRunner: GitRunner = (args, cwd): GitCommandResult => {
+      const joined = args.join(" ");
+      if (cwd === sourceRoot && joined === "rev-parse --verify HEAD") {
+        return ok([...args], "newer-source-head\n");
+      }
+      if (cwd === sourceRoot && joined === "log -1 --format=%cI HEAD") {
+        return ok([...args], "2026-05-16T10:00:00+00:00\n");
+      }
+
+      return ok([...args], "");
+    };
+
+    const targetReport = toolJson(
+      await callDevNexusMcpTool(
+        "target_report",
+        { projectRoot },
+        {
+          now: fixedClock("2026-05-16T10:05:00.000Z"),
+          gitRunner,
+          mcpRuntimeStartedAt: "2026-05-16T09:00:00.000Z",
+        },
+      ),
+    );
+
+    expect(targetReport.mcpRuntime).toMatchObject({
+      serverName: "dev-nexus",
+      stale: true,
+      warningCount: 1,
+      source: {
+        componentId: "primary",
+        sourceRoot,
+        headCommit: "newer-source-head",
+        headCommitDate: "2026-05-16T10:00:00.000Z",
+      },
+    });
+    expect(targetReport.mcpRuntime.warnings[0]).toContain(
+      "started before primary source HEAD",
+    );
+  });
+
   it("rejects invalid detail values on compactable MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     saveProjectConfig(projectRoot, projectConfig());

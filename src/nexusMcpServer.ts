@@ -190,6 +190,7 @@ export interface DevNexusMcpToolContext {
   gitRunner?: GitRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
+  mcpRuntimeStartedAt?: Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
 }
@@ -198,6 +199,27 @@ export interface DevNexusMcpToolResult {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 }
+
+export interface NexusMcpRuntimeSummary {
+  serverName: "dev-nexus";
+  protocolVersion: string;
+  startedAt: string;
+  processId: number;
+  nodeVersion: string;
+  command: string | null;
+  stale: boolean;
+  warningCount: number;
+  warnings: string[];
+  source: {
+    componentId: string;
+    sourceRoot: string;
+    sourceRootExists: boolean;
+    headCommit: string | null;
+    headCommitDate: string | null;
+  } | null;
+}
+
+const devNexusMcpServerStartedAt = new Date();
 
 const tools: McpTool[] = [
   {
@@ -1280,26 +1302,31 @@ export async function callDevNexusMcpTool(
       }
       case "automation_status": {
         const detail = mcpDetailFromArgs(args);
+        const projectRoot = projectRootFromArgs(args);
         const status = await getNexusAutomationStatus({
-          projectRoot: projectRootFromArgs(args),
+          projectRoot,
           homePath: optionalString(args, "homePath", "arguments"),
           now: context.now,
         });
         return toolResult({
           ok: true,
           detail,
+          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
           ...(detail === "full" ? status : summarizeAutomationStatus(status)),
         });
       }
-      case "eligible_work":
+      case "eligible_work": {
+        const projectRoot = projectRootFromArgs(args);
         return toolResult({
           ok: true,
+          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
           ...(await getNexusEligibleWorkSummary({
-            projectRoot: projectRootFromArgs(args),
+            projectRoot,
             eligibleWorkMode: optionalEligibleWorkMode(args, "mode", "arguments"),
             now: context.now,
           })),
         });
+      }
       case "agent_profiles":
         return toolResult({
           ok: true,
@@ -1387,13 +1414,15 @@ export async function callDevNexusMcpTool(
         });
       case "target_report": {
         const detail = mcpDetailFromArgs(args);
+        const projectRoot = projectRootFromArgs(args);
         const report = buildNexusAutomationTargetReport({
-          projectRoot: projectRootFromArgs(args),
+          projectRoot,
           now: context.now?.(),
         });
         return toolResult({
           ok: true,
           detail,
+          mcpRuntime: mcpRuntimeSummaryForProject(projectRoot, context),
           report: detail === "full" ? report : summarizeTargetReport(report),
         });
       }
@@ -2518,6 +2547,119 @@ function projectRootFromArgs(args: Record<string, unknown>): string {
   }
 
   return projectStatusFromArgs(args).projectRoot;
+}
+
+function mcpRuntimeSummaryForProject(
+  projectRoot: string,
+  context: DevNexusMcpToolContext,
+): NexusMcpRuntimeSummary {
+  const startedAtDate =
+    dateFromMcpRuntimeValue(context.mcpRuntimeStartedAt) ??
+    devNexusMcpServerStartedAt;
+  const startedAt = startedAtDate.toISOString();
+  const source = mcpRuntimeSourceIdentity(projectRoot, context);
+  const warnings: string[] = [];
+  let stale = false;
+  const headCommitDate = source?.headCommitDate
+    ? dateFromMcpRuntimeValue(source.headCommitDate)
+    : null;
+
+  if (source && headCommitDate && headCommitDate.getTime() > startedAtDate.getTime()) {
+    stale = true;
+    warnings.push(
+      `DevNexus MCP server started before ${source.componentId} source HEAD ` +
+        `${source.headCommit ?? "unknown"} at ${source.headCommitDate}; reload or ` +
+        "restart the agent MCP session, or use the project-local DevNexus CLI for source-current results.",
+    );
+  }
+
+  return {
+    serverName: "dev-nexus",
+    protocolVersion: devNexusMcpProtocolVersion,
+    startedAt,
+    processId: process.pid,
+    nodeVersion: process.version,
+    command: process.argv.length > 0 ? process.argv.join(" ") : null,
+    stale,
+    warningCount: warnings.length,
+    warnings,
+    source,
+  };
+}
+
+function mcpRuntimeSourceIdentity(
+  projectRoot: string,
+  context: DevNexusMcpToolContext,
+): NexusMcpRuntimeSummary["source"] {
+  const projectConfig = loadProjectConfig(projectRoot);
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const component =
+    components.find((candidate) => candidate.id === "dev-nexus") ??
+    components.find((candidate) => candidate.role === "primary") ??
+    components[0];
+  if (!component) {
+    return null;
+  }
+
+  let headCommit: string | null = null;
+  let headCommitDate: string | null = null;
+  if (component.sourceRootExists) {
+    const gitRunner = context.gitRunner ?? defaultGitRunner;
+    headCommit = mcpRuntimeGitStdout(
+      gitRunner,
+      ["rev-parse", "--verify", "HEAD"],
+      component.sourceRoot,
+    );
+    headCommitDate = isoDateFromMcpRuntimeValue(
+      mcpRuntimeGitStdout(
+        gitRunner,
+        ["log", "-1", "--format=%cI", "HEAD"],
+        component.sourceRoot,
+      ),
+    );
+  }
+
+  return {
+    componentId: component.id,
+    sourceRoot: component.sourceRoot,
+    sourceRootExists: component.sourceRootExists,
+    headCommit,
+    headCommitDate,
+  };
+}
+
+function mcpRuntimeGitStdout(
+  gitRunner: GitRunner,
+  args: readonly string[],
+  cwd: string,
+): string | null {
+  try {
+    const result = gitRunner(args, cwd);
+    if (result.exitCode !== 0) {
+      return null;
+    }
+    const stdout = result.stdout.trim();
+    return stdout.length > 0 ? stdout : null;
+  } catch {
+    return null;
+  }
+}
+
+function isoDateFromMcpRuntimeValue(value: Date | string | null): string | null {
+  return dateFromMcpRuntimeValue(value)?.toISOString() ?? null;
+}
+
+function dateFromMcpRuntimeValue(
+  value: Date | string | null | undefined,
+): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 async function projectHostingStatusFromArgs(
