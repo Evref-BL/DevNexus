@@ -145,6 +145,14 @@ and ready for coordinator-driven work across its components.
   releases, or package publishing. Verification passed locally, in PR #20
   Node 24 checks on Ubuntu/Windows/macOS, and after merge in the shared
   DevNexus checkout.
+- `dev-nexus:local-172` is ready from the 2026-05-20 no-eligible-work probe.
+  The current automation selector correctly found no actionable work, but the
+  target report progress bucket still showed completed items such as
+  `local-147`, `local-166`, `local-168`, and `local-169` under
+  `readyEligibleWork` because older target-cycle records had marked them
+  eligible. The next source slice should make current progress buckets exclude
+  completed/non-ready tracker items or explicitly separate historical cycle
+  facts from current actionable work.
 - `dev-nexus:local-165` is complete for version-scoped planning issue slicing.
   It created `dev-nexus:local-167` through `local-171` in dependency order:
   version config, scope resolution, readiness reporting, agent/report exposure,

@@ -1,7 +1,60 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T03:34:05.230Z",
+  "updatedAt": "2026-05-20T04:23:07.282Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-bc86ddac5e4f9dfd",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-target-report-stale-readyeligiblework-20260520",
+      "branchName": "codex/dev-nexus-dogfood/target-report-stale-readyeligiblework",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-target-report-stale-readyeligiblework"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T04:21:52.150Z",
+      "lastSeenAt": "2026-05-20T04:23:07.282Z",
+      "updatedAt": "2026-05-20T04:23:07.282Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f7b5ed7fd3303540ce7dd578e4b50fdd99d1583a",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-target-report-stale-readyeligiblework"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Created dev-nexus:local-172 from the no-eligible-work probe for stale target-report readyEligibleWork progress entries.",
+        "Metadata branch records the new ready dogfood item and target-state/plan direction for the next heartbeat."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

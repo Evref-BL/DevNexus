@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "nextNumber": 172,
+  "nextNumber": 173,
   "nextCommentNumber": 377,
-  "updatedAt": "2026-05-20T03:32:46.582Z",
+  "updatedAt": "2026-05-20T04:22:07.255Z",
   "items": [
     {
       "id": "local-1",
@@ -4435,6 +4435,30 @@
         "provider": "local",
         "itemId": "local-171",
         "itemNumber": 171
+      }
+    },
+    {
+      "id": "local-172",
+      "title": "Keep done items out of target-report readyEligibleWork",
+      "description": "Type: target-report defect slice\nReadiness: autonomous agent-ready (AFK)\nSource: 2026-05-20 heartbeat bounded no-eligible-work probe.\n\nSymptom:\nAfter local-166 completed and the automation selector returned zero current eligible work, `dev-nexus automation target-report` still listed completed tracker items such as local-147, local-166, local-168, and local-169 under `workItemSummary.progress.readyEligibleWork` because their latest recorded cycle status was historically `eligible`.\n\nGoal:\nMake the target report progress buckets reflect current actionable work, or clearly separate historical cycle classifications from current tracker status so completed items do not appear as ready eligible work.\n\nAcceptance criteria:\n- Completed or otherwise non-ready tracker items are not reported in the current `readyEligibleWork` progress bucket merely because an older target cycle recorded them as `eligible`.\n- The report preserves useful historical cycle evidence in an explicitly historical field or by resolving the current tracker status before bucket assignment.\n- Relaunch/stop decisions and existing completed-work summaries remain stable.\n- Add regression coverage using a completed local work item whose latest cycle status is `eligible`.\n- Keep provider reads mocked or local-only; do not mutate provider trackers.\n\nVerification:\n- Focused target-report progress tests.\n- `npm run check` when feasible.",
+      "status": "ready",
+      "provider": "local",
+      "labels": [
+        "dogfood",
+        "target-report",
+        "automation",
+        "reporting"
+      ],
+      "assignees": [],
+      "milestone": null,
+      "createdAt": "2026-05-20T04:22:07.255Z",
+      "updatedAt": "2026-05-20T04:22:07.255Z",
+      "closedAt": null,
+      "webUrl": null,
+      "externalRef": {
+        "provider": "local",
+        "itemId": "local-172",
+        "itemNumber": 172
       }
     }
   ],
@@ -9014,6 +9038,7 @@
           "itemId": "local-comment-373"
         }
       }
-    ]
+    ],
+    "local-172": []
   }
 }
