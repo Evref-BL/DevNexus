@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "nextAuditNumber": 39,
-  "updatedAt": "2026-05-20T07:59:44.988Z",
+  "nextAuditNumber": 41,
+  "updatedAt": "2026-05-20T11:38:20.810Z",
   "records": [
     {
       "projectId": "dev-nexus-dogfood",
@@ -1412,7 +1412,7 @@
       "componentId": "dev-nexus",
       "logicalItemId": "local-173",
       "createdAt": "2026-05-20T07:58:36.828Z",
-      "updatedAt": "2026-05-20T07:58:36.828Z",
+      "updatedAt": "2026-05-20T11:38:20.810Z",
       "references": [
         {
           "trackerId": "github",
@@ -1430,7 +1430,7 @@
           "nodeId": "I_kwDOSertp88AAAABC0pDsg",
           "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
           "firstObservedAt": "2026-05-20T07:58:35Z",
-          "lastObservedAt": "2026-05-20T07:58:35Z"
+          "lastObservedAt": "2026-05-20T11:38:20.810Z"
         }
       ],
       "audit": [
@@ -1441,6 +1441,49 @@
           "trackerId": "github",
           "itemId": "50",
           "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "50",
+            "itemNumber": 50,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
+            "firstObservedAt": "2026-05-20T07:58:35Z",
+            "lastObservedAt": "2026-05-20T07:58:35Z"
+          }
+        },
+        {
+          "id": "link-audit-40",
+          "action": "updated",
+          "at": "2026-05-20T11:38:20.810Z",
+          "trackerId": "github",
+          "itemId": "50",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "50",
+            "itemNumber": 50,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
+            "firstObservedAt": "2026-05-20T07:58:35Z",
+            "lastObservedAt": "2026-05-20T11:38:20.810Z"
+          },
+          "previousReference": {
             "trackerId": "github",
             "trackerName": "GitHub Issues",
             "provider": "github",
@@ -1682,7 +1725,7 @@
       "componentId": "dev-nexus",
       "logicalItemId": "local-178",
       "createdAt": "2026-05-20T07:58:47.815Z",
-      "updatedAt": "2026-05-20T07:58:47.815Z",
+      "updatedAt": "2026-05-20T11:38:20.787Z",
       "references": [
         {
           "trackerId": "github",
@@ -1700,7 +1743,7 @@
           "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
           "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
           "firstObservedAt": "2026-05-20T07:58:47Z",
-          "lastObservedAt": "2026-05-20T07:58:47Z"
+          "lastObservedAt": "2026-05-20T11:38:20.787Z"
         }
       ],
       "audit": [
@@ -1711,6 +1754,49 @@
           "trackerId": "github",
           "itemId": "55",
           "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "55",
+            "itemNumber": 55,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
+            "firstObservedAt": "2026-05-20T07:58:47Z",
+            "lastObservedAt": "2026-05-20T07:58:47Z"
+          }
+        },
+        {
+          "id": "link-audit-39",
+          "action": "updated",
+          "at": "2026-05-20T11:38:20.787Z",
+          "trackerId": "github",
+          "itemId": "55",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "55",
+            "itemNumber": 55,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
+            "firstObservedAt": "2026-05-20T07:58:47Z",
+            "lastObservedAt": "2026-05-20T11:38:20.787Z"
+          },
+          "previousReference": {
             "trackerId": "github",
             "trackerName": "GitHub Issues",
             "provider": "github",

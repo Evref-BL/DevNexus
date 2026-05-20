@@ -2,7 +2,7 @@
   "version": 1,
   "nextNumber": 190,
   "nextCommentNumber": 389,
-  "updatedAt": "2026-05-20T10:01:21.095Z",
+  "updatedAt": "2026-05-20T11:38:20.802Z",
   "items": [
     {
       "id": "local-1",
@@ -4465,7 +4465,7 @@
       "id": "local-173",
       "title": "Add quick-fix mode for one provider-native issue",
       "description": "Type: workflow/product slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20, case study Evref-BL/DevNexus#14.\n\nGoal:\nAdd an explicit quick-fix mode for one provider-native issue that preserves bot identity, isolated source worktree, publication policy, and cleanup safety without forcing full heartbeat-cycle bookkeeping.\n\nAcceptance criteria:\n- Operator can start one GitHub issue with component, provider ref, branch topic, and optional write scope, then get bot identity validation, source worktree/branch setup, and concise run context.\n- Operator can finish the issue through focused verification, PR creation/update, required checks, merge, provider issue close/comment, and cleanup in one guided path or small MCP/CLI pair.\n- Routine quick fixes do not require dogfood metadata PRs unless project config, policy, plan, target state, or durable coordination changed.\n- Finish output reports issue ref, PR URL, merge commit, verification, cleanup actions, and skipped bookkeeping.\n- Existing heartbeat and batch automation paths continue to work unchanged.\n\nVerification:\n- Add focused unit or fixture tests for provider-native GitHub quick start/finish planning without requiring live provider writes.\n- Add a CLI or MCP smoke test proving compact quick-fix summary output.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4478,8 +4478,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:46:49.851Z",
-      "updatedAt": "2026-05-20T07:46:49.851Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T11:38:20.802Z",
+      "closedAt": "2026-05-20T11:38:20.802Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4597,7 +4597,7 @@
       "id": "local-178",
       "title": "Add green-main publication helper with CI failure classification",
       "description": "Type: publication automation slice\nReadiness: autonomous agent-ready (AFK) for an initial conservative helper\nSource: DevNexus workflow audit notes 2026-05-20, case study Evref-BL/DevNexus#14.\n\nGoal:\nMake the common green-main PR loop a first-class DevNexus operation instead of requiring ad hoc GitHub CLI checks, log inspection, reruns, merge, and local sync steps.\n\nAcceptance criteria:\n- One operation can open or update a PR through the configured automation identity and wait for required checks.\n- Failed required jobs are summarized with job name, platform, failing test or step when available, and URL.\n- The helper refuses merge while required checks are failing or pending.\n- The helper supports one configured rerun only when policy allows it and records the rerun reason.\n- On green checks, the helper can merge according to publication authority, sync local main, and report PR URL, merge commit, verification, and residual risk.\n- The first implementation can be conservative: classify unknown failures as manual investigation required.\n\nBlockers:\n- Confirm the policy for automatic rerun of transient or unrelated CI failures before enabling reruns by default.\n\nVerification:\n- Unit tests cover check summaries, failing/pending/green states, and rerun policy decisions with mocked GitHub data.\n- CLI/MCP smoke uses mocked provider responses where live GitHub mutation is not safe.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4610,8 +4610,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:47:25.932Z",
-      "updatedAt": "2026-05-20T07:47:25.932Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T11:38:20.769Z",
+      "closedAt": "2026-05-20T11:38:20.769Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
