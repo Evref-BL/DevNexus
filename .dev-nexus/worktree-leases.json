@@ -1,7 +1,169 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T04:23:07.282Z",
+  "updatedAt": "2026-05-20T05:26:53.520Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f492ef54db6b8e12",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-172",
+      "branchName": "codex/dev-nexus-dogfood/local-172-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_root",
+        "base": "projectRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "."
+      },
+      "writeScope": [
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationTargetReport.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T05:26:07.893Z",
+      "lastSeenAt": "2026-05-20T05:26:53.520Z",
+      "updatedAt": "2026-05-20T05:26:53.520Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f5f51afb1cf9a21d905614c6d593c00c2d19e274",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_root",
+          "base": "projectRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "."
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged handoff for local-172 source work; see completion comment and project-meta lease for durable closeout.",
+        "Verification: focused target-report test, build, full checks, PR #21 checks, and dogfood target-report smoke passed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-e7b086916ff1c38b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-172-project-state",
+      "branchName": "codex/dev-nexus-dogfood/local-172-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-172-project-state"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/worktree-leases.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T05:25:42.243Z",
+      "lastSeenAt": "2026-05-20T05:26:53.520Z",
+      "updatedAt": "2026-05-20T05:26:53.520Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "f5f51afb1cf9a21d905614c6d593c00c2d19e274",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-172-project-state"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project metadata records local-172 completion, target-state closeout, and merged source lease details.",
+        "Publication path: bot PR to dogfood main after metadata validation; source was merged through DevNexus PR #21."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-2423e1ed4c2cc819",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-172",
+      "branchName": "codex/dev-nexus/local-172-target-report-current-ready-progress",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-172-target-report-current-ready-progress"
+      },
+      "writeScope": [
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationTargetReport.test.ts",
+        "src/nexusAutomationTargetCycle.ts",
+        "src/nexusAutomationTargetCycle.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T05:19:50.676Z",
+      "lastSeenAt": "2026-05-20T05:26:53.520Z",
+      "updatedAt": "2026-05-20T05:26:53.520Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "721ec82afe0eeccc9e0234ee7b5b8a50727433f0",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-172-target-report-current-ready-progress"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "DevNexus PR #21 merged to main as 93f0c3c after all required Node 24 checks passed.",
+        "Source commit 721ec82 makes current non-ready tracker status override stale eligible target-cycle facts in target-report progress buckets.",
+        "Verification passed: focused target-report test, build, git diff --check, full npm run check before and after merge, and dogfood target-report smoke.",
+        "No provider reads, provider writes, release, tag, or package publication were introduced."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
