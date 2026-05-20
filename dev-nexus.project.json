@@ -163,6 +163,19 @@
     ]
   },
   "worktreesRoot": "worktrees",
+  "agentTargets": {
+    "active": [
+      {
+        "provider": "codex",
+        "mcp": {
+          "configPath": ".codex/config.toml"
+        },
+        "skills": {
+          "directory": ".agents/skills"
+        }
+      }
+    ]
+  },
   "components": [
     {
       "id": "dev-nexus",
@@ -441,24 +454,11 @@
     "args": [
       "mcp-stdio"
     ],
-    "defaultToolsApprovalMode": "approve",
-    "agentTargets": [
-      {
-        "agent": "codex"
-      }
-    ]
+    "defaultToolsApprovalMode": "approve"
   },
   "skills": {
     "defaultCorePack": true,
-    "sourceControl": "support",
-    "agentTargets": [
-      {
-        "agent": "codex"
-      },
-      {
-        "agent": "claude"
-      }
-    ]
+    "sourceControl": "support"
   },
   "plugins": [
     {
