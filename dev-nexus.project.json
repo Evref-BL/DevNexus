@@ -716,7 +716,7 @@
     {
       "id": "dev-nexus-typescript",
       "name": "DevNexus TypeScript",
-      "version": "0.1.0-alpha.0",
+      "version": "0.1.0-alpha.1",
       "enabled": true,
       "capabilities": [
         {
@@ -733,6 +733,108 @@
             "dev-nexus-typescript"
           ],
           "reason": "Resolve local package binaries such as tsc and test runners from prepared worktrees."
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-typescript-diagnose",
+          "description": "Project the TypeScript compiler/runtime diagnosis workflow skill.",
+          "skillId": "typescript-diagnose",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-typescript-refactor",
+          "description": "Project the bounded TypeScript refactoring workflow skill.",
+          "skillId": "typescript-refactor",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-typescript-test-hygiene",
+          "description": "Project the TypeScript test hygiene workflow skill.",
+          "skillId": "typescript-test-hygiene",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-typescript-api-boundaries",
+          "description": "Project the TypeScript API boundary review workflow skill.",
+          "skillId": "typescript-api-boundaries",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ]
+        },
+        {
+          "kind": "projected_skill",
+          "id": "skill-typescript-codemod-planning",
+          "description": "Project the dry-run TypeScript bulk rewrite planning workflow skill.",
+          "skillId": "typescript-codemod-planning",
+          "targetAgents": [
+            "codex",
+            "claude"
+          ]
+        },
+        {
+          "kind": "mcp_server",
+          "id": "mcp-typescript-diagnostics-tracer",
+          "description": "Advertise read-only TypeScript project status and diagnostics tracer operations.",
+          "serverName": "dev-nexus-typescript",
+          "command": "dev-nexus-typescript",
+          "args": [
+            "mcp-stdio"
+          ],
+          "tools": [
+            {
+              "name": "typescript.projectStatus",
+              "description": "Read TypeScript project setup status, scripts, compiler availability, and setup blockers."
+            },
+            {
+              "name": "typescript.diagnostics",
+              "description": "Read TypeScript compiler diagnostics grouped by file and diagnostic code."
+            }
+          ]
+        },
+        {
+          "kind": "mcp_server",
+          "id": "mcp-typescript-import-graph-analysis",
+          "description": "Advertise read-only TypeScript import graph analysis operations.",
+          "serverName": "dev-nexus-typescript",
+          "command": "dev-nexus-typescript",
+          "args": [
+            "mcp-stdio"
+          ],
+          "tools": [
+            {
+              "name": "typescript.importGraph",
+              "description": "Read TypeScript module import edges, hubs, cycles, and ignored source facts."
+            }
+          ]
+        },
+        {
+          "kind": "mcp_server",
+          "id": "mcp-typescript-bulk-rewrite-planning",
+          "description": "Advertise read-only TypeScript bulk rewrite planning operations.",
+          "serverName": "dev-nexus-typescript",
+          "command": "dev-nexus-typescript",
+          "args": [
+            "mcp-stdio"
+          ],
+          "tools": [
+            {
+              "name": "typescript.bulkRewritePlan",
+              "description": "Preview TypeScript bulk rewrite plans without writing source files."
+            }
+          ]
         },
         {
           "kind": "worker_context_fragment",
