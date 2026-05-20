@@ -17,9 +17,11 @@ import {
   validateNexusHomeConfigBase,
   type GitCommandResult,
   type GitRunner,
+  type NexusAutomationConfig,
   type NexusAutomationCommandRunner,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
+  type WorkTrackerProvider,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -84,6 +86,18 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     },
     ...overrides,
+  };
+}
+
+function withDisabledWorkItemClaims(
+  config: NexusAutomationConfig = projectConfig().automation!,
+): NexusAutomationConfig {
+  return {
+    ...config,
+    workItemClaims: {
+      ...config.workItemClaims,
+      enabled: false,
+    },
   };
 }
 
@@ -263,7 +277,7 @@ describe("nexus automation agent launch", () => {
           },
         ],
         automation: {
-          ...projectConfig().automation!,
+          ...withDisabledWorkItemClaims(),
           agent: {
             ...projectConfig().automation!.agent,
             coordinatorProfileId: "codex-deep",
@@ -800,6 +814,228 @@ describe("nexus automation agent launch", () => {
     });
   });
 
+  it("claims one eligible work item before launching the coordinator", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Claim before launch",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      expect(options.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS).toBe("claimed");
+      expect(options.env.DEV_NEXUS_CLAIMED_WORK_ITEM_ID).toBe("local-1");
+      expect(options.env.DEV_NEXUS_CLAIM_COMPONENT_ID).toBe("primary");
+      expect(options.env.DEV_NEXUS_CLAIM_TRACKER_ID).toBe("default");
+      expect(options.env.DEV_NEXUS_CLAIM_LEASE_TOKEN).toBe("lease-agent-1");
+      expect(options.env.DEV_NEXUS_CLAIM_HOST_ID).toBe("host-a");
+      expect(options.env.DEV_NEXUS_CLAIM_AGENT_ID).toBe("agent-claim-1");
+
+      const context = JSON.parse(
+        fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
+      );
+      expect(context.workItemClaim).toMatchObject({
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        owner: {
+          hostId: "host-a",
+          agentId: "agent-claim-1",
+          leaseToken: "lease-agent-1",
+        },
+      });
+      expect(context.eligibleWorkItems).toMatchObject([
+        {
+          id: "local-1",
+          status: "in_progress",
+        },
+      ]);
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator saw a verified claim",
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "launched",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-claim-1",
+      workItemClaimOwner: {
+        hostId: "host-a",
+        ownerId: "coordinator-loop",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-agent-1",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      summary: "Coordinator saw a verified claim",
+      workItemClaim: {
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+      },
+      eligibleWorkItems: [
+        {
+          id: "local-1",
+          status: "in_progress",
+        },
+      ],
+    });
+    expect(
+      loadLocalWorkTrackingStore(defaultLocalWorkTrackingStorePath(projectRoot))
+        .items,
+    ).toMatchObject([
+      {
+        id: "local-1",
+        status: "in_progress",
+      },
+    ]);
+    expect(
+      readNexusAutomationRunLedger(projectRoot, loadProjectConfig(projectRoot).automation!)
+        .runs.at(-1),
+    ).toMatchObject({
+      id: "agent-claim-1",
+      componentId: "primary",
+      workItemId: "local-1",
+      workItemTitle: "Claim before launch",
+      status: "completed",
+    });
+  });
+
+  it("skips launch when claim verification loses a race", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Raced claim",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const racingProvider: WorkTrackerProvider = {
+      provider: tracker.provider,
+      capabilities: tracker.capabilities,
+      createWorkItem: tracker.createWorkItem.bind(tracker),
+      listWorkItems: tracker.listWorkItems.bind(tracker),
+      getWorkItem: tracker.getWorkItem.bind(tracker),
+      updateWorkItem: async (ref, patch) =>
+        tracker.updateWorkItem(ref, {
+          ...patch,
+          description: "claimed elsewhere without this lease token",
+        }),
+      addComment: tracker.addComment.bind(tracker),
+      setStatus: tracker.setStatus?.bind(tracker),
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-claim-race",
+      providerFactory: () => racingProvider,
+      workItemClaimOwner: { hostId: "host-a" },
+      workItemClaimLeaseTokenFactory: () => "lease-agent-race",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "skipped",
+      summary: expect.stringContaining("lost race"),
+      launch: null,
+      workItemClaim: {
+        status: "lost_race",
+        reason: "verification_failed",
+        componentId: "primary",
+        workItemId: "local-1",
+      },
+    });
+  });
+
+  it("blocks launch when the tracker cannot update work-item claims", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Claim needs update capability",
+      status: "ready",
+      labels: ["automation"],
+    });
+    const readOnlyProvider: WorkTrackerProvider = {
+      provider: tracker.provider,
+      capabilities: {
+        ...tracker.capabilities,
+        updateItem: false,
+      },
+      createWorkItem: tracker.createWorkItem.bind(tracker),
+      listWorkItems: tracker.listWorkItems.bind(tracker),
+      getWorkItem: tracker.getWorkItem.bind(tracker),
+      updateWorkItem: tracker.updateWorkItem.bind(tracker),
+      addComment: tracker.addComment.bind(tracker),
+      setStatus: tracker.setStatus?.bind(tracker),
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-claim-provider-blocker",
+      providerFactory: () => readOnlyProvider,
+      workItemClaimOwner: { hostId: "host-a" },
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: expect.stringContaining("claim coordination blocked"),
+      launch: null,
+      preflight: expect.arrayContaining([
+        expect.objectContaining({
+          name: "workItemClaim",
+          status: "failed",
+        }),
+      ]),
+    });
+  });
+
   it("adds noninteractive Git defaults to launched agent environments", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -1158,6 +1394,7 @@ describe("nexus automation agent launch", () => {
       projectRoot,
       projectConfig({
         workTracking: undefined,
+        automation: withDisabledWorkItemClaims(),
         components: [
           {
             id: "primary",

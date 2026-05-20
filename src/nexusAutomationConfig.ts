@@ -2,6 +2,7 @@ import type { WorkStatus } from "./workTrackingTypes.js";
 
 export type NexusAutomationMode = "run_once" | "agent_launch";
 export type NexusAutomationEligibleWorkMode = "default" | "discovery";
+export type NexusAutomationWorkItemClaimStalePolicy = "report" | "reclaim";
 export type NexusAutomationSafetyProfile =
   | "local"
   | "isolated"
@@ -62,6 +63,12 @@ export interface NexusAutomationLedgerConfig {
 export interface NexusAutomationLockConfig {
   path: string;
   staleAfterMs: number;
+}
+
+export interface NexusAutomationWorkItemClaimConfig {
+  enabled: boolean;
+  leaseDurationMs: number;
+  staleClaimPolicy: NexusAutomationWorkItemClaimStalePolicy;
 }
 
 export interface NexusAutomationBackoffConfig {
@@ -213,6 +220,7 @@ export interface NexusAutomationConfig {
   verification: NexusAutomationVerificationConfig;
   ledger: NexusAutomationLedgerConfig;
   lock: NexusAutomationLockConfig;
+  workItemClaims: NexusAutomationWorkItemClaimConfig;
   backoff: NexusAutomationBackoffConfig;
   schedule: NexusAutomationScheduleConfig;
   setup: NexusAutomationSetupConfig;
@@ -247,6 +255,11 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
   lock: {
     path: ".dev-nexus/automation/run.lock",
     staleAfterMs: 60 * 60 * 1000,
+  },
+  workItemClaims: {
+    enabled: true,
+    leaseDurationMs: 60 * 60 * 1000,
+    staleClaimPolicy: "report",
   },
   backoff: {
     failureLimit: 3,
@@ -347,6 +360,7 @@ export function validateNexusAutomationConfig(
   const verification = validateVerificationConfig(record.verification);
   const ledger = validateLedgerConfig(record.ledger);
   const lock = validateLockConfig(record.lock);
+  const workItemClaims = validateWorkItemClaimConfig(record.workItemClaims);
   const backoff = validateBackoffConfig(record.backoff);
   const schedule = validateScheduleConfig(record.schedule);
   const setup = validateSetupConfig(record.setup);
@@ -379,6 +393,10 @@ export function validateNexusAutomationConfig(
     lock: {
       ...defaultNexusAutomationConfig.lock,
       ...lock,
+    },
+    workItemClaims: {
+      ...defaultNexusAutomationConfig.workItemClaims,
+      ...workItemClaims,
     },
     backoff: {
       ...defaultNexusAutomationConfig.backoff,
@@ -660,6 +678,44 @@ function validateLockConfig(value: unknown): Partial<NexusAutomationLockConfig> 
     ...optionalStringField(record, "path", pathName),
     ...optionalPositiveIntegerField(record, "staleAfterMs", pathName),
   };
+}
+
+function validateWorkItemClaimConfig(
+  value: unknown,
+): Partial<NexusAutomationWorkItemClaimConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.workItemClaims";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalBooleanField(record, "enabled", pathName),
+    ...optionalPositiveIntegerField(record, "leaseDurationMs", pathName),
+    ...optionalWorkItemClaimStalePolicyField(
+      record,
+      "staleClaimPolicy",
+      pathName,
+    ),
+  };
+}
+
+function optionalWorkItemClaimStalePolicyField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusAutomationWorkItemClaimStalePolicy>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === "report" || value === "reclaim") {
+    return { [key]: value } as Record<Key, NexusAutomationWorkItemClaimStalePolicy>;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName}.${key} must be report or reclaim`,
+  );
 }
 
 function validateBackoffConfig(

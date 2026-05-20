@@ -5672,6 +5672,10 @@ describe("dev-nexus cli", () => {
       automation: {
         ...config.automation!,
         mode: "agent_launch",
+        workItemClaims: {
+          ...config.automation!.workItemClaims,
+          enabled: false,
+        },
         agent: {
           command: "codex run",
           timeoutMs: 4321,

@@ -1773,6 +1773,11 @@ describe("project config", () => {
         path: ".dev-nexus/automation/run.lock",
         staleAfterMs: 3600000,
       },
+      workItemClaims: {
+        enabled: true,
+        leaseDurationMs: 3600000,
+        staleClaimPolicy: "report",
+      },
       backoff: {
         failureLimit: 3,
         baseDelayMs: 300000,
@@ -3207,6 +3212,23 @@ describe("project config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.target\.statePath/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-automation-work-item-claims",
+        name: "Invalid Automation Work Item Claims",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          workItemClaims: {
+            staleClaimPolicy: "steal",
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.workItemClaims\.staleClaimPolicy/);
 
     expect(() =>
       validateProjectConfig({
