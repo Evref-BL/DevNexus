@@ -240,6 +240,7 @@ describe("DevNexus MCP server", () => {
       "coordination_handoff",
       "coordination_integrate",
       "coordination_request",
+      "host_check",
       "remote_execution_request_create",
       "remote_execution_result_record",
       "remote_execution_result_get",

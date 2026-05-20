@@ -132,6 +132,12 @@ import {
   type NexusRemoteExecutionVerificationOutcome,
 } from "./nexusRemoteExecution.js";
 import {
+  checkNexusHostCapabilities,
+  type NexusHostCheckMode,
+  type NexusHostCheckMockFacts,
+  type NexusHostCheckResult,
+} from "./nexusHostCheck.js";
+import {
   buildNexusCleanupPlan,
   type NexusCleanupPlan,
 } from "./nexusCleanupPlan.js";
@@ -948,6 +954,14 @@ interface ParsedAutomationCurrentAgentRecordCommand {
   json?: boolean;
 }
 
+interface ParsedHostCheckCommand {
+  projectRoot: string;
+  hostId?: string;
+  mode: NexusHostCheckMode;
+  mockFacts?: NexusHostCheckMockFacts;
+  json?: boolean;
+}
+
 export function usage(): string {
   return [
     "Usage:",
@@ -973,6 +987,7 @@ export function usage(): string {
     "  dev-nexus setup readiness <project-root> [options]",
     "  dev-nexus setup record <project-root> <flow-id> <step-id> --status <status> [options]",
     "  dev-nexus diagnostics cli-version-skew [options]",
+    "  dev-nexus host check <project-root> [options]",
     "  dev-nexus coordination status <project-root> [options]",
     "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
     "  dev-nexus coordination integrate <project-root> [options]",
@@ -1095,6 +1110,12 @@ export function usage(): string {
     "  --expected-file <path>        documentation file to scan; repeatable",
     "  --expected-command <command>  documented command to require; repeatable",
     "  --package-version <version>   installed package version to report",
+    "  --json",
+    "",
+    "Options for host check:",
+    "  --host <id>               configured project host id; defaults to local host",
+    "  --mock-remote             use mocked remote facts instead of local command probes",
+    "  --mock-facts <json-file>  mocked remote facts for tests and dry runs",
     "  --json",
     "",
     "Options for coordination status:",
@@ -1551,6 +1572,9 @@ async function mainUnchecked(
   if (argv[0] === "diagnostics") {
     return handleDiagnosticsCommand(argv, dependencies);
   }
+  if (argv[0] === "host") {
+    return handleHostCommand(argv, dependencies);
+  }
   if (argv[0] === "coordination") {
     return handleCoordinationCommand(argv, dependencies);
   }
@@ -1581,7 +1605,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
   );
 }
 
@@ -2055,6 +2079,27 @@ async function handleDiagnosticsCommand(
   }
 
   throw new Error("diagnostics requires cli-version-skew");
+}
+
+async function handleHostCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  if (argv[1] === "check") {
+    const parsed = parseHostCheckCommand(argv);
+    const result = checkNexusHostCapabilities({
+      projectRoot: parsed.projectRoot,
+      hostId: parsed.hostId,
+      mode: parsed.mode,
+      mockFacts: parsed.mockFacts,
+      commandRunner: dependencies.commandRunner,
+      now: dependencies.now,
+    });
+    printHostCheckResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
+  }
+
+  throw new Error("host requires check");
 }
 
 async function handleCoordinationCommand(
@@ -4746,6 +4791,51 @@ function parseCoordinationRequestCommand(
   }
 
   return parsed as ParsedCoordinationRequestCommand;
+}
+
+function parseHostCheckCommand(argv: string[]): ParsedHostCheckCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("host check requires a project root");
+  }
+
+  const parsed: ParsedHostCheckCommand = {
+    projectRoot,
+    mode: "local",
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--mock-remote":
+        parsed.mode = "mock-remote";
+        break;
+      case "--mock-facts":
+        parsed.mode = "mock-remote";
+        parsed.mockFacts = JSON.parse(
+          fs.readFileSync(next(), "utf8").replace(/^\uFEFF/u, ""),
+        ) as NexusHostCheckMockFacts;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown host check option: ${arg}`);
+    }
+  }
+
+  return parsed;
 }
 
 function parseRemoteExecutionRequestCreateCommand(
@@ -7936,6 +8026,34 @@ function printRemoteExecutionRequestCreateResult(
   writeLine(stdout, `  Status: ${request.status}`);
   writeLine(stdout, `  Runner profile: ${request.runnerProfileId}`);
   writeLine(stdout, `  Command profile: ${request.commandProfileId}`);
+}
+
+function printHostCheckResult(
+  result: NexusHostCheckResult,
+  parsed: ParsedHostCheckCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus host check: ${result.status}.`);
+  writeLine(stdout, `  Host: ${result.target.hostId} (${result.target.mode})`);
+  writeLine(stdout, `  Platform: ${result.platform.tag}`);
+  writeLine(stdout, `  Shell: ${result.shellKind}`);
+  writeLine(
+    stdout,
+    `  Capabilities: ${result.configuredCapabilities.join(",") || "none"}`,
+  );
+  writeLine(stdout, `  MCP: ${result.mcp.status} ${result.mcp.serverNames.join(",") || "none"}`);
+  for (const check of result.commandChecks) {
+    writeLine(stdout, `  ${check.id}: ${check.status}`);
+  }
+  for (const action of result.nextActions) {
+    writeLine(stdout, `  Next: ${action}`);
+  }
 }
 
 function printRemoteExecutionResultRecordResult(
