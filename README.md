@@ -1,14 +1,39 @@
 # DevNexus
 
-DevNexus is a language-neutral project orchestration toolkit for
-agent-assisted software work. It keeps project structure, work tracking, agent
-launch policy, coordination records, verification facts, and publication
-handoffs in one predictable place.
+DevNexus helps you work with agents on real projects.
 
-Use DevNexus when a project has multiple components, multiple work trackers,
-or repeatable agent workflows. DevNexus supplies the infrastructure and
-records; the human or launched agent still chooses the work, supervises
-implementation, verifies changes, and decides what to publish.
+It creates a small directory for agent collaboration. That directory contains
+the files agents need to understand the work, the list of source folders or
+artifacts they may need, a task list, and the support configuration for tools
+such as Codex or Claude.
+
+Think of it like a Maven or Gradle project root, but for agent-assisted work
+instead of a single build. You open the DevNexus project root in your agent, and
+the project root points to the repositories, documents, or other folders you
+want to work on.
+
+DevNexus records structure and facts. A human or agent still chooses the work,
+edits code, reviews changes, verifies results, and decides what to publish.
+
+## Terms
+
+- A **DevNexus project** is the directory you open in Codex, Claude, or another
+  agent. It contains `dev-nexus.project.json`, `AGENTS.md`, generated agent
+  files, and `.dev-nexus/` support state.
+- A **component** is something the project works on, such as a Git repository,
+  paper, dataset, spreadsheet, or support folder. One DevNexus project can have
+  many components.
+- A **work item** is a task or issue owned by a component. Work items can live
+  in DevNexus' local tracker or in providers such as GitHub, GitLab, or Jira.
+- The **DevNexus home** is user-local state, normally `~/.dev-nexus`. Most
+  users do not need to choose or manage it.
+- A **provider** is an external tool or service DevNexus can reference, such as
+  GitHub, GitLab, Jira, Codex, or Claude.
+- **Agent files** are generated files such as `AGENTS.md`, skills, context, and
+  Model Context Protocol configuration. Model Context Protocol, or MCP, is how
+  agents can call DevNexus tools from a project session.
+- A **worktree** is an isolated Git checkout for a focused change. Agents use
+  worktrees so parallel chats do not edit the same checkout.
 
 ## Install
 
@@ -19,218 +44,135 @@ npm install -g @evref-bl/dev-nexus
 dev-nexus --help
 ```
 
-The online README on `main` can move ahead of the latest npm release. When an
-agent installs from npm, verify the installed command surface with
-`dev-nexus diagnostics cli-version-skew --json` before following newer
-source-branch examples. If the diagnostic reports missing documented commands,
-upgrade the npm package, install DevNexus from the source checkout, or use the
-docs that shipped with the installed package version.
+If an agent reads this README from GitHub while using an older npm package, ask
+it to check for command skew before following examples:
 
-For source development:
+```bash
+dev-nexus diagnostics cli-version-skew --json
+```
+
+## Quick Start
+
+Create one DevNexus project for the work you want agents to understand.
+
+```bash
+dev-nexus project setup "$HOME/dev-nexus/example-suite"
+```
+
+The setup command guides you through the first project. It uses `~/.dev-nexus`
+as the default home, asks for the project root, asks which components belong to
+the project, creates local work tracking by default, and generates agent files.
+
+After setup:
+
+```bash
+dev-nexus project status "$HOME/dev-nexus/example-suite"
+```
+
+Then open this directory in Codex, Claude, or your agent:
+
+```text
+$HOME/dev-nexus/example-suite
+```
+
+Do not open the component repository as the agent project when you want
+DevNexus support. Open the DevNexus project root. The component repositories
+are the things DevNexus points to.
+
+Ask the agent to verify the project is ready, inspect the components, and
+create or triage the first work item.
+
+## Example
+
+If you want one agent workspace for a benchmark repository, two supporting
+repositories, and a paper, create one DevNexus project with four components:
+
+```text
+DevNexus project: ~/dev-nexus/graphrag-research-suite
+
+Components:
+- benchmark-graphrag
+- json-java-moose
+- json-java-no-moose
+- iwst-paper
+```
+
+Use one `project setup` run for that shape. Do not create four DevNexus
+projects unless you truly want four separate agent workspaces.
+
+For a detailed version of this example, see
+[First project from existing components](docs/user/first-project-existing-components.md).
+
+## Agent And CI Setup
+
+Humans should usually start with the interactive command:
+
+```bash
+dev-nexus project setup <project-root>
+```
+
+Agents, CI jobs, and reproducible onboarding scripts can use answer files:
+
+```bash
+dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --json
+dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --yes
+```
+
+The first command previews local writes. The second applies them. Provider
+mutations, such as creating GitHub repositories or repairing collaborator
+access, stay behind separate hosting commands.
+
+## Common Next Steps
+
+Check that the project is ready:
+
+```bash
+dev-nexus project status <project-root>
+dev-nexus setup check <project-root> join-existing-project
+```
+
+Create a component-scoped work item:
+
+```bash
+dev-nexus work-item create <project-root> --component <component-id> --title "Implement focused task" --status ready
+dev-nexus work-item list <project-root> --component <component-id>
+```
+
+Prepare an isolated worktree for implementation:
+
+```bash
+dev-nexus worktree prepare <project-root> --component <component-id> --work-item <work-item-id>
+```
+
+Refresh generated agent configuration when project settings change:
+
+```bash
+dev-nexus project mcp refresh <project-root> --agent codex
+```
+
+## Documentation
+
+- [Getting started](docs/user/getting-started.md) gives the full first-project
+  path.
+- [Concepts](docs/user/concepts.md) explains the project model and vocabulary.
+- [First project from existing components](docs/user/first-project-existing-components.md)
+  shows how to coordinate several existing folders in one project.
+- [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
+  GitHub, GitLab, Jira, bot accounts, human accounts, and meta-repository
+  hosting.
+- [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, worktrees,
+  automation loops, result files, and coordination handoffs.
+- [Multi-tracker work tracking](docs/user/multi-tracker.md) covers local and
+  provider-backed trackers.
+- [Architecture notes](docs/dev/architecture.md) covers internal design.
+
+## Source Development
 
 ```bash
 npm install
 npm run check
 ```
 
-## Quick Start
-
-Start by choosing three different locations:
-
-- The **DevNexus home** is user-local registry and host setup state. It is not
-  the project you work in.
-- The **DevNexus project root** is the shared orchestration directory. Open
-  this directory as the Codex or Claude project/session.
-- **Component source roots** are the actual repositories or folders the project
-  coordinates. The default layout puts stable component checkouts under
-  `components/<component-id>` inside the project root.
-
-For a first DevNexus project, prefer the guided setup command. It accepts a
-small JSON answer file, previews local writes by default, and applies only when
-`--yes` is present:
-
-```bash
-dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --json
-dev-nexus project setup "$HOME/dev-nexus/example-suite" --answers ./dev-nexus.setup.json --yes
-dev-nexus project status "$HOME/dev-nexus/example-suite"
-```
-
-`project setup` defaults the DevNexus home to `DEV_NEXUS_HOME` or
-`~/.dev-nexus` and creates the local home registry when needed. It then collects
-the project root, component sources, primary component, agent targets, local
-tracker choice, hosting intent, auth-profile references, and publication
-posture. Provider mutations, such as creating a GitHub repository or repairing
-access, are left as explicit next-phase hosting actions.
-
-Use `project create` as a low-level local scaffold command. Use `project
-import` only when one existing source checkout should become the primary
-component of a new DevNexus project. Do not run `project import` once per
-repository if the goal is one DevNexus project with several components; use
-`project setup` with multiple component answers instead. The full example is
-in [Getting started](docs/user/getting-started.md#first-project-from-existing-components).
-
-To add components later without manual JSON editing, preview and apply a
-component answer file:
-
-```bash
-dev-nexus project component add "$HOME/dev-nexus/example-suite" --answers ./component-add.json --json
-dev-nexus project component add "$HOME/dev-nexus/example-suite" --answers ./component-add.json --yes
-```
-
-Setup and component-add previews warn about common topology mistakes, including
-container folders with nested repositories, non-Git folders, branch or remote
-drift, and source roots placed under generated `worktrees/`.
-
-Setup previews also include an auth inventory for referenced GitHub, GitLab,
-Jira, and generic Git profiles. The inventory reports whether a profile is
-needed now, later, or only for provider mutations, and it checks host-local
-credential handles such as provider CLIs or environment-variable names without
-recording raw secret values.
-
-When meta-project hosting intent is configured, setup previews include a
-hosting handoff with the exact `project hosting status`, `project hosting
-plan`, and `project hosting apply` commands. `project setup` never creates
-provider repositories, pushes branches, repairs collaborators, or accepts
-invitations.
-
-List registered projects:
-
-```bash
-dev-nexus project list --home "$HOME/.dev-nexus"
-```
-
-Inspect declared repository hosting before onboarding or publication:
-
-```bash
-dev-nexus project hosting status <project-root>
-dev-nexus project hosting plan <project-root>
-```
-
-Configure authority roles for humans, automation accounts, reviewers, runtime
-operators, and release operators with the
-[authority roles guide](docs/user/authority-roles.md).
-
-Configure local work tracking and create a work item:
-
-```bash
-dev-nexus project tracker configure <project-root> --provider local
-dev-nexus work-item create <project-root> --title "Implement focused task" --status ready
-dev-nexus work-item list <project-root>
-```
-
-Refresh agent Model Context Protocol (MCP) configuration:
-
-```bash
-dev-nexus project mcp refresh <project-root> --agent codex
-dev-nexus mcp-stdio
-```
-
-For Codex Desktop, also create or open a Codex project whose root is the same
-DevNexus project root. DevNexus writes project-local `.codex/config.toml`; it
-does not switch the desktop app to that project for you.
-
-Check automation readiness:
-
-```bash
-dev-nexus automation status <project-root>
-dev-nexus automation eligible-work <project-root> --json
-dev-nexus automation agent-profiles <project-root> --json
-dev-nexus automation heartbeat prepare <project-root> --json
-```
-
-## Core Concepts
-
-- A **project** is the shared DevNexus orchestration context. It is configured
-  by `dev-nexus.project.json` and stores project-level support records under
-  `.dev-nexus/`.
-- A **component** is a source or support unit in a project. Each component can
-  have its own source root, Git defaults, generated worktree root, work-item
-  service, verification hints, publication policy, and relationships.
-- A **work tracker** is a named provider binding configured for a component,
-  such as a local store, GitHub Issues, GitLab issues, Jira, or another
-  provider adapter. One enabled tracker is the component default for ordinary
-  work-item commands; other trackers can serve mirror, coordination, planning,
-  feedback, migration, or archive roles.
-- A **target** is the user-requested outcome for an automation loop. DevNexus
-  records target state and cycle facts, but it does not decide which work is
-  selected.
-- An **agent profile** describes launch infrastructure: executor, model or
-  variant, command template, safety posture, and intended use.
-- A **plugin** contributes additive capabilities such as projected skills, MCP
-  servers, setup obligations, dependency projections, worker context, or
-  cleanup guidance.
-
-## Common Workflows
-
-For mutating interactive chats, start from a shared checkout only long enough
-to inspect status and prepare or adopt an isolated component or project-meta
-worktree. Keep shared checkouts and stable component source roots read-mostly
-unless the chat explicitly owns integration or project-state mutation.
-
-Before editing a Git checkout, run a freshness preflight: inspect status,
-remotes, upstream, and ahead/behind state; fetch configured remotes when policy
-allows; fast-forward clean branches with an upstream.
-
-After direct integration or merge, run a cleanup pass: fetch/prune, confirm the
-work branch is an ancestor of the target branch, remove the disposable worktree,
-and delete local and remote review branches only after that ancestry check
-passes. Preserve dirty or ambiguous branches with a handoff instead.
-
-Prepare an isolated component worktree for parallel work:
-
-```bash
-dev-nexus worktree prepare <project-root> --component <component-id> --work-item <work-item-id>
-```
-
-Record coordination facts for other agents:
-
-```bash
-dev-nexus coordination status <project-root> --component <component-id> --work-item <work-item-id>
-dev-nexus coordination handoff <project-root> <work-item-id> --component <component-id> --status ready --worktree <path>
-dev-nexus coordination integrate <project-root> --component <component-id> --work-item <work-item-id>
-```
-
-Run an agent launch loop when the project is configured for automation:
-
-```bash
-dev-nexus automation run-once <project-root>
-dev-nexus automation schedule <project-root> --max-runs 1
-dev-nexus automation coordinator-loop <project-root> --max-runs 1
-```
-
-For chat-driven runs where final JSON is still needed, keep stdout machine
-readable and stream low-volume progress events to stderr:
-
-```bash
-dev-nexus automation coordinator-loop <project-root> --max-runs 1 --json --progress-jsonl
-```
-
-Use current-agent adoption when an already-running agent should proceed under
-the same result-file contract without spawning a child process:
-
-```bash
-dev-nexus automation current-agent adopt <project-root> --run-id current-1 --json
-dev-nexus automation current-agent record <project-root> --run-id current-1 --status completed --summary "Completed requested work."
-```
-
-## More Documentation
-
-- [Getting started](docs/user/getting-started.md) covers installation, project
-  layout, setup checks, portable paths, and tracker basics.
-- [Multi-tracker work tracking](docs/user/multi-tracker.md) covers tracker
-  bindings, default tracker behavior, link records, dry-run sync planning,
-  one-way sync limits, and local-to-shared-provider migration guidance.
-- [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, work-item
-  commands, worktree-first chat workflows, automation loops, result files, and
-  coordination handoffs.
-- [Architecture notes](docs/dev/architecture.md) covers project boundaries,
-  components, plugin capabilities, worker context, automation internals, and
-  source development.
-
-## Project Boundary
-
-DevNexus is infrastructure. It launches configured tools, exposes project
-context, prepares support files, and records reported facts. It does not choose
-implementation work, assign subagents, review code, or bypass provider safety
-policy. Those decisions belong to the human operator or the launched
-coordinator agent.
+DevNexus is infrastructure. It gives agents a shared operating context; it does
+not replace human judgment, project ownership, verification, or publication
+policy.
