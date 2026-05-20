@@ -336,6 +336,8 @@ describe("DevNexus MCP server", () => {
       "automation_status",
       "target_report",
       "coordination_status",
+      "target_cycle_list",
+      "target_cycle_record",
       "work_item_list",
     ]) {
       expect(toolsByName.get(toolName)?.inputSchema).toMatchObject({
@@ -352,7 +354,6 @@ describe("DevNexus MCP server", () => {
       "project_hosting_plan",
       "project_hosting_apply",
       "agent_profiles",
-      "target_cycle_list",
     ]) {
       expect(
         (toolsByName.get(toolName)?.inputSchema.properties as Record<string, unknown>)
@@ -2472,6 +2473,7 @@ describe("DevNexus MCP server", () => {
 
     expect(recorded).toMatchObject({
       ok: true,
+      detail: "summary",
       record: {
         id: "cycle-1",
         targetId: "dogfood",
@@ -2479,13 +2481,13 @@ describe("DevNexus MCP server", () => {
         status: "dispatched",
         finishedAt: null,
         eligibleWorkItemCount: 2,
-        workItems: [
+        workItemCount: 6,
+        workItemRefs: [
           {
             componentId: "primary",
             id: "local-1",
             cycleStatus: "selected",
             agentProfileId: "codex-coordinator",
-            notes: "Selected for the bounded batch.",
           },
           {
             componentId: "primary",
@@ -2493,33 +2495,11 @@ describe("DevNexus MCP server", () => {
             cycleStatus: "dispatched",
             agentProfileId: "codex-local",
           },
-          {
-            componentId: "addon",
-            id: "local-3",
-            cycleStatus: "in_progress",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "addon",
-            id: "local-4",
-            cycleStatus: "completed",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "tools",
-            id: "local-5",
-            cycleStatus: "blocked",
-            agentProfileId: "codex-local",
-          },
-          {
-            componentId: "tools",
-            id: "local-6",
-            cycleStatus: "skipped",
-            agentProfileId: "codex-local",
-          },
         ],
+        omittedWorkItemRefCount: 4,
       },
     });
+    expect(recorded.record.workItems).toBeUndefined();
     expect(listed.ledger).toMatchObject({
       version: 1,
       cycleCount: 1,
@@ -2554,13 +2534,8 @@ describe("DevNexus MCP server", () => {
               cycleStatus: "dispatched",
               agentProfileId: "codex-local",
             },
-            {
-              componentId: "addon",
-              id: "local-3",
-              cycleStatus: "in_progress",
-              agentProfileId: "codex-local",
-            },
           ],
+          omittedWorkItemRefCount: 4,
         },
       ],
     });

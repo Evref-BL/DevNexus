@@ -57,6 +57,13 @@ import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
+import {
+  summarizeAutomationStatus,
+  summarizeCoordinationStatus,
+  summarizeProjectStatus,
+  summarizeTargetCycleLedger,
+  summarizeTargetReport,
+} from "./nexusMcpServer.js";
 import type {
   NexusAuthorityComponentSummary,
   NexusAuthorityProjectSummary,
@@ -82,6 +89,7 @@ import type {
 } from "./nexusExternalIssueVisibility.js";
 import {
   appendNexusAutomationTargetCycleRecord,
+  nexusAutomationTargetCycleLedgerPath,
   readNexusAutomationTargetCycleLedger,
   type NexusAutomationTargetCycleRecordInput,
   type NexusAutomationTargetCycleStatus,
@@ -341,6 +349,8 @@ interface ProjectHostingApplyCliResult extends ProjectHostingStatusCliResult {
   apply: NexusProjectHostingApplyResult;
 }
 
+type CliOutputDetail = "summary" | "full";
+
 interface ParsedHomeInitCommand {
   homePath: string;
   projectsRoot?: string;
@@ -394,6 +404,7 @@ interface ParsedProjectStatusCommand {
   homePath?: string;
   project: string;
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedProjectHostingCommand {
@@ -643,6 +654,7 @@ interface ParsedAutomationStatusCommand {
   projectRoot: string;
   homePath?: string;
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedAutomationEligibleWorkCommand {
@@ -684,6 +696,7 @@ interface ParsedAutomationHeartbeatPrepareCommand {
 interface ParsedAutomationTargetCycleListCommand {
   projectRoot: string;
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedAutomationTargetCycleRecordCommand {
@@ -697,11 +710,13 @@ interface ParsedAutomationTargetCycleRecordCommand {
   blockers: string[];
   notes: string[];
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedAutomationTargetReportCommand {
   projectRoot: string;
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedCoordinationStatusCommand {
@@ -712,6 +727,7 @@ interface ParsedCoordinationStatusCommand {
   trackerRole?: string;
   currentPath?: string;
   json?: boolean;
+  detail?: CliOutputDetail;
 }
 
 interface ParsedCoordinationHandoffCommand {
@@ -3684,6 +3700,13 @@ function parseProjectListCommand(argv: string[]): ParsedProjectListCommand {
   return parsed;
 }
 
+function parseCliOutputDetail(value: string, option: string): CliOutputDetail {
+  if (value === "summary" || value === "full") {
+    return value;
+  }
+  throw new Error(`${option} must be summary or full`);
+}
+
 function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
   const [, , project, ...rest] = argv;
   if (!project || project.startsWith("--")) {
@@ -3708,6 +3731,12 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
         break;
       case "--json":
         parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       default:
         throw new Error(`Unknown project status option: ${arg}`);
@@ -4094,6 +4123,12 @@ function parseCoordinationStatusCommand(
         break;
       case "--json":
         parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       default:
         throw new Error(`Unknown coordination status option: ${arg}`);
@@ -5676,10 +5711,25 @@ function parseAutomationTargetCycleListCommand(
   }
 
   const parsed: ParsedAutomationTargetCycleListCommand = { projectRoot };
-  for (const arg of rest) {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
     switch (arg) {
       case "--json":
         parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       default:
         throw new Error(`Unknown automation target-cycle list option: ${arg}`);
@@ -5758,6 +5808,12 @@ function parseAutomationTargetCycleRecordCommand(
       case "--json":
         parsed.json = true;
         break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
+        break;
       default:
         throw new Error(`Unknown automation target-cycle record option: ${arg}`);
     }
@@ -5779,10 +5835,25 @@ function parseAutomationTargetReportCommand(
   }
 
   const parsed: ParsedAutomationTargetReportCommand = { projectRoot };
-  for (const arg of rest) {
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
     switch (arg) {
       case "--json":
         parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       default:
         throw new Error(`Unknown automation target-report option: ${arg}`);
@@ -5870,6 +5941,12 @@ function parseAutomationStatusCommand(
     switch (arg) {
       case "--json":
         parsed.json = true;
+        break;
+      case "--full":
+        parsed.detail = "full";
+        break;
+      case "--detail":
+        parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       case "--home":
         parsed.homePath = next();
@@ -6514,12 +6591,40 @@ function printProjectListResult(
   }
 }
 
+function cliOutputDetail(parsed: { detail?: CliOutputDetail }): CliOutputDetail {
+  return parsed.detail ?? "summary";
+}
+
+function summarizeProjectConfigForCli(projectConfig: NexusProjectConfig) {
+  return {
+    id: projectConfig.id,
+    name: projectConfig.name,
+    componentCount: projectConfig.components.length,
+  };
+}
+
+function summarizeTargetCycleLedgerForCli(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  ledger: ReturnType<typeof readNexusAutomationTargetCycleLedger>,
+) {
+  const ledgerPath = projectConfig.automation
+    ? nexusAutomationTargetCycleLedgerPath(projectRoot, projectConfig.automation)
+    : "(automation target cycle ledger not configured)";
+  return summarizeTargetCycleLedger(ledger, ledgerPath);
+}
+
 function printProjectStatusResult(
   project: NexusProjectStatusBase,
   parsed: ParsedProjectStatusCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, project };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    project: detail === "full" ? project : summarizeProjectStatus(project),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -6980,7 +7085,12 @@ function printCoordinationStatusResult(
   parsed: ParsedCoordinationStatusCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, status };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    status: detail === "full" ? status : summarizeCoordinationStatus(status),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -7680,7 +7790,23 @@ function printAutomationTargetCycleListResult(
   parsed: ParsedAutomationTargetCycleListCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    projectConfig:
+      detail === "full"
+        ? result.projectConfig
+        : summarizeProjectConfigForCli(result.projectConfig),
+    ledger:
+      detail === "full"
+        ? result.ledger
+        : summarizeTargetCycleLedgerForCli(
+            parsed.projectRoot,
+            result.projectConfig,
+            result.ledger,
+          ),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -7707,7 +7833,37 @@ function printAutomationTargetCycleRecordResult(
   parsed: ParsedAutomationTargetCycleRecordCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    projectConfig:
+      detail === "full"
+        ? result.projectConfig
+        : summarizeProjectConfigForCli(result.projectConfig),
+    record:
+      detail === "full"
+        ? result.record
+        : {
+            id: result.record.id,
+            status: result.record.status,
+            runId: result.record.runId ?? null,
+            targetId: result.record.targetId ?? null,
+            summary: result.record.summary ?? null,
+            eligibleWorkItemCount: result.record.eligibleWorkItemCount ?? null,
+            workItemCount: result.record.workItems?.length ?? 0,
+            blockerCount: result.record.blockers?.length ?? 0,
+            noteCount: result.record.notes?.length ?? 0,
+          },
+    ledger:
+      detail === "full"
+        ? result.ledger
+        : summarizeTargetCycleLedgerForCli(
+            parsed.projectRoot,
+            result.projectConfig,
+            result.ledger,
+          ),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -7725,7 +7881,12 @@ function printAutomationTargetReportResult(
   parsed: ParsedAutomationTargetReportCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, report: result };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    report: detail === "full" ? result : summarizeTargetReport(result),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
@@ -7965,7 +8126,12 @@ function printAutomationStatusResult(
   parsed: ParsedAutomationStatusCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
+  const detail = cliOutputDetail(parsed);
+  const payload = {
+    ok: true,
+    detail,
+    ...(detail === "full" ? result : summarizeAutomationStatus(result)),
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;

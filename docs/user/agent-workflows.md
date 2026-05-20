@@ -61,6 +61,10 @@ dev-nexus automation agent-profiles <project-root> --json
 dev-nexus automation target-report <project-root> --json
 ```
 
+These JSON commands are compact by default. Use `--full --json` only when you
+need raw project config, full ledgers, target-state markdown, or complete
+handoff details for diagnostics.
+
 Then record the work it selected:
 
 ```bash

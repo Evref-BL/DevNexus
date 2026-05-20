@@ -418,6 +418,7 @@ const tools: McpTool[] = [
       type: "object",
       properties: {
         homePath: { type: "string" },
+        detail: { type: "string", enum: ["summary", "full"], default: "summary" },
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
@@ -431,6 +432,7 @@ const tools: McpTool[] = [
       type: "object",
       properties: {
         homePath: { type: "string" },
+        detail: { type: "string", enum: ["summary", "full"], default: "summary" },
         project: { type: "string" },
         projectRoot: { type: "string" },
         cycleId: { type: "string" },
@@ -1399,19 +1401,27 @@ export async function callDevNexusMcpTool(
           }),
         });
       case "target_cycle_list":
-        return toolResult({
-          ok: true,
-          ...targetCycleLedgerFromArgs(args),
-        });
-      case "target_cycle_record":
+        {
+          const detail = mcpDetailFromArgs(args);
+          return toolResult({
+            ok: true,
+            detail,
+            ...targetCycleLedgerFromArgs(args, detail),
+          });
+        }
+      case "target_cycle_record": {
+        const detail = mcpDetailFromArgs(args);
         assertMcpMutationAllowed(args, context, {
           command: "target_cycle_record",
           mutationClass: "target_state",
         });
+        const result = appendTargetCycleFromArgs(args, context);
         return toolResult({
           ok: true,
-          ...appendTargetCycleFromArgs(args, context),
+          detail,
+          ...summarizeTargetCycleRecordResult(result, detail),
         });
+      }
       case "target_report": {
         const detail = mcpDetailFromArgs(args);
         const projectRoot = projectRootFromArgs(args);
@@ -2303,10 +2313,12 @@ function logicalWorkItemFromArgs(args: Record<string, unknown>): {
   };
 }
 
-function targetCycleLedgerFromArgs(args: Record<string, unknown>): {
+function targetCycleLedgerFromArgs(args: Record<string, unknown>, detail: McpDetail): {
   projectRoot: string;
   projectId: string;
-  ledger: ReturnType<typeof summarizeTargetCycleLedger>;
+  ledger:
+    | ReturnType<typeof summarizeTargetCycleLedger>
+    | ReturnType<typeof readNexusAutomationTargetCycleLedger>;
 } {
   const { projectRoot, projectConfig, automationConfig } =
     targetCycleProjectFromArgs(args);
@@ -2314,10 +2326,32 @@ function targetCycleLedgerFromArgs(args: Record<string, unknown>): {
   return {
     projectRoot,
     projectId: projectConfig.id,
-    ledger: summarizeTargetCycleLedger(
-      ledger,
-      nexusAutomationTargetCycleLedgerPath(projectRoot, automationConfig),
-    ),
+    ledger:
+      detail === "full"
+        ? ledger
+        : summarizeTargetCycleLedger(
+            ledger,
+            nexusAutomationTargetCycleLedgerPath(projectRoot, automationConfig),
+          ),
+  };
+}
+
+function summarizeTargetCycleRecordResult(
+  result: ReturnType<typeof appendTargetCycleFromArgs>,
+  detail: McpDetail,
+) {
+  if (detail === "full") {
+    return result;
+  }
+  const ledgerPath = nexusAutomationTargetCycleLedgerPath(
+    result.projectRoot,
+    targetCycleProjectFromArgs({ projectRoot: result.projectRoot }).automationConfig,
+  );
+  return {
+    projectRoot: result.projectRoot,
+    projectId: result.projectId,
+    record: summarizeTargetCycleRecord(result.record),
+    ledger: summarizeTargetCycleLedger(result.ledger, ledgerPath),
   };
 }
 
@@ -3335,6 +3369,8 @@ function parseToolCallParams(value: unknown): { name: string; arguments?: unknow
 }
 
 type McpDetail = "summary" | "full";
+const MCP_SUMMARY_ITEM_LIMIT = 2;
+const MCP_SUMMARY_TEXT_LIMIT = 360;
 
 function mcpDetailFromArgs(args: Record<string, unknown>): McpDetail {
   const detail = optionalString(args, "detail", "arguments") ?? "summary";
@@ -3344,7 +3380,28 @@ function mcpDetailFromArgs(args: Record<string, unknown>): McpDetail {
   throw new Error("arguments.detail must be summary or full");
 }
 
-function summarizeProjectStatus(project: NexusProjectStatusBase) {
+function summaryItems<T>(
+  values: readonly T[],
+  limit = MCP_SUMMARY_ITEM_LIMIT,
+): T[] {
+  return values.slice(0, limit);
+}
+
+function omittedCount(values: readonly unknown[], limit = MCP_SUMMARY_ITEM_LIMIT) {
+  return Math.max(0, values.length - limit);
+}
+
+function summaryText(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (value.length <= MCP_SUMMARY_TEXT_LIMIT) {
+    return value;
+  }
+  return `${value.slice(0, MCP_SUMMARY_TEXT_LIMIT - 3)}...`;
+}
+
+export function summarizeProjectStatus(project: NexusProjectStatusBase) {
   return {
     id: project.id,
     name: project.name,
@@ -3453,7 +3510,7 @@ function summarizeWorkTracking(value: { provider: string } | null): { provider: 
   return value ? { provider: value.provider } : null;
 }
 
-function summarizeAutomationStatus(status: NexusAutomationStatus) {
+export function summarizeAutomationStatus(status: NexusAutomationStatus) {
   return {
     projectRoot: status.projectRoot,
     sourceRoot: status.sourceRoot,
@@ -3463,9 +3520,18 @@ function summarizeAutomationStatus(status: NexusAutomationStatus) {
       componentCount: status.projectConfig.components.length,
     },
     componentCount: status.components.length,
-    components: status.components.map(summarizeProjectComponent),
+    components: summaryItems(status.components).map((component) => ({
+      id: component.id,
+      name: component.name,
+      role: component.role,
+      kind: component.kind,
+      sourceRoot: component.sourceRoot,
+      defaultTrackerId: component.defaultTrackerId,
+      workTrackerCount: component.workTrackers.length,
+    })),
+    omittedComponentCount: omittedCount(status.components),
     status: status.status,
-    summary: status.summary,
+    summary: summaryText(status.summary),
     lock: status.lock
       ? {
           status: status.lock.status,
@@ -3499,27 +3565,38 @@ function summarizeAutomationStatus(status: NexusAutomationStatus) {
         }
       : null,
     runnerProfileCount: status.runnerProfiles.length,
-    publication: status.publication.map(summarizePublicationStatus),
-    currentActors: status.currentActors.map((actor) => ({
+    publication: summarizePublicationStatuses(status.publication),
+    currentActorCount: status.currentActors.length,
+    currentActors: summaryItems(status.currentActors).map((actor) => ({
       componentId: actor.componentId,
       status: actor.status,
       profileId: actor.profileId,
       expectedActorId: actor.expectedActorId,
       expectedProvider: actor.expectedProvider,
-      warnings: actor.warnings,
+      warningCount: actor.warnings.length,
+      warnings: summaryItems(actor.warnings),
     })),
+    omittedCurrentActorCount: omittedCount(status.currentActors),
     authority: summarizeAuthorityProject(status.authority),
     selectorQuery: status.selectorQuery,
     candidateCount: status.candidateCount,
     eligibleWorkMode: status.eligibleWorkMode,
     eligibleWorkItemCount: status.eligibleWorkItems?.length ?? null,
     eligibleWorkItems:
-      status.eligibleWorkItems?.slice(0, 5).map(summarizeEligibleWorkItem) ??
-      null,
+      status.eligibleWorkItems
+        ? summaryItems(status.eligibleWorkItems).map(summarizeEligibleWorkItem)
+        : null,
+    omittedEligibleWorkItemCount: status.eligibleWorkItems
+      ? omittedCount(status.eligibleWorkItems)
+      : null,
     importCandidateWorkItemCount: status.importCandidateWorkItems?.length ?? null,
     importCandidateWorkItems:
-      status.importCandidateWorkItems?.slice(0, 5).map(summarizeEligibleWorkItem) ??
-      null,
+      status.importCandidateWorkItems
+        ? summaryItems(status.importCandidateWorkItems).map(summarizeEligibleWorkItem)
+        : null,
+    omittedImportCandidateWorkItemCount: status.importCandidateWorkItems
+      ? omittedCount(status.importCandidateWorkItems)
+      : null,
     eligibleWorkWarnings: status.eligibleWorkWarnings,
     eligibleWorkBlockers: status.eligibleWorkBlockers,
     externalIssueVisibility: summarizeExternalIssueVisibility(
@@ -3535,7 +3612,8 @@ function summarizeAutomationStatus(status: NexusAutomationStatus) {
         blockerCount: component.blockers?.length ?? 0,
         trackerResultCount: component.trackerResults?.length ?? 0,
         trackerResults:
-          component.trackerResults?.slice(0, 5).map((trackerResult) => ({
+          component.trackerResults
+            ? summaryItems(component.trackerResults).map((trackerResult) => ({
             trackerId: trackerResult.trackerId,
             provider: trackerResult.provider,
             selected: trackerResult.selected,
@@ -3543,14 +3621,24 @@ function summarizeAutomationStatus(status: NexusAutomationStatus) {
             importCandidateCount: trackerResult.importCandidateCount,
             warningCount: trackerResult.warnings.length,
             blockerCount: trackerResult.blockers.length,
-          })) ?? [],
-        workItems: component.workItems
-          .slice(0, 5)
-          .map(summarizeWorkItemReference),
+          }))
+            : [],
+        omittedTrackerResultCount: component.trackerResults
+          ? omittedCount(component.trackerResults)
+          : 0,
+        workItems: summaryItems(component.workItems).map(
+          summarizeWorkItemReference,
+        ),
+        omittedWorkItemCount: omittedCount(component.workItems),
         importCandidateWorkItems:
           component.importCandidateWorkItems
-            ?.slice(0, 5)
-            .map(summarizeEligibleWorkItem) ?? [],
+            ? summaryItems(component.importCandidateWorkItems).map(
+                summarizeEligibleWorkItem,
+              )
+            : [],
+        omittedImportCandidateWorkItemCount: component.importCandidateWorkItems
+          ? omittedCount(component.importCandidateWorkItems)
+          : 0,
       })) ?? null,
     selectedWorkItem: status.selectedWorkItem
       ? summarizeWorkItemReference(status.selectedWorkItem)
@@ -3558,7 +3646,16 @@ function summarizeAutomationStatus(status: NexusAutomationStatus) {
   };
 }
 
-function summarizeTargetReport(report: NexusAutomationTargetReport) {
+export function summarizeTargetReport(report: NexusAutomationTargetReport) {
+  const activeComponentProgress = report.componentProgress.filter(
+    (component) =>
+      component.workItemCount > 0 ||
+      component.activeBlockers.length > 0 ||
+      component.commitIds.length > 0 ||
+      component.verification.length > 0 ||
+      component.publicationDecisions.length > 0 ||
+      component.runs.length > 0,
+  );
   return {
     version: report.version,
     generatedAt: report.generatedAt,
@@ -3585,9 +3682,12 @@ function summarizeTargetReport(report: NexusAutomationTargetReport) {
           totalReferences: report.workItemSummary.totalReferences,
           uniqueReferenceCount:
             report.workItemSummary.uniqueReferences.length,
-          uniqueReferences: report.workItemSummary.uniqueReferences
-            .slice(0, 5)
-            .map(summarizeTargetWorkItemReference),
+          uniqueReferences: summaryItems(
+            report.workItemSummary.uniqueReferences,
+          ).map(summarizeTargetWorkItemReference),
+          omittedUniqueReferenceCount: omittedCount(
+            report.workItemSummary.uniqueReferences,
+          ),
           byComponent: report.workItemSummary.byComponent,
           byCycleStatus: report.workItemSummary.byCycleStatus,
           progress: countTargetWorkItemProgress(report.workItemSummary.progress),
@@ -3597,7 +3697,9 @@ function summarizeTargetReport(report: NexusAutomationTargetReport) {
       ? {
           runCount: report.executionSummary.runCount,
           commitCount: report.executionSummary.commitIds.length,
-          commitIds: report.executionSummary.commitIds.slice(-5),
+          commitIds: report.executionSummary.commitIds.slice(
+            -MCP_SUMMARY_ITEM_LIMIT,
+          ),
           verificationCount: report.executionSummary.verification.length,
           failedVerificationCount: report.executionSummary.verification.filter(
             (record) => record.status === "failed",
@@ -3605,7 +3707,7 @@ function summarizeTargetReport(report: NexusAutomationTargetReport) {
           publicationDecisionCount:
             report.executionSummary.publicationDecisions.length,
           runSummaries: report.executionSummary.runs
-            .slice(-5)
+            .slice(-MCP_SUMMARY_ITEM_LIMIT)
             .map(summarizeTargetExecutionRun),
         }
       : null,
@@ -3613,18 +3715,18 @@ function summarizeTargetReport(report: NexusAutomationTargetReport) {
       report.externalIssueVisibility,
     ),
     authority: summarizeAuthorityProject(report.authority),
-    componentProgress: report.componentProgress.map((component) => ({
+    componentProgressCount: report.componentProgress.length,
+    componentProgress: summaryItems(activeComponentProgress).map((component) => ({
       componentId: component.componentId,
       componentName: component.componentName,
       role: component.role,
-      sourceRoot: component.sourceRoot,
       workTrackingProvider: component.workTrackingProvider,
       workItemCount: component.workItemCount,
       workItems: countTargetWorkItemProgress(component.workItems),
       activeBlockerCount: component.activeBlockers.length,
-      activeBlockers: component.activeBlockers.slice(0, 3),
+      activeBlockers: summaryItems(component.activeBlockers),
       commitCount: component.commitIds.length,
-      commitIds: component.commitIds.slice(-5),
+      commitIds: component.commitIds.slice(-MCP_SUMMARY_ITEM_LIMIT),
       verificationCount: component.verification.length,
       failedVerificationCount: component.verification.filter(
         (record) => record.status === "failed",
@@ -3638,19 +3740,39 @@ function summarizeTargetReport(report: NexusAutomationTargetReport) {
             integrationPreference: component.publication.integrationPreference,
           }
         : null,
-      authority: summarizeAuthorityComponent(component.authority),
+      authority: component.authority
+        ? {
+            actorStatus: component.authority.actor.status,
+            provider: component.authority.actor.provider,
+            handle: component.authority.actor.handle,
+            blockedActionCount: component.authority.blockedActions.length,
+            blockedDecisionCount: component.authority.decisions.filter(
+              (decision) => !decision.allowed,
+            ).length,
+            warningCount: component.authority.warnings.length,
+        }
+        : null,
     })),
+    omittedComponentProgressCount:
+      omittedCount(activeComponentProgress) +
+      (report.componentProgress.length - activeComponentProgress.length),
     relaunchDecision: report.relaunchDecision,
     activeBlockerCount: report.activeBlockers.length,
-    activeBlockers: report.activeBlockers.slice(0, 10),
+    activeBlockers: summaryItems(report.activeBlockers),
+    omittedActiveBlockerCount: omittedCount(report.activeBlockers),
     blockerCount: report.blockers.length,
-    blockers: report.blockers.slice(0, 10),
+    blockers: summaryItems(report.blockers),
+    omittedBlockerCount: omittedCount(report.blockers),
     noteCount: report.notes.length,
-    notes: report.notes.slice(0, 10),
+    notes: summaryItems(report.notes).map(summaryText),
+    omittedNoteCount: omittedCount(report.notes),
+    ...(report.versionPlanning
+      ? { versionPlanning: summarizeVersionPlanning(report.versionPlanning) }
+      : {}),
   };
 }
 
-function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
+export function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
   return {
     project: status.project,
     component: {
@@ -3688,7 +3810,7 @@ function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
       activeCount: status.leases.activeCount,
       staleCount: status.leases.staleCount,
       byStatus: countBy(status.leases.records, (record) => record.effectiveStatus),
-      records: status.leases.records.slice(0, 8).map((record) => ({
+      records: summaryItems(status.leases.records).map((record) => ({
         id: record.id,
         status: record.status,
         effectiveStatus: record.effectiveStatus,
@@ -3699,7 +3821,7 @@ function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
         hostId: record.hostId,
         agentId: record.agentId,
         componentId: record.scope.componentId ?? null,
-        worktree: record.worktree,
+        worktree: record.worktree.relativePath,
         dirty: record.dirty,
         pushed: record.pushed,
         ahead: record.git.ahead,
@@ -3709,7 +3831,9 @@ function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
         noteCount: record.notes.length,
         writeScopeCount: record.writeScope.length,
       })),
-      warnings: status.leases.warnings,
+      omittedRecordCount: omittedCount(status.leases.records),
+      warningCount: status.leases.warnings.length,
+      warnings: summaryItems(status.leases.warnings),
       blocking: status.leases.blocking,
     },
     handoffs: {
@@ -3722,11 +3846,10 @@ function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
         .length,
       staleCount: status.handoffs.records.filter((record) => record.stale)
         .length,
-      records: status.handoffs.records.slice(0, 8).map((record) => ({
+      records: summaryItems(status.handoffs.records).map((record) => ({
         workItemId: record.workItemId,
         status: record.status,
         branch: record.branch,
-        repositoryPath: record.repositoryPath,
         upstream: record.upstream,
         baseRef: record.baseRef,
         headCommit: record.headCommit,
@@ -3741,13 +3864,16 @@ function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
         hasVerificationSummary: Boolean(record.verificationSummary),
         integrationPreference: record.integrationPreference,
       })),
+      omittedRecordCount: omittedCount(status.handoffs.records),
       diagnosticCount: status.handoffs.diagnostics.length,
-      diagnostics: status.handoffs.diagnostics.slice(0, 5),
-      warnings: status.handoffs.warnings,
+      diagnostics: summaryItems(status.handoffs.diagnostics),
+      warningCount: status.handoffs.warnings.length,
+      warnings: summaryItems(status.handoffs.warnings),
     },
     nextAction: status.nextAction,
     blocking: status.blocking,
-    warnings: status.warnings,
+    warningCount: status.warnings.length,
+    warnings: summaryItems(status.warnings),
   };
 }
 
@@ -3778,7 +3904,7 @@ function summarizeWorkItem(item: WorkItem): Omit<WorkItem, "description"> & {
 function summarizeWorkItemReference(item: WorkItem) {
   return {
     id: item.id,
-    title: item.title,
+    title: summaryText(item.title),
     status: item.status,
     provider: item.provider,
     webUrl: item.webUrl ?? null,
@@ -3809,7 +3935,7 @@ function summarizeTrackerRef(ref: NonNullable<WorkItem["trackerRef"]> | null | u
     : null;
 }
 
-function summarizeTargetCycleLedger(
+export function summarizeTargetCycleLedger(
   ledger: NexusAutomationTargetCycleLedger,
   ledgerPath: string,
 ): {
@@ -3837,6 +3963,7 @@ function summarizeTargetCycleLedger(
       cycleStatus: string | null;
       agentProfileId: string | null;
     }>;
+    omittedWorkItemRefCount: number;
   }>;
 } {
   return {
@@ -3856,19 +3983,20 @@ function summarizeTargetCycleRecord(record: NexusAutomationTargetCycleRecord) {
     finishedAt: record.finishedAt,
     runId: record.runId,
     targetId: record.targetId,
-    summary: record.summary,
+    summary: summaryText(record.summary),
     eligibleWorkItemCount: record.eligibleWorkItemCount,
     workItemCount: record.workItems.length,
     workItemStatusCounts: countTargetCycleWorkItemStatuses(record),
     blockerCount: record.blockers.length,
     noteCount: record.notes.length,
     nextCycleNotBefore: record.nextCycleNotBefore,
-    workItemRefs: record.workItems.slice(0, 3).map((item) => ({
+    workItemRefs: summaryItems(record.workItems).map((item) => ({
       componentId: item.componentId,
       id: item.id,
       cycleStatus: item.cycleStatus,
       agentProfileId: item.agentProfileId,
     })),
+    omittedWorkItemRefCount: omittedCount(record.workItems),
   };
 }
 
@@ -3906,7 +4034,6 @@ function summarizeTargetCycleSummary(
 ) {
   return summary
     ? {
-        ledgerPath: summary.ledgerPath,
         cycleCount: summary.cycleCount,
         activeCycleCount: summary.activeCycleCount,
         completedCycleCount: summary.completedCycleCount,
@@ -3914,7 +4041,20 @@ function summarizeTargetCycleSummary(
         failedCycleCount: summary.failedCycleCount,
         skippedCycleCount: summary.skippedCycleCount,
         lastCycle: summary.lastCycle
-          ? summarizeTargetCycleRecord(summary.lastCycle)
+          ? {
+              id: summary.lastCycle.id,
+              status: summary.lastCycle.status,
+              startedAt: summary.lastCycle.startedAt,
+              finishedAt: summary.lastCycle.finishedAt,
+              runId: summary.lastCycle.runId,
+              targetId: summary.lastCycle.targetId,
+              summary: summaryText(summary.lastCycle.summary),
+              eligibleWorkItemCount: summary.lastCycle.eligibleWorkItemCount,
+              workItemCount: summary.lastCycle.workItems.length,
+              blockerCount: summary.lastCycle.blockers.length,
+              noteCount: summary.lastCycle.notes.length,
+              nextCycleNotBefore: summary.lastCycle.nextCycleNotBefore,
+            }
           : null,
       }
     : null;
@@ -3948,14 +4088,23 @@ function summarizeAutomationRun(
     workItemTitle: run.workItemTitle,
     branchName: run.branchName,
     baseRef: run.baseRef,
-    commitIds: run.commitIds,
-    summary: run.summary,
+    commitCount: run.commitIds.length,
+    commitIds: run.commitIds.slice(-MCP_SUMMARY_ITEM_LIMIT),
+    summary: summaryText(run.summary),
     verificationCount: run.verification.length,
     failedVerificationCount: run.verification.filter(
       (record) => record.status === "failed",
     ).length,
-    publicationDecision: run.publicationDecision,
-    error: run.error,
+    publicationDecision: run.publicationDecision
+      ? {
+          type: run.publicationDecision.type,
+          remote: run.publicationDecision.remote,
+          targetBranch: run.publicationDecision.targetBranch,
+          prUrl: run.publicationDecision.prUrl,
+          reason: summaryText(run.publicationDecision.reason),
+        }
+      : null,
+    error: summaryText(run.error),
     nextRunNotBefore: run.nextRunNotBefore,
   };
 }
@@ -3967,10 +4116,11 @@ function summarizePreflight(preflight: NexusAutomationStatus["preflight"]) {
     failedCount: preflight.filter((check) => check.status === "failed").length,
     checks: preflight
       .filter((check) => check.status !== "passed")
+      .slice(0, MCP_SUMMARY_ITEM_LIMIT)
       .map((check) => ({
         name: check.name,
         status: check.status,
-        message: check.message,
+        message: summaryText(check.message),
       })),
   };
 }
@@ -4020,6 +4170,35 @@ function summarizePublicationStatus(
   };
 }
 
+function summarizePublicationStatuses(
+  publications: NexusAutomationStatus["publication"],
+) {
+  return {
+    componentCount: publications.length,
+    blockedCount: publications.filter((publication) => publication.blocking)
+      .length,
+    warningCount: publications.reduce(
+      (count, publication) => count + publication.warnings.length,
+      0,
+    ),
+    actorProblemCount: publications.filter(
+      (publication) => publication.actor.status !== "matched",
+    ).length,
+    components: summaryItems(publications).map((publication) => ({
+      componentId: publication.componentId,
+      strategy: publication.policy.strategy,
+      remote: publication.policy.remote,
+      targetBranch: publication.policy.targetBranch,
+      actorStatus: publication.actor.status,
+      authorityStatus: publication.authority?.status ?? null,
+      blocking: publication.blocking,
+      warningCount: publication.warnings.length,
+      warnings: summaryItems(publication.warnings),
+    })),
+    omittedComponentCount: omittedCount(publications),
+  };
+}
+
 function summarizeEligibleWorkItem(
   item: NonNullable<NexusAutomationStatus["eligibleWorkItems"]>[number],
 ) {
@@ -4040,7 +4219,7 @@ function summarizeEligibleWorkItem(
         }
       : null,
     warningCount: item.warnings.length,
-    warnings: item.warnings.slice(0, 3),
+    warnings: summaryItems(item.warnings),
     selectable: item.selectable,
     importOnly: item.importOnly,
   };
@@ -4064,7 +4243,7 @@ function summarizeExternalIssueVisibility(value: unknown) {
     importOnlyWorkItemCount: record.importOnlyWorkItemCount,
     providerAccessWarningCount: record.providerAccessWarningCount,
     providerAccessBlockerCount: record.providerAccessBlockerCount,
-    components: components.map((componentValue) => {
+    components: summaryItems(components).map((componentValue) => {
       const component = componentValue as Record<string, unknown>;
       const providerAccessBlockers = Array.isArray(
         component.providerAccessBlockers,
@@ -4083,20 +4262,45 @@ function summarizeExternalIssueVisibility(value: unknown) {
         ...(providerAccessBlockers.length > 0 ? { providerAccessBlockers } : {}),
       };
     }),
+    omittedComponentCount: omittedCount(components),
   };
 }
 
 function summarizeAuthorityProject(
   authority: NexusAutomationStatus["authority"] | null,
 ) {
+  if (!authority) {
+    return null;
+  }
+  const blockedDecisionCount = authority.components.reduce(
+    (count, component) =>
+      count + component.decisions.filter((decision) => !decision.allowed).length,
+    0,
+  );
+  const blockedActionCount = authority.components.reduce(
+    (count, component) => count + component.blockedActions.length,
+    0,
+  );
+  const componentsWithProblems = authority.components.filter(
+    (component) =>
+      component.actor.status !== "matched" ||
+      component.blockedActions.length > 0 ||
+      component.warnings.length > 0,
+  );
   return authority
     ? {
         version: authority.version,
         projectId: authority.projectId,
         componentCount: authority.components.length,
-        components: authority.components.map(summarizeAuthorityComponent),
+        blockedActionCount,
+        blockedDecisionCount,
+        problemComponentCount: componentsWithProblems.length,
+        problemComponents: summaryItems(componentsWithProblems).map(
+          summarizeAuthorityComponent,
+        ),
+        omittedProblemComponentCount: omittedCount(componentsWithProblems),
         warningCount: authority.warnings.length,
-        warnings: authority.warnings.slice(0, 5),
+        warnings: summaryItems(authority.warnings),
       }
     : null;
 }
@@ -4106,7 +4310,6 @@ function summarizeAuthorityComponent(
 ) {
   return component
     ? {
-        version: component.version,
         componentId: component.componentId,
         componentName: component.componentName,
         actor: {
@@ -4115,26 +4318,15 @@ function summarizeAuthorityComponent(
           provider: component.actor.provider,
           handle: component.actor.handle,
         },
-        authProfile: component.authProfile
-          ? {
-              id: component.authProfile.id,
-              provider: component.authProfile.provider,
-              kind: component.authProfile.kind,
-            }
-          : null,
-        roles: component.roles,
-        roleBindingCount: component.roleBindings.length,
-        keyAllowedActionCount: component.keyAllowedActions.length,
         blockedActionCount: component.blockedActions.length,
-        waitingActionCount: component.waitingActions.length,
-        fallbackActionCount: component.fallbackActions.length,
-        blockedActions: component.blockedActions.slice(0, 5),
+        blockedActions: summaryItems(component.blockedActions),
+        omittedBlockedActionCount: omittedCount(component.blockedActions),
         decisionCount: component.decisions.length,
         blockedDecisionCount: component.decisions.filter(
           (decision) => !decision.allowed,
         ).length,
         warningCount: component.warnings.length,
-        warnings: component.warnings.slice(0, 5),
+        warnings: summaryItems(component.warnings),
       }
     : null;
 }
@@ -4149,7 +4341,7 @@ function summarizeTargetWorkItemReference(
     trackerId: item.trackerId,
     trackerProvider: item.trackerProvider,
     id: item.id,
-    title: item.title,
+    title: summaryText(item.title),
     status: item.status,
     latestCycleStatus: item.latestCycleStatus,
     latestCycleId: item.latestCycleId,
@@ -4166,10 +4358,39 @@ function summarizeTargetExecutionRun(
     componentId: run.componentId,
     status: run.status,
     workItemId: run.workItemId,
-    workItemTitle: run.workItemTitle,
-    commitIds: run.commitIds,
-    summary: run.summary,
-    error: run.error,
+    workItemTitle: summaryText(run.workItemTitle),
+    commitCount: run.commitIds.length,
+    commitIds: run.commitIds.slice(-MCP_SUMMARY_ITEM_LIMIT),
+    summary: summaryText(run.summary),
+    error: summaryText(run.error),
+  };
+}
+
+function summarizeVersionPlanning(
+  versionPlanning: NonNullable<NexusAutomationTargetReport["versionPlanning"]>,
+) {
+  return {
+    versionCount: versionPlanning.versionCount,
+    shownVersionCount: versionPlanning.shownVersionCount,
+    omittedVersionCount: versionPlanning.omittedVersionCount,
+    versions: summaryItems(versionPlanning.versions).map((version) => ({
+      id: version.id,
+      targetBranch: version.targetBranch,
+      owningComponents: version.owningComponents,
+      scopeCounts: version.scopeCounts,
+      readiness: version.readiness,
+      blockerCount: version.blockers.length,
+      blockers: summaryItems(version.blockers),
+      gateWarningCount: version.gateWarnings.length,
+      gateWarnings: summaryItems(version.gateWarnings).map((warning) => ({
+        kind: warning.kind,
+        required: warning.required,
+        status: warning.status,
+        message: summaryText(warning.message),
+      })),
+      warningCount: version.warnings.length,
+      warnings: summaryItems(version.warnings),
+    })),
   };
 }
 
@@ -4184,15 +4405,18 @@ function countTargetWorkItemProgress(
     failedWorkCount: progress.failedWork.length,
     skippedWorkCount: progress.skippedWork.length,
     staleInProgressWorkCount: progress.staleInProgressWork.length,
-    readyEligibleWork: progress.readyEligibleWork
-      .slice(0, 5)
-      .map(summarizeTargetWorkItemReference),
-    selectedWork: progress.selectedWork
-      .slice(0, 5)
-      .map(summarizeTargetWorkItemReference),
-    blockedHitlWork: progress.blockedHitlWork
-      .slice(0, 5)
-      .map(summarizeTargetWorkItemReference),
+    readyEligibleWork: summaryItems(progress.readyEligibleWork).map(
+      summarizeTargetWorkItemReference,
+    ),
+    omittedReadyEligibleWorkCount: omittedCount(progress.readyEligibleWork),
+    selectedWork: summaryItems(progress.selectedWork).map(
+      summarizeTargetWorkItemReference,
+    ),
+    omittedSelectedWorkCount: omittedCount(progress.selectedWork),
+    blockedHitlWork: summaryItems(progress.blockedHitlWork).map(
+      summarizeTargetWorkItemReference,
+    ),
+    omittedBlockedHitlWorkCount: omittedCount(progress.blockedHitlWork),
   };
 }
 
