@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 374,
-  "updatedAt": "2026-05-20T02:26:37.762Z",
+  "nextCommentNumber": 377,
+  "updatedAt": "2026-05-20T03:32:46.582Z",
   "items": [
     {
       "id": "local-1",
@@ -4285,7 +4285,7 @@
       "id": "local-166",
       "title": "Add CI failure intake and coordinator wakeup policy",
       "description": "Type: implementation planning slice\nReadiness: autonomous agent-ready after green-main config migration.\nSource: 2026-05-19 green-main discussion. The desired model is branch or PR CI first, then merge only when green; CI failures should create bounded recovery work rather than leaving main red or silently polling.\n\nGoal: add a DevNexus CI failure intake design and first implementation path that can turn GitHub Actions failures into deduplicated work items and optional coordinator wakeups.\n\nAcceptance criteria:\n- Model allowed repositories, branches, workflows, events, and check names for CI failure intake without granting broad provider write authority.\n- Support at least a dry-run/manual replay input for a GitHub Actions failure payload or run id; webhook and polling rollout can be selected by policy.\n- Create or update one deduplicated work item per failing head SHA/workflow/job with run URL, branch, PR when known, failure summary, and current owner/status.\n- Apply backoff and dedupe so repeated failures do not spam work items or wakeups.\n- Wake the DevNexus coordinator only when policy allows it and the work item is eligible; otherwise leave a clear tracker item for manual scheduling.\n- Keep branch/PR CI checking explicit and publication-scoped; do not introduce unsolicited global CI polling during unrelated agent work.\n- Tests use mocked GitHub/provider data; no live webhooks or provider writes in the first implementation slice.\n\nBoundaries:\n- Do not automatically merge to main.\n- Do not require a permanent develop branch.\n- Do not mutate GitHub branch protection.\n- Do not run agents on arbitrary external repositories.\n\nVerification:\n- Focused unit tests for dedupe keys, allowed-scope filtering, failure-to-work-item mapping, backoff, and wakeup decision.\n- A dry-run CLI or report can show what would be created from a sample failed run.\n- npm run check when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4298,8 +4298,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T20:09:54.077Z",
-      "updatedAt": "2026-05-19T20:10:10.371Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T03:32:46.582Z",
+      "closedAt": "2026-05-20T03:32:36.505Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -8761,7 +8761,41 @@
         }
       }
     ],
-    "local-166": [],
+    "local-166": [
+      {
+        "id": "local-comment-374",
+        "body": "Started heartbeat implementation for CI failure intake and coordinator wakeup policy. Source work is isolated in codex/dev-nexus/local-166-ci-failure-intake. Scope: config/model, dry-run/manual replay planning path, dedupe/backoff, wakeup decision, focused unit tests, and no live provider writes or unsolicited polling.",
+        "author": null,
+        "createdAt": "2026-05-20T03:19:59.777Z",
+        "updatedAt": "2026-05-20T03:19:59.777Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-374"
+        }
+      },
+      {
+        "id": "local-comment-375",
+        "body": "Completed through DevNexus PR #20, merged to main as 8a9896a. Added a pure CI failure intake planner and dry-run CLI `dev-nexus ci-failure-intake plan ...`; no live provider writes, webhooks, or polling. Verification passed: focused CI intake suite, build, CLI suite, full npm run check before and after merge, and PR #20 Node 24 checks on Ubuntu, Windows, and macOS.",
+        "author": null,
+        "createdAt": "2026-05-20T03:32:37.040Z",
+        "updatedAt": "2026-05-20T03:32:37.040Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-375"
+        }
+      },
+      {
+        "id": "local-comment-376",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus-dogfood/local-166-project-state\nHead: 0dc78d6239cd3384486fc282f03738a9425769f9\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-20T03:32:46.571Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-166-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-166\",\n  \"logicalItemId\": \"local-166\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-166\",\n    \"itemNumber\": 166,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-166\",\n      \"itemNumber\": 166\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-166\",\n    \"itemNumber\": 166,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-166\",\n      \"itemNumber\": 166\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-166\",\n      \"itemNumber\": 166,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-166\",\n        \"itemNumber\": 166\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-166-project-state\",\n  \"branch\": \"codex/dev-nexus-dogfood/local-166-project-state\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"0dc78d6239cd3384486fc282f03738a9425769f9\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusCiFailureIntake.ts\",\n    \"src/nexusCiFailureIntake.test.ts\",\n    \"src/cli.ts\",\n    \"src/index.ts\"\n  ],\n  \"decisions\": [\n    \"Implemented the first CI failure intake slice as a pure planner plus dry-run/manual replay CLI path, without live provider calls, webhooks, polling, or provider writes.\",\n    \"Failure intake scope is policy-gated by repository, branch, workflow, event, and check/job names; dedupe/backoff prevents repeat wakeups.\",\n    \"Coordinator wakeup is reported only when enabled and the planned work item satisfies the configured selector.\"\n  ],\n  \"verificationSummary\": \"Passed npm test -- src/nexusCiFailureIntake.test.ts; npm run build; npm test -- src/nexusCiFailureIntake.test.ts src/cli.test.ts; npm run check in the source worktree; all PR #20 required Node 24 checks; and post-merge npm run check in C:\\\\dev\\\\code\\\\sources\\\\dev-nexus.\",\n  \"integrationPreference\": \"Merged to DevNexus main through PR #20 as 8a9896a; dogfood metadata closeout is being published from the project-meta worktree.\",\n  \"note\": \"Source branch is merged and can be cleaned after dogfood metadata is published.\",\n  \"leaseId\": \"lease-b67f1293470b00bb\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-20T03:32:46.582Z",
+        "updatedAt": "2026-05-20T03:32:46.582Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-376"
+        }
+      }
+    ],
     "local-167": [
       {
         "id": "local-comment-355",

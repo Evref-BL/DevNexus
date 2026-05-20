@@ -1,7 +1,172 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T02:27:10.000Z",
+  "updatedAt": "2026-05-20T03:34:05.230Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b67f1293470b00bb",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-166",
+      "branchName": "codex/dev-nexus-dogfood/local-166-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_root",
+        "base": "projectRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "."
+      },
+      "writeScope": [
+        "src/nexusCiFailureIntake.ts",
+        "src/nexusCiFailureIntake.test.ts",
+        "src/cli.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T03:32:46.571Z",
+      "lastSeenAt": "2026-05-20T03:34:05.230Z",
+      "updatedAt": "2026-05-20T03:34:05.230Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "0dc78d6239cd3384486fc282f03738a9425769f9",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_root",
+          "base": "projectRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "."
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged handoff for local-166 source work; see completion comment and project-meta lease for durable closeout.",
+        "Verification: focused suite, build, CLI suite, full npm run check, PR #20 checks, and post-merge npm run check passed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3f6a839b361f0096",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-166-project-state",
+      "branchName": "codex/dev-nexus-dogfood/local-166-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-166-project-state"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/worktree-leases.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T03:30:16.347Z",
+      "lastSeenAt": "2026-05-20T03:34:05.230Z",
+      "updatedAt": "2026-05-20T03:34:05.230Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "0dc78d6239cd3384486fc282f03738a9425769f9",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-166-project-state"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project metadata records local-166 completion, target-state closeout, and merged source lease details.",
+        "Publication path: bot PR to dogfood main after metadata validation; source was already merged through DevNexus PR #20."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b843cdf03298e0b7",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-166",
+      "branchName": "codex/dev-nexus/local-166-ci-failure-intake",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-166-ci-failure-intake"
+      },
+      "writeScope": [
+        "src/nexusCiFailureIntake.ts",
+        "src/nexusCiFailureIntake.test.ts",
+        "src/index.ts",
+        "src/cli.ts",
+        "src/cli.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T03:19:36.933Z",
+      "lastSeenAt": "2026-05-20T03:34:05.230Z",
+      "updatedAt": "2026-05-20T03:34:05.230Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "b4d1e83edbcb5e0ad884f1741a715d8294460deb",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-166-ci-failure-intake"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "DevNexus PR #20 merged to main as 8a9896a after all required Node 24 checks passed.",
+        "Source commit b4d1e83 added the pure CI failure intake planner, dry-run CLI, exports, and mocked coverage.",
+        "Verification passed: focused CI intake suite, build, CLI suite, full npm run check before and after merge, and post-merge shared source check.",
+        "No live provider writes, webhook receiver, global polling, branch protection mutation, tags, releases, or package publishing were introduced."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
