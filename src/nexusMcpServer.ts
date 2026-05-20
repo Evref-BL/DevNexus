@@ -1624,6 +1624,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "coordination_handoff",
           mutationClass: "coordination_record",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: optionalString(args, "componentId", "arguments"),
         });
         return toolResult({
@@ -1679,6 +1680,7 @@ export async function callDevNexusMcpTool(
         assertMcpMutationAllowed(args, context, {
           command: "coordination_request",
           mutationClass: "coordination_record",
+          targetPath: optionalString(args, "currentPath", "arguments"),
           componentId: optionalString(args, "componentId", "arguments"),
         });
         return toolResult({
