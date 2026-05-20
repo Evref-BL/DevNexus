@@ -76,7 +76,7 @@ describe("Codex app-server MCP relay", () => {
                 tools: [
                   {
                     name: "project_status",
-                    description: "Read project state",
+                    description: "Read workspace state",
                   },
                 ],
               },
@@ -101,7 +101,7 @@ describe("Codex app-server MCP relay", () => {
         tools: [
           {
             name: "project_status",
-            description: "Read project state",
+            description: "Read workspace state",
           },
         ],
         raw: {
@@ -110,7 +110,7 @@ describe("Codex app-server MCP relay", () => {
           tools: [
             {
               name: "project_status",
-              description: "Read project state",
+              description: "Read workspace state",
             },
           ],
         },

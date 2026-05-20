@@ -115,7 +115,7 @@ afterEach(() => {
 });
 
 describe("nexus automation heartbeat preparation", () => {
-  it("renders a Codex heartbeat recipe from DevNexus project metadata", () => {
+  it("renders a Codex heartbeat recipe from DevNexus workspace metadata", () => {
     const projectRoot = makeTempDir("dev-nexus-heartbeat-project-");
     saveProjectConfig(projectRoot, projectConfig());
 
@@ -202,12 +202,12 @@ describe("nexus automation heartbeat preparation", () => {
       maxConcurrentSubagents: null,
     });
     expect(preparation.codexAutomation).toMatchObject({
-      name: "DevNexus heartbeat: Demo Project",
+      name: "DevNexus workspace heartbeat: Demo Project",
       rrule: "FREQ=MINUTELY;INTERVAL=60",
       status: "ACTIVE",
     });
     expect(preparation.warnings).toEqual([
-      "Project automation is not configured; heartbeat should record that blocker before launching work.",
+      "Workspace automation is not configured; heartbeat should record that blocker before launching work.",
     ]);
     expect(preparation.codexAutomation.prompt).toContain(
       "Automation mode: not configured",

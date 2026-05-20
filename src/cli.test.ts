@@ -316,14 +316,14 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
-    expect(output.output()).toContain("dev-nexus project status");
-    expect(output.output()).toContain("dev-nexus project setup");
-    expect(output.output()).toContain("dev-nexus project component add");
-    expect(output.output()).toContain("dev-nexus project hosting status");
-    expect(output.output()).toContain("dev-nexus project hosting plan");
-    expect(output.output()).toContain("dev-nexus project hosting apply");
-    expect(output.output()).toContain("dev-nexus project mcp refresh");
-    expect(output.output()).toContain("dev-nexus project plugin refresh");
+    expect(output.output()).toContain("dev-nexus workspace status");
+    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("dev-nexus workspace component add");
+    expect(output.output()).toContain("dev-nexus workspace hosting status");
+    expect(output.output()).toContain("dev-nexus workspace hosting plan");
+    expect(output.output()).toContain("dev-nexus workspace hosting apply");
+    expect(output.output()).toContain("dev-nexus workspace mcp refresh");
+    expect(output.output()).toContain("dev-nexus workspace plugin refresh");
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus diagnostics cli-version-skew");
     expect(output.output()).toContain("dev-nexus coordination status");
@@ -342,36 +342,36 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
-  it("prints focused project setup help", async () => {
+  it("prints focused workspace setup help", async () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "setup", "--help"], { stdout: output.writer }),
+      main(["workspace", "setup", "--help"], { stdout: output.writer }),
     ).resolves.toBe(0);
 
     expect(output.output()).toContain("Usage:");
-    expect(output.output()).toContain("dev-nexus project setup [project-root] [options]");
+    expect(output.output()).toContain("dev-nexus workspace setup [workspace-root] [options]");
     expect(output.output()).toContain("User quickstart:");
-    expect(output.output()).toContain("dev-nexus project setup");
+    expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("Run from the directory you want to use");
     expect(output.output()).toContain("DevNexus home defaults to");
     expect(output.output()).toContain("--answers <json-file>");
     expect(output.output()).toContain("--yes");
     expect(output.output()).toContain("--dry-run");
     expect(output.output()).toContain("--json");
-    expect(output.output()).toContain("Provider mutations are not part of project setup.");
+    expect(output.output()).toContain("Provider mutations are not part of workspace setup.");
   });
 
-  it("prints focused project component add help", async () => {
+  it("prints focused workspace component add help", async () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "component", "add", "--help"], { stdout: output.writer }),
+      main(["workspace", "component", "add", "--help"], { stdout: output.writer }),
     ).resolves.toBe(0);
 
     expect(output.output()).toContain("Usage:");
     expect(output.output()).toContain(
-      "dev-nexus project component add <project-root> [options]",
+      "dev-nexus workspace component add <workspace-root> [options]",
     );
     expect(output.output()).toContain("--answers <json-file>");
     expect(output.output()).toContain("--yes");
@@ -384,7 +384,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "setup", "--bad-option", "--json"], {
+      main(["workspace", "setup", "--bad-option", "--json"], {
         stdout: output.writer,
       }),
     ).resolves.toBe(1);
@@ -393,9 +393,19 @@ describe("dev-nexus cli", () => {
       ok: false,
       error: {
         code: "cli_error",
-        message: "Unknown project setup option: --bad-option",
+        message: "Unknown workspace setup option: --bad-option",
       },
     });
+  });
+
+  it("keeps project as a compatibility alias for workspace commands", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "setup", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("dev-nexus workspace setup");
   });
 
   it("refreshes a local project plugin and materializes skills and MCP config", async () => {
@@ -1005,7 +1015,7 @@ describe("dev-nexus cli", () => {
       [
         "Usage:",
         "  dev-nexus --help",
-        "  dev-nexus project status <project-id-or-root> [options]",
+        "  dev-nexus workspace status <workspace-id-or-root> [options]",
       ].join("\n"),
       "utf8",
     );
@@ -1019,9 +1029,9 @@ describe("dev-nexus cli", () => {
           "--installed-help-file",
           olderHelpPath,
           "--expected-command",
-          "dev-nexus project status <project-id-or-root>",
+          "dev-nexus workspace status <workspace-id-or-root>",
           "--expected-command",
-          "dev-nexus project setup <project-root> --answers <answers.json>",
+          "dev-nexus workspace setup <workspace-root> --answers <answers.json>",
           "--package-version",
           "0.1.0-alpha.10",
           "--json",
@@ -1036,7 +1046,7 @@ describe("dev-nexus cli", () => {
       diagnostic: {
         status: "skew_detected",
         installedPackageVersion: "0.1.0-alpha.10",
-        missingDocumentedCommands: ["dev-nexus project setup"],
+        missingDocumentedCommands: ["dev-nexus workspace setup"],
         remediation: {
           action: "upgrade_npm_package",
         },
@@ -1049,7 +1059,7 @@ describe("dev-nexus cli", () => {
     const olderHelpPath = path.join(tempDir, "older-help.txt");
     fs.writeFileSync(
       olderHelpPath,
-      "Usage:\n  dev-nexus project status <project-id-or-root> [options]\n",
+      "Usage:\n  dev-nexus workspace status <workspace-id-or-root> [options]\n",
       "utf8",
     );
     const output = captureOutput();
@@ -1062,7 +1072,7 @@ describe("dev-nexus cli", () => {
           "--installed-help-file",
           olderHelpPath,
           "--expected-command",
-          "dev-nexus project setup <project-root>",
+          "dev-nexus workspace setup <workspace-root>",
         ],
         { stdout: output.writer },
       ),
@@ -1070,11 +1080,11 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("DevNexus CLI version skew: skew_detected.");
     expect(output.output()).toContain("Missing documented commands:");
-    expect(output.output()).toContain("dev-nexus project setup");
+    expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("Remediation:");
   });
 
-  it("prints project hosting status and plan through the CLI", async () => {
+  it("prints workspace hosting status and plan through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-hosting-");
     const homePath = path.join(makeTempDir("dev-nexus-cli-hosting-home-"), "missing-home");
     saveProjectConfig(
@@ -1179,7 +1189,7 @@ describe("dev-nexus cli", () => {
     );
   });
 
-  it("applies project hosting local remote repairs through the CLI", async () => {
+  it("applies workspace hosting local remote repairs through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-hosting-apply-");
     saveProjectConfig(
       projectRoot,
@@ -1280,7 +1290,7 @@ describe("dev-nexus cli", () => {
     expect(payload.apply.finalPlan.actions).toEqual([]);
   });
 
-  it("applies project hosting repository creation through an injected provider", async () => {
+  it("applies workspace hosting repository creation through an injected provider", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-hosting-create-");
     const homePath = makeTempDir("dev-nexus-cli-hosting-create-home-");
     saveHomeConfig(homePath, [
@@ -1492,7 +1502,7 @@ describe("dev-nexus cli", () => {
     expect(payload.worktree.branchName).toBe("codex/primary/guard-bootstrap");
   });
 
-  it("prepares manual component and project-meta worktrees through the CLI", async () => {
+  it("prepares manual component and workspace-meta worktrees through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-worktree-");
     const sourceRoot = path.join(projectRoot, "source");
     const sourceDependency = path.join(sourceRoot, "node_modules");
@@ -1654,7 +1664,7 @@ describe("dev-nexus cli", () => {
         "worktree",
         "prepare",
         projectRoot,
-        "--project-meta",
+        "--workspace-meta",
         "--topic",
         "Project state cleanup",
         "--worktree-name",
@@ -1775,7 +1785,7 @@ describe("dev-nexus cli", () => {
     );
   });
 
-  it("reports required project setup answers in non-interactive JSON mode", async () => {
+  it("reports required workspace setup answers in non-interactive JSON mode", async () => {
     const output = captureOutput();
 
     await expect(
@@ -1793,7 +1803,7 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(output.output()).requiredAnswers).not.toContain("home.path");
   });
 
-  it("defaults project setup home when answers omit home path", async () => {
+  it("defaults workspace setup home when answers omit home path", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-default-home-");
     const defaultHomePath = path.join(makeTempDir("dev-nexus-default-home-"), "home");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -1866,7 +1876,7 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
-  it("previews and applies project setup from an answer file without provider mutations", async () => {
+  it("previews and applies workspace setup from an answer file without provider mutations", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-");
     const homePath = makeTempDir("dev-nexus-project-setup-home-");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -2046,19 +2056,19 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(applied.nextActions).toEqual([
-      `Open the DevNexus project root in Codex or your configured agent: ${projectRoot}`,
+      `Open the DevNexus workspace root in Codex or your configured agent: ${projectRoot}`,
       `Run dev-nexus setup check ${shellQuoteArgument(projectRoot)} join-existing-project --json to verify local readiness.`,
-      `Run dev-nexus project status ${shellQuoteArgument(projectRoot)} --json to inspect configured components.`,
+      `Run dev-nexus workspace status ${shellQuoteArgument(projectRoot)} --json to inspect configured components.`,
       "Create or triage the first work item for component core with tracker local.",
-      `Run dev-nexus project hosting status ${shellQuoteArgument(projectRoot)} --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.`,
+      `Run dev-nexus workspace hosting status ${shellQuoteArgument(projectRoot)} --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.`,
     ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     const agentsText = fs.readFileSync(path.join(projectRoot, "AGENTS.md"), "utf8");
-    expect(agentsText).toContain("## Project And Components");
-    expect(agentsText).toContain("The DevNexus project root contains orchestration files");
+    expect(agentsText).toContain("## Workspace And Components");
+    expect(agentsText).toContain("The DevNexus workspace root contains orchestration files");
     expect(agentsText).toContain("Components are the source roots listed in `dev-nexus.project.json`");
     expect(agentsText).toContain("## First-Run Checklist");
-    expect(agentsText).toContain("Run `dev-nexus setup check <project-root> join-existing-project --json`");
+    expect(agentsText).toContain("Run `dev-nexus setup check <workspace-root> join-existing-project --json`");
     expect(agentsText).toContain("Create or triage the first component work item");
     expect(agentsText).toContain("Before editing a Git checkout");
     expect(agentsText).toContain("Fetch configured remotes when policy allows");
@@ -4986,7 +4996,7 @@ describe("dev-nexus cli", () => {
     ).toBe(false);
   });
 
-  it("cleans up stale generated agent projections through the CLI", async () => {
+  it("cleans up stale generated agent workspaceions through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-agent-projection-cleanup-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     fs.mkdirSync(path.join(projectRoot, ".agents", "skills"), { recursive: true });

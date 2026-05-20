@@ -202,7 +202,7 @@ export function buildNexusProjectStatusForPath(
   const config = loadProjectConfigIfExists(projectRoot);
   if (!config) {
     throw new NexusProjectError(
-      `DevNexus project is not initialized: ${projectConfigPath(projectRoot)}`,
+      `DevNexus workspace is not initialized: ${projectConfigPath(projectRoot)}`,
     );
   }
 
@@ -259,7 +259,7 @@ export function upsertNexusProjectReference(
   );
   if (duplicateId) {
     throw new NexusProjectError(
-      `Project id is already registered at another root: ${duplicateId.id}`,
+      `Workspace id is already registered at another root: ${duplicateId.id}`,
     );
   }
 

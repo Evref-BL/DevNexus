@@ -222,7 +222,7 @@ describe("project operations", () => {
     });
   });
 
-  it("removes the partial project root when create scaffold extension setup fails", () => {
+  it("removes the partial workspace root when create scaffold extension setup fails", () => {
     const projectRegistry = registry();
     const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "BrokenTool");
 
@@ -238,14 +238,14 @@ describe("project operations", () => {
     );
 
     expect(error).toBeInstanceOf(NexusProjectError);
-    expect((error as Error).message).toMatch(/Project scaffold failed/u);
+    expect((error as Error).message).toMatch(/Workspace scaffold failed/u);
     expect((error as Error).message).toMatch(/throwing-extension/u);
     expect((error as Error).message).toMatch(/Safe next action/u);
     expect(fs.existsSync(projectRoot)).toBe(false);
     expect(projectRegistry.projects).toEqual([]);
   });
 
-  it("creates a managed project root and clones a remote source under it", () => {
+  it("creates a managed workspace root and clones a remote source under it", () => {
     const projectRegistry = registry();
     const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "RemoteProject");
     const gitCalls: string[][] = [];
@@ -326,7 +326,7 @@ describe("project operations", () => {
     ]);
   });
 
-  it("removes the managed project root but preserves the source checkout when import scaffold extension setup fails", () => {
+  it("removes the managed workspace root but preserves the source checkout when import scaffold extension setup fails", () => {
     const projectRegistry = registry();
     const sourceRoot = path.join(makeTempDir("dev-nexus-source-"), "Imported");
     const projectRoot = path.join(makeTempDir("dev-nexus-managed-"), "Imported");
@@ -349,7 +349,7 @@ describe("project operations", () => {
     );
 
     expect(error).toBeInstanceOf(NexusProjectError);
-    expect((error as Error).message).toMatch(/Project scaffold failed/u);
+    expect((error as Error).message).toMatch(/Workspace scaffold failed/u);
     expect((error as Error).message).toMatch(/throwing-extension/u);
     expect((error as Error).message).toMatch(/Safe next action/u);
     expect(fs.existsSync(projectRoot)).toBe(false);

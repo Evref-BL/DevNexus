@@ -263,10 +263,10 @@ export function validateNexusProjectSetupAnswers(
     diagnostics.push(errorDiagnostic("project.id", "Project id is required."));
   }
   if (!nonEmptyString(answers.project?.name)) {
-    diagnostics.push(errorDiagnostic("project.name", "Project name is required."));
+    diagnostics.push(errorDiagnostic("project.name", "Workspace name is required."));
   }
   if (!nonEmptyString(answers.project?.root)) {
-    diagnostics.push(errorDiagnostic("project.root", "Project root is required."));
+    diagnostics.push(errorDiagnostic("project.root", "Workspace root is required."));
   }
 
   if (!Array.isArray(answers.components) || answers.components.length === 0) {
@@ -308,7 +308,7 @@ export function validateNexusProjectSetupAnswers(
         if (!nonEmptyString(component.source.remoteUrl)) {
           diagnostics.push(errorDiagnostic(
             `${pathPrefix}.source.remoteUrl`,
-            "Project-local component clones require a remote URL.",
+            "Workspace-local component clones require a remote URL.",
           ));
         }
         break;
@@ -483,7 +483,7 @@ export function buildNexusProjectSetupOperations(
   const operations: NexusProjectSetupOperation[] = [
     {
       id: "write-project-config",
-      title: "Write DevNexus project configuration",
+      title: "Write DevNexus workspace configuration",
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
@@ -491,7 +491,7 @@ export function buildNexusProjectSetupOperations(
     },
     {
       id: "write-project-support",
-      title: "Write project support scaffold",
+      title: "Write workspace support scaffold",
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
@@ -502,22 +502,22 @@ export function buildNexusProjectSetupOperations(
   if (answers.home.registerProject !== false) {
     operations.push({
       id: "register-project-home",
-      title: "Register project in DevNexus home",
+      title: "Register workspace in DevNexus home",
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
-      summary: "Record the project in the selected host-local DevNexus home registry.",
+      summary: "Record the workspace in the selected host-local DevNexus home registry.",
     });
   }
 
   if (answers.project.initializeGit) {
     operations.push({
-      id: "initialize-meta-git",
-      title: "Initialize local meta-project Git repository",
+      id: "initialize-workspace-git",
+      title: "Initialize local workspace Git repository",
       mutationClass: "local_git_operation",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
-      summary: "Initialize the local meta-project repository without creating or pushing any remote repository.",
+      summary: "Initialize the local workspace repository without creating or pushing any remote repository.",
     });
   }
 
@@ -540,7 +540,7 @@ export function buildNexusProjectSetupOperations(
         mutationClass: "local_git_operation",
         phase: "local_setup",
         allowedDuringLocalSetup: true,
-        summary: `Clone ${component.source.remoteUrl ?? "the configured remote"} into the project-local component source area.`,
+        summary: `Clone ${component.source.remoteUrl ?? "the configured remote"} into the workspace-local component source area.`,
       });
     }
     if (component.source.kind === "create_local") {
@@ -568,7 +568,7 @@ export function buildNexusProjectSetupOperations(
   for (const target of answers.agentTargets ?? []) {
     operations.push({
       id: `project-agent-target-${operationIdPart(target.id ?? target.provider)}`,
-      title: `Project ${target.provider} agent support`,
+      title: `Workspace ${target.provider} agent support`,
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
@@ -591,7 +591,7 @@ export function buildNexusProjectSetupOperations(
   if (answers.hostingIntent) {
     operations.push({
       id: "read-hosting-status",
-      title: "Read meta-repo hosting status",
+      title: "Read workspace repository hosting status",
       mutationClass: "provider_read",
       phase: "readiness",
       allowedDuringLocalSetup: true,
@@ -600,7 +600,7 @@ export function buildNexusProjectSetupOperations(
     });
     operations.push({
       id: "apply-hosting-intent",
-      title: "Apply meta-repo hosting intent",
+      title: "Apply workspace repository hosting intent",
       mutationClass: "provider_mutation",
       phase: "next_phase",
       allowedDuringLocalSetup: false,

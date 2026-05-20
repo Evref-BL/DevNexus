@@ -279,7 +279,7 @@ export function buildNexusAutomationTargetReport(
       project: projectSummary(projectConfig, components),
       target: null,
       status: "not_started",
-      statusReason: "Project automation is not configured",
+      statusReason: "Workspace automation is not configured",
       cycleSummary: null,
       runSummary: null,
       workItemSummary: null,
@@ -289,7 +289,7 @@ export function buildNexusAutomationTargetReport(
       componentProgress: [],
       relaunchDecision: {
         type: "not_ready",
-        reason: "Project automation is not configured",
+        reason: "Workspace automation is not configured",
         eligibleWorkItemCount: null,
         latestCycleId: null,
         latestRunId: null,

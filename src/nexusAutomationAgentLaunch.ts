@@ -358,7 +358,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       projectConfig,
       automationConfig,
       status: "skipped",
-      summary: "Automation is not enabled for this project",
+      summary: "Automation is not enabled for this workspace",
       ledger,
       lock,
       preflight: [],
@@ -456,7 +456,7 @@ export async function runNexusAutomationAgentLaunchOnce(
       components,
     });
     if (componentProviders.length === 0) {
-      const summary = "No project component has work tracking configured";
+      const summary = "No workspace component has work tracking configured";
       preflight = [
         check(
           "workTracking",
@@ -916,7 +916,7 @@ export function preflightNexusAutomationAgentLaunch(options: {
       "workTracking",
       options.componentProviders.length > 0,
       "At least one component has work tracking configured",
-      "No project component has work tracking configured",
+      "No workspace component has work tracking configured",
     ),
     ...options.componentProviders.map(({ component, provider }) =>
       check(

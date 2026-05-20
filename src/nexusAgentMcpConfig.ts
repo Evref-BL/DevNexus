@@ -276,7 +276,7 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
     configSchema: "codex.mcp_servers",
     defaultConfigPath: path.join(".codex", "config.toml"),
     activationNotes: [
-      "Open or restart the Codex project/session rooted at the DevNexus project root after refreshing MCP config.",
+      "Open or restart the Codex workspace/session rooted at the DevNexus workspace root after refreshing MCP config.",
     ],
     trustSemantics: (target) => ({
       mode: "codex_default_tools_approval_mode",
@@ -293,12 +293,12 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
     configSchema: "claude.mcpServers",
     defaultConfigPath: ".mcp.json",
     activationNotes: [
-      "Open or restart the Claude project/session rooted at the DevNexus project root after refreshing MCP config.",
+      "Open or restart the Claude workspace/session rooted at the DevNexus workspace root after refreshing MCP config.",
     ],
     trustSemantics: () => ({
       mode: "provider_default",
       summary:
-        "DevNexus projects the MCP server only; Claude tool approval and trust prompts remain provider-managed.",
+        "DevNexus workspaces the MCP server only; Claude tool approval and trust prompts remain provider-managed.",
       settingPath: null,
     }),
     writer: writeClaudeMcpConfig,
@@ -309,7 +309,7 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
     configSchema: "opencode.mcp.local",
     defaultConfigPath: "opencode.json",
     activationNotes: [
-      "Start OpenCode from the DevNexus project root so it loads the project opencode.json.",
+      "Start OpenCode from the DevNexus workspace root so it loads the project opencode.json.",
     ],
     trustSemantics: () => ({
       mode: "opencode_permission_config",
@@ -341,7 +341,7 @@ function providerAdapterForTarget(
     defaultConfigPath:
       target.configPath ?? path.join(`.${safeAgentConfigDirectoryName(target.agent)}`, "mcp.md"),
     activationNotes: [
-      "Open or restart the configured agent provider project/session rooted at the DevNexus project root after applying MCP config.",
+      "Open or restart the configured agent provider workspace/session rooted at the DevNexus workspace root after applying MCP config.",
     ],
     trustSemantics: () => ({
       mode: "manual",
@@ -441,7 +441,7 @@ function manualInstructionsForTarget(options: {
   return [
     `Add MCP server ${options.serverName} to ${options.configPath} for provider ${options.provider}.`,
     `Use command ${JSON.stringify(options.command)} with args ${JSON.stringify(options.args)}.`,
-    "Do not place credentials, tokens, private keys, or provider app database state in the generated project config.",
+    "Do not place credentials, tokens, private keys, or provider app database state in the generated workspace config.",
   ];
 }
 

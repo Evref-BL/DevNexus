@@ -155,7 +155,7 @@ function writeReadySupport(projectRoot: string): void {
   });
 }
 
-describe("nexus project setup readiness", () => {
+describe("nexus workspace setup readiness", () => {
   it("aggregates readiness verdicts", () => {
     expect(aggregateNexusProjectSetupReadinessVerdict([
       { status: "passed" },

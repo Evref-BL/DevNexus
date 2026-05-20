@@ -37,8 +37,8 @@ afterEach(() => {
   }
 });
 
-describe("project config", () => {
-  it("validates and persists project config files", () => {
+describe("workspace config", () => {
+  it("validates and persists workspace config files", () => {
     const projectRoot = path.join(makeTempDir("dev-nexus-project-"), "project");
     const config = {
       version: 1 as const,
@@ -136,7 +136,7 @@ describe("project config", () => {
             configSchema: "claude.mcpServers",
             sourceControl: "source" as const,
             defaultToolsApprovalMode: "approve",
-            activationNotes: ["Open a fresh Claude project session."],
+            activationNotes: ["Open a fresh Claude workspace session."],
             trustSemantics: "Claude provider-managed approval prompts.",
             manualInstructions: ["Confirm the server is visible in Claude."],
           },
@@ -233,7 +233,7 @@ describe("project config", () => {
     );
   });
 
-  it("defaults legacy project configs to the current explicit JSON shape", () => {
+  it("defaults legacy workspace configs to the current explicit JSON shape", () => {
     const config = validateProjectConfig({
       version: 1,
       id: "legacy-project",
@@ -765,7 +765,7 @@ describe("project config", () => {
     });
   });
 
-  it("normalizes legacy MCP-only and skills-only project configs", () => {
+  it("normalizes legacy MCP-only and skills-only workspace configs", () => {
     const mcpOnly = validateProjectConfig({
       version: 1,
       id: "mcp-only-project",
@@ -911,7 +911,7 @@ describe("project config", () => {
             mutationClass: "verification",
           },
           {
-            id: "project-local",
+            id: "workspace-local",
             allowedOperationClasses: [
               "read_only",
               "verification",
@@ -981,7 +981,7 @@ describe("project config", () => {
         mutationClass: "verification",
       }),
       expect.objectContaining({
-        id: "project-local",
+        id: "workspace-local",
         mutationClass: "project_local",
       }),
       expect.objectContaining({
@@ -1557,7 +1557,7 @@ describe("project config", () => {
     ).toThrow(/trackerDiscovery\.missingCredentialBehavior/);
   });
 
-  it("accepts meta-project hosting config with portable auth profile references", () => {
+  it("accepts workspace repository hosting config with portable auth profile references", () => {
     expect(
       validateProjectConfig({
         version: 1,
@@ -2427,7 +2427,7 @@ describe("project config", () => {
               {
                 kind: "setup_obligation",
                 id: "review-local-docs",
-                description: "Review project-local setup notes before editing.",
+                description: "Review workspace-local setup notes before editing.",
                 required: true,
               },
               {
@@ -2516,7 +2516,7 @@ describe("project config", () => {
           {
             kind: "setup_obligation",
             id: "review-local-docs",
-            description: "Review project-local setup notes before editing.",
+            description: "Review workspace-local setup notes before editing.",
             required: true,
           },
           {
@@ -2735,7 +2735,7 @@ describe("project config", () => {
           source: "",
         }),
       ),
-    ).toThrow(/project config\.plugins\[0\]\.capabilities\[0\]\.source/);
+    ).toThrow(/workspace config\.plugins\[0\]\.capabilities\[0\]\.source/);
 
     expect(() =>
       validateProjectConfig(
@@ -2768,7 +2768,7 @@ describe("project config", () => {
         }),
       ),
     ).toThrow(
-      /project config\.plugins\[0\]\.capabilities\[0\]\.sourceControl/,
+      /workspace config\.plugins\[0\]\.capabilities\[0\]\.sourceControl/,
     );
   });
 
@@ -2923,7 +2923,7 @@ describe("project config", () => {
           namespace: "example",
         },
       }),
-    ).toThrow(/project config\.hosting\.provider/);
+    ).toThrow(/workspace config\.hosting\.provider/);
 
     expect(() =>
       validateProjectConfig({
@@ -3102,7 +3102,7 @@ describe("project config", () => {
           materialization: "install",
         },
       }),
-    ).toThrow(/project config\.skills\.materialization/);
+    ).toThrow(/workspace config\.skills\.materialization/);
 
     expect(() =>
       validateProjectConfig({
@@ -3117,7 +3117,7 @@ describe("project config", () => {
           agentTargets: "codex",
         },
       }),
-    ).toThrow(/project config\.skills\.agentTargets must be an array/);
+    ).toThrow(/workspace config\.skills\.agentTargets must be an array/);
 
     expect(() =>
       validateProjectConfig({
@@ -3137,7 +3137,7 @@ describe("project config", () => {
           ],
         },
       }),
-    ).toThrow(/project config\.skills\.agentTargets\[0\]\.sourceControl/);
+    ).toThrow(/workspace config\.skills\.agentTargets\[0\]\.sourceControl/);
 
     expect(() =>
       validateProjectConfig({
@@ -3152,7 +3152,7 @@ describe("project config", () => {
           agentTargets: "codex",
         },
       }),
-    ).toThrow(/project config\.mcp\.agentTargets must be an array/);
+    ).toThrow(/workspace config\.mcp\.agentTargets must be an array/);
 
     expect(() =>
       validateProjectConfig({
@@ -3172,7 +3172,7 @@ describe("project config", () => {
           ],
         },
       }),
-    ).toThrow(/project config\.mcp\.agentTargets\[0\]\.args/);
+    ).toThrow(/workspace config\.mcp\.agentTargets\[0\]\.args/);
 
     expect(() =>
       validateProjectConfig({
@@ -3189,7 +3189,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.selector\.statuses/);
+    ).toThrow(/workspace config\.automation\.selector\.statuses/);
 
     expect(() =>
       validateProjectConfig({
@@ -3206,7 +3206,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.target\.statePath/);
+    ).toThrow(/workspace config\.automation\.target\.statePath/);
 
     expect(() =>
       validateProjectConfig({
@@ -3223,7 +3223,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.target\.cycleLedgerPath/);
+    ).toThrow(/workspace config\.automation\.target\.cycleLedgerPath/);
 
     expect(() =>
       validateProjectConfig({
@@ -3240,7 +3240,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.agent\.maxConcurrentSubagents/);
+    ).toThrow(/workspace config\.automation\.agent\.maxConcurrentSubagents/);
 
     expect(() =>
       validateProjectConfig({
@@ -3286,7 +3286,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.agent\.profiles\[0\]\.intendedUse/);
+    ).toThrow(/workspace config\.automation\.agent\.profiles\[0\]\.intendedUse/);
 
     expect(() =>
       validateProjectConfig({
@@ -3311,7 +3311,7 @@ describe("project config", () => {
           },
         },
       }),
-    ).toThrow(/project config\.automation\.agent\.profiles\[0\]\.safety\.profile/);
+    ).toThrow(/workspace config\.automation\.agent\.profiles\[0\]\.safety\.profile/);
 
     expect(() =>
       validateProjectConfig({
@@ -3334,7 +3334,7 @@ describe("project config", () => {
           },
         ],
       }),
-    ).toThrow(/project config\.plugins\[0\]\.capabilities\[0\]\.serverName/);
+    ).toThrow(/workspace config\.plugins\[0\]\.capabilities\[0\]\.serverName/);
 
     expect(() =>
       validateProjectConfig({
@@ -3354,7 +3354,7 @@ describe("project config", () => {
           },
         ],
       }),
-    ).toThrow(/project config\.hosts contains duplicate id: mac/);
+    ).toThrow(/workspace config\.hosts contains duplicate id: mac/);
   });
 
   it("resolves configured worktree roots from the project directory", () => {
@@ -3375,12 +3375,12 @@ describe("project config", () => {
     );
   });
 
-  it("reports missing project config with the generic project name", () => {
+  it("reports missing workspace config with the generic project name", () => {
     const projectRoot = makeTempDir("dev-nexus-missing-project-");
 
     expect(() => loadProjectConfig(projectRoot)).toThrow(NexusConfigError);
     expect(() => loadProjectConfig(projectRoot)).toThrow(
-      `DevNexus project is not initialized: ${path.join(
+      `DevNexus workspace is not initialized: ${path.join(
         projectRoot,
         devNexusProjectConfigFileName,
       )}`,

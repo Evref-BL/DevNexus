@@ -63,12 +63,12 @@ describe("nexus project template", () => {
     expect(layout.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          area: "project_state",
+          area: "workspace_state",
           owner: "local_runtime",
           path: ".nexus/worktrees/core/",
         }),
         expect.objectContaining({
-          area: "project_state",
+          area: "workspace_state",
           owner: "local_runtime",
           path: ".nexus/worktrees/docs/",
         }),

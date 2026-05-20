@@ -125,7 +125,7 @@ describe("shared checkout mutation guard", () => {
       classification: "shared_project_checkout",
       mutationClass: "local_tracker",
     });
-    expect(decision.saferNextAction).toContain("project/meta worktree");
+    expect(decision.saferNextAction).toContain("workspace/meta worktree");
   });
 
   it("refuses target-state mutation from the shared project checkout", () => {
@@ -187,7 +187,7 @@ describe("shared checkout mutation guard", () => {
     });
   });
 
-  it("allows project-state mutation in a generated project-meta worktree", () => {
+  it("allows project-state mutation in a generated workspace-meta worktree", () => {
     const projectRoot = makeTempDir("dev-nexus-guard-project-");
     const metaWorktree = path.join(
       projectRoot,
@@ -204,7 +204,7 @@ describe("shared checkout mutation guard", () => {
         projectRoot,
         targetPath: metaWorktree,
         mutationClass: "project_state",
-        command: "project state write",
+        command: "workspace state write",
         gitRunner,
       }),
     ).toMatchObject({

@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide is the normal first-project path. A DevNexus project is the
+This guide is the normal first-workspace path. A DevNexus workspace is the
 directory you open in an agent such as Codex. Components are the source folders
-or artifacts that project coordinates.
+or artifacts that workspace coordinates.
 
 Read [Concepts](concepts.md) when a term is unfamiliar.
 
@@ -26,16 +26,16 @@ older, check for command differences:
 dev-nexus diagnostics cli-version-skew --json
 ```
 
-## Create The First Project
+## Create The First Workspace
 
-Create or choose the directory you want to use as the DevNexus project root.
+Create or choose the directory you want to use as the DevNexus workspace root.
 From that directory, start the guided setup command:
 
 ```bash
-dev-nexus project setup
+dev-nexus workspace setup
 ```
 
-For a user in a terminal, setup asks the minimum first-project questions. The
+For a user in a terminal, setup asks the minimum first-workspace questions. The
 DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
 one.
 
@@ -44,7 +44,7 @@ Setup creates or updates:
 - `dev-nexus.project.json`
 - `.dev-nexus/` support state
 - `AGENTS.md`
-- project-local agent configuration, such as `.codex/config.toml`
+- workspace-local agent configuration, such as `.codex/config.toml`
 - local work-item stores when local tracking is enabled
 - the home registry entry under `~/.dev-nexus`
 
@@ -54,17 +54,17 @@ packages are explicit later steps.
 
 ## Open The Right Directory
 
-Open the DevNexus project root in the agent:
+Open the DevNexus workspace root in the agent:
 
 ```text
-the directory where you ran dev-nexus project setup
+the directory where you ran dev-nexus workspace setup
 ```
 
 Do not open a component repository when you expect DevNexus tools and generated
-agent context. Components are the things the project coordinates. The DevNexus
-project root is the agent workspace.
+agent context. Components are the things the workspace coordinates. The DevNexus
+workspace root is the agent workspace.
 
-After opening the project, ask the agent to:
+After opening the workspace, ask the agent to:
 
 1. read `AGENTS.md`
 2. verify DevNexus readiness
@@ -74,32 +74,32 @@ After opening the project, ask the agent to:
 Copy-paste prompt:
 
 ```text
-Open this directory as the DevNexus project root. Read AGENTS.md.
-Run dev-nexus project status . and dev-nexus setup check . join-existing-project.
+Open this directory as the DevNexus workspace root. Read AGENTS.md.
+Run dev-nexus workspace status . and dev-nexus setup check . join-existing-project.
 Then inspect the components and create or triage the first component work item. Treat DevNexus as infrastructure; I still choose the work.
 ```
 
 Useful checks:
 
 ```bash
-dev-nexus project status .
+dev-nexus workspace status .
 dev-nexus setup check . join-existing-project
 ```
 
-The project is ready when `project status` succeeds, setup check is not
+The workspace is ready when `workspace status` succeeds, setup check is not
 blocked, `AGENTS.md` exists, and your agent config was generated, such as
 `.codex/config.toml` for Codex or `.mcp.json` for Claude.
 
 ## Add Existing Components
 
-A DevNexus project can coordinate several existing folders. For example, one
-project might point to an API repository, a frontend repository, a shared
+A DevNexus workspace can coordinate several existing folders. For example, one
+workspace might point to an API repository, a frontend repository, a shared
 library, and a load-test harness.
 
-Use one DevNexus project with several components. Do not run `project import`
+Use one DevNexus workspace with several components. Do not run `workspace import`
 once per repository if the goal is one shared agent workspace.
 
-See [First project from existing components](first-project-existing-components.md)
+See [First workspace from existing components](first-workspace-existing-components.md)
 for a full example.
 
 ## Add Components Later
@@ -108,8 +108,8 @@ After the first setup, add components with the component-add flow instead of
 manual JSON editing:
 
 ```bash
-dev-nexus project component add <project-root> --answers ./component-add.json --json
-dev-nexus project component add <project-root> --answers ./component-add.json --yes
+dev-nexus workspace component add <workspace-root> --answers ./component-add.json --json
+dev-nexus workspace component add <workspace-root> --answers ./component-add.json --yes
 ```
 
 The preview reports common topology mistakes before writing. It checks for
@@ -121,24 +121,24 @@ drift, and stable component source roots placed under generated `worktrees/`.
 Create tasks on the component that owns the work:
 
 ```bash
-dev-nexus work-item create <project-root> --component <component-id> --title "Implement focused task" --status ready
-dev-nexus work-item list <project-root> --component <component-id>
+dev-nexus work-item create <workspace-root> --component <component-id> --title "Implement focused task" --status ready
+dev-nexus work-item list <workspace-root> --component <component-id>
 ```
 
-Local tracking is enough for a first project. Provider-backed trackers such as
+Local tracking is enough for a first workspace. Provider-backed trackers such as
 GitHub, GitLab, or Jira can be added later.
 
 ## Agent Configuration
 
 Setup generates files only for the active agent targets selected by the
-project. Choose the providers this project actually uses, such as Codex-only,
+workspace. Choose the providers this workspace actually uses, such as Codex-only,
 Claude-only, OpenCode/manual, or a deliberate multi-provider setup.
 
-When project configuration changes, refresh generated support:
+When workspace configuration changes, refresh generated support:
 
 ```bash
-dev-nexus project mcp refresh <project-root> --agent codex
-dev-nexus project mcp refresh <project-root> --agent claude
+dev-nexus workspace mcp refresh <workspace-root> --agent codex
+dev-nexus workspace mcp refresh <workspace-root> --agent claude
 ```
 
 Codex targets write `.codex/config.toml`. Claude targets write `.mcp.json`.
@@ -146,7 +146,7 @@ Codex targets write `.codex/config.toml`. Claude targets write `.mcp.json`.
 Model Context Protocol, or MCP, is the protocol agents use to call DevNexus
 tools. A raw `dev-nexus mcp-stdio` smoke test only proves the server command can
 start. The agent session is ready when the active agent exposes those tools in
-the opened DevNexus project.
+the opened DevNexus workspace.
 
 See [Agent targets and projection cleanup](agent-targets.md) for provider
 examples, active target configuration, and stale generated support cleanup.
@@ -157,12 +157,12 @@ Answer files are useful for agents, CI, repeatable onboarding, and documented
 examples:
 
 ```bash
-dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --json
-dev-nexus project setup <project-root> --answers ./dev-nexus.setup.json --yes
+dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --json
+dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --yes
 ```
 
 The preview command prints planned local writes. The apply command writes local
-project files. Raw tokens, passwords, private keys, SSH keys, and provider CLI
+workspace files. Raw tokens, passwords, private keys, SSH keys, and provider CLI
 state do not belong in answer files.
 
 Answer files may reference host-local credential context by id, such as a
@@ -171,11 +171,11 @@ store id. See [Providers, auth, and hosting](providers-auth-hosting.md).
 
 ## Low-Level Commands
 
-`project setup` is the first-project command.
+`workspace setup` is the first-workspace command.
 
-Use `project create` only when you want a low-level local scaffold. Use
-`project import <source-root>` only when one existing source checkout should
-become the primary component of a new DevNexus project.
+Use `workspace create` only when you want a low-level local scaffold. Use
+`workspace import <source-root>` only when one existing source checkout should
+become the primary component of a new DevNexus workspace.
 
 ## Advanced Workflows
 
@@ -186,4 +186,4 @@ become the primary component of a new DevNexus project.
 - [Multi-tracker work tracking](multi-tracker.md) explains local and provider
   trackers, link records, and sync planning.
 - [Providers, auth, and hosting](providers-auth-hosting.md) explains user
-  accounts, bot accounts, provider CLI profiles, and meta-repository hosting.
+  accounts, bot accounts, provider CLI profiles, and workspace repository hosting.

@@ -633,7 +633,7 @@ function readRawProjectConfig(projectRoot: string): Record<string, unknown> {
   const configPath = saveProjectConfigPath(projectRoot);
   const parsed = JSON.parse(fs.readFileSync(configPath, "utf8").replace(/^\uFEFF/u, ""));
   if (!isRecord(parsed)) {
-    throw new Error(`DevNexus project config must be a JSON object: ${configPath}`);
+    throw new Error(`DevNexus workspace config must be a JSON object: ${configPath}`);
   }
 
   return parsed;

@@ -19,7 +19,7 @@ import { defaultLocalWorkTrackingStorePath } from "./workTrackingLocalProvider.j
 import type { WorkTrackingConfig } from "./workTrackingTypes.js";
 
 export type NexusProjectTemplateArea =
-  | "project_state"
+  | "workspace_state"
   | "component_configuration"
   | "target_state"
   | "skills"
@@ -74,15 +74,15 @@ export function buildNexusProjectTemplateLayout(
       path: devNexusProjectConfigFileName,
       sourceControl: "source",
       description:
-        "Project, component, work-item service, automation, skills, plugins, and agent MCP configuration.",
+        "Workspace, component, work-item service, automation, skills, plugins, and agent MCP configuration.",
     },
     {
-      area: "project_state",
+      area: "workspace_state",
       owner: "generated",
       path: ".dev-nexus/README.md",
       sourceControl: "support",
       description:
-        "Generated map of project support state, runtime state, and migration boundaries.",
+        "Generated map of workspace support state, runtime state, and migration boundaries.",
     },
   ];
 
@@ -95,7 +95,7 @@ export function buildNexusProjectTemplateLayout(
       description: `Source root for component ${component.id}.`,
     });
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: displayPath(projectRoot, component.worktreesRoot, true),
       sourceControl: "local",
@@ -113,7 +113,7 @@ export function buildNexusProjectTemplateLayout(
         "Concise target memory maintained by humans or launched agents as current direction changes.",
     });
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: normalizedProjectRelativePath(automationConfig.target.cycleLedgerPath),
       sourceControl: "local",
@@ -121,21 +121,21 @@ export function buildNexusProjectTemplateLayout(
         "Caller-reported target cycle facts used for reports and relaunch decisions.",
     });
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: normalizedProjectRelativePath(automationConfig.ledger.path),
       sourceControl: "local",
       description: "Automation run ledger written by DevNexus.",
     });
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: normalizedProjectRelativePath(automationConfig.lock.path),
       sourceControl: "local",
       description: "Automation lock file used to prevent overlapping runs.",
     });
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: ".dev-nexus/automation/agent-launches/",
       sourceControl: "local",
@@ -185,7 +185,7 @@ export function buildNexusProjectTemplateLayout(
 
   for (const storePath of localWorkItemStorePaths(projectRoot, options.projectConfig)) {
     entries.push({
-      area: "project_state",
+      area: "workspace_state",
       owner: "local_runtime",
       path: displayPath(projectRoot, storePath),
       sourceControl: "local",
@@ -251,8 +251,8 @@ export function materializeNexusProjectTemplate(
 export function nexusProjectTemplateMigrationNotes(): string[] {
   return [
     "Historical staging roots are migration-only evidence; production templates must not inherit source-specific paths, tracker ids, agent launch commands, or component names from them.",
-    "Generated state can be refreshed by DevNexus and must stay separate from user-authored project config, component source, and target notes.",
-    "Local runtime state records locks, ledgers, local tracker files, and generated worktrees; keep it out of component source roots unless the project explicitly configures that boundary.",
+    "Generated state can be refreshed by DevNexus and must stay separate from user-authored workspace config, component source, and target notes.",
+    "Local runtime state records locks, ledgers, local tracker files, and generated worktrees; keep it out of component source roots unless the workspace explicitly configures that boundary.",
   ];
 }
 
@@ -392,16 +392,16 @@ function renderNexusProjectSupportReadme(
   layout: NexusProjectTemplateLayout,
 ): string {
   const lines = [
-    "# DevNexus Project Support",
+    "# DevNexus Workspace Support",
     "",
-    "## Project Template Layout",
+    "## Workspace Template Layout",
     "",
-    "DevNexus keeps generic project support state separate from component source, target memory, curated skills, agent MCP projection, and local runtime records.",
+    "DevNexus keeps generic workspace support state separate from component source, target memory, curated skills, agent MCP projection, and local runtime records.",
     "",
     "## Ownership Classes",
     "",
-    "- `user_authored`: Maintained by humans or launched agents as durable project intent.",
-    "- `generated`: Written or refreshed by DevNexus from project configuration.",
+    "- `user_authored`: Maintained by humans or launched agents as durable workspace intent.",
+    "- `generated`: Written or refreshed by DevNexus from workspace configuration.",
     "- `local_runtime`: Machine-local state created while checking, launching, or recording work.",
     "",
     "## Paths",

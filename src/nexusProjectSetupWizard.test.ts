@@ -43,7 +43,7 @@ function captureOutput(options: {
   };
 }
 
-describe("nexus project setup wizard", () => {
+describe("nexus workspace setup wizard", () => {
   it("uses the TTY path as the user quickstart without prompting for home", async () => {
     const defaultHome = path.join(os.tmpdir(), "dev-nexus-user-quickstart-home");
     process.env.DEV_NEXUS_HOME = defaultHome;
@@ -185,7 +185,7 @@ describe("nexus project setup wizard", () => {
     expect(stdout.output()).toContain("Additional components cannot use role primary.");
   });
 
-  it("builds first-run next actions from the applied project config", () => {
+  it("builds first-run next actions from the applied workspace config", () => {
     const result = {
       projectRoot: "/workspace/demo",
       proposal: {
@@ -210,11 +210,11 @@ describe("nexus project setup wizard", () => {
         quoteArgument: (value) => `'${value}'`,
       }),
     ).toEqual([
-      "Open the DevNexus project root in Codex or your configured agent: /workspace/demo",
+      "Open the DevNexus workspace root in Codex or your configured agent: /workspace/demo",
       "Run dev-nexus setup check '/workspace/demo' join-existing-project --json to verify local readiness.",
-      "Run dev-nexus project status '/workspace/demo' --json to inspect configured components.",
+      "Run dev-nexus workspace status '/workspace/demo' --json to inspect configured components.",
       "Create or triage the first work item for component core with tracker local.",
-      "Run dev-nexus project hosting status '/workspace/demo' --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.",
+      "Run dev-nexus workspace hosting status '/workspace/demo' --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.",
     ]);
   });
 });

@@ -142,8 +142,8 @@ export function checkNexusHostCapabilities(
       mode,
       host,
       overlay,
-      reason: `Host ${host.id} is disabled in shared project config.`,
-      nextAction: "Enable the host in shared project config or choose another host.",
+      reason: `Host ${host.id} is disabled in shared workspace config.`,
+      nextAction: "Enable the host in shared workspace config or choose another host.",
     });
   }
 
@@ -430,7 +430,7 @@ function mcpSummary(
     return {
       status: "missing",
       serverNames,
-      summary: "No MCP server configuration is visible in shared project config.",
+      summary: "No MCP server configuration is visible in shared workspace config.",
       nextAction: "Configure DevNexus MCP or plugin MCP server entries.",
     };
   }

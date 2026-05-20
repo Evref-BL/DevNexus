@@ -118,7 +118,7 @@ export function planNexusAgentProjectionCleanup(
           ...item,
           action: "skip" as const,
           cleanupSafe: false,
-          blocker: "Path resolves outside the project root.",
+          blocker: "Path resolves outside the workspace root.",
         }
   );
   const blocked = items.some((item) =>
@@ -184,7 +184,7 @@ export function applyNexusAgentProjectionCleanup(
     remainingPlan,
     nextActions: status === "completed"
       ? [
-          "Run dev-nexus project status <project-root> to confirm stale generated projections are gone.",
+          "Run dev-nexus workspace status <workspace-root> to confirm stale generated projections are gone.",
           "Rerun setup checks if agent target configuration changed.",
         ]
       : [
@@ -245,7 +245,7 @@ function removalRefusal(
     return "Cleanup refuses to remove source-controlled paths.";
   }
   if (!pathInside(projectRoot, item.absolutePath)) {
-    return "Cleanup refuses to remove paths outside the project root.";
+    return "Cleanup refuses to remove paths outside the workspace root.";
   }
   if (!fs.existsSync(item.absolutePath)) {
     return null;

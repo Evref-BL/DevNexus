@@ -1,10 +1,10 @@
 # Authority Roles
 
 DevNexus separates the shared authority model from host-local credentials.
-Projects can name the actors that are allowed to do work, bind roles to those
+Workspaces can name the actors that are allowed to do work, bind roles to those
 actors, and keep each machine's credential details in its own DevNexus home.
-This lets private projects use automation accounts without storing secrets in
-the shared meta-project, and lets open-source contributors prepare work without
+This lets private workspaces use automation accounts without storing secrets in
+the shared workspace repository, and lets open-source contributors prepare work without
 needing maintainer access.
 
 Authority is advisory unless a command path explicitly gates a mutation. Do
@@ -14,7 +14,7 @@ state, setup checks, and host-local credentials can still block a command.
 
 ## Model
 
-An actor is the identity DevNexus expects to act. Actors are durable project
+An actor is the identity DevNexus expects to act. Actors are durable workspace
 facts, such as a human maintainer, machine-user bot, GitHub App, team, external
 agent, or local operator.
 
@@ -22,21 +22,21 @@ An auth profile is host-local credential context. It lives in the DevNexus home
 config, not in `dev-nexus.project.json`. It can name an account, provider,
 credential kind, SSH host alias, GitHub CLI config directory, wrapper command,
 or command environment keys. Do not put tokens, private keys, or provider CLI
-state in the shared project.
+state in the shared workspace.
 
 A role is a named set of authority actions. DevNexus ships recommended roles:
 
 | Role | Typical use |
 | --- | --- |
-| `maintainer` | Project-state updates, branch pushes, review requests, and target-branch integration when publication policy allows it. |
+| `maintainer` | Workspace-state updates, branch pushes, review requests, and target-branch integration when publication policy allows it. |
 | `contributor` | Local preparation, feature branches, work-item updates, PR creation, and review requests without target-branch integration. |
 | `reviewer` | Inspect work, comment, and approve or reject reviews where provider policy allows it. |
-| `observer` | Read project/provider state and leave handoffs without source, tracker, provider, or runtime mutation. |
+| `observer` | Read workspace/provider state and leave handoffs without source, tracker, provider, or runtime mutation. |
 | `runtime_operator` | Approved runtime or host-local mutations without source integration authority. |
 | `release_operator` | Package or release publication when release policy also allows it. |
 
 A role binding assigns one or more roles to one actor inside a scope. Scopes can
-name a project, component, provider, tracker, repository, target branch, or
+name a workspace, component, provider, tracker, repository, target branch, or
 environment. Prefer the narrowest scope that matches the job.
 
 Effective authority is the resolved answer for a specific component and
@@ -48,18 +48,18 @@ branch-policy clearance is still missing.
 
 Safe defaults are conservative:
 
-- Unknown actors fall back to read-only observer behavior unless the project
+- Unknown actors fall back to read-only observer behavior unless the workspace
   config deliberately changes the fallback role.
-- Secrets and local credential paths stay out of the shared meta-project.
+- Secrets and local credential paths stay out of the shared workspace repository.
 - A machine-user automation profile should not be reused as the human/manual
   profile.
 - Target-branch pushes, provider mutation, package publishing, release
   publishing, and live runtime mutation need both role authority and the
-  relevant project policy.
+  relevant workspace policy.
 - If the observed account does not match the configured actor, setup and status
   surfaces should warn before mutation.
 
-## Shared Project Configuration
+## Shared Workspace Configuration
 
 Declare actors and role bindings in `dev-nexus.project.json`:
 
@@ -228,7 +228,7 @@ Each machine stores auth profiles in its DevNexus home config:
 }
 ```
 
-The shared project may mention `human-github` and `bot-github` as profile ids,
+The shared workspace may mention `human-github` and `bot-github` as profile ids,
 but every operator controls what those profiles mean on their own machine.
 Setup checks should flag a missing profile, an account mismatch, or a remote
 that points at the wrong profile before automation publishes.
@@ -237,7 +237,7 @@ that points at the wrong profile before automation publishes.
 
 Use these patterns as starting points and narrow scopes when possible.
 
-Maintainer bot for a private meta-project:
+Maintainer bot for a private workspace repository:
 
 ```json
 {
@@ -282,7 +282,7 @@ Reviewer:
 ```
 
 Reviewer authority is for comments and provider review decisions. It does not
-grant source publication or project-state ownership.
+grant source publication or workspace-state ownership.
 
 Observer:
 
@@ -312,7 +312,7 @@ Runtime operator:
 ```
 
 Runtime authority is deliberately separate from source integration. The
-selected work item and project policy must still authorize live runtime work.
+selected work item and workspace policy must still authorize live runtime work.
 
 Release operator:
 
@@ -332,9 +332,9 @@ stays blocked.
 
 ## Onboarding
 
-When creating a new private project:
+When creating a new private workspace:
 
-1. Create or import the DevNexus project.
+1. Create or import the DevNexus workspace.
 2. Add shared `hosting`, `publication`, `authority.actors`, and
    `authority.roleBindings` records that describe the intended actors and
    remotes.
@@ -342,16 +342,16 @@ When creating a new private project:
 4. Run setup and hosting status checks before allowing automation to mutate
    remotes, trackers, providers, or target branches.
 
-When joining an existing project on a new machine:
+When joining an existing workspace on a new machine:
 
-1. Clone or open the shared meta-project.
+1. Clone or open the shared workspace repository.
 2. Initialize or select a DevNexus home.
-3. Add host-local auth profiles whose ids match the shared project references.
+3. Add host-local auth profiles whose ids match the shared workspace references.
 4. Configure local remotes such as `origin` for the human profile and `bot` for
    the automation profile.
 5. Run setup checks and inspect authority status before starting automation.
 
-The shared meta-project should contain only portable intent: actor ids,
+The shared workspace repository should contain only portable intent: actor ids,
 provider identities, remote names, profile ids, SSH host aliases, and expected
 account names. Secrets, token files, private keys, and provider CLI state stay
 host-local.
@@ -359,7 +359,7 @@ host-local.
 ## Open-Source Contribution
 
 For open-source work, contributors should not need maintainer rights in the
-upstream project. A contributor setup normally uses a fork or feature branch,
+upstream repository. A contributor setup normally uses a fork or feature branch,
 `contributor` role authority, and a publication policy that opens or updates a
 pull request instead of pushing the target branch.
 
@@ -367,15 +367,14 @@ PR-only behavior means:
 
 - Prepare work in a generated component worktree or fork checkout.
 - Push a feature branch only through the contributor-controlled remote.
-- Open or update a pull request when the provider adapter and project policy
+- Open or update a pull request when the provider adapter and workspace policy
   allow it.
 - Wait for reviews, checks, mergeability, and branch policy before merge.
 - Do not directly integrate to the upstream target branch by default.
 - Do not write `.dev-nexus/`, generated skill files, worktree metadata, or
   local tracker files into the target repository unless that repository is the
-  DevNexus meta-project itself and explicitly owns those files.
+  DevNexus workspace repository itself and explicitly owns those files.
 
-DevNexus coordination artifacts belong in the configured meta-project or
+DevNexus coordination artifacts belong in the configured workspace repository or
 tracker. Target source repositories should receive only the source, tests,
-docs, and project-native files required by the contribution.
-
+docs, and repository-native files required by the contribution.

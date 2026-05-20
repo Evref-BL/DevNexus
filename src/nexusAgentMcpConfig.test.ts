@@ -157,7 +157,7 @@ describe("nexus agent MCP config", () => {
       .toBe(false);
   });
 
-  it("materializes OpenCode MCP config using the documented project config shape", () => {
+  it("materializes OpenCode MCP config using the documented workspace config shape", () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     initGitInfo(projectRoot);
     const opencodeConfigPath = path.join(projectRoot, "opencode.json");

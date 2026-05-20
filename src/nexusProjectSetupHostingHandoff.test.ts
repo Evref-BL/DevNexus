@@ -55,7 +55,7 @@ function answers(): NexusProjectSetupAnswers {
   };
 }
 
-describe("project setup hosting handoff", () => {
+describe("workspace setup hosting handoff", () => {
   it("reports unconfigured hosting without commands", () => {
     const setupAnswers = answers();
     delete setupAnswers.hostingIntent;
@@ -94,21 +94,21 @@ describe("project setup hosting handoff", () => {
     expect(handoff.commands).toEqual([
       expect.objectContaining({
         id: "hosting-status",
-        command: "dev-nexus project hosting status '/tmp/demo project' --json",
+        command: "dev-nexus workspace hosting status '/tmp/demo project' --json",
         providerMutation: false,
         allowedDuringProjectSetup: false,
         authProfileId: "human-github",
       }),
       expect.objectContaining({
         id: "hosting-plan",
-        command: "dev-nexus project hosting plan '/tmp/demo project' --json",
+        command: "dev-nexus workspace hosting plan '/tmp/demo project' --json",
         providerMutation: false,
         allowedDuringProjectSetup: false,
         authProfileId: "human-github",
       }),
       expect.objectContaining({
         id: "hosting-apply",
-        command: "dev-nexus project hosting apply '/tmp/demo project' --json",
+        command: "dev-nexus workspace hosting apply '/tmp/demo project' --json",
         providerMutation: true,
         allowedDuringProjectSetup: false,
         authProfileId: "bot-github",

@@ -30,7 +30,7 @@ describe("nexus project path resolver", () => {
     ).toBe("/Users/me/dev-nexus/dogfood/components/dev-nexus/plugins/core");
   });
 
-  it("reports componentsRoot as a portable project-local base", () => {
+  it("reports componentsRoot as a portable workspace-local base", () => {
     expect(
       analyzeNexusProjectPath({
         projectRoot: "C:\\Users\\me\\dev-nexus\\dogfood",

@@ -339,7 +339,7 @@ export async function adoptNexusAutomationCurrentAgent(
       status: "skipped",
       shouldProceed: false,
       reused,
-      summary: "Automation is not enabled for this project",
+      summary: "Automation is not enabled for this workspace",
       ledger,
       lock,
       preflight,
@@ -479,7 +479,7 @@ export async function adoptNexusAutomationCurrentAgent(
       components,
     });
     if (componentProviders.length === 0) {
-      const summary = "No project component has work tracking configured";
+      const summary = "No workspace component has work tracking configured";
       preflight = [
         {
           name: "workTracking",
@@ -961,7 +961,7 @@ export function recordNexusAutomationCurrentAgentAdoptionResult(
   const automationConfig = projectConfig.automation ?? null;
   if (!automationConfig) {
     throw new NexusAutomationCurrentAgentAdoptionError(
-      "Project automation is not configured",
+      "Workspace automation is not configured",
     );
   }
   const files = currentAgentAdoptionFiles({ projectRoot, runId });

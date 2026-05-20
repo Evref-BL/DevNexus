@@ -410,7 +410,7 @@ function validateNexusProjectReferences(value: unknown): NexusProjectReference[]
   const projectIds = new Set<string>();
   for (const project of projects) {
     if (projectIds.has(project.id)) {
-      throw new NexusConfigError(`Project id is duplicated: ${project.id}`);
+      throw new NexusConfigError(`Workspace id is duplicated: ${project.id}`);
     }
 
     projectIds.add(project.id);

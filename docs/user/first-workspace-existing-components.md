@@ -1,7 +1,7 @@
-# First Project From Existing Components
+# First Workspace From Existing Components
 
 Use this guide when you already have folders or repositories and want one
-DevNexus project that lets an agent work across them.
+DevNexus workspace that lets an agent work across them.
 
 ## The Shape
 
@@ -14,10 +14,10 @@ Suppose you have these existing folders:
 /Users/alice/projects/rocket-shop/load-test-lab
 ```
 
-The right DevNexus shape is usually one project with several components:
+The right DevNexus shape is usually one workspace with several components:
 
 ```text
-DevNexus project root:
+DevNexus workspace root:
   /Users/alice/dev-nexus/rocket-shop-suite
 
 Components:
@@ -27,29 +27,29 @@ Components:
   load-test-lab
 ```
 
-Do not create one DevNexus project per folder unless you want separate agent
-workspaces and separate project state.
+Do not create one DevNexus workspace per folder unless you want separate agent
+workspaces and separate workspace state.
 
 ## Interactive Setup
 
-For a user in a terminal, create or choose the DevNexus project directory, then
+For a user in a terminal, create or choose the DevNexus workspace directory, then
 run setup from that directory:
 
 ```bash
-dev-nexus project setup
+dev-nexus workspace setup
 ```
 
 Use the existing folder paths as component source roots when prompted. Pick one
 primary component. Other components can be dependencies, addons, or support
 components.
 
-`setup check` classifies each component source root as project-local, explicit
+`setup check` classifies each component source root as workspace-local, explicit
 external, legacy external, missing, incompatible with the current host, or a
-project-local-looking symlink/junction escape. External layouts are allowed
-when intentional, but project-local component clones under `componentsRoot:` are
+workspace-local-looking symlink/junction escape. External layouts are allowed
+when intentional, but workspace-local component clones under `componentsRoot:` are
 the cleanest default for repeatable agent work.
 
-After setup, open the DevNexus project directory in the agent:
+After setup, open the DevNexus workspace directory in the agent:
 
 ```text
 /Users/alice/dev-nexus/rocket-shop-suite
@@ -126,18 +126,18 @@ Agents and repeatable setup flows can use an answer file.
 Preview local writes:
 
 ```bash
-dev-nexus project setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --json
+dev-nexus workspace setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --json
 ```
 
 Apply the local setup:
 
 ```bash
-dev-nexus project setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --yes
+dev-nexus workspace setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --yes
 ```
 
-## Project-Local Components
+## Workspace-Local Components
 
-For new projects, the easiest long-term layout is usually project-local
+For new workspaces, the easiest long-term layout is usually workspace-local
 components:
 
 ```text
@@ -160,7 +160,7 @@ reference those external checkouts in place.
 ## Verify Readiness
 
 ```bash
-dev-nexus project status "/Users/alice/dev-nexus/rocket-shop-suite"
+dev-nexus workspace status "/Users/alice/dev-nexus/rocket-shop-suite"
 dev-nexus setup check "/Users/alice/dev-nexus/rocket-shop-suite" join-existing-project
 ```
 

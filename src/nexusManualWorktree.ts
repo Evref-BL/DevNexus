@@ -253,7 +253,7 @@ export function prepareNexusManualWorktree(
   const projectMeta = options.projectMeta === true;
   if (projectMeta && options.componentId) {
     throw new Error(
-      "worktree prepare accepts either --project-meta or --component, not both",
+      "worktree prepare accepts either --workspace-meta or --component, not both",
     );
   }
   const workItemRoute =
@@ -589,7 +589,7 @@ function componentWorktreeTarget(
       )
     : resolvePrimaryProjectComponent(projectRoot, projectConfig);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
 
   return {
@@ -782,7 +782,7 @@ function nextActions(
   scope: NexusManualWorktreeScope,
   worktree: PrepareGitWorktreeResult,
 ): string[] {
-  const scopeLabel = scope === "project" ? "project/meta" : "component";
+  const scopeLabel = scope === "project" ? "workspace/meta" : "component";
   return [
     `Run source and Git commands from ${worktree.worktreePath}.`,
     `Treat the original ${scopeLabel} checkout as shared context unless you explicitly own it.`,

@@ -100,7 +100,7 @@ export function slugify(value: string): string {
 
   if (!slug) {
     throw new NexusProjectError(
-      "Project name must contain at least one filesystem-safe character",
+      "Workspace name must contain at least one filesystem-safe character",
     );
   }
 
@@ -126,7 +126,7 @@ export function directoryExistsAndIsNonEmpty(directoryPath: string): boolean {
   const stat = fs.statSync(directoryPath);
   if (!stat.isDirectory()) {
     throw new NexusProjectError(
-      `Project root exists and is not a directory: ${directoryPath}`,
+      `Workspace root exists and is not a directory: ${directoryPath}`,
     );
   }
 
@@ -179,7 +179,7 @@ export function resolvePrimaryProjectComponent(
   const primary =
     components.find((component) => component.role === "primary") ?? components[0];
   if (!primary) {
-    throw new NexusProjectError("DevNexus project has no components");
+    throw new NexusProjectError("DevNexus workspace has no components");
   }
 
   return primary;
@@ -430,7 +430,7 @@ export function ensureUniqueProject(
 
   if (duplicate) {
     throw new NexusProjectError(
-      `Project is already registered: ${duplicate.id}`,
+      `Workspace is already registered: ${duplicate.id}`,
     );
   }
 }

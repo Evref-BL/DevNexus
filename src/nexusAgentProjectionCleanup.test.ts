@@ -70,7 +70,7 @@ function writeGeneratedSkillProjection(projectRoot: string, relativePath: string
   fs.writeFileSync(path.join(skillRoot, "dev-nexus.skill.json"), "{}\n", "utf8");
 }
 
-describe("nexus agent projection cleanup", () => {
+describe("nexus agent workspaceion cleanup", () => {
   it("plans cleanup-safe stale generated projections and refusal entries", () => {
     const projectRoot = makeTempDir("dev-nexus-agent-projection-cleanup-");
     fs.mkdirSync(path.join(projectRoot, ".agents", "skills"), { recursive: true });

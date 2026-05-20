@@ -1028,7 +1028,7 @@ describe("DevNexus MCP server", () => {
     expect(issues).toEqual([]);
   });
 
-  it("prepares project-meta worktrees through MCP tools", async () => {
+  it("prepares workspace-meta worktrees through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-worktree-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
@@ -2792,7 +2792,7 @@ describe("DevNexus MCP server", () => {
     });
   });
 
-  it("returns project status diagnostics for plugin MCP core tool overlap", async () => {
+  it("returns workspace status diagnostics for plugin MCP core tool overlap", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-plugin-overlap-");
     fs.writeFileSync(
       path.join(projectRoot, "dev-nexus.project.json"),

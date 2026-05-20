@@ -95,7 +95,7 @@ describe("nexus automation", () => {
           }),
           workItem({
             id: "work-2",
-            title: "Import project config",
+            title: "Import workspace config",
             status: "ready",
             labels: ["automation"],
             assignees: ["agent-1"],
@@ -106,7 +106,7 @@ describe("nexus automation", () => {
     ).toBe("work-2");
   });
 
-  it("records run ledger entries with retention inside the project root", () => {
+  it("records run ledger entries with retention inside the workspace root", () => {
     const projectRoot = makeTempDir("dev-nexus-automation-project-");
     const config = automationConfig({
       ledger: {
@@ -173,7 +173,7 @@ describe("nexus automation", () => {
     });
   });
 
-  it("rejects automation state paths outside the project root", () => {
+  it("rejects automation state paths outside the workspace root", () => {
     const projectRoot = makeTempDir("dev-nexus-automation-project-");
     const config = automationConfig({
       ledger: {
@@ -182,7 +182,7 @@ describe("nexus automation", () => {
     });
 
     expect(() => nexusAutomationLedgerPath(projectRoot, config)).toThrow(
-      /must resolve inside the project root/,
+      /must resolve inside the workspace root/,
     );
   });
 

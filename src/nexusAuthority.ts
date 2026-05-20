@@ -104,7 +104,7 @@ export const recommendedNexusAuthorityRoleDefinitions: NexusAuthorityRoleDefinit
     id: "maintainer",
     name: "Maintainer",
     description:
-      "May update project state, push branches, open review requests, and integrate approved work when publication policy allows it.",
+      "May update workspace state, push branches, open review requests, and integrate approved work when publication policy allows it.",
     actions: [
       "project.read",
       "work_item.read",
@@ -174,7 +174,7 @@ export const recommendedNexusAuthorityRoleDefinitions: NexusAuthorityRoleDefinit
     id: "observer",
     name: "Observer",
     description:
-      "May read project and provider state and produce handoffs without source, tracker, provider, or runtime mutation authority.",
+      "May read workspace and provider state and produce handoffs without source, tracker, provider, or runtime mutation authority.",
     actions: [
       "project.read",
       "work_item.read",
@@ -1164,7 +1164,7 @@ function projectAuthoritySummaryText(
   components: readonly NexusAuthorityComponentSummary[],
 ): string {
   if (components.length === 0) {
-    return `Project ${projectId} has no component authority summaries.`;
+    return `Workspace ${projectId} has no component authority summaries.`;
   }
 
   return components

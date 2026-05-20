@@ -1018,86 +1018,86 @@ export function usage(): string {
     "  dev-nexus --help",
     "  dev-nexus mcp-stdio",
     "  dev-nexus home init [home-path] [options]",
-    "  dev-nexus project create <name> [options]",
-    "  dev-nexus project setup [project-root] [options]",
-    "  dev-nexus project component add <project-root> [options]",
-    "  dev-nexus project import <source-root> [options]",
-    "  dev-nexus project list [options]",
-    "  dev-nexus project status <project-id-or-root> [options]",
-    "  dev-nexus project hosting status <project-root> [options]",
-    "  dev-nexus project hosting plan <project-root> [options]",
-    "  dev-nexus project hosting apply <project-root> [options]",
-    "  dev-nexus project mcp refresh <project-root> [options]",
-    "  dev-nexus project plugin refresh <project-root> --from <package|path> [options]",
-    "  dev-nexus project agent-projection cleanup <project-root> [options]",
-    "  dev-nexus project tracker configure <project> --provider <provider> [options]",
-    "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
+    "  dev-nexus workspace create <name> [options]",
+    "  dev-nexus workspace setup [workspace-root] [options]",
+    "  dev-nexus workspace component add <workspace-root> [options]",
+    "  dev-nexus workspace import <source-root> [options]",
+    "  dev-nexus workspace list [options]",
+    "  dev-nexus workspace status <workspace-id-or-root> [options]",
+    "  dev-nexus workspace hosting status <workspace-root> [options]",
+    "  dev-nexus workspace hosting plan <workspace-root> [options]",
+    "  dev-nexus workspace hosting apply <workspace-root> [options]",
+    "  dev-nexus workspace mcp refresh <workspace-root> [options]",
+    "  dev-nexus workspace plugin refresh <workspace-root> --from <package|path> [options]",
+    "  dev-nexus workspace agent-projection cleanup <workspace-root> [options]",
+    "  dev-nexus workspace tracker configure <workspace> --provider <provider> [options]",
+    "  dev-nexus workspace tracker link <workspace> --tracker-project-id <id> [options]",
     "  dev-nexus setup list [options]",
-    "  dev-nexus setup plan <project-root> <flow-id> [options]",
-    "  dev-nexus setup check <project-root> <flow-id> [options]",
-    "  dev-nexus setup readiness <project-root> [options]",
-    "  dev-nexus setup record <project-root> <flow-id> <step-id> --status <status> [options]",
+    "  dev-nexus setup plan <workspace-root> <flow-id> [options]",
+    "  dev-nexus setup check <workspace-root> <flow-id> [options]",
+    "  dev-nexus setup readiness <workspace-root> [options]",
+    "  dev-nexus setup record <workspace-root> <flow-id> <step-id> --status <status> [options]",
     "  dev-nexus diagnostics cli-version-skew [options]",
-    "  dev-nexus host check <project-root> [options]",
-    "  dev-nexus coordination status <project-root> [options]",
-    "  dev-nexus coordination handoff <project-root> <work-item-id> --status <status> [options]",
-    "  dev-nexus coordination integrate <project-root> [options]",
-    "  dev-nexus coordination cleanup-plan <project-root> [options]",
-    "  dev-nexus coordination request <project-root> --intent <intent> (--question <text>|--note <text>) [options]",
-    "  dev-nexus remote-execution request create <project-root> [options]",
-    "  dev-nexus remote-execution result record <project-root> <request-id> [options]",
-    "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
-    "  dev-nexus remote-execution ssh-plan <project-root> <request-id> [options]",
-    "  dev-nexus worktree prepare <project-root> [options]",
-    "  dev-nexus publication green-main plan <project-root> --pr <number> --checks-file <json-file> [options]",
-    "  dev-nexus quick-fix plan <project-root> --work-item <id> [options]",
-    "  dev-nexus quick-fix start <project-root> --work-item <id> [options]",
-    "  dev-nexus quick-fix finish <project-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
-    "  dev-nexus work-item create <project-root> --title <title> [options]",
-    "  dev-nexus work-item discovery-status <project-root> [options]",
-    "  dev-nexus work-item claim-next <project-root> --host <id> [options]",
-    "  dev-nexus work-item list <project-root> [options]",
-    "  dev-nexus work-item get <project-root> <work-item-id> [options]",
-    "  dev-nexus work-item update <project-root> <work-item-id> [options]",
-    "  dev-nexus work-item comment <project-root> <work-item-id> --body <text> [options]",
-    "  dev-nexus work-item set-status <project-root> <work-item-id> --status <status> [options]",
-    "  dev-nexus work-item link <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
-    "  dev-nexus work-item show-links <project-root> <logical-item-id> [options]",
-    "  dev-nexus work-item unlink <project-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
-    "  dev-nexus work-item import-plan <project-root> --source-tracker <github-id> --target-tracker <local-id> [options]",
-    "  dev-nexus work-item import-execute <project-root> --source-tracker <github-id> --target-tracker <local-id> --direction external_to_local --credentials available [options]",
-    "  dev-nexus work-item sync-plan <project-root> --source-tracker <id> --target-tracker <id> [options]",
-    "  dev-nexus work-item sync-execute <project-root> --source-tracker <id> --target-tracker <id> --credentials available [options]",
-    "  dev-nexus ci-failure-intake plan <project-root> --input <json-file> [options]",
-    "  dev-nexus automation status <project-root> [options]",
-    "  dev-nexus automation eligible-work <project-root> [options]",
-    "  dev-nexus automation agent-profiles <project-root> [options]",
-    "  dev-nexus automation app-server-probe <project-root> [options]",
-    "  dev-nexus automation enqueue <project-root> --title <title> [options]",
-    "  dev-nexus automation heartbeat prepare <project-root> [options]",
-    "  dev-nexus automation target-cycle list <project-root> [options]",
-    "  dev-nexus automation target-cycle record <project-root> --status <status> [options]",
-    "  dev-nexus automation target-report <project-root> [options]",
-    "  dev-nexus automation run-once <project-root> [--command <command>] [options]",
-    "  dev-nexus automation schedule <project-root> [--command <command>] [options]",
-    "  dev-nexus automation coordinator-loop <project-root> [--command <command>] [options]",
-    "  dev-nexus automation current-agent adopt <project-root> [options]",
-    "  dev-nexus automation current-agent record <project-root> --run-id <id> --status <status> --summary <text> [options]",
+    "  dev-nexus host check <workspace-root> [options]",
+    "  dev-nexus coordination status <workspace-root> [options]",
+    "  dev-nexus coordination handoff <workspace-root> <work-item-id> --status <status> [options]",
+    "  dev-nexus coordination integrate <workspace-root> [options]",
+    "  dev-nexus coordination cleanup-plan <workspace-root> [options]",
+    "  dev-nexus coordination request <workspace-root> --intent <intent> (--question <text>|--note <text>) [options]",
+    "  dev-nexus remote-execution request create <workspace-root> [options]",
+    "  dev-nexus remote-execution result record <workspace-root> <request-id> [options]",
+    "  dev-nexus remote-execution result get <workspace-root> <request-id> [options]",
+    "  dev-nexus remote-execution ssh-plan <workspace-root> <request-id> [options]",
+    "  dev-nexus worktree prepare <workspace-root> [options]",
+    "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
+    "  dev-nexus quick-fix plan <workspace-root> --work-item <id> [options]",
+    "  dev-nexus quick-fix start <workspace-root> --work-item <id> [options]",
+    "  dev-nexus quick-fix finish <workspace-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
+    "  dev-nexus work-item create <workspace-root> --title <title> [options]",
+    "  dev-nexus work-item discovery-status <workspace-root> [options]",
+    "  dev-nexus work-item claim-next <workspace-root> --host <id> [options]",
+    "  dev-nexus work-item list <workspace-root> [options]",
+    "  dev-nexus work-item get <workspace-root> <work-item-id> [options]",
+    "  dev-nexus work-item update <workspace-root> <work-item-id> [options]",
+    "  dev-nexus work-item comment <workspace-root> <work-item-id> --body <text> [options]",
+    "  dev-nexus work-item set-status <workspace-root> <work-item-id> --status <status> [options]",
+    "  dev-nexus work-item link <workspace-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
+    "  dev-nexus work-item show-links <workspace-root> <logical-item-id> [options]",
+    "  dev-nexus work-item unlink <workspace-root> <logical-item-id> --tracker <id> --item-id <id> [options]",
+    "  dev-nexus work-item import-plan <workspace-root> --source-tracker <github-id> --target-tracker <local-id> [options]",
+    "  dev-nexus work-item import-execute <workspace-root> --source-tracker <github-id> --target-tracker <local-id> --direction external_to_local --credentials available [options]",
+    "  dev-nexus work-item sync-plan <workspace-root> --source-tracker <id> --target-tracker <id> [options]",
+    "  dev-nexus work-item sync-execute <workspace-root> --source-tracker <id> --target-tracker <id> --credentials available [options]",
+    "  dev-nexus ci-failure-intake plan <workspace-root> --input <json-file> [options]",
+    "  dev-nexus automation status <workspace-root> [options]",
+    "  dev-nexus automation eligible-work <workspace-root> [options]",
+    "  dev-nexus automation agent-profiles <workspace-root> [options]",
+    "  dev-nexus automation app-server-probe <workspace-root> [options]",
+    "  dev-nexus automation enqueue <workspace-root> --title <title> [options]",
+    "  dev-nexus automation heartbeat prepare <workspace-root> [options]",
+    "  dev-nexus automation target-cycle list <workspace-root> [options]",
+    "  dev-nexus automation target-cycle record <workspace-root> --status <status> [options]",
+    "  dev-nexus automation target-report <workspace-root> [options]",
+    "  dev-nexus automation run-once <workspace-root> [--command <command>] [options]",
+    "  dev-nexus automation schedule <workspace-root> [--command <command>] [options]",
+    "  dev-nexus automation coordinator-loop <workspace-root> [--command <command>] [options]",
+    "  dev-nexus automation current-agent adopt <workspace-root> [options]",
+    "  dev-nexus automation current-agent record <workspace-root> --run-id <id> --status <status> --summary <text> [options]",
     "",
     "Options for home init:",
     "  --projects-root <path>",
     "  --workspaces-root <path>",
     "  --json",
     "",
-    "Options for project commands:",
+    "Options for workspace commands:",
     "  --home <path>             defaults to DEV_NEXUS_HOME or ~/.dev-nexus",
     "  --json",
     "",
-    "Options for project hosting commands:",
+    "Options for workspace hosting commands:",
     "  --home <path>",
     "  --json",
     "",
-    "Options for project create:",
+    "Options for workspace create:",
     "  --home <path>",
     "  --root <path>",
     "  --from <git-url>",
@@ -1105,32 +1105,32 @@ export function usage(): string {
     "  --tracker-project-id <id>",
     "  --json",
     "",
-    "Options for project setup:",
+    "Options for workspace setup:",
     "  --home <path>",
     "  --answers <json-file>     setup answers for non-interactive automation",
     "  --yes                     apply local setup writes after preview validation",
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
-    "Options for project component add:",
+    "Options for workspace component add:",
     "  --answers <json-file>     component answers with one or more components",
     "  --home <path>",
-    "  --yes                     apply local project config/scaffold writes after preview validation",
+    "  --yes                     apply local workspace config/scaffold writes after preview validation",
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
-    "Options for project import:",
+    "Options for workspace import:",
     "  --home <path>",
-    "  --project-root <path>",
+    "  --workspace-root <path>",
     "  --name <name>",
     "  --tracker-project-id <id>",
     "  --json",
     "",
-    "Options for project mcp refresh:",
-    "  --agent <agent>           repeatable; defaults to project mcp.agentTargets or codex",
+    "Options for workspace mcp refresh:",
+    "  --agent <agent>           repeatable; defaults to workspace mcp.agentTargets or codex",
     "  --json",
     "",
-    "Options for project plugin refresh:",
+    "Options for workspace plugin refresh:",
     "  --from <package|path>     npm package name, local package directory, or module file",
     "  --export <name>           plugin config export; auto-detected when unambiguous",
     "  --skills-export <name>    skill definitions export; package skills/ is also discovered",
@@ -1139,12 +1139,12 @@ export function usage(): string {
     "  --dry-run                 resolve and validate without writing config or projections",
     "  --json",
     "",
-    "Options for project agent-projection cleanup:",
+    "Options for workspace agent-projection cleanup:",
     "  --apply                   remove only cleanup-safe stale generated provider support",
     "  --dry-run                 preview only; default when --apply is omitted",
     "  --json",
     "",
-    "Options for project tracker configure:",
+    "Options for workspace tracker configure:",
     "  --home <path>",
     "  --provider <local|github|gitlab|jira>",
     "  --host <host>",
@@ -1156,7 +1156,7 @@ export function usage(): string {
     "  --store-path <path>",
     "  --json",
     "",
-    "Options for project tracker link:",
+    "Options for workspace tracker link:",
     "  --home <path>",
     "  --tracker-project-id <id>",
     "  --json",
@@ -1215,8 +1215,8 @@ export function usage(): string {
     "",
     "Options for coordination cleanup-plan:",
     "  --component <id>          defaults to the primary component",
-    "  --include-project-meta    also scan project-meta worktrees and branches",
-    "  --target-branch <branch>  defaults to component or project publication target",
+    "  --include-workspace-meta  also scan workspace-meta worktrees and branches",
+    "  --target-branch <branch>  defaults to component or workspace publication target",
     "  --json",
     "",
     "Options for coordination request:",
@@ -1279,13 +1279,13 @@ export function usage(): string {
     "",
     "Options for worktree prepare:",
     "  --component <id>          prepare a component-scoped worktree; defaults to the primary component",
-    "  --project-meta            prepare a project/meta worktree rooted at the DevNexus project checkout",
+    "  --workspace-meta          prepare a workspace/meta worktree rooted at the DevNexus workspace checkout",
     "  --work-item <id>          owning work item id used for branch naming and metadata",
     "  --work-item-title <text>",
     "  --topic <text>            human-readable topic used when --work-item is omitted",
     "  --branch <name>           branch to create; defaults to codex/<scope>/<work-item-or-topic>",
     "  --worktree-name <name>    directory name under the configured worktrees root",
-    "  --base-ref <ref>          defaults to the component or project default branch",
+    "  --base-ref <ref>          defaults to the component or workspace default branch",
     "  --no-base-ref             create the branch from the source checkout HEAD",
     "  --host <id>               lease host id; defaults to local hostname",
     "  --agent <id>              optional lease agent/chat id",
@@ -1578,12 +1578,12 @@ export function usage(): string {
 export function projectSetupUsage(): string {
   return [
     "Usage:",
-    "  dev-nexus project setup [project-root] [options]",
+    "  dev-nexus workspace setup [workspace-root] [options]",
     "",
     "User quickstart:",
-    "  dev-nexus project setup",
+    "  dev-nexus workspace setup",
     "",
-    "Run from the directory you want to use, or pass [project-root] for scripted setup.",
+    "Run from the directory you want to use, or pass [workspace-root] for scripted setup.",
     "",
     "The DevNexus home defaults to DEV_NEXUS_HOME or ~/.dev-nexus.",
     "",
@@ -1594,25 +1594,25 @@ export function projectSetupUsage(): string {
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
-    "Provider mutations are not part of project setup.",
-    "Use project hosting commands for repository creation, access repair, and other provider writes.",
+    "Provider mutations are not part of workspace setup.",
+    "Use workspace hosting commands for repository creation, access repair, and other provider writes.",
   ].join("\n");
 }
 
 export function projectComponentAddUsage(): string {
   return [
     "Usage:",
-    "  dev-nexus project component add <project-root> [options]",
+    "  dev-nexus workspace component add <workspace-root> [options]",
     "",
     "Options:",
     "  --answers <json-file>     component answers with one or more components",
     "  --home <path>",
-    "  --yes                     apply local project config/scaffold writes after preview validation",
+    "  --yes                     apply local workspace config/scaffold writes after preview validation",
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
     "",
     "Provider mutations are not part of component add.",
-    "Use project hosting commands for repository creation, access repair, and other provider writes.",
+    "Use workspace hosting commands for repository creation, access repair, and other provider writes.",
   ].join("\n");
 }
 
@@ -1644,7 +1644,7 @@ async function mainUnchecked(
   if (argv[0] === "home") {
     return handleHomeCommand(argv, dependencies);
   }
-  if (argv[0] === "project") {
+  if (argv[0] === "workspace" || argv[0] === "project") {
     return handleProjectCommand(argv, dependencies);
   }
   if (argv[0] === "setup") {
@@ -1686,7 +1686,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
   );
 }
 
@@ -1766,7 +1766,7 @@ async function handleProjectCommand(
     if (parsed.yes) {
       assertCliMutationAllowed(dependencies, {
         projectRoot: proposal.answers.project.root,
-        command: "project setup",
+        command: "workspace setup",
         mutationClass: "worktree_bootstrap",
         targetPath: proposal.answers.project.root,
       });
@@ -1842,7 +1842,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
+  throw new Error("workspace requires create, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -1851,7 +1851,7 @@ async function handleProjectComponentCommand(
 ): Promise<number> {
   const subcommand = argv[2];
   if (subcommand !== "add") {
-    throw new Error("project component requires add");
+    throw new Error("workspace component requires add");
   }
 
   if (argvRequestsHelp(argv)) {
@@ -1868,7 +1868,7 @@ async function handleProjectComponentCommand(
   if (parsed.yes) {
     assertCliMutationAllowed(dependencies, {
       projectRoot: parsed.projectRoot,
-      command: "project component add",
+      command: "workspace component add",
       mutationClass: "project_state",
       targetPath: parsed.projectRoot,
     });
@@ -1904,7 +1904,7 @@ async function handleProjectHostingCommand(
   if (parsed.command === "apply") {
     assertCliMutationAllowed(dependencies, {
       projectRoot: statusResult.projectRoot,
-      command: "project hosting apply",
+      command: "workspace hosting apply",
       mutationClass: "local_remote_repair",
       targetPath: statusResult.projectRoot,
     });
@@ -1958,14 +1958,14 @@ async function handleProjectMcpCommand(
 ): Promise<number> {
   const command = argv[2];
   if (command !== "refresh") {
-    throw new Error("project mcp requires refresh");
+    throw new Error("workspace mcp requires refresh");
   }
 
   const parsed = parseProjectMcpRefreshCommand(argv);
   const projectRoot = path.resolve(parsed.projectRoot);
   assertCliMutationAllowed(dependencies, {
     projectRoot,
-    command: "project mcp refresh",
+    command: "workspace mcp refresh",
     mutationClass: "skill_mcp_projection",
   });
   const projectConfig = loadProjectConfig(projectRoot);
@@ -1987,14 +1987,14 @@ async function handleProjectPluginCommand(
 ): Promise<number> {
   const command = argv[2];
   if (command !== "refresh") {
-    throw new Error("project plugin requires refresh");
+    throw new Error("workspace plugin requires refresh");
   }
 
   const parsed = parseProjectPluginRefreshCommand(argv);
   const projectRoot = path.resolve(parsed.projectRoot);
   assertCliMutationAllowed(dependencies, {
     projectRoot,
-    command: "project plugin refresh",
+    command: "workspace plugin refresh",
     mutationClass: "skill_mcp_projection",
   });
   const result = await refreshNexusProjectPlugin({
@@ -2022,7 +2022,7 @@ async function handleProjectAgentProjectionCommand(
 ): Promise<number> {
   const command = argv[2];
   if (command !== "cleanup") {
-    throw new Error("project agent-projection requires cleanup");
+    throw new Error("workspace agent-projection requires cleanup");
   }
 
   const parsed = parseProjectAgentProjectionCleanupCommand(argv);
@@ -2030,7 +2030,7 @@ async function handleProjectAgentProjectionCommand(
   if (parsed.apply) {
     assertCliMutationAllowed(dependencies, {
       projectRoot,
-      command: "project agent-projection cleanup",
+      command: "workspace agent-projection cleanup",
       mutationClass: "cleanup_execution",
       targetPath: projectRoot,
     });
@@ -2100,7 +2100,7 @@ async function handleProjectTrackerCommand(
     return 0;
   }
 
-  throw new Error("project tracker requires configure or link");
+  throw new Error("workspace tracker requires configure or link");
 }
 
 async function handleSetupCommand(
@@ -3517,8 +3517,8 @@ function resolveAutomationCommandCliOptions(
   if (!command) {
     throw new Error(
       mode === "agent_launch"
-        ? `automation ${commandName} requires --command or project config automation.agent.command`
-        : `automation ${commandName} requires --command or project config automation.executor.command`,
+        ? `automation ${commandName} requires --command or workspace config automation.agent.command`
+        : `automation ${commandName} requires --command or workspace config automation.executor.command`,
     );
   }
 
@@ -3552,7 +3552,7 @@ function createAutomationCoordinatorLoopCliLauncher(
       );
       if (commandOptions.mode !== "agent_launch") {
         throw new Error(
-          "automation coordinator-loop requires project config automation.mode agent_launch",
+          "automation coordinator-loop requires workspace config automation.mode agent_launch",
         );
       }
       launcher = createNexusAutomationAgentCommandLauncher({
@@ -3642,7 +3642,7 @@ function resolveCliWorkItemAuthority(
       )
     : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   const publication = resolveNexusPublicationPolicy(config, component);
   const authProfiles = hostingAuthProfilesForCli(config, undefined);
@@ -3767,7 +3767,7 @@ function remoteExecutionCoordinationAttachmentRefs(
       )
     : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   const workItemId =
     qualifiedWorkItem?.itemId ??
@@ -3795,7 +3795,7 @@ function resolveDirectProject(
       )
     : resolvePrimaryProjectComponent(resolvedProjectRoot, config);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   if (!component.workTracking) {
     throw new Error(`Component ${component.id} work tracking is not configured`);
@@ -4000,7 +4000,7 @@ function parseHomeInitCommand(argv: string[]): ParsedHomeInitCommand {
 function parseProjectCreateCommand(argv: string[]): ParsedProjectCreateCommand {
   const [, , name, ...rest] = argv;
   if (!name || name.startsWith("--")) {
-    throw new Error("project create requires a name");
+    throw new Error("workspace create requires a name");
   }
 
   const parsed: ParsedProjectCreateCommand = { name };
@@ -4035,7 +4035,7 @@ function parseProjectCreateCommand(argv: string[]): ParsedProjectCreateCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project create option: ${arg}`);
+        throw new Error(`Unknown workspace create option: ${arg}`);
     }
   }
 
@@ -4078,12 +4078,12 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project setup option: ${arg}`);
+        throw new Error(`Unknown workspace setup option: ${arg}`);
     }
   }
 
   if (parsed.yes && parsed.dryRun) {
-    throw new Error("project setup --yes and --dry-run are mutually exclusive");
+    throw new Error("workspace setup --yes and --dry-run are mutually exclusive");
   }
 
   return parsed;
@@ -4125,18 +4125,18 @@ function parseProjectComponentAddCommand(argv: string[]): ParsedProjectComponent
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project component add option: ${arg}`);
+        throw new Error(`Unknown workspace component add option: ${arg}`);
     }
   }
 
   if (!parsed.projectRoot) {
-    throw new Error("project component add requires <project-root>");
+    throw new Error("workspace component add requires <workspace-root>");
   }
   if (!parsed.answersPath) {
-    throw new Error("project component add requires --answers <json-file>");
+    throw new Error("workspace component add requires --answers <json-file>");
   }
   if (parsed.yes && parsed.dryRun) {
-    throw new Error("project component add --yes and --dry-run are mutually exclusive");
+    throw new Error("workspace component add --yes and --dry-run are mutually exclusive");
   }
 
   return parsed as ParsedProjectComponentAddCommand;
@@ -4145,7 +4145,7 @@ function parseProjectComponentAddCommand(argv: string[]): ParsedProjectComponent
 function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
   const [, , root, ...rest] = argv;
   if (!root || root.startsWith("--")) {
-    throw new Error("project import requires a source root");
+    throw new Error("workspace import requires a source root");
   }
 
   const parsed: ParsedProjectImportCommand = { root };
@@ -4165,6 +4165,7 @@ function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
         parsed.homePath = next();
         break;
       case "--project-root":
+      case "--workspace-root":
         parsed.projectRoot = next();
         break;
       case "--name":
@@ -4177,7 +4178,7 @@ function parseProjectImportCommand(argv: string[]): ParsedProjectImportCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project import option: ${arg}`);
+        throw new Error(`Unknown workspace import option: ${arg}`);
     }
   }
 
@@ -4206,7 +4207,7 @@ function parseProjectListCommand(argv: string[]): ParsedProjectListCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project list option: ${arg}`);
+        throw new Error(`Unknown workspace list option: ${arg}`);
     }
   }
 
@@ -4223,7 +4224,7 @@ function parseCliOutputDetail(value: string, option: string): CliOutputDetail {
 function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
   const [, , project, ...rest] = argv;
   if (!project || project.startsWith("--")) {
-    throw new Error("project status requires a project id or root");
+    throw new Error("workspace status requires a workspace id or root");
   }
 
   const parsed: ParsedProjectStatusCommand = { project };
@@ -4252,7 +4253,7 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
         parsed.detail = parseCliOutputDetail(next(), arg);
         break;
       default:
-        throw new Error(`Unknown project status option: ${arg}`);
+        throw new Error(`Unknown workspace status option: ${arg}`);
     }
   }
 
@@ -4262,10 +4263,10 @@ function parseProjectStatusCommand(argv: string[]): ParsedProjectStatusCommand {
 function parseProjectHostingCommand(argv: string[]): ParsedProjectHostingCommand {
   const [, , command, projectRoot, ...rest] = argv;
   if (command !== "status" && command !== "plan" && command !== "apply") {
-    throw new Error("project hosting requires status, plan, or apply");
+    throw new Error("workspace hosting requires status, plan, or apply");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error(`project hosting ${command} requires a project root`);
+    throw new Error(`workspace hosting ${command} requires a workspace root`);
   }
 
   const parsed: ParsedProjectHostingCommand = { command, projectRoot };
@@ -4288,7 +4289,7 @@ function parseProjectHostingCommand(argv: string[]): ParsedProjectHostingCommand
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project hosting ${command} option: ${arg}`);
+        throw new Error(`Unknown workspace hosting ${command} option: ${arg}`);
     }
   }
 
@@ -4300,7 +4301,7 @@ function parseProjectMcpRefreshCommand(
 ): ParsedProjectMcpRefreshCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("project mcp refresh requires a project root");
+    throw new Error("workspace mcp refresh requires a workspace root");
   }
 
   const parsed: ParsedProjectMcpRefreshCommand = {
@@ -4326,7 +4327,7 @@ function parseProjectMcpRefreshCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project mcp refresh option: ${arg}`);
+        throw new Error(`Unknown workspace mcp refresh option: ${arg}`);
     }
   }
 
@@ -4338,7 +4339,7 @@ function parseProjectPluginRefreshCommand(
 ): ParsedProjectPluginRefreshCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("project plugin refresh requires a project root");
+    throw new Error("workspace plugin refresh requires a workspace root");
   }
 
   const parsed: ParsedProjectPluginRefreshCommand = {
@@ -4381,12 +4382,12 @@ function parseProjectPluginRefreshCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project plugin refresh option: ${arg}`);
+        throw new Error(`Unknown workspace plugin refresh option: ${arg}`);
     }
   }
 
   if (!parsed.from) {
-    throw new Error("project plugin refresh requires --from <package|path>");
+    throw new Error("workspace plugin refresh requires --from <package|path>");
   }
 
   return parsed;
@@ -4397,7 +4398,7 @@ function parseProjectAgentProjectionCleanupCommand(
 ): ParsedProjectAgentProjectionCleanupCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("project agent-projection cleanup requires a project root");
+    throw new Error("workspace agent-projection cleanup requires a workspace root");
   }
 
   const parsed: ParsedProjectAgentProjectionCleanupCommand = {
@@ -4415,11 +4416,11 @@ function parseProjectAgentProjectionCleanupCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project agent-projection cleanup option: ${arg}`);
+        throw new Error(`Unknown workspace agent-projection cleanup option: ${arg}`);
     }
   }
   if (parsed.apply && parsed.dryRun) {
-    throw new Error("project agent-projection cleanup cannot combine --apply and --dry-run");
+    throw new Error("workspace agent-projection cleanup cannot combine --apply and --dry-run");
   }
 
   return parsed;
@@ -4430,7 +4431,7 @@ function parseProjectTrackerConfigureCommand(
 ): ParsedProjectTrackerConfigureCommand {
   const [, , , project, ...rest] = argv;
   if (!project || project.startsWith("--")) {
-    throw new Error("project tracker configure requires a project");
+    throw new Error("workspace tracker configure requires a workspace");
   }
 
   const parsed: Partial<ParsedProjectTrackerConfigureCommand> = { project };
@@ -4477,12 +4478,12 @@ function parseProjectTrackerConfigureCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project tracker configure option: ${arg}`);
+        throw new Error(`Unknown workspace tracker configure option: ${arg}`);
     }
   }
 
   if (!parsed.provider) {
-    throw new Error("project tracker configure requires --provider");
+    throw new Error("workspace tracker configure requires --provider");
   }
 
   return parsed as ParsedProjectTrackerConfigureCommand;
@@ -4493,7 +4494,7 @@ function parseProjectTrackerLinkCommand(
 ): ParsedProjectTrackerLinkCommand {
   const [, , , project, ...rest] = argv;
   if (!project || project.startsWith("--")) {
-    throw new Error("project tracker link requires a project");
+    throw new Error("workspace tracker link requires a workspace");
   }
 
   const parsed: Partial<ParsedProjectTrackerLinkCommand> = { project };
@@ -4519,12 +4520,12 @@ function parseProjectTrackerLinkCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown project tracker link option: ${arg}`);
+        throw new Error(`Unknown workspace tracker link option: ${arg}`);
     }
   }
 
   if (!parsed.trackerProjectId) {
-    throw new Error("project tracker link requires --tracker-project-id");
+    throw new Error("workspace tracker link requires --tracker-project-id");
   }
 
   return parsed as ParsedProjectTrackerLinkCommand;
@@ -4547,7 +4548,7 @@ function parseSetupListCommand(argv: string[]): ParsedSetupListCommand {
 function parseSetupPlanCommand(argv: string[]): ParsedSetupPlanCommand {
   const [, , projectRoot, flowId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("setup plan requires a project root");
+    throw new Error("setup plan requires a workspace root");
   }
   if (!flowId || flowId.startsWith("--")) {
     throw new Error("setup plan requires a flow id");
@@ -4561,7 +4562,7 @@ function parseSetupPlanCommand(argv: string[]): ParsedSetupPlanCommand {
 function parseSetupCheckCommand(argv: string[]): ParsedSetupCheckCommand {
   const [, , projectRoot, flowId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("setup check requires a project root");
+    throw new Error("setup check requires a workspace root");
   }
   if (!flowId || flowId.startsWith("--")) {
     throw new Error("setup check requires a flow id");
@@ -4575,7 +4576,7 @@ function parseSetupCheckCommand(argv: string[]): ParsedSetupCheckCommand {
 function parseSetupReadinessCommand(argv: string[]): ParsedSetupReadinessCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("setup readiness requires a project root");
+    throw new Error("setup readiness requires a workspace root");
   }
 
   const parsed: ParsedSetupReadinessCommand = { projectRoot };
@@ -4643,7 +4644,7 @@ function parseSetupReadinessOptions(
 function parseSetupRecordCommand(argv: string[]): ParsedSetupRecordCommand {
   const [, , projectRoot, flowId, stepId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("setup record requires a project root");
+    throw new Error("setup record requires a workspace root");
   }
   if (!flowId || flowId.startsWith("--")) {
     throw new Error("setup record requires a flow id");
@@ -4695,7 +4696,7 @@ function parseCoordinationStatusCommand(
 ): ParsedCoordinationStatusCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("coordination status requires a project root");
+    throw new Error("coordination status requires a workspace root");
   }
 
   const parsed: ParsedCoordinationStatusCommand = { projectRoot };
@@ -4794,7 +4795,7 @@ function parseCoordinationHandoffCommand(
 ): ParsedCoordinationHandoffCommand {
   const [, , projectRoot, workItemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("coordination handoff requires a project root");
+    throw new Error("coordination handoff requires a workspace root");
   }
   if (!workItemId || workItemId.startsWith("--")) {
     throw new Error("coordination handoff requires a work item id");
@@ -4874,7 +4875,7 @@ function parseCoordinationIntegrateCommand(
 ): ParsedCoordinationIntegrateCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("coordination integrate requires a project root");
+    throw new Error("coordination integrate requires a workspace root");
   }
 
   const parsed: ParsedCoordinationIntegrateCommand = { projectRoot };
@@ -4927,7 +4928,7 @@ function parseCoordinationCleanupPlanCommand(
 ): ParsedCoordinationCleanupPlanCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("coordination cleanup-plan requires a project root");
+    throw new Error("coordination cleanup-plan requires a workspace root");
   }
 
   const parsed: ParsedCoordinationCleanupPlanCommand = { projectRoot };
@@ -4946,6 +4947,7 @@ function parseCoordinationCleanupPlanCommand(
       case "--component":
         parsed.componentId = next();
         break;
+      case "--include-workspace-meta":
       case "--include-project-meta":
         parsed.includeProjectMeta = true;
         break;
@@ -4968,7 +4970,7 @@ function parseCoordinationRequestCommand(
 ): ParsedCoordinationRequestCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("coordination request requires a project root");
+    throw new Error("coordination request requires a workspace root");
   }
 
   const parsed: Partial<ParsedCoordinationRequestCommand> = {
@@ -5053,7 +5055,7 @@ function parseCoordinationRequestCommand(
 function parseHostCheckCommand(argv: string[]): ParsedHostCheckCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("host check requires a project root");
+    throw new Error("host check requires a workspace root");
   }
 
   const parsed: ParsedHostCheckCommand = {
@@ -5100,7 +5102,7 @@ function parseRemoteExecutionRequestCreateCommand(
 ): ParsedRemoteExecutionRequestCreateCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("remote-execution request create requires a project root");
+    throw new Error("remote-execution request create requires a workspace root");
   }
 
   const parsed: Partial<ParsedRemoteExecutionRequestCreateCommand> = {
@@ -5204,7 +5206,7 @@ function parseRemoteExecutionResultRecordCommand(
 ): ParsedRemoteExecutionResultRecordCommand {
   const [, , , projectRoot, requestId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("remote-execution result record requires a project root");
+    throw new Error("remote-execution result record requires a workspace root");
   }
   if (!requestId || requestId.startsWith("--")) {
     throw new Error("remote-execution result record requires a request id");
@@ -5301,7 +5303,7 @@ function parseRemoteExecutionResultGetCommand(
 ): ParsedRemoteExecutionResultGetCommand {
   const [, , , projectRoot, requestId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("remote-execution result get requires a project root");
+    throw new Error("remote-execution result get requires a workspace root");
   }
   if (!requestId || requestId.startsWith("--")) {
     throw new Error("remote-execution result get requires a request id");
@@ -5327,7 +5329,7 @@ function parseRemoteExecutionSshPlanCommand(
 ): ParsedRemoteExecutionSshPlanCommand {
   const [, , projectRoot, requestId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("remote-execution ssh-plan requires a project root");
+    throw new Error("remote-execution ssh-plan requires a workspace root");
   }
   if (!requestId || requestId.startsWith("--")) {
     throw new Error("remote-execution ssh-plan requires a request id");
@@ -5368,7 +5370,7 @@ function parseWorktreePrepareCommand(
 ): ParsedWorktreePrepareCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("worktree prepare requires a project root");
+    throw new Error("worktree prepare requires a workspace root");
   }
 
   const parsed: ParsedWorktreePrepareCommand = {
@@ -5391,6 +5393,7 @@ function parseWorktreePrepareCommand(
       case "--component":
         parsed.componentId = next();
         break;
+      case "--workspace-meta":
       case "--project-meta":
         parsed.projectMeta = true;
         break;
@@ -5449,7 +5452,7 @@ function parsePublicationGreenMainPlanCommand(
     throw new Error("publication requires green-main plan");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication green-main plan requires a project root");
+    throw new Error("publication green-main plan requires a workspace root");
   }
 
   const parsed: Partial<ParsedPublicationGreenMainPlanCommand> = {
@@ -5603,7 +5606,7 @@ function parseQuickFixPlanCommand(argv: string[]): ParsedQuickFixPlanCommand {
     throw new Error("quick-fix requires plan, start, or finish");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error(`quick-fix ${command} requires a project root`);
+    throw new Error(`quick-fix ${command} requires a workspace root`);
   }
 
   const parsed: Partial<ParsedQuickFixPlanCommand> = {
@@ -5686,7 +5689,7 @@ function parseQuickFixPlanCommand(argv: string[]): ParsedQuickFixPlanCommand {
 function parseWorkItemCreateCommand(argv: string[]): ParsedWorkItemCreateCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item create requires a project root");
+    throw new Error("work-item create requires a workspace root");
   }
 
   const parsed: Partial<ParsedWorkItemCreateCommand> = {
@@ -5750,7 +5753,7 @@ function parseWorkItemDiscoveryStatusCommand(
 ): ParsedWorkItemDiscoveryStatusCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item discovery-status requires a project root");
+    throw new Error("work-item discovery-status requires a workspace root");
   }
 
   const parsed: ParsedWorkItemDiscoveryStatusCommand = { projectRoot };
@@ -5772,7 +5775,7 @@ function parseWorkItemClaimNextCommand(
 ): ParsedWorkItemClaimNextCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item claim-next requires a project root");
+    throw new Error("work-item claim-next requires a workspace root");
   }
 
   const parsed: Partial<ParsedWorkItemClaimNextCommand> = { projectRoot };
@@ -5836,7 +5839,7 @@ function parseWorkItemClaimNextCommand(
 function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item list requires a project root");
+    throw new Error("work-item list requires a workspace root");
   }
 
   const parsed: ParsedWorkItemListCommand = {
@@ -5892,7 +5895,7 @@ function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
 function parseWorkItemGetCommand(argv: string[]): ParsedWorkItemGetCommand {
   const [, , projectRoot, itemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item get requires a project root");
+    throw new Error("work-item get requires a workspace root");
   }
   if (!itemId || itemId.startsWith("--")) {
     throw new Error("work-item get requires a work item id");
@@ -5931,7 +5934,7 @@ function parseWorkItemGetCommand(argv: string[]): ParsedWorkItemGetCommand {
 function parseWorkItemUpdateCommand(argv: string[]): ParsedWorkItemUpdateCommand {
   const [, , projectRoot, itemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item update requires a project root");
+    throw new Error("work-item update requires a workspace root");
   }
   if (!itemId || itemId.startsWith("--")) {
     throw new Error("work-item update requires a work item id");
@@ -6040,7 +6043,7 @@ function parseWorkItemUpdateCommand(argv: string[]): ParsedWorkItemUpdateCommand
 function parseWorkItemCommentCommand(argv: string[]): ParsedWorkItemCommentCommand {
   const [, , projectRoot, itemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item comment requires a project root");
+    throw new Error("work-item comment requires a workspace root");
   }
   if (!itemId || itemId.startsWith("--")) {
     throw new Error("work-item comment requires a work item id");
@@ -6091,7 +6094,7 @@ function parseWorkItemSetStatusCommand(
 ): ParsedWorkItemSetStatusCommand {
   const [, , projectRoot, itemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item set-status requires a project root");
+    throw new Error("work-item set-status requires a workspace root");
   }
   if (!itemId || itemId.startsWith("--")) {
     throw new Error("work-item set-status requires a work item id");
@@ -6142,7 +6145,7 @@ function parseCiFailureIntakePlanCommand(
 ): ParsedCiFailureIntakePlanCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("ci-failure-intake plan requires a project root");
+    throw new Error("ci-failure-intake plan requires a workspace root");
   }
 
   const parsed: Partial<ParsedCiFailureIntakePlanCommand> = {
@@ -6208,7 +6211,7 @@ function readCiFailureIntakeInput(inputPath: string): {
 function parseWorkItemLinkCommand(argv: string[]): ParsedWorkItemLinkCommand {
   const [, , projectRoot, logicalItemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item link requires a project root");
+    throw new Error("work-item link requires a workspace root");
   }
   if (!logicalItemId || logicalItemId.startsWith("--")) {
     throw new Error("work-item link requires a logical work item id");
@@ -6298,7 +6301,7 @@ function parseWorkItemShowLinksCommand(
 ): ParsedWorkItemShowLinksCommand {
   const [, , projectRoot, logicalItemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item show-links requires a project root");
+    throw new Error("work-item show-links requires a workspace root");
   }
   if (!logicalItemId || logicalItemId.startsWith("--")) {
     throw new Error("work-item show-links requires a logical work item id");
@@ -6339,7 +6342,7 @@ function parseWorkItemUnlinkCommand(
 ): ParsedWorkItemUnlinkCommand {
   const [, , projectRoot, logicalItemId, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item unlink requires a project root");
+    throw new Error("work-item unlink requires a workspace root");
   }
   if (!logicalItemId || logicalItemId.startsWith("--")) {
     throw new Error("work-item unlink requires a logical work item id");
@@ -6396,7 +6399,7 @@ function parseWorkItemSyncPlanCommand(
 ): ParsedWorkItemSyncPlanCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item sync-plan requires a project root");
+    throw new Error("work-item sync-plan requires a workspace root");
   }
 
   const parsed: Partial<ParsedWorkItemSyncPlanCommand> = {
@@ -6501,7 +6504,7 @@ function parseWorkItemImportPlanCommand(
 ): ParsedWorkItemImportPlanCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("work-item import-plan requires a project root");
+    throw new Error("work-item import-plan requires a workspace root");
   }
 
   const parsed: Partial<ParsedWorkItemImportPlanCommand> = {
@@ -6604,7 +6607,7 @@ function parseAutomationEnqueueCommand(
 ): ParsedAutomationEnqueueCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation enqueue requires a project root");
+    throw new Error("automation enqueue requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationEnqueueCommand> = {
@@ -6665,7 +6668,7 @@ function parseAutomationHeartbeatPrepareCommand(
     throw new Error("automation heartbeat requires prepare");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation heartbeat prepare requires a project root");
+    throw new Error("automation heartbeat prepare requires a workspace root");
   }
 
   const parsed: ParsedAutomationHeartbeatPrepareCommand = { projectRoot };
@@ -6706,7 +6709,7 @@ function parseAutomationTargetCycleListCommand(
 ): ParsedAutomationTargetCycleListCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation target-cycle list requires a project root");
+    throw new Error("automation target-cycle list requires a workspace root");
   }
 
   const parsed: ParsedAutomationTargetCycleListCommand = { projectRoot };
@@ -6743,7 +6746,7 @@ function parseAutomationTargetCycleRecordCommand(
 ): ParsedAutomationTargetCycleRecordCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation target-cycle record requires a project root");
+    throw new Error("automation target-cycle record requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationTargetCycleRecordCommand> = {
@@ -6830,7 +6833,7 @@ function parseAutomationTargetReportCommand(
 ): ParsedAutomationTargetReportCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation target-report requires a project root");
+    throw new Error("automation target-report requires a workspace root");
   }
 
   const parsed: ParsedAutomationTargetReportCommand = { projectRoot };
@@ -6867,7 +6870,7 @@ function parseAutomationRunOnceCommand(
 ): ParsedAutomationRunOnceCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation run-once requires a project root");
+    throw new Error("automation run-once requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationRunOnceCommand> = { projectRoot };
@@ -6923,7 +6926,7 @@ function parseAutomationStatusCommand(
 ): ParsedAutomationStatusCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation status requires a project root");
+    throw new Error("automation status requires a workspace root");
   }
 
   const parsed: ParsedAutomationStatusCommand = { projectRoot };
@@ -6963,7 +6966,7 @@ function parseAutomationEligibleWorkCommand(
 ): ParsedAutomationEligibleWorkCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation eligible-work requires a project root");
+    throw new Error("automation eligible-work requires a workspace root");
   }
 
   const parsed: ParsedAutomationEligibleWorkCommand = { projectRoot };
@@ -7010,7 +7013,7 @@ function parseAutomationAgentProfilesCommand(
 ): ParsedAutomationAgentProfilesCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation agent-profiles requires a project root");
+    throw new Error("automation agent-profiles requires a workspace root");
   }
 
   const parsed: ParsedAutomationAgentProfilesCommand = { projectRoot };
@@ -7032,7 +7035,7 @@ function parseAutomationAppServerProbeCommand(
 ): ParsedAutomationAppServerProbeCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation app-server-probe requires a project root");
+    throw new Error("automation app-server-probe requires a workspace root");
   }
 
   const parsed: ParsedAutomationAppServerProbeCommand = { projectRoot };
@@ -7066,7 +7069,7 @@ function parseAutomationScheduleCommand(
 ): ParsedAutomationScheduleCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation schedule requires a project root");
+    throw new Error("automation schedule requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationScheduleCommand> = { projectRoot };
@@ -7125,7 +7128,7 @@ function parseAutomationCoordinatorLoopCommand(
 ): ParsedAutomationCoordinatorLoopCommand {
   const [, , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation coordinator-loop requires a project root");
+    throw new Error("automation coordinator-loop requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationCoordinatorLoopCommand> = { projectRoot };
@@ -7187,7 +7190,7 @@ function parseAutomationCurrentAgentAdoptCommand(
 ): ParsedAutomationCurrentAgentAdoptCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation current-agent adopt requires a project root");
+    throw new Error("automation current-agent adopt requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationCurrentAgentAdoptCommand> = { projectRoot };
@@ -7225,7 +7228,7 @@ function parseAutomationCurrentAgentRecordCommand(
 ): ParsedAutomationCurrentAgentRecordCommand {
   const [, , , projectRoot, ...rest] = argv;
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("automation current-agent record requires a project root");
+    throw new Error("automation current-agent record requires a workspace root");
   }
 
   const parsed: Partial<ParsedAutomationCurrentAgentRecordCommand> & {
@@ -7406,7 +7409,7 @@ function printProjectCreateResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project created.");
+  writeLine(stdout, "DevNexus workspace created.");
   printProjectStatusText(result.reference, stdout);
   writeLine(stdout, `  Config: ${result.projectConfigPath}`);
 }
@@ -7475,7 +7478,7 @@ function printProjectSetupApplyResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project setup applied.");
+  writeLine(stdout, "DevNexus workspace setup applied.");
   writeLine(stdout, `  Root: ${result.projectRoot}`);
   writeLine(stdout, `  Config: ${result.projectConfigPath}`);
   writeLine(stdout, `  Worktrees: ${result.worktreesRoot}`);
@@ -7522,8 +7525,8 @@ function printProjectComponentAddApplyResult(
     writtenFiles: result.writtenFiles,
     ensuredLocalTrackerStores: result.ensuredLocalTrackerStores,
     nextActions: [
-      "Run dev-nexus project status <project-root> to inspect the updated component graph.",
-      "Run dev-nexus setup check <project-root> join-existing-project to verify local readiness.",
+      "Run dev-nexus workspace status <workspace-root> to inspect the updated component graph.",
+      "Run dev-nexus setup check <workspace-root> join-existing-project to verify local readiness.",
       "Create component-scoped work items with --component <component-id>.",
     ],
   };
@@ -7532,7 +7535,7 @@ function printProjectComponentAddApplyResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project components added.");
+  writeLine(stdout, "DevNexus workspace components added.");
   writeLine(stdout, `  Root: ${result.projectRoot}`);
   writeLine(stdout, `  Added: ${result.proposal.addedComponentIds.join(", ")}`);
   for (const action of payload.nextActions) {
@@ -7544,7 +7547,7 @@ function renderProjectComponentAddSummary(
   proposal: NexusProjectComponentAddProposal,
 ): string {
   const lines = [
-    `Project component add proposal: ${proposal.project.name} (${proposal.project.id})`,
+    `Workspace component add proposal: ${proposal.project.name} (${proposal.project.id})`,
     `Root: ${proposal.projectRoot}`,
     `Existing components: ${proposal.existingComponentIds.join(", ") || "none"}`,
     `Added components: ${proposal.addedComponentIds.join(", ") || "none"}`,
@@ -7568,7 +7571,7 @@ function printProjectImportResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project imported.");
+  writeLine(stdout, "DevNexus workspace imported.");
   printProjectStatusText(result.reference, stdout);
   writeLine(stdout, `  Config: ${result.projectConfigPath}`);
 }
@@ -7584,7 +7587,7 @@ function printProjectListResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus projects: ${result.projects.length}`);
+  writeLine(stdout, `DevNexus workspaces: ${result.projects.length}`);
   for (const project of result.projects) {
     writeLine(stdout, `  ${project.id} ${project.projectRoot}`);
   }
@@ -7629,7 +7632,7 @@ function printProjectStatusResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus project ${project.id}.`);
+  writeLine(stdout, `DevNexus workspace ${project.id}.`);
   printProjectStatusText(project, stdout);
   writeLine(
     stdout,
@@ -7734,7 +7737,7 @@ function printProjectHostingStatusResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus project hosting status: ${result.status.status}.`);
+  writeLine(stdout, `DevNexus workspace hosting status: ${result.status.status}.`);
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(stdout, `  Root: ${result.projectRoot}`);
   writeLine(
@@ -7781,7 +7784,7 @@ function printProjectHostingPlanResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus project hosting plan: ${result.plan.status}.`);
+  writeLine(stdout, `DevNexus workspace hosting plan: ${result.plan.status}.`);
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(
     stdout,
@@ -7816,7 +7819,7 @@ function printProjectHostingApplyResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus project hosting apply: ${result.apply.status}.`);
+  writeLine(stdout, `DevNexus workspace hosting apply: ${result.apply.status}.`);
   writeLine(stdout, `  Project: ${result.project.id} (${result.project.name})`);
   writeLine(stdout, `  Actions: ${result.apply.actions.length}`);
   for (const action of result.apply.actions) {
@@ -7922,7 +7925,7 @@ function printProjectPluginRefreshResult(
 
   writeLine(
     stdout,
-    `DevNexus project plugin ${result.applied ? "refreshed" : "refresh dry-run"}.`,
+    `DevNexus workspace plugin ${result.applied ? "refreshed" : "refresh dry-run"}.`,
   );
   writeLine(stdout, `  Plugin: ${result.plugin.id}`);
   writeLine(stdout, `  Version: ${result.plugin.version ?? "not specified"}`);
@@ -7960,7 +7963,7 @@ function printProjectAgentProjectionCleanupPlanResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus agent projection cleanup dry-run: ${plan.status}.`);
+  writeLine(stdout, `DevNexus agent workspaceion cleanup dry-run: ${plan.status}.`);
   writeLine(stdout, `  Active providers: ${plan.activeProviders.join(",") || "none"}`);
   writeLine(stdout, `  Removable: ${plan.removableCount}`);
   writeLine(stdout, `  Skipped: ${plan.skippedCount}`);
@@ -7996,7 +7999,7 @@ function printProjectAgentProjectionCleanupApplyResult(
     return;
   }
 
-  writeLine(stdout, `DevNexus agent projection cleanup apply: ${result.status}.`);
+  writeLine(stdout, `DevNexus agent workspaceion cleanup apply: ${result.status}.`);
   writeLine(stdout, `  Removed: ${result.removed.length}`);
   for (const item of result.removed) {
     writeLine(stdout, `    ${item.provider} ${item.kind}: ${item.path}`);
@@ -8027,7 +8030,7 @@ function printProjectTrackerConfigureResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project tracker configured.");
+  writeLine(stdout, "DevNexus workspace tracker configured.");
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Provider: ${result.workTracking.provider}`);
 }
@@ -8043,7 +8046,7 @@ function printProjectTrackerLinkResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus project tracker linked.");
+  writeLine(stdout, "DevNexus workspace tracker linked.");
   writeLine(stdout, `  Project: ${result.project.id}`);
   writeLine(stdout, `  Tracker project: ${result.vibeKanbanProjectId}`);
 }
@@ -8103,7 +8106,7 @@ function printSetupCheckResult(
 
   writeLine(stdout, `DevNexus setup check: ${check.status}.`);
   writeLine(stdout, `  Flow: ${check.flow.id}`);
-  writeLine(stdout, `  Project root: ${check.projectRoot}`);
+  writeLine(stdout, `  Workspace root: ${check.projectRoot}`);
   for (const result of check.checks) {
     writeLine(stdout, `    ${result.id}: ${result.status} - ${result.summary}`);
   }
@@ -8159,7 +8162,7 @@ function printSetupReadinessResult(
   }
 
   writeLine(stdout, `DevNexus setup readiness: ${report.verdict}.`);
-  writeLine(stdout, `  Project root: ${report.projectRoot}`);
+  writeLine(stdout, `  Workspace root: ${report.projectRoot}`);
   for (const check of report.checks) {
     writeLine(stdout, `    ${check.id}: ${check.status} - ${check.summary}`);
   }
@@ -10015,7 +10018,7 @@ function automationConfigForProjectRoot(projectRoot: string): {
   const projectConfig = loadProjectConfig(path.resolve(projectRoot));
   const automationConfig = projectConfig.automation;
   if (!automationConfig) {
-    throw new Error("Project automation is not configured");
+    throw new Error("Workspace automation is not configured");
   }
 
   return {
@@ -10294,7 +10297,7 @@ function workItemImportExecutionAuthorityFromProject(
       )
     : resolvePrimaryProjectComponent(resolvedProjectRoot, projectConfig);
   if (!component) {
-    throw new Error(`Project component is not configured: ${componentId}`);
+    throw new Error(`Workspace component is not configured: ${componentId}`);
   }
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
   const authProfiles = loadNexusPublicationAuthProfiles({

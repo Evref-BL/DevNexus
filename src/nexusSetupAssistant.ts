@@ -50,6 +50,7 @@ import {
 } from "./nexusSkills.js";
 
 export type NexusSetupFlowId =
+  | "github-workspace-repository"
   | "github-meta-project"
   | "join-existing-project";
 
@@ -172,16 +173,16 @@ export interface RecordNexusSetupStepResult {
 
 const setupFlows: NexusSetupFlowSummary[] = [
   {
-    id: "github-meta-project",
-    title: "Create or connect GitHub meta-project hosting",
+    id: "github-workspace-repository",
+    title: "Create or connect GitHub workspace repository hosting",
     summary:
-      "Guide bot or organization setup, isolated GitHub auth, SSH aliases, and shared DevNexus meta-repo remotes.",
+      "Guide bot or organization setup, isolated GitHub auth, SSH aliases, and shared DevNexus workspace repository remotes.",
   },
   {
     id: "join-existing-project",
-    title: "Join an existing DevNexus project on this machine",
+    title: "Join an existing DevNexus workspace on this machine",
     summary:
-      "Guide a new machine through cloning a shared meta project, configuring host-local auth, preparing components, and refreshing agent setup.",
+      "Guide a new machine through cloning a shared workspace repository, configuring host-local auth, preparing components, and refreshing agent setup.",
   },
 ];
 
@@ -214,14 +215,14 @@ export function buildNexusSetupPlan(options: {
     nextActions:
       flow.id === "join-existing-project"
         ? [
-            "Install prerequisites, then choose a fresh DevNexus project root and clone or update the shared meta repository there.",
+            "Install prerequisites, then choose a fresh DevNexus workspace root and clone or update the shared workspace repository there.",
             "Configure human and automation GitHub auth profiles before allowing pushes.",
             "Run setup check again and address blocked component source roots or MCP projection gaps.",
           ]
         : [
-            "Choose whether the meta repository lives under a machine-user account or an organization.",
+            "Choose whether the workspace repository lives under a machine-user account or an organization.",
             "Complete manual GitHub account or organization setup before running verification checks.",
-            "Configure host-local auth profiles and only then create or connect the private meta repository.",
+            "Configure host-local auth profiles and only then create or connect the private workspace repository.",
           ],
   };
 }
@@ -243,7 +244,7 @@ export function buildNexusSetupCheck(options: {
     projectConfig = loadProjectConfig(projectRoot);
     checks.push({
       id: "project-config",
-      title: "Project config",
+      title: "Workspace config",
       status: "passed",
       summary: "dev-nexus.project.json loaded successfully.",
       nextAction: null,
@@ -251,20 +252,20 @@ export function buildNexusSetupCheck(options: {
   } catch (error) {
     checks.push({
       id: "project-config",
-      title: "Project config",
+      title: "Workspace config",
       status: "blocked",
       summary: error instanceof Error ? error.message : String(error),
-      nextAction: "Clone the shared meta repository or run this command from the project root.",
+      nextAction: "Clone the shared workspace repository or run this command from the workspace root.",
     });
   }
 
   checks.push(pathCheck({
-    id: "meta-git-repository",
-    title: "Meta Git repository",
+    id: "workspace-git-repository",
+    title: "Workspace Git repository",
     pathName: path.join(projectRoot, ".git"),
-    passedSummary: "The meta project is a Git checkout.",
-    blockedSummary: "The meta project is not a Git checkout at this path.",
-    nextAction: "Clone or initialize the shared DevNexus meta repository.",
+    passedSummary: "The workspace repository is a Git checkout.",
+    blockedSummary: "The workspace repository is not a Git checkout at this path.",
+    nextAction: "Clone or initialize the shared DevNexus workspace repository.",
     missingStatus: "blocked",
   }));
 
@@ -275,11 +276,11 @@ export function buildNexusSetupCheck(options: {
       title: `${target.agent} MCP config`,
       pathName: target.configPath,
       passedSummary:
-        `${target.provider} MCP config exists for this project root: ${target.configPathRelative}.`,
+        `${target.provider} MCP config exists for this workspace root: ${target.configPathRelative}.`,
       blockedSummary:
         `${target.provider} MCP config has not been projected or manually configured for this machine: ${target.configPathRelative}.`,
       nextAction:
-        "Run dev-nexus project mcp refresh . after installing DevNexus.",
+        "Run dev-nexus workspace mcp refresh . after installing DevNexus.",
       missingStatus: "warning",
     }));
     checks.push(agentMcpServerConfiguredCheck(target));
@@ -292,7 +293,7 @@ export function buildNexusSetupCheck(options: {
     checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
   }
 
-  if (flow.id === "github-meta-project" && projectConfig) {
+  if (flow.id === "github-workspace-repository" && projectConfig) {
     checks.push(...githubMetaProjectChecks(projectRoot, projectConfig, setupState));
   }
 
@@ -307,18 +308,18 @@ export function buildNexusSetupCheck(options: {
     const flowState = setupState.flows[flow.id];
     checks.push(recordedStepCheck({
       id: "agent-project-session",
-      title: "Agent project session",
+      title: "Agent workspace session",
       record:
         flowState?.steps[agentProjectSessionStepId] ??
         flowState?.steps[legacyCodexDesktopProjectStepId],
       passedSummary:
-        "Agent application project/session opening and DevNexus MCP visibility were recorded for this machine.",
+        "Agent application workspace/session opening and DevNexus MCP visibility were recorded for this machine.",
       pendingSummary:
-        "Repo-local MCP config exists, but opening the configured agent application or session on this project root has not been recorded.",
+        "Repo-local MCP config exists, but opening the configured agent application or session on this workspace root has not been recorded.",
       blockedSummary:
-        "Agent application project/session setup was recorded as blocked for this machine.",
+        "Agent application workspace/session setup was recorded as blocked for this machine.",
       nextAction:
-        `Open or restart the configured agent application on this project root, confirm DevNexus MCP tools are visible, then run dev-nexus setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible."`,
+        `Open or restart the configured agent application on this workspace root, confirm DevNexus MCP tools are visible, then run dev-nexus setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible."`,
     }));
   }
 
@@ -380,18 +381,19 @@ export function buildNexusMcpRuntimeFreshnessChecks(options: {
 export function recordNexusSetupStep(
   options: RecordNexusSetupStepOptions,
 ): RecordNexusSetupStepResult {
-  setupFlow(options.flowId);
+  const flow = setupFlow(options.flowId);
   const statePath = nexusSetupStatePath(options.projectRoot);
   const now = normalizeNow(options.now?.() ?? new Date());
   const state = readNexusSetupState(statePath);
-  const flowState = state.flows[options.flowId] ?? { steps: {} };
+  const legacyFlowState = state.flows[options.flowId] ?? { steps: {} };
+  const flowState = state.flows[flow.id] ?? legacyFlowState;
 
   flowState.steps[options.stepId] = {
     status: options.status,
     note: options.note ?? null,
     updatedAt: now,
   };
-  state.flows[options.flowId] = flowState;
+  state.flows[flow.id] = flowState;
   state.updatedAt = now;
 
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
@@ -405,7 +407,10 @@ export function nexusSetupStatePath(projectRoot: string): string {
 }
 
 function setupFlow(flowId: NexusSetupFlowId | string): NexusSetupFlowSummary {
-  const flow = setupFlows.find((candidate) => candidate.id === flowId);
+  const normalizedFlowId = flowId === "github-meta-project"
+    ? "github-workspace-repository"
+    : flowId;
+  const flow = setupFlows.find((candidate) => candidate.id === normalizedFlowId);
   if (!flow) {
     throw new Error(`Unknown DevNexus setup flow: ${flowId}`);
   }
@@ -533,7 +538,7 @@ function metaProjectRemotePlan(
     };
   }
 
-  const metaRemote = projectConfig.repo.remoteUrl ?? "<meta-repo-url>";
+  const metaRemote = projectConfig.repo.remoteUrl ?? "<workspace-repository-url>";
   const botRemote = metaRemote;
   return {
     humanRemote: humanRemoteFromAutomationRemote(metaRemote),
@@ -671,12 +676,12 @@ function joinExistingProjectSteps(options: {
       checks: ["git --version", "gh --version", "node --version", `${devNexusCommand} --help`],
     },
     {
-      id: "clone-or-update-meta-repo",
-      title: "Clone or update the shared meta repository",
+      id: "clone-or-update-workspace-repository",
+      title: "Clone or update the shared workspace repository",
       kind: "manual",
       scope: "host-local",
       summary:
-        `Create or reuse the DevNexus project root at ${projectRootForPlatform}; this directory is the shared meta project checkout, not a component source checkout.`,
+        `Create or reuse the DevNexus workspace root at ${projectRootForPlatform}; this directory is the shared workspace repository checkout, not a component source checkout.`,
       commands: [
         makeDirectoryCommand(path.dirname(projectRootForPlatform), options.platform),
         `git clone ${humanRemote} ${shellPathPlaceholder(projectRootForPlatform)}`,
@@ -684,9 +689,9 @@ function joinExistingProjectSteps(options: {
         "git pull --ff-only",
       ],
       manualInstructions: [
-        `Use ${projectRootForPlatform} as the fresh DevNexus project directory on this machine unless you intentionally chose another empty location.`,
-        "The cloned meta repository root becomes the DevNexus project root for later setup, MCP refresh, automation, and work-item commands.",
-        "Do not clone the meta project inside a component source checkout; component sources are prepared in a later step.",
+        `Use ${projectRootForPlatform} as the fresh DevNexus workspace directory on this machine unless you intentionally chose another empty location.`,
+        "The cloned workspace repository root becomes the DevNexus workspace root for later setup, MCP refresh, automation, and work-item commands.",
+        "Do not clone the workspace repository inside a component source checkout; component sources are prepared in a later step.",
         "Use your human account for the normal origin remote when the repo is private and you are a collaborator.",
         "If this directory already exists, inspect dirty state before pulling.",
       ],
@@ -732,7 +737,7 @@ function joinExistingProjectSteps(options: {
         ],
       }),
       manualInstructions: [
-        "Keep bot/app tokens and private keys host-local; do not commit them to the meta repo.",
+        "Keep bot/app tokens and private keys host-local; do not commit them to the workspace repository.",
         "If using an SSH host alias, configure it in ~/.ssh/config before validating the bot remote.",
       ],
       checks: [
@@ -741,8 +746,8 @@ function joinExistingProjectSteps(options: {
       ],
     },
     {
-      id: "configure-meta-remotes",
-      title: "Configure meta-project remotes",
+      id: "configure-workspace-remotes",
+      title: "Configure workspace repository remotes",
       kind: "automated",
       scope: "host-local",
       summary: "Set origin for human work and bot for automation publication.",
@@ -753,7 +758,7 @@ function joinExistingProjectSteps(options: {
         "git fetch bot",
       ],
       manualInstructions: [
-        "Run these from the DevNexus meta-project root after both accounts can read the private repository.",
+        "Run these from the DevNexus workspace root after both accounts can read the private repository.",
       ],
       checks: ["git remote -v", "git fetch --dry-run origin", "git fetch --dry-run bot"],
     },
@@ -783,16 +788,16 @@ function joinExistingProjectSteps(options: {
       title: "Refresh agent MCP and skills projection",
       kind: "automated",
       scope: "host-local",
-      summary: "Project DevNexus MCP and agent support files for this machine.",
+      summary: "Refresh DevNexus MCP and agent support files for this machine.",
       commands: [
-        `${devNexusCommand} project mcp refresh .`,
+        `${devNexusCommand} workspace mcp refresh .`,
         `${devNexusCommand} automation eligible-work . --json`,
       ],
       manualInstructions: [
-        "Run from the meta-project root after installing DevNexus and configuring local paths.",
+        "Run from the workspace root after installing DevNexus and configuring local paths.",
         `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
         "Plugin-projected skills and plugin MCP servers may require plugin-specific setup commands; setup check reports those gaps explicitly.",
-        "A raw stdio MCP tools/list smoke test confirms the server command works, but the agent project session is not ready until the active provider exposes the tools in its own session.",
+        "A raw stdio MCP tools/list smoke test confirms the server command works, but the agent workspace session is not ready until the active provider exposes the tools in its own session.",
       ],
       checks: [
         ...agentMcpConfigCheckCommands(
@@ -810,26 +815,26 @@ function joinExistingProjectSteps(options: {
     },
     {
       id: agentProjectSessionStepId,
-      title: "Open agent project session",
+      title: "Open agent workspace session",
       kind: "manual",
       scope: "host-local",
       summary:
-        "Open or create the configured agent application project/session for this meta-project root; DevNexus projects repo-local MCP config but does not mutate private agent app state.",
+        "Open or create the configured agent application workspace/session for this workspace root; DevNexus writes repo-local MCP config but does not mutate private agent app state.",
       commands: [
         `${devNexusCommand} setup record . join-existing-project ${agentProjectSessionStepId} --status completed --note "DevNexus MCP tools visible in the configured agent application."`,
       ],
       manualInstructions: [
-        `In the configured agent application or CLI provider, create, open, or select a project/session rooted at ${projectRootForPlatform}.`,
+        `In the configured agent application or CLI provider, create, open, or select a workspace/session rooted at ${projectRootForPlatform}.`,
         `Configured agent MCP targets: ${agentMcpTargets.length > 0 ? agentMcpTargets.map(agentMcpTargetSummary).join("; ") : "none"}.`,
-        "Confirm the provider is using the generated MCP config from the meta-project root.",
-        "For Codex Desktop, this means opening or creating a Codex project at the meta-project root; other providers may use a different project/session model.",
+        "Confirm the provider is using the generated MCP config from the workspace root.",
+        "For Codex Desktop, this means opening or creating a Codex project at the workspace root; other providers may use a different workspace/session model.",
         "Reload, restart, or start a fresh provider session if the DevNexus MCP tools are not visible after the MCP refresh.",
         "Do not treat a standalone stdio tools/list probe as completion for this step; it only proves the MCP server command can start.",
         "Run the setup record command only after the active provider session can see the DevNexus MCP tools.",
-        "Do not edit provider global state or app databases directly; treat project/session registration as a manual provider action until a supported API exists.",
+        "Do not edit provider global state or app databases directly; treat workspace/session registration as a manual provider action until a supported API exists.",
       ],
       checks: [
-        "Open the configured agent application or session on the meta-project root and confirm DevNexus MCP tools are visible.",
+        "Open the configured agent application or session on the workspace root and confirm DevNexus MCP tools are visible.",
         `${devNexusCommand} setup check . join-existing-project --platform ${options.platform} --json`,
       ],
     },
@@ -873,18 +878,18 @@ function githubMetaProjectSteps(options: {
   return [
     {
       id: "choose-hosting-namespace",
-      title: "Choose meta-project hosting namespace",
+      title: "Choose workspace repository hosting namespace",
       kind: "manual",
       scope: "shared",
       summary:
-        `Choose where the shared meta repository lives. Recommended bot account: ${guide.recommendedBotAccount}; recommended organization namespace: ${guide.recommendedOrgNamespace}; repository: ${guide.repositoryName}.`,
+        `Choose where the shared workspace repository lives. Recommended bot account: ${guide.recommendedBotAccount}; recommended organization namespace: ${guide.recommendedOrgNamespace}; repository: ${guide.repositoryName}.`,
       commands: [],
       manualInstructions: [
         `Use a clearly named machine-user or app actor for automation activity, for example ${guide.recommendedBotAccount}; custom names are fine when recorded in hosting/auth profile metadata.`,
         `Use a private organization namespace such as ${guide.recommendedOrgNamespace} when team ownership is more important than machine-user simplicity.`,
         "Create GitHub accounts, verify email addresses, complete browser/device login, and create organizations manually; DevNexus must not automate account or organization creation.",
         `Record only portable hosting intent in dev-nexus.project.json: provider=github, namespace=${guide.namespace}, repository=${guide.repositoryName}, visibility=${guide.visibility}, defaultBranch=${guide.defaultBranch}.`,
-        "Keep source project repositories separate from DevNexus meta-project repositories when needed.",
+        "Keep source repositories separate from DevNexus workspace repositories when needed.",
       ],
       checks: [],
     },
@@ -914,7 +919,7 @@ function githubMetaProjectSteps(options: {
       manualInstructions: [
         "Create an SSH host alias such as github.com-<bot> in ~/.ssh/config or the Windows user SSH config before validating the bot remote.",
         "Do not commit tokens, private keys, or gh config directories.",
-        "Keep GH_CONFIG_DIR, SSH key paths, GitHub App private keys, and wrapper commands in host-local DevNexus home config or shell state, not in the shared meta repository.",
+        "Keep GH_CONFIG_DIR, SSH key paths, GitHub App private keys, and wrapper commands in host-local DevNexus home config or shell state, not in the shared workspace repository.",
       ],
       checks: [
         "gh auth status --hostname github.com",
@@ -923,19 +928,19 @@ function githubMetaProjectSteps(options: {
       ],
     },
     {
-      id: "connect-meta-repository",
-      title: "Connect meta repository",
+      id: "connect-workspace-repository",
+      title: "Connect workspace repository",
       kind: "manual",
       scope: "host-local",
       summary:
         guide.allowCreate
-          ? "Propose creating or connecting the shared meta repository; live creation still requires explicit approval and configured credentials."
-          : "Connect the shared meta repository; automatic GitHub repository creation is disabled by project policy.",
+          ? "Propose creating or connecting the shared workspace repository; live creation still requires explicit approval and configured credentials."
+          : "Connect the shared workspace repository; automatic GitHub repository creation is disabled by workspace policy.",
       commands: [
-        `${devNexusCommand} project hosting status . --json`,
-        `${devNexusCommand} project hosting plan . --json`,
+        `${devNexusCommand} workspace hosting status . --json`,
+        `${devNexusCommand} workspace hosting plan . --json`,
         ...(guide.allowCreate
-          ? [`${devNexusCommand} project hosting apply . --json`]
+          ? [`${devNexusCommand} workspace hosting apply . --json`]
           : []),
         `git remote set-url origin ${humanRemote}`,
         `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
@@ -945,14 +950,14 @@ function githubMetaProjectSteps(options: {
       ],
       manualInstructions: [
         guide.allowCreate
-          ? "Treat project hosting apply as an approval-required operation; review the plan first and run apply only after confirming the selected namespace, actor permissions, and no-secret boundary."
-          : "If project hosting status or plan reports a missing repository, create it manually in the provider or update hosting metadata; apply will not create it while allowCreate is false.",
+          ? "Treat workspace hosting apply as an approval-required operation; review the plan first and run apply only after confirming the selected namespace, actor permissions, and no-secret boundary."
+          : "If workspace hosting status or plan reports a missing repository, create it manually in the provider or update hosting metadata; apply will not create it while allowCreate is false.",
         "Use origin for human/manual access and bot for the automation actor remote so later publication guardrails can distinguish actors.",
         "Do not push until repository existence, remotes, and actor permissions are verified.",
       ],
       checks: [
-        `${devNexusCommand} project hosting status . --json`,
-        `${devNexusCommand} project hosting plan . --json`,
+        `${devNexusCommand} workspace hosting status . --json`,
+        `${devNexusCommand} workspace hosting plan . --json`,
         `git ls-remote ${humanRemote} HEAD`,
         `git ls-remote ${botRemote} HEAD`,
         "git remote -v",
@@ -969,15 +974,15 @@ function githubMetaProjectSteps(options: {
         "Confirm DevNexus hosting and publication metadata identify the intended human and automation actors before agents publish.",
       commands: [
         "dev-nexus automation status . --json",
-        "dev-nexus setup check . github-meta-project --json",
+        "dev-nexus setup check . github-workspace-repository --json",
       ],
       manualInstructions: [
-        "Project hosting metadata should describe expected remotes; component or automation publication policy should name the remote future agents may push.",
+        "Workspace hosting metadata should describe expected remotes; component or automation publication policy should name the remote future agents may push.",
         "Do not store secrets in shared publication guardrails. Store only actor kind/provider/handle, remote names, SSH host aliases, and non-secret command environment keys.",
       ],
       checks: [
         "dev-nexus automation status . --json",
-        "dev-nexus setup check . github-meta-project --json",
+        "dev-nexus setup check . github-workspace-repository --json",
       ],
     },
     {
@@ -988,14 +993,14 @@ function githubMetaProjectSteps(options: {
       summary: "Save a final non-secret setup report that another machine or agent can read before continuing.",
       commands: [
         makeDirectoryCommand(setupCommandPath(".dev-nexus/host-setup", options.platform), options.platform),
-        "dev-nexus setup check . github-meta-project --json > .dev-nexus/host-setup/github-meta-project-report.json",
+        "dev-nexus setup check . github-workspace-repository --json > .dev-nexus/host-setup/github-workspace-repository-report.json",
         "git status --short --branch",
       ],
       manualInstructions: [
         "Keep the report host-local under .dev-nexus/host-setup; it may mention local paths or auth profile ids but must not contain tokens, private keys, or gh config contents.",
       ],
       checks: [
-        "test -f .dev-nexus/host-setup/github-meta-project-report.json",
+        "test -f .dev-nexus/host-setup/github-workspace-repository-report.json",
       ],
     },
   ];
@@ -1123,7 +1128,7 @@ function agentProjectionStatusChecks(
     nextAction: summaryStatus === "passed"
       ? null
       : status.explicit
-        ? "Review non-passed agent projection checks before refreshing or cleaning provider-native support state."
+        ? "Review non-passed agent workspaceion checks before refreshing or cleaning provider-native support state."
         : "Add config.agentTargets.active to make provider projection selection explicit.",
   }];
 
@@ -1168,7 +1173,7 @@ function agentProjectionPathCheck(
       : projection.state === "expected-missing"
         ? `Refresh ${projection.provider} ${projection.kind} projection or record why this host intentionally leaves it missing.`
         : projection.cleanupSafe
-          ? "Run dev-nexus project agent-projection cleanup <project-root> --dry-run before applying cleanup; do not remove source-controlled or manual files."
+          ? "Run dev-nexus workspace agent-projection cleanup <workspace-root> --dry-run before applying cleanup; do not remove source-controlled or manual files."
           : "Inspect the file ownership before cleanup; DevNexus does not classify this path as generated cleanup-safe support.",
   };
 }
@@ -1180,7 +1185,7 @@ function agentProjectionPolicyCheck(
     id:
       `agent-projection-policy-${setupCheckIdPart(diagnostic.provider)}-` +
       `${setupCheckIdPart(diagnostic.state)}`,
-    title: `${diagnostic.provider} agent projection policy`,
+    title: `${diagnostic.provider} agent workspaceion policy`,
     status: "warning",
     summary: `state=${diagnostic.state}; source=${diagnostic.source}; ${diagnostic.reason}`,
     nextAction:
@@ -1221,7 +1226,7 @@ function pluginProjectedSkillChecks(
       passedSummary: `Plugin-projected skill is materialized in ${nexusSkillSupportDirectoryName}/${nexusSkillsDirectoryName}: ${skillId}.`,
       blockedSummary: `Plugin ${pluginLabel} declares projected skill ${skillId}, but it is not materialized in ${nexusSkillSupportDirectoryName}/${nexusSkillsDirectoryName}.`,
       nextAction:
-        `Run the plugin skill refresh/setup command or update the project skill bundle before assigning ${pluginLabel} worker tasks.`,
+        `Run the plugin skill refresh/setup command or update the workspace skill bundle before assigning ${pluginLabel} worker tasks.`,
       missingStatus: "warning",
     }));
 
@@ -1238,7 +1243,7 @@ function pluginProjectedSkillChecks(
         passedSummary: `Plugin-projected skill ${skillId} is available to ${target.agent}.`,
         blockedSummary: `Plugin-projected skill ${skillId} is missing from the ${target.agent} skill directory.`,
         nextAction:
-          `Refresh ${target.agent} skill projection after the project-managed ${skillId} skill is materialized.`,
+          `Refresh ${target.agent} skill projection after the workspace-managed ${skillId} skill is materialized.`,
         missingStatus: "warning",
       }));
     }
@@ -1297,7 +1302,7 @@ function pluginMcpServerCheck(options: {
       summary:
         `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.provider} MCP config is missing.`,
       nextAction:
-        `Project ${options.provider} MCP config at ${options.configPathRelative}, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
+        `Refresh ${options.provider} MCP config at ${options.configPathRelative}, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
     };
   }
 
@@ -1378,7 +1383,7 @@ function agentMcpServerConfiguredCheck(
       summary:
         `${target.provider} MCP config is missing, so DevNexus cannot confirm ${target.serverName} is configured.`,
       nextAction:
-        `Run dev-nexus project mcp refresh . to project ${target.serverName} into ${target.configPathRelative}.`,
+        `Run dev-nexus workspace mcp refresh . to project ${target.serverName} into ${target.configPathRelative}.`,
     };
   }
 
@@ -1407,7 +1412,7 @@ function agentMcpServerConfiguredCheck(
           `DevNexus MCP server ${target.serverName} is configured for ${target.provider}, but its command line is stale or unexpected. ` +
           `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.`,
         nextAction:
-          `Run dev-nexus project mcp refresh . and reload or restart the ${target.provider} session so it uses ${formatMcpCommandLine(expectedCommandLine)}.`,
+          `Run dev-nexus workspace mcp refresh . and reload or restart the ${target.provider} session so it uses ${formatMcpCommandLine(expectedCommandLine)}.`,
       };
     }
 
@@ -1429,7 +1434,7 @@ function agentMcpServerConfiguredCheck(
         : `DevNexus cannot inspect ${target.provider} MCP config schema ${target.configSchema} for server ${target.serverName}.`,
     nextAction:
       configured === false
-        ? `Run dev-nexus project mcp refresh . and confirm ${target.serverName} appears in ${target.configPathRelative}.`
+        ? `Run dev-nexus workspace mcp refresh . and confirm ${target.serverName} appears in ${target.configPathRelative}.`
         : `Confirm ${target.serverName} manually in ${target.configPathRelative}, or add a DevNexus adapter for ${target.provider}.`,
   };
 }
@@ -2238,7 +2243,7 @@ function componentSourceRootTopologyCheck(options: {
   const status: NexusSetupCheckStatus =
     topology.state === "missing" || topology.state === "incompatible-platform"
       ? "blocked"
-      : topology.layout === "project-local" && topology.state === "present"
+      : topology.layout === "workspace-local" && topology.state === "present"
         ? "passed"
         : "warning";
   return {
@@ -2422,7 +2427,7 @@ function githubMetaProjectReadinessChecks(
       title: "GitHub hosting config",
       status: "warning",
       summary:
-        "No shared hosting record is configured; setup is falling back to repo.remoteUrl for meta-project remotes.",
+        "No shared hosting record is configured; setup is falling back to repo.remoteUrl for workspace repository remotes.",
       nextAction:
         "Add a dev-nexus.project.json hosting record before relying on automation publication guardrails from this setup flow.",
     });
@@ -2449,7 +2454,7 @@ function hostingStatusSetupCheck(
     nextAction:
       status.status === "passed"
         ? null
-        : "Run dev-nexus project hosting status . --json for full drift details, then dev-nexus project hosting plan . --json before any apply.",
+        : "Run dev-nexus workspace hosting status . --json for full drift details, then dev-nexus workspace hosting plan . --json before any apply.",
   };
 }
 
@@ -2477,7 +2482,7 @@ function hostingPlanSetupCheck(
     nextAction:
       plan.status === "passed"
         ? null
-        : "Run dev-nexus project hosting plan . --json and use dev-nexus project hosting apply . --json only when provisioning policy allows the proposed repairs.",
+        : "Run dev-nexus workspace hosting plan . --json and use dev-nexus workspace hosting apply . --json only when provisioning policy allows the proposed repairs.",
   };
 }
 
@@ -2526,17 +2531,19 @@ function statusCountSummary(values: string[]): string {
 function githubMetaProjectSetupRecordChecks(
   setupState: NexusSetupState,
 ): NexusSetupCheckResult[] {
-  const flowState = setupState.flows["github-meta-project"];
+  const flowState =
+    setupState.flows["github-workspace-repository"] ??
+    setupState.flows["github-meta-project"];
   return [recordedStepCheck({
-    id: "github-meta-final-report",
-    title: "GitHub meta-project setup report",
+    id: "github-workspace-repository-final-report",
+    title: "GitHub workspace repository setup report",
     record: flowState?.steps["write-setup-report"],
     passedSummary:
-      "A host-local GitHub meta-project setup report was recorded for this machine.",
+      "A host-local GitHub workspace repository setup report was recorded for this machine.",
     pendingSummary:
-      "A host-local GitHub meta-project setup report has not been recorded yet.",
+      "A host-local GitHub workspace repository setup report has not been recorded yet.",
     blockedSummary:
-      "The host-local GitHub meta-project setup report was recorded as blocked.",
+      "The host-local GitHub workspace repository setup report was recorded as blocked.",
     nextAction:
       "Run the final setup check command and save the JSON report under .dev-nexus/host-setup before handoff.",
   })];
@@ -2550,32 +2557,32 @@ function metaRepositoryRemoteChecks(options: {
     const actualUrl = gitRemoteUrl(options.projectRoot, remoteName);
     if (actualUrl === null) {
       return {
-        id: `meta-remote-${setupCheckIdPart(remoteName)}`,
-        title: `Meta remote ${remoteName}`,
+        id: `workspace-remote-${setupCheckIdPart(remoteName)}`,
+        title: `Workspace remote ${remoteName}`,
         status: "blocked",
-        summary: `Meta repository remote ${remoteName} is not configured.`,
+        summary: `Workspace repository remote ${remoteName} is not configured.`,
         nextAction:
-          `Run git remote add ${remoteName} ${expectedUrl} from the DevNexus meta-project root.`,
+          `Run git remote add ${remoteName} ${expectedUrl} from the DevNexus workspace root.`,
       };
     }
 
     if (actualUrl.trim() !== expectedUrl) {
       return {
-        id: `meta-remote-${setupCheckIdPart(remoteName)}`,
-        title: `Meta remote ${remoteName}`,
+        id: `workspace-remote-${setupCheckIdPart(remoteName)}`,
+        title: `Workspace remote ${remoteName}`,
         status: "blocked",
         summary:
-          `Meta repository remote ${remoteName} points to ${actualUrl}, expected ${expectedUrl}.`,
+          `Workspace repository remote ${remoteName} points to ${actualUrl}, expected ${expectedUrl}.`,
         nextAction:
           `Run git remote set-url ${remoteName} ${expectedUrl} after confirming this machine should use that actor/remote.`,
       };
     }
 
     return {
-      id: `meta-remote-${setupCheckIdPart(remoteName)}`,
-      title: `Meta remote ${remoteName}`,
+      id: `workspace-remote-${setupCheckIdPart(remoteName)}`,
+      title: `Workspace remote ${remoteName}`,
       status: "passed",
-      summary: `Meta repository remote ${remoteName} matches expected URL.`,
+      summary: `Workspace repository remote ${remoteName} matches expected URL.`,
       nextAction: null,
     };
   });
@@ -2617,7 +2624,7 @@ function hostingAuthProfileChecks(
       status: "blocked",
       summary: home.summary,
       nextAction:
-        `Create host-local DevNexus home auth profile ${profileId}; do not store tokens, private keys, or gh config contents in the shared meta repo.`,
+        `Create host-local DevNexus home auth profile ${profileId}; do not store tokens, private keys, or gh config contents in the shared workspace repository.`,
     }));
   }
 
@@ -2635,7 +2642,7 @@ function hostingAuthProfileChecks(
         summary:
           `Host-local DevNexus home config does not define auth profile ${profileId}.`,
         nextAction:
-          `Add auth profile ${profileId} to the host-local DevNexus home config; keep credentials and private key material outside the shared meta repo.`,
+          `Add auth profile ${profileId} to the host-local DevNexus home config; keep credentials and private key material outside the shared workspace repository.`,
       };
     }
 
@@ -2871,7 +2878,7 @@ function componentSetupSourceRoot(options: {
       path: projectLocalPath,
       topology,
       reason:
-        `No sourceRoot is configured for ${component.id}; using the project-local components root.`,
+        `No sourceRoot is configured for ${component.id}; using the workspace-local components root.`,
     };
   }
 
@@ -2899,7 +2906,7 @@ function componentSetupSourceRoot(options: {
     path: projectLocalPath,
     topology,
     reason:
-      `Configured sourceRoot ${component.sourceRoot} is not compatible with ${platform}; using the project-local components root.`,
+      `Configured sourceRoot ${component.sourceRoot} is not compatible with ${platform}; using the workspace-local components root.`,
   };
 }
 

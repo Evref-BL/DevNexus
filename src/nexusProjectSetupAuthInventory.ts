@@ -239,7 +239,7 @@ function capabilityCheckForCredentialMethod(options: {
         summary: exists
           ? `${method.variable} is defined; value was not read.`
           : `${method.variable} is not defined.`,
-        nextAction: `Define ${method.variable} in the host-local agent environment; do not write its value to project config.`,
+        nextAction: `Define ${method.variable} in the host-local agent environment; do not write its value to workspace config.`,
       };
     }
     case "http_api_token_reference":

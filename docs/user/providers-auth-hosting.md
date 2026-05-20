@@ -1,19 +1,19 @@
 # Providers, Auth, And Hosting
 
 DevNexus can reference external systems such as GitHub, GitLab, Jira, Codex,
-Claude, and future providers. Shared project configuration should describe
+Claude, and future providers. Shared workspace configuration should describe
 intent. Host-local credential details stay on each machine.
 
 ## Accounts
 
-Projects often need two kinds of provider accounts:
+Workspaces often need two kinds of provider accounts:
 
 - A **user account** for manual user actions. The current config model may call
   this actor kind `human`.
 - A **bot or machine account** for agent-created provider activity, such as
   pushing branches, opening issues, commenting, or creating pull requests.
 
-Do not let an agent silently fall back to a user account when project policy
+Do not let an agent silently fall back to a user account when workspace policy
 expects a bot account. Configure the bot profile explicitly.
 
 ## Credential Methods
@@ -73,7 +73,7 @@ checks host-local handles without printing secret values.
 
 A component can use a local tracker, a provider tracker, or both.
 
-Local tracking is the simplest first-project default. Provider-backed trackers
+Local tracking is the simplest first-workspace default. Provider-backed trackers
 are useful when the shared system of record is GitHub Issues, GitLab issues,
 Jira, or another provider.
 
@@ -112,10 +112,10 @@ one forge.
 
 ## Meta-Repository Hosting
 
-The DevNexus project root is often a Git repository. Hosting that repository
-lets multiple machines and agents share project state.
+The DevNexus workspace root is often a Git repository. Hosting that repository
+lets multiple machines and agents share workspace state.
 
-Hosting intent is about the DevNexus meta-repository, not every component
+Hosting intent is about the DevNexus workspace repository, not every component
 repository.
 
 Example:
@@ -134,20 +134,20 @@ Example:
 }
 ```
 
-`project setup` records hosting intent and reports the next commands. It does
+`workspace setup` records hosting intent and reports the next commands. It does
 not create repositories or mutate provider state.
 
 Inspect hosting state:
 
 ```bash
-dev-nexus project hosting status <project-root>
-dev-nexus project hosting plan <project-root>
+dev-nexus workspace hosting status <workspace-root>
+dev-nexus workspace hosting plan <workspace-root>
 ```
 
 Apply hosting repairs only when policy and credentials are explicit:
 
 ```bash
-dev-nexus project hosting apply <project-root>
+dev-nexus workspace hosting apply <workspace-root>
 ```
 
 ## Publication Posture
@@ -162,7 +162,7 @@ Common postures:
 - `green_main`: validate through required checks before merging to the target
   branch.
 
-For hosted projects, prefer explicit bot remotes and bot auth profiles for
+For hosted workspaces, prefer explicit bot remotes and bot auth profiles for
 agent-created Git and provider activity.
 
 ## Authority Roles

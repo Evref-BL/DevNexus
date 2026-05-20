@@ -337,7 +337,7 @@ describe("nexus worktree leases", () => {
     });
   });
 
-  it("records project-meta leases and defaults missing host and agent ids", () => {
+  it("records workspace-meta leases and defaults missing host and agent ids", () => {
     const { projectRoot } = initLeaseFixture();
     const worktreePath = path.join(projectRoot, "worktrees", "lease-demo", "meta");
     fs.mkdirSync(worktreePath, { recursive: true });

@@ -1,29 +1,29 @@
 # Concepts
 
-DevNexus is infrastructure for agent-assisted project work. It gives users and
-agents one place to find project structure, component relationships, work
+DevNexus is infrastructure for agent-assisted development work. It gives users and
+agents one place to find workspace structure, component relationships, work
 items, generated agent context, setup checks, and recorded coordination facts.
 
 DevNexus does not decide what to build. The human operator or the agent working
-in the project chooses the work and reports results back.
+in the workspace chooses the work and reports results back.
 
-## Project
+## Workspace
 
-A DevNexus project is the directory you open in an agent.
+A DevNexus workspace is the directory you open in an agent.
 
-The project root contains:
+The workspace root contains:
 
-- `dev-nexus.project.json`, the shared project configuration
+- `dev-nexus.project.json`, the shared workspace configuration
 - `AGENTS.md`, the first file agents should read
 - `.dev-nexus/`, support state such as work items, target facts, leases, and
   setup records
 - generated agent configuration, such as `.codex/config.toml` or `.mcp.json`
 
-One DevNexus project can coordinate one component or many components.
+One DevNexus workspace can coordinate one component or many components.
 
 ## Component
 
-A component is something the project works on. Common components are Git
+A component is something the workspace works on. Common components are Git
 repositories, documentation folders, datasets, spreadsheets, release assets, or
 generated support folders.
 
@@ -36,15 +36,15 @@ Each component can have its own:
 - publication policy
 - relationships to other components
 
-Use one DevNexus project with several components when one agent workspace needs
+Use one DevNexus workspace with several components when one agent workspace needs
 to understand related repositories or artifacts together.
 
 ## Home
 
 The DevNexus home is user-local state. The default is `~/.dev-nexus`.
 
-The home can store a registry of projects and host-local setup facts. It is not
-the project root and it is not where component source code normally lives.
+The home can store a registry of workspaces and host-local setup facts. It is not
+the workspace root and it is not where component source code normally lives.
 
 Most users should let DevNexus use the default home.
 
@@ -59,28 +59,28 @@ issues, feedback, planning, or migration need separate roles.
 
 ## Agent Files
 
-Agent files are generated support files that make the project usable from an
+Agent files are generated support files that make the workspace usable from an
 agent session.
 
 Examples include:
 
 - `AGENTS.md`
 - projected skills
-- project context files
+- workspace context files
 - `.codex/config.toml`
 - `.mcp.json`
 
 Model Context Protocol, or MCP, is how agents call DevNexus tools from inside a
-project session.
+workspace session.
 
 ## Agent Target
 
-An agent target is a provider this project actively prepares generated support
-for. DevNexus can support several providers, but a project can intentionally
+An agent target is a provider this workspace actively prepares generated support
+for. DevNexus can support several providers, but a workspace can intentionally
 select only Codex, only Claude, OpenCode/manual setup, or several providers.
 
 Active targets decide which MCP config files, skill directories, and
-provider-specific setup notes should exist in the project. Stale generated
+provider-specific setup notes should exist in the workspace. Stale generated
 support for inactive providers should be reviewed before cleanup instead of
 deleted blindly.
 
@@ -100,7 +100,7 @@ A provider is an external system DevNexus can reference through a neutral
 configuration model. Examples include GitHub, GitLab, Jira, Codex, Claude, and
 future agent or tracker providers.
 
-Provider credentials are host-local. Shared project config should reference
+Provider credentials are host-local. Shared workspace config should reference
 credential profiles by id, not store raw tokens or private keys.
 
 ## Target And Automation

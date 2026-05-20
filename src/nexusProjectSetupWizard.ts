@@ -98,13 +98,13 @@ export function buildNexusProjectSetupApplyNextActions(
   const projectRoot = quoteArgument(result.projectRoot);
   const firstTracker = firstConfiguredTracker(result.projectConfig);
   return [
-    `Open the DevNexus project root in Codex or your configured agent: ${result.projectRoot}`,
+    `Open the DevNexus workspace root in Codex or your configured agent: ${result.projectRoot}`,
     `Run dev-nexus setup check ${projectRoot} join-existing-project --json to verify local readiness.`,
-    `Run dev-nexus project status ${projectRoot} --json to inspect configured components.`,
+    `Run dev-nexus workspace status ${projectRoot} --json to inspect configured components.`,
     firstTracker
       ? `Create or triage the first work item for component ${firstTracker.componentId} with tracker ${firstTracker.trackerId}.`
       : "Create or triage the first work item through the component work-item service.",
-    `Run dev-nexus project hosting status ${projectRoot} --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.`,
+    `Run dev-nexus workspace hosting status ${projectRoot} --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.`,
   ];
 }
 
@@ -152,7 +152,7 @@ export async function applyNexusProjectSetup(
   const proposal = previewNexusProjectSetup(options.answers);
   if (proposal.status !== "ready") {
     throw new Error(
-      `project setup proposal is blocked: ${proposal.diagnostics
+      `workspace setup proposal is blocked: ${proposal.diagnostics
         .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`)
         .join("; ")}`,
     );
@@ -161,7 +161,7 @@ export async function applyNexusProjectSetup(
     (operation) => operation.mutationClass === "provider_mutation",
   );
   if (providerMutation?.allowedDuringLocalSetup) {
-    throw new Error("project setup refuses provider mutations during local setup");
+    throw new Error("workspace setup refuses provider mutations during local setup");
   }
 
   const projectRoot = path.resolve(proposal.answers.project.root);
@@ -346,7 +346,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
 
 export function renderNexusProjectSetupRequiredAnswers(): string {
   return [
-    "project setup requires --answers <json-file> in non-interactive mode.",
+    "workspace setup requires --answers <json-file> in non-interactive mode.",
     "Required answer paths:",
     ...nexusProjectSetupRequiredAnswerPaths.map((answer) => `- ${answer}`),
   ].join("\n");
@@ -394,17 +394,17 @@ async function promptForNexusProjectSetupAnswers(options: {
     options.stdout.write(
       [
         "DevNexus user quickstart",
-        "Answer the project and primary component prompts. Add more components when the first project has more than one source folder. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
+        "Answer the workspace and primary component prompts. Add more components when the first workspace has more than one source folder. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
     );
     const projectRoot = await askWithDefault(
       rl,
-      "DevNexus project root",
+      "DevNexus workspace root",
       options.projectRoot ?? process.cwd(),
     );
     const defaultName = path.basename(projectRoot);
-    const projectName = await askWithDefault(rl, "Project name", defaultName);
+    const projectName = await askWithDefault(rl, "Workspace name", defaultName);
     const projectId = await askWithDefault(rl, "Project id", slug(projectName));
     const homePath = options.homePath ?? defaultNexusHomePath();
     const componentId = await askWithDefault(rl, "Primary component id", "primary");
@@ -775,24 +775,24 @@ function writeProjectAgentsFile(
     [
       `# Agent Guide For ${projectConfig.name}`,
       "",
-      "This is a DevNexus-managed project.",
+      "This is a DevNexus-managed workspace.",
       "",
-      "## Project And Components",
+      "## Workspace And Components",
       "",
-      "- The DevNexus project root contains orchestration files: `dev-nexus.project.json`, `.dev-nexus/`, generated agent/MCP support, project-level handoff notes, and target state.",
-      "- Components are the source roots listed in `dev-nexus.project.json`; implementation changes belong in the owning component, not in project support files unless the work item explicitly says so.",
+      "- The DevNexus workspace root contains orchestration files: `dev-nexus.project.json`, `.dev-nexus/`, generated agent/MCP support, workspace-level handoff notes, and target state.",
+      "- Components are the source roots listed in `dev-nexus.project.json`; implementation changes belong in the owning component, not in workspace support files unless the work item explicitly says so.",
       "- Use generated worktrees under the configured worktrees root for coordinated implementation work.",
       "",
       "## First-Run Checklist",
       "",
-      "- Open this DevNexus project root in Codex or the configured agent.",
-      "- Run `dev-nexus setup check <project-root> join-existing-project --json` and resolve blocked readiness checks before launching work.",
-      "- Run `dev-nexus project status <project-root> --json` to inspect components, trackers, worktrees, and generated agent support.",
+      "- Open this DevNexus workspace root in Codex or the configured agent.",
+      "- Run `dev-nexus setup check <workspace-root> join-existing-project --json` and resolve blocked readiness checks before launching work.",
+      "- Run `dev-nexus workspace status <workspace-root> --json` to inspect components, trackers, worktrees, and generated agent support.",
       "- Create or triage the first component work item before assigning implementation work.",
       "",
       "## Operating Rules",
       "",
-      "- Read this file, `CONTEXT.md` when present, and DevNexus project status before making changes.",
+      "- Read this file, `CONTEXT.md` when present, and DevNexus workspace status before making changes.",
       "- Use DevNexus work items, component metadata, and generated worktrees for coordinated work.",
       "- Before editing a Git checkout, inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, then fast-forward clean branches with an upstream.",
       "- After direct integration or merge, delete only branches and worktrees proven merged into the target branch; hand off ambiguous or dirty state.",

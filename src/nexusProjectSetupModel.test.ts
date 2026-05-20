@@ -138,7 +138,7 @@ function richAnswers(): NexusProjectSetupAnswers {
   };
 }
 
-describe("project setup answer model", () => {
+describe("workspace setup answer model", () => {
   it("builds a local setup proposal with explicit mutation classes and hosting handoff", () => {
     const proposal = buildNexusProjectSetupProposal(richAnswers());
 
@@ -166,7 +166,7 @@ describe("project setup answer model", () => {
 
     const summary = renderNexusProjectSetupProposalSummary(proposal);
     expect(summary).toContain("Project setup proposal: Research Suite");
-    expect(summary).toContain("[next:provider_mutation] Apply meta-repo hosting intent");
+    expect(summary).toContain("[next:provider_mutation] Apply workspace repository hosting intent");
   });
 
   it("validates required project topology and component source strategies", () => {

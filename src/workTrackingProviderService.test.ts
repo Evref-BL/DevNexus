@@ -46,7 +46,7 @@ describe("work tracking provider service", () => {
     });
   });
 
-  it("creates forge providers without specialization project config", () => {
+  it("creates forge providers without specialization workspace config", () => {
     expect(
       createWorkTrackerProvider({
         provider: "github",

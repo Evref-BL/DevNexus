@@ -279,7 +279,7 @@ describe("nexus manual worktree worker target preparation", () => {
     ).toBe("claude");
   });
 
-  it("rejects a worker provider outside the active project policy", () => {
+  it("rejects a worker provider outside the active workspace policy", () => {
     const { projectRoot, calls } = prepareProject({
       agentTargets: {
         active: [{ provider: "codex" }],

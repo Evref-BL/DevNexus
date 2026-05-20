@@ -37,7 +37,7 @@ function component(
 }
 
 describe("nexus source root topology", () => {
-  it("classifies project-local, sourcesRoot, absolute, missing, and incompatible roots", () => {
+  it("classifies workspace-local, sourcesRoot, absolute, missing, and incompatible roots", () => {
     const fixtureRoot = makeTempDir("dev-nexus-source-root-topology-");
     const projectRoot = path.join(fixtureRoot, "Project");
     const projectLocal = path.join(projectRoot, "components", "dev-nexus");
@@ -51,7 +51,7 @@ describe("nexus source root topology", () => {
       projectRoot,
       component: component("componentsRoot:dev-nexus"),
     })).toMatchObject({
-      layout: "project-local",
+      layout: "workspace-local",
       state: "present",
       configuredBase: "componentsRoot",
       exists: true,
@@ -81,7 +81,7 @@ describe("nexus source root topology", () => {
       projectRoot,
       component: component("componentsRoot:missing"),
     })).toMatchObject({
-      layout: "project-local",
+      layout: "workspace-local",
       state: "missing",
       exists: false,
     });
@@ -98,7 +98,7 @@ describe("nexus source root topology", () => {
     });
   });
 
-  it("warns when project-local-looking roots resolve outside the project", () => {
+  it("warns when workspace-local-looking roots resolve outside the project", () => {
     const fixtureRoot = makeTempDir("dev-nexus-source-root-topology-");
     const projectRoot = path.join(fixtureRoot, "Project");
     const externalRoot = path.join(path.dirname(projectRoot), "external", "dev-nexus");
@@ -121,8 +121,8 @@ describe("nexus source root topology", () => {
     });
 
     expect(topology).toMatchObject({
-      layout: "project-local",
-      state: "project-local-escape",
+      layout: "workspace-local",
+      state: "workspace-local-escape",
       exists: true,
       insideProjectRoot: true,
       realInsideProjectRoot: false,
