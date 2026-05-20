@@ -123,6 +123,7 @@ export interface NexusWorkerContextDependencyProjection {
   reason: string | null;
   status: NexusWorkerContextDependencyProjectionStatus;
   message: string;
+  warnings?: string[];
   sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata;
   sourceComponent?: NexusWorkerContextDependencyProjectionSourceComponent;
 }
@@ -703,6 +704,11 @@ function normalizeWorkerDependencySupport(
 function normalizeWorkerDependencyProjection(
   projection: NexusWorkerContextDependencyProjection,
 ): NexusWorkerContextDependencyProjection {
+  const warnings = normalizeStringArray(
+    projection.warnings ?? [],
+    "dependencyProjections.warnings",
+  );
+
   return {
     id: requiredNonEmptyString(projection.id, "dependencyProjections.id"),
     source: requiredNonEmptyString(
@@ -737,6 +743,7 @@ function normalizeWorkerDependencyProjection(
       projection.message,
       "dependencyProjections.message",
     ),
+    ...(warnings.length > 0 ? { warnings } : {}),
     sourceMetadata: normalizeDependencyProjectionSourceMetadata(
       projection.sourceMetadata,
     ),
@@ -830,6 +837,7 @@ function renderDependencyProjectionLines(
         ]
       : []),
     ...(projection.reason ? [`  Reason: ${projection.reason}`] : []),
+    ...(projection.warnings ?? []).map((warning) => `  Warning: ${warning}`),
   ]);
 }
 

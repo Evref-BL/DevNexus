@@ -1411,6 +1411,10 @@ describe("dev-nexus cli", () => {
               id: "node-modules",
               status: "linked",
               pluginId: "typescript",
+              warningCount: 1,
+              warnings: [
+                expect.stringContaining("Projected node_modules is shared"),
+              ],
             },
           ],
         },

@@ -595,7 +595,12 @@ describe("nexus automation worktree setup", () => {
     expect(result.dependencyProjections[0]).toMatchObject({
       id: "typescript-node-modules",
       status: "linked",
+      warnings: [
+        expect.stringContaining("Projected node_modules is shared"),
+      ],
     });
+    expect(result.dependencyProjections[0]?.warnings?.[0]).toContain(sourceRoot);
+    expect(result.dependencyProjections[0]?.warnings?.[0]).toContain(worktreePath);
     expect(resolvedVitest).toBe(path.join(worktreePath, "node_modules", ".bin", vitestBinName));
     expect(fs.realpathSync(resolvedVitest!)).toBe(fs.realpathSync(sourceVitest));
   });

@@ -152,6 +152,8 @@ export interface NexusPreparedWorktreeSummary {
         required: boolean;
         sourceControl: string;
         status: string;
+        warningCount: number;
+        warnings: string[];
         pluginId: string;
         capabilityId: string;
       }>;
@@ -515,6 +517,8 @@ export function summarizeNexusManualWorktreeResult(
           required: projection.required,
           sourceControl: projection.sourceControl,
           status: projection.status,
+          warningCount: projection.warnings?.length ?? 0,
+          warnings: projection.warnings ?? [],
           pluginId: projection.sourceMetadata.pluginId,
           capabilityId: projection.sourceMetadata.capabilityId,
         })),
