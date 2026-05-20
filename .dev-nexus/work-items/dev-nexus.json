@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 190,
-  "nextCommentNumber": 388,
-  "updatedAt": "2026-05-20T09:47:06.907Z",
+  "nextCommentNumber": 389,
+  "updatedAt": "2026-05-20T10:01:21.095Z",
   "items": [
     {
       "id": "local-1",
@@ -4623,7 +4623,7 @@
       "id": "local-179",
       "title": "Complete or hide provider-native coordination handoff paths",
       "description": "Type: provider integration/coordination slice\nReadiness: autonomous agent-ready (AFK) for diagnostics and hiding incomplete paths; HITL if live provider write/read policy changes\nSource: DevNexus workflow audit notes 2026-05-20. Related existing items include shared coordination and provider policy work such as `local-14`, `local-16`, `local-18`, and `local-52`.\n\nGoal:\nProvider-native coordination should either be reliable enough to use in recommended workflows or clearly marked as incomplete so agents avoid it in the hot path.\n\nAcceptance criteria:\n- When GitHub is configured as a coordination tracker, DevNexus can write and read enough handoff records to make coordination status and integration planning useful.\n- If provider comment reads or writes are unavailable, status output says provider coordination is incomplete and names the missing capability.\n- Recommended cycle and quick-fix checklists do not require provider coordination when the configured provider path is write-only, read-only, or mocked.\n- Tool errors distinguish tracker lookup failures from provider capability failures.\n- Existing local coordination behavior remains available.\n\nBlockers:\n- Confirm live provider comment read/write policy and credentials before enabling live provider-backed records by default.\n\nVerification:\n- Mocked provider tests cover read/write available, write-only, read-only, unavailable, and local-only coordination trackers.\n- CLI/MCP smoke verifies incomplete provider coordination is not presented as a required next action.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4636,8 +4636,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:47:33.444Z",
-      "updatedAt": "2026-05-20T07:47:33.444Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T10:01:21.095Z",
+      "closedAt": "2026-05-20T10:01:20.961Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9534,7 +9534,19 @@
     ],
     "local-177": [],
     "local-178": [],
-    "local-179": [],
+    "local-179": [
+      {
+        "id": "local-comment-388",
+        "body": "Completed in DevNexus PR #66, merged as 039aa2f. Provider-backed coordination handoff storage is now explicitly marked incomplete when provider comments cannot be read back; provider handoff writes fail closed before lease/comment creation; CLI/MCP status and integration summaries expose capability diagnostics; heartbeat/docs guidance no longer requires provider-native coordination handoffs. Verification passed: npm run check, focused coordination/CLI/MCP tests, git diff --check, and GitHub CI on macOS/Ubuntu/Windows.",
+        "author": null,
+        "createdAt": "2026-05-20T10:01:21.095Z",
+        "updatedAt": "2026-05-20T10:01:21.095Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-388"
+        }
+      }
+    ],
     "local-180": [],
     "local-181": [],
     "local-182": [
