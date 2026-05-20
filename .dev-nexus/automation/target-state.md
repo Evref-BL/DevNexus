@@ -7,6 +7,9 @@ and ready for coordinator-driven work across its components.
 
 - The dogfood project uses GitHub Issues as the primary shared tracker for
   configured components. Local tracker stores are archive/history only.
+- PLexus and pharo-launcher-mcp are present as manual-only dependency
+  components for explicit coordination, packaging, publication, and security
+  maintenance. They are not `eligible_source` trackers for heartbeat work.
 - Open local `ready`, `todo`, and `blocked` work was one-way synced to GitHub
   on 2026-05-20 and linked in `.dev-nexus/work-item-links.json`. Completed
   local history was not fully backfilled.
@@ -33,6 +36,9 @@ and ready for coordinator-driven work across its components.
 - Provider-native GitHub issues are the work items of record. Do not copy new
   provider-native issues into local tracker state unless a policy-gated import
   explicitly requires it.
+- PLexus and pharo-launcher-mcp default to provider-native GitHub issue
+  trackers when explicitly selected, while their normal implementation backlog
+  remains in the sibling `dev-nexus-plexus` project.
 - Local tracker refresh from GitHub should use inbound import
   (`work-item import-plan/import-execute`) with creates skipped unless the user
   explicitly asks to backfill local archive items.
@@ -65,6 +71,8 @@ and ready for coordinator-driven work across its components.
 - Re-check eligible work after any issue status/label changes.
 - Prefer small, explicit mode choices:
   - quick manual fix for one provider-native issue;
+  - explicit PLexus or pharo-launcher-mcp maintenance such as npm publishing
+    setup;
   - heartbeat batch for ready dogfood work;
   - project-meta cleanup for context, docs, target state, tracker archives, and
     generated support;
@@ -76,6 +84,8 @@ and ready for coordinator-driven work across its components.
 
 - Do not create Vibe workspaces, sessions, executions, or workers for
   implementation.
+- Do not treat PLexus or pharo-launcher-mcp as automatic heartbeat development
+  components.
 - Do not run live Pharo images, PLexus open/close, Docker, package installs, or
   destructive host cleanup without a current approved isolated runner profile.
 - Preserve unrelated changes in component working trees.

@@ -18,11 +18,19 @@ chooses implementation work.
 - `dev-nexus`: generic core and primary component.
 - `dev-nexus-pharo`: Pharo plugin for DevNexus.
 - `dev-nexus-typescript`: TypeScript/JavaScript plugin for DevNexus.
+- `plexus`: manual-only dependency component for PLexus runtime packaging,
+  publishing, and coordination tasks.
+- `pharo-launcher-mcp`: manual-only dependency component for launcher MCP
+  packaging, publishing, and coordination tasks.
 
 ## Current Operating State
 
 - Component work defaults to provider-native GitHub Issues through each
   component's `github` tracker.
+- PLexus and pharo-launcher-mcp are configured as manual-only dependency
+  components. Their GitHub trackers are the default explicit work-item services,
+  but they are not marked `eligible_source`, so heartbeat discovery does not
+  select their work automatically.
 - Local work-item stores under `.dev-nexus/work-items/` are archive/history and
   migration material. They are not the default shared tracker for new work.
 - Open local dogfood work was one-way synced to GitHub Issues on 2026-05-20.
@@ -55,8 +63,12 @@ chooses implementation work.
   affordances, gateway routing, and image-side Pharo MCP access for Pharo work.
 - DevNexus-TypeScript supplies TypeScript/JavaScript setup policy, especially
   reusable dependency projection for generated worktrees.
-- PLexus, pharo-launcher-mcp, and MCP-Pharo implementation work belongs in the
-  sibling `dev-nexus-plexus` DevNexus project, not this dogfood root.
+- PLexus and pharo-launcher-mcp implementation backlogs still belong in the
+  sibling `dev-nexus-plexus` DevNexus project by default. This dogfood root may
+  act on them explicitly for cross-project coordination, packaging, publication,
+  and security maintenance when a human selects that work.
+- MCP-Pharo implementation work remains owned by the sibling
+  `dev-nexus-plexus` project unless explicitly authorized here.
 - Mac and Windows agents coordinate through work-item intent, Git branches,
   structured handoffs, target-cycle facts, and provider-backed requests.
 - Parallel interactive chats should use isolated worktrees for mutating work.

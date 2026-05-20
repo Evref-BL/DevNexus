@@ -447,6 +447,170 @@
           "componentId": "dev-nexus"
         }
       ]
+    },
+    {
+      "id": "plexus",
+      "name": "PLexus",
+      "kind": "git",
+      "role": "dependency",
+      "remoteUrl": "git@github.com:Evref-BL/PLexus.git",
+      "defaultBranch": "main",
+      "sourceRoot": "sourcesRoot:plexus",
+      "worktreesRoot": "worktrees/plexus",
+      "defaultWorkTrackerId": "github",
+      "trackerDiscovery": {
+        "scannedRoles": [
+          "migration"
+        ],
+        "directExternalSelection": "allowed",
+        "importRequiredFirst": false,
+        "providerFilters": [
+          "github"
+        ],
+        "queryLimit": 25,
+        "conflictWinner": "scanned_tracker",
+        "missingCredentialBehavior": "skip"
+      },
+      "workTrackers": [
+        {
+          "id": "github",
+          "name": "GitHub Issues",
+          "enabled": true,
+          "roles": [
+            "primary",
+            "planning",
+            "coordination",
+            "external_feedback"
+          ],
+          "workTracking": {
+            "provider": "github",
+            "host": "github.com",
+            "repository": {
+              "owner": "Evref-BL",
+              "name": "PLexus"
+            }
+          }
+        }
+      ],
+      "verification": {
+        "focusedCommands": [
+          "npm run check"
+        ],
+        "fullCommands": [
+          "npm run check"
+        ],
+        "requirePassing": true
+      },
+      "publication": {
+        "strategy": "green_main",
+        "remote": "bot",
+        "targetBranch": "main",
+        "push": false,
+        "commandEnvironment": {
+          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+        },
+        "greenMain": {
+          "integrationPreference": "pull_request",
+          "directTargetPush": "blocked",
+          "mergeAuthority": "authorized_merge",
+          "requiredChecks": [
+            "Node 24 check (ubuntu-latest)",
+            "Node 24 check (windows-latest)",
+            "Node 24 check (macos-latest)"
+          ],
+          "staleChecks": "block"
+        }
+      },
+      "relationships": [
+        {
+          "kind": "related",
+          "componentId": "dev-nexus-pharo"
+        }
+      ]
+    },
+    {
+      "id": "pharo-launcher-mcp",
+      "name": "pharo-launcher-mcp",
+      "kind": "git",
+      "role": "dependency",
+      "remoteUrl": "git@github.com:Evref-BL/pharo-launcher-mcp.git",
+      "defaultBranch": "main",
+      "sourceRoot": "sourcesRoot:pharo-launcher-mcp",
+      "worktreesRoot": "worktrees/pharo-launcher-mcp",
+      "defaultWorkTrackerId": "github",
+      "trackerDiscovery": {
+        "scannedRoles": [
+          "migration"
+        ],
+        "directExternalSelection": "allowed",
+        "importRequiredFirst": false,
+        "providerFilters": [
+          "github"
+        ],
+        "queryLimit": 25,
+        "conflictWinner": "scanned_tracker",
+        "missingCredentialBehavior": "skip"
+      },
+      "workTrackers": [
+        {
+          "id": "github",
+          "name": "GitHub Issues",
+          "enabled": true,
+          "roles": [
+            "primary",
+            "planning",
+            "coordination",
+            "external_feedback"
+          ],
+          "workTracking": {
+            "provider": "github",
+            "host": "github.com",
+            "repository": {
+              "owner": "Evref-BL",
+              "name": "pharo-launcher-mcp"
+            }
+          }
+        }
+      ],
+      "verification": {
+        "focusedCommands": [
+          "npm run check"
+        ],
+        "fullCommands": [
+          "npm run check"
+        ],
+        "requirePassing": true
+      },
+      "publication": {
+        "strategy": "green_main",
+        "remote": "bot",
+        "targetBranch": "main",
+        "push": false,
+        "commandEnvironment": {
+          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
+        },
+        "greenMain": {
+          "integrationPreference": "pull_request",
+          "directTargetPush": "blocked",
+          "mergeAuthority": "authorized_merge",
+          "requiredChecks": [
+            "ubuntu-latest Node 24 check",
+            "windows-latest Node 24 check",
+            "macos-latest Node 24 check"
+          ],
+          "staleChecks": "block"
+        }
+      },
+      "relationships": [
+        {
+          "kind": "depends_on",
+          "componentId": "plexus"
+        },
+        {
+          "kind": "related",
+          "componentId": "dev-nexus-pharo"
+        }
+      ]
     }
   ],
   "mcp": {
