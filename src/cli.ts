@@ -292,6 +292,7 @@ import {
   claimNexusEligibleWorkItem,
   type NexusEligibleWorkClaimProviderFactory,
   type NexusWorkItemClaimResult,
+  type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
 import {
   createWorkItemService,
@@ -549,6 +550,7 @@ interface ParsedWorkItemClaimNextCommand {
   agentId?: string | null;
   ownerId?: string | null;
   leaseDurationMs?: number;
+  staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   json?: boolean;
 }
 
@@ -1299,6 +1301,8 @@ export function usage(): string {
     "  --agent <id>              optional claiming agent id",
     "  --owner <id>              optional logical owner id",
     "  --lease-ms <ms>           lease duration in milliseconds",
+    "  --reclaim-stale           claim an expired in-progress optimistic claim",
+    "  --stale-claim-policy <report|reclaim>",
     "  --json",
     "",
     "Options for work-item list:",
@@ -3500,6 +3504,7 @@ async function claimNextWorkItem(
       ownerId: parsed.ownerId,
     },
     leaseDurationMs: parsed.leaseDurationMs,
+    staleClaimPolicy: parsed.staleClaimPolicy,
     providerFactory: dependencies.workItemClaimProviderFactory,
     leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
     now: dependencies.now,
@@ -5614,6 +5619,12 @@ function parseWorkItemClaimNextCommand(
       case "--lease-ms":
       case "--lease-duration-ms":
         parsed.leaseDurationMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--reclaim-stale":
+        parsed.staleClaimPolicy = "reclaim";
+        break;
+      case "--stale-claim-policy":
+        parsed.staleClaimPolicy = parseStaleClaimPolicy(next(), arg);
         break;
       case "--json":
         parsed.json = true;
@@ -8586,6 +8597,28 @@ function printWorkItemClaimNextResult(
 
   writeLine(stdout, "DevNexus work item claim found no claimable work.");
   writeLine(stdout, `  Reason: ${claim.reason}`);
+  if (claim.reason === "stale_claims") {
+    writeLine(stdout, `  Stale claims: ${claim.staleClaims?.length ?? 0}`);
+    for (const stale of claim.staleClaims ?? []) {
+      writeLine(
+        stdout,
+        `    ${stale.id}: ${stale.owner.hostId} ` +
+          `${stale.owner.agentId ? `/${stale.owner.agentId} ` : ""}` +
+          `lease ${stale.owner.leaseToken} expired ${stale.owner.expiresAt}`,
+      );
+    }
+  }
+  if (claim.reason === "active_claims") {
+    writeLine(stdout, `  Active claims: ${claim.activeClaims?.length ?? 0}`);
+    for (const active of claim.activeClaims ?? []) {
+      writeLine(
+        stdout,
+        `    ${active.id}: ${active.owner.hostId} ` +
+          `${active.owner.agentId ? `/${active.owner.agentId} ` : ""}` +
+          `lease ${active.owner.leaseToken} expires ${active.owner.expiresAt}`,
+      );
+    }
+  }
 }
 
 function printWorkItemListResult(
@@ -10067,6 +10100,17 @@ function parseWorkStatusQuery(value: string, optionName: string): WorkStatusQuer
   }
 
   return parseWorkStatus(value, optionName);
+}
+
+function parseStaleClaimPolicy(
+  value: string,
+  optionName: string,
+): NexusWorkItemStaleClaimPolicy {
+  if (value === "report" || value === "reclaim") {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be report or reclaim`);
 }
 
 function parseRemoteExecutionRequestStatus(

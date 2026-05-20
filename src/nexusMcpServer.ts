@@ -52,6 +52,7 @@ import {
 import {
   claimNexusEligibleWorkItem,
   type NexusEligibleWorkClaimProviderFactory,
+  type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
 import {
   getNexusAutomationStatus,
@@ -924,6 +925,10 @@ const tools: McpTool[] = [
         agentId: { type: ["string", "null"] },
         ownerId: { type: ["string", "null"] },
         leaseDurationMs: { type: "number" },
+        staleClaimPolicy: {
+          type: "string",
+          enum: ["report", "reclaim"],
+        },
       },
       required: ["hostId"],
       additionalProperties: false,
@@ -1889,6 +1894,11 @@ export async function callDevNexusMcpTool(
             leaseDurationMs: optionalPositiveInteger(
               args,
               "leaseDurationMs",
+              "arguments",
+            ),
+            staleClaimPolicy: optionalStaleClaimPolicy(
+              args,
+              "staleClaimPolicy",
               "arguments",
             ),
             providerFactory: context.workItemClaimProviderFactory,
@@ -5065,6 +5075,22 @@ function parseWorkStatusQuery(value: string, pathName: string): WorkStatusQuery 
   }
 
   return parseWorkStatus(value, pathName);
+}
+
+function optionalStaleClaimPolicy(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusWorkItemStaleClaimPolicy | undefined {
+  const value = optionalString(record, key, pathName);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "report" || value === "reclaim") {
+    return value;
+  }
+
+  throw new Error(`${pathName}.${key} must be report or reclaim`);
 }
 
 function parseNexusSetupRecordedStepStatus(

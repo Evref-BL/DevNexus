@@ -335,6 +335,9 @@ describe("DevNexus MCP server", () => {
         leaseDurationMs: {
           type: "number",
         },
+        staleClaimPolicy: {
+          enum: ["report", "reclaim"],
+        },
       },
       required: ["hostId"],
     });
