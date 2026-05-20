@@ -3,9 +3,9 @@
 ## Purpose
 
 This repository is the clean dogfood meta-project for DevNexus. It stores the
-portable project graph, local component work items, planning documents,
-agent-facing instructions, target state, and setup projections used to work on
-DevNexus and its related components.
+portable project graph, component tracker bindings and archive data, planning
+documents, agent-facing instructions, target state, and setup projections used
+to work on DevNexus and its related components.
 
 DevNexus is infrastructure. It records project state, work items, agent launch
 policy, target-cycle facts, worktree metadata, verification, publication
@@ -20,14 +20,18 @@ coordinator agent chooses and supervises implementation work.
 
 ## Current Operating State
 
-- Component work is tracked through local component-owned work-item stores under
-  `.dev-nexus/work-items/` and through GitHub Issues tracker bindings on each
-  configured component.
+- Component work now defaults to provider-native GitHub Issues through each
+  component's `github` tracker. Local component-owned work-item stores under
+  `.dev-nexus/work-items/` remain historical archive data and migration source
+  material, not the default place for new shared work.
+- Open local dogfood work was one-way synced to GitHub Issues on 2026-05-20.
+  Link records live in `.dev-nexus/work-item-links.json`; completed local
+  history was not backfilled into GitHub.
 - Current eligible-work discovery uses `automation.eligibleWorkMode:
-  discovery`, scans each component's local primary tracker and GitHub Issues
-  `eligible_source` tracker, and allows direct selection of matching external
-  issues without import-first migration. The automation selector still controls
-  which local or GitHub issues are eligible for coordinator work.
+  discovery`, scans configured `primary` and `eligible_source` tracker roles,
+  and now lands on each component's GitHub tracker by default because GitHub has
+  both roles. Local archive trackers are not scanned. The automation selector
+  still controls which GitHub issues are eligible for coordinator work.
 - PLexus, pharo-launcher-mcp, and MCP-Pharo work moved to the sibling
   `/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus` DevNexus project.
 - The dogfood meta repository records explicit GitHub hosting metadata:
@@ -75,10 +79,12 @@ coordinator agent chooses and supervises implementation work.
   request and response state.
 - Cross-tracker discovery and inbound provider issue import are planned in
   `docs/tracker-discovery-inbound-sync-prd.md` and sliced into
-  `dev-nexus:local-129` through `local-137`. Dogfood policy now permits direct
-  selection from configured GitHub eligible-source trackers, while provider
-  comments and scheduled import remain separate explicit policy decisions.
-  Keep inbound import policy-gated because it mutates local tracker state.
+  `dev-nexus:local-129` through `local-137`. Dogfood policy now uses GitHub
+  Issues as the shared primary tracker for all configured components; local
+  tracker stores are archive/history only. Keep inbound import and future sync
+  policy-gated because they mutate tracker state, and keep provider-native
+  GitHub issues as the work items of record rather than copying new issues into
+  local tracker state.
   `dev-nexus:local-153` is complete for keeping GitHub issue labels/status
   labels aligned with the local automation selector without copying those
   issues into local tracker state.
@@ -100,6 +106,11 @@ coordinator agent chooses and supervises implementation work.
   `GH_CONFIG_DIR=home:.config/gh-automation-github` profile authenticated as
   `Gabot-Darbot`; keep agent-created Git/GitHub activity on the configured
   automation remotes and profile to prevent human-account fallback.
+- The 2026-05-20 local-to-GitHub issue migration exposed a provider-auth
+  defect: DevNexus sync execution wrote GitHub issue/comment activity as
+  `Gabriel-Darbord` even when launched from a shell configured with the bot
+  `GH_CONFIG_DIR`. Treat live provider writes as unsafe until the sync provider
+  is proven to honor the configured automation identity.
 - Fresh Mac onboarding proved generic `dev_nexus` and `dev_nexus_pharo` stdio
   MCP servers can list tools. PLexus-backed runtime work now belongs in the
   sibling `dev-nexus-plexus` project.
