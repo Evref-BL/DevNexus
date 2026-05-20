@@ -17,6 +17,10 @@ import {
   workTrackerCapabilitiesForConfig,
 } from "./workTrackingProviderService.js";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import {
+  classifyNexusComponentSourceRootTopology,
+  type NexusComponentSourceRootTopology,
+} from "./nexusSourceRootTopology.js";
 import type {
   TrackerCapabilities,
   WorkTrackerCapabilityReport,
@@ -146,6 +150,7 @@ export interface ResolvedNexusProjectComponent {
   defaultBranch: string | null;
   sourceRoot: string;
   sourceRootExists: boolean;
+  sourceRootTopology: NexusComponentSourceRootTopology;
   worktreesRoot: string;
   worktreesRootExists: boolean;
   defaultTrackerId: string | null;
@@ -220,6 +225,12 @@ export function resolveProjectComponent(
     defaultBranch: component.defaultBranch,
     sourceRoot,
     sourceRootExists: directoryExists(sourceRoot),
+    sourceRootTopology: classifyNexusComponentSourceRootTopology({
+      projectRoot,
+      component,
+      platform: "auto",
+      pathPlatform: "auto",
+    }),
     worktreesRoot,
     worktreesRootExists: directoryExists(worktreesRoot),
     defaultTrackerId: normalizedWorkTrackers.defaultTrackerId,
