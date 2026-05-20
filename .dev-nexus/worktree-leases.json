@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T06:52:00.000Z",
+  "updatedAt": "2026-05-20T06:56:30.000Z",
   "leases": [
     {
       "kind": "dev-nexus.worktree.lease",
@@ -29,14 +29,14 @@
         ".dev-nexus/worktree-leases.json",
         ".dev-nexus/coordination/**"
       ],
-      "status": "working",
+      "status": "merged",
       "createdAt": "2026-05-20T06:48:14.460Z",
-      "lastSeenAt": "2026-05-20T06:48:14.460Z",
-      "updatedAt": "2026-05-20T06:48:14.460Z",
-      "refreshCount": 0,
-      "lastObservedHeadCommit": "392b0ddd2d98ab6874529fa928adad96536d3539",
+      "lastSeenAt": "2026-05-20T06:56:30.000Z",
+      "updatedAt": "2026-05-20T06:56:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "a178be39940cc716ecd57a5bf841871ed8dbdc70",
       "dirty": false,
-      "pushed": null,
+      "pushed": true,
       "git": {
         "repository": {
           "kind": "project_meta_worktree",
@@ -45,18 +45,16 @@
           "relativePath": "dev-nexus-dogfood/codex-dogfood-github-14-closeout"
         },
         "upstream": null,
-        "ahead": null,
-        "behind": null,
+        "ahead": 0,
+        "behind": 0,
         "stagedCount": 0,
         "unstagedCount": 0,
         "untrackedCount": 0,
-        "warnings": [
-          "Current branch has no upstream configured."
-        ]
+        "warnings": []
       },
       "notes": [
         "Project-meta closeout for DevNexus source PR #23 / GitHub #14.",
-        "Record target-cycle and handoff facts; keep source changes in dev-nexus component history."
+        "Dogfood metadata PR #10 merged as 5e6a5c3; disposable project-meta worktree and branch were removed."
       ]
     },
     {
