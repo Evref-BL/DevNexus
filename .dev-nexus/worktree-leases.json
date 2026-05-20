@@ -1,7 +1,62 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T01:37:20.427Z",
+  "updatedAt": "2026-05-20T02:27:10.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-1d0ffc0dc0f70cd3",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-171",
+      "branchName": "codex/dev-nexus-dogfood/local-171-version-planning-config",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-171-version-planning-config"
+      },
+      "writeScope": [
+        "dev-nexus.project.json",
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        "PLAN.md",
+        ".dev-nexus/worktree-leases.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T02:19:52.431Z",
+      "lastSeenAt": "2026-05-20T02:27:10.000Z",
+      "updatedAt": "2026-05-20T02:27:10.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "10f32f2149c9079cf28f0322d6a7023fd5359917",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-171-version-planning-config"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project metadata records local-171 completion and dogfood-version-planning configuration.",
+        "Target-report smoke resolved all five scoped version-planning work items."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
