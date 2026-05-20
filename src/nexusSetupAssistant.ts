@@ -1172,7 +1172,7 @@ function agentProjectionPathCheck(
       : projection.state === "expected-missing"
         ? `Refresh ${projection.provider} ${projection.kind} projection or record why this host intentionally leaves it missing.`
         : projection.cleanupSafe
-          ? "Run a cleanup dry-run before removing stale generated support state; do not remove source-controlled or manual files."
+          ? "Run dev-nexus project agent-projection cleanup <project-root> --dry-run before applying cleanup; do not remove source-controlled or manual files."
           : "Inspect the file ownership before cleanup; DevNexus does not classify this path as generated cleanup-safe support.",
   };
 }

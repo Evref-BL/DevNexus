@@ -175,8 +175,16 @@ Do a dry-run style review before removing anything:
 ```bash
 dev-nexus project status <project-root>
 dev-nexus setup check <project-root> join-existing-project
+dev-nexus project agent-projection cleanup <project-root> --dry-run
 ```
 
-Only remove generated support after status or setup checks identify it as
-cleanup-safe. Do not delete provider-global files, source-controlled files,
-manual provider configuration, credentials, or user-local profile state.
+Only apply cleanup after the dry-run identifies removable generated support:
+
+```bash
+dev-nexus project agent-projection cleanup <project-root> --apply
+```
+
+The cleanup command removes only paths classified as cleanup-safe stale
+generated support. It skips active provider support, source-controlled files,
+manual provider configuration, credentials, and user-local profile state.
+Do not delete provider-global files outside the project.

@@ -293,10 +293,11 @@ function classifyUnexpectedProjection(
   candidate: ProjectionCandidate,
 ): NexusAgentProjectionPathStatus {
   const sourceControlled = isSourceControlled(projectRoot, candidate.relativePath);
-  const generated = !sourceControlled &&
-    (isIgnoredByGit(projectRoot, candidate.relativePath) ||
-      containsGeneratedSkillManifest(path.join(projectRoot, candidate.relativePath)));
-  if (generated) {
+  const ignoredByGit = !sourceControlled &&
+    isIgnoredByGit(projectRoot, candidate.relativePath);
+  const hasGeneratedSkillManifest = !sourceControlled &&
+    containsGeneratedSkillManifest(path.join(projectRoot, candidate.relativePath));
+  if (ignoredByGit || hasGeneratedSkillManifest) {
     return {
       kind: candidate.kind,
       provider: candidate.provider,
@@ -306,7 +307,8 @@ function classifyUnexpectedProjection(
       cleanupSafe: true,
       sourceControl: candidate.sourceControl,
       reason:
-        `${candidate.provider} ${candidate.kind} projection is present but not selected; generated/ignored evidence makes cleanup review safe.`,
+        `${candidate.provider} ${candidate.kind} projection is present but not selected; ` +
+        `${generatedProjectionEvidence({ ignoredByGit, hasGeneratedSkillManifest })} makes cleanup review safe.`,
     };
   }
 
@@ -321,6 +323,16 @@ function classifyUnexpectedProjection(
     reason:
       `${candidate.provider} ${candidate.kind} path is present but not selected; it is not classified as generated cleanup-safe support.`,
   };
+}
+
+function generatedProjectionEvidence(options: {
+  ignoredByGit: boolean;
+  hasGeneratedSkillManifest: boolean;
+}): string {
+  return [
+    options.ignoredByGit ? "Git ignore evidence" : null,
+    options.hasGeneratedSkillManifest ? "DevNexus skill manifest evidence" : null,
+  ].filter(Boolean).join(" and ");
 }
 
 function legacyTargetsOutsideActivePolicy(
