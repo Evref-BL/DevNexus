@@ -15,7 +15,7 @@ import {
 } from "./worktreeExecutionMetadata.js";
 import type {
   NexusAutomationCodexAppServerLaunchMetadata,
-} from "./nexusAutomationAgentLaunch.js";
+} from "./nexusAutomationAgentLaunchMetadata.js";
 
 export type NexusAutomationRunStatus =
   | "started"

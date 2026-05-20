@@ -94,6 +94,9 @@ import type {
   NexusAutomationPreflightStatus,
   NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
+import type {
+  NexusAutomationCodexAppServerLaunchMetadata,
+} from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
@@ -247,24 +250,9 @@ export interface NexusAutomationAgentLaunchResult {
   codexAppServer?: NexusAutomationCodexAppServerLaunchMetadata;
 }
 
-export interface NexusAutomationCodexAppServerLaunchMetadata {
-  provider: "codex-app-server";
-  status: "started" | NexusAutomationAgentLaunchStatus;
-  action: "thread_start" | "thread_fork";
-  runId: string;
-  profileId: string;
-  threadId: string | null;
-  turnId: string | null;
-  sourceThreadId: string | null;
-  sourceTurnId: string | null;
-  ephemeral: boolean;
-  threadPersistence: "ephemeral" | "durable";
-  cwd: string;
-  model: string | null;
-  reasoning: string | null;
-  resultFile: string;
-  failureSummary: string | null;
-}
+export type {
+  NexusAutomationCodexAppServerLaunchMetadata,
+} from "./nexusAutomationAgentLaunchMetadata.js";
 
 export type NexusAutomationAgentLauncher = (
   input: NexusAutomationAgentLaunchInput,
