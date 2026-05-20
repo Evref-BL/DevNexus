@@ -384,21 +384,24 @@ and ready for coordinator-driven work across its components.
   posture. Keep `local-148` through `local-151` ordered behind this skeleton
   and the relevant setup/projection tests.
 - Cross-tracker discovery implementation is complete through
-  `dev-nexus:local-137` for this dogfood policy: local and GitHub Issues are
-  peer discovery sources for configured components, and matching GitHub issues
-  can be selected directly without copy/import migration. Provider comments and
-  scheduled import are still not automatically enabled. `dev-nexus:local-153`
-  is complete for GitHub issue eligibility hygiene: provider-native issues now
-  use the same selector convention as local items (`dogfood` plus
-  `status:ready` is directly selectable; blocked/unsafe labels exclude) without
-  creating local duplicates. Selector-level direct discovery currently returns
-  Evref-BL/DevNexus#3, Evref-BL/DevNexus#4, and Evref-BL/DevNexus-Pharo#1 as
-  eligible GitHub issues. The authority provider-signal
-  follow-on `local-93` is complete. The local tracker auth-profile mismatch
-  follow-on `local-152` is
-  also complete as `0e86479`; DevNexus-Pharo package-template and legacy Vibe
-  metadata fixes `dev-nexus-pharo:local-20` and `local-21` are complete as
-  `84a4556` and `f0027da`. DevNexus import extension config preservation
+  `dev-nexus:local-137` for this dogfood policy. As of 2026-05-20, GitHub
+  Issues is the primary shared tracker for configured components, while local
+  tracker stores are archive/history only. Open local `ready`, `todo`, and
+  `blocked` items were one-way synced to GitHub and linked in
+  `.dev-nexus/work-item-links.json`; completed local history was not backfilled.
+  Provider comments, scheduled import, and future external mutation policy
+  remain explicit policy decisions. `dev-nexus:local-153` is complete for
+  GitHub issue eligibility hygiene: provider-native issues now use the same
+  selector convention as local items (`dogfood` plus `status:ready` is directly
+  selectable; blocked/unsafe labels exclude) without creating local duplicates.
+  The migration exposed a provider-auth defect: sync-created issue/comment
+  activity used `Gabriel-Darbord` instead of the configured bot identity, so
+  live provider writes should be treated as unsafe until that path is fixed.
+  The authority provider-signal follow-on `local-93` is complete. The local
+  tracker auth-profile mismatch follow-on `local-152` is also complete as
+  `0e86479`; DevNexus-Pharo package-template and legacy Vibe metadata fixes
+  `dev-nexus-pharo:local-20` and `local-21` are complete as `84a4556` and
+  `f0027da`. DevNexus import extension config preservation
   `dev-nexus:local-142` is complete as `9fbb9f1`. The next cycle should
   re-check eligible work and either promote the next dependency-satisfied
   bounded slice or record the blocker that keeps remaining items out of ready

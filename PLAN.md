@@ -16,15 +16,16 @@ target-cycle facts, commits, and the target report.
   publication policy, and relationships.
 - Plugins compose into one DevNexus project. Plugins contribute setup policy,
   skills, MCP wiring, and domain affordances without replacing DevNexus.
-- Work trackers are component-level systems of record. Local stores are used for
-  immediate dogfooding; GitHub, GitLab, Jira, GitHub Projects, and Vibe Kanban
-  remain provider options through neutral work-item APIs.
+- Work trackers are component-level systems of record. GitHub Issues is now the
+  dogfood default shared tracker; local stores remain archive and migration
+  history. GitLab, Jira, GitHub Projects, and Vibe Kanban remain provider
+  options through neutral work-item APIs.
 
 ## Active Themes
 
-- Multi-tracker work tracking: local primary trackers, optional shared or
-  mirrored trackers, neutral link records, dry-run sync planning, policy-gated
-  one-way sync, explicit discovery sources, and inbound provider issue import.
+- Multi-tracker work tracking: GitHub primary trackers, local archive stores,
+  neutral link records, dry-run sync planning, policy-gated one-way sync,
+  explicit discovery sources, and inbound provider issue import.
 - Shared multi-host coordination: Mac and Windows agents coordinate through
   work-item intent, Git branches, structured handoffs, integration planning, and
   provider-backed approval or feedback requests.
@@ -125,13 +126,15 @@ target-cycle facts, commits, and the target report.
   execution. `local-135` is complete for compact external issue visibility
   summaries, and `local-136` is complete for fake GitHub inbox discovery/import
   smoke coverage.
-  `local-137` is resolved for direct external selection: this dogfood project
-  scans both local primary trackers and configured GitHub Issues eligible-source
-  trackers without requiring import-first migration. Provider comments,
-  scheduled import, and any external mutation policy remain separate blocked
-  decisions. `local-153` is complete for GitHub issue eligibility hygiene:
-  `dogfood` plus `status:ready` marks provider-native GitHub issues as directly
-  selectable, while blocked/unsafe labels exclude them, without copying issues
+  `local-137` is resolved for direct external selection. As of 2026-05-20,
+  this dogfood project uses GitHub Issues as the primary shared tracker for all
+  configured components; local trackers are archive/history only. Open local
+  `ready`, `todo`, and `blocked` work was one-way synced to GitHub, while
+  completed local history remains local. Provider comments, scheduled import,
+  and future external mutation policy remain explicit policy decisions.
+  `local-153` is complete for GitHub issue eligibility hygiene: `dogfood` plus
+  `status:ready` marks provider-native GitHub issues as directly selectable,
+  while blocked/unsafe labels exclude them, without copying new provider issues
   into local tracker state.
 - Resolve `dev-nexus:local-69` before treating Windows source roots as clean
   production examples.

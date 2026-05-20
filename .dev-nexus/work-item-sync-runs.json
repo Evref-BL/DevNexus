@@ -1,0 +1,2148 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-20T07:59:46.060Z",
+  "runs": [
+    {
+      "summary": {
+        "id": "sync-run-831a5d375854",
+        "status": "completed",
+        "startedAt": "2026-05-20T07:57:33.322Z",
+        "finishedAt": "2026-05-20T07:58:56.704Z",
+        "projectRoot": "C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus-dogfood\\codex-dev-nexus-dogfood-github-default-tracker",
+        "projectId": "dev-nexus-dogfood",
+        "componentId": "dev-nexus",
+        "sourceTrackerId": "local",
+        "targetTrackerId": "github",
+        "planGeneratedAt": "2026-05-20T07:57:33.322Z",
+        "counts": {
+          "created": 35,
+          "updated": 0,
+          "skipped": 0,
+          "conflicted": 0,
+          "blocked": 0,
+          "comments": 35,
+          "links": 35
+        }
+      },
+      "providerLinks": [
+        {
+          "action": "created",
+          "source": {
+            "id": "local-16",
+            "title": "Choose shared coordination provider and transport for Mac Windows dogfood",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-17T00:06:30.327Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-16",
+              "itemNumber": 16
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-24",
+            "title": "Choose shared coordination provider and transport for Mac Windows dogfood",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:35Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "24",
+              "itemNumber": 24,
+              "nodeId": "I_kwDOSertp88AAAABC0om-w",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/24"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/24"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "24",
+            "itemNumber": 24,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0om-w",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/24",
+            "firstObservedAt": "2026-05-20T07:57:35Z",
+            "lastObservedAt": "2026-05-20T07:57:35Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-18",
+            "title": "Choose external coordination posting policy",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-17T10:57:50.039Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-18",
+              "itemNumber": 18
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-25",
+            "title": "Choose external coordination posting policy",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:38Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "25",
+              "itemNumber": 25,
+              "nodeId": "I_kwDOSertp88AAAABC0ooZA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/25"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/25"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "25",
+            "itemNumber": 25,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ooZA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/25",
+            "firstObservedAt": "2026-05-20T07:57:38Z",
+            "lastObservedAt": "2026-05-20T07:57:38Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-22",
+            "title": "Decide whether to add nested execution workspaces",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-16T21:15:18.764Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-22",
+              "itemNumber": 22
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-26",
+            "title": "Decide whether to add nested execution workspaces",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:40Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "26",
+              "itemNumber": 26,
+              "nodeId": "I_kwDOSertp88AAAABC0opQw",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/26"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/26"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "26",
+            "itemNumber": 26,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0opQw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/26",
+            "firstObservedAt": "2026-05-20T07:57:40Z",
+            "lastObservedAt": "2026-05-20T07:57:40Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-30",
+            "title": "Slice Codex app-server provider PRD into implementation work items",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-17T10:38:45.366Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-30",
+              "itemNumber": 30
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-27",
+            "title": "Slice Codex app-server provider PRD into implementation work items",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:42Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "27",
+              "itemNumber": 27,
+              "nodeId": "I_kwDOSertp88AAAABC0oqEw",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/27"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/27"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "27",
+            "itemNumber": 27,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0oqEw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/27",
+            "firstObservedAt": "2026-05-20T07:57:42Z",
+            "lastObservedAt": "2026-05-20T07:57:42Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-52",
+            "title": "Choose first live multi-tracker dogfood sync/mirroring policy",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-19T12:40:43.261Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-52",
+              "itemNumber": 52
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-28",
+            "title": "Choose first live multi-tracker dogfood sync/mirroring policy",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:44Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "28",
+              "itemNumber": 28,
+              "nodeId": "I_kwDOSertp88AAAABC0orHg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/28"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/28"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "28",
+            "itemNumber": 28,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0orHg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/28",
+            "firstObservedAt": "2026-05-20T07:57:44Z",
+            "lastObservedAt": "2026-05-20T07:57:44Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-69",
+            "title": "Umbrella: Make project-local component clones the default layout",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T11:58:11.055Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-69",
+              "itemNumber": 69
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-29",
+            "title": "Umbrella: Make project-local component clones the default layout",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:46Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "29",
+              "itemNumber": 29,
+              "nodeId": "I_kwDOSertp88AAAABC0osRQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/29"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/29"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "29",
+            "itemNumber": 29,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0osRQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/29",
+            "firstObservedAt": "2026-05-20T07:57:46Z",
+            "lastObservedAt": "2026-05-20T07:57:46Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-73",
+            "title": "Classify component source-root topology in setup diagnostics",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T11:57:14.962Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-73",
+              "itemNumber": 73
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-30",
+            "title": "Classify component source-root topology in setup diagnostics",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:48Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "30",
+              "itemNumber": 30,
+              "nodeId": "I_kwDOSertp88AAAABC0otuA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/30"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/30"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "30",
+            "itemNumber": 30,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0otuA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/30",
+            "firstObservedAt": "2026-05-20T07:57:48Z",
+            "lastObservedAt": "2026-05-20T07:57:48Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-75",
+            "title": "Migrate dogfood sources to project-local components layout",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T16:52:06.974Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-75",
+              "itemNumber": 75
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-31",
+            "title": "Migrate dogfood sources to project-local components layout",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:50Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "31",
+              "itemNumber": 31,
+              "nodeId": "I_kwDOSertp88AAAABC0ounw",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/31"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/31"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "31",
+            "itemNumber": 31,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ounw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/31",
+            "firstObservedAt": "2026-05-20T07:57:50Z",
+            "lastObservedAt": "2026-05-20T07:57:50Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-82",
+            "title": "Add read-only host capability check command",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:30.225Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-82",
+              "itemNumber": 82
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-32",
+            "title": "Add read-only host capability check command",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:52Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "32",
+              "itemNumber": 32,
+              "nodeId": "I_kwDOSertp88AAAABC0ovuQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/32"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/32"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "32",
+            "itemNumber": 32,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ovuQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/32",
+            "firstObservedAt": "2026-05-20T07:57:52Z",
+            "lastObservedAt": "2026-05-20T07:57:52Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-83",
+            "title": "Plan SSH transport execution without live network dependency",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:30.500Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-83",
+              "itemNumber": 83
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-33",
+            "title": "Plan SSH transport execution without live network dependency",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:54Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "33",
+              "itemNumber": 33,
+              "nodeId": "I_kwDOSertp88AAAABC0owwg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/33"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/33"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "33",
+            "itemNumber": 33,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0owwg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/33",
+            "firstObservedAt": "2026-05-20T07:57:54Z",
+            "lastObservedAt": "2026-05-20T07:57:54Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-84",
+            "title": "Execute verification-only remote commands through approved runner profiles",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:30.754Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-84",
+              "itemNumber": 84
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-34",
+            "title": "Execute verification-only remote commands through approved runner profiles",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:57:57Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "34",
+              "itemNumber": 34,
+              "nodeId": "I_kwDOSertp88AAAABC0oxzg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/34"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/34"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "34",
+            "itemNumber": 34,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0oxzg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/34",
+            "firstObservedAt": "2026-05-20T07:57:57Z",
+            "lastObservedAt": "2026-05-20T07:57:57Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-85",
+            "title": "Choose first Mac Windows remote runner dogfood policy",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:31.108Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-85",
+              "itemNumber": 85
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-35",
+            "title": "Choose first Mac Windows remote runner dogfood policy",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:00Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "35",
+              "itemNumber": 35,
+              "nodeId": "I_kwDOSertp88AAAABC0ozQA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/35"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/35"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "35",
+            "itemNumber": 35,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ozQA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/35",
+            "firstObservedAt": "2026-05-20T07:58:00Z",
+            "lastObservedAt": "2026-05-20T07:58:00Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-86",
+            "title": "Run first read-only Mac Windows remote host status smoke",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:31.396Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-86",
+              "itemNumber": 86
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-36",
+            "title": "Run first read-only Mac Windows remote host status smoke",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:02Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "36",
+              "itemNumber": 36,
+              "nodeId": "I_kwDOSertp88AAAABC0o0Lg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/36"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/36"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "36",
+            "itemNumber": 36,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o0Lg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/36",
+            "firstObservedAt": "2026-05-20T07:58:02Z",
+            "lastObservedAt": "2026-05-20T07:58:02Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-95",
+            "title": "Decide advanced authority policies for self-approval and temporary elevation",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:08:02.324Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-95",
+              "itemNumber": 95
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-37",
+            "title": "Decide advanced authority policies for self-approval and temporary elevation",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:05Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "37",
+              "itemNumber": 37,
+              "nodeId": "I_kwDOSertp88AAAABC0o0_Q",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/37"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/37"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "37",
+            "itemNumber": 37,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o0_Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/37",
+            "firstObservedAt": "2026-05-20T07:58:05Z",
+            "lastObservedAt": "2026-05-20T07:58:05Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-100",
+            "title": "Expand coordination status for active parallel work",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:22:17.449Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-100",
+              "itemNumber": 100
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-38",
+            "title": "Expand coordination status for active parallel work",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:07Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "38",
+              "itemNumber": 38,
+              "nodeId": "I_kwDOSertp88AAAABC0o14w",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/38"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/38"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "38",
+            "itemNumber": 38,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o14w",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/38",
+            "firstObservedAt": "2026-05-20T07:58:07Z",
+            "lastObservedAt": "2026-05-20T07:58:07Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-101",
+            "title": "Add start or adopt flow for interactive chats",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:22:17.674Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-101",
+              "itemNumber": 101
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-39",
+            "title": "Add start or adopt flow for interactive chats",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:10Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "39",
+              "itemNumber": 39,
+              "nodeId": "I_kwDOSertp88AAAABC0o3iA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/39"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/39"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "39",
+            "itemNumber": 39,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o3iA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/39",
+            "firstObservedAt": "2026-05-20T07:58:10Z",
+            "lastObservedAt": "2026-05-20T07:58:10Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-103",
+            "title": "Execute cleanup with rescue preservation under authority gates",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:22:18.185Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-103",
+              "itemNumber": 103
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-40",
+            "title": "Execute cleanup with rescue preservation under authority gates",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:12Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "40",
+              "itemNumber": 40,
+              "nodeId": "I_kwDOSertp88AAAABC0o4xg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/40"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/40"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "40",
+            "itemNumber": 40,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o4xg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/40",
+            "firstObservedAt": "2026-05-20T07:58:12Z",
+            "lastObservedAt": "2026-05-20T07:58:12Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-108",
+            "title": "Add safe cleanup for stale generated agent provider support",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:34:18.113Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-108",
+              "itemNumber": 108
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-41",
+            "title": "Add safe cleanup for stale generated agent provider support",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:15Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "41",
+              "itemNumber": 41,
+              "nodeId": "I_kwDOSertp88AAAABC0o6Rg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/41"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/41"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "41",
+            "itemNumber": 41,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o6Rg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/41",
+            "firstObservedAt": "2026-05-20T07:58:15Z",
+            "lastObservedAt": "2026-05-20T07:58:15Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-110",
+            "title": "Document opt-in agent targets and projection cleanup",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:34:18.591Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-110",
+              "itemNumber": 110
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-42",
+            "title": "Document opt-in agent targets and projection cleanup",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:18Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "42",
+              "itemNumber": 42,
+              "nodeId": "I_kwDOSertp88AAAABC0o7Tw",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/42"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/42"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "42",
+            "itemNumber": 42,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o7Tw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/42",
+            "firstObservedAt": "2026-05-20T07:58:18Z",
+            "lastObservedAt": "2026-05-20T07:58:18Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-111",
+            "title": "Migrate dogfood project to explicit Codex-only active targets",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:34:18.824Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-111",
+              "itemNumber": 111
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-43",
+            "title": "Migrate dogfood project to explicit Codex-only active targets",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:20Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "43",
+              "itemNumber": 43,
+              "nodeId": "I_kwDOSertp88AAAABC0o8Cw",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/43"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/43"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "43",
+            "itemNumber": 43,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o8Cw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/43",
+            "firstObservedAt": "2026-05-20T07:58:20Z",
+            "lastObservedAt": "2026-05-20T07:58:20Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-116",
+            "title": "Record provider session and turn facts for Codex app-server runs",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T15:39:30.783Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-116",
+              "itemNumber": 116
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-44",
+            "title": "Record provider session and turn facts for Codex app-server runs",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:22Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "44",
+              "itemNumber": 44,
+              "nodeId": "I_kwDOSertp88AAAABC0o83g",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/44"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/44"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "44",
+            "itemNumber": 44,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o83g",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/44",
+            "firstObservedAt": "2026-05-20T07:58:22Z",
+            "lastObservedAt": "2026-05-20T07:58:22Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-146",
+            "title": "Decide DevNexus-Research license and ARS integration posture",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T21:54:12.366Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-146",
+              "itemNumber": 146
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-45",
+            "title": "Decide DevNexus-Research license and ARS integration posture",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:24Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "45",
+              "itemNumber": 45,
+              "nodeId": "I_kwDOSertp88AAAABC0o92A",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/45"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/45"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "45",
+            "itemNumber": 45,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o92A",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/45",
+            "firstObservedAt": "2026-05-20T07:58:24Z",
+            "lastObservedAt": "2026-05-20T07:58:24Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-148",
+            "title": "Project baseline research workflow skills",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T21:54:26.558Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-148",
+              "itemNumber": 148
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-46",
+            "title": "Project baseline research workflow skills",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:26Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "46",
+              "itemNumber": 46,
+              "nodeId": "I_kwDOSertp88AAAABC0o_ww",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/46"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/46"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "46",
+            "itemNumber": 46,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o_ww",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/46",
+            "firstObservedAt": "2026-05-20T07:58:26Z",
+            "lastObservedAt": "2026-05-20T07:58:26Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-149",
+            "title": "Add research artifact conventions and setup checks",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T21:54:33.717Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-149",
+              "itemNumber": 149
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-47",
+            "title": "Add research artifact conventions and setup checks",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:29Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "47",
+              "itemNumber": 47,
+              "nodeId": "I_kwDOSertp88AAAABC0pBHg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/47"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/47"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "47",
+            "itemNumber": 47,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pBHg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/47",
+            "firstObservedAt": "2026-05-20T07:58:29Z",
+            "lastObservedAt": "2026-05-20T07:58:29Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-150",
+            "title": "Integrate optional external ARS Codex skill projection",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T21:54:42.148Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-150",
+              "itemNumber": 150
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-48",
+            "title": "Integrate optional external ARS Codex skill projection",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:31Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "48",
+              "itemNumber": 48,
+              "nodeId": "I_kwDOSertp88AAAABC0pB_Q",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/48"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/48"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "48",
+            "itemNumber": 48,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pB_Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/48",
+            "firstObservedAt": "2026-05-20T07:58:31Z",
+            "lastObservedAt": "2026-05-20T07:58:31Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-151",
+            "title": "Add DevNexus-Research dogfood paper-project smoke",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T21:54:48.636Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-151",
+              "itemNumber": 151
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-49",
+            "title": "Add DevNexus-Research dogfood paper-project smoke",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:33Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "49",
+              "itemNumber": 49,
+              "nodeId": "I_kwDOSertp88AAAABC0pC1Q",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/49"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/49"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "49",
+            "itemNumber": 49,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pC1Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/49",
+            "firstObservedAt": "2026-05-20T07:58:33Z",
+            "lastObservedAt": "2026-05-20T07:58:33Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-173",
+            "title": "Add quick-fix mode for one provider-native issue",
+            "status": "ready",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:46:49.851Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-173",
+              "itemNumber": 173
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-50",
+            "title": "Add quick-fix mode for one provider-native issue",
+            "status": "ready",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:35Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "50",
+              "itemNumber": 50,
+              "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "50",
+            "itemNumber": 50,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
+            "firstObservedAt": "2026-05-20T07:58:35Z",
+            "lastObservedAt": "2026-05-20T07:58:35Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-174",
+            "title": "Define mode-aware closeout rules for quick fixes and heartbeat runs",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:46:56.254Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-174",
+              "itemNumber": 174
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-51",
+            "title": "Define mode-aware closeout rules for quick fixes and heartbeat runs",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:38Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "51",
+              "itemNumber": 51,
+              "nodeId": "I_kwDOSertp88AAAABC0pEyA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/51"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/51"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "51",
+            "itemNumber": 51,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pEyA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/51",
+            "firstObservedAt": "2026-05-20T07:58:38Z",
+            "lastObservedAt": "2026-05-20T07:58:38Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-175",
+            "title": "Report why visible work is excluded from eligible-work selection",
+            "status": "ready",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:03.084Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-175",
+              "itemNumber": 175
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-52",
+            "title": "Report why visible work is excluded from eligible-work selection",
+            "status": "ready",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:40Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "52",
+              "itemNumber": 52,
+              "nodeId": "I_kwDOSertp88AAAABC0pFoQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/52"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/52"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "52",
+            "itemNumber": 52,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pFoQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/52",
+            "firstObservedAt": "2026-05-20T07:58:40Z",
+            "lastObservedAt": "2026-05-20T07:58:40Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-176",
+            "title": "Make automation and coordination outputs compact by default",
+            "status": "ready",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:10.083Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-176",
+              "itemNumber": 176
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-53",
+            "title": "Make automation and coordination outputs compact by default",
+            "status": "ready",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:42Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "53",
+              "itemNumber": 53,
+              "nodeId": "I_kwDOSertp88AAAABC0pGkA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/53"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/53"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "53",
+            "itemNumber": 53,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pGkA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/53",
+            "firstObservedAt": "2026-05-20T07:58:42Z",
+            "lastObservedAt": "2026-05-20T07:58:42Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-177",
+            "title": "Split worktree lease storage between coordination and runtime state",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:18.579Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-177",
+              "itemNumber": 177
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-54",
+            "title": "Split worktree lease storage between coordination and runtime state",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:45Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "54",
+              "itemNumber": 54,
+              "nodeId": "I_kwDOSertp88AAAABC0pHnQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/54"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/54"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "54",
+            "itemNumber": 54,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pHnQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/54",
+            "firstObservedAt": "2026-05-20T07:58:45Z",
+            "lastObservedAt": "2026-05-20T07:58:45Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-178",
+            "title": "Add green-main publication helper with CI failure classification",
+            "status": "ready",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:25.932Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-178",
+              "itemNumber": 178
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-55",
+            "title": "Add green-main publication helper with CI failure classification",
+            "status": "ready",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:47Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "55",
+              "itemNumber": 55,
+              "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "55",
+            "itemNumber": 55,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
+            "firstObservedAt": "2026-05-20T07:58:47Z",
+            "lastObservedAt": "2026-05-20T07:58:47Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-179",
+            "title": "Complete or hide provider-native coordination handoff paths",
+            "status": "ready",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:33.444Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-179",
+              "itemNumber": 179
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-56",
+            "title": "Complete or hide provider-native coordination handoff paths",
+            "status": "ready",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:49Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "56",
+              "itemNumber": 56,
+              "nodeId": "I_kwDOSertp88AAAABC0pKGQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/56"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/56"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "56",
+            "itemNumber": 56,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pKGQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/56",
+            "firstObservedAt": "2026-05-20T07:58:49Z",
+            "lastObservedAt": "2026-05-20T07:58:49Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-180",
+            "title": "Add target-state compaction from durable project facts",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:41.517Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-180",
+              "itemNumber": 180
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-57",
+            "title": "Add target-state compaction from durable project facts",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:52Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "57",
+              "itemNumber": 57,
+              "nodeId": "I_kwDOSertp88AAAABC0pK7Q",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/57"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/57"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "57",
+            "itemNumber": 57,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pK7Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/57",
+            "firstObservedAt": "2026-05-20T07:58:52Z",
+            "lastObservedAt": "2026-05-20T07:58:52Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-181",
+            "title": "Support risk-scaled verification policies by workflow mode",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-20T07:47:49.982Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-181",
+              "itemNumber": 181
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-58",
+            "title": "Support risk-scaled verification policies by workflow mode",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:58:55Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus",
+              "itemId": "58",
+              "itemNumber": 58,
+              "nodeId": "I_kwDOSertp88AAAABC0pMFQ",
+              "webUrl": "https://github.com/Evref-BL/DevNexus/issues/58"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/58"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "58",
+            "itemNumber": 58,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pMFQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/58",
+            "firstObservedAt": "2026-05-20T07:58:55Z",
+            "lastObservedAt": "2026-05-20T07:58:55Z"
+          }
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "summary": {
+        "id": "sync-run-48629d1ae417",
+        "status": "completed",
+        "startedAt": "2026-05-20T07:59:38.217Z",
+        "finishedAt": "2026-05-20T07:59:46.060Z",
+        "projectRoot": "C:\\dev\\code\\dev-nexus-dogfood\\worktrees\\dev-nexus-dogfood\\codex-dev-nexus-dogfood-github-default-tracker",
+        "projectId": "dev-nexus-dogfood",
+        "componentId": "dev-nexus-pharo",
+        "sourceTrackerId": "local",
+        "targetTrackerId": "github",
+        "planGeneratedAt": "2026-05-20T07:59:38.218Z",
+        "counts": {
+          "created": 3,
+          "updated": 0,
+          "skipped": 0,
+          "conflicted": 0,
+          "blocked": 0,
+          "comments": 3,
+          "links": 3
+        }
+      },
+      "providerLinks": [
+        {
+          "action": "created",
+          "source": {
+            "id": "local-3",
+            "title": "Run approved DevNexus-Pharo self-hosted startup smoke",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-16T23:56:32.844Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-3",
+              "itemNumber": 3
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-6",
+            "title": "Run approved DevNexus-Pharo self-hosted startup smoke",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:59:39Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus-Pharo",
+              "itemId": "6",
+              "itemNumber": 6,
+              "nodeId": "I_kwDOSNc8HM8AAAABC0piAg",
+              "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/6"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/6"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "6",
+            "itemNumber": 6,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0piAg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/6",
+            "firstObservedAt": "2026-05-20T07:59:39Z",
+            "lastObservedAt": "2026-05-20T07:59:39Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-5",
+            "title": "Verify DevNexus-Pharo-provided Pharo MCP access in subagent worktrees",
+            "status": "blocked",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-16T23:57:13.793Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-5",
+              "itemNumber": 5
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-7",
+            "title": "Verify DevNexus-Pharo-provided Pharo MCP access in subagent worktrees",
+            "status": "blocked",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:59:42Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus-Pharo",
+              "itemId": "7",
+              "itemNumber": 7,
+              "nodeId": "I_kwDOSNc8HM8AAAABC0pjeA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/7"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/7"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "7",
+            "itemNumber": 7,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0pjeA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/7",
+            "firstObservedAt": "2026-05-20T07:59:42Z",
+            "lastObservedAt": "2026-05-20T07:59:42Z"
+          }
+        },
+        {
+          "action": "created",
+          "source": {
+            "id": "local-14",
+            "title": "Contribute DevNexus-Pharo host capability probes and runner profile templates",
+            "status": "todo",
+            "trackerId": "local",
+            "provider": "local",
+            "updatedAt": "2026-05-18T13:04:31.676Z",
+            "externalRef": {
+              "provider": "local",
+              "itemId": "local-14",
+              "itemNumber": 14
+            },
+            "webUrl": null
+          },
+          "target": {
+            "id": "github-8",
+            "title": "Contribute DevNexus-Pharo host capability probes and runner profile templates",
+            "status": "todo",
+            "trackerId": "github",
+            "provider": "github",
+            "updatedAt": "2026-05-20T07:59:44Z",
+            "externalRef": {
+              "provider": "github",
+              "host": "github.com",
+              "repositoryOwner": "Evref-BL",
+              "repositoryName": "DevNexus-Pharo",
+              "itemId": "8",
+              "itemNumber": 8,
+              "nodeId": "I_kwDOSNc8HM8AAAABC0pkTA",
+              "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/8"
+            },
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/8"
+          },
+          "linkAction": "linked",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "8",
+            "itemNumber": 8,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0pkTA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/8",
+            "firstObservedAt": "2026-05-20T07:59:44Z",
+            "lastObservedAt": "2026-05-20T07:59:44Z"
+          }
+        }
+      ],
+      "blockers": []
+    }
+  ]
+}
