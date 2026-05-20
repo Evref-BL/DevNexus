@@ -1419,12 +1419,20 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(applied.nextActions).toEqual([
-      `Open the DevNexus project root in the configured agent application: ${projectRoot}`,
-      `Run dev-nexus setup check ${shellQuoteArgument(projectRoot)} join-existing-project --json.`,
-      `Run dev-nexus project hosting status ${shellQuoteArgument(projectRoot)} --home ${shellQuoteArgument(homePath)} --json when hosting intent is configured.`,
+      `Open the DevNexus project root in Codex or your configured agent: ${projectRoot}`,
+      `Run dev-nexus setup check ${shellQuoteArgument(projectRoot)} join-existing-project --json to verify local readiness.`,
+      `Run dev-nexus project status ${shellQuoteArgument(projectRoot)} --json to inspect configured components.`,
+      "Create or triage the first work item for component core with tracker local.",
+      `Run dev-nexus project hosting status ${shellQuoteArgument(projectRoot)} --json when hosting intent is configured. Add --home only if you used a custom DevNexus home.`,
     ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     const agentsText = fs.readFileSync(path.join(projectRoot, "AGENTS.md"), "utf8");
+    expect(agentsText).toContain("## Project And Components");
+    expect(agentsText).toContain("The DevNexus project root contains orchestration files");
+    expect(agentsText).toContain("Components are the source roots listed in `dev-nexus.project.json`");
+    expect(agentsText).toContain("## First-Run Checklist");
+    expect(agentsText).toContain("Run `dev-nexus setup check <project-root> join-existing-project --json`");
+    expect(agentsText).toContain("Create or triage the first component work item");
     expect(agentsText).toContain("Before editing a Git checkout");
     expect(agentsText).toContain("Fetch configured remotes when policy allows");
     expect(agentsText).toContain("branches and worktrees proven merged");
