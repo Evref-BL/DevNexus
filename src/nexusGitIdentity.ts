@@ -49,6 +49,7 @@ export function resolveExpectedAutomationGitIdentity(options: {
 
   const commandEnvironment = options.publication.commandEnvironment;
   const profile = findPublicationActorAuthProfile(actor, options.authProfiles);
+  const publicationGitIdentity = options.publication.gitIdentity;
   const envName =
     matchingEnvironmentValue(commandEnvironment, [
       "GIT_AUTHOR_NAME",
@@ -61,6 +62,7 @@ export function resolveExpectedAutomationGitIdentity(options: {
     ]) ?? null;
   const name =
     envName ??
+    publicationGitIdentity?.name ??
     profile?.gitUserName ??
     profile?.account ??
     actor.handle ??
@@ -68,12 +70,15 @@ export function resolveExpectedAutomationGitIdentity(options: {
     null;
   const email =
     envEmail ??
+    publicationGitIdentity?.email ??
     profile?.gitUserEmail ??
     explicitGithubNoReplyEmail(actor) ??
     null;
   const source =
     envName || envEmail
       ? "publication.commandEnvironment"
+      : publicationGitIdentity?.name || publicationGitIdentity?.email
+        ? "publication.gitIdentity"
       : profile?.gitUserName || profile?.gitUserEmail
         ? `authProfile:${profile.id}`
         : explicitGithubNoReplyEmail(actor)

@@ -370,4 +370,66 @@ describe("nexus manual worktree worker target preparation", () => {
       "- automation Git identity: Example Bot <bot@example.invalid>",
     );
   });
+
+  it("prepares worktrees with the project default automation Git identity", () => {
+    const { projectRoot, calls } = prepareProject({
+      home: "home",
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "direct_integration",
+          remote: "bot",
+          push: true,
+          actor: {
+            kind: "machine_user",
+            provider: "github",
+            handle: "example-bot",
+            id: null,
+          },
+          gitIdentity: {
+            name: "Project Bot",
+            email: "project-bot@example.invalid",
+          },
+        },
+      },
+    });
+    saveHomeConfig(path.join(projectRoot, "home"));
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      topic: "project bot git identity",
+      branchName: "codex/primary/project-bot-git-identity",
+      worktreeName: "project-bot-git-identity",
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(result.worktree.gitIdentity).toEqual({
+      name: "Project Bot",
+      email: "project-bot@example.invalid",
+    });
+    expect(calls).toContainEqual({
+      cwd: result.worktree.worktreePath,
+      args: ["config", "--local", "user.name", "Project Bot"],
+    });
+    expect(calls).toContainEqual({
+      cwd: result.worktree.worktreePath,
+      args: ["config", "--local", "user.email", "project-bot@example.invalid"],
+    });
+    expect(context.gitIdentity).toMatchObject({
+      name: "Project Bot",
+      email: "project-bot@example.invalid",
+      source: "publication.gitIdentity",
+    });
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "- raw git commit uses the prepared repo-local automation identity unless the worker overrides Git config.",
+    );
+  });
 });

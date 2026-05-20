@@ -802,6 +802,113 @@ describe("nexus automation status", () => {
       }),
     );
   });
+
+  it("blocks readiness when automation commit identity is incomplete", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...projectConfig().automation!,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "direct_integration",
+            remote: "bot",
+            remoteUrl: "git@github.com-bot:example/project.git",
+            sshHostAlias: "github.com-bot",
+            targetBranch: "main",
+            push: true,
+            actor: {
+              kind: "machine_user",
+              provider: "github",
+              handle: "example-bot",
+              id: "example-bot-actor",
+            },
+            gitIdentity: {
+              name: "Example Bot",
+              email: null,
+            },
+            commandEnvironment: {
+              GH_CONFIG_DIR: "home:.config/gh-example-bot",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "example-bot-actor",
+              kind: "machine_user",
+              provider: "github",
+              providerIdentity: "example-bot",
+              displayName: "Example Bot",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "example-bot-actor",
+              roles: ["maintainer"],
+              scope: {
+                component: "primary",
+              },
+            },
+          ],
+        },
+      }),
+    );
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Blocked identity task",
+      status: "ready",
+      labels: ["automation"],
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      authProfiles: [
+        {
+          id: "bot-github",
+          actorId: "example-bot-actor",
+          provider: "github",
+          kind: "automation",
+          account: "example-bot",
+          sshHost: "github.com-bot",
+          githubCliConfigDir: "home:.config/gh-example-bot",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        },
+      ],
+      gitRunner: publicationGitRunner(sourceRoot),
+      publicationActorRunner: actorRunnerWithHandle("example-bot"),
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      candidateCount: null,
+      selectedWorkItem: null,
+      publication: [
+        {
+          componentId: "primary",
+          blocking: true,
+          gitIdentity: {
+            status: "unchecked",
+          },
+        },
+      ],
+    });
+    expect(result.summary).toContain("Expected Git email is not configured");
+    expect(result.preflight).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:gitIdentity",
+        status: "failed",
+      }),
+    );
+  });
 });
 
 function publicationGitRunner(repositoryPath: string): GitRunner {

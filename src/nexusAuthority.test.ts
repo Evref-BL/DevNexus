@@ -60,6 +60,7 @@ const publication: NexusAutomationPublicationConfig = {
     provider: "github",
     handle: "Example-Bot",
   },
+  gitIdentity: null,
   manualRemote: "origin",
   manualActor: {
     id: "example-human",
