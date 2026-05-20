@@ -6,6 +6,7 @@ import {
   createLocalWorkTrackerProvider,
   createDefaultNexusHomeConfigBase,
   createNexusAutomationAgentCommandLauncher,
+  currentNexusCliScriptPath,
   defaultLocalWorkTrackingStorePath,
   defaultNexusAutomationConfig,
   loadLocalWorkTrackingStore,
@@ -23,6 +24,14 @@ import {
 } from "./index.js";
 
 const tempDirs: string[] = [];
+
+function projectedDevNexusMcpToml(): string {
+  return `[mcp_servers.dev_nexus]\ncommand = "node"\nargs = ["${currentNexusCliScriptPath()}", "mcp-stdio"]\n`;
+}
+
+function expectedProjectedDevNexusMcpCommandLine(): string {
+  return `"node" "${currentNexusCliScriptPath()}" "mcp-stdio"`;
+}
 
 function runNexusAutomationAgentLaunchOnce(
   options: Parameters<typeof runNexusAutomationAgentLaunchOnceBase>[0],
@@ -1019,7 +1028,7 @@ describe("nexus automation agent launch", () => {
           name: "mcpRuntime:agent-mcp-server-codex-dev_nexus",
           status: "failed",
           message: expect.stringContaining(
-            `Expected: "${process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus"}" "mcp-stdio"`,
+            `Expected: ${expectedProjectedDevNexusMcpCommandLine()}`,
           ),
         }),
       ]),
@@ -1032,7 +1041,7 @@ describe("nexus automation agent launch", () => {
     fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, ".codex", "config.toml"),
-      "[mcp_servers.dev_nexus]\ncommand = \"dev-nexus\"\nargs = [\"mcp-stdio\"]\n",
+      projectedDevNexusMcpToml(),
     );
     saveProjectConfig(
       projectRoot,
@@ -1060,6 +1069,8 @@ describe("nexus automation agent launch", () => {
         {
           pid: 4242,
           commandLine: "old-dev-nexus mcp-stdio",
+          provider: "codex",
+          serverName: "dev_nexus",
         },
       ],
       launcher: () => {

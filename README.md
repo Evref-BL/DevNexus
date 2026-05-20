@@ -51,6 +51,18 @@ dev-nexus diagnostics cli-version-skew --json
 - A **worktree** is an isolated Git checkout for a focused change. Agents use
   worktrees so parallel chats do not edit the same checkout.
 
+When working from a newer source checkout while the shell `dev-nexus` command
+may still point at an older global install, run the source CLI and inspect the
+shell command explicitly:
+
+```bash
+node /path/to/dev-nexus/dist/cli.js diagnostics cli-version-skew --installed-command dev-nexus --json
+```
+
+Generated MCP config pins the active CLI script path during `workspace mcp
+refresh`, so agent sessions do not silently inherit a stale global
+`dev-nexus mcp-stdio` runtime.
+
 ## Quick Start
 
 Create or choose a directory for the DevNexus workspace. From that directory,

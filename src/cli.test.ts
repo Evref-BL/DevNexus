@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main, usage } from "./cli.js";
 import {
   createLocalWorkTrackerProvider,
+  currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
@@ -1082,6 +1083,46 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("Missing documented commands:");
     expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("Remediation:");
+  });
+
+  it("can inspect a dev-nexus command on PATH for skew", async () => {
+    const output = captureOutput();
+    const commands: string[] = [];
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      commands.push(command);
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "Usage:\n  dev-nexus workspace status <workspace-id-or-root> [options]\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    await expect(
+      main(
+        [
+          "diagnostics",
+          "cli-version-skew",
+          "--installed-command",
+          "dev-nexus",
+          "--expected-command",
+          "dev-nexus diagnostics cli-version-skew",
+          "--json",
+        ],
+        { stdout: output.writer, commandRunner },
+      ),
+    ).resolves.toBe(1);
+
+    expect(commands).toEqual(["dev-nexus --help"]);
+    const parsed = JSON.parse(output.output());
+    expect(parsed).toMatchObject({
+      ok: false,
+      diagnostic: {
+        status: "skew_detected",
+        missingDocumentedCommands: ["dev-nexus diagnostics cli-version-skew"],
+      },
+    });
   });
 
   it("prints workspace hosting status and plan through the CLI", async () => {
@@ -4922,8 +4963,8 @@ describe("dev-nexus cli", () => {
         },
       ],
     });
-    const expectedCommand =
-      process.platform === "win32" ? "dev-nexus.cmd" : "dev-nexus";
+    const expectedCommand = "node";
+    const expectedArgs = [currentNexusCliScriptPath(), "mcp-stdio"];
     expect(
       fs.readFileSync(path.join(projectRoot, ".codex", "config.toml"), "utf8"),
     ).toContain("[mcp_servers.dev_nexus]");
@@ -4932,14 +4973,14 @@ describe("dev-nexus cli", () => {
         .mcpServers.dev_nexus,
     ).toEqual({
       command: expectedCommand,
-      args: ["mcp-stdio"],
+      args: expectedArgs,
     });
     expect(
       JSON.parse(fs.readFileSync(path.join(projectRoot, "opencode.json"), "utf8"))
         .mcp.dev_nexus,
     ).toEqual({
       type: "local",
-      command: [expectedCommand, "mcp-stdio"],
+      command: [expectedCommand, ...expectedArgs],
       enabled: true,
     });
   });
