@@ -189,6 +189,7 @@ import {
 } from "./nexusProjectConfig.js";
 import {
   applyNexusProjectSetup,
+  buildNexusProjectSetupApplyNextActions,
   loadNexusProjectSetupAnswers,
   previewNexusProjectSetup,
   renderNexusProjectSetupRequiredAnswers,
@@ -948,7 +949,7 @@ export function usage(): string {
     "",
     "Options for project setup:",
     "  --home <path>",
-    "  --answers <json-file>     setup answers; required in non-interactive mode",
+    "  --answers <json-file>     setup answers for non-interactive automation",
     "  --yes                     apply local setup writes after preview validation",
     "  --dry-run                 preview only; default when --yes is omitted",
     "  --json",
@@ -8841,16 +8842,9 @@ function cliErrorPayload(error: unknown): {
 function projectSetupApplyNextActions(
   result: NexusProjectSetupApplyResult,
 ): string[] {
-  const projectRoot = shellQuoteArgument(result.projectRoot);
-  const homePath = result.proposal.answers.home.path
-    ? shellQuoteArgument(result.proposal.answers.home.path)
-    : null;
-  const homeOption = homePath ? ` --home ${homePath}` : "";
-  return [
-    `Open the DevNexus project root in the configured agent application: ${result.projectRoot}`,
-    `Run dev-nexus setup check ${projectRoot} join-existing-project --json.`,
-    `Run dev-nexus project hosting status ${projectRoot}${homeOption} --json when hosting intent is configured.`,
-  ];
+  return buildNexusProjectSetupApplyNextActions(result, {
+    quoteArgument: shellQuoteArgument,
+  });
 }
 
 function assertCliMutationAllowed(
