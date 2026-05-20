@@ -334,6 +334,41 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
+  it("prints focused project setup help", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "setup", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus project setup [project-root] [options]");
+    expect(output.output()).toContain("DevNexus home defaults to");
+    expect(output.output()).toContain("--answers <json-file>");
+    expect(output.output()).toContain("--yes");
+    expect(output.output()).toContain("--dry-run");
+    expect(output.output()).toContain("--json");
+    expect(output.output()).toContain("Provider mutations are not part of project setup.");
+  });
+
+  it("prints focused project component add help", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["project", "component", "add", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain(
+      "dev-nexus project component add <project-root> [options]",
+    );
+    expect(output.output()).toContain("--answers <json-file>");
+    expect(output.output()).toContain("--yes");
+    expect(output.output()).toContain("--dry-run");
+    expect(output.output()).toContain("--json");
+    expect(output.output()).toContain("Provider mutations are not part of component add.");
+  });
+
   it("prints JSON errors when --json is present", async () => {
     const output = captureOutput();
 
