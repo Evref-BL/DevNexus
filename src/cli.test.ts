@@ -4840,6 +4840,86 @@ describe("dev-nexus cli", () => {
     ).toBe(false);
   });
 
+  it("cleans up stale generated agent projections through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-agent-projection-cleanup-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".agents", "skills"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".claude", "skills", "legacy"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(projectRoot, ".claude", "skills", "legacy", "dev-nexus.skill.json"),
+      "{}\n",
+      "utf8",
+    );
+    fs.mkdirSync(path.join(projectRoot, ".opencode", "skills"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".opencode", "skills", "README.md"),
+      "manual support\n",
+      "utf8",
+    );
+    saveProjectConfig(projectRoot, projectConfig({
+      agentTargets: {
+        active: [{ provider: "codex" }],
+      },
+      skills: {
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude" },
+        ],
+      },
+    }));
+    const dryRunOutput = captureOutput();
+    const applyOutput = captureOutput();
+
+    await main(["project", "agent-projection", "cleanup", projectRoot, "--json"], {
+      stdout: dryRunOutput.writer,
+    });
+
+    const dryRunPayload = JSON.parse(dryRunOutput.output());
+    expect(dryRunPayload).toMatchObject({
+      ok: true,
+      mode: "dry-run",
+      plan: {
+        removableCount: 1,
+        skippedCount: 2,
+      },
+    });
+    expect(
+      fs.existsSync(path.join(projectRoot, ".claude", "skills")),
+    ).toBe(true);
+
+    await main(
+      ["project", "agent-projection", "cleanup", projectRoot, "--apply", "--json"],
+      {
+        stdout: applyOutput.writer,
+      },
+    );
+
+    const applyPayload = JSON.parse(applyOutput.output());
+    expect(applyPayload).toMatchObject({
+      ok: true,
+      mode: "apply",
+      result: {
+        status: "completed",
+        removed: [
+          expect.objectContaining({
+            path: ".claude/skills",
+          }),
+        ],
+      },
+    });
+    expect(
+      fs.existsSync(path.join(projectRoot, ".claude", "skills")),
+    ).toBe(false);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".agents", "skills")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(projectRoot, ".opencode", "skills")),
+    ).toBe(true);
+  });
+
   it("records and lists target cycles through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

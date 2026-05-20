@@ -304,6 +304,7 @@ function mutationAllowed(
       "project_state",
       "skill_mcp_projection",
       "coordination_record",
+      "cleanup_execution",
       "provider_sync",
     ].includes(mutationClass);
   }

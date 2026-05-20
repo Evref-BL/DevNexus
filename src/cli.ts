@@ -164,6 +164,12 @@ import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
+import {
+  applyNexusAgentProjectionCleanup,
+  planNexusAgentProjectionCleanup,
+  type NexusAgentProjectionCleanupApplyResult,
+  type NexusAgentProjectionCleanupPlan,
+} from "./nexusAgentProjectionCleanup.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
   assertNexusSharedCheckoutMutationAllowed,
@@ -428,6 +434,13 @@ interface ParsedProjectHostingCommand {
 interface ParsedProjectMcpRefreshCommand {
   projectRoot: string;
   agents: string[];
+  json?: boolean;
+}
+
+interface ParsedProjectAgentProjectionCleanupCommand {
+  projectRoot: string;
+  apply?: boolean;
+  dryRun?: boolean;
   json?: boolean;
 }
 
@@ -951,6 +964,7 @@ export function usage(): string {
     "  dev-nexus project hosting plan <project-root> [options]",
     "  dev-nexus project hosting apply <project-root> [options]",
     "  dev-nexus project mcp refresh <project-root> [options]",
+    "  dev-nexus project agent-projection cleanup <project-root> [options]",
     "  dev-nexus project tracker configure <project> --provider <provider> [options]",
     "  dev-nexus project tracker link <project> --tracker-project-id <id> [options]",
     "  dev-nexus setup list [options]",
@@ -1046,6 +1060,11 @@ export function usage(): string {
     "",
     "Options for project mcp refresh:",
     "  --agent <agent>           repeatable; defaults to project mcp.agentTargets or codex",
+    "  --json",
+    "",
+    "Options for project agent-projection cleanup:",
+    "  --apply                   remove only cleanup-safe stale generated provider support",
+    "  --dry-run                 preview only; default when --apply is omitted",
     "  --json",
     "",
     "Options for project tracker configure:",
@@ -1706,11 +1725,15 @@ async function handleProjectCommand(
     return handleProjectMcpCommand(argv, dependencies);
   }
 
+  if (command === "agent-projection") {
+    return handleProjectAgentProjectionCommand(argv, dependencies);
+  }
+
   if (command === "tracker") {
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, or tracker");
+  throw new Error("project requires create, setup, component, import, list, status, hosting, mcp, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -1847,6 +1870,42 @@ async function handleProjectMcpCommand(
   });
   printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
   return 0;
+}
+
+async function handleProjectAgentProjectionCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[2];
+  if (command !== "cleanup") {
+    throw new Error("project agent-projection requires cleanup");
+  }
+
+  const parsed = parseProjectAgentProjectionCleanupCommand(argv);
+  const projectRoot = path.resolve(parsed.projectRoot);
+  if (parsed.apply) {
+    assertCliMutationAllowed(dependencies, {
+      projectRoot,
+      command: "project agent-projection cleanup",
+      mutationClass: "cleanup_execution",
+      targetPath: projectRoot,
+    });
+    const result = applyNexusAgentProjectionCleanup({ projectRoot });
+    printProjectAgentProjectionCleanupApplyResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.status === "completed" ? 0 : 2;
+  }
+
+  const plan = planNexusAgentProjectionCleanup({ projectRoot });
+  printProjectAgentProjectionCleanupPlanResult(
+    plan,
+    parsed,
+    dependencies.stdout ?? process.stdout,
+  );
+  return plan.status === "ready" ? 0 : 2;
 }
 
 async function handleProjectTrackerCommand(
@@ -4026,6 +4085,39 @@ function parseProjectMcpRefreshCommand(
       default:
         throw new Error(`Unknown project mcp refresh option: ${arg}`);
     }
+  }
+
+  return parsed;
+}
+
+function parseProjectAgentProjectionCleanupCommand(
+  argv: string[],
+): ParsedProjectAgentProjectionCleanupCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("project agent-projection cleanup requires a project root");
+  }
+
+  const parsed: ParsedProjectAgentProjectionCleanupCommand = {
+    projectRoot,
+  };
+  for (const arg of rest) {
+    switch (arg) {
+      case "--apply":
+        parsed.apply = true;
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown project agent-projection cleanup option: ${arg}`);
+    }
+  }
+  if (parsed.apply && parsed.dryRun) {
+    throw new Error("project agent-projection cleanup cannot combine --apply and --dry-run");
   }
 
   return parsed;
@@ -7360,6 +7452,78 @@ function printProjectMcpRefreshResult(
   }
   if (result.gitExcludeEntries.length > 0) {
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
+  }
+}
+
+function printProjectAgentProjectionCleanupPlanResult(
+  plan: NexusAgentProjectionCleanupPlan,
+  parsed: ParsedProjectAgentProjectionCleanupCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: plan.status === "ready",
+    mode: "dry-run",
+    projectRoot: plan.projectRoot,
+    plan,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus agent projection cleanup dry-run: ${plan.status}.`);
+  writeLine(stdout, `  Active providers: ${plan.activeProviders.join(",") || "none"}`);
+  writeLine(stdout, `  Removable: ${plan.removableCount}`);
+  writeLine(stdout, `  Skipped: ${plan.skippedCount}`);
+  for (const item of plan.items) {
+    writeLine(
+      stdout,
+      `    ${item.action} ${item.provider} ${item.kind}: ${item.path} state=${item.state} cleanupSafe=${item.cleanupSafe} source=${item.sourceControl ?? "none"}`,
+    );
+    if (item.blocker) {
+      writeLine(stdout, `      Refused: ${item.blocker}`);
+    } else {
+      writeLine(stdout, `      ${item.reason}`);
+    }
+  }
+  for (const nextAction of plan.nextActions) {
+    writeLine(stdout, `  Next: ${nextAction}`);
+  }
+}
+
+function printProjectAgentProjectionCleanupApplyResult(
+  result: NexusAgentProjectionCleanupApplyResult,
+  parsed: ParsedProjectAgentProjectionCleanupCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: result.status === "completed",
+    mode: "apply",
+    projectRoot: result.projectRoot,
+    result,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus agent projection cleanup apply: ${result.status}.`);
+  writeLine(stdout, `  Removed: ${result.removed.length}`);
+  for (const item of result.removed) {
+    writeLine(stdout, `    ${item.provider} ${item.kind}: ${item.path}`);
+  }
+  writeLine(stdout, `  Skipped: ${result.skipped.length}`);
+  for (const item of result.skipped) {
+    writeLine(
+      stdout,
+      `    ${item.provider} ${item.kind}: ${item.path} (${item.blocker ?? "not removable"})`,
+    );
+  }
+  for (const error of result.errors) {
+    writeLine(stdout, `  Error: ${error.path}: ${error.message}`);
+  }
+  for (const nextAction of result.nextActions) {
+    writeLine(stdout, `  Next: ${nextAction}`);
   }
 }
 
