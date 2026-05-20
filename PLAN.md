@@ -1,153 +1,91 @@
 # DevNexus Dogfood Plan
 
-This plan is the durable project direction for the clean dogfood root. It should
-stay concise and current; completed cycle details belong in work items,
-target-cycle facts, commits, and the target report.
+This is the durable forward plan for the clean dogfood root. Keep it concise:
+completed cycle details belong in GitHub issues, target-cycle facts, commits,
+pull requests, and generated reports.
 
 ## Product Direction
 
 - DevNexus is infrastructure for project metadata, components, work trackers,
-  target/run facts, worktree metadata, verification, publication, skills,
-  Model Context Protocol (MCP) wiring, and agent launch policy.
-- DevNexus does not choose, plan, or supervise implementation work. A human or a
+  target/run facts, worktree metadata, verification, publication, skills, MCP
+  wiring, and agent launch policy.
+- DevNexus does not choose, plan, or supervise implementation work. A human or
   coordinator agent does that work and reports facts back to DevNexus.
 - DevNexus projects are multi-component by default. Each component can have its
   own source root, generated worktree root, tracker, verification policy,
   publication policy, and relationships.
 - Plugins compose into one DevNexus project. Plugins contribute setup policy,
   skills, MCP wiring, and domain affordances without replacing DevNexus.
-- Work trackers are component-level systems of record. GitHub Issues is now the
-  dogfood default shared tracker; local stores remain archive and migration
-  history. GitLab, Jira, GitHub Projects, and Vibe Kanban remain provider
-  options through neutral work-item APIs.
+- GitHub Issues is the dogfood default shared tracker. Local stores remain
+  archive/history and migration source material.
 
 ## Active Themes
 
 - Multi-tracker work tracking: GitHub primary trackers, local archive stores,
-  neutral link records, dry-run sync planning, policy-gated one-way sync,
-  explicit discovery sources, and inbound provider issue import.
+  neutral link records, dry-run planning, policy-gated sync/import, explicit
+  discovery sources, and direct provider-native issue selection.
 - Shared multi-host coordination: Mac and Windows agents coordinate through
   work-item intent, Git branches, structured handoffs, integration planning, and
   provider-backed approval or feedback requests.
 - Parallel interactive chats: default mutating work to isolated worktrees,
   record advisory leases and handoffs, keep shared checkouts read-mostly, and
   serialize cleanup/integration through authority-aware guardrails.
-- Remote host execution: trusted Mac, Windows, and Linux hosts can eventually
-  run bounded verification requests through capability-based runner profiles,
-  with Tailscale/SSH as an initial transport and DevNexus as the durable
-  request/result owner.
+- Remote host execution: trusted hosts can eventually run bounded verification
+  requests through capability-based runner profiles, with Tailscale/SSH as an
+  initial transport and DevNexus as the durable request/result owner.
 - Codex app-server support: optional executor/thread provider for ephemeral
   workers, while retaining `codex exec` where it is simpler.
 - Plugin projection: DevNexus-Pharo and DevNexus-TypeScript should set up
   workers with domain tools and skills without leaking plugin concepts into
   DevNexus core.
-- Non-engineering plugin expansion: DevNexus-Research should prove DevNexus can
-  support academic research and writing workflows through additive skills,
-  setup checks, artifact conventions, integrity gates, and human checkpoints,
-  without making DevNexus core academic-domain-specific.
-- DevNexus-Pharo MCP cleanup: delegated generic DevNexus MCP tools, generic
-  tracker wrappers, generic worktree compatibility tools, remaining MCP naming
-  overlap, and old config migration paths have been removed. DevNexus core now
-  rejects plugin MCP tool names that overlap core `dev_nexus` tools.
-- Project hygiene: keep this dogfood root free of old staging artifacts,
-  obsolete local runtime profiles, and stale completed-cycle narration.
+- DevNexus-Research: prove DevNexus can support research/writing workflows
+  through additive skills, setup checks, artifact conventions, integrity gates,
+  and human checkpoints.
+- Project hygiene: keep this dogfood root free of obsolete staging artifacts,
+  stale completed-cycle narration, and unclassified planning documents.
 
-## Dependency Direction
+## Current Work Selection
 
-- `pharo-launcher-mcp` owns only launcher MCP and Pharo Launcher behavior.
-- `mcp-pharo` owns only the image-side Pharo MCP server.
-- `plexus` may know about launcher and image-side MCP contracts because it
-  scopes runtime lifecycle and routes Pharo MCP calls.
-- `dev-nexus-pharo` may know about DevNexus, PLexus, pharo-launcher-mcp, and
-  MCP-Pharo because it composes them as a DevNexus plugin.
-- `dev-nexus-typescript` may know about DevNexus and JavaScript/TypeScript
-  setup policy.
-- `dev-nexus` remains generic and must not contain plugin-specific behavior.
-- Direct PLexus, pharo-launcher-mcp, and MCP-Pharo work items are owned by the
-  sibling `dev-nexus-plexus` DevNexus project, not this dogfood root.
+- The automation selector is `status:ready` plus `dogfood`, excluding
+  `blocked` and `unsafe-live-runtime`.
+- Current GitHub discovery reports no eligible work item. Remaining visible
+  dogfood issues are mostly `todo`, `blocked`, or dependency-gated.
+- Before heartbeat work can resume automatically, a human or coordinator should
+  promote one dependency-satisfied GitHub issue to `status:ready`, or explicitly
+  choose a one-off quick-fix/investigation outside the selector.
 
-## Next Work Candidates
+## Near-Term Candidates
 
-- Continue green-main operationalization after completed `dev-nexus:local-166`.
-  CI failure intake now has a pure dry-run/manual replay planner, scoped
-  policy checks, dedupe/backoff, failure-to-work-item mapping, and
-  coordinator-wakeup decisions. Webhook or polling rollout remains a separate
-  policy-controlled follow-up. `dev-nexus:local-172` is complete for keeping
-  completed items out of the target report's current `readyEligibleWork`
-  progress bucket when only stale historical cycle facts marked them eligible.
-  Provider issue Evref-BL/DevNexus#4 is complete through PR #22 for detecting
-  source-newer-than-process DevNexus MCP runtimes in status/report surfaces.
-  Provider issue Evref-BL/DevNexus#14 is complete through PR #23 for ignoring
-  superseded `pending` placeholders from duplicate target-cycle records in
-  target-report and eligible-work progress summaries.
-  Version-scoped planning follow-up from
-  `docs/version-scoped-planning-prd.md` has been sliced by
-  `dev-nexus:local-165`; `dev-nexus:local-167` through `local-171` are
-  complete, and the dogfood project now has a read-only version plan for that
-  implementation chain.
-- Continue remote-host execution after the durable `dev-nexus:local-81`
-  request/result record model; keep host checks, SSH transport, and live
-  verification execution ordered behind explicit runner policy.
-- Continue parallel-agent workflow with the fail-closed mutation guard
-  `dev-nexus:local-98`; cleanup/read-only slice `dev-nexus:local-102` is
-  complete, authority status summaries now exist through `local-90`, and status
-  expansion `local-100` can be reconsidered with the newer authority context.
-- Continue Codex app-server correction after completed `dev-nexus:local-115`
-  safe initialize probes; keep provider-native worker orchestration behind the
-  remaining app-server event and capability facts.
-- Continue authority configuration after completed `dev-nexus:local-92`
-  coordination and provider mutation gating. `local-94` role documentation is
-  complete; `local-93` provider approval and branch-policy signal mapping is
-  complete; `local-152` local tracker auth-profile mismatch handling is
-  complete. Keep `local-95` blocked for the remaining HITL role-policy
-  decisions.
-- Continue agent-target projection after completed `dev-nexus:local-106`
-  active-target filtering and completed `local-107` stale projection
-  diagnostics. `local-109` worker context propagation is complete. Cleanup and
-  dogfood migration remain later.
-- Continue DevNexus-Pharo onboarding cleanup after completed
-  `dev-nexus-pharo:local-20` and `local-21`; packaged create/import now
-  includes the default `AGENTS.md` template, and neutral imports no longer
-  preserve legacy PLexus/Vibe metadata. The core import extension preservation
-  defect `dev-nexus:local-142` is complete as `9fbb9f1`; remaining Pharo
-  project-import defects should stay source-only unless an approved runtime
-  boundary is explicit.
-- Continue DevNexus-Research from `docs/dev-nexus-research-plugin-prd.md`.
-  `dev-nexus:local-146` is the blocked human-in-the-loop license and upstream
-  ARS integration posture decision; `local-147` is complete for an original
-  DevNexus-Research plugin skeleton. Promote `local-148` through `local-151`
-  after relevant setup/artifact prerequisites land.
-- Cross-tracker discovery and inbound GitHub-to-local import are sliced:
-  `dev-nexus:local-129` is complete for tracker roles and discovery-policy
-  defaults, and `local-130` is complete for read-only discovery status.
-  `local-131` is complete for opt-in eligible-work aggregation, `local-132`
-  is complete for linked-item deduplication, `local-133` is complete for
-  inbound import planning, and `local-134` is complete for policy-gated import
-  execution. `local-135` is complete for compact external issue visibility
-  summaries, and `local-136` is complete for fake GitHub inbox discovery/import
-  smoke coverage.
-  `local-137` is resolved for direct external selection. As of 2026-05-20,
-  this dogfood project uses GitHub Issues as the primary shared tracker for all
-  configured components; local trackers are archive/history only. Open local
-  `ready`, `todo`, and `blocked` work was one-way synced to GitHub, while
-  completed local history remains local. Provider comments, scheduled import,
-  and future external mutation policy remain explicit policy decisions.
-  `local-153` is complete for GitHub issue eligibility hygiene: `dogfood` plus
-  `status:ready` marks provider-native GitHub issues as directly selectable,
-  while blocked/unsafe labels exclude them, without copying new provider issues
-  into local tracker state.
-- Resolve `dev-nexus:local-69` before treating Windows source roots as clean
-  production examples.
-- Keep live-runtime Pharo and PLexus work in the `dev-nexus-plexus` project and
-  blocked there until an isolated runner profile is current and explicit.
+- Context and documentation hygiene: keep root context short, use
+  `docs/README.md` as the PRD index, and avoid appending completed history to
+  target state.
+- Quick-fix workflow: make one provider-native issue runnable without full
+  heartbeat bookkeeping when the user asks for a quick manual fix.
+- Target-state compaction: implement a DevNexus command that proposes or
+  applies concise target-state from durable facts.
+- Green-main operations: continue improving CI failure classification, required
+  check waiting, merge reporting, and risk-scaled verification.
+- Parallel-agent workflow: continue status expansion, start/adopt flows, and
+  cleanup execution behind existing authority and mutation guards.
+- Agent-target projection: continue safe cleanup of stale generated provider
+  support and dogfood migration to explicit Codex-only active targets.
+- Remote-host execution: keep host checks, SSH transport, verification
+  execution, and live smokes ordered behind completed request/result records and
+  explicit runner policy.
+- DevNexus-Research: keep license and ARS integration posture blocked until the
+  user decides whether ARS is inspiration-only, optional external integration,
+  or bundled/adapted content under an explicit license posture.
+- Source-root migration: resolve the project-local component clone direction
+  before presenting Windows source roots as clean onboarding examples.
 
 ## Boundaries
 
 - Do not create Vibe workspaces, sessions, executions, or implementation
   workers from this dogfood root.
-- Do not run live images, PLexus open/close, Docker, package installs, process
-  kills, image deletion, or destructive host cleanup without a current approved
-  isolated runner and cleanup plan.
-- Preserve unrelated changes in component working trees.
+- Do not run live Pharo images, PLexus open/close, Docker, package installs,
+  process kills, image deletion, or destructive host cleanup without a current
+  approved isolated runner profile.
+- Preserve component source roots and source branches unless a work item
+  explicitly owns their migration or deletion.
 - Prefer DevNexus CLI/MCP surfaces for project state, work items, target facts,
   setup, and coordination.
