@@ -52,6 +52,17 @@ export interface NexusWorkItemClaimOwner {
   expiresAt: string;
 }
 
+export type NexusWorkItemStaleClaimPolicy = "report" | "reclaim";
+
+export interface NexusWorkItemClaimObservation {
+  id: string;
+  title: string;
+  componentId: string;
+  trackerId: string;
+  observedStatus: WorkStatus;
+  owner: NexusWorkItemClaimOwner;
+}
+
 export type NexusWorkItemClaimSkipReason =
   | "missing_tracker"
   | "no_longer_ready"
@@ -87,6 +98,7 @@ export interface ClaimNexusEligibleWorkItemOptions {
   env?: NodeJS.ProcessEnv;
   owner: NexusWorkItemClaimOwnerInput;
   leaseDurationMs?: number;
+  staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   leaseTokenFactory?: () => string;
   now?: () => Date | string;
 }
@@ -99,11 +111,20 @@ export type NexusWorkItemClaimResult =
       trackerId: string;
       owner: NexusWorkItemClaimOwner;
       skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+      activeClaims?: NexusWorkItemClaimObservation[];
+      staleClaims?: NexusWorkItemClaimObservation[];
+      reclaimedFrom?: NexusWorkItemClaimObservation;
     }
   | {
       status: "no_claim";
-      reason: "no_eligible_candidate" | "candidates_not_claimable";
+      reason:
+        | "no_eligible_candidate"
+        | "candidates_not_claimable"
+        | "active_claims"
+        | "stale_claims";
       skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+      activeClaims?: NexusWorkItemClaimObservation[];
+      staleClaims?: NexusWorkItemClaimObservation[];
     }
   | {
       status: "lost_race";
@@ -114,12 +135,29 @@ export type NexusWorkItemClaimResult =
       trackerId: string;
       owner: NexusWorkItemClaimOwner;
       skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+      activeClaims?: NexusWorkItemClaimObservation[];
+      staleClaims?: NexusWorkItemClaimObservation[];
+      reclaimedFrom?: NexusWorkItemClaimObservation;
     };
 
 const defaultLeaseDurationMs = 60 * 60 * 1000;
 const claimMarkerName = "dev-nexus-work-item-claim";
 const claimBlockPattern =
   /<!--\s*dev-nexus-work-item-claim\s*\n([\s\S]*?)\n-->/g;
+
+interface ClaimInspectionCandidate {
+  observation: NexusWorkItemClaimObservation;
+  candidate: NexusEligibleWorkItem;
+  workItem: WorkItem;
+  provider: WorkTrackerProvider;
+  tracker: ResolvedNexusProjectWorkTracker;
+  ref: WorkItemRef;
+}
+
+interface ClaimInspectionResult {
+  activeClaims: ClaimInspectionCandidate[];
+  staleClaims: ClaimInspectionCandidate[];
+}
 
 export async function claimNexusEligibleWorkItem(
   options: ClaimNexusEligibleWorkItemOptions,
@@ -147,12 +185,31 @@ export async function claimNexusEligibleWorkItem(
     env,
     now: options.now,
   });
+  const now = currentDate(options.now);
+  const activeClaims: NexusWorkItemClaimObservation[] = [];
   if (eligibleWork.eligibleWorkItems.length === 0) {
-    return {
-      status: "no_claim",
-      reason: "no_eligible_candidate",
+    const inspectedClaims = await inspectExistingWorkItemClaims({
+      options,
+      projectRoot,
+      components,
+      env,
+      selectorQuery,
+      now,
+    });
+    const reclaimed = await maybeReclaimStaleClaim({
+      options,
+      inspection: inspectedClaims,
+      now,
       skippedCandidates: [],
-    };
+    });
+    if (reclaimed) {
+      return reclaimed;
+    }
+
+    return noClaimResult("no_eligible_candidate", [], {
+      activeClaims: inspectedClaims.activeClaims.map((item) => item.observation),
+      staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+    });
   }
 
   const skippedCandidates: NexusWorkItemClaimSkippedCandidate[] = [];
@@ -174,7 +231,6 @@ export async function claimNexusEligibleWorkItem(
     assertWorkTrackerCapability(provider, "update", "claim work items");
     const ref = workItemRefForCandidate(candidate);
     const fresh = await provider.getWorkItem(ref);
-    const now = currentDate(options.now);
     const activeClaim = activeWorkItemClaim(fresh, now);
     const selectorMatch = eligibleNexusAutomationWorkItems(
       [fresh],
@@ -188,6 +244,9 @@ export async function claimNexusEligibleWorkItem(
       continue;
     }
     if (activeClaim) {
+      activeClaims.push(
+        claimObservation(candidate, tracker, fresh, activeClaim),
+      );
       skippedCandidates.push(
         skippedCandidate(candidate, "claimed_by_another_owner", fresh.status),
       );
@@ -230,6 +289,7 @@ export async function claimNexusEligibleWorkItem(
         trackerId: tracker.id,
         owner,
         skippedCandidates,
+        ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
       };
     }
 
@@ -244,13 +304,239 @@ export async function claimNexusEligibleWorkItem(
       trackerId: tracker.id,
       owner,
       skippedCandidates,
+      ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
     };
   }
 
+  const inspectedClaims = await inspectExistingWorkItemClaims({
+    options,
+    projectRoot,
+    components,
+    env,
+    selectorQuery,
+    now,
+  });
+  const combinedActiveClaims = [
+    ...activeClaims,
+    ...inspectedClaims.activeClaims.map((item) => item.observation),
+  ];
+  const reclaimed = await maybeReclaimStaleClaim({
+    options,
+    inspection: inspectedClaims,
+    now,
+    skippedCandidates,
+    activeClaims: combinedActiveClaims,
+  });
+  if (reclaimed) {
+    return reclaimed;
+  }
+
+  return noClaimResult("candidates_not_claimable", skippedCandidates, {
+    activeClaims: combinedActiveClaims,
+    staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+  });
+}
+
+async function inspectExistingWorkItemClaims(options: {
+  options: ClaimNexusEligibleWorkItemOptions;
+  projectRoot: string;
+  components: ResolvedNexusProjectComponent[];
+  env: NodeJS.ProcessEnv;
+  selectorQuery: WorkItemQuery;
+  now: Date;
+}): Promise<ClaimInspectionResult> {
+  const automationConfig = {
+    ...options.options.automationConfig,
+    selector: {
+      ...options.options.automationConfig.selector,
+      statuses: ["in_progress" as const],
+    },
+  };
+  const selectorQuery: WorkItemQuery = {
+    ...options.selectorQuery,
+    status: "in_progress",
+  };
+  const eligibleWork = await listNexusEligibleWorkByComponent({
+    projectRoot: options.projectRoot,
+    projectConfig: options.options.projectConfig,
+    components: options.components,
+    automationConfig,
+    selectorQuery,
+    mode: options.options.mode,
+    provider: options.options.provider,
+    providerFactory: options.options.providerFactory,
+    providerOptions: options.options.providerOptions,
+    env: options.env,
+    now: options.options.now,
+  });
+  const activeClaims: ClaimInspectionCandidate[] = [];
+  const staleClaims: ClaimInspectionCandidate[] = [];
+
+  for (const candidate of eligibleWork.eligibleWorkItems) {
+    const resolved = resolveCandidateTracker(
+      options.options,
+      options.projectRoot,
+      options.components,
+      candidate,
+      options.env,
+    );
+    if (!resolved) {
+      continue;
+    }
+    const { provider, tracker } = resolved;
+    assertWorkTrackerCapability(provider, "get", "inspect work item claims");
+    const ref = workItemRefForCandidate(candidate);
+    const fresh = await provider.getWorkItem(ref);
+    const claim = latestWorkItemClaim(fresh);
+    if (!claim) {
+      continue;
+    }
+    const inspection = {
+      observation: claimObservation(candidate, tracker, fresh, claim),
+      candidate,
+      workItem: fresh,
+      provider,
+      tracker,
+      ref,
+    };
+    if (claimIsActive(claim, options.now)) {
+      activeClaims.push(inspection);
+    } else {
+      staleClaims.push(inspection);
+    }
+  }
+
+  return {
+    activeClaims,
+    staleClaims,
+  };
+}
+
+async function maybeReclaimStaleClaim(options: {
+  options: ClaimNexusEligibleWorkItemOptions;
+  inspection: ClaimInspectionResult;
+  now: Date;
+  skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
+  activeClaims?: NexusWorkItemClaimObservation[];
+}): Promise<NexusWorkItemClaimResult | null> {
+  if (
+    options.options.staleClaimPolicy !== "reclaim" ||
+    options.inspection.staleClaims.length === 0
+  ) {
+    return null;
+  }
+
+  const staleClaim = options.inspection.staleClaims[0]!;
+  const { provider, ref, workItem, candidate, tracker } = staleClaim;
+  assertWorkTrackerCapability(provider, "update", "reclaim stale work item claims");
+  const owner = claimOwner({
+    input: options.options.owner,
+    leaseToken:
+      options.options.leaseTokenFactory?.() ?? randomUUID(),
+    now: options.now,
+    leaseDurationMs:
+      options.options.leaseDurationMs ?? defaultLeaseDurationMs,
+  });
+  await provider.updateWorkItem(ref, {
+    status: "in_progress",
+    description: descriptionWithClaim(workItem.description, owner),
+  });
+  const observed = await provider.getWorkItem(ref);
+  const observedClaim = activeWorkItemClaim(observed, options.now);
+  const activeClaims = options.activeClaims ?? [];
+  const staleClaims = options.inspection.staleClaims.map((item) => item.observation);
+  if (
+    observed.status !== "in_progress" ||
+    observedClaim?.leaseToken !== owner.leaseToken
+  ) {
+    return {
+      status: "lost_race",
+      reason: "verification_failed",
+      candidate: workItem,
+      observedWorkItem: observed,
+      componentId: candidate.componentId,
+      trackerId: tracker.id,
+      owner,
+      skippedCandidates: options.skippedCandidates,
+      reclaimedFrom: staleClaim.observation,
+      ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+    };
+  }
+
+  if (provider.capabilities.comment) {
+    await provider.addComment(
+      ref,
+      reclaimComment(owner, staleClaim.observation.owner),
+    );
+  }
+
+  return {
+    status: "claimed",
+    workItem: observed,
+    componentId: candidate.componentId,
+    trackerId: tracker.id,
+    owner,
+    skippedCandidates: options.skippedCandidates,
+    reclaimedFrom: staleClaim.observation,
+    ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+  };
+}
+
+function noClaimResult(
+  fallbackReason: Extract<
+    NexusWorkItemClaimResult,
+    { status: "no_claim" }
+  >["reason"],
+  skippedCandidates: NexusWorkItemClaimSkippedCandidate[],
+  diagnostics: {
+    activeClaims: NexusWorkItemClaimObservation[];
+    staleClaims: NexusWorkItemClaimObservation[];
+  },
+): NexusWorkItemClaimResult {
+  const reason =
+    diagnostics.staleClaims.length > 0
+      ? "stale_claims"
+      : diagnostics.activeClaims.length > 0
+        ? "active_claims"
+        : fallbackReason;
   return {
     status: "no_claim",
-    reason: "candidates_not_claimable",
+    reason,
     skippedCandidates,
+    ...claimDiagnosticsFields(diagnostics),
+  };
+}
+
+function claimDiagnosticsFields(diagnostics: {
+  activeClaims: NexusWorkItemClaimObservation[];
+  staleClaims: NexusWorkItemClaimObservation[];
+}): {
+  activeClaims?: NexusWorkItemClaimObservation[];
+  staleClaims?: NexusWorkItemClaimObservation[];
+} {
+  return {
+    ...(diagnostics.activeClaims.length > 0
+      ? { activeClaims: diagnostics.activeClaims }
+      : {}),
+    ...(diagnostics.staleClaims.length > 0
+      ? { staleClaims: diagnostics.staleClaims }
+      : {}),
+  };
+}
+
+function claimObservation(
+  candidate: NexusEligibleWorkItem,
+  tracker: ResolvedNexusProjectWorkTracker,
+  item: WorkItem,
+  owner: NexusWorkItemClaimOwner,
+): NexusWorkItemClaimObservation {
+  return {
+    id: item.id,
+    title: item.title,
+    componentId: candidate.componentId,
+    trackerId: tracker.id,
+    observedStatus: item.status,
+    owner,
   };
 }
 
@@ -426,15 +712,21 @@ function activeWorkItemClaim(
   item: Pick<WorkItem, "description">,
   now: Date,
 ): NexusWorkItemClaimOwner | null {
-  const claims = workItemClaims(item.description);
-  for (let index = claims.length - 1; index >= 0; index -= 1) {
-    const claim = claims[index]!;
-    if (dateFrom(claim.expiresAt, "claim.expiresAt").getTime() > now.getTime()) {
-      return claim;
-    }
-  }
+  const claim = latestWorkItemClaim(item);
+  return claim && claimIsActive(claim, now) ? claim : null;
+}
 
-  return null;
+function latestWorkItemClaim(
+  item: Pick<WorkItem, "description">,
+): NexusWorkItemClaimOwner | null {
+  return workItemClaims(item.description).at(-1) ?? null;
+}
+
+function claimIsActive(
+  claim: NexusWorkItemClaimOwner,
+  now: Date,
+): boolean {
+  return dateFrom(claim.expiresAt, "claim.expiresAt").getTime() > now.getTime();
 }
 
 function workItemClaims(
@@ -501,6 +793,27 @@ function claimComment(owner: NexusWorkItemClaimOwner): string {
     ...(owner.ownerId ? [`- owner: ${owner.ownerId}`] : []),
     `- lease token: ${owner.leaseToken}`,
     `- expires: ${owner.expiresAt}`,
+  ].join("\n");
+}
+
+function reclaimComment(
+  owner: NexusWorkItemClaimOwner,
+  previousOwner: NexusWorkItemClaimOwner,
+): string {
+  return [
+    "DevNexus optimistic claim reclaimed from expired owner.",
+    "",
+    `- host: ${owner.hostId}`,
+    ...(owner.agentId ? [`- agent: ${owner.agentId}`] : []),
+    ...(owner.ownerId ? [`- owner: ${owner.ownerId}`] : []),
+    `- lease token: ${owner.leaseToken}`,
+    `- expires: ${owner.expiresAt}`,
+    `- previous host: ${previousOwner.hostId}`,
+    ...(previousOwner.agentId
+      ? [`- previous agent: ${previousOwner.agentId}`]
+      : []),
+    `- previous lease token: ${previousOwner.leaseToken}`,
+    `- previous expiry: ${previousOwner.expiresAt}`,
   ].join("\n");
 }
 

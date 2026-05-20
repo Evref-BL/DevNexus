@@ -6373,11 +6373,108 @@ describe("dev-nexus cli", () => {
     expect(provider.updates).toEqual([]);
   });
 
+  it("reports stale in-progress claims through claim-next text output", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-10", "Expired CLI claim", {
+        status: "in_progress",
+        labels: ["automation"],
+        description: claimBlock("expired-token", {
+          expiresAt: "2026-05-20T09:30:00.000Z",
+        }),
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--host",
+        "host-a",
+      ],
+      {
+        stdout: stdout.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout.output()).toContain("Reason: stale_claims");
+    expect(stdout.output()).toContain("Stale claims: 1");
+    expect(stdout.output()).toContain("expired-token");
+    expect(stdout.output()).toContain("2026-05-20T09:30:00.000Z");
+    expect(provider.updates).toEqual([]);
+  });
+
+  it("reclaims stale in-progress claims through claim-next when enabled", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-11", "Reclaim through CLI", {
+        status: "in_progress",
+        labels: ["automation"],
+        description: claimBlock("expired-token", {
+          expiresAt: "2026-05-20T09:30:00.000Z",
+        }),
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--host",
+        "host-a",
+        "--agent",
+        "agent-a",
+        "--reclaim-stale",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimLeaseTokenFactory: () => "cli-token-2",
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      claim: {
+        status: "claimed",
+        workItem: {
+          id: "github-11",
+          status: "in_progress",
+        },
+        owner: {
+          hostId: "host-a",
+          agentId: "agent-a",
+          leaseToken: "cli-token-2",
+        },
+        reclaimedFrom: {
+          owner: {
+            leaseToken: "expired-token",
+            expiresAt: "2026-05-20T09:30:00.000Z",
+          },
+        },
+      },
+    });
+    expect(provider.items[0]?.description).toContain("cli-token-2");
+    expect(provider.items[0]?.description).not.toContain("expired-token");
+  });
+
   it("reports lost races through claim-next without crashing the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-claim-");
     saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
     const provider = new ClaimMemoryProvider([
-      githubWorkItem("github-9", "Race through CLI", {
+      githubWorkItem("github-12", "Race through CLI", {
         labels: ["automation"],
       }),
     ]);
@@ -6583,7 +6680,13 @@ function cloneClaimItem(item: WorkItem): WorkItem {
   };
 }
 
-function claimBlock(leaseToken: string): string {
+function claimBlock(
+  leaseToken: string,
+  overrides: {
+    claimedAt?: string;
+    expiresAt?: string;
+  } = {},
+): string {
   return [
     "<!-- dev-nexus-work-item-claim",
     JSON.stringify({
@@ -6592,8 +6695,8 @@ function claimBlock(leaseToken: string): string {
       agentId: "other-agent",
       ownerId: null,
       leaseToken,
-      claimedAt: "2026-05-20T10:00:01.000Z",
-      expiresAt: "2026-05-20T10:30:01.000Z",
+      claimedAt: overrides.claimedAt ?? "2026-05-20T10:00:01.000Z",
+      expiresAt: overrides.expiresAt ?? "2026-05-20T10:30:01.000Z",
     }),
     "-->",
   ].join("\n");
