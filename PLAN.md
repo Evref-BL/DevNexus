@@ -6,18 +6,18 @@ pull requests, and generated reports.
 
 ## Product Direction
 
-- DevNexus is infrastructure for project metadata, components, work trackers,
+- DevNexus is infrastructure for workspace metadata, components, work trackers,
   target/run facts, worktree metadata, verification, publication, skills, MCP
   wiring, and agent launch policy.
 - DevNexus does not choose, plan, or supervise implementation work. A human or
   coordinator agent does that work and reports facts back to DevNexus.
-- DevNexus projects are multi-component by default. Each component can have its
+- DevNexus workspaces are multi-component by default. Each component can have its
   own source root, generated worktree root, tracker, verification policy,
   publication policy, and relationships.
 - Dependency components can be kept manual-only: available for explicit
   coordination or source work without becoming heartbeat-selected development
   surfaces.
-- Plugins compose into one DevNexus project. Plugins contribute setup policy,
+- Plugins compose into one DevNexus workspace. Plugins contribute setup policy,
   skills, MCP wiring, and domain affordances without replacing DevNexus.
 - GitHub Issues is the dogfood default shared tracker. Local stores remain
   archive/history and migration source material.
@@ -47,7 +47,7 @@ pull requests, and generated reports.
 - DevNexus-Research: prove DevNexus can support research/writing workflows
   through additive skills, setup checks, artifact conventions, integrity gates,
   and human checkpoints.
-- Project hygiene: keep this dogfood root free of obsolete staging artifacts,
+- Workspace hygiene: keep this dogfood root free of obsolete staging artifacts,
   stale completed-cycle narration, and unclassified planning documents.
 
 ## Current Work Selection
@@ -83,7 +83,7 @@ pull requests, and generated reports.
 - DevNexus-Research: keep license and ARS integration posture blocked until the
   user decides whether ARS is inspiration-only, optional external integration,
   or bundled/adapted content under an explicit license posture.
-- Source-root migration: resolve the project-local component clone direction
+- Source-root migration: resolve the workspace-local component clone direction
   before presenting Windows source roots as clean onboarding examples.
 
 ## Boundaries
@@ -98,5 +98,5 @@ pull requests, and generated reports.
   item is directly named.
 - Preserve component source roots and source branches unless a work item
   explicitly owns their migration or deletion.
-- Prefer DevNexus CLI/MCP surfaces for project state, work items, target facts,
+- Prefer DevNexus CLI/MCP surfaces for workspace state, work items, target facts,
   setup, and coordination.
