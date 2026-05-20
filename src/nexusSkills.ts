@@ -200,6 +200,142 @@ function curatedCoreSkill(
   };
 }
 
+const humanizerSkillMarkdown = skillMarkdown(
+  "humanizer",
+  "Remove signs of AI-generated writing from text. Use when editing or reviewing prose to make it sound natural, specific, and human-written while preserving meaning and technical accuracy.",
+  `
+# Humanizer
+
+Vendored from \`blader/humanizer\`, this is a DevNexus adaptation of the MIT-licensed upstream
+skill. Use it when text reads like an AI draft: inflated, over-structured,
+over-polite, vague, promotional, or too evenly polished.
+
+## Task
+
+When asked to humanize text:
+
+1. Identify AI writing patterns in the input.
+2. Rewrite the problematic sections.
+3. Preserve meaning, factual claims, commands, warnings, and technical terms.
+4. Match the intended tone and, when provided, the user's writing sample.
+5. Add voice only where the document type allows it. A README can be direct and
+   helpful without becoming chatty.
+6. Do a final audit: ask what still sounds obviously AI generated, then revise
+   those remaining tells.
+
+## Voice Calibration
+
+If the user provides a writing sample, read it before rewriting. Notice sentence
+length, word choice, paragraph starts, punctuation habits, transitions, and any
+recurring phrases. Match those patterns without copying private or unrelated
+content from the sample.
+
+When no sample is provided, default to plain, varied, specific writing. Prefer a
+competent maintainer's voice over a marketing page or tutorial script.
+
+## Patterns To Remove
+
+- Significance inflation: "pivotal", "crucial", "testament", "underscores",
+  "marks a shift", "evolving landscape".
+- Promotional phrasing: "boasts", "vibrant", "groundbreaking", "seamless",
+  "powerful", "in the heart of".
+- Vague attribution: "experts believe", "industry observers", "some say",
+  "available sources suggest".
+- Superficial "-ing" clauses that fake depth: "highlighting", "ensuring",
+  "showcasing", "reflecting".
+- Copula avoidance: replace "serves as", "functions as", "stands as" with
+  "is", "has", or another direct verb when clearer.
+- Negative parallelisms: "not just X, but Y" and similar constructions.
+- Forced threes, false ranges, synonym cycling, and balanced list padding.
+- Chatbot artifacts: "Great question", "Of course", "I hope this helps",
+  "let me know if".
+- Formulaic transitions: "let's dive in", "here's what you need to know",
+  "without further ado".
+- Generic positive conclusions: "the future looks bright", "exciting times lie
+  ahead", "a step in the right direction".
+- Over-formatting: decorative emoji, mechanical bold labels, and unnecessary
+  em dashes.
+- Excessive hedging and filler: "could potentially", "it is important to note",
+  "in order to", "due to the fact that".
+
+## Rewrite Rules
+
+- Replace vague claims with sourced specifics, or remove them.
+- Shorten before decorating. If a sentence can be direct, make it direct.
+- Keep repeated terms when repetition is clearer than synonym cycling.
+- Do not invent citations, examples, names, metrics, or confidence.
+- Do not soften warnings that users need to see.
+- Preserve commands exactly unless the task is to correct them.
+- Use contractions only when they fit the document and project voice.
+- Keep Markdown structure useful. Do not flatten a good quick start just to make
+  prose sound casual.
+
+## Output
+
+For short text, provide the final rewrite directly.
+
+For larger or risky edits, provide:
+
+1. Draft rewrite.
+2. Brief remaining-AI-tells audit.
+3. Final rewrite.
+4. Optional concise summary of what changed.
+
+## Attribution
+
+Adapted from \`blader/humanizer\` version 2.5.1 at commit
+\`8b3a17889fbf12bedae20974a3c9f9de746ed754\`, licensed under MIT by Siqi Chen.
+The pattern catalog is based on Wikipedia's "Signs of AI writing" guidance
+maintained by WikiProject AI Cleanup.
+`,
+);
+
+const humanizerLicenseText = `MIT License
+
+Copyright (c) 2025 Siqi Chen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+
+const humanizerSkill: NexusSkillDefinition = {
+  manifest: {
+    id: "humanizer",
+    name: "humanizer",
+    description:
+      "Vendored MIT writing-polish skill adapted from blader/humanizer. Use when editing or reviewing prose to remove signs of AI-generated writing while preserving meaning, technical accuracy, and the user's intended voice.",
+    version: "2.5.1-dev-nexus.0",
+    license: "MIT",
+    source: {
+      type: "git",
+      uri: "https://github.com/blader/humanizer",
+      commit: "8b3a17889fbf12bedae20974a3c9f9de746ed754",
+    },
+    supportedAgents: ["codex", "claude"],
+    materialization: "copy",
+    sourceControl: "support",
+  },
+  files: {
+    [nexusSkillMarkdownFileName]: humanizerSkillMarkdown,
+    LICENSE: humanizerLicenseText,
+  },
+};
+
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "dev-nexus",
@@ -372,7 +508,7 @@ Use this skill when creating, auditing, or updating README files, getting-starte
 7. Keep examples copyable and truthful. Use placeholders only when the user must substitute a value. If a wizard asks for a value, do not also require it in the quick-start command unless scripting needs it.
 8. Update docs with code and tests when behavior changes. Delete stale docs rather than preserving half-correct history in the active path.
 9. Validate links, command examples, and generated output where feasible. Add focused documentation tests when the project already has docs guardrails.
-10. Finish with a humanizer-style pass: remove chatbot artifacts, hype, vague attribution, generic conclusions, forced threes, over-bolding, emoji decoration, and unnecessary em dashes while preserving technical precision.
+10. Finish by using the \`humanizer\` companion skill for the prose-polish pass, then re-check that technical claims, commands, warnings, and terms stayed precise.
 
 ## README Shape
 
@@ -402,14 +538,10 @@ Long architecture, all command variants, provider-specific auth, historical desi
 
 ## Humanizer Pairing
 
-The external \`blader/humanizer\` skill is a useful companion for the final polish pass, especially after an agent drafts prose. Treat it as inspiration or an optional external skill, not vendored DevNexus content, unless the project explicitly approves the license and distribution posture.
-
-For a self-contained final pass, ask:
-
-1. What still sounds obviously AI generated?
-2. Which sentence is vague, promotional, over-structured, or too eager to please?
-3. Can this be shorter without losing a requirement, command, or warning?
-4. Does the voice sound like a competent maintainer helping a user, rather than a chatbot presenting an essay?
+Use the vendored \`humanizer\` skill after the documentation structure is correct.
+Documentation decides what belongs where; humanizer improves how the prose
+sounds. Do not let polish change commands, facts, warnings, status, provider
+support, or project vocabulary.
 
 ## Sources To Consult When Needed
 
@@ -418,9 +550,10 @@ For a self-contained final pass, ask:
 - [Write the Docs documentation principles](https://www.writethedocs.org/guide/writing/docs-principles/): docs should be skimmable, current, discoverable, addressable, and close to the code they describe.
 - [Google developer documentation style guide](https://developers.google.com/style): prefer project-specific style first; clarity and consistency matter more than rigid rules.
 - [Google documentation best practices](https://google.github.io/styleguide/docguide/best_practices.html): update docs with code, keep minimum viable documentation fresh, and treat design docs as archives once implementation lands.
-- [blader/humanizer](https://github.com/blader/humanizer) and [Wikipedia "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing): use an anti-AI cleanup pass to remove inflated, vague, formulaic, and chatbot-like prose.
+- [blader/humanizer](https://github.com/blader/humanizer) and [Wikipedia "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing): use the vendored \`humanizer\` companion skill to remove inflated, vague, formulaic, and chatbot-like prose.
 `,
   ),
+  humanizerSkill,
   curatedCoreSkill(
     "to-issues",
     "to-issues",
