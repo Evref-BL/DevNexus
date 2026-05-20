@@ -128,6 +128,24 @@ describe("README onboarding guardrails", () => {
     expect(readme).not.toContain("dev-nexus project create");
   });
 
+  it("includes an agent prompt and concrete readiness criteria in Quick Start", () => {
+    const readme = repoFile("README.md");
+    const quickStartStart = readme.indexOf("## Quick Start");
+    const exampleStart = readme.indexOf("## Example");
+    const quickStart = readme.slice(quickStartStart, exampleStart);
+
+    expect(quickStart).toContain("Copy-paste prompt");
+    expect(quickStart).toContain("Codex or Claude");
+    expect(quickStart).toContain("DevNexus project root");
+    expect(quickStart).toContain("AGENTS.md");
+    expect(quickStart).toContain("dev-nexus project status");
+    expect(quickStart).toContain("dev-nexus setup check");
+    expect(quickStart).toContain("inspect the components");
+    expect(quickStart).toContain("create or triage the first component work item");
+    expect(quickStart).toContain(".codex/config.toml");
+    expect(quickStart).toContain(".mcp.json");
+  });
+
   it("keeps README local documentation links valid", () => {
     for (const file of [
       "README.md",

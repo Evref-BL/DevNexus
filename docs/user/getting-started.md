@@ -70,12 +70,24 @@ After opening the project, ask the agent to:
 3. inspect the components
 4. create or triage the first work item
 
+Copy-paste prompt:
+
+```text
+Open $HOME/dev-nexus/example-suite as the DevNexus project root. Read AGENTS.md.
+Run dev-nexus project status "$HOME/dev-nexus/example-suite" and dev-nexus setup check "$HOME/dev-nexus/example-suite" join-existing-project.
+Then inspect the components and create or triage the first component work item. Treat DevNexus as infrastructure; I still choose the work.
+```
+
 Useful checks:
 
 ```bash
 dev-nexus project status "$HOME/dev-nexus/example-suite"
 dev-nexus setup check "$HOME/dev-nexus/example-suite" join-existing-project
 ```
+
+The project is ready when `project status` succeeds, setup check is not
+blocked, `AGENTS.md` exists, and your agent config was generated, such as
+`.codex/config.toml` for Codex or `.mcp.json` for Claude.
 
 ## Add Existing Components
 

@@ -1456,6 +1456,45 @@ export function usage(): string {
   ].join("\n");
 }
 
+export function projectSetupUsage(): string {
+  return [
+    "Usage:",
+    "  dev-nexus project setup [project-root] [options]",
+    "",
+    "Human quickstart:",
+    '  dev-nexus project setup "$HOME/dev-nexus/example-suite"',
+    "",
+    "The DevNexus home defaults to DEV_NEXUS_HOME or ~/.dev-nexus.",
+    "",
+    "Options:",
+    "  --home <path>",
+    "  --answers <json-file>     setup answers for non-interactive automation",
+    "  --yes                     apply local setup writes after preview validation",
+    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --json",
+    "",
+    "Provider mutations are not part of project setup.",
+    "Use project hosting commands for repository creation, access repair, and other provider writes.",
+  ].join("\n");
+}
+
+export function projectComponentAddUsage(): string {
+  return [
+    "Usage:",
+    "  dev-nexus project component add <project-root> [options]",
+    "",
+    "Options:",
+    "  --answers <json-file>     component answers with one or more components",
+    "  --home <path>",
+    "  --yes                     apply local project config/scaffold writes after preview validation",
+    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --json",
+    "",
+    "Provider mutations are not part of component add.",
+    "Use project hosting commands for repository creation, access repair, and other provider writes.",
+  ].join("\n");
+}
+
 export async function main(
   argv: string[],
   dependencies: DevNexusCliDependencies = {},
@@ -1583,6 +1622,11 @@ async function handleProjectCommand(
   }
 
   if (command === "setup") {
+    if (argvRequestsHelp(argv)) {
+      writeLine(dependencies.stdout ?? process.stdout, projectSetupUsage());
+      return 0;
+    }
+
     const parsed = parseProjectSetupCommand(argv);
     const answers = await loadNexusProjectSetupAnswers({
       ...(parsed.answersPath ? { answersPath: parsed.answersPath } : {}),
@@ -1676,6 +1720,11 @@ async function handleProjectComponentCommand(
   const subcommand = argv[2];
   if (subcommand !== "add") {
     throw new Error("project component requires add");
+  }
+
+  if (argvRequestsHelp(argv)) {
+    writeLine(dependencies.stdout ?? process.stdout, projectComponentAddUsage());
+    return 0;
   }
 
   const parsed = parseProjectComponentAddCommand(argv);
@@ -9868,6 +9917,10 @@ function writeJson(stdout: TextWriter, value: unknown): void {
 
 function argvRequestsJson(argv: readonly string[]): boolean {
   return argv.includes("--json");
+}
+
+function argvRequestsHelp(argv: readonly string[]): boolean {
+  return argv.includes("--help") || argv.includes("-h");
 }
 
 function cliErrorPayload(error: unknown): {
