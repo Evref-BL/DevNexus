@@ -152,6 +152,18 @@ dev-nexus quick-fix start <project-root> --component <component-id> --work-item 
 dev-nexus quick-fix finish <project-root> --component <component-id> --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
 ```
 
+After opening a green-main pull request, evaluate required checks from saved
+GitHub check data before merging:
+
+```bash
+gh pr checks <pr-number> --repo <owner/repo> --required --json name,state,bucket,conclusion,link,workflow > checks.json
+dev-nexus publication green-main plan <project-root> --component <component-id> --pr <pr-number> --checks-file checks.json
+```
+
+The helper refuses merge commands while required checks are pending, failed,
+stale, missing, or unknown. A single failed-run rerun is proposed only when the
+caller passes `--allow-rerun --rerun-reason <text>`.
+
 Refresh generated agent configuration when project settings change:
 
 ```bash

@@ -183,6 +183,12 @@ import {
   type NexusQuickFixPlan,
 } from "./nexusQuickFix.js";
 import {
+  buildNexusGreenMainPublicationPlan,
+  type NexusGreenMainCheckRunInput,
+  type NexusGreenMainCommandStep,
+  type NexusGreenMainPublicationPlan,
+} from "./nexusGreenMainPublication.js";
+import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthorityForCurrentActor,
@@ -871,6 +877,19 @@ interface ParsedQuickFixPlanCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationGreenMainPlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  prNumber: number;
+  prUrl?: string | null;
+  headBranch?: string | null;
+  checksFile: string;
+  allowRerun?: boolean;
+  rerunAttempted?: boolean;
+  rerunReason?: string | null;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -948,6 +967,7 @@ export function usage(): string {
     "  dev-nexus remote-execution result record <project-root> <request-id> [options]",
     "  dev-nexus remote-execution result get <project-root> <request-id> [options]",
     "  dev-nexus worktree prepare <project-root> [options]",
+    "  dev-nexus publication green-main plan <project-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus quick-fix plan <project-root> --work-item <id> [options]",
     "  dev-nexus quick-fix start <project-root> --work-item <id> [options]",
     "  dev-nexus quick-fix finish <project-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
@@ -1165,6 +1185,17 @@ export function usage(): string {
     "  --worker-agent <provider> assigned worker provider target, such as codex or claude",
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
+    "  --json",
+    "",
+    "Options for publication green-main plan:",
+    "  --component <id>          defaults to the primary component",
+    "  --pr <number>             pull request number to evaluate",
+    "  --pr-url <url>",
+    "  --head <branch>           candidate branch name for PR creation hints",
+    "  --checks-file <json>      gh pr checks --json output, or {\"checks\": [...]}",
+    "  --allow-rerun             allow one failed-run rerun when a reason is provided",
+    "  --rerun-reason <text>",
+    "  --rerun-attempted         mark the one allowed rerun as already used",
     "  --json",
     "",
     "Options for quick-fix plan/start/finish:",
@@ -1470,6 +1501,9 @@ async function mainUnchecked(
   if (argv[0] === "worktree") {
     return handleWorktreeCommand(argv, dependencies);
   }
+  if (argv[0] === "publication") {
+    return handlePublicationCommand(argv, dependencies);
+  }
   if (argv[0] === "quick-fix") {
     return handleQuickFixCommand(argv, dependencies);
   }
@@ -1488,7 +1522,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, project, setup, diagnostics, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
   );
 }
 
@@ -2197,6 +2231,37 @@ async function handleWorktreeCommand(
   }
 
   throw new Error("worktree requires prepare");
+}
+
+async function handlePublicationCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  if (argv[1] === "green-main" && argv[2] === "plan") {
+    const parsed = parsePublicationGreenMainPlanCommand(argv);
+    const checks = readGreenMainChecksInput(parsed.checksFile);
+    const plan = buildNexusGreenMainPublicationPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      prNumber: parsed.prNumber,
+      prUrl: parsed.prUrl,
+      headBranch: parsed.headBranch,
+      checks,
+      rerunPolicy: {
+        allowed: parsed.allowRerun ?? false,
+        alreadyAttempted: parsed.rerunAttempted ?? false,
+        reason: parsed.rerunReason ?? null,
+      },
+    });
+    printPublicationGreenMainPlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("publication requires green-main plan");
 }
 
 async function handleQuickFixCommand(
@@ -4844,6 +4909,93 @@ function parseWorktreePrepareCommand(
   }
 
   return parsed;
+}
+
+function parsePublicationGreenMainPlanCommand(
+  argv: string[],
+): ParsedPublicationGreenMainPlanCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "green-main" || command !== "plan") {
+    throw new Error("publication requires green-main plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication green-main plan requires a project root");
+  }
+
+  const parsed: Partial<ParsedPublicationGreenMainPlanCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--pr":
+        parsed.prNumber = parsePositiveInteger(next(), arg);
+        break;
+      case "--pr-url":
+        parsed.prUrl = next();
+        break;
+      case "--head":
+        parsed.headBranch = next();
+        break;
+      case "--checks-file":
+        parsed.checksFile = next();
+        break;
+      case "--allow-rerun":
+        parsed.allowRerun = true;
+        break;
+      case "--rerun-attempted":
+        parsed.rerunAttempted = true;
+        break;
+      case "--rerun-reason":
+        parsed.rerunReason = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication green-main plan option: ${arg}`);
+    }
+  }
+  if (!parsed.prNumber) {
+    throw new Error("publication green-main plan requires --pr");
+  }
+  if (!parsed.checksFile) {
+    throw new Error("publication green-main plan requires --checks-file");
+  }
+
+  return parsed as ParsedPublicationGreenMainPlanCommand;
+}
+
+function readGreenMainChecksInput(
+  inputPath: string,
+): NexusGreenMainCheckRunInput[] {
+  const raw = JSON.parse(fs.readFileSync(inputPath, "utf8")) as unknown;
+  if (Array.isArray(raw)) {
+    return raw as NexusGreenMainCheckRunInput[];
+  }
+  if (
+    raw !== null &&
+    typeof raw === "object" &&
+    Array.isArray((raw as { checks?: unknown }).checks)
+  ) {
+    return (raw as { checks: NexusGreenMainCheckRunInput[] }).checks;
+  }
+
+  throw new Error(
+    "publication green-main checks file must be an array or an object with checks",
+  );
 }
 
 function parseQuickFixPlanCommand(argv: string[]): ParsedQuickFixPlanCommand {
@@ -7569,6 +7721,70 @@ function printWorktreePrepareResult(
   }
 }
 
+function printPublicationGreenMainPlan(
+  plan: NexusGreenMainPublicationPlan,
+  parsed: ParsedPublicationGreenMainPlanCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...plan };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus green-main publication plan.");
+  writeLine(
+    stdout,
+    `  Pull request: ${plan.pullRequest.repository}#${plan.pullRequest.number}`,
+  );
+  writeLine(stdout, `  Component: ${plan.component.id}`);
+  writeLine(stdout, `  Status: ${plan.status}`);
+  writeLine(
+    stdout,
+    `  Merge: ${plan.merge.allowed ? "allowed" : "blocked"} - ${plan.merge.reason}`,
+  );
+  writeLine(
+    stdout,
+    `  Rerun: ${plan.rerun.decision}${plan.rerun.reason ? ` - ${plan.rerun.reason}` : ""}`,
+  );
+  if (plan.warnings.length > 0) {
+    for (const warning of plan.warnings) {
+      writeLine(stdout, `  Warning: ${warning}`);
+    }
+  }
+  writeLine(stdout, "  Required checks:");
+  for (const check of plan.requiredChecks) {
+    writeLine(stdout, `    ${check.name}: ${check.status}`);
+  }
+  if (plan.failedJobs.length > 0) {
+    writeLine(stdout, "  Failed jobs:");
+    for (const job of plan.failedJobs) {
+      const details = [
+        job.platform ? `platform=${job.platform}` : null,
+        job.workflow ? `workflow=${job.workflow}` : null,
+        job.url ? `url=${job.url}` : null,
+      ].filter((item): item is string => item !== null);
+      writeLine(
+        stdout,
+        `    ${job.name}: ${job.classification}${details.length > 0 ? ` ${details.join(" ")}` : ""}`,
+      );
+      if (job.failingStep) {
+        writeLine(stdout, `      Step: ${job.failingStep}`);
+      }
+      if (job.failingTest) {
+        writeLine(stdout, `      Test: ${job.failingTest}`);
+      }
+      if (job.message) {
+        writeLine(stdout, `      Message: ${job.message}`);
+      }
+    }
+  }
+  writeLine(stdout, "  Commands:");
+  for (const step of Object.values(plan.commands)) {
+    writeLine(stdout, `    ${step.title}: ${formatGreenMainStep(step)}`);
+  }
+}
+
 function printQuickFixPlan(
   plan: NexusQuickFixPlan,
   parsed: ParsedQuickFixPlanCommand,
@@ -7693,6 +7909,20 @@ function printQuickFixFinish(
   for (const item of result.skippedBookkeeping) {
     writeLine(stdout, `    ${item}`);
   }
+}
+
+function formatGreenMainStep(step: NexusGreenMainCommandStep): string {
+  if (!step.enabled || !step.command) {
+    return `disabled${step.note ? ` (${step.note})` : ""}`;
+  }
+  const environment = Object.entries(step.environment);
+  const envPrefix =
+    environment.length === 0
+      ? ""
+      : `${environment
+          .map(([key, value]) => `${key}=${value}`)
+          .join(" ")} `;
+  return `${envPrefix}${step.command}${step.note ? ` (${step.note})` : ""}`;
 }
 
 function formatQuickFixStep(step: NexusQuickFixCommandStepLike): string {
