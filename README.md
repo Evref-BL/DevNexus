@@ -23,12 +23,12 @@ edits code, reviews changes, verifies results, and decides what to publish.
 - A **component** is something the project works on, such as a Git repository,
   paper, dataset, spreadsheet, or support folder. One DevNexus project can have
   many components.
+- A **provider** is an external tool or service DevNexus can reference, such as
+  GitHub, GitLab, Jira, Codex, or Claude.
 - A **work item** is a task or issue owned by a component. Work items can live
   in DevNexus' local tracker or in providers such as GitHub, GitLab, or Jira.
 - The **DevNexus home** is user-local state, normally `~/.dev-nexus`. Most
   users do not need to choose or manage it.
-- A **provider** is an external tool or service DevNexus can reference, such as
-  GitHub, GitLab, Jira, Codex, or Claude.
 - **Agent files** are generated files such as `AGENTS.md`, skills, context, and
   Model Context Protocol configuration. Model Context Protocol, or MCP, is how
   agents can call DevNexus tools from a project session.
