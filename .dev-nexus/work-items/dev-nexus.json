@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 172,
-  "nextCommentNumber": 368,
-  "updatedAt": "2026-05-20T00:34:08.276Z",
+  "nextCommentNumber": 372,
+  "updatedAt": "2026-05-20T01:37:20.439Z",
   "items": [
     {
       "id": "local-1",
@@ -4387,7 +4387,7 @@
       "id": "local-170",
       "title": "Expose version planning in agent and report surfaces",
       "description": "Type: implementation slice\nReadiness: autonomous agent-ready after dev-nexus:local-169.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: expose compact version scope and readiness facts through existing read-only DevNexus agent, target report, CLI, and MCP-facing surfaces.\n\nAcceptance criteria:\n- Add a compact version section to target reports with objective, target branch, owning components, scope counts, readiness state, blockers, and gate warnings.\n- Add version planning context to agent-facing surfaces so agents can tell whether selected work is in committed, candidate, stretch, deferred, excluded, or unrelated scope.\n- Keep output low-token by default and omit unrelated future versions unless an explicit version or verbose/detail option asks for them.\n- Preserve existing target-report and automation-status output when no version configuration is present.\n- Expose only read-only facts; no provider milestone creation, provider comments, merge action, package publish, or release publish.\n\nVerification:\n- Focused CLI text and JSON tests for version report output.\n- MCP/schema or target-report serialization tests for the new version section.\n- Agent-context regression coverage for projects with and without version configuration.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4402,8 +4402,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:22:03.839Z",
-      "updatedAt": "2026-05-20T00:33:10.015Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T01:37:20.439Z",
+      "closedAt": "2026-05-20T01:36:13.993Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -4415,7 +4415,7 @@
       "id": "local-171",
       "title": "Dogfood version planning with a read-only project version",
       "description": "Type: dogfood configuration and smoke slice\nReadiness: autonomous agent-ready after dev-nexus:local-170.\nParent: dev-nexus:local-165\nSource PRD: docs/version-scoped-planning-prd.md\n\nGoal: configure one read-only DevNexus Dogfood version plan and prove the version reporting path works against real dogfood project metadata.\n\nAcceptance criteria:\n- Add a dogfood version plan that names the objective, owning components, target branch, readiness gates, release policy posture, and initial committed or candidate scope.\n- Use existing work-item fields such as labels, milestones, or explicit local item references; do not create provider milestones or require rich provider version objects.\n- Confirm the normal eligible-work selector is unchanged unless a later implementation explicitly opts into version-filtered work selection.\n- Confirm target reports and agent context show the configured version with useful readiness and blocker information.\n- Do not publish tags, packages, provider releases, changelogs, or merge work as part of this dogfood configuration.\n\nVerification:\n- Run a read-only DevNexus target report or equivalent CLI/MCP smoke showing the configured version.\n- Run focused tests touched by the version config/reporting path, and `npm run check` when feasible.",
-      "status": "todo",
+      "status": "ready",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4428,7 +4428,7 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-19T22:22:11.709Z",
-      "updatedAt": "2026-05-19T22:22:11.709Z",
+      "updatedAt": "2026-05-20T01:36:15.088Z",
       "closedAt": null,
       "webUrl": null,
       "externalRef": {
@@ -8911,8 +8911,53 @@
           "provider": "local",
           "itemId": "local-comment-366"
         }
+      },
+      {
+        "id": "local-comment-368",
+        "body": "Heartbeat 2026-05-20T01:18Z selected this item. Prepared isolated source worktree codex/dev-nexus/local-170-version-report-surfaces and project-state worktree codex/dev-nexus-dogfood/local-170-project-state. Starting with target-report and agent-surface regression tests, then implementation.",
+        "author": null,
+        "createdAt": "2026-05-20T01:20:58.413Z",
+        "updatedAt": "2026-05-20T01:20:58.413Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-368"
+        }
+      },
+      {
+        "id": "local-comment-369",
+        "body": "Completed through DevNexus PR #19, merged to `main` as `1c3e0b0`. The implementation adds a shared compact version-planning surface, target-report/CLI version summaries, eligible-work and agent-launch version scope annotations, and focused regression coverage. Verification passed locally before PR, all required PR #19 Node 24 checks passed, and post-merge `npm run check` passed in `C:\\dev\\code\\sources\\dev-nexus`. Corrective note: PR #18 was closed because it was created with the default human gh account; PR #19 was recreated and merged under the configured `Gabot-Darbot` automation profile.",
+        "author": null,
+        "createdAt": "2026-05-20T01:36:14.703Z",
+        "updatedAt": "2026-05-20T01:36:14.703Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-369"
+        }
+      },
+      {
+        "id": "local-comment-371",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus/local-170-version-report-surfaces\nHead: 29338b2c107296ef148758000c83cebb8da7c4aa\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-20T01:37:20.427Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-170-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-170\",\n  \"logicalItemId\": \"local-170\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-170\",\n    \"itemNumber\": 170,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-170\",\n      \"itemNumber\": 170\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-170\",\n    \"itemNumber\": 170,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-170\",\n      \"itemNumber\": 170\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-170\",\n      \"itemNumber\": 170,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-170\",\n        \"itemNumber\": 170\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus\\\\codex-dev-nexus-local-170-version-report-surfaces\",\n  \"branch\": \"codex/dev-nexus/local-170-version-report-surfaces\",\n  \"upstream\": \"bot/codex/dev-nexus/local-170-version-report-surfaces\",\n  \"baseRef\": \"bot/codex/dev-nexus/local-170-version-report-surfaces\",\n  \"headCommit\": \"29338b2c107296ef148758000c83cebb8da7c4aa\",\n  \"dirty\": false,\n  \"ahead\": 0,\n  \"behind\": 0,\n  \"pushed\": true,\n  \"changedAreas\": [\n    \"src/nexusVersionPlanningSurface.ts\",\n    \"src/nexusAutomationTargetReport.ts\",\n    \"src/nexusAutomationAgentSurface.ts\",\n    \"src/nexusAutomationAgentLaunch.ts\",\n    \"src/cli.ts\",\n    \"src/index.ts\",\n    \"src/*version/report/agent tests\"\n  ],\n  \"decisions\": [\n    \"Implemented a synchronous compact version-planning surface from configured scope entries plus work items already present in report and agent surfaces.\",\n    \"Kept provider milestone writes, release/package publishing, and merge automation out of scope; the new surfaces are read-only summaries and annotations.\",\n    \"Closed human-authored PR #18 and recreated PR #19 under the configured Gabot-Darbot automation profile before merge.\"\n  ],\n  \"verificationSummary\": \"Passed focused surface tests, npm run build, related version/report/MCP suite, full npm run check in the source worktree, all PR #19 required Node 24 checks, and post-merge npm run check in C:\\\\dev\\\\code\\\\sources\\\\dev-nexus.\",\n  \"integrationPreference\": \"Merged to DevNexus main through PR #19 as 1c3e0b0; dogfood metadata closeout is being published from the project-meta worktree.\",\n  \"note\": \"Source branch can be cleaned after dogfood metadata is committed and pushed.\",\n  \"leaseId\": \"lease-1339ee1073a8fa2d\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-20T01:37:20.439Z",
+        "updatedAt": "2026-05-20T01:37:20.439Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-371"
+        }
       }
     ],
-    "local-171": []
+    "local-171": [
+      {
+        "id": "local-comment-370",
+        "body": "Dependency `dev-nexus:local-170` is complete through DevNexus PR #19. This dogfood configuration/smoke slice is now ready: configure one read-only dogfood version plan, confirm target-report and agent-context surfaces show useful version readiness facts, and keep release/package/provider writes out of scope.",
+        "author": null,
+        "createdAt": "2026-05-20T01:36:15.088Z",
+        "updatedAt": "2026-05-20T01:36:15.088Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-370"
+        }
+      }
+    ]
   }
 }

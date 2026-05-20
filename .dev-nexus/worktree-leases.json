@@ -1,7 +1,177 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T00:34:08.262Z",
+  "updatedAt": "2026-05-20T01:37:20.427Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a03e2fb813e189f9",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-170",
+      "branchName": "codex/dev-nexus/local-170-version-report-surfaces",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-local-170-version-report-surfaces"
+      },
+      "writeScope": [
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationTargetReport.test.ts",
+        "src/nexusAutomationAgentSurface.ts",
+        "src/nexusAutomationAgentSurface.test.ts",
+        "src/cli.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T01:20:41.097Z",
+      "lastSeenAt": "2026-05-20T01:37:20.427Z",
+      "updatedAt": "2026-05-20T01:37:20.427Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "29338b2c107296ef148758000c83cebb8da7c4aa",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-local-170-version-report-surfaces"
+        },
+        "upstream": "bot/codex/dev-nexus/local-170-version-report-surfaces",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Merged through DevNexus PR #19 as 1c3e0b0 after required Node 24 checks passed.",
+        "Post-merge npm run check passed in C:/dev/code/sources/dev-nexus."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-5011bf5ae7bf899f",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-170-project-state",
+      "branchName": "codex/dev-nexus-dogfood/local-170-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-170-project-state"
+      },
+      "writeScope": [
+        ".dev-nexus/work-items/dev-nexus.json",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/automation/runs.json",
+        ".dev-nexus/worktree-leases.json",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T01:20:47.374Z",
+      "lastSeenAt": "2026-05-20T01:37:20.427Z",
+      "updatedAt": "2026-05-20T01:37:20.427Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c85d6413d8d95a3a41ba1b026ffc8ae2b37556b8",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-local-170-project-state"
+        },
+        "upstream": "bot/codex/dev-nexus-dogfood/local-170-project-state",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project metadata records local-170 completion and local-171 promotion.",
+        "Dogfood metadata branch is intended for fast-forward publication to main."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-1339ee1073a8fa2d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "local-170",
+      "branchName": "codex/dev-nexus/local-170-version-report-surfaces",
+      "baseRef": "bot/codex/dev-nexus/local-170-version-report-surfaces",
+      "worktree": {
+        "kind": "external",
+        "base": "external",
+        "componentId": "dev-nexus",
+        "relativePath": null
+      },
+      "writeScope": [
+        "src/nexusVersionPlanningSurface.ts",
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationAgentSurface.ts",
+        "src/nexusAutomationAgentLaunch.ts",
+        "src/cli.ts",
+        "src/index.ts",
+        "src/*version/report/agent tests"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T01:37:20.427Z",
+      "lastSeenAt": "2026-05-20T01:37:20.427Z",
+      "updatedAt": "2026-05-20T01:37:20.427Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "29338b2c107296ef148758000c83cebb8da7c4aa",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "external",
+          "base": "external",
+          "componentId": "dev-nexus",
+          "relativePath": null
+        },
+        "upstream": "bot/codex/dev-nexus/local-170-version-report-surfaces",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Source branch can be cleaned after dogfood metadata is committed and pushed.",
+        "Verification: Passed focused surface tests, npm run build, related version/report/MCP suite, full npm run check in the source worktree, all PR #19 required Node 24 checks, and post-merge npm run check in C:\\dev\\code\\sources\\dev-nexus.",
+        "Integration preference: Merged to DevNexus main through PR #19 as 1c3e0b0; dogfood metadata closeout is being published from the project-meta worktree."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

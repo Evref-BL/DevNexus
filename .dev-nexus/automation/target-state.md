@@ -153,13 +153,19 @@ and ready for coordinator-driven work across its components.
   is complete through DevNexus PR #17 as merge commit `3c441a0`, adding the
   pure readiness reporter over scope, target-cycle, verification, publication,
   authority, release-policy, and green-main validation facts. `dev-nexus:local-170`
-  is now ready to expose version planning in target reports, agent context, CLI,
-  and MCP-facing read-only surfaces. Keep
-  provider milestone writes, automatic release publishing, and merge automation
-  out of the first implementation path.
+  is complete through DevNexus PR #19 as merge commit `1c3e0b0`, adding the
+  compact version-planning surface, target-report/CLI version summaries,
+  eligible-work and agent-launch version-scope annotations, and regression
+  coverage for no-config projects. `dev-nexus:local-171` is now ready to add a
+  read-only dogfood version configuration and smoke the new reporting path
+  against this project. Keep provider milestone writes, automatic release
+  publishing, package publishing, and merge automation out of the first
+  dogfood configuration path.
 - The current bot profile has direct write access for the active
   `Evref-BL/DevNexus` dogfood source flow; it fast-forwarded source `main` to
-  `3c441a0` after PR #17 branch CI passed.
+  `1c3e0b0` after PR #19 branch CI passed. PR #18 was closed because it was
+  accidentally created with the default human `gh` account; PR #19 was
+  recreated and merged under the configured `Gabot-Darbot` automation profile.
 - Windows and Mac bot publication paths are authenticated for the current
   dogfood flow. Agent-created Git/GitHub activity must continue to use the
   configured `bot` remotes and `Gabot-Darbot` automation profile.
