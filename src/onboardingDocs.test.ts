@@ -175,6 +175,8 @@ describe("first-project quickstart smoke", () => {
   it("creates a ready local project from the no-answer-file human setup path", async () => {
     const projectRoot = makeTempDir("dev-nexus-quickstart-project-");
     const homePath = makeTempDir("dev-nexus-quickstart-home-");
+    fs.mkdirSync(path.join(projectRoot, "packages", "api"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "docs", "paper"), { recursive: true });
     process.env.DEV_NEXUS_HOME = homePath;
 
     const stdin = ttyInput();
@@ -184,6 +186,15 @@ describe("first-project quickstart smoke", () => {
       "",
       "core",
       ".",
+      "yes",
+      "api",
+      "packages/api",
+      "dependency",
+      "yes",
+      "paper",
+      "docs/paper",
+      "optional",
+      "",
       "",
       "",
       "",
@@ -202,15 +213,18 @@ describe("first-project quickstart smoke", () => {
 
     expect(stdout.output()).toContain("DevNexus human quickstart");
     expect(result.projectConfigPath).toBe(path.join(projectRoot, "dev-nexus.project.json"));
-    expect(projectConfig).toMatchObject({
-      id: "quickstart-smoke",
-      components: [
-        expect.objectContaining({
-          id: "core",
-          defaultWorkTrackerId: "local",
-        }),
-      ],
-    });
+    expect(projectConfig.id).toBe("quickstart-smoke");
+    expect(
+      projectConfig.components.map((component) => ({
+        id: component.id,
+        role: component.role,
+        defaultWorkTrackerId: component.defaultWorkTrackerId,
+      })),
+    ).toEqual([
+      { id: "core", role: "primary", defaultWorkTrackerId: "local" },
+      { id: "api", role: "dependency", defaultWorkTrackerId: "local" },
+      { id: "paper", role: "optional", defaultWorkTrackerId: "local" },
+    ]);
     expect(fs.existsSync(path.join(projectRoot, "AGENTS.md"))).toBe(true);
     expect(fs.readFileSync(path.join(projectRoot, "AGENTS.md"), "utf8")).toContain(
       "## First-Run Checklist",
@@ -219,6 +233,16 @@ describe("first-project quickstart smoke", () => {
     expect(
       loadLocalWorkTrackingStore(
         path.join(projectRoot, ".dev-nexus", "work-items", "core.json"),
+      ).items,
+    ).toEqual([]);
+    expect(
+      loadLocalWorkTrackingStore(
+        path.join(projectRoot, ".dev-nexus", "work-items", "api.json"),
+      ).items,
+    ).toEqual([]);
+    expect(
+      loadLocalWorkTrackingStore(
+        path.join(projectRoot, ".dev-nexus", "work-items", "paper.json"),
       ).items,
     ).toEqual([]);
     expect(readiness.verdict).not.toBe("blocked");

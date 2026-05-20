@@ -38,6 +38,7 @@ import {
   type NexusProjectSetupAgentProvider,
   type NexusProjectSetupAnswers,
   type NexusProjectSetupAuthProfileAnswers,
+  type NexusProjectSetupComponentRole,
   type NexusProjectSetupProposal,
   type NexusProjectSetupWorkTrackerAnswers,
 } from "./nexusProjectSetupModel.js";
@@ -393,7 +394,7 @@ async function promptForNexusProjectSetupAnswers(options: {
     options.stdout.write(
       [
         "DevNexus human quickstart",
-        "Answer the project and primary component prompts. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
+        "Answer the project and primary component prompts. Add more components when the first project has more than one source folder. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
     );
@@ -412,6 +413,41 @@ async function promptForNexusProjectSetupAnswers(options: {
       "Primary component source path",
       ".",
     );
+    const components: NexusProjectSetupAnswers["components"] = [
+      {
+        id: componentId,
+        name: componentId,
+        role: "primary",
+        source: {
+          kind: "reference_existing",
+          path: componentPath,
+        },
+      },
+    ];
+
+    while (yesNo(await askWithDefault(rl, "Add another component? (yes/no)", "no"))) {
+      const additionalComponentId = await askWithDefault(
+        rl,
+        "Additional component id",
+        `component-${components.length + 1}`,
+      );
+      const additionalComponentPath = await askWithDefault(
+        rl,
+        "Additional component source path",
+        path.join("components", additionalComponentId),
+      );
+      const role = await askAdditionalComponentRole(rl, options.stdout);
+      components.push({
+        id: additionalComponentId,
+        name: additionalComponentId,
+        role,
+        source: {
+          kind: "reference_existing",
+          path: additionalComponentPath,
+        },
+      });
+    }
+
     const agent = await askWithDefault(rl, "Agent target", "codex");
     const localTracker = await askWithDefault(rl, "Enable local tracker? (yes/no)", "yes");
     const initializeGit = await askWithDefault(rl, "Initialize meta Git repo? (yes/no)", "yes");
@@ -427,17 +463,7 @@ async function promptForNexusProjectSetupAnswers(options: {
         root: projectRoot,
         initializeGit: yesNo(initializeGit),
       },
-      components: [
-        {
-          id: componentId,
-          name: componentId,
-          role: "primary",
-          source: {
-            kind: "reference_existing",
-            path: componentPath,
-          },
-        },
-      ],
+      components,
       agentTargets: [
         {
           provider: agentProvider,
@@ -451,6 +477,46 @@ async function promptForNexusProjectSetupAnswers(options: {
     };
   } finally {
     rl.close();
+  }
+}
+
+async function askAdditionalComponentRole(
+  rl: readline.Interface,
+  stdout: NodeJS.WriteStream,
+): Promise<NexusProjectSetupComponentRole> {
+  for (;;) {
+    const answer = await askWithDefault(
+      rl,
+      "Additional component role (dependency/addon/extension/optional/support)",
+      "addon",
+    );
+    const role = normalizeAdditionalComponentRole(answer);
+    if (role) {
+      return role;
+    }
+    if (answer.trim().toLowerCase() === "primary") {
+      stdout.write("Additional components cannot use role primary.\n");
+    } else {
+      stdout.write(
+        "Supported additional component roles: dependency, addon, extension, optional, support.\n",
+      );
+    }
+  }
+}
+
+function normalizeAdditionalComponentRole(
+  value: string,
+): NexusProjectSetupComponentRole | null {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "dependency":
+    case "addon":
+    case "extension":
+    case "optional":
+    case "support":
+      return normalized;
+    default:
+      return null;
   }
 }
 
