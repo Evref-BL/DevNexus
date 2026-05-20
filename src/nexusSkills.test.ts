@@ -59,6 +59,22 @@ describe("nexus skills", () => {
       materialization: "copy",
       sourceControl: "support",
     });
+    const humanizer = result.installed.find((skill) => skill.id === "humanizer");
+    expect(humanizer?.sourceControl).toBe("support");
+    expect(
+      fs.readFileSync(path.join(humanizer?.skillRoot ?? "", "LICENSE"), "utf8"),
+    ).toContain("Copyright (c) 2025 Siqi Chen");
+    expect(
+      JSON.parse(fs.readFileSync(humanizer?.manifestPath ?? "", "utf8")),
+    ).toMatchObject({
+      id: "humanizer",
+      license: "MIT",
+      source: {
+        type: "git",
+        uri: "https://github.com/blader/humanizer",
+        commit: "8b3a17889fbf12bedae20974a3c9f9de746ed754",
+      },
+    });
   });
 
   it("projects selected skills into configured agent-native directories", () => {
@@ -167,6 +183,7 @@ describe("nexus skills", () => {
       "setup-agent-skills",
       "grill-with-docs",
       "documentation",
+      "humanizer",
       "to-issues",
       "to-prd",
       "prototype",
@@ -209,13 +226,21 @@ describe("nexus skills", () => {
     expect(skillMarkdown.documentation).toContain(
       "If a wizard asks for a value, do not also require it in the quick-start command",
     );
-    expect(skillMarkdown.documentation).toContain("humanizer-style pass");
+    expect(skillMarkdown.documentation).toContain(
+      "using the `humanizer` companion skill",
+    );
     expect(skillMarkdown.documentation).toContain("blader/humanizer");
     expect(skillMarkdown.documentation).toContain("GitHub Docs");
     expect(skillMarkdown.documentation).toContain("Write the Docs");
     expect(skillMarkdown.documentation).toContain(
       "Google developer documentation style guide",
     );
+    expect(skillMarkdown.humanizer).toContain("name: humanizer");
+    expect(skillMarkdown.humanizer).toContain(
+      "Vendored from `blader/humanizer`",
+    );
+    expect(skillMarkdown.humanizer).toContain("Signs of AI writing");
+    expect(skillMarkdown.humanizer).toContain("Preserve commands exactly");
     expect(skillMarkdown["setup-agent-skills"]).toContain(
       "Architecture Decision Records (ADRs)",
     );
