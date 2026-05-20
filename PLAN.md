@@ -71,7 +71,10 @@ target-cycle facts, commits, and the target report.
   CI failure intake now has a pure dry-run/manual replay planner, scoped
   policy checks, dedupe/backoff, failure-to-work-item mapping, and
   coordinator-wakeup decisions. Webhook or polling rollout remains a separate
-  policy-controlled follow-up. Version-scoped planning follow-up from
+  policy-controlled follow-up. The next ready dogfood reporting defect is
+  `dev-nexus:local-172`: keep completed items out of the target report's
+  current `readyEligibleWork` progress bucket when only stale historical cycle
+  facts marked them eligible. Version-scoped planning follow-up from
   `docs/version-scoped-planning-prd.md` has been sliced by
   `dev-nexus:local-165`; `dev-nexus:local-167` through `local-171` are
   complete, and the dogfood project now has a read-only version plan for that
