@@ -323,6 +323,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus project hosting plan");
     expect(output.output()).toContain("dev-nexus project hosting apply");
     expect(output.output()).toContain("dev-nexus project mcp refresh");
+    expect(output.output()).toContain("dev-nexus project plugin refresh");
     expect(output.output()).toContain("dev-nexus setup plan");
     expect(output.output()).toContain("dev-nexus diagnostics cli-version-skew");
     expect(output.output()).toContain("dev-nexus coordination status");
@@ -392,6 +393,141 @@ describe("dev-nexus cli", () => {
         message: "Unknown project setup option: --bad-option",
       },
     });
+  });
+
+  it("refreshes a local project plugin and materializes skills and MCP config", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-plugin-project-");
+    const pluginRoot = makeTempDir("dev-nexus-cli-plugin-package-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        agentTargets: {
+          active: [
+            {
+              provider: "codex",
+              mcp: {},
+              skills: {},
+            },
+          ],
+        },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "demo-dev-nexus-plugin",
+          type: "module",
+          main: "./index.js",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "index.js"),
+      [
+        "export function demoDevNexusPluginConfig(options = {}) {",
+        "  return {",
+        "    id: 'demo-typescript',",
+        "    name: 'Demo TypeScript',",
+        "    version: '1.2.3',",
+        "    enabled: true,",
+        "    capabilities: [",
+        "      { kind: 'projected_skill', id: 'skill-demo-ts', description: 'Project the demo TypeScript skill.', skillId: 'demo-ts', targetAgents: options.targetAgents?.length ? options.targetAgents : ['codex'] },",
+        "      { kind: 'mcp_server', id: 'mcp-demo-ts', description: 'Project the demo TypeScript MCP server.', serverName: 'demo_ts', command: 'node', args: ['demo-server.js'], targetAgents: ['codex'], tools: [{ name: 'demo.status' }] }",
+        "    ]",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const skillRoot = path.join(pluginRoot, "skills", "demo-ts");
+    fs.mkdirSync(skillRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillRoot, "dev-nexus.skill.json"),
+      JSON.stringify(
+        {
+          id: "demo-ts",
+          name: "demo-ts",
+          description: "Demo TypeScript workflow skill.",
+          version: "1.0.0",
+          license: "Apache-2.0",
+          source: {
+            type: "local",
+            uri: "demo-dev-nexus-plugin/skills/demo-ts",
+          },
+          supportedAgents: ["codex"],
+          materialization: "copy",
+          sourceControl: "support",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(skillRoot, "SKILL.md"),
+      "---\nname: demo-ts\ndescription: Demo TypeScript workflow skill.\n---\n\n# Demo\n",
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await expect(
+      main(
+        [
+          "project",
+          "plugin",
+          "refresh",
+          projectRoot,
+          "--from",
+          pluginRoot,
+          "--json",
+        ],
+        { stdout: output.writer },
+      ),
+    ).resolves.toBe(0);
+
+    const payload = JSON.parse(output.output());
+    expect(payload.plugin).toMatchObject({
+      id: "demo-typescript",
+      created: true,
+      capabilityCount: 2,
+      projectedSkillCount: 1,
+      mcpServerCount: 1,
+    });
+    expect(payload.skillProjection).toMatchObject({
+      materializedSkillCount: 1,
+      materializedAgentSkillCount: 1,
+    });
+    expect(payload.mcpProjection).toMatchObject({
+      materializedServerCount: 1,
+      materializedTargetCount: 1,
+      skippedServers: [],
+    });
+    expect(loadProjectConfig(projectRoot).plugins?.[0]).toMatchObject({
+      id: "demo-typescript",
+      version: "1.2.3",
+    });
+    expect(
+      fs.existsSync(
+        path.join(projectRoot, ".dev-nexus", "skills", "demo-ts", "SKILL.md"),
+      ),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(projectRoot, ".agents", "skills", "demo-ts", "SKILL.md"),
+      ),
+    ).toBe(true);
+    const codexConfig = fs.readFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "utf8",
+    );
+    expect(codexConfig).toContain("[mcp_servers.demo_ts]");
+    expect(codexConfig).toContain('command = "node"');
+    expect(codexConfig).toContain('args = ["demo-server.js"]');
   });
 
   it("prints a quick-fix plan for one provider-native GitHub issue", async () => {
