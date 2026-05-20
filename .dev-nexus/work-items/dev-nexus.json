@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 190,
-  "nextCommentNumber": 386,
-  "updatedAt": "2026-05-20T08:40:33.681Z",
+  "nextCommentNumber": 387,
+  "updatedAt": "2026-05-20T09:09:34.806Z",
   "items": [
     {
       "id": "local-1",
@@ -4544,7 +4544,7 @@
       "id": "local-176",
       "title": "Make automation and coordination outputs compact by default",
       "description": "Type: CLI/MCP ergonomics slice\nReadiness: autonomous agent-ready (AFK)\nSource: DevNexus workflow audit notes 2026-05-20. Existing completed item `local-9` should be checked first so this slice extends rather than duplicates low-token status work.\n\nGoal:\nReduce operator and model overhead by making common automation, target-report, coordination, and target-cycle outputs concise by default, with full ledgers available only through explicit detail flags.\n\nAcceptance criteria:\n- Default outputs for automation status, target-report, coordination status, and target-cycle result paths fit in one screen for normal dogfood projects.\n- Concise output includes current decision, eligible count, excluded/stale counts when available, active blockers, active leases, selected work, and warnings.\n- Full config, ledgers, embedded target-state markdown, large handoff JSON, and historical notes require explicit full-detail flags or equivalent MCP detail options.\n- Existing full-detail behavior remains available for diagnostics.\n- Agent-facing instructions prefer compact commands unless full detail is needed.\n\nVerification:\n- Snapshot or fixture tests cover compact and full output modes.\n- Run focused CLI/MCP tests and ensure existing low-token status behavior from `local-9` is preserved.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4557,8 +4557,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T07:47:10.083Z",
-      "updatedAt": "2026-05-20T07:47:10.083Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T09:09:34.806Z",
+      "closedAt": "2026-05-20T09:09:34.806Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9507,7 +9507,19 @@
     "local-173": [],
     "local-174": [],
     "local-175": [],
-    "local-176": [],
+    "local-176": [
+      {
+        "id": "local-comment-386",
+        "body": "Implemented in Evref-BL/DevNexus#64, merged as bca6b3c9177fdd23eb35ebcfe4fd9de88e087c63. CLI JSON and MCP status/report surfaces now default to compact summaries for project status, automation status, target report, coordination status, and target-cycle list/record, with full raw payloads available through --full / --detail full or MCP detail: full. Dogfood measurements after the change: project_status 7.7 KB, automation_status 10.5 KB, target_report 13.3 KB CLI / 13.9 KB MCP, coordination_status 5.1 KB, target_cycle_list 5.9 KB. Verification: npm run check; GitHub Node 24 checks passed on ubuntu-latest, macos-latest, and windows-latest.",
+        "author": null,
+        "createdAt": "2026-05-20T09:09:30.689Z",
+        "updatedAt": "2026-05-20T09:09:30.689Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-386"
+        }
+      }
+    ],
     "local-177": [],
     "local-178": [],
     "local-179": [],
