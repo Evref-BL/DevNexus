@@ -67,10 +67,11 @@ target-cycle facts, commits, and the target report.
 
 ## Next Work Candidates
 
-- Continue green-main operationalization with `dev-nexus:local-166`: CI failure
-  intake and coordinator wakeup policy, including allowed scopes,
-  webhook/poll/manual replay rollout, dedupe/backoff, and failure-to-work-item
-  mapping. Version-scoped planning follow-up from
+- Continue green-main operationalization after completed `dev-nexus:local-166`.
+  CI failure intake now has a pure dry-run/manual replay planner, scoped
+  policy checks, dedupe/backoff, failure-to-work-item mapping, and
+  coordinator-wakeup decisions. Webhook or polling rollout remains a separate
+  policy-controlled follow-up. Version-scoped planning follow-up from
   `docs/version-scoped-planning-prd.md` has been sliced by
   `dev-nexus:local-165`; `dev-nexus:local-167` through `local-171` are
   complete, and the dogfood project now has a read-only version plan for that

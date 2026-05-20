@@ -136,9 +136,15 @@ and ready for coordinator-driven work across its components.
   request validation first; merge to `main` only after required checks are
   green and the current actor has explicit merge authority. Branch CI status
   checks are explicit publication actions, not unsolicited background polling.
-- `dev-nexus:local-166` is ready for CI failure intake and coordinator wakeup
-  policy: allowed scopes, webhook/poll/manual replay rollout, dedupe/backoff,
-  failure-to-work-item mapping, and policy-gated coordinator wakeups.
+- `dev-nexus:local-166` is complete through DevNexus PR #20 as merge commit
+  `8a9896a`, adding the first CI failure intake implementation path: a pure
+  dry-run/manual replay planner, allowed repository/branch/workflow/event/check
+  scope checks, dedupe and backoff, failure-to-work-item mapping, and
+  policy-gated coordinator wakeup decisions. It deliberately does not add live
+  provider writes, webhooks, global polling, branch protection mutation, tags,
+  releases, or package publishing. Verification passed locally, in PR #20
+  Node 24 checks on Ubuntu/Windows/macOS, and after merge in the shared
+  DevNexus checkout.
 - `dev-nexus:local-165` is complete for version-scoped planning issue slicing.
   It created `dev-nexus:local-167` through `local-171` in dependency order:
   version config, scope resolution, readiness reporting, agent/report exposure,
