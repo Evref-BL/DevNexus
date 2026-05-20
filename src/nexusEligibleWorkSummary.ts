@@ -22,6 +22,7 @@ import {
 } from "./nexusAutomationWorkTrackerSummary.js";
 import type {
   NexusEligibleWorkDedupeInfo,
+  NexusEligibleWorkExcludedItem,
   NexusEligibleWorkItem,
   NexusEligibleWorkMode,
   NexusEligibleWorkTrackerQueryResult,
@@ -55,6 +56,20 @@ export interface NexusEligibleWorkItemSummary {
   importOnly: boolean;
 }
 
+export interface NexusExcludedWorkItemSummary {
+  componentId: string;
+  id: string;
+  title: string;
+  status: WorkItem["status"];
+  labels: string[];
+  assignees: string[];
+  milestone: string | null;
+  updatedAt: string | null;
+  webUrl: string | null;
+  sourceTrackerRef: WorkTrackerRef | null;
+  reasons: string[];
+}
+
 export interface NexusEligibleWorkComponentSummary {
   componentId: string;
   componentName: string;
@@ -65,6 +80,8 @@ export interface NexusEligibleWorkComponentSummary {
   workTrackers: NexusAutomationWorkTrackerSummary[];
   workItems: NexusEligibleWorkItemSummary[];
   importCandidateWorkItems: NexusEligibleWorkItemSummary[];
+  excludedWorkItemCount: number;
+  excludedWorkItems: NexusExcludedWorkItemSummary[];
   staleInProgressWorkItems: NexusEligibleWorkItemSummary[];
   warnings: string[];
   blockers: string[];
@@ -80,6 +97,7 @@ export interface NexusEligibleWorkSummary {
   selector: NexusAutomationConfig["selector"] | null;
   eligibleWorkItemCount: number;
   importCandidateWorkItemCount: number;
+  excludedWorkItemCount: number;
   staleInProgressWorkItemCount: number;
   warnings: string[];
   blockers: string[];
@@ -134,6 +152,8 @@ export async function getNexusEligibleWorkSummary(
         : [],
       workItems: [],
       importCandidateWorkItems: [],
+      excludedWorkItemCount: 0,
+      excludedWorkItems: [],
       staleInProgressWorkItems: [],
       warnings: [],
       blockers: [],
@@ -156,6 +176,11 @@ export async function getNexusEligibleWorkSummary(
     summary.importCandidateWorkItems.push(
       ...(component.importCandidateWorkItems ?? []).map((item) =>
         summarizeEligibleWorkItem(component.componentId, item),
+      ),
+    );
+    summary.excludedWorkItems.push(
+      ...(component.excludedWorkItems ?? []).map((item) =>
+        summarizeExcludedWorkItem(component.componentId, item),
       ),
     );
     summary.warnings.push(...(component.warnings ?? []));
@@ -193,10 +218,15 @@ export async function getNexusEligibleWorkSummary(
     });
   }
 
+  for (const component of summariesByComponent.values()) {
+    component.excludedWorkItemCount = countExcludedWorkItems(component);
+  }
+
   const components = [...summariesByComponent.values()].filter(
     (component) =>
       component.workItems.length > 0 ||
       component.importCandidateWorkItems.length > 0 ||
+      component.excludedWorkItemCount > 0 ||
       component.staleInProgressWorkItems.length > 0 ||
       component.warnings.length > 0 ||
       component.blockers.length > 0,
@@ -218,6 +248,10 @@ export async function getNexusEligibleWorkSummary(
     ),
     importCandidateWorkItemCount: components.reduce(
       (total, component) => total + component.importCandidateWorkItems.length,
+      0,
+    ),
+    excludedWorkItemCount: components.reduce(
+      (total, component) => total + component.excludedWorkItemCount,
       0,
     ),
     staleInProgressWorkItemCount: components.reduce(
@@ -247,6 +281,10 @@ function emptyEligibleComponent(
   return (
     component.workItems.length === 0 &&
     (component.importCandidateWorkItems ?? []).length === 0 &&
+    (component.excludedWorkItems ?? []).length === 0 &&
+    (component.trackerResults ?? []).every(
+      (tracker) => tracker.excludedCount === 0,
+    ) &&
     (component.warnings ?? []).length === 0 &&
     (component.blockers ?? []).length === 0
   );
@@ -280,4 +318,37 @@ function summarizeEligibleWorkItem(
     selectable: eligible.selectable ?? true,
     importOnly: eligible.importOnly ?? false,
   };
+}
+
+function summarizeExcludedWorkItem(
+  componentId: string,
+  item: NexusEligibleWorkExcludedItem,
+): NexusExcludedWorkItemSummary {
+  return {
+    componentId,
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    labels: [...(item.labels ?? [])],
+    assignees: [...(item.assignees ?? [])],
+    milestone: item.milestone ?? null,
+    updatedAt: item.updatedAt ?? null,
+    webUrl: item.webUrl ?? item.externalRef?.webUrl ?? null,
+    sourceTrackerRef: item.sourceTrackerRef,
+    reasons: [...item.reasons],
+  };
+}
+
+function countExcludedWorkItems(
+  component: NexusEligibleWorkComponentSummary,
+): number {
+  const visibleExcludedCount = component.trackerResults.reduce(
+    (total, tracker) => total + tracker.excludedCount,
+    0,
+  );
+  const finalLimitExcludedCount = component.excludedWorkItems.filter((item) =>
+    item.reasons.includes("final limit reached"),
+  ).length;
+
+  return visibleExcludedCount + finalLimitExcludedCount;
 }

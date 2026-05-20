@@ -260,6 +260,10 @@ whether non-default tracker items are directly selectable or import-only. Keep
 the default mode for projects that want automation to read only the component
 default tracker.
 
+`automation eligible-work --discovery` also reports bounded examples of visible
+items excluded by the selector or tracker-discovery policy, including status,
+label, assignee, milestone, search, excluded-label, and final-limit reasons.
+
 When an agent is assigned a canonical local item:
 
 - Update status and progress comments on the default tracker.

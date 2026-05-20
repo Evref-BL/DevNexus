@@ -8150,6 +8150,9 @@ function printAutomationEligibleWorkResult(
       `  Import candidates: ${result.importCandidateWorkItemCount}`,
     );
   }
+  if (result.excludedWorkItemCount > 0) {
+    writeLine(stdout, `  Visible excluded: ${result.excludedWorkItemCount}`);
+  }
   if (result.staleInProgressWorkItemCount > 0) {
     writeLine(
       stdout,
@@ -8169,9 +8172,20 @@ function printAutomationEligibleWorkResult(
     writeLine(stdout, `  Selector: ${formatAutomationSelector(result.selector)}`);
   }
   for (const component of result.components) {
+    const counts = [
+      component.importCandidateWorkItems.length > 0
+        ? `import ${component.importCandidateWorkItems.length}`
+        : null,
+      component.excludedWorkItemCount > 0
+        ? `excluded ${component.excludedWorkItemCount}`
+        : null,
+      component.staleInProgressWorkItems.length > 0
+        ? `stale ${component.staleInProgressWorkItems.length}`
+        : null,
+    ].filter((count) => count !== null);
     writeLine(
       stdout,
-      `  ${component.componentId} (${component.componentName}): ${component.workItems.length}`,
+      `  ${component.componentId} (${component.componentName}): ${component.workItems.length}${counts.length > 0 ? ` (${counts.join(", ")})` : ""}`,
     );
     for (const item of component.workItems) {
       writeLine(stdout, `    ${item.id} [${item.status}] ${item.title}`);
@@ -8182,6 +8196,21 @@ function printAutomationEligibleWorkResult(
         `    ${item.id} [${item.status}] import-only ${item.title}`,
       );
     }
+    for (const tracker of component.trackerResults) {
+      if (tracker.excludedCount === 0) {
+        continue;
+      }
+      writeLine(
+        stdout,
+        `    tracker ${tracker.trackerId}: excluded ${tracker.excludedCount}${formatExclusionReasonCounts(tracker.exclusionReasonCounts)}`,
+      );
+    }
+    for (const item of component.excludedWorkItems) {
+      writeLine(
+        stdout,
+        `    ${item.id} [${item.status}] excluded ${item.title} (${item.reasons.join("; ")})`,
+      );
+    }
     for (const item of component.staleInProgressWorkItems) {
       writeLine(
         stdout,
@@ -8189,6 +8218,20 @@ function printAutomationEligibleWorkResult(
       );
     }
   }
+}
+
+function formatExclusionReasonCounts(
+  reasonCounts: Record<string, number>,
+): string {
+  const entries = Object.entries(reasonCounts);
+  if (entries.length === 0) {
+    return "";
+  }
+
+  return ` (${entries
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([reason, count]) => `${reason}: ${count}`)
+    .join(", ")})`;
 }
 
 function printExternalIssueVisibilitySummary(
