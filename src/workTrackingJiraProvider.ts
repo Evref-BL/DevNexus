@@ -11,6 +11,7 @@ import type {
   WorkItemQuery,
   WorkItemRef,
   WorkStatus,
+  WorkStatusQuery,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
 
@@ -719,7 +720,7 @@ function issueKeyFromRef(ref: WorkItemRef): string {
 }
 
 function normalizeStatusFilter(
-  status: WorkStatus | WorkStatus[] | undefined,
+  status: WorkStatusQuery | WorkStatusQuery[] | undefined,
 ): Set<WorkStatus> | undefined {
   if (status === undefined) {
     return undefined;
@@ -895,9 +896,11 @@ function dedupeStrings(values: string[]): string[] {
   return result;
 }
 
-function assertWorkStatus(status: WorkStatus): void {
-  if (!workStatuses.has(status)) {
-    throw new JiraWorkTrackerProviderError(`Invalid work status: ${status}`);
+function assertWorkStatus(status: string): asserts status is WorkStatus {
+  if (!workStatuses.has(status as WorkStatus)) {
+    throw new JiraWorkTrackerProviderError(
+      `Invalid Jira work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`,
+    );
   }
 }
 

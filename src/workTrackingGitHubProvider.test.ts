@@ -334,6 +334,88 @@ describe("GitHub work tracker provider", () => {
     ]);
   });
 
+  it("accepts GitHub-native open and closed status filters when listing", async () => {
+    const openFake = queuedFetch([
+      {
+        body: [
+          issue({
+            number: 1,
+            title: "Unlabeled open task",
+            labels: [],
+          }),
+          issue({
+            number: 2,
+            title: "Ready open task",
+            labels: [{ name: "status:ready" }],
+          }),
+        ],
+      },
+    ]);
+    const openProvider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      fetch: openFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(openProvider.listWorkItems({ status: "open" })).resolves.toMatchObject([
+      {
+        id: "github-1",
+        status: "todo",
+      },
+      {
+        id: "github-2",
+        status: "ready",
+      },
+    ]);
+    expect(openFake.calls[0]?.url).toBe(
+      "https://api.github.com/repos/example/project/issues?state=open&per_page=100&page=1",
+    );
+
+    const closedFake = queuedFetch([
+      {
+        body: [
+          issue({
+            number: 3,
+            title: "Completed task",
+            state: "closed",
+            state_reason: "completed",
+            closed_at: "2026-05-15T10:10:00Z",
+          }),
+          issue({
+            number: 4,
+            title: "Not planned task",
+            state: "closed",
+            state_reason: "not_planned",
+            closed_at: "2026-05-15T10:11:00Z",
+          }),
+        ],
+      },
+    ]);
+    const closedProvider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      fetch: closedFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(
+      closedProvider.listWorkItems({ status: "closed" }),
+    ).resolves.toMatchObject([
+      {
+        id: "github-3",
+        status: "done",
+      },
+      {
+        id: "github-4",
+        status: "wont_do",
+      },
+    ]);
+    expect(closedFake.calls[0]?.url).toBe(
+      "https://api.github.com/repos/example/project/issues?state=closed&per_page=100&page=1",
+    );
+  });
+
   it("updates status without dropping existing non-status labels", async () => {
     const fake = queuedFetch([
       {

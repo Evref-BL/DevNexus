@@ -323,6 +323,7 @@ import type {
   WorkItem,
   WorkItemPatch,
   WorkStatus,
+  WorkStatusQuery,
 } from "./workTrackingTypes.js";
 
 interface TextWriter {
@@ -514,7 +515,7 @@ interface ParsedWorkItemListCommand {
   projectRoot: string;
   componentId?: string;
   trackerId?: string;
-  statuses: WorkStatus[];
+  statuses: WorkStatusQuery[];
   labels: string[];
   assignees: string[];
   search?: string;
@@ -1229,7 +1230,7 @@ export function usage(): string {
     "Options for work-item list:",
     "  --component <id>          defaults to the primary component",
     "  --tracker <id>            defaults to the component default tracker",
-    "  --status <todo|ready|in_progress|blocked|done|wont_do>  repeatable",
+    "  --status <todo|ready|in_progress|blocked|done|wont_do|open|closed>  repeatable",
     "  --label <label>            repeatable",
     "  --assignee <assignee>      repeatable",
     "  --search <text>",
@@ -5199,7 +5200,7 @@ function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
         parsed.trackerId = next();
         break;
       case "--status":
-        parsed.statuses.push(parseWorkStatus(next(), arg));
+        parsed.statuses.push(parseWorkStatusQuery(next(), arg));
         break;
       case "--label":
         parsed.labels.push(next());
@@ -9306,7 +9307,13 @@ function parseGitRemoteVerboseOutput(
   return [...remotes.entries()].map(([name, url]) => ({ name, url }));
 }
 
-function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefined {
+function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefined;
+function statusQuery(
+  statuses: WorkStatusQuery[],
+): WorkStatusQuery | WorkStatusQuery[] | undefined;
+function statusQuery(
+  statuses: WorkStatusQuery[],
+): WorkStatusQuery | WorkStatusQuery[] | undefined {
   if (statuses.length === 0) {
     return undefined;
   }
@@ -9462,6 +9469,14 @@ function parseWorkStatus(value: string, optionName: string): WorkStatus {
   }
 
   throw new Error(`${optionName} must be a valid work status`);
+}
+
+function parseWorkStatusQuery(value: string, optionName: string): WorkStatusQuery {
+  if (value === "open" || value === "closed") {
+    return value;
+  }
+
+  return parseWorkStatus(value, optionName);
 }
 
 function parseRemoteExecutionRequestStatus(

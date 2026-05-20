@@ -141,6 +141,9 @@ describe("local work tracker provider", () => {
     });
 
     await expect(provider.listWorkItems({ status: "in_progress" })).resolves.toHaveLength(1);
+    await expect(provider.listWorkItems({ status: "open" })).rejects.toThrow(
+      /Invalid local work status: open/,
+    );
     await expect(
       provider.listWorkItems({
         labels: ["bug"],
