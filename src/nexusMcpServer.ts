@@ -3854,6 +3854,7 @@ export function summarizeCoordinationStatus(status: NexusCoordinationStatus) {
     },
     handoffs: {
       available: status.handoffs.available,
+      capability: status.handoffs.capability,
       tracker: status.handoffs.tracker,
       trackerId: status.handoffs.trackerId,
       provider: status.handoffs.provider,

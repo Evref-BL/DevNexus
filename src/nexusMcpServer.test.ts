@@ -1758,6 +1758,92 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("reports provider-backed coordination handoffs as incomplete through MCP tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-179");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot,
+            worktreesRoot: "worktrees/primary",
+            defaultWorkTrackerId: "local",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["coordination"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const status = toolJson(
+      await callDevNexusMcpTool(
+        "coordination_status",
+        {
+          projectRoot,
+          trackerRole: "coordination",
+          currentPath: worktreePath,
+        },
+        {
+          now: fixedClock("2026-05-18T08:15:00.000Z"),
+          gitRunner: fakeGitRunner(worktreePath),
+        },
+      ),
+    );
+
+    expect(status).toMatchObject({
+      ok: true,
+      status: {
+        handoffs: {
+          available: false,
+          capability: {
+            read: false,
+            write: false,
+          },
+          diagnostics: [
+            {
+              kind: "coordination_provider_capability_unavailable",
+              capability: "read_handoffs",
+            },
+          ],
+        },
+        nextAction: expect.stringContaining("Use a local coordination tracker"),
+      },
+    });
+  });
+
   it("records coordination requests through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-17");

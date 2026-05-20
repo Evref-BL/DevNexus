@@ -2992,6 +2992,115 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("reports provider-backed coordination handoffs as incomplete through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-179");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot,
+            worktreesRoot: "worktrees/primary",
+            defaultWorkTrackerId: "local",
+            workTrackers: [
+              {
+                id: "local",
+                name: "Local",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "local",
+                },
+              },
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["coordination"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const jsonOutput = captureOutput();
+    const textOutput = captureOutput();
+
+    await main(
+      [
+        "coordination",
+        "status",
+        projectRoot,
+        "--tracker-role",
+        "coordination",
+        "--worktree",
+        worktreePath,
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+        gitRunner: fakeCoordinationIntegrationGitRunner(worktreePath),
+        now: fixedClock("2026-05-18T08:15:00.000Z"),
+      },
+    );
+    await main(
+      [
+        "coordination",
+        "status",
+        projectRoot,
+        "--tracker-role",
+        "coordination",
+        "--worktree",
+        worktreePath,
+      ],
+      {
+        stdout: textOutput.writer,
+        gitRunner: fakeCoordinationIntegrationGitRunner(worktreePath),
+        now: fixedClock("2026-05-18T08:15:00.000Z"),
+      },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      status: {
+        handoffs: {
+          available: false,
+          capability: {
+            read: false,
+            write: false,
+          },
+          diagnostics: [
+            {
+              kind: "coordination_provider_capability_unavailable",
+              capability: "read_handoffs",
+            },
+          ],
+        },
+        nextAction: expect.stringContaining("Use a local coordination tracker"),
+      },
+    });
+    expect(textOutput.output()).toContain("Handoff storage: incomplete");
+    expect(textOutput.output()).toContain("Use a local coordination tracker");
+  });
+
   it("records coordination requests through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     const worktreePath = path.join(projectRoot, "worktrees", "primary", "local-17");

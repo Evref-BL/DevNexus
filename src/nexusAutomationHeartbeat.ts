@@ -159,7 +159,7 @@ function renderNexusAutomationHeartbeatPrompt(
     "- Select the largest safe bounded batch of eligible work you can actually finish, respecting component ownership, safety policy, publication policy, and maxConcurrentSubagents.",
     "- Prepare isolated DevNexus worktrees before source edits and keep each worker or local task inside its assigned component/worktree boundary.",
     "- Use subagents when independent work can safely run in parallel; give each subagent explicit component, worktree, write-scope, and verification ownership.",
-    "- Advance selected work through the owning tracker with status updates, concise comments, blockers, and coordination handoffs.",
+    "- Advance selected work through the owning tracker with status updates, concise comments, and blockers. Use coordination handoffs only when DevNexus reports the configured coordination tracker can read and write handoff records; otherwise rely on worktree leases and ordinary work-item comments.",
     "- Record target-cycle facts through DevNexus for selected, dispatched, in-progress, completed, blocked, failed, or skipped work.",
     "- Run focused verification first, then broader relevant checks when feasible, and publish only through the configured automation authority and publication policy.",
     "- After direct integration or merge, fetch/prune, confirm work branches are ancestors of the target branch, remove disposable worktrees, and delete merged local and remote review branches; hand off dirty or ambiguous branches instead of deleting.",

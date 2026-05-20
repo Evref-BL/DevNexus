@@ -77,8 +77,12 @@ commands:
 | `archive` | Read-mostly historical tracker. |
 
 A tracker can have more than one role only when the component config says so.
-For example, a GitHub tracker can be both `mirror` and `coordination`, but a
-mirror role alone does not make it the coordination target.
+For example, a tracker can be both `mirror` and `coordination`, but a mirror
+role alone does not make it the coordination target. Today, durable DevNexus
+handoff records are read back only from local tracker stores; provider-native
+trackers such as GitHub can still be used for ordinary work-item comments, but
+DevNexus marks provider-backed coordination handoff storage as incomplete until
+provider comment reads are implemented.
 
 ## Default Tracker Behavior
 

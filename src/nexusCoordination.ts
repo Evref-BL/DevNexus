@@ -153,12 +153,20 @@ export interface NexusCoordinationHandoffSummary
 
 export interface NexusCoordinationHandoffCollection {
   available: boolean;
+  capability: NexusCoordinationHandoffCapability;
   tracker: NexusCoordinationTrackerSummary | null;
   trackerId: string | null;
   provider: string | null;
   records: NexusCoordinationHandoffSummary[];
   diagnostics: NexusCoordinationDiagnostic[];
   warnings: string[];
+}
+
+export interface NexusCoordinationHandoffCapability {
+  read: boolean;
+  write: boolean;
+  reason: string | null;
+  recovery: string | null;
 }
 
 export type NexusCoordinationDiagnosticSeverity = "error" | "warning";
@@ -191,9 +199,17 @@ export interface NexusCoordinationHandoffCommentDiagnostic
   severity: "warning";
 }
 
+export interface NexusCoordinationProviderCapabilityDiagnostic
+  extends NexusCoordinationDiagnosticBase {
+  kind: "coordination_provider_capability_unavailable";
+  severity: "warning" | "error";
+  capability: "read_handoffs" | "write_handoffs";
+}
+
 export type NexusCoordinationDiagnostic =
   | NexusCoordinationTrackerReadDiagnostic
-  | NexusCoordinationHandoffCommentDiagnostic;
+  | NexusCoordinationHandoffCommentDiagnostic
+  | NexusCoordinationProviderCapabilityDiagnostic;
 
 export class NexusCoordinationTrackerReadError extends Error {
   readonly diagnostic: NexusCoordinationTrackerReadDiagnostic;
@@ -209,6 +225,19 @@ export class NexusCoordinationTrackerReadError extends Error {
     if (options.cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = options.cause;
     }
+  }
+}
+
+export class NexusCoordinationProviderCapabilityError extends Error {
+  readonly diagnostic: NexusCoordinationProviderCapabilityDiagnostic;
+
+  constructor(
+    message: string,
+    diagnostic: NexusCoordinationProviderCapabilityDiagnostic,
+  ) {
+    super(message);
+    this.name = "NexusCoordinationProviderCapabilityError";
+    this.diagnostic = diagnostic;
   }
 }
 
@@ -293,6 +322,7 @@ export interface NexusCoordinationIntegrationPlan {
   fetch: NexusCoordinationIntegrationFetchPlan;
   handoffs: {
     available: boolean;
+    capability: NexusCoordinationHandoffCapability;
     tracker: NexusCoordinationTrackerSummary | null;
     trackerId: string | null;
     provider: string | null;
@@ -458,7 +488,7 @@ export async function getNexusCoordinationStatus(
     authority: coordinationAuthoritySummary(context),
     leases,
     handoffs,
-    nextAction: coordinationNextAction(git),
+    nextAction: coordinationNextAction(git, handoffs),
     blocking: false,
     warnings,
   };
@@ -475,6 +505,10 @@ export async function createNexusCoordinationHandoff(
   });
   const status = parseNexusCoordinationHandoffStatus(options.status, "status");
   const git = getCoordinationGitStatus(context, options.gitRunner);
+  assertCoordinationHandoffWriteCapability({
+    context,
+    tracker: coordinationTracker,
+  });
   const timestamp = currentTimestamp(options.now);
   const logicalItemId = requiredNonEmptyString(
     context.workItemId ?? options.workItemId,
@@ -725,6 +759,7 @@ export async function getNexusCoordinationIntegrationPlan(
     fetch,
     handoffs: {
       available: handoffCollection.available,
+      capability: handoffCollection.capability,
       tracker: handoffCollection.tracker,
       trackerId: handoffCollection.trackerId,
       provider: handoffCollection.provider,
@@ -741,7 +776,11 @@ export async function getNexusCoordinationIntegrationPlan(
     branches,
     decisionConflicts,
     suggestedOrder,
-    nextAction: integrationNextAction(branches, decisionConflicts),
+    nextAction: integrationNextAction(
+      branches,
+      decisionConflicts,
+      handoffCollection,
+    ),
     warnings,
     mutatesSource: false,
   };
@@ -762,6 +801,9 @@ export function nexusCoordinationDiagnosticsFromError(
   error: unknown,
 ): NexusCoordinationDiagnostic[] {
   if (error instanceof NexusCoordinationTrackerReadError) {
+    return [error.diagnostic];
+  }
+  if (error instanceof NexusCoordinationProviderCapabilityError) {
     return [error.diagnostic];
   }
 
@@ -1854,7 +1896,14 @@ function suggestMergeOrder(options: {
 function integrationNextAction(
   branches: NexusCoordinationIntegrationBranchPlan[],
   decisionConflicts: NexusCoordinationDecisionConflict[],
+  handoffs: NexusCoordinationHandoffCollection,
 ): string {
+  if (!handoffs.available) {
+    return (
+      handoffs.capability.recovery ??
+      "Coordination handoffs are unavailable; use a local coordination tracker or inspect worktree leases directly."
+    );
+  }
   if (decisionConflicts.length > 0) {
     return "Resolve competing handoff decisions before choosing merge order.";
   }
@@ -1974,6 +2023,88 @@ function parseAheadBehind(
   return { ahead, behind };
 }
 
+function coordinationHandoffCapability(
+  tracker: ResolvedCoordinationTracker,
+): NexusCoordinationHandoffCapability {
+  const provider = tracker.tracker.workTracking.provider;
+  if (provider === "local") {
+    return {
+      read: true,
+      write: true,
+      reason: null,
+      recovery: null,
+    };
+  }
+
+  return {
+    read: false,
+    write: false,
+    reason:
+      `Provider-backed coordination is incomplete for tracker "${tracker.tracker.id}" ` +
+      `provider "${provider}": DevNexus can add provider comments but cannot read ` +
+      "provider comments back through the work-tracker interface.",
+    recovery:
+      "Use a local coordination tracker for durable handoffs, or rely on worktree leases and ordinary provider work-item comments until provider comment reads are implemented.",
+  };
+}
+
+function assertCoordinationHandoffWriteCapability(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+}): void {
+  const capability = coordinationHandoffCapability(options.tracker);
+  if (capability.write) {
+    return;
+  }
+
+  const diagnostic = coordinationProviderCapabilityDiagnostic({
+    context: options.context,
+    tracker: options.tracker,
+    severity: "error",
+    capability: "write_handoffs",
+    operation: "createCoordinationHandoff",
+    stage: "provider_handoff_write_disabled",
+  });
+  throw new NexusCoordinationProviderCapabilityError(
+    diagnostic.message,
+    diagnostic,
+  );
+}
+
+function coordinationProviderCapabilityDiagnostic(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+  severity: NexusCoordinationDiagnosticSeverity;
+  capability: NexusCoordinationProviderCapabilityDiagnostic["capability"];
+  operation: string;
+  stage: string;
+}): NexusCoordinationProviderCapabilityDiagnostic {
+  const capability = coordinationHandoffCapability(options.tracker);
+  const provider = options.tracker.tracker.workTracking.provider;
+  const message =
+    capability.reason ??
+    `Coordination handoff capability ${options.capability} is unavailable for ` +
+      `tracker "${options.tracker.tracker.id}" provider "${provider}".`;
+  return {
+    kind: "coordination_provider_capability_unavailable",
+    severity: options.severity,
+    componentId: options.context.component.id,
+    trackerId: options.tracker.tracker.id,
+    provider,
+    storePath: null,
+    operation: options.operation,
+    stage: options.stage,
+    workItemId: options.context.workItemId ?? null,
+    commentId: null,
+    recovery:
+      capability.recovery ??
+      "Use a local coordination tracker for durable handoffs.",
+    cause: `missing ${options.capability}`,
+    message,
+    capability: options.capability,
+  };
+}
+
 function readCoordinationHandoffs(options: {
   context: ResolvedCoordinationContext;
   tracker: ResolvedCoordinationTracker;
@@ -1984,22 +2115,31 @@ function readCoordinationHandoffs(options: {
   maxHandoffAgeMs: number;
 }): NexusCoordinationHandoffCollection {
   const provider = options.tracker.tracker.workTracking.provider;
+  const capability = coordinationHandoffCapability(options.tracker);
   if (provider !== "local") {
+    const diagnostic = coordinationProviderCapabilityDiagnostic({
+      context: options.context,
+      tracker: options.tracker,
+      severity: "warning",
+      capability: "read_handoffs",
+      operation: "readCoordinationHandoffs",
+      stage: "provider_comment_read_unavailable",
+    });
     return {
       available: false,
+      capability,
       tracker: options.tracker.summary,
       trackerId: options.tracker.tracker.id,
       provider,
       records: [],
-      diagnostics: [],
-      warnings: [
-        `Related handoffs cannot be read from tracker "${options.tracker.tracker.id}" provider "${provider}" because DevNexus core does not expose provider comment reads for coordination records.`,
-      ],
+      diagnostics: [diagnostic],
+      warnings: [diagnostic.message],
     };
   }
   if (options.logicalItemId && options.missingTargetWarning) {
     return {
       available: true,
+      capability,
       tracker: options.tracker.summary,
       trackerId: options.tracker.tracker.id,
       provider,
@@ -2078,6 +2218,7 @@ function readCoordinationHandoffs(options: {
 
   return {
     available: true,
+    capability,
     tracker: options.tracker.summary,
     trackerId: options.tracker.tracker.id,
     provider,
@@ -2347,7 +2488,16 @@ function handoffRecordFromUnknown(
   };
 }
 
-function coordinationNextAction(git: NexusCoordinationGitStatus): string {
+function coordinationNextAction(
+  git: NexusCoordinationGitStatus,
+  handoffs: NexusCoordinationHandoffCollection,
+): string {
+  if (!handoffs.available) {
+    return (
+      handoffs.capability.recovery ??
+      "Coordination handoffs are unavailable; use a local coordination tracker or inspect worktree leases directly."
+    );
+  }
   if (!git.repositoryPath) {
     return "Open the component source or a git worktree before integration.";
   }
