@@ -321,6 +321,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
+    expect(output.output()).toContain("dev-nexus publication green-main plan");
     expect(output.output()).toContain("dev-nexus quick-fix plan");
     expect(output.output()).toContain("dev-nexus quick-fix start");
     expect(output.output()).toContain("dev-nexus quick-fix finish");
@@ -529,6 +530,150 @@ describe("dev-nexus cli", () => {
         mergeCommit: "abc123",
         verification: "npm run check passed",
         cleanupActions: ["removed disposable worktree"],
+      },
+    });
+  });
+
+  it("prints a green-main publication plan from mocked PR checks", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    const checksFile = path.join(projectRoot, "checks.json");
+    fs.writeFileSync(
+      checksFile,
+      JSON.stringify(
+        {
+          checks: [
+            {
+              name: "Node 24 check (ubuntu-latest)",
+              bucket: "pass",
+            },
+            {
+              name: "Node 24 check (windows-latest)",
+              bucket: "fail",
+              link: "https://github.com/example/demo/actions/runs/1002/job/2",
+              failure: {
+                step: "Run npm test",
+                test: "green-main publication plan",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                name: "GitHub Issues",
+                enabled: true,
+                roles: ["primary", "eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            verification: {
+              focusedCommands: [],
+              fullCommands: [],
+              requirePassing: true,
+            },
+            publication: {
+              ...defaultNexusAutomationConfig.publication,
+              strategy: "green_main",
+              remote: "bot",
+              targetBranch: "main",
+              commandEnvironment: {
+                GH_CONFIG_DIR: "home:.config/gh-automation-github",
+              },
+              greenMain: {
+                integrationPreference: "pull_request",
+                directTargetPush: "blocked",
+                mergeAuthority: "authorized_merge",
+                requiredChecks: [
+                  "Node 24 check (ubuntu-latest)",
+                  "Node 24 check (windows-latest)",
+                ],
+                staleChecks: "block",
+              },
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const output = captureOutput();
+    await main(
+      [
+        "publication",
+        "green-main",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--pr",
+        "12",
+        "--checks-file",
+        checksFile,
+      ],
+      { stdout: output.writer },
+    );
+
+    expect(output.output()).toContain("DevNexus green-main publication plan.");
+    expect(output.output()).toContain("Pull request: example/demo#12");
+    expect(output.output()).toContain("Status: failed");
+    expect(output.output()).toContain("Merge: blocked");
+    expect(output.output()).toContain("Node 24 check (windows-latest):");
+    expect(output.output()).toContain("Step: Run npm test");
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "green-main",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--pr",
+        "12",
+        "--checks-file",
+        checksFile,
+        "--allow-rerun",
+        "--rerun-reason",
+        "transient hosted runner failure",
+        "--json",
+      ],
+      { stdout: jsonOutput.writer },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      pullRequest: {
+        repository: "example/demo",
+        number: 12,
+      },
+      status: "failed",
+      rerun: {
+        decision: "rerun_once",
       },
     });
   });

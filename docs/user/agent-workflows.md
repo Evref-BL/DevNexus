@@ -131,6 +131,19 @@ dev-nexus quick-fix start <project-root> --component core --work-item github-50
 dev-nexus quick-fix finish <project-root> --component core --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
 ```
 
+For green-main publication, save provider check data and let DevNexus classify
+the PR before any merge attempt:
+
+```bash
+gh pr checks <pr-number> --repo <owner/repo> --required --json name,state,bucket,conclusion,link,workflow > checks.json
+dev-nexus publication green-main plan <project-root> --component core --pr <pr-number> --checks-file checks.json
+```
+
+The plan reports required-check state, failed job names, platform labels,
+available failing step or test details, merge refusal reasons, and the exact
+merge or rerun command only when policy allows it. Unknown failures stay manual
+investigation items.
+
 Prepared worktrees carry ownership metadata: component id, source root,
 generated path, branch, base ref, and owning work item. The generated path must
 resolve inside the component worktrees root.
