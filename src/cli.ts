@@ -7119,6 +7119,12 @@ function printCoordinationStatusResult(
   );
   writeLine(stdout, `  Active leases: ${status.leases.activeCount}`);
   writeLine(stdout, `  Handoffs: ${status.handoffs.records.length}`);
+  if (!status.handoffs.available) {
+    writeLine(stdout, "  Handoff storage: incomplete");
+    if (status.handoffs.capability.reason) {
+      writeLine(stdout, `  Handoff blocker: ${status.handoffs.capability.reason}`);
+    }
+  }
   writeLine(stdout, `  Next action: ${status.nextAction}`);
 }
 
@@ -7179,6 +7185,12 @@ function printCoordinationIntegrationPlan(
       stdout,
       `  Coordination tracker: ${plan.handoffs.tracker.trackerId} (${plan.handoffs.tracker.provider})`,
     );
+  }
+  if (!plan.handoffs.available) {
+    writeLine(stdout, "  Handoff storage: incomplete");
+    if (plan.handoffs.capability.reason) {
+      writeLine(stdout, `  Handoff blocker: ${plan.handoffs.capability.reason}`);
+    }
   }
   printAuthorityComponentSummary(plan.authority, stdout);
   writeLine(stdout, `  Handoff branches: ${plan.branches.length}`);
