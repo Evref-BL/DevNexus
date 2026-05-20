@@ -1,7 +1,117 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T06:16:30.000Z",
+  "updatedAt": "2026-05-20T06:52:00.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-9720e9ef3ebc1eac",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "github-14",
+      "branchName": "codex/dogfood/github-14-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dogfood-github-14-closeout"
+      },
+      "writeScope": [
+        "PLAN.md",
+        "CONTEXT.md",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/worktree-leases.json",
+        ".dev-nexus/coordination/**"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T06:48:14.460Z",
+      "lastSeenAt": "2026-05-20T06:48:14.460Z",
+      "updatedAt": "2026-05-20T06:48:14.460Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "392b0ddd2d98ab6874529fa928adad96536d3539",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dogfood-github-14-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Project-meta closeout for DevNexus source PR #23 / GitHub #14.",
+        "Record target-cycle and handoff facts; keep source changes in dev-nexus component history."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3fb936afe36bae67",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "github-14",
+      "branchName": "codex/dev-nexus/github-14-reconcile-pending-placeholders",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-14-reconcile-pending-placeholders"
+      },
+      "writeScope": [
+        "src/nexusAutomationTargetReport.ts",
+        "src/nexusAutomationTargetReport.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T06:35:29.441Z",
+      "lastSeenAt": "2026-05-20T06:52:00.000Z",
+      "updatedAt": "2026-05-20T06:52:00.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "a6be5a8c2fa96f5d18ffd8392a4a38fc40086dc6",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-14-reconcile-pending-placeholders"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Manual quick dogfood pass for Evref-BL/DevNexus#14.",
+        "Source PR #23 merged as e81c41e; remote branch deleted after merge.",
+        "Post-merge npm run check passed in C:/dev/code/sources/dev-nexus."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

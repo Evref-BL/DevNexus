@@ -162,6 +162,15 @@ and ready for coordinator-driven work across its components.
   trusting stale status/report output. Verification passed locally, in PR #22
   Node 24 checks on Ubuntu/Windows/macOS, and after merge in the shared
   DevNexus checkout.
+- Provider-native issue Evref-BL/DevNexus#14 is complete through DevNexus PR
+  #23 as merge commit `e81c41e`, fixing target-report work-item summaries for
+  historical duplicate target-cycle records. Work-item progress now uses the
+  latest record for each cycle id, so superseded `pending` placeholders from an
+  earlier started record no longer appear as stale in-progress work in
+  `target_report` or `eligible_work`. Verification passed locally, in PR #23
+  Node 24 checks on Ubuntu/macOS/Windows after rerunning an unrelated transient
+  Windows `processSupervisor` timeout, and after merge in the shared DevNexus
+  checkout.
 - `dev-nexus:local-165` is complete for version-scoped planning issue slicing.
   It created `dev-nexus:local-167` through `local-171` in dependency order:
   version config, scope resolution, readiness reporting, agent/report exposure,

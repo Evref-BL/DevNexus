@@ -76,6 +76,9 @@ target-cycle facts, commits, and the target report.
   progress bucket when only stale historical cycle facts marked them eligible.
   Provider issue Evref-BL/DevNexus#4 is complete through PR #22 for detecting
   source-newer-than-process DevNexus MCP runtimes in status/report surfaces.
+  Provider issue Evref-BL/DevNexus#14 is complete through PR #23 for ignoring
+  superseded `pending` placeholders from duplicate target-cycle records in
+  target-report and eligible-work progress summaries.
   Version-scoped planning follow-up from
   `docs/version-scoped-planning-prd.md` has been sliced by
   `dev-nexus:local-165`; `dev-nexus:local-167` through `local-171` are
