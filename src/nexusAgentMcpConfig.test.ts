@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  currentNexusCliScriptPath,
   materializeNexusProjectAgentMcpConfig,
 } from "./nexusAgentMcpConfig.js";
 
@@ -61,8 +62,8 @@ describe("nexus agent MCP config", () => {
       {
         agent: "codex",
         serverName: "dev_nexus",
-        command: "dev-nexus",
-        args: ["mcp-stdio"],
+        command: "node",
+        args: [currentNexusCliScriptPath(), "mcp-stdio"],
         sourceControl: "support",
         configPath: codexConfigPath,
         provider: "codex",
@@ -76,8 +77,8 @@ describe("nexus agent MCP config", () => {
     expect(refreshed).toContain("[tools]");
     expect(refreshed).not.toContain("old-dev-nexus");
     expect(refreshed).toContain("[mcp_servers.dev_nexus]");
-    expect(refreshed).toContain('command = "dev-nexus"');
-    expect(refreshed).toContain('args = ["mcp-stdio"]');
+    expect(refreshed).toContain('command = "node"');
+    expect(refreshed).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-stdio"]`);
     expect(refreshed).toContain('default_tools_approval_mode = "approve"');
     expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
       .toContain(".codex/config.toml");
@@ -150,8 +151,8 @@ describe("nexus agent MCP config", () => {
       command: "other-tool",
     });
     expect(refreshed.mcpServers.dev_nexus).toEqual({
-      command: "dev-nexus",
-      args: ["mcp-stdio"],
+      command: "node",
+      args: [currentNexusCliScriptPath(), "mcp-stdio"],
     });
     expect(fs.existsSync(path.join(projectRoot, ".git", "info", "exclude")))
       .toBe(false);
@@ -212,7 +213,7 @@ describe("nexus agent MCP config", () => {
     });
     expect(refreshed.mcp.dev_nexus).toEqual({
       type: "local",
-      command: ["dev-nexus", "mcp-stdio"],
+      command: ["node", currentNexusCliScriptPath(), "mcp-stdio"],
       enabled: true,
     });
     expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
@@ -300,13 +301,17 @@ describe("nexus agent MCP config", () => {
       .toBe(false);
   });
 
-  it("uses the Windows cmd shim form for the DevNexus MCP command", () => {
+  it("uses the Windows cmd shim form for an explicitly configured DevNexus command", () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     const codexConfigPath = path.join(projectRoot, ".codex", "config.toml");
 
     const result = materializeNexusProjectAgentMcpConfig({
       projectRoot,
       platform: "win32",
+      mcpConfig: {
+        command: "dev-nexus",
+        args: ["custom-mcp"],
+      },
     });
     const refreshed = fs.readFileSync(codexConfigPath, "utf8");
 
@@ -319,5 +324,28 @@ describe("nexus agent MCP config", () => {
       },
     });
     expect(refreshed).toContain('command = "dev-nexus.cmd"');
+  });
+
+  it("projects a legacy Windows DevNexus MCP command to the active CLI script", () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+
+    const result = materializeNexusProjectAgentMcpConfig({
+      projectRoot,
+      platform: "win32",
+      mcpConfig: {
+        command: "dev-nexus.cmd",
+        args: ["mcp-stdio"],
+      },
+    });
+
+    expect(result.agentTargets[0]).toMatchObject({
+      command: "node",
+      args: [currentNexusCliScriptPath(), "mcp-stdio"],
+      commandResolution: {
+        originalCommand: "node",
+        command: "node",
+        strategy: "unchanged",
+      },
+    });
   });
 });

@@ -26,6 +26,13 @@ older, check for command differences:
 dev-nexus diagnostics cli-version-skew --json
 ```
 
+If you are running from a newer source checkout and need to check whether the
+shell command is stale, run the source CLI and inspect `dev-nexus` on `PATH`:
+
+```bash
+node /path/to/dev-nexus/dist/cli.js diagnostics cli-version-skew --installed-command dev-nexus --json
+```
+
 ## Create The First Workspace
 
 Create or choose the directory you want to use as the DevNexus workspace root.

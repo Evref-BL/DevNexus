@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   createNexusAutomationCommandExecutor,
+  defaultNexusAutomationCommandRunner,
   type NexusAutomationCommandRunner,
 } from "./nexusAutomationCommandExecutor.js";
 import {
@@ -536,6 +537,7 @@ interface ParsedSetupRecordCommand {
 
 interface ParsedDiagnosticsCliVersionSkewCommand {
   installedHelpFile?: string;
+  installedCommand?: string;
   expectedFiles: string[];
   expectedCommands: string[];
   packageVersion?: string | null;
@@ -1169,6 +1171,7 @@ export function usage(): string {
     "",
     "Options for diagnostics cli-version-skew:",
     "  --installed-help-file <path>  help text to inspect; defaults to this CLI help",
+    "  --installed-command <command> command to inspect with --help, such as dev-nexus",
     "  --expected-file <path>        documentation file to scan; repeatable",
     "  --expected-command <command>  documented command to require; repeatable",
     "  --package-version <version>   installed package version to report",
@@ -2177,9 +2180,7 @@ async function handleDiagnosticsCommand(
   if (command === "cli-version-skew") {
     const parsed = parseDiagnosticsCliVersionSkewCommand(argv);
     const diagnostic = buildNexusCliVersionSkewDiagnostic({
-      installedHelpText: parsed.installedHelpFile
-        ? fs.readFileSync(parsed.installedHelpFile, "utf8")
-        : usage(),
+      installedHelpText: resolveDiagnosticsInstalledHelpText(parsed, dependencies),
       expectedCommands: resolveExpectedCliVersionSkewCommands(parsed),
       installedPackageVersion:
         parsed.packageVersion === undefined
@@ -4766,6 +4767,9 @@ function parseDiagnosticsCliVersionSkewCommand(
       case "--installed-help-file":
         parsed.installedHelpFile = next();
         break;
+      case "--installed-command":
+        parsed.installedCommand = next();
+        break;
       case "--expected-file":
         parsed.expectedFiles.push(next());
         break;
@@ -4788,6 +4792,27 @@ function parseDiagnosticsCliVersionSkewCommand(
   }
 
   return parsed;
+}
+
+function resolveDiagnosticsInstalledHelpText(
+  parsed: ParsedDiagnosticsCliVersionSkewCommand,
+  dependencies: DevNexusCliDependencies,
+): string {
+  if (parsed.installedHelpFile) {
+    return fs.readFileSync(parsed.installedHelpFile, "utf8");
+  }
+  if (parsed.installedCommand) {
+    const commandRunner =
+      dependencies.commandRunner ?? defaultNexusAutomationCommandRunner;
+    const result = commandRunner(`${shellQuoteArgument(parsed.installedCommand)} --help`, {
+      cwd: process.cwd(),
+      env: process.env,
+      timeoutMs: 10000,
+    });
+    return [result.stdout, result.stderr].filter((text) => text.length > 0)
+      .join("\n");
+  }
+  return usage();
 }
 
 function parseCoordinationHandoffCommand(

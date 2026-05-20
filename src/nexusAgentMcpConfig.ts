@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import type {
   NexusProjectAgentMcpTarget,
   NexusProjectAgentMcpConfigFormat,
@@ -11,6 +12,7 @@ import type { NexusSkillSourceControl } from "./nexusSkills.js";
 export const defaultNexusMcpServerName = "dev_nexus";
 export const defaultNexusMcpCommand = "dev-nexus";
 export const defaultNexusMcpArgs = ["mcp-stdio"] as const;
+export const defaultProjectedNexusMcpCommand = "node";
 
 export interface MaterializeNexusProjectAgentMcpConfigOptions {
   projectRoot: string;
@@ -113,6 +115,16 @@ export function emptyNexusProjectAgentMcpConfigResult(): MaterializeNexusProject
   };
 }
 
+export function currentNexusCliScriptPath(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(moduleDir, "cli.js"),
+    path.join(moduleDir, "..", "dist", "cli.js"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ??
+    path.join(moduleDir, "cli.js");
+}
+
 export function materializeNexusProjectAgentMcpConfig(
   options: MaterializeNexusProjectAgentMcpConfigOptions,
 ): MaterializeNexusProjectAgentMcpConfigResult {
@@ -174,11 +186,17 @@ function resolveAgentMcpTargets(
         target.serverName ??
         options.mcpConfig?.serverName ??
         defaultNexusMcpServerName;
-      const command =
+      const configuredCommand =
         target.command ?? options.mcpConfig?.command ?? defaultNexusMcpCommand;
-      const args = [
+      const configuredArgs = [
         ...(target.args ?? options.mcpConfig?.args ?? defaultNexusMcpArgs),
       ];
+      const projectedCommandLine = projectNexusMcpCommandLine({
+        command: configuredCommand,
+        args: configuredArgs,
+      });
+      const command = projectedCommandLine.command;
+      const args = projectedCommandLine.args;
       const defaultToolsApprovalMode =
         target.defaultToolsApprovalMode ??
         options.mcpConfig?.defaultToolsApprovalMode;
@@ -267,6 +285,35 @@ function resolveAgentMcpTargets(
         },
       };
     });
+}
+
+function projectNexusMcpCommandLine(commandLine: {
+  command: string;
+  args: readonly string[];
+}): { command: string; args: string[] } {
+  if (!isLegacyDefaultNexusMcpCommandLine(commandLine)) {
+    return {
+      command: commandLine.command,
+      args: [...commandLine.args],
+    };
+  }
+
+  return {
+    command: defaultProjectedNexusMcpCommand,
+    args: [currentNexusCliScriptPath(), ...defaultNexusMcpArgs],
+  };
+}
+
+function isLegacyDefaultNexusMcpCommandLine(commandLine: {
+  command: string;
+  args: readonly string[];
+}): boolean {
+  return (
+    (commandLine.command === defaultNexusMcpCommand ||
+      commandLine.command === `${defaultNexusMcpCommand}.cmd`) &&
+    commandLine.args.length === defaultNexusMcpArgs.length &&
+    defaultNexusMcpArgs.every((arg, index) => commandLine.args[index] === arg)
+  );
 }
 
 const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
