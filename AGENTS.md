@@ -48,6 +48,13 @@ dogfood project. Treat it as the forward plan for new targets. The old control
 handoff remains historical reference, not the primary source for future dogfood
 cycles.
 
+## Document Loading
+
+Use `docs/README.md` as the index for planning documents. Product Requirements
+Documents (PRDs), audits, and onboarding notes are design/history artifacts, not
+default live context. Load them only when the selected work item or current
+question names them directly.
+
 ## Result File Shape
 
 Write a JSON object like:
