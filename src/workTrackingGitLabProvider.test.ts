@@ -200,6 +200,72 @@ describe("GitLab work tracker provider", () => {
     ]);
   });
 
+  it("accepts GitLab open and closed status aliases when listing", async () => {
+    const openFake = queuedFetch([
+      {
+        body: [
+          issue({ iid: 1, title: "Todo task" }),
+          issue({
+            iid: 2,
+            title: "Ready task",
+            labels: ["status:ready"],
+          }),
+        ],
+      },
+    ]);
+    const openProvider = createGitLabWorkTrackerProvider({
+      config: gitLabConfig(),
+      fetch: openFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(openProvider.listWorkItems({ status: "open" })).resolves.toMatchObject([
+      { id: "gitlab-1", status: "todo" },
+      { id: "gitlab-2", status: "ready" },
+    ]);
+    expect(openFake.calls[0]?.url).toBe(
+      "https://gitlab.com/api/v4/projects/example%2Fproject/issues?state=opened&per_page=100&page=1",
+    );
+
+    const closedFake = queuedFetch([
+      {
+        body: [
+          issue({
+            iid: 3,
+            title: "Done task",
+            state: "closed",
+            closed_at: "2026-05-15T10:10:00Z",
+          }),
+          issue({
+            iid: 4,
+            title: "Wont do task",
+            state: "closed",
+            labels: ["status:wont_do"],
+            closed_at: "2026-05-15T10:11:00Z",
+          }),
+        ],
+      },
+    ]);
+    const closedProvider = createGitLabWorkTrackerProvider({
+      config: gitLabConfig(),
+      fetch: closedFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(closedProvider.listWorkItems({ status: "closed" })).resolves.toMatchObject([
+      { id: "gitlab-3", status: "done" },
+      { id: "gitlab-4", status: "wont_do" },
+    ]);
+    expect(closedFake.calls[0]?.url).toBe(
+      "https://gitlab.com/api/v4/projects/example%2Fproject/issues?state=closed&per_page=100&page=1",
+    );
+    await expect(
+      closedProvider.listWorkItems({ status: "not_real" as any }),
+    ).rejects.toThrow(/Invalid GitLab work status: not_real/);
+  });
+
   it("updates status without dropping existing non-status labels", async () => {
     const fake = queuedFetch([
       {

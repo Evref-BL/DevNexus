@@ -729,6 +729,18 @@ function normalizeStatusFilter(
   const values = Array.isArray(status) ? status : [status];
   const normalized = new Set<WorkStatus>();
   for (const value of values) {
+    if (value === "open") {
+      for (const openStatus of openStatuses) {
+        normalized.add(openStatus);
+      }
+      continue;
+    }
+    if (value === "closed") {
+      for (const closedStatus of closedStatuses) {
+        normalized.add(closedStatus);
+      }
+      continue;
+    }
     assertWorkStatus(value);
     normalized.add(value);
   }

@@ -282,6 +282,108 @@ describe("Jira work tracker provider", () => {
     ]);
   });
 
+  it("accepts Jira open and closed status aliases when listing", async () => {
+    const openFake = queuedFetch([
+      {
+        body: {
+          issues: [
+            issue({
+              key: "FCD-1",
+              fields: {
+                ...issue().fields,
+                summary: "Ready task",
+                labels: ["status:ready"],
+              },
+            }),
+            issue({
+              key: "FCD-2",
+              fields: {
+                ...issue().fields,
+                summary: "Todo task",
+                labels: [],
+                status: {
+                  name: "To Do",
+                  statusCategory: {
+                    key: "new",
+                  },
+                },
+              },
+            }),
+          ],
+        },
+      },
+    ]);
+    const openProvider = createJiraWorkTrackerProvider({
+      config: jiraConfig(),
+      fetch: openFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(openProvider.listWorkItems({ status: "open" })).resolves.toMatchObject([
+      { id: "jira-FCD-1", status: "ready" },
+      { id: "jira-FCD-2", status: "todo" },
+    ]);
+    expect(openFake.calls[0]).toMatchObject({
+      body: {
+        jql: 'project = "FCD" ORDER BY updated DESC',
+      },
+    });
+
+    const closedFake = queuedFetch([
+      {
+        body: {
+          issues: [
+            issue({
+              key: "FCD-3",
+              fields: {
+                ...issue().fields,
+                summary: "Done task",
+                labels: [],
+                status: {
+                  name: "Done",
+                  statusCategory: {
+                    key: "done",
+                  },
+                },
+                resolutiondate: "2026-05-15T10:10:00.000+0000",
+              },
+            }),
+            issue({
+              key: "FCD-4",
+              fields: {
+                ...issue().fields,
+                summary: "Wont do task",
+                labels: ["status:wont_do"],
+                status: {
+                  name: "Done",
+                  statusCategory: {
+                    key: "done",
+                  },
+                },
+                resolutiondate: "2026-05-15T10:11:00.000+0000",
+              },
+            }),
+          ],
+        },
+      },
+    ]);
+    const closedProvider = createJiraWorkTrackerProvider({
+      config: jiraConfig(),
+      fetch: closedFake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(closedProvider.listWorkItems({ status: "closed" })).resolves.toMatchObject([
+      { id: "jira-FCD-3", status: "done" },
+      { id: "jira-FCD-4", status: "wont_do" },
+    ]);
+    await expect(
+      closedProvider.listWorkItems({ status: "not_real" as any }),
+    ).rejects.toThrow(/Invalid Jira work status: not_real/);
+  });
+
   it("updates status labels and applies configured Jira workflow transitions", async () => {
     const fake = queuedFetch([
       {
