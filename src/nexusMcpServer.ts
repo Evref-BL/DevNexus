@@ -3608,6 +3608,9 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
         workItemCount: component.workItems.length,
         importCandidateWorkItemCount:
           component.importCandidateWorkItems?.length ?? 0,
+        excludedWorkItemCount: countAutomationStatusExcludedWorkItems(component),
+        excludedReasonCounts: automationStatusExcludedReasonCounts(component),
+        excludedCategoryCounts: automationStatusExcludedCategoryCounts(component),
         warningCount: component.warnings?.length ?? 0,
         blockerCount: component.blockers?.length ?? 0,
         trackerResultCount: component.trackerResults?.length ?? 0,
@@ -3619,6 +3622,10 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
             selected: trackerResult.selected,
             selectableCount: trackerResult.selectableCount,
             importCandidateCount: trackerResult.importCandidateCount,
+            excludedCount: trackerResult.excludedCount,
+            exclusionReasonCounts: trackerResult.exclusionReasonCounts,
+            exclusionCategoryCounts:
+              trackerResult.exclusionCategoryCounts ?? {},
             warningCount: trackerResult.warnings.length,
             blockerCount: trackerResult.blockers.length,
           }))
@@ -3638,6 +3645,15 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
             : [],
         omittedImportCandidateWorkItemCount: component.importCandidateWorkItems
           ? omittedCount(component.importCandidateWorkItems)
+          : 0,
+        excludedWorkItems:
+          component.excludedWorkItems
+            ? summaryItems(component.excludedWorkItems).map(
+                summarizeExcludedWorkItem,
+              )
+            : [],
+        omittedExcludedWorkItemCount: component.excludedWorkItems
+          ? omittedCount(component.excludedWorkItems)
           : 0,
       })) ?? null,
     selectedWorkItem: status.selectedWorkItem
@@ -4223,6 +4239,99 @@ function summarizeEligibleWorkItem(
     selectable: item.selectable,
     importOnly: item.importOnly,
   };
+}
+
+function summarizeExcludedWorkItem(
+  item: NonNullable<
+    NonNullable<NexusAutomationStatus["componentEligibleWorkItems"]>[number][
+      "excludedWorkItems"
+    ]
+  >[number],
+) {
+  return {
+    id: item.id,
+    title: summaryText(item.title),
+    status: item.status,
+    provider: item.provider,
+    webUrl: item.webUrl ?? item.externalRef?.webUrl ?? null,
+    sourceTrackerRef: summarizeTrackerRef(item.sourceTrackerRef),
+    reasons: summaryItems(item.reasons),
+    reasonCount: item.reasons.length,
+    exclusionFindings: summaryItems(item.exclusionFindings).map((finding) => ({
+      category: finding.category,
+      reason: finding.reason,
+      value: finding.value,
+    })),
+    omittedExclusionFindingCount: omittedCount(item.exclusionFindings),
+  };
+}
+
+function countAutomationStatusExcludedWorkItems(
+  component: NonNullable<NexusAutomationStatus["componentEligibleWorkItems"]>[number],
+): number {
+  const visibleExcludedCount = (component.trackerResults ?? []).reduce(
+    (total, tracker) => total + tracker.excludedCount,
+    0,
+  );
+  const finalLimitExcludedCount = (component.excludedWorkItems ?? []).filter(
+    (item) => item.reasons.includes("final limit reached"),
+  ).length;
+
+  return visibleExcludedCount + finalLimitExcludedCount;
+}
+
+function automationStatusExcludedReasonCounts(
+  component: NonNullable<NexusAutomationStatus["componentEligibleWorkItems"]>[number],
+): Record<string, number> {
+  const counts = mergeSummaryCountRecords(
+    (component.trackerResults ?? []).map(
+      (tracker) => tracker.exclusionReasonCounts,
+    ),
+  );
+  for (const item of finalLimitExcludedWorkItems(component)) {
+    for (const reason of item.reasons) {
+      counts[reason] = (counts[reason] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function automationStatusExcludedCategoryCounts(
+  component: NonNullable<NexusAutomationStatus["componentEligibleWorkItems"]>[number],
+): Record<string, number> {
+  const counts = mergeSummaryCountRecords(
+    (component.trackerResults ?? []).map(
+      (tracker) => tracker.exclusionCategoryCounts ?? {},
+    ),
+  );
+  for (const item of finalLimitExcludedWorkItems(component)) {
+    for (const finding of item.exclusionFindings) {
+      counts[finding.category] = (counts[finding.category] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function finalLimitExcludedWorkItems(
+  component: NonNullable<NexusAutomationStatus["componentEligibleWorkItems"]>[number],
+) {
+  return (component.excludedWorkItems ?? []).filter((item) =>
+    item.reasons.includes("final limit reached"),
+  );
+}
+
+function mergeSummaryCountRecords(
+  records: Array<Record<string, number> | undefined>,
+): Record<string, number> {
+  const merged: Record<string, number> = {};
+  for (const record of records) {
+    for (const [key, value] of Object.entries(record ?? {})) {
+      merged[key] = (merged[key] ?? 0) + value;
+    }
+  }
+  return merged;
 }
 
 function summarizeExternalIssueVisibility(value: unknown) {

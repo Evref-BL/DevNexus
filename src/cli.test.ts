@@ -3783,6 +3783,12 @@ describe("dev-nexus cli", () => {
       eligibleWorkItemCount: 1,
       importCandidateWorkItemCount: 1,
       excludedWorkItemCount: 1,
+      excludedReasonCounts: {
+        "status todo not selected": 1,
+      },
+      excludedCategoryCounts: {
+        status: 1,
+      },
       externalIssueVisibility: {
         componentCount: 1,
         importRequiredComponentCount: 1,
@@ -3824,11 +3830,24 @@ describe("dev-nexus cli", () => {
             },
           ],
           excludedWorkItemCount: 1,
+          excludedReasonCounts: {
+            "status todo not selected": 1,
+          },
+          excludedCategoryCounts: {
+            status: 1,
+          },
           excludedWorkItems: [
             {
               id: "local-2",
               status: "todo",
               reasons: ["status todo not selected"],
+              exclusionFindings: [
+                {
+                  category: "status",
+                  reason: "status todo not selected",
+                  value: "todo",
+                },
+              ],
             },
           ],
         },
@@ -3842,6 +3861,7 @@ describe("dev-nexus cli", () => {
     expect(textOutput.output()).toContain("External issue visibility:");
     expect(textOutput.output()).toContain("1 import-required");
     expect(textOutput.output()).toContain("Visible excluded: 1");
+    expect(textOutput.output()).toContain("Excluded categories: status: 1");
     expect(textOutput.output()).toContain(
       "local-2 [todo] excluded Todo task (status todo not selected)",
     );

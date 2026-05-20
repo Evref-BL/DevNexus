@@ -1981,6 +1981,16 @@ describe("DevNexus MCP server", () => {
       title: "Split the plan",
       status: "ready",
     });
+    await callDevNexusMcpTool(
+      "work_item_create",
+      {
+        projectRoot,
+        title: "Parked plan",
+        status: "todo",
+        labels: ["automation"],
+      },
+      { now: fixedClock("2026-05-16T10:01:00.000Z") },
+    );
 
     const automationStatus = toolJson(
       await callDevNexusMcpTool(
@@ -2002,6 +2012,40 @@ describe("DevNexus MCP server", () => {
           id: "local-1",
         },
       ],
+      componentEligibleWorkItems: [
+        {
+          componentId: "primary",
+          workItemCount: 1,
+          excludedWorkItemCount: 1,
+          excludedCategoryCounts: {
+            status: 1,
+          },
+          excludedReasonCounts: {
+            "status todo not selected": 1,
+          },
+          excludedWorkItems: [
+            {
+              id: "local-2",
+              reasons: ["status todo not selected"],
+              exclusionFindings: [
+                {
+                  category: "status",
+                  reason: "status todo not selected",
+                  value: "todo",
+                },
+              ],
+            },
+          ],
+          trackerResults: [
+            {
+              excludedCount: 1,
+              exclusionCategoryCounts: {
+                status: 1,
+              },
+            },
+          ],
+        },
+      ],
     });
 
     const eligibleWork = toolJson(
@@ -2019,13 +2063,27 @@ describe("DevNexus MCP server", () => {
         id: "mcp-demo",
       },
       eligibleWorkItemCount: 1,
+      excludedWorkItemCount: 1,
+      excludedCategoryCounts: {
+        status: 1,
+      },
       components: [
         {
           componentId: "primary",
+          excludedWorkItemCount: 1,
+          excludedCategoryCounts: {
+            status: 1,
+          },
           workItems: [
             {
               id: "local-1",
               title: "Split the plan",
+            },
+          ],
+          excludedWorkItems: [
+            {
+              id: "local-2",
+              reasons: ["status todo not selected"],
             },
           ],
         },
