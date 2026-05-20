@@ -1,7 +1,1565 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T06:56:30.000Z",
+  "updatedAt": "2026-05-20T19:38:12.520Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-4999ae3694971a9d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "codex-local",
+      "agentId": "codex-humanizer-skill",
+      "workItemId": "github-114",
+      "branchName": "codex/dev-nexus/github-114-humanizer-skill",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-114-humanizer-skill"
+      },
+      "writeScope": [
+        "src/nexusSkills.ts",
+        "src/nexusSkills.test.ts",
+        "docs/dev/architecture.md"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T19:38:12.520Z",
+      "lastSeenAt": "2026-05-20T19:38:12.520Z",
+      "updatedAt": "2026-05-20T19:38:12.520Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "55aeb377032e63fdc68d445cb8c0d64720c8e2d0",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-114-humanizer-skill"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Vendor blader/humanizer as MIT curated skill and adjust documentation skill to reference it."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-44eed3377268d145",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/warp-comparison-notes",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/warp-comparison-notes"
+      },
+      "writeScope": [
+        "docs/**"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T19:36:20.769Z",
+      "lastSeenAt": "2026-05-20T19:36:20.769Z",
+      "updatedAt": "2026-05-20T19:36:20.769Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "4fb3573626990359d88d7fa1f75403dac08b19f8",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/warp-comparison-notes"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Research warpdotdev/warp and compare with DevNexus",
+        "Do not modify component source roots"
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-9635e0bcd9789a76",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "codex-local",
+      "agentId": "codex-docs-skill",
+      "workItemId": "github-112",
+      "branchName": "codex/dev-nexus/github-112-docs-skill",
+      "baseRef": "bot/main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-112-docs-skill"
+      },
+      "writeScope": [
+        "src/nexusSkills.ts",
+        "src/nexusSkills.test.ts"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T19:32:17.416Z",
+      "lastSeenAt": "2026-05-20T19:32:17.416Z",
+      "updatedAt": "2026-05-20T19:32:17.416Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "4027ad322a1f37200ca3a961c4861f025f373469",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-112-docs-skill"
+        },
+        "upstream": "bot/main",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Add core documentation-writing skill from README audit knowledge and humanizer-inspired final pass."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-3e2fbceb1736db9b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/add-plexus-reference-components",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-add-plexus-reference-components"
+      },
+      "writeScope": [
+        "dev-nexus.project.json",
+        "CONTEXT.md",
+        "PLAN.md",
+        ".dev-nexus/automation/target-state.md"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T19:08:13.345Z",
+      "lastSeenAt": "2026-05-20T19:08:13.345Z",
+      "updatedAt": "2026-05-20T19:08:13.345Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "4fb3573626990359d88d7fa1f75403dac08b19f8",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-add-plexus-reference-components"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-7b568d861d2e147e",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-76",
+      "branchName": "codex/dev-nexus/github-76",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-76"
+      },
+      "writeScope": [
+        "README.md",
+        "docs/user"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T18:44:27.129Z",
+      "lastSeenAt": "2026-05-20T18:44:27.129Z",
+      "updatedAt": "2026-05-20T18:44:27.129Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-76"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-998db5a376bf0124",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/npm-trusted-publishing",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "codex-npm-trusted-publishing"
+      },
+      "writeScope": [
+        "package.json",
+        ".github/workflows/publish.yml"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T18:22:29.364Z",
+      "lastSeenAt": "2026-05-20T18:22:29.364Z",
+      "updatedAt": "2026-05-20T18:22:29.364Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "9c566d964215daaad057329edc2b05954088104e",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "codex-npm-trusted-publishing"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c6e5a382a2e3417b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-pharo"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/npm-trusted-publishing",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-pharo",
+        "relativePath": "codex-npm-trusted-publishing"
+      },
+      "writeScope": [
+        "package.json",
+        ".github/workflows/publish.yml"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T18:22:25.688Z",
+      "lastSeenAt": "2026-05-20T18:22:25.688Z",
+      "updatedAt": "2026-05-20T18:22:25.688Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "087391268b42ad0d6e7ef371c490c477673141dd",
+      "dirty": true,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-pharo",
+          "relativePath": "codex-npm-trusted-publishing"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 1,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b1991fe2053e7a09",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/npm-trusted-publishing",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-npm-trusted-publishing"
+      },
+      "writeScope": [
+        "package.json",
+        ".github/workflows/publish.yml"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T18:22:21.724Z",
+      "lastSeenAt": "2026-05-20T18:22:21.724Z",
+      "updatedAt": "2026-05-20T18:22:21.724Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-npm-trusted-publishing"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": []
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-788a8bf381a72a9e",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/typescript-plugin-mcp-command",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-plugin-mcp-command"
+      },
+      "writeScope": [
+        "src/**",
+        "package.json",
+        "package-lock.json",
+        "README.md"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T17:40:36.741Z",
+      "lastSeenAt": "2026-05-20T17:40:36.741Z",
+      "updatedAt": "2026-05-20T17:40:36.741Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "11cc7aa574227a2f2ada8e3644b4a9501f99c189",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-plugin-mcp-command"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Add a package bin and stdio MCP server for the advertised TypeScript tools.",
+        "Carry target component scoping into base plugin capabilities so plugin refresh preserves dogfood scope."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-a4398138f32bcd77",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/typescript-plugin-refresh-projection",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/project-typescript-plugin-refresh-projection"
+      },
+      "writeScope": [
+        "dev-nexus.project.json",
+        ".dev-nexus/skills/**",
+        ".agents/skills/**",
+        ".claude/skills/**",
+        ".codex/config.toml",
+        ".mcp.json"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T17:37:03.411Z",
+      "lastSeenAt": "2026-05-20T17:37:03.411Z",
+      "updatedAt": "2026-05-20T17:37:03.411Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/project-typescript-plugin-refresh-projection"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Use the new core project plugin refresh command to load DevNexus-TypeScript capabilities and package-owned skills into dogfood project support state."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-6848f27d485eb0ca",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/typescript-plugin-refresh-projection",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "typescript-plugin-refresh-projection"
+      },
+      "writeScope": [
+        "dev-nexus.project.json",
+        ".dev-nexus/skills/**",
+        ".agents/skills/**",
+        ".claude/skills/**",
+        ".codex/config.toml",
+        ".mcp.json"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T17:36:58.542Z",
+      "lastSeenAt": "2026-05-20T17:36:58.542Z",
+      "updatedAt": "2026-05-20T17:36:58.542Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "typescript-plugin-refresh-projection"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Use the new core project plugin refresh command to load DevNexus-TypeScript capabilities and package-owned skills into dogfood project support state."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-44b30e24e4566889",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/dev-nexus-plugin-refresh",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "dev-nexus-plugin-refresh"
+      },
+      "writeScope": [
+        "src/cli.ts",
+        "src/nexusProjectPluginRefresh.ts",
+        "src/nexusProjectPluginRefresh.test.ts",
+        "src/nexusPluginCapabilities.ts",
+        "src/nexusAgentMcpConfig.ts",
+        "README.md",
+        "docs/user/getting-started.md",
+        "package.json",
+        "package-lock.json"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T17:28:51.800Z",
+      "lastSeenAt": "2026-05-20T17:28:51.800Z",
+      "updatedAt": "2026-05-20T17:28:51.800Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "dev-nexus-plugin-refresh"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Implement a core project plugin refresh command without mutating the shared dev-nexus checkout.",
+        "Command should update project plugin capability snapshots and materialize plugin-owned skills/MCP projection."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-502936c0ba6e53da",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": "11",
+      "branchName": "codex/typescript-codemod-planning-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/typescript-codemod-planning-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "CONTEXT.md",
+        "PLAN.md",
+        "docs/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T17:18:25.172Z",
+      "lastSeenAt": "2026-05-20T17:18:56.206Z",
+      "updatedAt": "2026-05-20T17:18:56.206Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/typescript-codemod-planning-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project-meta closeout for TypeScript #10/#11 recorded target cycle target-cycle-20260520T171831-176Z-1jsp0t.",
+        "Closeout worktree removed after recording completion facts."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-84730d94dc1d4171",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "Mac.lan",
+      "agentId": null,
+      "workItemId": "11",
+      "branchName": "codex/typescript-codemod-planning",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-codemod-planning"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "package.json",
+        "package-lock.json",
+        "skills/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T17:13:23.324Z",
+      "lastSeenAt": "2026-05-20T17:18:56.206Z",
+      "updatedAt": "2026-05-20T17:18:56.206Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "05af6fd8ec66fbc9e33bdf8c2d5349e8db0993d0",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-codemod-planning"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Implemented DevNexus-TypeScript issue #11 on codex/typescript-codemod-planning.",
+        "PR #17 merged at 11cc7aa574227a2f2ada8e3644b4a9501f99c189; issue #11 closed.",
+        "Verification passed: focused bulk rewrite Vitest, npm run check in component worktree and source main, built-output smoke."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c1b49335f72ca5ee",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "9",
+      "branchName": "codex/typescript-import-graph-closeout-meta",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/typescript-import-graph-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "CONTEXT.md",
+        "PLAN.md",
+        "docs/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T16:14:14.098Z",
+      "lastSeenAt": "2026-05-20T16:15:52.258Z",
+      "updatedAt": "2026-05-20T16:15:52.258Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/typescript-import-graph-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Project-meta closeout for issue #9 recorded target cycle target-cycle-20260520T161427-233Z-48tvi7.",
+        "Closeout worktree removed after recording completion facts."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-13e87e66826e6ece",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "9",
+      "branchName": "codex/typescript-import-graph-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "typescript-import-graph-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "CONTEXT.md",
+        "PLAN.md",
+        "docs/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T16:14:05.065Z",
+      "lastSeenAt": "2026-05-20T16:15:52.258Z",
+      "updatedAt": "2026-05-20T16:15:52.258Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "typescript-import-graph-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Accidental component closeout worktree prepared for dev-nexus instead of project-meta; no source changes were made.",
+        "Worktree removed and branch deleted during issue #9 cleanup."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-aed2a989ff8d1469",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "9",
+      "branchName": "codex/typescript-import-graph-analysis",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-import-graph-analysis"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "package.json",
+        "package-lock.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T16:05:26.358Z",
+      "lastSeenAt": "2026-05-20T16:15:52.258Z",
+      "updatedAt": "2026-05-20T16:15:52.258Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "642dfb7fe0a5ad7693c975943d3f29f967b297a7",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-import-graph-analysis"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "Implemented DevNexus-TypeScript issue #9 on codex/typescript-import-graph-analysis.",
+        "PR #16 merged at 62b96ebcf73b0c6b3bdc093a3b7e1e164d1204e2; issue #9 closed.",
+        "Verification passed: focused import graph Vitest, npm run check in component worktree and source main, built-output smoke."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-8146793e438fdaaf",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "8",
+      "branchName": "codex/typescript-mcp-diagnostics-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/typescript-mcp-diagnostics-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "docs/**",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T16:04:08.864Z",
+      "lastSeenAt": "2026-05-20T16:04:30.000Z",
+      "updatedAt": "2026-05-20T16:04:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/typescript-mcp-diagnostics-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Closeout records for DevNexus-TypeScript #8 were written through this project/meta worktree.",
+        "No project source changes were required; temporary worktree can be removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-0df0d8cca775877b",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "8",
+      "branchName": "codex/typescript-mcp-diagnostics-tracer",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-mcp-diagnostics-tracer"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "package.json",
+        "package-lock.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:58:33.423Z",
+      "lastSeenAt": "2026-05-20T16:04:30.000Z",
+      "updatedAt": "2026-05-20T16:04:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "94aeefc19d0ac1b2a561c810757b21637a5ee547",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-mcp-diagnostics-tracer"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Remote review branch deleted after PR merge."
+        ]
+      },
+      "notes": [
+        "Published via DevNexus-TypeScript PR #15 merged as ad7decff4b7468005cb1948edf0708298594a8e1.",
+        "Verification: npm run check passed before publication and after source checkout fast-forward; issue #8 closed as completed.",
+        "Built dist import smoke test confirmed tracer tool descriptors and project status."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-d0e23ada40d08368",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "5",
+      "branchName": "codex/typescript-baseline-skills-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/typescript-baseline-skills-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "docs/**",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:49:23.167Z",
+      "lastSeenAt": "2026-05-20T15:49:40.000Z",
+      "updatedAt": "2026-05-20T15:49:40.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/typescript-baseline-skills-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Closeout records for DevNexus-TypeScript #5 were written through this project/meta worktree.",
+        "No project source changes were required; temporary worktree can be removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-c6688483917d93e9",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "5",
+      "branchName": "codex/typescript-baseline-skills",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-baseline-skills"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "package.json",
+        "skills/**",
+        ".agents/**"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:43:09.732Z",
+      "lastSeenAt": "2026-05-20T15:49:40.000Z",
+      "updatedAt": "2026-05-20T15:49:40.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "9b4e9b82549fd02992d62f81d22e4fa96de92f1b",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-baseline-skills"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Remote review branch deleted after PR merge."
+        ]
+      },
+      "notes": [
+        "Published via DevNexus-TypeScript PR #14 merged as be567b40dbd8530bdb1fda367640ae208b58910b.",
+        "Verification: npm run check passed before publication and after source checkout fast-forward; issue #5 closed as completed.",
+        "Skill validator quick_validate could not run because default Python lacks PyYAML; package tests validate frontmatter and manifests."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-95dbfeb689005529",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "7",
+      "branchName": "codex/typescript-worker-guidance-closeout",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/typescript-worker-guidance-closeout"
+      },
+      "writeScope": [
+        ".dev-nexus/**",
+        "docs/**",
+        "CONTEXT.md",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:39:30.894Z",
+      "lastSeenAt": "2026-05-20T15:40:30.000Z",
+      "updatedAt": "2026-05-20T15:40:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/typescript-worker-guidance-closeout"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Closeout records for DevNexus-TypeScript #7 were written through this project/meta worktree.",
+        "No project source changes were required; temporary worktree can be removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-ae7b1f5b3d63565d",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-7",
+      "branchName": "codex/typescript-worker-guidance",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-worker-guidance"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "AGENTS.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:33:28.713Z",
+      "lastSeenAt": "2026-05-20T15:40:30.000Z",
+      "updatedAt": "2026-05-20T15:40:30.000Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "d7bf0e55efdef8833aa3b484a711e0549e15dae7",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-worker-guidance"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Remote review branch deleted after PR merge."
+        ]
+      },
+      "notes": [
+        "Implement DevNexus-TypeScript issue #7 only.",
+        "Use TDD: failing guidance tests first, then implementation.",
+        "Preserve unrelated dogfood project state and source changes.",
+        "Published via DevNexus-TypeScript PR #13 merged as 49f2488d66f1a49cb3873f9e1cb19f2e1e08472b.",
+        "Verification: npm run check passed before publication; issue #7 closed as completed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-ea6d8d7f25d7d76f",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-89",
+      "branchName": "codex/dev-nexus/github-89-coordinator-claims",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-89-coordinator-claims"
+      },
+      "writeScope": [
+        "src/nexusAutomationRunOnce.ts",
+        "src/nexusAutomationRunOnce.test.ts",
+        "src/nexusAutomationAgentLaunch.ts",
+        "src/nexusAutomationAgentLaunch.test.ts",
+        "src/nexusAutomationCurrentAgentAdoption.ts",
+        "src/nexusAutomationTargetCycle.ts",
+        "src/nexusAutomationTargetCycle.test.ts",
+        "src/nexusAutomationStatus.ts",
+        "src/nexusAutomationStatus.test.ts",
+        "src/nexusWorkItemClaim.ts",
+        "src/nexusWorkItemClaim.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T15:38:22.769Z",
+      "lastSeenAt": "2026-05-20T15:38:22.769Z",
+      "updatedAt": "2026-05-20T15:38:22.769Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c0a2c445878d23e33b27adce0b5fde16cffa2a72",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-89-coordinator-claims"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "GitHub #89 claimed from Mac. Integrate verified claim-next ownership into automation coordinator loop before launching work.",
+        "Avoid #94 status/query helper refactor owned by Windows."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-487646c78fdb2df2",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-93",
+      "branchName": "codex/dev-nexus/github-93-status-aliases",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-93-status-aliases"
+      },
+      "writeScope": [
+        "src/workTracking*.ts",
+        "src/workTracking*.test.ts",
+        "src/*GitHub*Work*.ts",
+        "src/*GitLab*Work*.ts",
+        "src/*Jira*Work*.ts",
+        "src/*Local*Work*.ts",
+        "src/cli.ts",
+        "src/cli.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:03:17.160Z",
+      "lastSeenAt": "2026-05-20T15:36:19.922Z",
+      "updatedAt": "2026-05-20T15:36:19.922Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "f0da93d7fecb91fa332ce340134894ac21760c64",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-93-status-aliases"
+        },
+        "upstream": "bot/codex/dev-nexus/github-93-status-aliases",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "GitHub #93 claimed from Mac. Narrow bug fix for provider-neutral open/closed work-status query aliases.",
+        "Avoid #88 claimed by Windows and #89 downstream automation loop work.",
+        "PR #103 merged as c0a2c445878d23e33b27adce0b5fde16cffa2a72; stale local worktree and branch were removed. #94 left unclaimed for Windows."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-7ddc23df6fd7182c",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus-typescript"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-6",
+      "branchName": "codex/typescript-setup-inventory",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus-typescript",
+        "relativePath": "typescript-setup-inventory"
+      },
+      "writeScope": [
+        "src/**",
+        "README.md",
+        "package.json",
+        "tsconfig.json"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T15:01:14.946Z",
+      "lastSeenAt": "2026-05-20T15:29:51.483Z",
+      "updatedAt": "2026-05-20T15:29:51.483Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "0eccbcec215d81468b1e0710822a50677158e31d",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus-typescript",
+          "relativePath": "typescript-setup-inventory"
+        },
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Remote review branch deleted after PR merge."
+        ]
+      },
+      "notes": [
+        "Published via DevNexus-TypeScript PR #12 merged as 28cf7af.",
+        "Verification: npm run check passed before publication; issue #6 closed as completed.",
+        "Host-local bot-github profile now binds to dogfood-automation-bot with explicit Git identity."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-f484959712d5df3a",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": "github-33",
+      "branchName": "codex/dev-nexus/github-33-ssh-execution-plan",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-33-ssh-execution-plan"
+      },
+      "writeScope": [
+        "src/nexusRemoteExecution*.ts",
+        "src/nexusRemoteExecution*.test.ts",
+        "src/nexusSshExecutionPlan.ts",
+        "src/nexusSshExecutionPlan.test.ts",
+        "src/nexusProjectConfig.ts",
+        "src/nexusProjectConfig.test.ts",
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts",
+        "src/index.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T14:49:22.759Z",
+      "lastSeenAt": "2026-05-20T15:02:09.124Z",
+      "updatedAt": "2026-05-20T15:02:09.124Z",
+      "refreshCount": 1,
+      "lastObservedHeadCommit": "2a52ac9d763444ef094188b760880287cb664f6d",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-33-ssh-execution-plan"
+        },
+        "upstream": "bot/codex/dev-nexus/github-33-ssh-execution-plan",
+        "ahead": 0,
+        "behind": 0,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": []
+      },
+      "notes": [
+        "GitHub #33 claimed from Mac. No live SSH/Tailscale/network execution; mocked planning only.",
+        "Avoid claim-next CLI/MCP work owned by Windows on #87.",
+        "PR #101 merged as 9523afc; required Node 24 checks passed on macOS, Ubuntu, and Windows; local worktree and branch were removed."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-86b8716369b265ed",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-M-15666.local",
+      "agentId": null,
+      "workItemId": null,
+      "branchName": "codex/code-quality-audit-2026-05-20",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/dogfood-code-quality-audit"
+      },
+      "writeScope": [
+        "docs/dev-nexus-code-quality-audit-2026-05-20.md",
+        ".dev-nexus/automation/target-cycles.json",
+        ".dev-nexus/coordination/**"
+      ],
+      "status": "working",
+      "createdAt": "2026-05-20T14:38:31.905Z",
+      "lastSeenAt": "2026-05-20T14:38:31.905Z",
+      "updatedAt": "2026-05-20T14:38:31.905Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "31ff8e87eb8c0dd9cf44f2fc35100890d11434be",
+      "dirty": false,
+      "pushed": null,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/dogfood-code-quality-audit"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "User-directed read-only source audit; write scope is audit/reporting metadata only.",
+        "Do not modify component source roots from this worktree."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,

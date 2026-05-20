@@ -1,11 +1,11 @@
 # DevNexus Dogfood Target State
 
-Current target: keep the clean DevNexus dogfood project current, reproducible,
+Current target: keep the clean DevNexus dogfood workspace current, reproducible,
 and ready for coordinator-driven work across its components.
 
 ## Live State
 
-- The dogfood project uses GitHub Issues as the primary shared tracker for
+- The dogfood workspace uses GitHub Issues as the primary shared tracker for
   configured components. Local tracker stores are archive/history only.
 - PLexus and pharo-launcher-mcp are present as manual-only dependency
   components for explicit coordination, packaging, publication, and security
@@ -22,8 +22,11 @@ and ready for coordinator-driven work across its components.
 - Current eligible-work discovery reports no matching work item. Open GitHub
   issues still exist, but they are `todo`, `blocked`, missing `dogfood`, or
   excluded by safety labels.
-- The project-local DevNexus CLI is the source-current fallback when the active
-  MCP runtime reports a stale process.
+- DevNexus runtime projection policy is source-current: fresh shells should use
+  the refreshed global `dev-nexus` command built from
+  `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus`, while generated MCP
+  config should pin the active CLI script path from `workspace mcp refresh`
+  instead of inheriting stale global `dev-nexus mcp-stdio` behavior.
 
 ## Current Decisions
 
@@ -45,7 +48,7 @@ and ready for coordinator-driven work across its components.
 - PRDs and audit documents under `docs/` are design/history artifacts. Use
   `docs/README.md` as the index and load individual PRDs only when the selected
   work item or current question names them directly.
-- Routine quick fixes do not need dogfood metadata PRs unless project
+- Routine quick fixes do not need dogfood metadata PRs unless workspace
   configuration, policy, plan, target state, or durable coordination facts
   changed.
 
@@ -58,7 +61,7 @@ and ready for coordinator-driven work across its components.
   live runtime/remote-host policy, advanced authority/self-approval policy,
   DevNexus-Research license posture, and sync/mirroring policy.
 - Windows source roots still use host-local external checkouts. Treat the
-  source-root migration issues as the path to clean project-local component
+  source-root migration issues as the path to clean workspace-local component
   clones.
 - Provider-native coordination remains incomplete enough that GitHub comments
   and GitHub issues should be treated as the durable human-visible record when
@@ -74,7 +77,7 @@ and ready for coordinator-driven work across its components.
   - explicit PLexus or pharo-launcher-mcp maintenance such as npm publishing
     setup;
   - heartbeat batch for ready dogfood work;
-  - project-meta cleanup for context, docs, target state, tracker archives, and
+  - workspace/meta cleanup for context, docs, target state, tracker archives, and
     generated support;
   - source worktree for component source changes.
 - Continue context hygiene by archiving or indexing historical docs rather than
@@ -89,5 +92,5 @@ and ready for coordinator-driven work across its components.
 - Do not run live Pharo images, PLexus open/close, Docker, package installs, or
   destructive host cleanup without a current approved isolated runner profile.
 - Preserve unrelated changes in component working trees.
-- Use isolated project-meta worktrees for project-state mutations from
+- Use isolated workspace/meta worktrees for workspace-state mutations from
   interactive chats.

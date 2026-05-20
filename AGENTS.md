@@ -1,11 +1,11 @@
 # Agent Guide For DevNexus Dogfood
 
-This is the clean DevNexus dogfood managed project. It is intentionally
+This is the clean DevNexus dogfood managed workspace. It is intentionally
 separate from the older staging root.
 
 ## Operating Boundary
 
-- Use DevNexus as infrastructure: project metadata, component graph, work-item
+- Use DevNexus as infrastructure: workspace metadata, component graph, work-item
   service, target state, target cycle records, agent launch records, and
   factual target reports.
 - The launched coordinator agent chooses work. DevNexus does not choose or
@@ -13,11 +13,11 @@ separate from the older staging root.
 - Do not create Vibe Kanban workspaces, sessions, or executions for
   implementation. Vibe may be inspected only as a tracker/system-of-record
   when a component is explicitly configured for it.
-- Prefer local DevNexus MCP/CLI tools for project, automation, target, and
+- Prefer local DevNexus MCP/CLI tools for workspace, automation, target, and
   work-item operations.
-- Do not mutate another DevNexus project's local metadata or local work-item
-  stores unless the user explicitly authorizes that project for the current
-  task. If the target is not a local component of this project, use the
+- Do not mutate another DevNexus workspace's local metadata or local work-item
+  stores unless the user explicitly authorizes that workspace for the current
+  task. If the target is not a local component of this workspace, use the
   configured provider-native tracker, such as GitHub Issues, or leave a
   provider-backed coordination request instead.
 - Human account defaults are for manual human actions only. Agent-created Git
@@ -37,14 +37,14 @@ separate from the older staging root.
 5. Record target cycle facts with DevNexus target-cycle tooling.
 6. Run focused verification first, then broader relevant checks when feasible.
 7. Commit and push source changes in the owning component when policy allows.
-8. Keep this project state concise: update target state with current decisions,
+8. Keep this workspace state concise: update target state with current decisions,
    active blockers, and next direction; remove stale detail.
 9. Write `DEV_NEXUS_AGENT_RESULT_FILE` as JSON before exiting.
 
 ## Plan Handoff
 
-`PLAN.md` is the durable handoff from the older staging project into this clean
-dogfood project. Treat it as the forward plan for new targets. The old control
+`PLAN.md` is the durable handoff from the older staging workspace into this clean
+dogfood workspace. Treat it as the forward plan for new targets. The old control
 handoff remains historical reference, not the primary source for future dogfood
 cycles.
 

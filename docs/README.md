@@ -37,6 +37,9 @@ them by default.
   follow-up.
 - `shared-multi-host-coordination-prd.md` - provider-backed coordination
   decisions and external feedback policy.
+- `work-item-claim-coordination-prd.md` - local mirror of DevNexus Discussion
+  #90 about claim-time race handling for GitHub-only optimistic claims,
+  optional SSH/Tailscale brokers, and mature coordination stores.
 
 ## Historical Or Mostly Implemented PRDs
 

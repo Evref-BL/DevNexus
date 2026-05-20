@@ -1,6 +1,6 @@
 # DevNexus Operating Model
 
-DevNexus is the project control plane around one or more component repositories.
+DevNexus is the workspace control plane around one or more component repositories.
 It records durable facts, exposes safe tooling, projects agent setup, and gates
 mutations. Humans and coordinator agents still choose what work to do and how to
 supervise it.
@@ -20,8 +20,8 @@ flowchart LR
     integrator["Integrator agent<br/>serializes ready branches"]
   end
 
-  subgraph DevNexus["DevNexus project control plane"]
-    projectConfig["Project config<br/>components, plugins, policies"]
+  subgraph DevNexus["DevNexus workspace control plane"]
+    projectConfig["Workspace config<br/>components, plugins, policies"]
     workItems["Work-item service<br/>component tracker bindings"]
     targetState["Target state and cycle ledger<br/>run facts and objective"]
     handoffs["Leases and handoffs<br/>coordination status"]
@@ -29,8 +29,8 @@ flowchart LR
     authority["Publication and authority policy<br/>current gates and planned resolver"]
   end
 
-  subgraph Components["Git projects and components"]
-    metaRepo["Dogfood meta repo<br/>AGENTS, PLAN, docs, .dev-nexus"]
+  subgraph Components["Git repositories and components"]
+    workspaceRepo["Dogfood workspace repo<br/>AGENTS, PLAN, docs, .dev-nexus"]
     coreRepo["dev-nexus<br/>generic core"]
     pharoRepo["dev-nexus-pharo<br/>Pharo plugin"]
     tsRepo["dev-nexus-typescript<br/>TypeScript plugin"]
@@ -46,7 +46,7 @@ flowchart LR
   human -->|"may choose work directly"| coordinator
   reviewer -->|"answers requests"| github
 
-  coordinator -->|"reads project context"| projectConfig
+  coordinator -->|"reads workspace context"| projectConfig
   coordinator -->|"lists eligible work"| workItems
   coordinator -->|"records cycle facts"| targetState
   coordinator -->|"prepares or launches"| launch
@@ -62,7 +62,7 @@ flowchart LR
   authority -->|"uses component policy"| projectConfig
   integrator -->|"publishes when allowed"| github
 
-  projectConfig -->|"declares"| metaRepo
+  projectConfig -->|"declares"| workspaceRepo
   projectConfig -->|"declares primary component"| coreRepo
   projectConfig -->|"declares extension component"| pharoRepo
   projectConfig -->|"declares extension component"| tsRepo
@@ -85,7 +85,7 @@ sequenceDiagram
   Coordinator->>DevNexus: Read AGENTS, CONTEXT, PLAN, target state
   Coordinator->>Tracker: List eligible component work
   Coordinator->>DevNexus: Select bounded batch and record target-cycle start
-  Coordinator->>DevNexus: Prepare project or component worktrees
+  Coordinator->>DevNexus: Prepare workspace or component worktrees
   DevNexus-->>Worker: Agent context, skills, policy, writable boundary
   Worker->>Git: Edit in owned worktree, commit branch
   Worker->>Tracker: Update status, comments, blockers
@@ -135,10 +135,10 @@ unless the user explicitly overrides that policy.
 
 ```mermaid
 erDiagram
-  PROJECT ||--o{ COMPONENT : declares
-  PROJECT ||--o{ TARGET_CYCLE : records
-  PROJECT ||--o{ ACTOR : binds
-  PROJECT ||--o{ PLUGIN : enables
+  WORKSPACE ||--o{ COMPONENT : declares
+  WORKSPACE ||--o{ TARGET_CYCLE : records
+  WORKSPACE ||--o{ ACTOR : binds
+  WORKSPACE ||--o{ PLUGIN : enables
   COMPONENT ||--o{ TRACKER_BINDING : owns
   COMPONENT ||--o{ WORKTREE_LEASE : coordinates
   COMPONENT ||--|| PUBLICATION_POLICY : has
@@ -150,9 +150,9 @@ erDiagram
   AUTH_PROFILE ||--o{ REMOTE : authenticates
   PUBLICATION_POLICY }o--|| REMOTE : publishes_through
 
-  PROJECT {
+  WORKSPACE {
     string id
-    string projectRoot
+    string workspaceRoot
     string targetStatePath
     string cycleLedgerPath
   }
@@ -213,10 +213,10 @@ erDiagram
 
 | Entity | What It Owns | Current Dogfood Shape |
 | --- | --- | --- |
-| DevNexus project | Portable project graph, target state, automation policy, skills, MCP wiring, worktree roots, local work-item stores | `dev-nexus-dogfood` |
+| DevNexus workspace | Portable workspace graph, target state, automation policy, skills, MCP wiring, worktree roots, local work-item stores | `dev-nexus-dogfood` |
 | Component | Source root, generated worktree root, tracker bindings, verification policy, publication policy | `dev-nexus`, `dev-nexus-pharo`, `dev-nexus-typescript` |
 | Tracker binding | Component-scoped system of record for work items, comments, status, labels, and provider references | Local JSON stores under `.dev-nexus/work-items/` |
-| Worktree lease | Advisory ownership record for one active agent surface | Records component or project-meta scope, branch, status, verification, handoff |
+| Worktree lease | Advisory ownership record for one active agent surface | Records component or workspace/meta scope, branch, status, verification, handoff |
 | Target cycle | One coordinator run against the target objective | Records selected work, blockers, verification, publication, result JSON |
 | Actor and auth profile | Who is attempting an action and which host-local credential profile is used | Human `Gabriel-Darbord`; automation `Gabot-Darbot` |
 | Publication policy | Whether and how verified changes may be published | Direct integration to `main` through `bot` where component policy allows |
@@ -226,7 +226,7 @@ erDiagram
 
 | Scope | Source Root | Tracker | Publication |
 | --- | --- | --- | --- |
-| Meta project | `/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood` | Project-local DevNexus state | `bot` remote to `main` for automation; `origin` for manual human work |
+| Workspace repository | `/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood` | Workspace-local DevNexus state | `bot` remote to `main` for automation; `origin` for manual human work |
 | `dev-nexus` | `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus` | `.dev-nexus/work-items/dev-nexus.json` | Direct integration through component `bot` remote |
 | `dev-nexus-pharo` | `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus-pharo` | `.dev-nexus/work-items/dev-nexus-pharo.json` | Direct integration through component `bot` remote |
 | `dev-nexus-typescript` | `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus-typescript` | `.dev-nexus/work-items/dev-nexus-typescript.json` | Direct integration through component `bot` remote |
