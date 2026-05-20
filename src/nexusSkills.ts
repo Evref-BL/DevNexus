@@ -353,6 +353,75 @@ Glossary entries should define project-specific concepts in one sentence, list a
 `,
   ),
   curatedCoreSkill(
+    "documentation",
+    "documentation",
+    "Documentation writing and README maintenance workflow for creating, auditing, and updating clear user-facing technical docs. Use when writing or revising README files, getting-started guides, user docs, agent onboarding docs, CLI examples, terminology sections, or docs that need a final anti-AI style pass.",
+    `
+# Documentation
+
+Use this skill when creating, auditing, or updating README files, getting-started guides, user docs, agent onboarding docs, CLI examples, terminology sections, or release-facing documentation.
+
+## Workflow
+
+1. Identify the reader and their first successful action. A README should answer what this is, why it is useful, how to start, where to get help, and where deeper docs live.
+2. Read the current code, CLI help, tests, package metadata, and nearby docs before writing. Do not invent commands, options, support status, provider behavior, or product claims.
+3. Put the fastest credible path early. Installation and the first runnable command usually belong before long terminology, architecture, or provider detail.
+4. Define terms before relying on them. Use one canonical term consistently and avoid overloaded words when a simpler noun works.
+5. Keep README content short and skimmable. Move reference detail, provider-specific setup, edge cases, and long rationale into linked docs.
+6. Prefer general examples over dogfood, internal, or unusually specialized examples. Use specific names only when they help the target reader recognize the shape.
+7. Keep examples copyable and truthful. Use placeholders only when the user must substitute a value. If a wizard asks for a value, do not also require it in the quick-start command unless scripting needs it.
+8. Update docs with code and tests when behavior changes. Delete stale docs rather than preserving half-correct history in the active path.
+9. Validate links, command examples, and generated output where feasible. Add focused documentation tests when the project already has docs guardrails.
+10. Finish with a humanizer-style pass: remove chatbot artifacts, hype, vague attribution, generic conclusions, forced threes, over-bolding, emoji decoration, and unnecessary em dashes while preserving technical precision.
+
+## README Shape
+
+Use this shape by default, then adapt to the project:
+
+1. One-sentence purpose.
+2. Short explanation of what the project creates or enables.
+3. Install.
+4. Minimal terms only if the quick start needs them.
+5. Quick start with the shortest working path.
+6. A small example that matches common industry use, not an internal edge case.
+7. Common next steps and readiness checks.
+8. Links to deeper documentation, contribution, support, and maintainer information.
+
+Long architecture, all command variants, provider-specific auth, historical design notes, and troubleshooting matrices belong in docs, not the README fast path.
+
+## Style Rules
+
+- Use direct, ordinary language. Prefer "is", "has", "uses", and "run" over inflated verbs.
+- Start sections with the answer, not a throat-clearing sentence.
+- Use sentence case headings unless the project style says otherwise.
+- Keep paragraphs short. Use bullets for scanning, not for every sentence.
+- Preserve necessary repetition when it helps readers succeed. Documentation is allowed to repeat important facts that code already encodes.
+- Link with descriptive text. Avoid "click here" and broken multiline links.
+- Keep version-sensitive facts either generated, tested, or clearly scoped.
+- When using an external style guide, follow project-specific style first, then the external guide.
+
+## Humanizer Pairing
+
+The external \`blader/humanizer\` skill is a useful companion for the final polish pass, especially after an agent drafts prose. Treat it as inspiration or an optional external skill, not vendored DevNexus content, unless the project explicitly approves the license and distribution posture.
+
+For a self-contained final pass, ask:
+
+1. What still sounds obviously AI generated?
+2. Which sentence is vague, promotional, over-structured, or too eager to please?
+3. Can this be shorter without losing a requirement, command, or warning?
+4. Does the voice sound like a competent maintainer helping a user, rather than a chatbot presenting an essay?
+
+## Sources To Consult When Needed
+
+- [GitHub Docs, "About READMEs"](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes): README files should explain what the project does, why it is useful, how to get started, where to get help, and who maintains it.
+- [Google README guidance](https://google.github.io/styleguide/docguide/READMEs.html): README files are short directory summaries; package READMEs should explain use, status, contacts, and links to deeper docs.
+- [Write the Docs documentation principles](https://www.writethedocs.org/guide/writing/docs-principles/): docs should be skimmable, current, discoverable, addressable, and close to the code they describe.
+- [Google developer documentation style guide](https://developers.google.com/style): prefer project-specific style first; clarity and consistency matter more than rigid rules.
+- [Google documentation best practices](https://google.github.io/styleguide/docguide/best_practices.html): update docs with code, keep minimum viable documentation fresh, and treat design docs as archives once implementation lands.
+- [blader/humanizer](https://github.com/blader/humanizer) and [Wikipedia "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing): use an anti-AI cleanup pass to remove inflated, vague, formulaic, and chatbot-like prose.
+`,
+  ),
+  curatedCoreSkill(
     "to-issues",
     "to-issues",
     "Issue-slicing workflow for converting a plan or product requirements document into independently verifiable tracker issues.",

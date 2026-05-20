@@ -229,7 +229,7 @@ source-controlled projection.
 
 The default core pack includes skills for DevNexus usage, diagnosis,
 Test-Driven Development (TDD), handoff, triage, architecture review, setup,
-planning, prototyping, and unfamiliar-code exploration.
+documentation writing, planning, prototyping, and unfamiliar-code exploration.
 
 ## Source Development
 

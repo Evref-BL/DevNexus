@@ -166,6 +166,7 @@ describe("nexus skills", () => {
       "architecture-review",
       "setup-agent-skills",
       "grill-with-docs",
+      "documentation",
       "to-issues",
       "to-prd",
       "prototype",
@@ -201,6 +202,19 @@ describe("nexus skills", () => {
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",
+    );
+    expect(skillMarkdown.documentation).toContain(
+      "README files, getting-started guides, user docs",
+    );
+    expect(skillMarkdown.documentation).toContain(
+      "If a wizard asks for a value, do not also require it in the quick-start command",
+    );
+    expect(skillMarkdown.documentation).toContain("humanizer-style pass");
+    expect(skillMarkdown.documentation).toContain("blader/humanizer");
+    expect(skillMarkdown.documentation).toContain("GitHub Docs");
+    expect(skillMarkdown.documentation).toContain("Write the Docs");
+    expect(skillMarkdown.documentation).toContain(
+      "Google developer documentation style guide",
     );
     expect(skillMarkdown["setup-agent-skills"]).toContain(
       "Architecture Decision Records (ADRs)",
