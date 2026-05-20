@@ -50,6 +50,7 @@ export * from "./nexusProjectComponentTopology.js";
 export * from "./nexusProjectHosting.js";
 export * from "./nexusProjectHostingIntegrationFixture.js";
 export * from "./nexusPublicationPolicy.js";
+export * from "./nexusQuickFix.js";
 export * from "./nexusRemoteExecution.js";
 export * from "./nexusProjectScaffold.js";
 export * from "./nexusProjectSetupAuthInventory.js";

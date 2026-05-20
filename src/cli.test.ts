@@ -321,6 +321,9 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus coordination status");
     expect(output.output()).toContain("dev-nexus coordination request");
     expect(output.output()).toContain("dev-nexus worktree prepare");
+    expect(output.output()).toContain("dev-nexus quick-fix plan");
+    expect(output.output()).toContain("dev-nexus quick-fix start");
+    expect(output.output()).toContain("dev-nexus quick-fix finish");
     expect(output.output()).toContain("dev-nexus work-item create");
     expect(output.output()).toContain("dev-nexus automation enqueue");
     expect(output.output()).toContain("dev-nexus automation target-cycle record");
@@ -344,6 +347,188 @@ describe("dev-nexus cli", () => {
       error: {
         code: "cli_error",
         message: "Unknown project setup option: --bad-option",
+      },
+    });
+  });
+
+  it("prints a quick-fix plan for one provider-native GitHub issue", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                name: "GitHub Issues",
+                enabled: true,
+                roles: ["primary", "eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            verification: {
+              focusedCommands: ["npm test -- src/nexusQuickFix.test.ts"],
+              fullCommands: ["npm run check"],
+              requirePassing: true,
+            },
+            publication: {
+              ...defaultNexusAutomationConfig.publication,
+              strategy: "green_main",
+              remote: "bot",
+              targetBranch: "main",
+              commandEnvironment: {
+                GH_CONFIG_DIR: "home:.config/gh-automation-github",
+              },
+              greenMain: {
+                integrationPreference: "pull_request",
+                directTargetPush: "blocked",
+                mergeAuthority: "authorized_merge",
+                requiredChecks: ["Node 24 check (ubuntu-latest)"],
+                staleChecks: "block",
+              },
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    );
+    const output = captureOutput();
+
+    await main(
+      [
+        "quick-fix",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--work-item",
+        "github-50",
+        "--topic",
+        "quick fix",
+        "--write-scope",
+        "src/nexusQuickFix.ts",
+      ],
+      { stdout: output.writer },
+    );
+
+    expect(output.output()).toContain("DevNexus quick-fix plan.");
+    expect(output.output()).toContain("Issue: example/demo#50 (github-50)");
+    expect(output.output()).toContain("Validate automation GitHub identity");
+    expect(output.output()).toContain("worktree prepare");
+    expect(output.output()).toContain("Skipped bookkeeping:");
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "quick-fix",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--work-item",
+        "github-50",
+        "--json",
+      ],
+      { stdout: jsonOutput.writer },
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      issue: {
+        repository: "example/demo",
+        number: 50,
+      },
+      publication: {
+        remote: "bot",
+      },
+    });
+
+    const startOutput = captureOutput();
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    await main(
+      [
+        "quick-fix",
+        "start",
+        projectRoot,
+        "--component",
+        "primary",
+        "--work-item",
+        "github-50",
+        "--topic",
+        "quick fix start",
+        "--json",
+      ],
+      {
+        stdout: startOutput.writer,
+        gitRunner: fakeGitRunner(gitCalls),
+      },
+    );
+    expect(JSON.parse(startOutput.output())).toMatchObject({
+      ok: true,
+      mode: "start",
+      issue: {
+        repository: "example/demo",
+        number: 50,
+      },
+      preparedWorktree: {
+        worktree: {
+          branchName: "codex/primary/quick-fix-start",
+        },
+      },
+    });
+    expect(gitCalls.map((call) => call.args.slice(0, 2))).toContainEqual([
+      "worktree",
+      "add",
+    ]);
+
+    const finishOutput = captureOutput();
+    await main(
+      [
+        "quick-fix",
+        "finish",
+        projectRoot,
+        "--component",
+        "primary",
+        "--work-item",
+        "github-50",
+        "--pr-url",
+        "https://github.com/example/demo/pull/12",
+        "--merge-commit",
+        "abc123",
+        "--verification",
+        "npm run check passed",
+        "--cleanup-action",
+        "removed disposable worktree",
+        "--json",
+      ],
+      { stdout: finishOutput.writer },
+    );
+    expect(JSON.parse(finishOutput.output())).toMatchObject({
+      ok: true,
+      mode: "finish",
+      issue: {
+        repository: "example/demo",
+        number: 50,
+      },
+      result: {
+        prUrl: "https://github.com/example/demo/pull/12",
+        mergeCommit: "abc123",
+        verification: "npm run check passed",
+        cleanupActions: ["removed disposable worktree"],
       },
     });
   });

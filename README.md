@@ -144,6 +144,14 @@ Prepare an isolated worktree for implementation:
 dev-nexus worktree prepare <project-root> --component <component-id> --work-item <work-item-id>
 ```
 
+For a one-issue provider-native fix, preview the compact quick-fix path:
+
+```bash
+dev-nexus quick-fix plan <project-root> --component <component-id> --work-item github-50
+dev-nexus quick-fix start <project-root> --component <component-id> --work-item github-50
+dev-nexus quick-fix finish <project-root> --component <component-id> --work-item github-50 --pr-url <url> --merge-commit <sha> --verification "npm run check passed"
+```
+
 Refresh generated agent configuration when project settings change:
 
 ```bash
