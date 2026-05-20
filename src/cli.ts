@@ -84,6 +84,9 @@ import {
   type NexusEligibleWorkMode,
   type NexusEligibleWorkSummary,
 } from "./nexusEligibleWorkSummary.js";
+import {
+  defaultNexusAutomationConfig,
+} from "./nexusAutomationConfig.js";
 import type {
   NexusExternalIssueVisibilitySummary,
 } from "./nexusExternalIssueVisibility.js";
@@ -286,6 +289,11 @@ import {
   type NexusWorkItemDiscoveryStatus,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
+  claimNexusEligibleWorkItem,
+  type NexusEligibleWorkClaimProviderFactory,
+  type NexusWorkItemClaimResult,
+} from "./nexusWorkItemClaim.js";
+import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
 } from "./workItemService.js";
@@ -353,6 +361,8 @@ export interface DevNexusCliDependencies {
   now?: () => Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
+  workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimLeaseTokenFactory?: () => string;
 }
 
 interface ProjectHostingStatusCliResult {
@@ -527,6 +537,18 @@ interface ParsedWorkItemCreateCommand {
 
 interface ParsedWorkItemDiscoveryStatusCommand {
   projectRoot: string;
+  json?: boolean;
+}
+
+interface ParsedWorkItemClaimNextCommand {
+  projectRoot: string;
+  componentId?: string;
+  trackerId?: string;
+  mode?: NexusEligibleWorkMode;
+  hostId: string;
+  agentId?: string | null;
+  ownerId?: string | null;
+  leaseDurationMs?: number;
   json?: boolean;
 }
 
@@ -1003,6 +1025,7 @@ export function usage(): string {
     "  dev-nexus quick-fix finish <project-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
     "  dev-nexus work-item create <project-root> --title <title> [options]",
     "  dev-nexus work-item discovery-status <project-root> [options]",
+    "  dev-nexus work-item claim-next <project-root> --host <id> [options]",
     "  dev-nexus work-item list <project-root> [options]",
     "  dev-nexus work-item get <project-root> <work-item-id> [options]",
     "  dev-nexus work-item update <project-root> <work-item-id> [options]",
@@ -1265,6 +1288,17 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item discovery-status:",
+    "  --json",
+    "",
+    "Options for work-item claim-next:",
+    "  --component <id>          defaults to the primary component",
+    "  --tracker <id>            defaults to the component default tracker",
+    "  --mode <default|discovery>",
+    "  --discovery               shortcut for --mode discovery",
+    "  --host <id>               claiming host id",
+    "  --agent <id>              optional claiming agent id",
+    "  --owner <id>              optional logical owner id",
+    "  --lease-ms <ms>           lease duration in milliseconds",
     "  --json",
     "",
     "Options for work-item list:",
@@ -2557,6 +2591,46 @@ async function handleWorkItemCommand(
     return 0;
   }
 
+  if (command === "claim-next") {
+    const parsed = parseWorkItemClaimNextCommand(argv);
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: path.resolve(parsed.projectRoot),
+      command: "work-item claim-next",
+      mutationClass: "local_tracker",
+      componentId: parsed.componentId,
+    });
+    const provider = cliWorkItemTrackerProvider(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+    );
+    const authorityBlock = cliWorkItemAuthorityBlock(
+      parsed.projectRoot,
+      parsed.componentId,
+      parsed.trackerId,
+      [
+        ...workItemPatchAuthorityActions(
+          {
+            status: "in_progress",
+            description: "DevNexus optimistic claim metadata",
+          },
+          provider,
+        ),
+        workItemCommentAuthorityAction(provider),
+      ],
+    );
+    if (authorityBlock) {
+      return printCliAuthorityBlock(authorityBlock, parsed, dependencies);
+    }
+    const claim = await claimNextWorkItem(parsed, dependencies);
+    printWorkItemClaimNextResult(
+      claim,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (command === "list") {
     const parsed = parseWorkItemListCommand(argv);
     const items = await workItemService(parsed.projectRoot, dependencies)
@@ -2907,7 +2981,7 @@ async function handleWorkItemCommand(
   }
 
   throw new Error(
-    "work-item requires create, discovery-status, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
+    "work-item requires create, discovery-status, claim-next, list, get, update, comment, set-status, link, show-links, unlink, import-plan, import-execute, sync-plan, or sync-execute",
   );
 }
 
@@ -3402,6 +3476,32 @@ function workItemService(
   return createWorkItemService({
     resolveProject: (selector) =>
       resolveDirectProject(projectRoot, selector.componentId),
+    now: dependencies.now,
+  });
+}
+
+async function claimNextWorkItem(
+  parsed: ParsedWorkItemClaimNextCommand,
+  dependencies: DevNexusCliDependencies,
+): Promise<NexusWorkItemClaimResult> {
+  const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  return claimNexusEligibleWorkItem({
+    projectRoot,
+    projectConfig,
+    components: resolveProjectComponents(projectRoot, projectConfig),
+    automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    componentId: parsed.componentId,
+    trackerId: parsed.trackerId,
+    mode: parsed.mode,
+    owner: {
+      hostId: parsed.hostId,
+      agentId: parsed.agentId,
+      ownerId: parsed.ownerId,
+    },
+    leaseDurationMs: parsed.leaseDurationMs,
+    providerFactory: dependencies.workItemClaimProviderFactory,
+    leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
     now: dependencies.now,
   });
 }
@@ -5467,6 +5567,66 @@ function parseWorkItemDiscoveryStatusCommand(
   }
 
   return parsed;
+}
+
+function parseWorkItemClaimNextCommand(
+  argv: string[],
+): ParsedWorkItemClaimNextCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("work-item claim-next requires a project root");
+  }
+
+  const parsed: Partial<ParsedWorkItemClaimNextCommand> = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--tracker":
+        parsed.trackerId = next();
+        break;
+      case "--mode":
+        parsed.mode = parseEligibleWorkMode(next(), arg);
+        break;
+      case "--discovery":
+        parsed.mode = "discovery";
+        break;
+      case "--host":
+        parsed.hostId = next();
+        break;
+      case "--agent":
+        parsed.agentId = next();
+        break;
+      case "--owner":
+        parsed.ownerId = next();
+        break;
+      case "--lease-ms":
+      case "--lease-duration-ms":
+        parsed.leaseDurationMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown work-item claim-next option: ${arg}`);
+    }
+  }
+  if (!parsed.hostId) {
+    throw new Error("work-item claim-next requires --host");
+  }
+
+  return parsed as ParsedWorkItemClaimNextCommand;
 }
 
 function parseWorkItemListCommand(argv: string[]): ParsedWorkItemListCommand {
@@ -8396,6 +8556,36 @@ function printWorkItemDiscoveryStatusResult(
   for (const blocker of result.blockers) {
     writeLine(stdout, `  Blocker: ${blocker}`);
   }
+}
+
+function printWorkItemClaimNextResult(
+  claim: NexusWorkItemClaimResult,
+  parsed: ParsedWorkItemClaimNextCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, claim };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  if (claim.status === "claimed") {
+    writeLine(stdout, "DevNexus work item claimed.");
+    writeLine(stdout, `  Id: ${claim.workItem.id}`);
+    writeLine(stdout, `  Title: ${claim.workItem.title}`);
+    writeLine(stdout, `  Lease: ${claim.owner.leaseToken}`);
+    writeLine(stdout, `  Expires: ${claim.owner.expiresAt}`);
+    return;
+  }
+  if (claim.status === "lost_race") {
+    writeLine(stdout, "DevNexus work item claim lost race.");
+    writeLine(stdout, `  Candidate: ${claim.candidate.id}`);
+    writeLine(stdout, `  Observed status: ${claim.observedWorkItem.status}`);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus work item claim found no claimable work.");
+  writeLine(stdout, `  Reason: ${claim.reason}`);
 }
 
 function printWorkItemListResult(

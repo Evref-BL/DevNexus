@@ -25,6 +25,9 @@ import {
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
+import {
+  nexusWorkItemDiscoveryCredentialEnvironment,
+} from "./nexusWorkItemDiscoveryStatus.js";
 import type {
   WorkItem,
   WorkItemQuery,
@@ -74,11 +77,14 @@ export interface ClaimNexusEligibleWorkItemOptions {
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
   automationConfig: NexusAutomationConfig;
+  componentId?: string | null;
+  trackerId?: string | null;
   selectorQuery?: WorkItemQuery;
   mode?: NexusEligibleWorkMode;
   provider?: WorkTrackerProvider;
   providerFactory?: NexusEligibleWorkClaimProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  env?: NodeJS.ProcessEnv;
   owner: NexusWorkItemClaimOwnerInput;
   leaseDurationMs?: number;
   leaseTokenFactory?: () => string;
@@ -119,19 +125,26 @@ export async function claimNexusEligibleWorkItem(
   options: ClaimNexusEligibleWorkItemOptions,
 ): Promise<NexusWorkItemClaimResult> {
   const projectRoot = path.resolve(requiredNonEmptyString(options.projectRoot, "projectRoot"));
+  const components = claimSelectableComponents(options);
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
   const selectorQuery =
     options.selectorQuery ??
     buildNexusAutomationWorkItemQuery(options.automationConfig);
   const eligibleWork = await listNexusEligibleWorkByComponent({
     projectRoot,
     projectConfig: options.projectConfig,
-    components: options.components,
+    components,
     automationConfig: options.automationConfig,
     selectorQuery,
     mode: options.mode,
     provider: options.provider,
     providerFactory: options.providerFactory,
     providerOptions: options.providerOptions,
+    env,
     now: options.now,
   });
   if (eligibleWork.eligibleWorkItems.length === 0) {
@@ -144,7 +157,13 @@ export async function claimNexusEligibleWorkItem(
 
   const skippedCandidates: NexusWorkItemClaimSkippedCandidate[] = [];
   for (const candidate of eligibleWork.eligibleWorkItems) {
-    const resolved = resolveCandidateTracker(options, projectRoot, candidate);
+    const resolved = resolveCandidateTracker(
+      options,
+      projectRoot,
+      components,
+      candidate,
+      env,
+    );
     if (!resolved) {
       skippedCandidates.push(skippedCandidate(candidate, "missing_tracker", null));
       continue;
@@ -238,13 +257,15 @@ export async function claimNexusEligibleWorkItem(
 function resolveCandidateTracker(
   options: ClaimNexusEligibleWorkItemOptions,
   projectRoot: string,
+  components: ResolvedNexusProjectComponent[],
   candidate: NexusEligibleWorkItem,
+  env: NodeJS.ProcessEnv,
 ): {
   component: ResolvedNexusProjectComponent;
   tracker: ResolvedNexusProjectWorkTracker;
   provider: WorkTrackerProvider;
 } | null {
-  const component = options.components.find(
+  const component = components.find(
     (item) => item.id === candidate.componentId,
   );
   if (!component) {
@@ -269,7 +290,7 @@ function resolveCandidateTracker(
     options.provider ??
     options.providerFactory?.(context) ??
     createWorkTrackerProvider(tracker.workTracking, {
-      ...options.providerOptions,
+      ...providerOptionsWithEnv(options.providerOptions, env),
       projectRoot,
       now: options.now,
     });
@@ -278,6 +299,63 @@ function resolveCandidateTracker(
     component,
     tracker,
     provider,
+  };
+}
+
+function claimSelectableComponents(
+  options: ClaimNexusEligibleWorkItemOptions,
+): ResolvedNexusProjectComponent[] {
+  const componentId = optionalNonEmptyString(options.componentId);
+  const trackerId = optionalNonEmptyString(options.trackerId);
+  const components = componentId
+    ? options.components.filter((component) => component.id === componentId)
+    : options.components;
+  if (componentId && components.length === 0) {
+    throw new Error(`Project component is not configured: ${componentId}`);
+  }
+  if (!trackerId) {
+    return components;
+  }
+
+  return components.map((component) => {
+    const tracker = component.workTrackers.find(
+      (candidate) => candidate.id === trackerId,
+    );
+    if (!tracker) {
+      throw new Error(
+        `Component ${component.id} work tracker is not configured: ${trackerId}`,
+      );
+    }
+
+    return {
+      ...component,
+      defaultTrackerId: tracker.id,
+      workTrackers: [tracker],
+      workTracking: tracker.workTracking,
+      workTrackingCapabilities: tracker.workTrackingCapabilities,
+      workTrackingCapabilityReport: tracker.workTrackingCapabilityReport,
+    };
+  });
+}
+
+function providerOptionsWithEnv(
+  providerOptions: CreateWorkTrackerProviderOptions | undefined,
+  env: NodeJS.ProcessEnv,
+): CreateWorkTrackerProviderOptions | undefined {
+  return {
+    ...providerOptions,
+    github: {
+      ...providerOptions?.github,
+      env: providerOptions?.github?.env ?? env,
+    },
+    gitlab: {
+      ...providerOptions?.gitlab,
+      env: providerOptions?.gitlab?.env ?? env,
+    },
+    jira: {
+      ...providerOptions?.jira,
+      env: providerOptions?.jira?.env ?? env,
+    },
   };
 }
 

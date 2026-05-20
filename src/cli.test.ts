@@ -13,6 +13,7 @@ import {
   readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
   shellQuoteArgument,
+  type NexusEligibleWorkClaimProviderFactory,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectHostingProviderAdapter,
@@ -20,6 +21,12 @@ import {
   type NexusProjectConfig,
   type ProjectGitCommandResult,
   type ProjectGitRunner,
+  type WorkComment,
+  type WorkItem,
+  type WorkItemPatch,
+  type WorkItemQuery,
+  type WorkItemRef,
+  type WorkTrackerProvider,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -6273,4 +6280,321 @@ describe("dev-nexus cli", () => {
       summary: "Coordinator loop completed",
     });
   });
+
+  it("claims the next eligible GitHub work item through the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-7", "Claim through CLI", {
+        labels: ["automation", "dogfood"],
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--component",
+        "core",
+        "--tracker",
+        "github",
+        "--host",
+        "host-a",
+        "--agent",
+        "agent-a",
+        "--lease-ms",
+        "600000",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimLeaseTokenFactory: () => "cli-token-1",
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      claim: {
+        status: "claimed",
+        workItem: {
+          id: "github-7",
+          status: "in_progress",
+        },
+        owner: {
+          hostId: "host-a",
+          agentId: "agent-a",
+          leaseToken: "cli-token-1",
+          expiresAt: "2026-05-20T10:10:00.000Z",
+        },
+      },
+    });
+  });
+
+  it("reports no eligible work through claim-next without failing the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-8", "Not selected", {
+        labels: ["other"],
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--host",
+        "host-a",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toEqual({
+      ok: true,
+      claim: {
+        status: "no_claim",
+        reason: "no_eligible_candidate",
+        skippedCandidates: [],
+      },
+    });
+    expect(provider.updates).toEqual([]);
+  });
+
+  it("reports lost races through claim-next without crashing the CLI", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-claim-");
+    saveProjectConfig(projectRoot, githubWorkItemProjectConfig());
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-9", "Race through CLI", {
+        labels: ["automation"],
+      }),
+    ]);
+    provider.afterUpdate = (item) => {
+      item.description = claimBlock("other-token");
+    };
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--host",
+        "host-a",
+        "--agent",
+        "agent-a",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+        workItemClaimLeaseTokenFactory: () => "cli-token-1",
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      claim: {
+        status: "lost_race",
+        reason: "verification_failed",
+        owner: {
+          leaseToken: "cli-token-1",
+        },
+      },
+    });
+  });
 });
+
+function githubWorkItemProjectConfig(): NexusProjectConfig {
+  return projectConfig({
+    components: [
+      {
+        id: "core",
+        name: "Core",
+        kind: "git",
+        role: "primary",
+        remoteUrl: null,
+        defaultBranch: "main",
+        sourceRoot: "source",
+        defaultWorkTrackerId: "github",
+        workTrackers: [
+          {
+            id: "github",
+            name: "GitHub",
+            enabled: true,
+            roles: ["primary", "eligible_source"],
+            workTracking: {
+              provider: "github",
+              repository: {
+                owner: "example",
+                name: "demo",
+              },
+            },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  });
+}
+
+function githubWorkItem(
+  id: string,
+  title: string,
+  overrides: Partial<WorkItem> = {},
+): WorkItem {
+  const itemNumber = Number(id.replace(/^github-/, ""));
+  return {
+    id,
+    title,
+    description: overrides.description ?? null,
+    status: overrides.status ?? "ready",
+    provider: "github",
+    labels: overrides.labels ?? [],
+    assignees: overrides.assignees ?? [],
+    milestone: null,
+    createdAt: "2026-05-20T09:00:00.000Z",
+    updatedAt: "2026-05-20T09:00:00.000Z",
+    closedAt: null,
+    webUrl: `https://github.com/example/demo/issues/${itemNumber}`,
+    externalRef: {
+      provider: "github",
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      itemId: String(itemNumber),
+      itemNumber,
+    },
+    ...overrides,
+  };
+}
+
+function claimProviderFactory(
+  provider: ClaimMemoryProvider,
+): NexusEligibleWorkClaimProviderFactory {
+  return () => provider;
+}
+
+class ClaimMemoryProvider implements WorkTrackerProvider {
+  readonly provider = "github";
+  readonly capabilities = {
+    createItem: true,
+    listItems: true,
+    getItem: true,
+    updateItem: true,
+    comment: true,
+    labels: true,
+    assignees: true,
+    milestones: true,
+    board: false,
+    boardStatus: false,
+    draftItems: false,
+    webhooks: false,
+  };
+  readonly updates: Array<{ ref: WorkItemRef; patch: WorkItemPatch }> = [];
+  readonly comments: Array<{ ref: WorkItemRef; body: string }> = [];
+  afterUpdate?: (item: WorkItem) => void;
+
+  constructor(readonly items: WorkItem[]) {}
+
+  async createWorkItem(): Promise<WorkItem> {
+    throw new Error("not implemented");
+  }
+
+  async listWorkItems(query: WorkItemQuery): Promise<WorkItem[]> {
+    return this.items.filter((item) => claimMatchesQuery(item, query)).map(cloneClaimItem);
+  }
+
+  async getWorkItem(ref: WorkItemRef): Promise<WorkItem> {
+    return cloneClaimItem(this.findItem(ref));
+  }
+
+  async updateWorkItem(ref: WorkItemRef, patch: WorkItemPatch): Promise<WorkItem> {
+    this.updates.push({ ref, patch });
+    const item = this.findItem(ref);
+    if (patch.status !== undefined) {
+      item.status = patch.status;
+    }
+    if (patch.description !== undefined) {
+      item.description = patch.description;
+    }
+    this.afterUpdate?.(item);
+    return cloneClaimItem(item);
+  }
+
+  async addComment(ref: WorkItemRef, body: string): Promise<WorkComment> {
+    this.comments.push({ ref, body });
+    return {
+      id: `comment-${this.comments.length}`,
+      body,
+    };
+  }
+
+  private findItem(ref: WorkItemRef): WorkItem {
+    const id = ref.id ?? ref.externalRef?.itemId;
+    const item = this.items.find(
+      (candidate) =>
+        candidate.id === id ||
+        candidate.externalRef?.itemId === id ||
+        candidate.externalRef?.itemNumber === Number(id),
+    );
+    if (!item) {
+      throw new Error(`missing item ${id}`);
+    }
+
+    return item;
+  }
+}
+
+function claimMatchesQuery(item: WorkItem, query: WorkItemQuery): boolean {
+  const statuses = Array.isArray(query.status)
+    ? query.status
+    : query.status
+      ? [query.status]
+      : [];
+  if (statuses.length > 0 && !statuses.includes(item.status)) {
+    return false;
+  }
+  if (query.labels?.some((label) => !item.labels?.includes(label))) {
+    return false;
+  }
+  return true;
+}
+
+function cloneClaimItem(item: WorkItem): WorkItem {
+  return {
+    ...item,
+    labels: item.labels ? [...item.labels] : undefined,
+    assignees: item.assignees ? [...item.assignees] : undefined,
+    externalRef: item.externalRef ? { ...item.externalRef } : undefined,
+  };
+}
+
+function claimBlock(leaseToken: string): string {
+  return [
+    "<!-- dev-nexus-work-item-claim",
+    JSON.stringify({
+      version: 1,
+      hostId: "other-host",
+      agentId: "other-agent",
+      ownerId: null,
+      leaseToken,
+      claimedAt: "2026-05-20T10:00:01.000Z",
+      expiresAt: "2026-05-20T10:30:01.000Z",
+    }),
+    "-->",
+  ].join("\n");
+}
