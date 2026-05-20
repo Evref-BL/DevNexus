@@ -3748,6 +3748,16 @@ describe("dev-nexus cli", () => {
     });
     await createLocalWorkTrackerProvider({
       projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: fixedClock("2026-05-16T09:02:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Todo task",
+      status: "todo",
+      labels: ["automation"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
       config: { provider: "local", storePath: inboxStorePath },
       now: fixedClock("2026-05-16T09:05:00.000Z"),
     }).createWorkItem({
@@ -3772,6 +3782,7 @@ describe("dev-nexus cli", () => {
       mode: "discovery",
       eligibleWorkItemCount: 1,
       importCandidateWorkItemCount: 1,
+      excludedWorkItemCount: 1,
       externalIssueVisibility: {
         componentCount: 1,
         importRequiredComponentCount: 1,
@@ -3812,6 +3823,14 @@ describe("dev-nexus cli", () => {
               },
             },
           ],
+          excludedWorkItemCount: 1,
+          excludedWorkItems: [
+            {
+              id: "local-2",
+              status: "todo",
+              reasons: ["status todo not selected"],
+            },
+          ],
         },
       ],
     });
@@ -3822,6 +3841,10 @@ describe("dev-nexus cli", () => {
     });
     expect(textOutput.output()).toContain("External issue visibility:");
     expect(textOutput.output()).toContain("1 import-required");
+    expect(textOutput.output()).toContain("Visible excluded: 1");
+    expect(textOutput.output()).toContain(
+      "local-2 [todo] excluded Todo task (status todo not selected)",
+    );
   });
 
   it("prints read-only work item discovery status as json", async () => {

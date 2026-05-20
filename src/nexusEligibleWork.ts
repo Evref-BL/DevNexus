@@ -75,6 +75,8 @@ export interface NexusEligibleWorkTrackerQueryResult {
   selected: boolean;
   selectableCount: number;
   importCandidateCount: number;
+  excludedCount: number;
+  exclusionReasonCounts: Record<string, number>;
   warnings: string[];
   blockers: string[];
 }
@@ -104,10 +106,17 @@ export interface NexusEligibleWorkItem extends WorkItem {
   importOnly: boolean;
 }
 
+export interface NexusEligibleWorkExcludedItem extends WorkItem {
+  componentId: string;
+  sourceTrackerRef: WorkTrackerRef | null;
+  reasons: string[];
+}
+
 export interface NexusEligibleWorkComponentResult {
   componentId: string;
   workItems: NexusEligibleWorkItem[];
   importCandidateWorkItems: NexusEligibleWorkItem[];
+  excludedWorkItems: NexusEligibleWorkExcludedItem[];
   finalLimit: number | null;
   warnings: string[];
   blockers: string[];
@@ -119,6 +128,7 @@ export interface NexusEligibleWorkResult {
   componentEligibleWorkItems: NexusEligibleWorkComponentResult[];
   eligibleWorkItems: NexusEligibleWorkItem[];
   importCandidateWorkItems: NexusEligibleWorkItem[];
+  excludedWorkItems: NexusEligibleWorkExcludedItem[];
   warnings: string[];
   blockers: string[];
 }
@@ -210,6 +220,7 @@ async function listDefaultEligibleWork(
       componentId: component.id,
       workItems,
       importCandidateWorkItems: [],
+      excludedWorkItems: [],
       finalLimit: null,
       warnings: [],
       blockers: [],
@@ -221,6 +232,8 @@ async function listDefaultEligibleWork(
           selected: true,
           selectableCount: workItems.length,
           importCandidateCount: 0,
+          excludedCount: 0,
+          exclusionReasonCounts: {},
           warnings: [],
           blockers: [],
         },
@@ -253,6 +266,7 @@ async function listDiscoveryEligibleWork(
         componentId: component.id,
         workItems: [],
         importCandidateWorkItems: [],
+        excludedWorkItems: [],
         finalLimit: component.trackerDiscovery.finalLimit,
         warnings: [],
         blockers: [],
@@ -341,17 +355,19 @@ async function scanDiscoveryTracker(options: {
   options.state.result.trackerResults.push(trackerResult);
 
   let listed: WorkItem[];
+  const provider = createProvider(
+    options.options,
+    options.component,
+    options.tracker,
+  );
+  const query = discoveryQuery(
+    options.options.selectorQuery,
+    options.component.trackerDiscovery,
+    options.tracker,
+  );
   try {
-    listed = await createProvider(
-      options.options,
-      options.component,
-      options.tracker,
-    ).listWorkItems({
-      ...discoveryQuery(
-        options.options.selectorQuery,
-        options.component.trackerDiscovery,
-        options.tracker,
-      ),
+    listed = await provider.listWorkItems({
+      ...query,
       projectRoot: options.options.projectRoot,
     });
   } catch (error) {
@@ -370,6 +386,17 @@ async function scanDiscoveryTracker(options: {
       options.component.trackerDiscovery,
     ),
   );
+  const matchingKeys = new Set(
+    matchingItems.flatMap((item) => observedReferenceKeys(options.tracker, item)),
+  );
+  await recordVisibleExcludedWork({
+    ...options,
+    provider,
+    query,
+    listed,
+    matchingKeys,
+    trackerResult,
+  });
   options.state.successfulTrackerIds.add(options.tracker.id);
   for (const item of matchingItems) {
     for (const key of observedReferenceKeys(options.tracker, item)) {
@@ -389,6 +416,69 @@ async function scanDiscoveryTracker(options: {
     } else {
       trackerResult.importCandidateCount += 1;
     }
+  }
+}
+
+async function recordVisibleExcludedWork(options: {
+  options: ListNexusEligibleWorkOptions & { projectRoot: string };
+  component: ResolvedNexusProjectComponent;
+  tracker: ResolvedNexusProjectWorkTracker;
+  provider: WorkTrackerProvider;
+  query: WorkItemQuery;
+  listed: WorkItem[];
+  matchingKeys: Set<string>;
+  trackerResult: NexusEligibleWorkTrackerQueryResult;
+  state: ComponentScanState;
+}): Promise<void> {
+  const visibleQuery = visibleDiscoveryQuery(
+    options.options.selectorQuery,
+    options.component.trackerDiscovery,
+    options.tracker,
+  );
+  let visibleItems = options.listed;
+  if (!sameWorkItemQuery(options.query, visibleQuery)) {
+    try {
+      visibleItems = await options.provider.listWorkItems({
+        ...visibleQuery,
+        projectRoot: options.options.projectRoot,
+      });
+    } catch (error) {
+      const warning = `Component ${options.component.id} tracker ${options.tracker.id} could not read visible excluded work: ${errorMessage(error)}`;
+      options.state.result.warnings.push(warning);
+      options.trackerResult.warnings.push(warning);
+      return;
+    }
+  }
+
+  for (const item of visibleItems) {
+    const keys = observedReferenceKeys(options.tracker, item);
+    if (keys.some((key) => options.matchingKeys.has(key))) {
+      continue;
+    }
+    const reasons = eligibleWorkExclusionReasons({
+      item,
+      selectorQuery: options.options.selectorQuery,
+      automationConfig: options.options.automationConfig,
+      policy: options.component.trackerDiscovery,
+    });
+    if (reasons.length === 0) {
+      continue;
+    }
+
+    options.trackerResult.excludedCount += 1;
+    for (const reason of reasons) {
+      options.trackerResult.exclusionReasonCounts[reason] =
+        (options.trackerResult.exclusionReasonCounts[reason] ?? 0) + 1;
+    }
+    if (options.state.result.excludedWorkItems.length >= 10) {
+      continue;
+    }
+    options.state.result.excludedWorkItems.push({
+      ...item,
+      componentId: options.component.id,
+      sourceTrackerRef: trackerRef(options.component, options.tracker),
+      reasons,
+    });
   }
 }
 
@@ -769,8 +859,20 @@ function applyFinalLimit(
 
   for (const component of components) {
     if (remaining <= 0) {
+      component.excludedWorkItems.push(
+        ...component.workItems.map((item) =>
+          excludedFromEligibleItem(item, "final limit reached"),
+        ),
+      );
       component.workItems = [];
       continue;
+    }
+    if (component.workItems.length > remaining) {
+      component.excludedWorkItems.push(
+        ...component.workItems
+          .slice(remaining)
+          .map((item) => excludedFromEligibleItem(item, "final limit reached")),
+      );
     }
     component.workItems = component.workItems.slice(0, remaining);
     remaining -= component.workItems.length;
@@ -795,6 +897,9 @@ function eligibleWorkResult(
   const importCandidateWorkItems = components.flatMap(
     (component) => component.importCandidateWorkItems,
   );
+  const excludedWorkItems = components.flatMap(
+    (component) => component.excludedWorkItems,
+  );
   const warnings = components.flatMap((component) => component.warnings);
   const blockers = components.flatMap((component) => component.blockers);
 
@@ -803,6 +908,7 @@ function eligibleWorkResult(
     componentEligibleWorkItems: components,
     eligibleWorkItems,
     importCandidateWorkItems,
+    excludedWorkItems,
     warnings,
     blockers,
   };
@@ -836,6 +942,119 @@ function discoveryQuery(
   }
 
   return query;
+}
+
+function visibleDiscoveryQuery(
+  selectorQuery: WorkItemQuery,
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"],
+  tracker: ResolvedNexusProjectWorkTracker,
+): WorkItemQuery {
+  const search = policy.providerQuery ?? selectorQuery.search;
+  const query: WorkItemQuery = {
+    ...(search ? { search } : {}),
+  };
+  const limit = policy.trackerLimits[tracker.id] ?? policy.queryLimit;
+  if (limit !== null) {
+    query.limit = limit;
+  }
+
+  return query;
+}
+
+function sameWorkItemQuery(left: WorkItemQuery, right: WorkItemQuery): boolean {
+  return (
+    JSON.stringify(normalizedQuery(left)) ===
+    JSON.stringify(normalizedQuery(right))
+  );
+}
+
+function normalizedQuery(query: WorkItemQuery): WorkItemQuery {
+  return {
+    ...(query.status !== undefined ? { status: query.status } : {}),
+    ...(query.labels !== undefined ? { labels: query.labels } : {}),
+    ...(query.assignees !== undefined ? { assignees: query.assignees } : {}),
+    ...(query.search !== undefined ? { search: query.search } : {}),
+    ...(query.limit !== undefined ? { limit: query.limit } : {}),
+  };
+}
+
+function eligibleWorkExclusionReasons(options: {
+  item: WorkItem;
+  selectorQuery: WorkItemQuery;
+  automationConfig: NexusAutomationConfig;
+  policy: ResolvedNexusProjectComponent["trackerDiscovery"];
+}): string[] {
+  const reasons: string[] = [];
+  const labels = lowerSet(options.item.labels);
+  const assignees = lowerSet(options.item.assignees);
+  const statuses = mergedStatuses(
+    options.selectorQuery.status,
+    options.policy.statuses,
+  );
+  if (statuses.length > 0 && !statuses.includes(options.item.status)) {
+    reasons.push(`status ${options.item.status} not selected`);
+  }
+
+  for (const label of uniqueStrings([
+    ...(options.selectorQuery.labels ?? []),
+    ...options.policy.labels,
+  ])) {
+    if (!labels.has(label.toLowerCase())) {
+      reasons.push(`missing label ${label}`);
+    }
+  }
+
+  for (const label of options.automationConfig.selector.excludeLabels) {
+    if (labels.has(label.toLowerCase())) {
+      reasons.push(`excluded label ${label}`);
+    }
+  }
+
+  for (const assignee of uniqueStrings([
+    ...(options.selectorQuery.assignees ?? []),
+    ...options.policy.assignees,
+  ])) {
+    if (!assignees.has(assignee.toLowerCase())) {
+      reasons.push(`missing assignee ${assignee}`);
+    }
+  }
+
+  if (
+    options.policy.milestones.length > 0 &&
+    (!options.item.milestone ||
+      !options.policy.milestones.includes(options.item.milestone))
+  ) {
+    reasons.push("missing milestone");
+  }
+
+  const search = options.policy.providerQuery ?? options.selectorQuery.search;
+  if (search && !matchesSearch(options.item, search)) {
+    reasons.push(`search mismatch ${search}`);
+  }
+
+  return uniqueStrings(reasons);
+}
+
+function matchesSearch(item: WorkItem, search: string): boolean {
+  const needle = search.toLowerCase();
+  return [item.id, item.title, item.description ?? ""].some((value) =>
+    value.toLowerCase().includes(needle),
+  );
+}
+
+function lowerSet(values: readonly string[] | undefined): Set<string> {
+  return new Set((values ?? []).map((value) => value.toLowerCase()));
+}
+
+function excludedFromEligibleItem(
+  item: NexusEligibleWorkItem,
+  reason: string,
+): NexusEligibleWorkExcludedItem {
+  return {
+    ...item,
+    sourceTrackerRef: item.sourceTrackerRef,
+    reasons: [reason],
+  };
 }
 
 function itemMatchesDiscoveryFilters(
@@ -972,6 +1191,8 @@ function emptyTrackerResult(options: {
     selected: options.selected,
     selectableCount: 0,
     importCandidateCount: 0,
+    excludedCount: 0,
+    exclusionReasonCounts: {},
     warnings: options.warnings,
     blockers: options.blockers,
   };

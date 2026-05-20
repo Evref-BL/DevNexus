@@ -181,10 +181,15 @@ describe("eligible work discovery", () => {
       },
     });
 
-    expect(fetchCalls).toHaveLength(1);
-    expect(fetchCalls[0]).toMatchObject({
-      authorization: "Bearer credential-token",
-    });
+    expect(fetchCalls).toHaveLength(2);
+    expect(fetchCalls).toEqual([
+      expect.objectContaining({
+        authorization: "Bearer credential-token",
+      }),
+      expect.objectContaining({
+        authorization: "Bearer credential-token",
+      }),
+    ]);
     expect(result.eligibleWorkItems).toMatchObject([
       {
         id: "github-42",
@@ -261,6 +266,9 @@ describe("eligible work discovery", () => {
     });
 
     expect(fetchCalls).toEqual([
+      {
+        authorization: "Bearer runtime-token",
+      },
       {
         authorization: "Bearer runtime-token",
       },
@@ -363,11 +371,25 @@ describe("eligible work discovery", () => {
         },
       },
       {
+        trackerId: "local",
+        query: {
+          search: "provider-filter",
+          limit: 5,
+        },
+      },
+      {
         trackerId: "inbox",
         query: {
           status: ["ready"],
           labels: ["automation", "inbox"],
           assignees: ["bot"],
+          search: "provider-filter",
+          limit: 2,
+        },
+      },
+      {
+        trackerId: "inbox",
+        query: {
           search: "provider-filter",
           limit: 2,
         },
@@ -402,6 +424,128 @@ describe("eligible work discovery", () => {
           },
         },
       ],
+      excludedWorkItems: [
+        {
+          id: "43",
+          reasons: ["final limit reached"],
+        },
+      ],
+    });
+  });
+
+  it("reports visible work excluded by selector and discovery policy", async () => {
+    const projectRoot = makeTempDir("dev-nexus-eligible-work-");
+    const automation = {
+      ...automationConfig(),
+      selector: {
+        ...automationConfig().selector,
+        excludeLabels: ["blocked"],
+      },
+    };
+    const config = {
+      ...projectConfig({
+        trackerDiscovery: {
+          scannedRoles: ["primary"],
+          directExternalSelection: "allowed",
+          importRequiredFirst: false,
+          providerFilters: ["local"],
+          queryLimit: 10,
+          statuses: ["ready"],
+          labels: ["inbox"],
+          assignees: ["bot"],
+          milestones: ["m1"],
+          conflictWinner: "scanned_tracker",
+          missingCredentialBehavior: "skip",
+        },
+      }),
+      automation,
+    };
+    saveProjectConfig(projectRoot, config);
+    const providers = providerFactory({
+      local: [
+        workItem("local-1", "Selected", {
+          status: "ready",
+          labels: ["automation", "inbox"],
+          assignees: ["bot"],
+          milestone: "m1",
+        }),
+        workItem("todo-1", "Wrong status", {
+          status: "todo",
+          labels: ["automation", "inbox"],
+          assignees: ["bot"],
+          milestone: "m1",
+        }),
+        workItem("missing-label-1", "Missing automation label", {
+          status: "ready",
+          labels: ["inbox"],
+          assignees: ["bot"],
+          milestone: "m1",
+        }),
+        workItem("blocked-1", "Blocked", {
+          status: "ready",
+          labels: ["automation", "inbox", "blocked"],
+          assignees: ["bot"],
+          milestone: "m1",
+        }),
+        workItem("unassigned-1", "Unassigned", {
+          status: "ready",
+          labels: ["automation", "inbox"],
+          assignees: [],
+          milestone: "m1",
+        }),
+        workItem("unmilestoned-1", "No milestone", {
+          status: "ready",
+          labels: ["automation", "inbox"],
+          assignees: ["bot"],
+          milestone: null,
+        }),
+      ],
+    });
+
+    const result = await listNexusEligibleWorkByComponent({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automation,
+      selectorQuery: buildNexusAutomationWorkItemQuery(automation),
+      mode: "discovery",
+      providerFactory: providers.factory,
+    });
+
+    expect(result.eligibleWorkItems.map((item) => item.id)).toEqual([
+      "local-1",
+    ]);
+    expect(result.excludedWorkItems).toMatchObject([
+      {
+        id: "todo-1",
+        reasons: ["status todo not selected"],
+      },
+      {
+        id: "missing-label-1",
+        reasons: ["missing label automation"],
+      },
+      {
+        id: "blocked-1",
+        reasons: ["excluded label blocked"],
+      },
+      {
+        id: "unassigned-1",
+        reasons: ["missing assignee bot"],
+      },
+      {
+        id: "unmilestoned-1",
+        reasons: ["missing milestone"],
+      },
+    ]);
+    expect(result.componentEligibleWorkItems[0].trackerResults[0]).toMatchObject({
+      excludedCount: 5,
+      exclusionReasonCounts: {
+        "status todo not selected": 1,
+        "missing label automation": 1,
+        "excluded label blocked": 1,
+        "missing assignee bot": 1,
+        "missing milestone": 1,
+      },
     });
   });
 

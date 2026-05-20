@@ -70,6 +70,7 @@ import {
 } from "./nexusAutomationWorkTrackerSummary.js";
 import {
   listNexusEligibleWorkByComponent,
+  type NexusEligibleWorkExcludedItem,
   type NexusEligibleWorkItem,
   type NexusEligibleWorkMode,
   type NexusEligibleWorkProviderFactory,
@@ -160,6 +161,7 @@ export interface NexusAutomationComponentEligibleWorkItems {
   componentId: string;
   workItems: WorkItem[];
   importCandidateWorkItems?: NexusEligibleWorkItem[];
+  excludedWorkItems?: NexusEligibleWorkExcludedItem[];
   warnings?: string[];
   blockers?: string[];
   trackerResults?: NexusEligibleWorkTrackerQueryResult[];
