@@ -74,6 +74,8 @@ target-cycle facts, commits, and the target report.
   policy-controlled follow-up. `dev-nexus:local-172` is complete for keeping
   completed items out of the target report's current `readyEligibleWork`
   progress bucket when only stale historical cycle facts marked them eligible.
+  Provider issue Evref-BL/DevNexus#4 is complete through PR #22 for detecting
+  source-newer-than-process DevNexus MCP runtimes in status/report surfaces.
   Version-scoped planning follow-up from
   `docs/version-scoped-planning-prd.md` has been sliced by
   `dev-nexus:local-165`; `dev-nexus:local-167` through `local-171` are
