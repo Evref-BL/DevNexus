@@ -11,6 +11,7 @@ import {
   createWorkItemTrackerLinkService,
   defaultWorkItemTrackerLinkStorePath,
   loadWorkItemTrackerLinkStore,
+  type WorkItemTrackerLinkRecord,
   type WorkItemTrackerReference,
 } from "./workItemTrackerLinks.js";
 import {
@@ -148,6 +149,11 @@ export interface WorkItemSyncUpdatePlan {
   targetReference: WorkItemTrackerReference;
   fields: WorkItemSyncFieldChange[];
   conflictFields: WorkItemSyncFieldChange[];
+}
+
+interface MatchedLinkRecord {
+  record: WorkItemTrackerLinkRecord;
+  sourceMatch: "logical" | "reference";
 }
 
 export interface WorkItemSyncSkipPlan {
@@ -468,13 +474,13 @@ export async function createWorkItemSyncPlan(
     (record) =>
       record.projectId === plan.projectId && record.componentId === componentId,
   );
-  const linkedTargetIds = new Set(
-    componentRecords.flatMap((record) =>
-      record.references
-        .filter((reference) => reference.trackerId === policy.targetTrackerId)
-        .map((reference) => reference.itemId),
-    ),
-  );
+  const linkedTargetIds = linkedTargetItemIds({
+    records: componentRecords,
+    sourceItems,
+    sourceTrackerId: policy.sourceTrackerId,
+    targetItems,
+    targetTrackerId: policy.targetTrackerId,
+  });
   plan.unlinkedTargets.push(
     ...targetItems
       .filter((item) => !linkedTargetIds.has(targetItemId(item)))
@@ -483,12 +489,20 @@ export async function createWorkItemSyncPlan(
 
   for (const sourceItem of sourceItems) {
     const sourceSummary = summarizeWorkItem(sourceItem, policy.sourceTrackerId);
-    const record = componentRecords.find(
-      (candidate) => candidate.logicalItemId === sourceItem.id,
-    );
-    const targetReference = record?.references.find(
-      (reference) => reference.trackerId === policy.targetTrackerId,
-    );
+    const match = findLinkRecordForSourceItem({
+      records: componentRecords,
+      sourceItem,
+      sourceTrackerId: policy.sourceTrackerId,
+    });
+    const targetReference = match
+      ? targetReferenceForRecord({
+          record: match.record,
+          allowLogicalTarget: match.sourceMatch === "reference",
+          targetItems,
+          targetContext,
+          targetTrackerId: policy.targetTrackerId,
+        })
+      : undefined;
 
     if (!targetReference) {
       planCreate({
@@ -1247,6 +1261,162 @@ function missingFieldCapability(options: {
   }
 
   return null;
+}
+
+function linkedTargetItemIds(options: {
+  records: WorkItemTrackerLinkRecord[];
+  sourceItems: WorkItem[];
+  sourceTrackerId: string;
+  targetItems: WorkItem[];
+  targetTrackerId: string;
+}): Set<string> {
+  const linkedIds = new Set(
+    options.records.flatMap((record) =>
+      record.references
+        .filter((reference) => reference.trackerId === options.targetTrackerId)
+        .map((reference) => reference.itemId),
+    ),
+  );
+
+  for (const record of options.records) {
+    if (
+      !record.references.some(
+        (reference) =>
+          reference.trackerId === options.sourceTrackerId &&
+          options.sourceItems.some((sourceItem) =>
+            referenceMatchesWorkItem(reference, sourceItem),
+          ),
+      )
+    ) {
+      continue;
+    }
+
+    const logicalTarget = options.targetItems.find((item) =>
+      targetItemMatchesLogicalItem(item, record.logicalItemId),
+    );
+    if (logicalTarget) {
+      linkedIds.add(targetItemId(logicalTarget));
+    }
+  }
+
+  return linkedIds;
+}
+
+function findLinkRecordForSourceItem(options: {
+  records: WorkItemTrackerLinkRecord[];
+  sourceItem: WorkItem;
+  sourceTrackerId: string;
+}): MatchedLinkRecord | undefined {
+  const logicalRecord = options.records.find(
+    (candidate) => candidate.logicalItemId === options.sourceItem.id,
+  );
+  if (logicalRecord) {
+    return {
+      record: logicalRecord,
+      sourceMatch: "logical",
+    };
+  }
+
+  const referencedRecord = options.records.find((candidate) =>
+    candidate.references.some(
+      (reference) =>
+        reference.trackerId === options.sourceTrackerId &&
+        referenceMatchesWorkItem(reference, options.sourceItem),
+    ),
+  );
+  return referencedRecord
+    ? {
+        record: referencedRecord,
+        sourceMatch: "reference",
+      }
+    : undefined;
+}
+
+function targetReferenceForRecord(options: {
+  record: WorkItemTrackerLinkRecord;
+  allowLogicalTarget: boolean;
+  targetItems: WorkItem[];
+  targetContext: ResolvedWorkItemProviderContext;
+  targetTrackerId: string;
+}): WorkItemTrackerReference | undefined {
+  const directReference = options.record.references.find(
+    (reference) => reference.trackerId === options.targetTrackerId,
+  );
+  if (directReference) {
+    return directReference;
+  }
+
+  if (!options.allowLogicalTarget) {
+    return undefined;
+  }
+
+  const logicalTarget = options.targetItems.find((item) =>
+    targetItemMatchesLogicalItem(item, options.record.logicalItemId),
+  );
+  if (!logicalTarget) {
+    return undefined;
+  }
+
+  return referenceFromLinkedLogicalTarget({
+    record: options.record,
+    targetItem: logicalTarget,
+    targetContext: options.targetContext,
+    targetTrackerId: options.targetTrackerId,
+  });
+}
+
+function referenceFromLinkedLogicalTarget(options: {
+  record: WorkItemTrackerLinkRecord;
+  targetItem: WorkItem;
+  targetContext: ResolvedWorkItemProviderContext;
+  targetTrackerId: string;
+}): WorkItemTrackerReference {
+  const externalRef = options.targetItem.externalRef;
+  return {
+    trackerId: options.targetTrackerId,
+    trackerName: options.targetContext.trackerName,
+    provider: externalRef?.provider ?? options.targetItem.provider,
+    host: externalRef?.host ?? null,
+    repositoryId: externalRef?.repositoryId ?? null,
+    repositoryOwner: externalRef?.repositoryOwner ?? null,
+    repositoryName: externalRef?.repositoryName ?? null,
+    projectId: externalRef?.projectId ?? null,
+    boardId: externalRef?.boardId ?? null,
+    itemId: targetItemId(options.targetItem),
+    itemNumber: externalRef?.itemNumber ?? null,
+    itemKey: externalRef?.itemKey ?? null,
+    nodeId: externalRef?.nodeId ?? null,
+    webUrl: externalRef?.webUrl ?? options.targetItem.webUrl ?? null,
+    firstObservedAt: options.record.createdAt,
+    lastObservedAt: options.record.updatedAt,
+  };
+}
+
+function referenceMatchesWorkItem(
+  reference: WorkItemTrackerReference,
+  item: WorkItem,
+): boolean {
+  const externalRef = item.externalRef;
+  return (
+    reference.itemId === item.id ||
+    reference.itemId === externalRef?.itemId ||
+    (reference.itemNumber !== null &&
+      reference.itemNumber !== undefined &&
+      reference.itemNumber === externalRef?.itemNumber) ||
+    (reference.itemKey !== null &&
+      reference.itemKey !== undefined &&
+      reference.itemKey === externalRef?.itemKey) ||
+    (reference.nodeId !== null &&
+      reference.nodeId !== undefined &&
+      reference.nodeId === externalRef?.nodeId)
+  );
+}
+
+function targetItemMatchesLogicalItem(
+  item: WorkItem,
+  logicalItemId: string,
+): boolean {
+  return item.id === logicalItemId || item.externalRef?.itemId === logicalItemId;
 }
 
 function handleWriteDisposition(options: {

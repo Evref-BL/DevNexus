@@ -491,6 +491,129 @@ describe("work item sync planner", () => {
     expect(targetProvider.mutations).toEqual([]);
   });
 
+  it("plans reverse linked updates from GitHub sources back to local archive items", async () => {
+    const projectRoot = makeTempDir("dev-nexus-sync-");
+    const project = createGitHubMirrorProjectContext(projectRoot);
+    const sourceProvider = new MemoryWorkTrackerProvider(
+      [
+        workItem("github-50", {
+          title: "Quick fix",
+          status: "done",
+          provider: "github",
+          labels: ["dogfood", "github"],
+          updatedAt: "2026-05-18T09:00:00.000Z",
+          webUrl: "https://github.com/example/project/issues/50",
+          externalRef: {
+            provider: "github",
+            itemId: "50",
+            itemNumber: 50,
+            repositoryOwner: "example",
+            repositoryName: "project",
+            webUrl: "https://github.com/example/project/issues/50",
+          },
+        }),
+      ],
+      {},
+      "github",
+    );
+    const targetProvider = new MemoryWorkTrackerProvider([
+      workItem("local-173", {
+        title: "Quick fix",
+        status: "ready",
+        labels: ["dogfood"],
+        updatedAt: "2026-05-18T08:00:00.000Z",
+      }),
+      workItem("local-orphan", {
+        title: "Unlinked local item",
+        status: "ready",
+      }),
+    ]);
+    const providers = new Map([
+      ["github", sourceProvider],
+      ["primary", targetProvider],
+    ]);
+    const resolveProject = createProjectResolver(project);
+    await createWorkItemTrackerLinkService({
+      resolveProject,
+      now: fixedClock("2026-05-18T08:30:00.000Z"),
+    }).linkReference({
+      projectRoot,
+      logicalItemId: "local-173",
+      trackerId: "github",
+      itemId: "50",
+      itemNumber: 50,
+      observedAt: "2026-05-18T08:30:00.000Z",
+    });
+
+    const plan = await createWorkItemSyncPlan({
+      projectRoot,
+      componentId: "core",
+      policy: {
+        ...defaultPolicy,
+        sourceTrackerId: "github",
+        targetTrackerId: "primary",
+        filters: {
+          status: "done",
+          labels: ["dogfood"],
+        },
+        fieldSet: ["status", "labels"],
+        writePolicy: {
+          ...defaultPolicy.writePolicy,
+          creates: "skip",
+        },
+      },
+      resolveProject,
+      providerFactory: (context) =>
+        providers.get(context.trackerId ?? "") ?? targetProvider,
+      now: fixedClock("2026-05-18T09:05:00.000Z"),
+    });
+
+    expect(plan.creates).toEqual([]);
+    expect(plan.updates).toMatchObject([
+      {
+        source: { id: "github-50" },
+        target: { id: "local-173" },
+        targetReference: {
+          trackerId: "primary",
+          itemId: "local-173",
+        },
+        fields: [
+          {
+            field: "status",
+            sourceValue: "done",
+            targetValue: "ready",
+            plannedValue: "done",
+          },
+          {
+            field: "labels",
+            sourceValue: ["dogfood", "github"],
+            targetValue: ["dogfood"],
+            plannedValue: ["dogfood", "github"],
+          },
+        ],
+      },
+    ]);
+    expect(plan.linkedTargets).toMatchObject([
+      {
+        source: { id: "github-50" },
+        target: { id: "local-173" },
+      },
+    ]);
+    expect(plan.unlinkedTargets).toMatchObject([
+      {
+        id: "local-orphan",
+      },
+    ]);
+    expect(plan.counts).toMatchObject({
+      creates: 0,
+      updates: 1,
+      linkedTargets: 1,
+      unlinkedTargets: 1,
+    });
+    expect(sourceProvider.mutations).toEqual([]);
+    expect(targetProvider.mutations).toEqual([]);
+  });
+
   it("turns provider capability gaps into planned skips instead of calling mutations", async () => {
     const projectRoot = makeTempDir("dev-nexus-sync-");
     const project = createProjectContext(projectRoot);
