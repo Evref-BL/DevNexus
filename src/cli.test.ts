@@ -676,6 +676,118 @@ describe("dev-nexus cli", () => {
         decision: "rerun_once",
       },
     });
+
+    const utf16ChecksFile = path.join(projectRoot, "checks-utf16.json");
+    const greenChecksJson = JSON.stringify({
+      checks: [
+        {
+          name: "Node 24 check (ubuntu-latest)",
+          bucket: "pass",
+        },
+        {
+          name: "Node 24 check (windows-latest)",
+          bucket: "pass",
+        },
+      ],
+    });
+    fs.writeFileSync(
+      utf16ChecksFile,
+      Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from(greenChecksJson, "utf16le"),
+      ]),
+    );
+
+    const utf16Output = captureOutput();
+    await main(
+      [
+        "publication",
+        "green-main",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--pr",
+        "12",
+        "--checks-file",
+        utf16ChecksFile,
+        "--json",
+      ],
+      { stdout: utf16Output.writer },
+    );
+
+    expect(JSON.parse(utf16Output.output())).toMatchObject({
+      ok: true,
+      status: "green",
+      merge: {
+        allowed: true,
+      },
+    });
+
+    const utf16BeChecksFile = path.join(projectRoot, "checks-utf16be.json");
+    const utf16BeBody = Buffer.from(greenChecksJson, "utf16le");
+    for (let index = 0; index < utf16BeBody.length; index += 2) {
+      const low = utf16BeBody[index]!;
+      utf16BeBody[index] = utf16BeBody[index + 1]!;
+      utf16BeBody[index + 1] = low;
+    }
+    fs.writeFileSync(
+      utf16BeChecksFile,
+      Buffer.concat([Buffer.from([0xfe, 0xff]), utf16BeBody]),
+    );
+
+    const utf16BeOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "green-main",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--pr",
+        "12",
+        "--checks-file",
+        utf16BeChecksFile,
+        "--json",
+      ],
+      { stdout: utf16BeOutput.writer },
+    );
+
+    expect(JSON.parse(utf16BeOutput.output())).toMatchObject({
+      ok: true,
+      status: "green",
+    });
+
+    const invalidChecksFile = path.join(projectRoot, "checks-invalid.json");
+    fs.writeFileSync(invalidChecksFile, "{not-json", "utf8");
+    const invalidOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "green-main",
+        "plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--pr",
+        "12",
+        "--checks-file",
+        invalidChecksFile,
+        "--json",
+      ],
+      { stdout: invalidOutput.writer },
+    );
+
+    expect(JSON.parse(invalidOutput.output())).toMatchObject({
+      ok: false,
+      error: {
+        message: expect.stringContaining("must contain valid JSON"),
+      },
+    });
+    expect(JSON.parse(invalidOutput.output()).error.message).toContain(
+      invalidChecksFile,
+    );
   });
 
   it("keeps onboarding documentation command examples on the CLI surface", () => {
