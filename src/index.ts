@@ -66,6 +66,7 @@ export * from "./processSupervisor.js";
 export * from "./workTrackingGitHubProvider.js";
 export * from "./workTrackingGitLabProvider.js";
 export * from "./workTrackingJiraProvider.js";
+export * from "./workTrackingQuery.js";
 export * from "./workItemService.js";
 export * from "./workItemImportPlanner.js";
 export * from "./workItemSyncPlanner.js";

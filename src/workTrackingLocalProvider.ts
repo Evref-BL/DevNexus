@@ -1,5 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
+import {
+  assertWorkStatus as assertSharedWorkStatus,
+  expandWorkStatusQuery,
+  isClosedWorkStatus,
+  isWorkStatus,
+  matchesRequiredStrings,
+  matchesWorkItemSearch,
+  matchesWorkStatusFilter,
+  normalizeWorkItemLimit,
+  normalizeWorkItemSearch,
+  normalizeWorkItemStringArray,
+  requiredNonEmptyWorkItemString,
+} from "./workTrackingQuery.js";
 import type {
   CreateWorkItemInput,
   DetectedTracker,
@@ -23,18 +36,6 @@ export const localWorkTrackingStoreFileName = "work-items.json";
 export const localWorkTrackingStoreVersion = 1;
 const localWorkTrackingStoreLockTimeoutMs = 30_000;
 const localWorkTrackingStoreLockRetryMs = 10;
-
-const openStatuses = new Set<WorkStatus>([
-  "todo",
-  "ready",
-  "in_progress",
-  "blocked",
-]);
-const closedStatuses = new Set<WorkStatus>(["done", "wont_do"]);
-const workStatuses = new Set<WorkStatus>([
-  ...openStatuses,
-  ...closedStatuses,
-]);
 
 export interface LocalWorkTrackingStore {
   version: typeof localWorkTrackingStoreVersion;
@@ -86,6 +87,11 @@ export class LocalWorkTrackerProviderError extends Error {
     }
   }
 }
+
+const localWorkStatusValidationOptions = {
+  errorFactory: localProviderError,
+  invalidStatusMessage: invalidLocalWorkStatusMessage,
+};
 
 export const localWorkTrackerCapabilities: TrackerCapabilities = {
   createItem: true,
@@ -226,20 +232,20 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
 
     const labels = normalizeStringArray(query.labels, "labels");
     const assignees = normalizeStringArray(query.assignees, "assignees");
-    const search = query.search?.trim().toLowerCase();
+    const search = normalizeWorkItemSearch(query.search);
     const limit = normalizeLimit(query.limit);
 
     let items = this.loadStore(projectRoot, "listWorkItems").items.filter((item) => {
-      if (statuses && !statuses.has(item.status)) {
+      if (!matchesWorkStatusFilter(item, statuses)) {
         return false;
       }
-      if (labels.some((label) => !item.labels?.includes(label))) {
+      if (!matchesRequiredStrings(item.labels, labels)) {
         return false;
       }
-      if (assignees.some((assignee) => !item.assignees?.includes(assignee))) {
+      if (!matchesRequiredStrings(item.assignees, assignees)) {
         return false;
       }
-      if (search && !matchesSearch(item, search)) {
+      if (search && !matchesWorkItemSearch(item, search)) {
         return false;
       }
 
@@ -768,12 +774,6 @@ function findWorkItem(store: LocalWorkTrackingStore, ref: WorkItemRef): WorkItem
   return item;
 }
 
-function matchesSearch(item: WorkItem, search: string): boolean {
-  return [item.id, item.title, item.description ?? ""].some((value) =>
-    value.toLowerCase().includes(search),
-  );
-}
-
 function localItemNumber(record: Record<string, unknown>): number | null {
   const externalRef =
     record.externalRef && typeof record.externalRef === "object"
@@ -786,48 +786,21 @@ function localItemNumber(record: Record<string, unknown>): number | null {
 }
 
 function isClosedStatus(status: WorkStatus): boolean {
-  return status === "done" || status === "wont_do";
+  return isClosedWorkStatus(status);
 }
 
 function assertWorkStatus(status: string): asserts status is WorkStatus {
-  if (!workStatuses.has(status as WorkStatus)) {
-    throw new LocalWorkTrackerProviderError(
-      `Invalid local work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`,
-    );
-  }
+  assertSharedWorkStatus(status, localWorkStatusValidationOptions);
 }
 
 function normalizeStatusFilter(
   status: WorkStatusQuery | WorkStatusQuery[] | undefined,
 ): Set<WorkStatus> | undefined {
-  if (status === undefined) {
-    return undefined;
-  }
-
-  const values = Array.isArray(status) ? status : [status];
-  const normalized = new Set<WorkStatus>();
-  for (const value of values) {
-    if (value === "open") {
-      for (const openStatus of openStatuses) {
-        normalized.add(openStatus);
-      }
-      continue;
-    }
-    if (value === "closed") {
-      for (const closedStatus of closedStatuses) {
-        normalized.add(closedStatus);
-      }
-      continue;
-    }
-    assertWorkStatus(value);
-    normalized.add(value);
-  }
-
-  return normalized;
+  return expandWorkStatusQuery(status, localWorkStatusValidationOptions);
 }
 
 function workStatus(value: unknown, pathName: string): WorkStatus {
-  if (typeof value !== "string" || !workStatuses.has(value as WorkStatus)) {
+  if (!isWorkStatus(value)) {
     throw new LocalWorkTrackerProviderError(`${pathName} must be a valid status`);
   }
 
@@ -835,48 +808,22 @@ function workStatus(value: unknown, pathName: string): WorkStatus {
 }
 
 function normalizeLimit(limit: number | undefined): number | undefined {
-  if (limit === undefined) {
-    return undefined;
-  }
-  if (!Number.isInteger(limit) || limit < 0) {
-    throw new LocalWorkTrackerProviderError(
-      "limit must be a non-negative integer",
-    );
-  }
-
-  return limit;
+  return normalizeWorkItemLimit(limit, { errorFactory: localProviderError });
 }
 
 function normalizeStringArray(
   values: string[] | undefined,
   pathName: string,
 ): string[] {
-  if (values === undefined) {
-    return [];
-  }
-
-  return stringArray(values, pathName);
+  return normalizeWorkItemStringArray(values, pathName, {
+    errorFactory: localProviderError,
+  });
 }
 
 function stringArray(value: unknown, pathName: string): string[] {
-  if (value === undefined) {
-    return [];
-  }
-  if (!Array.isArray(value)) {
-    throw new LocalWorkTrackerProviderError(`${pathName} must be an array`);
-  }
-
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of value) {
-    const normalized = requiredNonEmptyString(item, pathName);
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      result.push(normalized);
-    }
-  }
-
-  return result;
+  return normalizeWorkItemStringArray(value, pathName, {
+    errorFactory: localProviderError,
+  });
 }
 
 function optionalNullableString(
@@ -911,13 +858,9 @@ function optionalNullableText(
 }
 
 function requiredNonEmptyString(value: unknown, pathName: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new LocalWorkTrackerProviderError(
-      `${pathName} must be a non-empty string`,
-    );
-  }
-
-  return value.trim();
+  return requiredNonEmptyWorkItemString(value, pathName, {
+    errorFactory: localProviderError,
+  });
 }
 
 function positiveInteger(value: unknown, pathName: string): number {
@@ -936,4 +879,12 @@ function assertRecord(value: unknown, pathName: string): Record<string, unknown>
   }
 
   return value as Record<string, unknown>;
+}
+
+function localProviderError(message: string): LocalWorkTrackerProviderError {
+  return new LocalWorkTrackerProviderError(message);
+}
+
+function invalidLocalWorkStatusMessage(status: string): string {
+  return `Invalid local work status: ${status}; expected todo, ready, in_progress, blocked, done, or wont_do`;
 }
