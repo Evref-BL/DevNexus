@@ -50,6 +50,10 @@ import {
   getNexusWorkItemDiscoveryStatus,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
+  claimNexusEligibleWorkItem,
+  type NexusEligibleWorkClaimProviderFactory,
+} from "./nexusWorkItemClaim.js";
+import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
 } from "./nexusAutomationStatus.js";
@@ -68,6 +72,9 @@ import {
   getNexusEligibleWorkSummary,
   type NexusEligibleWorkMode,
 } from "./nexusEligibleWorkSummary.js";
+import {
+  defaultNexusAutomationConfig,
+} from "./nexusAutomationConfig.js";
 import {
   probeCodexAppServerInitialize,
 } from "./codexAppServerInitializeProbe.js";
@@ -201,6 +208,8 @@ export interface DevNexusMcpToolContext {
   mcpRuntimeStartedAt?: Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
+  workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimLeaseTokenFactory?: () => string;
 }
 
 export interface DevNexusMcpToolResult {
@@ -896,6 +905,27 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "work_item_claim_next",
+    description: "Claim the next eligible work item through the configured DevNexus work tracker.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        homePath: { type: "string" },
+        project: { type: "string" },
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        trackerId: { type: "string" },
+        mode: { type: "string", enum: ["default", "discovery"] },
+        hostId: { type: "string" },
+        agentId: { type: ["string", "null"] },
+        ownerId: { type: ["string", "null"] },
+        leaseDurationMs: { type: "number" },
+      },
+      required: ["hostId"],
       additionalProperties: false,
     },
   },
@@ -1818,6 +1848,55 @@ export async function callDevNexusMcpTool(
             projectRoot: projectRootFromArgs(args),
           }),
         });
+      case "work_item_claim_next": {
+        assertMcpMutationAllowed(args, context, {
+          command: "work_item_claim_next",
+          mutationClass: "local_tracker",
+          componentId: optionalString(args, "componentId", "arguments"),
+        });
+        const provider = workItemTrackerProviderFromArgs(args, {
+          ...projectSelectorFromArgs(args),
+          trackerId: optionalString(args, "trackerId", "arguments"),
+        });
+        assertMcpWorkItemAuthorityAllowed(args, [
+          ...workItemPatchAuthorityActions(
+            {
+              status: "in_progress",
+              description: "DevNexus optimistic claim metadata",
+            },
+            provider,
+          ),
+          workItemCommentAuthorityAction(provider),
+        ]);
+        const projectRoot = projectRootFromArgs(args);
+        const projectConfig = loadProjectConfig(projectRoot);
+        return toolResult({
+          ok: true,
+          claim: await claimNexusEligibleWorkItem({
+            projectRoot,
+            projectConfig,
+            components: resolveProjectComponents(projectRoot, projectConfig),
+            automationConfig:
+              projectConfig.automation ?? defaultNexusAutomationConfig,
+            componentId: optionalString(args, "componentId", "arguments"),
+            trackerId: optionalString(args, "trackerId", "arguments"),
+            mode: optionalEligibleWorkMode(args, "mode", "arguments"),
+            owner: {
+              hostId: requiredString(args, "hostId", "arguments"),
+              agentId: optionalNullableString(args, "agentId", "arguments"),
+              ownerId: optionalNullableString(args, "ownerId", "arguments"),
+            },
+            leaseDurationMs: optionalPositiveInteger(
+              args,
+              "leaseDurationMs",
+              "arguments",
+            ),
+            providerFactory: context.workItemClaimProviderFactory,
+            leaseTokenFactory: context.workItemClaimLeaseTokenFactory,
+            now: context.now,
+          }),
+        });
+      }
       case "work_item_list": {
         const detail = optionalString(args, "detail", "arguments") ?? "summary";
         if (detail !== "summary" && detail !== "full") {

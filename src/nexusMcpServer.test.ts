@@ -19,8 +19,15 @@ import {
   StdioJsonRpcTransport,
   type GitCommandResult,
   type GitRunner,
+  type NexusEligibleWorkClaimProviderFactory,
   type NexusProjectHostingProviderAdapter,
   type NexusProjectConfig,
+  type WorkComment,
+  type WorkItem,
+  type WorkItemPatch,
+  type WorkItemQuery,
+  type WorkItemRef,
+  type WorkTrackerProvider,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -246,6 +253,7 @@ describe("DevNexus MCP server", () => {
       "remote_execution_result_get",
       "work_item_create",
       "work_item_discovery_status",
+      "work_item_claim_next",
       "work_item_list",
       "work_item_get",
       "work_item_update",
@@ -292,6 +300,9 @@ describe("DevNexus MCP server", () => {
     const eligibleWork = listDevNexusMcpTools().find(
       (candidate) => candidate.name === "eligible_work",
     );
+    const claimNext = listDevNexusMcpTools().find(
+      (candidate) => candidate.name === "work_item_claim_next",
+    );
     const targetCycleRecord = listDevNexusMcpTools().find(
       (candidate) => candidate.name === "target_cycle_record",
     );
@@ -312,6 +323,20 @@ describe("DevNexus MCP server", () => {
           enum: ["default", "discovery"],
         },
       },
+    });
+    expect(claimNext?.inputSchema).toMatchObject({
+      properties: {
+        mode: {
+          enum: ["default", "discovery"],
+        },
+        hostId: {
+          type: "string",
+        },
+        leaseDurationMs: {
+          type: "number",
+        },
+      },
+      required: ["hostId"],
     });
     expect(targetCycleRecord?.inputSchema).toMatchObject({
       properties: {
@@ -3452,4 +3477,238 @@ describe("DevNexus MCP server", () => {
     stdin.end();
     await started;
   });
+
+  it("claims the next eligible GitHub work item through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-claim-");
+    saveProjectConfig(projectRoot, githubClaimProjectConfig());
+    const provider = new McpClaimMemoryProvider([
+      mcpGithubWorkItem("github-7", "Claim through MCP", {
+        labels: ["automation"],
+      }),
+    ]);
+
+    const result = await callDevNexusMcpTool(
+      "work_item_claim_next",
+      {
+        projectRoot,
+        componentId: "core",
+        trackerId: "github",
+        hostId: "host-a",
+        agentId: "agent-a",
+        leaseDurationMs: 600000,
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: mcpClaimProviderFactory(provider),
+        workItemClaimLeaseTokenFactory: () => "mcp-token-1",
+      },
+    );
+
+    expect(toolJson(result)).toMatchObject({
+      ok: true,
+      claim: {
+        status: "claimed",
+        workItem: {
+          id: "github-7",
+          status: "in_progress",
+        },
+        owner: {
+          hostId: "host-a",
+          agentId: "agent-a",
+          leaseToken: "mcp-token-1",
+          expiresAt: "2026-05-20T10:10:00.000Z",
+        },
+      },
+    });
+  });
+
+  it("reports blocked claim provider capabilities through MCP", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-claim-");
+    saveProjectConfig(projectRoot, githubClaimProjectConfig());
+    const provider = new McpClaimMemoryProvider([
+      mcpGithubWorkItem("github-8", "Cannot update", {
+        labels: ["automation"],
+      }),
+    ]);
+    provider.capabilities.updateItem = false;
+
+    const result = await callDevNexusMcpTool(
+      "work_item_claim_next",
+      {
+        projectRoot,
+        hostId: "host-a",
+      },
+      {
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: mcpClaimProviderFactory(provider),
+      },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(toolJson(result)).toMatchObject({
+      ok: false,
+    });
+    expect(toolJson(result).error).toContain("claim work items");
+    expect(provider.updates).toEqual([]);
+  });
 });
+
+function githubClaimProjectConfig(): NexusProjectConfig {
+  return projectConfig({
+    components: [
+      {
+        id: "core",
+        name: "Core",
+        kind: "git",
+        role: "primary",
+        remoteUrl: null,
+        defaultBranch: "main",
+        sourceRoot: "source",
+        defaultWorkTrackerId: "github",
+        workTrackers: [
+          {
+            id: "github",
+            name: "GitHub",
+            enabled: true,
+            roles: ["primary", "eligible_source"],
+            workTracking: {
+              provider: "github",
+              repository: {
+                owner: "example",
+                name: "demo",
+              },
+            },
+          },
+        ],
+        relationships: [],
+      },
+    ],
+  });
+}
+
+function mcpGithubWorkItem(
+  id: string,
+  title: string,
+  overrides: Partial<WorkItem> = {},
+): WorkItem {
+  const itemNumber = Number(id.replace(/^github-/, ""));
+  return {
+    id,
+    title,
+    description: overrides.description ?? null,
+    status: overrides.status ?? "ready",
+    provider: "github",
+    labels: overrides.labels ?? [],
+    assignees: overrides.assignees ?? [],
+    milestone: null,
+    createdAt: "2026-05-20T09:00:00.000Z",
+    updatedAt: "2026-05-20T09:00:00.000Z",
+    closedAt: null,
+    webUrl: `https://github.com/example/demo/issues/${itemNumber}`,
+    externalRef: {
+      provider: "github",
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      itemId: String(itemNumber),
+      itemNumber,
+    },
+    ...overrides,
+  };
+}
+
+function mcpClaimProviderFactory(
+  provider: McpClaimMemoryProvider,
+): NexusEligibleWorkClaimProviderFactory {
+  return () => provider;
+}
+
+class McpClaimMemoryProvider implements WorkTrackerProvider {
+  readonly provider = "github";
+  readonly capabilities = {
+    createItem: true,
+    listItems: true,
+    getItem: true,
+    updateItem: true,
+    comment: true,
+    labels: true,
+    assignees: true,
+    milestones: true,
+    board: false,
+    boardStatus: false,
+    draftItems: false,
+    webhooks: false,
+  };
+  readonly updates: Array<{ ref: WorkItemRef; patch: WorkItemPatch }> = [];
+
+  constructor(readonly items: WorkItem[]) {}
+
+  async createWorkItem(): Promise<WorkItem> {
+    throw new Error("not implemented");
+  }
+
+  async listWorkItems(query: WorkItemQuery): Promise<WorkItem[]> {
+    return this.items.filter((item) => mcpClaimMatchesQuery(item, query)).map(cloneMcpClaimItem);
+  }
+
+  async getWorkItem(ref: WorkItemRef): Promise<WorkItem> {
+    return cloneMcpClaimItem(this.findItem(ref));
+  }
+
+  async updateWorkItem(ref: WorkItemRef, patch: WorkItemPatch): Promise<WorkItem> {
+    this.updates.push({ ref, patch });
+    const item = this.findItem(ref);
+    if (patch.status !== undefined) {
+      item.status = patch.status;
+    }
+    if (patch.description !== undefined) {
+      item.description = patch.description;
+    }
+    return cloneMcpClaimItem(item);
+  }
+
+  async addComment(_ref: WorkItemRef, body: string): Promise<WorkComment> {
+    return {
+      id: "comment-1",
+      body,
+    };
+  }
+
+  private findItem(ref: WorkItemRef): WorkItem {
+    const id = ref.id ?? ref.externalRef?.itemId;
+    const item = this.items.find(
+      (candidate) =>
+        candidate.id === id ||
+        candidate.externalRef?.itemId === id ||
+        candidate.externalRef?.itemNumber === Number(id),
+    );
+    if (!item) {
+      throw new Error(`missing item ${id}`);
+    }
+
+    return item;
+  }
+}
+
+function mcpClaimMatchesQuery(item: WorkItem, query: WorkItemQuery): boolean {
+  const statuses = Array.isArray(query.status)
+    ? query.status
+    : query.status
+      ? [query.status]
+      : [];
+  if (statuses.length > 0 && !statuses.includes(item.status)) {
+    return false;
+  }
+  if (query.labels?.some((label) => !item.labels?.includes(label))) {
+    return false;
+  }
+  return true;
+}
+
+function cloneMcpClaimItem(item: WorkItem): WorkItem {
+  return {
+    ...item,
+    labels: item.labels ? [...item.labels] : undefined,
+    assignees: item.assignees ? [...item.assignees] : undefined,
+    externalRef: item.externalRef ? { ...item.externalRef } : undefined,
+  };
+}
