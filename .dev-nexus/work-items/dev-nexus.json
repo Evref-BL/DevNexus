@@ -1,8 +1,8 @@
 {
   "version": 1,
   "nextNumber": 173,
-  "nextCommentNumber": 377,
-  "updatedAt": "2026-05-20T04:22:07.255Z",
+  "nextCommentNumber": 380,
+  "updatedAt": "2026-05-20T05:26:07.906Z",
   "items": [
     {
       "id": "local-1",
@@ -4441,7 +4441,7 @@
       "id": "local-172",
       "title": "Keep done items out of target-report readyEligibleWork",
       "description": "Type: target-report defect slice\nReadiness: autonomous agent-ready (AFK)\nSource: 2026-05-20 heartbeat bounded no-eligible-work probe.\n\nSymptom:\nAfter local-166 completed and the automation selector returned zero current eligible work, `dev-nexus automation target-report` still listed completed tracker items such as local-147, local-166, local-168, and local-169 under `workItemSummary.progress.readyEligibleWork` because their latest recorded cycle status was historically `eligible`.\n\nGoal:\nMake the target report progress buckets reflect current actionable work, or clearly separate historical cycle classifications from current tracker status so completed items do not appear as ready eligible work.\n\nAcceptance criteria:\n- Completed or otherwise non-ready tracker items are not reported in the current `readyEligibleWork` progress bucket merely because an older target cycle recorded them as `eligible`.\n- The report preserves useful historical cycle evidence in an explicitly historical field or by resolving the current tracker status before bucket assignment.\n- Relaunch/stop decisions and existing completed-work summaries remain stable.\n- Add regression coverage using a completed local work item whose latest cycle status is `eligible`.\n- Keep provider reads mocked or local-only; do not mutate provider trackers.\n\nVerification:\n- Focused target-report progress tests.\n- `npm run check` when feasible.",
-      "status": "ready",
+      "status": "done",
       "provider": "local",
       "labels": [
         "dogfood",
@@ -4452,8 +4452,8 @@
       "assignees": [],
       "milestone": null,
       "createdAt": "2026-05-20T04:22:07.255Z",
-      "updatedAt": "2026-05-20T04:22:07.255Z",
-      "closedAt": null,
+      "updatedAt": "2026-05-20T05:26:07.906Z",
+      "closedAt": "2026-05-20T05:25:54.167Z",
       "webUrl": null,
       "externalRef": {
         "provider": "local",
@@ -9039,6 +9039,40 @@
         }
       }
     ],
-    "local-172": []
+    "local-172": [
+      {
+        "id": "local-comment-377",
+        "body": "Started heartbeat implementation in source worktree codex/dev-nexus/local-172-target-report-current-ready-progress. Scope: focused target-report regression, current-progress bucket filtering, local-only/mocked tests, and green-main PR publication.",
+        "author": null,
+        "createdAt": "2026-05-20T05:19:57.689Z",
+        "updatedAt": "2026-05-20T05:19:57.689Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-377"
+        }
+      },
+      {
+        "id": "local-comment-378",
+        "body": "Completed through DevNexus PR #21, merged to main as 93f0c3c. Target report progress now lets current non-ready tracker status override stale eligible cycle facts, so done items no longer appear in readyEligibleWork. Verification passed: focused target-report test, build, full npm run check before PR, required PR #21 Node 24 checks on Ubuntu/Windows/macOS, post-merge npm run check, and dogfood target-report smoke showing readyEligibleWork empty for the stale done items.",
+        "author": null,
+        "createdAt": "2026-05-20T05:25:54.740Z",
+        "updatedAt": "2026-05-20T05:25:54.740Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-378"
+        }
+      },
+      {
+        "id": "local-comment-379",
+        "body": "DevNexus coordination handoff\n\nStatus: merged\nHost: BLPP-15398\nBranch: codex/dev-nexus-dogfood/local-172-project-state\nHead: f5f51afb1cf9a21d905614c6d593c00c2d19e274\n\n```json\n{\n  \"kind\": \"dev-nexus.coordination.handoff\",\n  \"version\": 1,\n  \"createdAt\": \"2026-05-20T05:26:07.893Z\",\n  \"projectId\": \"dev-nexus-dogfood\",\n  \"projectRoot\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-172-project-state\",\n  \"componentId\": \"dev-nexus\",\n  \"componentName\": \"DevNexus\",\n  \"workItemId\": \"local-172\",\n  \"logicalItemId\": \"local-172\",\n  \"selectedWorkItemRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-172\",\n    \"itemNumber\": 172,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-172\",\n      \"itemNumber\": 172\n    }\n  },\n  \"coordinationTargetRef\": {\n    \"componentId\": \"dev-nexus\",\n    \"trackerId\": \"local\",\n    \"trackerName\": \"Local Primary\",\n    \"provider\": \"local\",\n    \"itemId\": \"local-172\",\n    \"itemNumber\": 172,\n    \"itemKey\": null,\n    \"webUrl\": null,\n    \"externalRef\": {\n      \"provider\": \"local\",\n      \"itemId\": \"local-172\",\n      \"itemNumber\": 172\n    }\n  },\n  \"trackerReferences\": [\n    {\n      \"componentId\": \"dev-nexus\",\n      \"trackerId\": \"local\",\n      \"trackerName\": \"Local Primary\",\n      \"provider\": \"local\",\n      \"itemId\": \"local-172\",\n      \"itemNumber\": 172,\n      \"itemKey\": null,\n      \"webUrl\": null,\n      \"externalRef\": {\n        \"provider\": \"local\",\n        \"itemId\": \"local-172\",\n        \"itemNumber\": 172\n      }\n    }\n  ],\n  \"hostId\": \"BLPP-15398\",\n  \"agentId\": null,\n  \"status\": \"merged\",\n  \"repositoryPath\": \"C:\\\\dev\\\\code\\\\dev-nexus-dogfood\\\\worktrees\\\\dev-nexus-dogfood\\\\codex-dev-nexus-dogfood-local-172-project-state\",\n  \"branch\": \"codex/dev-nexus-dogfood/local-172-project-state\",\n  \"upstream\": null,\n  \"baseRef\": \"main\",\n  \"headCommit\": \"f5f51afb1cf9a21d905614c6d593c00c2d19e274\",\n  \"dirty\": true,\n  \"ahead\": null,\n  \"behind\": null,\n  \"pushed\": null,\n  \"changedAreas\": [\n    \"src/nexusAutomationTargetReport.ts\",\n    \"src/nexusAutomationTargetReport.test.ts\"\n  ],\n  \"decisions\": [\n    \"Target-report progress buckets now let current non-ready tracker status override stale eligible target-cycle facts.\",\n    \"Historical cycle status remains visible on the work item reference; the bucket assignment is what changes for current progress reporting.\",\n    \"No provider reads or mutations were added.\"\n  ],\n  \"verificationSummary\": \"Passed npm test -- src/nexusAutomationTargetReport.test.ts; npm run build; git diff --check; npm run check in source worktree; PR #21 Node 24 checks on Ubuntu, Windows, and macOS; post-merge npm run check in C:\\\\dev\\\\code\\\\sources\\\\dev-nexus; dogfood target-report smoke shows readyEligibleWork empty for stale done items.\",\n  \"integrationPreference\": \"Merged to DevNexus main through PR #21 as 93f0c3c; dogfood metadata closeout is being published from the project-meta worktree.\",\n  \"note\": \"Source branch is merged and can be cleaned after dogfood metadata is published.\",\n  \"leaseId\": \"lease-f492ef54db6b8e12\"\n}\n```",
+        "author": null,
+        "createdAt": "2026-05-20T05:26:07.906Z",
+        "updatedAt": "2026-05-20T05:26:07.906Z",
+        "externalRef": {
+          "provider": "local",
+          "itemId": "local-comment-379"
+        }
+      }
+    ]
   }
 }
