@@ -1032,8 +1032,7 @@ function publicationPolicyChecks(options: {
     );
     if (
       options.policy.actor.kind !== "human" &&
-      options.gitIdentity.status !== "not_configured" &&
-      options.gitIdentity.status !== "unchecked"
+      options.gitIdentity.status !== "not_configured"
     ) {
       checks.push(
         check(

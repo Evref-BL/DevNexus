@@ -223,6 +223,125 @@ describe("nexus publication policy", () => {
     );
   });
 
+  it("uses project publication Git identity as the default commit identity", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const configWithDefaultIdentity = projectConfig();
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...configWithDefaultIdentity.automation!,
+        publication: {
+          ...configWithDefaultIdentity.automation!.publication,
+          gitIdentity: {
+            name: "Project Bot",
+            email: "project-bot@example.invalid",
+          },
+        },
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+    const actorCommands: Array<{ env: NodeJS.ProcessEnv }> = [];
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "git_push",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(sourceRoot, {
+        localUserName: "Project Bot",
+        localUserEmail: "project-bot@example.invalid",
+      }),
+      actorRunner: (_command, _args, options) => {
+        actorCommands.push({ env: options.env });
+        return { status: 0, stdout: "example-bot\n", stderr: "" };
+      },
+    });
+
+    expect(status.blocking).toBe(false);
+    expect(status.gitIdentity).toMatchObject({
+      status: "matched",
+      expected: {
+        name: "Project Bot",
+        email: "project-bot@example.invalid",
+        source: "publication.gitIdentity",
+      },
+    });
+    expect(actorCommands[0]!.env).toMatchObject({
+      GIT_AUTHOR_NAME: "Project Bot",
+      GIT_AUTHOR_EMAIL: "project-bot@example.invalid",
+      GIT_COMMITTER_NAME: "Project Bot",
+      GIT_COMMITTER_EMAIL: "project-bot@example.invalid",
+    });
+  });
+
+  it("blocks automation publication when the default commit identity is incomplete", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const incompleteIdentityConfig = projectConfig();
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: {
+        ...incompleteIdentityConfig.automation!,
+        publication: {
+          ...incompleteIdentityConfig.automation!.publication,
+          gitIdentity: {
+            name: "Example Bot",
+            email: null,
+          },
+        },
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+    const component = resolveProjectComponents(projectRoot, config)[0]!;
+
+    const status = getNexusPublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      component,
+      action: "git_push",
+      authProfiles: [
+        {
+          id: "bot-github",
+          actorId: "example-bot-actor",
+          provider: "github",
+          kind: "automation",
+          account: "example-bot",
+          sshHost: "github.com-bot",
+          githubCliConfigDir: "home:.config/gh-example-bot",
+          environmentKeys: ["GH_CONFIG_DIR"],
+        },
+      ],
+      gitRunner: publicationGitRunner(sourceRoot, {
+        localUserName: "Example Bot",
+        localUserEmail: "bot@example.invalid",
+      }),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status.blocking).toBe(true);
+    expect(status.gitIdentity).toMatchObject({
+      status: "unchecked",
+      expected: {
+        name: "Example Bot",
+        email: null,
+        source: "publication.gitIdentity",
+      },
+    });
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:primary:gitIdentity",
+        status: "failed",
+        message: expect.stringContaining("Expected Git email is not configured"),
+      }),
+    );
+    expect(() => assertNexusPublicationGuard(status)).toThrow(
+      /Expected Git email is not configured/u,
+    );
+  });
+
   it("blocks when only inherited human Git identity is configured for automation publication", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-project-");
     const sourceRoot = path.join(projectRoot, "source");

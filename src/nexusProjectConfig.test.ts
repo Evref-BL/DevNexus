@@ -1832,6 +1832,7 @@ describe("project config", () => {
         packagePublish: false,
         releasePublish: false,
         actor: null,
+        gitIdentity: null,
         manualRemote: null,
         manualActor: null,
         commandEnvironment: {},
@@ -1862,6 +1863,10 @@ describe("project config", () => {
               provider: "github",
               handle: "example-bot",
             },
+            gitIdentity: {
+              name: "Example Bot",
+              email: "bot@example.invalid",
+            },
             manualRemote: "origin",
             manualActor: {
               kind: "human",
@@ -1889,6 +1894,10 @@ describe("project config", () => {
         provider: "github",
         handle: "example-bot",
         id: null,
+      },
+      gitIdentity: {
+        name: "Example Bot",
+        email: "bot@example.invalid",
       },
       manualRemote: "origin",
       manualActor: {

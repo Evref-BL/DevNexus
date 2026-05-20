@@ -158,6 +158,11 @@ export interface NexusPublicationActorConfig {
   id: string | null;
 }
 
+export interface NexusPublicationGitIdentityConfig {
+  name: string | null;
+  email: string | null;
+}
+
 export interface NexusAutomationGreenMainConfig {
   integrationPreference: NexusAutomationGreenMainIntegrationPreference;
   integrationBranch: string | null;
@@ -178,6 +183,7 @@ export interface NexusAutomationPublicationConfig {
   packagePublish: boolean;
   releasePublish: boolean;
   actor: NexusPublicationActorConfig | null;
+  gitIdentity: NexusPublicationGitIdentityConfig | null;
   manualRemote: string | null;
   manualActor: NexusPublicationActorConfig | null;
   commandEnvironment: Record<string, string>;
@@ -295,6 +301,7 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     packagePublish: false,
     releasePublish: false,
     actor: null,
+    gitIdentity: null,
     manualRemote: null,
     manualActor: null,
     commandEnvironment: {},
@@ -1213,11 +1220,36 @@ export function validatePartialNexusAutomationPublicationConfig(
     ...optionalBooleanField(record, "packagePublish", pathName),
     ...optionalBooleanField(record, "releasePublish", pathName),
     ...optionalPublicationActorField(record, "actor", pathName),
+    ...optionalPublicationGitIdentityField(record, "gitIdentity", pathName),
     ...optionalNullableStringField(record, "manualRemote", pathName),
     ...optionalPublicationActorField(record, "manualActor", pathName),
     ...optionalCommandEnvironmentField(record, "commandEnvironment", pathName),
     ...optionalGreenMainPublicationField(record, "greenMain", pathName),
   };
+}
+
+function optionalPublicationGitIdentityField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusPublicationGitIdentityConfig | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<Key, null>;
+  }
+
+  const identityPath = `${pathName}.${key}`;
+  const identity = assertRecord(value, identityPath);
+  return {
+    [key]: {
+      name: optionalNullableString(identity.name, `${identityPath}.name`) ?? null,
+      email:
+        optionalNullableString(identity.email, `${identityPath}.email`) ?? null,
+    },
+  } as Record<Key, NexusPublicationGitIdentityConfig>;
 }
 
 function assertRecord(value: unknown, pathName: string): Record<string, unknown> {

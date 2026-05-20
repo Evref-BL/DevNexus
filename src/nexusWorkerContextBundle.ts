@@ -875,12 +875,18 @@ function renderGitIdentityLines(
   gitIdentity: NexusExpectedGitIdentity | null,
 ): string[] {
   if (!gitIdentity) {
-    return ["- automation Git identity: none"];
+    return [
+      "- automation Git identity: none",
+      "- automation Git identity warning: repo-local Git identity is not configured; raw git commit may use an inherited host identity.",
+    ];
   }
 
   return [
     `- automation Git identity: ${gitIdentity.name ?? "unknown"} <${gitIdentity.email ?? "unknown"}>`,
     `- automation Git identity source: ${gitIdentity.source}`,
+    gitIdentity.name && gitIdentity.email
+      ? "- raw git commit uses the prepared repo-local automation identity unless the worker overrides Git config."
+      : "- automation Git identity warning: repo-local Git identity is incomplete; raw git commit may use an inherited host identity.",
     ...gitIdentity.warnings.map((warning) => `- automation Git identity warning: ${warning}`),
   ];
 }

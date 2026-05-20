@@ -928,6 +928,7 @@ function localOnlyPublicationPolicy(): NexusAutomationPublicationConfig {
     packagePublish: false,
     releasePublish: false,
     actor: null,
+    gitIdentity: null,
     manualRemote: null,
     manualActor: null,
     commandEnvironment: {},
