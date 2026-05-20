@@ -173,7 +173,7 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus",
       "worktreesRoot": "worktrees/dev-nexus",
-      "defaultWorkTrackerId": "local",
+      "defaultWorkTrackerId": "github",
       "trackerDiscovery": {
         "scannedRoles": [
           "primary",
@@ -192,10 +192,10 @@
       "workTrackers": [
         {
           "id": "local",
-          "name": "Local Primary",
+          "name": "Local Archive",
           "enabled": true,
           "roles": [
-            "primary"
+            "archive"
           ],
           "workTracking": {
             "provider": "local",
@@ -207,6 +207,7 @@
           "name": "GitHub Issues",
           "enabled": true,
           "roles": [
+            "primary",
             "eligible_source",
             "external_inbox",
             "coordination",
@@ -262,7 +263,7 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus-pharo",
       "worktreesRoot": "worktrees/dev-nexus-pharo",
-      "defaultWorkTrackerId": "local",
+      "defaultWorkTrackerId": "github",
       "trackerDiscovery": {
         "scannedRoles": [
           "primary",
@@ -281,10 +282,10 @@
       "workTrackers": [
         {
           "id": "local",
-          "name": "Local Primary",
+          "name": "Local Archive",
           "enabled": true,
           "roles": [
-            "primary"
+            "archive"
           ],
           "workTracking": {
             "provider": "local",
@@ -296,6 +297,7 @@
           "name": "GitHub Issues",
           "enabled": true,
           "roles": [
+            "primary",
             "eligible_source",
             "external_inbox",
             "coordination",
@@ -347,7 +349,7 @@
       "defaultBranch": "main",
       "sourceRoot": "sourcesRoot:dev-nexus-typescript",
       "worktreesRoot": "worktrees/dev-nexus-typescript",
-      "defaultWorkTrackerId": "local",
+      "defaultWorkTrackerId": "github",
       "trackerDiscovery": {
         "scannedRoles": [
           "primary",
@@ -366,10 +368,10 @@
       "workTrackers": [
         {
           "id": "local",
-          "name": "Local Primary",
+          "name": "Local Archive",
           "enabled": true,
           "roles": [
-            "primary"
+            "archive"
           ],
           "workTracking": {
             "provider": "local",
@@ -381,6 +383,7 @@
           "name": "GitHub Issues",
           "enabled": true,
           "roles": [
+            "primary",
             "eligible_source",
             "external_inbox",
             "coordination",

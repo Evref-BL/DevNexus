@@ -1,0 +1,2059 @@
+{
+  "version": 1,
+  "nextAuditNumber": 39,
+  "updatedAt": "2026-05-20T07:59:44.988Z",
+  "records": [
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-16",
+      "createdAt": "2026-05-20T07:57:36.017Z",
+      "updatedAt": "2026-05-20T07:57:36.017Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "24",
+          "itemNumber": 24,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0om-w",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/24",
+          "firstObservedAt": "2026-05-20T07:57:35Z",
+          "lastObservedAt": "2026-05-20T07:57:35Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-1",
+          "action": "linked",
+          "at": "2026-05-20T07:57:36.017Z",
+          "trackerId": "github",
+          "itemId": "24",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "24",
+            "itemNumber": 24,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0om-w",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/24",
+            "firstObservedAt": "2026-05-20T07:57:35Z",
+            "lastObservedAt": "2026-05-20T07:57:35Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-18",
+      "createdAt": "2026-05-20T07:57:38.415Z",
+      "updatedAt": "2026-05-20T07:57:38.415Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "25",
+          "itemNumber": 25,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0ooZA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/25",
+          "firstObservedAt": "2026-05-20T07:57:38Z",
+          "lastObservedAt": "2026-05-20T07:57:38Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-2",
+          "action": "linked",
+          "at": "2026-05-20T07:57:38.415Z",
+          "trackerId": "github",
+          "itemId": "25",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "25",
+            "itemNumber": 25,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ooZA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/25",
+            "firstObservedAt": "2026-05-20T07:57:38Z",
+            "lastObservedAt": "2026-05-20T07:57:38Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-22",
+      "createdAt": "2026-05-20T07:57:40.494Z",
+      "updatedAt": "2026-05-20T07:57:40.494Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "26",
+          "itemNumber": 26,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0opQw",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/26",
+          "firstObservedAt": "2026-05-20T07:57:40Z",
+          "lastObservedAt": "2026-05-20T07:57:40Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-3",
+          "action": "linked",
+          "at": "2026-05-20T07:57:40.494Z",
+          "trackerId": "github",
+          "itemId": "26",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "26",
+            "itemNumber": 26,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0opQw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/26",
+            "firstObservedAt": "2026-05-20T07:57:40Z",
+            "lastObservedAt": "2026-05-20T07:57:40Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-30",
+      "createdAt": "2026-05-20T07:57:42.496Z",
+      "updatedAt": "2026-05-20T07:57:42.496Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "27",
+          "itemNumber": 27,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0oqEw",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/27",
+          "firstObservedAt": "2026-05-20T07:57:42Z",
+          "lastObservedAt": "2026-05-20T07:57:42Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-4",
+          "action": "linked",
+          "at": "2026-05-20T07:57:42.496Z",
+          "trackerId": "github",
+          "itemId": "27",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "27",
+            "itemNumber": 27,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0oqEw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/27",
+            "firstObservedAt": "2026-05-20T07:57:42Z",
+            "lastObservedAt": "2026-05-20T07:57:42Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-52",
+      "createdAt": "2026-05-20T07:57:44.652Z",
+      "updatedAt": "2026-05-20T07:57:44.652Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "28",
+          "itemNumber": 28,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0orHg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/28",
+          "firstObservedAt": "2026-05-20T07:57:44Z",
+          "lastObservedAt": "2026-05-20T07:57:44Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-5",
+          "action": "linked",
+          "at": "2026-05-20T07:57:44.652Z",
+          "trackerId": "github",
+          "itemId": "28",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "28",
+            "itemNumber": 28,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0orHg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/28",
+            "firstObservedAt": "2026-05-20T07:57:44Z",
+            "lastObservedAt": "2026-05-20T07:57:44Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-69",
+      "createdAt": "2026-05-20T07:57:46.715Z",
+      "updatedAt": "2026-05-20T07:57:46.715Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "29",
+          "itemNumber": 29,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0osRQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/29",
+          "firstObservedAt": "2026-05-20T07:57:46Z",
+          "lastObservedAt": "2026-05-20T07:57:46Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-6",
+          "action": "linked",
+          "at": "2026-05-20T07:57:46.715Z",
+          "trackerId": "github",
+          "itemId": "29",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "29",
+            "itemNumber": 29,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0osRQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/29",
+            "firstObservedAt": "2026-05-20T07:57:46Z",
+            "lastObservedAt": "2026-05-20T07:57:46Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-73",
+      "createdAt": "2026-05-20T07:57:48.827Z",
+      "updatedAt": "2026-05-20T07:57:48.827Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "30",
+          "itemNumber": 30,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0otuA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/30",
+          "firstObservedAt": "2026-05-20T07:57:48Z",
+          "lastObservedAt": "2026-05-20T07:57:48Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-7",
+          "action": "linked",
+          "at": "2026-05-20T07:57:48.827Z",
+          "trackerId": "github",
+          "itemId": "30",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "30",
+            "itemNumber": 30,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0otuA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/30",
+            "firstObservedAt": "2026-05-20T07:57:48Z",
+            "lastObservedAt": "2026-05-20T07:57:48Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-75",
+      "createdAt": "2026-05-20T07:57:50.954Z",
+      "updatedAt": "2026-05-20T07:57:50.954Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "31",
+          "itemNumber": 31,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0ounw",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/31",
+          "firstObservedAt": "2026-05-20T07:57:50Z",
+          "lastObservedAt": "2026-05-20T07:57:50Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-8",
+          "action": "linked",
+          "at": "2026-05-20T07:57:50.954Z",
+          "trackerId": "github",
+          "itemId": "31",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "31",
+            "itemNumber": 31,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ounw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/31",
+            "firstObservedAt": "2026-05-20T07:57:50Z",
+            "lastObservedAt": "2026-05-20T07:57:50Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-82",
+      "createdAt": "2026-05-20T07:57:53.145Z",
+      "updatedAt": "2026-05-20T07:57:53.145Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "32",
+          "itemNumber": 32,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0ovuQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/32",
+          "firstObservedAt": "2026-05-20T07:57:52Z",
+          "lastObservedAt": "2026-05-20T07:57:52Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-9",
+          "action": "linked",
+          "at": "2026-05-20T07:57:53.145Z",
+          "trackerId": "github",
+          "itemId": "32",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "32",
+            "itemNumber": 32,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ovuQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/32",
+            "firstObservedAt": "2026-05-20T07:57:52Z",
+            "lastObservedAt": "2026-05-20T07:57:52Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-83",
+      "createdAt": "2026-05-20T07:57:55.633Z",
+      "updatedAt": "2026-05-20T07:57:55.633Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "33",
+          "itemNumber": 33,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0owwg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/33",
+          "firstObservedAt": "2026-05-20T07:57:54Z",
+          "lastObservedAt": "2026-05-20T07:57:54Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-10",
+          "action": "linked",
+          "at": "2026-05-20T07:57:55.633Z",
+          "trackerId": "github",
+          "itemId": "33",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "33",
+            "itemNumber": 33,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0owwg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/33",
+            "firstObservedAt": "2026-05-20T07:57:54Z",
+            "lastObservedAt": "2026-05-20T07:57:54Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-84",
+      "createdAt": "2026-05-20T07:57:58.437Z",
+      "updatedAt": "2026-05-20T07:57:58.437Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "34",
+          "itemNumber": 34,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0oxzg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/34",
+          "firstObservedAt": "2026-05-20T07:57:57Z",
+          "lastObservedAt": "2026-05-20T07:57:57Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-11",
+          "action": "linked",
+          "at": "2026-05-20T07:57:58.437Z",
+          "trackerId": "github",
+          "itemId": "34",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "34",
+            "itemNumber": 34,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0oxzg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/34",
+            "firstObservedAt": "2026-05-20T07:57:57Z",
+            "lastObservedAt": "2026-05-20T07:57:57Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-85",
+      "createdAt": "2026-05-20T07:58:00.880Z",
+      "updatedAt": "2026-05-20T07:58:00.880Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "35",
+          "itemNumber": 35,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0ozQA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/35",
+          "firstObservedAt": "2026-05-20T07:58:00Z",
+          "lastObservedAt": "2026-05-20T07:58:00Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-12",
+          "action": "linked",
+          "at": "2026-05-20T07:58:00.880Z",
+          "trackerId": "github",
+          "itemId": "35",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "35",
+            "itemNumber": 35,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0ozQA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/35",
+            "firstObservedAt": "2026-05-20T07:58:00Z",
+            "lastObservedAt": "2026-05-20T07:58:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-86",
+      "createdAt": "2026-05-20T07:58:03.269Z",
+      "updatedAt": "2026-05-20T07:58:03.269Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "36",
+          "itemNumber": 36,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o0Lg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/36",
+          "firstObservedAt": "2026-05-20T07:58:02Z",
+          "lastObservedAt": "2026-05-20T07:58:02Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-13",
+          "action": "linked",
+          "at": "2026-05-20T07:58:03.269Z",
+          "trackerId": "github",
+          "itemId": "36",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "36",
+            "itemNumber": 36,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o0Lg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/36",
+            "firstObservedAt": "2026-05-20T07:58:02Z",
+            "lastObservedAt": "2026-05-20T07:58:02Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-95",
+      "createdAt": "2026-05-20T07:58:05.383Z",
+      "updatedAt": "2026-05-20T07:58:05.383Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "37",
+          "itemNumber": 37,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o0_Q",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/37",
+          "firstObservedAt": "2026-05-20T07:58:05Z",
+          "lastObservedAt": "2026-05-20T07:58:05Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-14",
+          "action": "linked",
+          "at": "2026-05-20T07:58:05.383Z",
+          "trackerId": "github",
+          "itemId": "37",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "37",
+            "itemNumber": 37,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o0_Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/37",
+            "firstObservedAt": "2026-05-20T07:58:05Z",
+            "lastObservedAt": "2026-05-20T07:58:05Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-100",
+      "createdAt": "2026-05-20T07:58:08.152Z",
+      "updatedAt": "2026-05-20T07:58:08.152Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "38",
+          "itemNumber": 38,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o14w",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/38",
+          "firstObservedAt": "2026-05-20T07:58:07Z",
+          "lastObservedAt": "2026-05-20T07:58:07Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-15",
+          "action": "linked",
+          "at": "2026-05-20T07:58:08.152Z",
+          "trackerId": "github",
+          "itemId": "38",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "38",
+            "itemNumber": 38,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o14w",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/38",
+            "firstObservedAt": "2026-05-20T07:58:07Z",
+            "lastObservedAt": "2026-05-20T07:58:07Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-101",
+      "createdAt": "2026-05-20T07:58:10.747Z",
+      "updatedAt": "2026-05-20T07:58:10.747Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "39",
+          "itemNumber": 39,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o3iA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/39",
+          "firstObservedAt": "2026-05-20T07:58:10Z",
+          "lastObservedAt": "2026-05-20T07:58:10Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-16",
+          "action": "linked",
+          "at": "2026-05-20T07:58:10.747Z",
+          "trackerId": "github",
+          "itemId": "39",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "39",
+            "itemNumber": 39,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o3iA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/39",
+            "firstObservedAt": "2026-05-20T07:58:10Z",
+            "lastObservedAt": "2026-05-20T07:58:10Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-103",
+      "createdAt": "2026-05-20T07:58:13.053Z",
+      "updatedAt": "2026-05-20T07:58:13.053Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "40",
+          "itemNumber": 40,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o4xg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/40",
+          "firstObservedAt": "2026-05-20T07:58:12Z",
+          "lastObservedAt": "2026-05-20T07:58:12Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-17",
+          "action": "linked",
+          "at": "2026-05-20T07:58:13.053Z",
+          "trackerId": "github",
+          "itemId": "40",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "40",
+            "itemNumber": 40,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o4xg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/40",
+            "firstObservedAt": "2026-05-20T07:58:12Z",
+            "lastObservedAt": "2026-05-20T07:58:12Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-108",
+      "createdAt": "2026-05-20T07:58:16.333Z",
+      "updatedAt": "2026-05-20T07:58:16.333Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "41",
+          "itemNumber": 41,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o6Rg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/41",
+          "firstObservedAt": "2026-05-20T07:58:15Z",
+          "lastObservedAt": "2026-05-20T07:58:15Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-18",
+          "action": "linked",
+          "at": "2026-05-20T07:58:16.333Z",
+          "trackerId": "github",
+          "itemId": "41",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "41",
+            "itemNumber": 41,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o6Rg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/41",
+            "firstObservedAt": "2026-05-20T07:58:15Z",
+            "lastObservedAt": "2026-05-20T07:58:15Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-110",
+      "createdAt": "2026-05-20T07:58:18.428Z",
+      "updatedAt": "2026-05-20T07:58:18.428Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "42",
+          "itemNumber": 42,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o7Tw",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/42",
+          "firstObservedAt": "2026-05-20T07:58:18Z",
+          "lastObservedAt": "2026-05-20T07:58:18Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-19",
+          "action": "linked",
+          "at": "2026-05-20T07:58:18.428Z",
+          "trackerId": "github",
+          "itemId": "42",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "42",
+            "itemNumber": 42,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o7Tw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/42",
+            "firstObservedAt": "2026-05-20T07:58:18Z",
+            "lastObservedAt": "2026-05-20T07:58:18Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-111",
+      "createdAt": "2026-05-20T07:58:20.457Z",
+      "updatedAt": "2026-05-20T07:58:20.457Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "43",
+          "itemNumber": 43,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o8Cw",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/43",
+          "firstObservedAt": "2026-05-20T07:58:20Z",
+          "lastObservedAt": "2026-05-20T07:58:20Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-20",
+          "action": "linked",
+          "at": "2026-05-20T07:58:20.457Z",
+          "trackerId": "github",
+          "itemId": "43",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "43",
+            "itemNumber": 43,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o8Cw",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/43",
+            "firstObservedAt": "2026-05-20T07:58:20Z",
+            "lastObservedAt": "2026-05-20T07:58:20Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-116",
+      "createdAt": "2026-05-20T07:58:22.595Z",
+      "updatedAt": "2026-05-20T07:58:22.595Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "44",
+          "itemNumber": 44,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o83g",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/44",
+          "firstObservedAt": "2026-05-20T07:58:22Z",
+          "lastObservedAt": "2026-05-20T07:58:22Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-21",
+          "action": "linked",
+          "at": "2026-05-20T07:58:22.595Z",
+          "trackerId": "github",
+          "itemId": "44",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "44",
+            "itemNumber": 44,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o83g",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/44",
+            "firstObservedAt": "2026-05-20T07:58:22Z",
+            "lastObservedAt": "2026-05-20T07:58:22Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-146",
+      "createdAt": "2026-05-20T07:58:24.970Z",
+      "updatedAt": "2026-05-20T07:58:24.970Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "45",
+          "itemNumber": 45,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o92A",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/45",
+          "firstObservedAt": "2026-05-20T07:58:24Z",
+          "lastObservedAt": "2026-05-20T07:58:24Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-22",
+          "action": "linked",
+          "at": "2026-05-20T07:58:24.970Z",
+          "trackerId": "github",
+          "itemId": "45",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "45",
+            "itemNumber": 45,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o92A",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/45",
+            "firstObservedAt": "2026-05-20T07:58:24Z",
+            "lastObservedAt": "2026-05-20T07:58:24Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-148",
+      "createdAt": "2026-05-20T07:58:27.132Z",
+      "updatedAt": "2026-05-20T07:58:27.132Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "46",
+          "itemNumber": 46,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0o_ww",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/46",
+          "firstObservedAt": "2026-05-20T07:58:26Z",
+          "lastObservedAt": "2026-05-20T07:58:26Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-23",
+          "action": "linked",
+          "at": "2026-05-20T07:58:27.132Z",
+          "trackerId": "github",
+          "itemId": "46",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "46",
+            "itemNumber": 46,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0o_ww",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/46",
+            "firstObservedAt": "2026-05-20T07:58:26Z",
+            "lastObservedAt": "2026-05-20T07:58:26Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-149",
+      "createdAt": "2026-05-20T07:58:29.761Z",
+      "updatedAt": "2026-05-20T07:58:29.761Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "47",
+          "itemNumber": 47,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pBHg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/47",
+          "firstObservedAt": "2026-05-20T07:58:29Z",
+          "lastObservedAt": "2026-05-20T07:58:29Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-24",
+          "action": "linked",
+          "at": "2026-05-20T07:58:29.761Z",
+          "trackerId": "github",
+          "itemId": "47",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "47",
+            "itemNumber": 47,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pBHg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/47",
+            "firstObservedAt": "2026-05-20T07:58:29Z",
+            "lastObservedAt": "2026-05-20T07:58:29Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-150",
+      "createdAt": "2026-05-20T07:58:32.034Z",
+      "updatedAt": "2026-05-20T07:58:32.034Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "48",
+          "itemNumber": 48,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pB_Q",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/48",
+          "firstObservedAt": "2026-05-20T07:58:31Z",
+          "lastObservedAt": "2026-05-20T07:58:31Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-25",
+          "action": "linked",
+          "at": "2026-05-20T07:58:32.034Z",
+          "trackerId": "github",
+          "itemId": "48",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "48",
+            "itemNumber": 48,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pB_Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/48",
+            "firstObservedAt": "2026-05-20T07:58:31Z",
+            "lastObservedAt": "2026-05-20T07:58:31Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-151",
+      "createdAt": "2026-05-20T07:58:34.201Z",
+      "updatedAt": "2026-05-20T07:58:34.201Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "49",
+          "itemNumber": 49,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pC1Q",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/49",
+          "firstObservedAt": "2026-05-20T07:58:33Z",
+          "lastObservedAt": "2026-05-20T07:58:33Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-26",
+          "action": "linked",
+          "at": "2026-05-20T07:58:34.201Z",
+          "trackerId": "github",
+          "itemId": "49",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "49",
+            "itemNumber": 49,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pC1Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/49",
+            "firstObservedAt": "2026-05-20T07:58:33Z",
+            "lastObservedAt": "2026-05-20T07:58:33Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-173",
+      "createdAt": "2026-05-20T07:58:36.828Z",
+      "updatedAt": "2026-05-20T07:58:36.828Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "50",
+          "itemNumber": 50,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
+          "firstObservedAt": "2026-05-20T07:58:35Z",
+          "lastObservedAt": "2026-05-20T07:58:35Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-27",
+          "action": "linked",
+          "at": "2026-05-20T07:58:36.828Z",
+          "trackerId": "github",
+          "itemId": "50",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "50",
+            "itemNumber": 50,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pDsg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/50",
+            "firstObservedAt": "2026-05-20T07:58:35Z",
+            "lastObservedAt": "2026-05-20T07:58:35Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-174",
+      "createdAt": "2026-05-20T07:58:39.006Z",
+      "updatedAt": "2026-05-20T07:58:39.006Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "51",
+          "itemNumber": 51,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pEyA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/51",
+          "firstObservedAt": "2026-05-20T07:58:38Z",
+          "lastObservedAt": "2026-05-20T07:58:38Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-28",
+          "action": "linked",
+          "at": "2026-05-20T07:58:39.006Z",
+          "trackerId": "github",
+          "itemId": "51",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "51",
+            "itemNumber": 51,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pEyA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/51",
+            "firstObservedAt": "2026-05-20T07:58:38Z",
+            "lastObservedAt": "2026-05-20T07:58:38Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-175",
+      "createdAt": "2026-05-20T07:58:41.118Z",
+      "updatedAt": "2026-05-20T07:58:41.118Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "52",
+          "itemNumber": 52,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pFoQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/52",
+          "firstObservedAt": "2026-05-20T07:58:40Z",
+          "lastObservedAt": "2026-05-20T07:58:40Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-29",
+          "action": "linked",
+          "at": "2026-05-20T07:58:41.118Z",
+          "trackerId": "github",
+          "itemId": "52",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "52",
+            "itemNumber": 52,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pFoQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/52",
+            "firstObservedAt": "2026-05-20T07:58:40Z",
+            "lastObservedAt": "2026-05-20T07:58:40Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-176",
+      "createdAt": "2026-05-20T07:58:43.224Z",
+      "updatedAt": "2026-05-20T07:58:43.224Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "53",
+          "itemNumber": 53,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pGkA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/53",
+          "firstObservedAt": "2026-05-20T07:58:42Z",
+          "lastObservedAt": "2026-05-20T07:58:42Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-30",
+          "action": "linked",
+          "at": "2026-05-20T07:58:43.224Z",
+          "trackerId": "github",
+          "itemId": "53",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "53",
+            "itemNumber": 53,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pGkA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/53",
+            "firstObservedAt": "2026-05-20T07:58:42Z",
+            "lastObservedAt": "2026-05-20T07:58:42Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-177",
+      "createdAt": "2026-05-20T07:58:45.623Z",
+      "updatedAt": "2026-05-20T07:58:45.623Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "54",
+          "itemNumber": 54,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pHnQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/54",
+          "firstObservedAt": "2026-05-20T07:58:45Z",
+          "lastObservedAt": "2026-05-20T07:58:45Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-31",
+          "action": "linked",
+          "at": "2026-05-20T07:58:45.623Z",
+          "trackerId": "github",
+          "itemId": "54",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "54",
+            "itemNumber": 54,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pHnQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/54",
+            "firstObservedAt": "2026-05-20T07:58:45Z",
+            "lastObservedAt": "2026-05-20T07:58:45Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-178",
+      "createdAt": "2026-05-20T07:58:47.815Z",
+      "updatedAt": "2026-05-20T07:58:47.815Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "55",
+          "itemNumber": 55,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
+          "firstObservedAt": "2026-05-20T07:58:47Z",
+          "lastObservedAt": "2026-05-20T07:58:47Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-32",
+          "action": "linked",
+          "at": "2026-05-20T07:58:47.815Z",
+          "trackerId": "github",
+          "itemId": "55",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "55",
+            "itemNumber": 55,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pIiQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/55",
+            "firstObservedAt": "2026-05-20T07:58:47Z",
+            "lastObservedAt": "2026-05-20T07:58:47Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-179",
+      "createdAt": "2026-05-20T07:58:50.199Z",
+      "updatedAt": "2026-05-20T07:58:50.199Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "56",
+          "itemNumber": 56,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pKGQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/56",
+          "firstObservedAt": "2026-05-20T07:58:49Z",
+          "lastObservedAt": "2026-05-20T07:58:49Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-33",
+          "action": "linked",
+          "at": "2026-05-20T07:58:50.199Z",
+          "trackerId": "github",
+          "itemId": "56",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "56",
+            "itemNumber": 56,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pKGQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/56",
+            "firstObservedAt": "2026-05-20T07:58:49Z",
+            "lastObservedAt": "2026-05-20T07:58:49Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-180",
+      "createdAt": "2026-05-20T07:58:52.495Z",
+      "updatedAt": "2026-05-20T07:58:52.495Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "57",
+          "itemNumber": 57,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pK7Q",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/57",
+          "firstObservedAt": "2026-05-20T07:58:52Z",
+          "lastObservedAt": "2026-05-20T07:58:52Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-34",
+          "action": "linked",
+          "at": "2026-05-20T07:58:52.495Z",
+          "trackerId": "github",
+          "itemId": "57",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "57",
+            "itemNumber": 57,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pK7Q",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/57",
+            "firstObservedAt": "2026-05-20T07:58:52Z",
+            "lastObservedAt": "2026-05-20T07:58:52Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus",
+      "logicalItemId": "local-181",
+      "createdAt": "2026-05-20T07:58:55.597Z",
+      "updatedAt": "2026-05-20T07:58:55.597Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "58",
+          "itemNumber": 58,
+          "itemKey": null,
+          "nodeId": "I_kwDOSertp88AAAABC0pMFQ",
+          "webUrl": "https://github.com/Evref-BL/DevNexus/issues/58",
+          "firstObservedAt": "2026-05-20T07:58:55Z",
+          "lastObservedAt": "2026-05-20T07:58:55Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-35",
+          "action": "linked",
+          "at": "2026-05-20T07:58:55.597Z",
+          "trackerId": "github",
+          "itemId": "58",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "58",
+            "itemNumber": 58,
+            "itemKey": null,
+            "nodeId": "I_kwDOSertp88AAAABC0pMFQ",
+            "webUrl": "https://github.com/Evref-BL/DevNexus/issues/58",
+            "firstObservedAt": "2026-05-20T07:58:55Z",
+            "lastObservedAt": "2026-05-20T07:58:55Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus-pharo",
+      "logicalItemId": "local-3",
+      "createdAt": "2026-05-20T07:59:40.212Z",
+      "updatedAt": "2026-05-20T07:59:40.212Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus-Pharo",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "6",
+          "itemNumber": 6,
+          "itemKey": null,
+          "nodeId": "I_kwDOSNc8HM8AAAABC0piAg",
+          "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/6",
+          "firstObservedAt": "2026-05-20T07:59:39Z",
+          "lastObservedAt": "2026-05-20T07:59:39Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-36",
+          "action": "linked",
+          "at": "2026-05-20T07:59:40.212Z",
+          "trackerId": "github",
+          "itemId": "6",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "6",
+            "itemNumber": 6,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0piAg",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/6",
+            "firstObservedAt": "2026-05-20T07:59:39Z",
+            "lastObservedAt": "2026-05-20T07:59:39Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus-pharo",
+      "logicalItemId": "local-5",
+      "createdAt": "2026-05-20T07:59:42.865Z",
+      "updatedAt": "2026-05-20T07:59:42.865Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus-Pharo",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "7",
+          "itemNumber": 7,
+          "itemKey": null,
+          "nodeId": "I_kwDOSNc8HM8AAAABC0pjeA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/7",
+          "firstObservedAt": "2026-05-20T07:59:42Z",
+          "lastObservedAt": "2026-05-20T07:59:42Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-37",
+          "action": "linked",
+          "at": "2026-05-20T07:59:42.865Z",
+          "trackerId": "github",
+          "itemId": "7",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "7",
+            "itemNumber": 7,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0pjeA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/7",
+            "firstObservedAt": "2026-05-20T07:59:42Z",
+            "lastObservedAt": "2026-05-20T07:59:42Z"
+          }
+        }
+      ]
+    },
+    {
+      "projectId": "dev-nexus-dogfood",
+      "componentId": "dev-nexus-pharo",
+      "logicalItemId": "local-14",
+      "createdAt": "2026-05-20T07:59:44.988Z",
+      "updatedAt": "2026-05-20T07:59:44.988Z",
+      "references": [
+        {
+          "trackerId": "github",
+          "trackerName": "GitHub Issues",
+          "provider": "github",
+          "host": "github.com",
+          "repositoryId": null,
+          "repositoryOwner": "Evref-BL",
+          "repositoryName": "DevNexus-Pharo",
+          "projectId": null,
+          "boardId": null,
+          "itemId": "8",
+          "itemNumber": 8,
+          "itemKey": null,
+          "nodeId": "I_kwDOSNc8HM8AAAABC0pkTA",
+          "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/8",
+          "firstObservedAt": "2026-05-20T07:59:44Z",
+          "lastObservedAt": "2026-05-20T07:59:44Z"
+        }
+      ],
+      "audit": [
+        {
+          "id": "link-audit-38",
+          "action": "linked",
+          "at": "2026-05-20T07:59:44.988Z",
+          "trackerId": "github",
+          "itemId": "8",
+          "reference": {
+            "trackerId": "github",
+            "trackerName": "GitHub Issues",
+            "provider": "github",
+            "host": "github.com",
+            "repositoryId": null,
+            "repositoryOwner": "Evref-BL",
+            "repositoryName": "DevNexus-Pharo",
+            "projectId": null,
+            "boardId": null,
+            "itemId": "8",
+            "itemNumber": 8,
+            "itemKey": null,
+            "nodeId": "I_kwDOSNc8HM8AAAABC0pkTA",
+            "webUrl": "https://github.com/Evref-BL/DevNexus-Pharo/issues/8",
+            "firstObservedAt": "2026-05-20T07:59:44Z",
+            "lastObservedAt": "2026-05-20T07:59:44Z"
+          }
+        }
+      ]
+    }
+  ]
+}
