@@ -10,6 +10,7 @@ export * from "./nexusAutomationHeartbeat.js";
 export * from "./nexusAuthority.js";
 export * from "./nexusAuthorityProviderSignals.js";
 export * from "./nexusAutomationAgentLaunch.js";
+export * from "./nexusAutomationAgentLaunchMetadata.js";
 export * from "./nexusAutomationCodexAppServerLaunch.js";
 export * from "./nexusAutomationAgentProfile.js";
 export * from "./nexusAutomationAgentSurface.js";
