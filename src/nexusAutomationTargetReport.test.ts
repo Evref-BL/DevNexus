@@ -7,6 +7,7 @@ import {
 } from "./nexusAutomation.js";
 import {
   appendNexusAutomationTargetCycleRecord,
+  writeNexusAutomationTargetCycleLedger,
 } from "./nexusAutomationTargetCycle.js";
 import {
   buildNexusAutomationTargetReport,
@@ -1148,6 +1149,114 @@ describe("nexus automation target report", () => {
           ],
         },
       ],
+    });
+  });
+
+  it("ignores superseded pending placeholders from duplicate target-cycle records", async () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: () => "2026-05-16T09:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Concrete completed work",
+      status: "done",
+    });
+    writeNexusAutomationTargetCycleLedger(projectRoot, config.automation!, {
+      version: 1,
+      updatedAt: "2026-05-16T10:30:00.000Z",
+      cycles: [
+        {
+          id: "cycle-reconciled",
+          projectId: "report-demo",
+          targetId: "dogfood",
+          runId: "run-reconciled",
+          status: "started",
+          startedAt: "2026-05-16T10:00:00.000Z",
+          finishedAt: null,
+          objective: null,
+          summary: "Coordinator reserved placeholder work.",
+          eligibleWorkItemCount: 1,
+          workItems: [
+            {
+              componentId: "primary",
+              trackerId: "local",
+              trackerProvider: "local",
+              id: "pending",
+              logicalItemId: null,
+              title: "Pending component work",
+              status: "in_progress",
+              cycleStatus: "in_progress",
+              agentProfileId: null,
+              notes: null,
+            },
+          ],
+          authority: null,
+          blockers: [],
+          notes: [],
+          nextCycleNotBefore: null,
+        },
+        {
+          id: "cycle-reconciled",
+          projectId: "report-demo",
+          targetId: "dogfood",
+          runId: "run-reconciled",
+          status: "completed",
+          startedAt: "2026-05-16T10:00:00.000Z",
+          finishedAt: "2026-05-16T10:30:00.000Z",
+          objective: null,
+          summary: "Coordinator completed the concrete work item.",
+          eligibleWorkItemCount: 0,
+          workItems: [
+            {
+              componentId: "primary",
+              trackerId: "local",
+              trackerProvider: "local",
+              id: "local-1",
+              logicalItemId: null,
+              title: "Concrete completed work",
+              status: "done",
+              cycleStatus: "completed",
+              agentProfileId: null,
+              notes: null,
+            },
+          ],
+          authority: null,
+          blockers: [],
+          notes: [],
+          nextCycleNotBefore: null,
+        },
+      ],
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:45:00.000Z",
+    });
+
+    expect(report.workItemSummary?.uniqueReferences).toMatchObject([
+      {
+        componentId: "primary",
+        id: "local-1",
+        latestCycleId: "cycle-reconciled",
+        latestCycleStatus: "completed",
+      },
+    ]);
+    expect(report.workItemSummary?.progress).toMatchObject({
+      staleInProgressWork: [],
+      completedWork: [{ componentId: "primary", id: "local-1" }],
+    });
+
+    const eligibleWork = await getNexusAutomationEligibleWorkSummary({
+      projectRoot,
+    });
+    expect(eligibleWork).toMatchObject({
+      eligibleWorkItemCount: 0,
+      staleInProgressWorkItemCount: 0,
+      components: [],
     });
   });
 

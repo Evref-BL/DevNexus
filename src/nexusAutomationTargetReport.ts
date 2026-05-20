@@ -583,7 +583,7 @@ function summarizeCycleWorkItems(
   ledger: NexusAutomationTargetCycleLedger,
   workItemResolver: LocalWorkItemResolver,
 ): NexusAutomationTargetReportWorkItemSummary {
-  const all = ledger.cycles.flatMap((cycle) =>
+  const all = latestTargetCycleRecordsById(ledger.cycles).flatMap((cycle) =>
     cycle.workItems.map((item) => ({ cycle, item })),
   );
   const unique = new Map<string, NexusAutomationTargetReportWorkItemReference>();
@@ -645,6 +645,17 @@ function summarizeCycleWorkItems(
     byCycleStatus,
     progress: summarizeWorkItemProgress(uniqueReferences),
   };
+}
+
+function latestTargetCycleRecordsById(
+  cycles: NexusAutomationTargetCycleRecord[],
+): NexusAutomationTargetCycleRecord[] {
+  const latest = new Map<string, NexusAutomationTargetCycleRecord>();
+  for (const cycle of cycles) {
+    latest.delete(cycle.id);
+    latest.set(cycle.id, cycle);
+  }
+  return [...latest.values()];
 }
 
 function summarizeExecution(
