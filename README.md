@@ -180,6 +180,9 @@ dev-nexus project mcp refresh <project-root> --agent codex
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
   GitHub, GitLab, Jira, bot accounts, human accounts, and meta-repository
   hosting.
+- [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
+  supported providers, active targets, generated support, and stale provider
+  files.
 - [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, worktrees,
   automation loops, result files, and coordination handoffs.
 - [Multi-tracker work tracking](docs/user/multi-tracker.md) covers local and

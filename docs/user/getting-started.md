@@ -117,7 +117,11 @@ GitHub, GitLab, or Jira can be added later.
 
 ## Agent Configuration
 
-Setup generates agent files. When project configuration changes, refresh them:
+Setup generates files only for the active agent targets selected by the
+project. Choose the providers this project actually uses, such as Codex-only,
+Claude-only, OpenCode/manual, or a deliberate multi-provider setup.
+
+When project configuration changes, refresh generated support:
 
 ```bash
 dev-nexus project mcp refresh <project-root> --agent codex
@@ -130,6 +134,9 @@ Model Context Protocol, or MCP, is the protocol agents use to call DevNexus
 tools. A raw `dev-nexus mcp-stdio` smoke test only proves the server command can
 start. The agent session is ready when the active agent exposes those tools in
 the opened DevNexus project.
+
+See [Agent targets and projection cleanup](agent-targets.md) for provider
+examples, active target configuration, and stale generated support cleanup.
 
 ## Answer Files
 
@@ -161,6 +168,8 @@ become the primary component of a new DevNexus project.
 
 - [Agent workflows](agent-workflows.md) explains worktrees, automation loops,
   result files, and coordination handoffs.
+- [Agent targets and projection cleanup](agent-targets.md) explains supported
+  providers, active targets, generated support, and stale provider files.
 - [Multi-tracker work tracking](multi-tracker.md) explains local and provider
   trackers, link records, and sync planning.
 - [Providers, auth, and hosting](providers-auth-hosting.md) explains human
