@@ -2393,6 +2393,18 @@ describe("dev-nexus cli", () => {
       projectRoot,
       config: {
         provider: "local",
+        storePath: ".dev-nexus/primary-items.json",
+      },
+    }).createWorkItem({
+      projectRoot,
+      title: "Completed source",
+      status: "done",
+      labels: ["sync"],
+    });
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: {
+        provider: "local",
         storePath: ".dev-nexus/mirror-items.json",
       },
     }).createWorkItem({
@@ -2413,8 +2425,7 @@ describe("dev-nexus cli", () => {
         "primary",
         "--target-tracker",
         "mirror",
-        "--status",
-        "ready",
+        "--open",
         "--label",
         "sync",
         "--field",
@@ -2453,6 +2464,25 @@ describe("dev-nexus cli", () => {
         },
       },
     });
+  });
+
+  it("rejects ambiguous sync open and explicit status filters", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+
+    await expect(
+      main([
+        "work-item",
+        "sync-plan",
+        projectRoot,
+        "--source-tracker",
+        "primary",
+        "--target-tracker",
+        "mirror",
+        "--open",
+        "--status",
+        "ready",
+      ]),
+    ).rejects.toThrow(/cannot combine --open with --status/u);
   });
 
   it("gets, updates, and comments on local work items", async () => {

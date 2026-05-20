@@ -585,6 +585,7 @@ interface ParsedWorkItemSyncPlanCommand {
   sourceTrackerId: string;
   targetTrackerId: string;
   direction?: "source_to_target";
+  openOnly?: boolean;
   statuses: WorkStatus[];
   labels: string[];
   assignees: string[];
@@ -1236,6 +1237,7 @@ export function usage(): string {
     "  --source-tracker <id>",
     "  --target-tracker <id>",
     "  --direction <source_to_target>",
+    "  --open                    shortcut for todo, ready, in_progress, and blocked",
     "  --status <todo|ready|in_progress|blocked|done|wont_do>  repeatable",
     "  --label <label>            repeatable",
     "  --assignee <assignee>      repeatable",
@@ -5394,6 +5396,9 @@ function parseWorkItemSyncPlanCommand(
       case "--direction":
         parsed.direction = parseWorkItemSyncDirection(next(), arg);
         break;
+      case "--open":
+        parsed.openOnly = true;
+        break;
       case "--status":
         parsed.statuses?.push(parseWorkStatus(next(), arg));
         break;
@@ -5448,6 +5453,9 @@ function parseWorkItemSyncPlanCommand(
   }
   if (!parsed.targetTrackerId) {
     throw new Error("work-item sync-plan requires --target-tracker");
+  }
+  if (parsed.openOnly && (parsed.statuses?.length ?? 0) > 0) {
+    throw new Error("work-item sync-plan cannot combine --open with --status");
   }
 
   return parsed as ParsedWorkItemSyncPlanCommand;
@@ -8516,6 +8524,13 @@ function statusQuery(statuses: WorkStatus[]): WorkStatus | WorkStatus[] | undefi
   return statuses.length === 1 ? statuses[0] : statuses;
 }
 
+const openWorkStatuses: WorkStatus[] = [
+  "todo",
+  "ready",
+  "in_progress",
+  "blocked",
+];
+
 function workItemSyncPolicyFromParsed(
   parsed: ParsedWorkItemSyncPlanCommand,
   mode: "dry_run" | "execute",
@@ -8525,8 +8540,12 @@ function workItemSyncPolicyFromParsed(
     targetTrackerId: parsed.targetTrackerId,
     ...(parsed.direction ? { direction: parsed.direction } : {}),
     filters: {
-      ...(parsed.statuses.length > 0
-        ? { status: statusQuery(parsed.statuses) }
+      ...(parsed.openOnly || parsed.statuses.length > 0
+        ? {
+            status: statusQuery(
+              parsed.openOnly ? openWorkStatuses : parsed.statuses,
+            ),
+          }
         : {}),
       ...(parsed.labels.length > 0 ? { labels: parsed.labels } : {}),
       ...(parsed.assignees.length > 0 ? { assignees: parsed.assignees } : {}),
