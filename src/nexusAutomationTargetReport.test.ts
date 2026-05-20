@@ -211,6 +211,205 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("adds compact version planning readiness facts when configured", async () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      versionPlanning: {
+        versions: [
+          {
+            id: "v-next",
+            objective: "Ship the next DevNexus version.",
+            owningComponents: ["primary"],
+            targetBranch: "main",
+            scope: [
+              {
+                kind: "work_item",
+                componentId: "primary",
+                trackerId: null,
+                workItemId: "local-1",
+                status: "committed",
+              },
+              {
+                kind: "work_item",
+                componentId: "primary",
+                trackerId: null,
+                workItemId: "local-2",
+                status: "deferred",
+              },
+            ],
+            readinessGates: [
+              {
+                kind: "work_items_done",
+                required: true,
+                components: ["primary"],
+              },
+              {
+                kind: "no_blockers",
+                required: true,
+                components: ["primary"],
+              },
+            ],
+            releasePolicy: {
+              tags: "none",
+              packages: "none",
+              providerRelease: "none",
+              releaseNotes: "optional",
+              changelog: "none",
+            },
+          },
+          {
+            id: "v-later",
+            objective: "Future unrelated work.",
+            owningComponents: ["primary"],
+            targetBranch: "main",
+            scope: [
+              {
+                kind: "work_item",
+                componentId: "primary",
+                trackerId: null,
+                workItemId: "local-99",
+                status: "candidate",
+              },
+            ],
+            readinessGates: [],
+            releasePolicy: {
+              tags: "none",
+              packages: "none",
+              providerRelease: "none",
+              releaseNotes: "none",
+              changelog: "none",
+            },
+          },
+        ],
+      },
+    });
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: () => "2026-05-16T09:00:00.000Z",
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Committed work",
+      status: "ready",
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Deferred work",
+      status: "done",
+    });
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:05:00.000Z",
+      record: {
+        id: "cycle-1",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        status: "completed",
+        eligibleWorkItemCount: 1,
+        workItems: [
+          {
+            componentId: "primary",
+            id: "local-1",
+            cycleStatus: "eligible",
+          },
+          {
+            componentId: "primary",
+            id: "local-2",
+            cycleStatus: "completed",
+          },
+        ],
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:10:00.000Z",
+    });
+
+    expect(report.versionPlanning).toMatchObject({
+      versionCount: 2,
+      shownVersionCount: 1,
+      omittedVersionCount: 1,
+      versions: [
+        {
+          id: "v-next",
+          objective: "Ship the next DevNexus version.",
+          targetBranch: "main",
+          owningComponents: ["primary"],
+          scopeCounts: {
+            resolvedItemCount: 2,
+            requiredResolvedItemCount: 1,
+            configuredEntryCount: 2,
+            byScopeStatus: {
+              committed: 1,
+              deferred: 1,
+            },
+          },
+          readiness: {
+            ready: false,
+            state: "blocked",
+            gateWarningCount: 1,
+          },
+          gateWarnings: [
+            {
+              kind: "work_items_done",
+              status: "failed",
+              message: "Some committed or candidate scope items are not done.",
+            },
+          ],
+        },
+      ],
+    });
+
+    const eligibleWork = await getNexusAutomationEligibleWorkSummary({
+      projectRoot,
+    });
+    expect(eligibleWork.versionPlanning).toMatchObject({
+      versionCount: 2,
+      shownVersionCount: 1,
+      workItems: [
+        {
+          componentId: "primary",
+          id: "local-1",
+          unrelated: false,
+          scopes: [
+            {
+              versionId: "v-next",
+              scopeStatus: "committed",
+              scopeStatuses: ["committed"],
+              entryKinds: ["work_item"],
+            },
+          ],
+        },
+      ],
+    });
+    expect(eligibleWork.components[0]!.workItems[0]).toMatchObject({
+      id: "local-1",
+      versionScopes: [
+        {
+          versionId: "v-next",
+          scopeStatus: "committed",
+        },
+      ],
+    });
+  });
+
+  it("omits version planning from target reports when no version config exists", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    expect(
+      buildNexusAutomationTargetReport({
+        projectRoot,
+        now: "2026-05-16T10:10:00.000Z",
+      }).versionPlanning,
+    ).toBeUndefined();
+  });
+
   it("summarizes component progress and execution facts with local tracker work item details", async () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

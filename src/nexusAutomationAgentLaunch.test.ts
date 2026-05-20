@@ -343,6 +343,33 @@ describe("nexus automation agent launch", () => {
             },
           ],
         },
+        versionPlanning: {
+          versions: [
+            {
+              id: "v-next",
+              objective: "Ship agent-visible version scope.",
+              owningComponents: ["primary"],
+              targetBranch: "main",
+              scope: [
+                {
+                  kind: "label",
+                  componentId: "primary",
+                  trackerId: null,
+                  label: "automation",
+                  status: "committed",
+                },
+              ],
+              readinessGates: [],
+              releasePolicy: {
+                tags: "none",
+                packages: "none",
+                providerRelease: "none",
+                releaseNotes: "none",
+                changelog: "none",
+              },
+            },
+          ],
+        },
       }),
     );
     const tracker = createLocalWorkTrackerProvider({
@@ -606,6 +633,25 @@ describe("nexus automation agent launch", () => {
             title: "Let an agent choose",
           },
         ],
+        versionPlanning: {
+          versionCount: 1,
+          shownVersionCount: 1,
+          workItems: [
+            {
+              componentId: "primary",
+              id: "local-1",
+              unrelated: false,
+              scopes: [
+                {
+                  versionId: "v-next",
+                  scopeStatus: "committed",
+                  scopeStatuses: ["committed"],
+                  entryKinds: ["label"],
+                },
+              ],
+            },
+          ],
+        },
         externalIssueVisibility: {
           componentCount: 1,
           defaultTrackerOnlyComponentCount: 1,

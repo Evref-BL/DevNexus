@@ -97,6 +97,11 @@ import {
   createWorkTrackerProvider,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
+import {
+  buildNexusVersionPlanningSurface,
+  type NexusVersionPlanningSurface,
+  type NexusVersionPlanningSurfaceWorkItemInput,
+} from "./nexusVersionPlanningSurface.js";
 import type {
   WorkItem,
   WorkItemQuery,
@@ -195,6 +200,7 @@ export interface NexusAutomationAgentLaunchContext {
   eligibleWorkBlockers: string[];
   externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
+  versionPlanning?: NexusVersionPlanningSurface;
   safety: NexusAutomationConfig["safety"];
   publication: NexusAutomationConfig["publication"];
 }
@@ -1126,6 +1132,18 @@ function buildAgentLaunchContext(
       repository: component.remoteUrl,
     })),
   });
+  const versionPlanning = buildNexusVersionPlanningSurface({
+    projectConfig: input.projectConfig,
+    components: input.components,
+    workItems: input.componentEligibleWorkItems.flatMap((component) =>
+      component.workItems.map((item) =>
+        versionSurfaceWorkItemInput(component.componentId, item),
+      )
+    ),
+    authority,
+    includeWorkItems: true,
+    includeUnrelatedWorkItems: true,
+  });
 
   return {
     version: 1,
@@ -1167,8 +1185,22 @@ function buildAgentLaunchContext(
       componentEligibleWorkItems: input.componentEligibleWorkItems,
     }),
     componentEligibleWorkItems: input.componentEligibleWorkItems,
+    ...(versionPlanning ? { versionPlanning } : {}),
     safety: input.automationConfig.safety,
     publication: input.automationConfig.publication,
+  };
+}
+
+function versionSurfaceWorkItemInput(
+  componentId: string,
+  item: WorkItem,
+): NexusVersionPlanningSurfaceWorkItemInput {
+  return {
+    componentId,
+    trackerId: item.trackerRef?.trackerId ?? null,
+    trackerProvider: item.trackerRef?.provider ?? null,
+    logicalItemId: item.externalRef?.itemId ?? item.id,
+    workItem: item,
   };
 }
 

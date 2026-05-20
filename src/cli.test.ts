@@ -4533,6 +4533,115 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints compact version planning in target report text and json output", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, {
+      ...projectConfig(),
+      versionPlanning: {
+        versions: [
+          {
+            id: "v-next",
+            objective: "Expose version planning surfaces.",
+            owningComponents: ["primary"],
+            targetBranch: "main",
+            scope: [
+              {
+                kind: "work_item",
+                componentId: "primary",
+                trackerId: null,
+                workItemId: "local-1",
+                status: "committed",
+              },
+            ],
+            readinessGates: [
+              {
+                kind: "work_items_done",
+                required: true,
+                components: ["primary"],
+              },
+            ],
+            releasePolicy: {
+              tags: "none",
+              packages: "none",
+              providerRelease: "none",
+              releaseNotes: "none",
+              changelog: "none",
+            },
+          },
+        ],
+      },
+    });
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot,
+      title: "Surface version planning",
+      status: "ready",
+    });
+    const recordOutput = captureOutput();
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      [
+        "automation",
+        "target-cycle",
+        "record",
+        projectRoot,
+        "--cycle-id",
+        "cycle-1",
+        "--status",
+        "completed",
+        "--eligible-work-items",
+        "1",
+        "--work-item",
+        "primary:local-1",
+      ],
+      {
+        stdout: recordOutput.writer,
+        now: fixedClock("2026-05-16T10:00:00.000Z"),
+      },
+    );
+    await main(["automation", "target-report", projectRoot], {
+      stdout: textOutput.writer,
+      now: fixedClock("2026-05-16T10:05:00.000Z"),
+    });
+    await main(["automation", "target-report", projectRoot, "--json"], {
+      stdout: jsonOutput.writer,
+      now: fixedClock("2026-05-16T10:05:00.000Z"),
+    });
+
+    expect(textOutput.output()).toContain("Version planning: 1 shown");
+    expect(textOutput.output()).toContain(
+      "v-next: blocked; scope 1/1 resolved",
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      report: {
+        versionPlanning: {
+          versions: [
+            {
+              id: "v-next",
+              readiness: {
+                ready: false,
+                state: "blocked",
+              },
+              gateWarnings: [
+                {
+                  kind: "work_items_done",
+                  status: "failed",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it("enqueues work items that match the automation selector", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
