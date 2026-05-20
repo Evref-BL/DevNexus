@@ -138,7 +138,12 @@ Check that the project is ready:
 ```bash
 dev-nexus project status <project-root>
 dev-nexus setup check <project-root> join-existing-project
+dev-nexus host check <project-root> --json
 ```
+
+`host check` is read-only. It summarizes the current or configured host's
+platform, shell kind, DevNexus, Git, Node, configured host capabilities, and
+visible MCP server configuration without printing host-local paths.
 
 Create a component-scoped work item:
 

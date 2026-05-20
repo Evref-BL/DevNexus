@@ -112,6 +112,11 @@ import {
   type NexusRemoteExecutionAttachmentRef,
 } from "./nexusRemoteExecution.js";
 import {
+  checkNexusHostCapabilities,
+  type NexusHostCheckMode,
+  type NexusHostCheckMockFacts,
+} from "./nexusHostCheck.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -168,6 +173,7 @@ import type {
   WorkStatusQuery,
 } from "./workTrackingTypes.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
+import type { NexusAutomationCommandRunner } from "./nexusAutomationCommandExecutor.js";
 
 export const devNexusMcpProtocolVersion = "2024-11-05";
 
@@ -189,6 +195,7 @@ export interface McpTool {
 export interface DevNexusMcpToolContext {
   now?: () => Date | string;
   gitRunner?: GitRunner;
+  commandRunner?: NexusAutomationCommandRunner;
   hostingProvider?: NexusProjectHostingProviderAdapter;
   currentPath?: string;
   mcpRuntimeStartedAt?: Date | string;
@@ -721,6 +728,21 @@ const tools: McpTool[] = [
         currentPath: { type: "string" },
       },
       required: ["intent"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "host_check",
+    description: "Run a read-only local or mocked remote host capability check.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        hostId: { type: "string" },
+        mode: { type: "string", enum: ["local", "mock-remote"] },
+        mockFacts: { type: "object" },
+      },
+      required: ["projectRoot"],
       additionalProperties: false,
     },
   },
@@ -1642,6 +1664,18 @@ export async function callDevNexusMcpTool(
             gitRunner: context.gitRunner,
             now: context.now,
           })),
+        });
+      case "host_check":
+        return toolResult({
+          ok: true,
+          result: checkNexusHostCapabilities({
+            projectRoot: projectRootFromArgs(args),
+            hostId: optionalString(args, "hostId", "arguments"),
+            mode: hostCheckModeFromArgs(args),
+            mockFacts: hostCheckMockFactsFromArgs(args),
+            commandRunner: context.commandRunner,
+            now: context.now,
+          }),
         });
       case "remote_execution_request_create":
         assertMcpMutationAllowed(args, context, {
@@ -3113,6 +3147,29 @@ function remoteExecutionMutationClassFromArgs(
   throw new Error(
     "arguments.mutationClass must be none, verification, project_local, live_runtime, or destructive",
   );
+}
+
+function hostCheckModeFromArgs(args: Record<string, unknown>): NexusHostCheckMode {
+  const value = optionalString(args, "mode", "arguments") ?? "local";
+  if (value === "local" || value === "mock-remote") {
+    return value;
+  }
+
+  throw new Error("arguments.mode must be local or mock-remote");
+}
+
+function hostCheckMockFactsFromArgs(
+  args: Record<string, unknown>,
+): NexusHostCheckMockFacts | null {
+  const value = args.mockFacts;
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("arguments.mockFacts must be an object");
+  }
+
+  return value as NexusHostCheckMockFacts;
 }
 
 function workItemSyncPolicyFromArgs(
