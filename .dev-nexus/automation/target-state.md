@@ -153,6 +153,15 @@ and ready for coordinator-driven work across its components.
   `local-169` no longer appear under `readyEligibleWork`. Verification passed
   locally, in PR #21 Node 24 checks on Ubuntu/Windows/macOS, after merge in
   the shared DevNexus checkout, and in the dogfood target-report smoke.
+- Provider-native issue Evref-BL/DevNexus#4 is complete through DevNexus PR
+  #22 as merge commit `73e1571`, adding `mcpRuntime` identity to
+  `automation_status`, `eligible_work`, and `target_report` MCP responses. The
+  runtime summary compares the running MCP server start time with the project
+  DevNexus source `HEAD` timestamp and warns when the process predates source
+  changes, so heartbeat agents can reload or use the project-local CLI before
+  trusting stale status/report output. Verification passed locally, in PR #22
+  Node 24 checks on Ubuntu/Windows/macOS, and after merge in the shared
+  DevNexus checkout.
 - `dev-nexus:local-165` is complete for version-scoped planning issue slicing.
   It created `dev-nexus:local-167` through `local-171` in dependency order:
   version config, scope resolution, readiness reporting, agent/report exposure,
@@ -337,8 +346,10 @@ and ready for coordinator-driven work across its components.
   `C:\dev\code\sources\dev-nexus` with 64 test files and 575 tests.
 - The focused coordination auth-profile fix for the previous mismatch remains
   published as `8735a73`. Active MCP server processes may still need reload
-  before their coordination status surfaces reflect the fixed code; use the
-  project-local source CLI for authority-sensitive checks until then.
+  after source integrations; PR #22 now exposes `mcpRuntime` stale-process
+  warnings on DevNexus MCP status/report surfaces, and the project-local source
+  CLI remains the fallback for source-current checks until the MCP session is
+  reloaded.
 - Keep remote host execution ordered: promote host checks, SSH transport,
   verification execution, or live dogfood smokes only after their dependencies
   on completed `dev-nexus:local-81` are explicit.

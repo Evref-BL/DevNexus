@@ -1,7 +1,120 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-20T05:26:53.520Z",
+  "updatedAt": "2026-05-20T06:16:30.000Z",
   "leases": [
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-4bc4684cc72fa6f0",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "project_meta",
+        "componentId": null
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "github-4-project-state",
+      "branchName": "codex/dev-nexus-dogfood/github-4-project-state",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "project_meta_worktree",
+        "base": "projectWorktreesRoot",
+        "componentId": null,
+        "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-github-4-project-state"
+      },
+      "writeScope": [
+        ".dev-nexus/worktree-leases.json",
+        ".dev-nexus/automation/target-state.md",
+        ".dev-nexus/automation/target-cycles.json",
+        "PLAN.md"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T06:15:11.105Z",
+      "lastSeenAt": "2026-05-20T06:16:30.000Z",
+      "updatedAt": "2026-05-20T06:16:30.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "57e9139357947385da03d1ab82d7203df87aedf2",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "project_meta_worktree",
+          "base": "projectWorktreesRoot",
+          "componentId": null,
+          "relativePath": "dev-nexus-dogfood/codex-dev-nexus-dogfood-github-4-project-state"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Project metadata closeout records GitHub #4 / DevNexus PR #22 completion and is intended for dogfood main integration."
+      ]
+    },
+    {
+      "kind": "dev-nexus.worktree.lease",
+      "version": 1,
+      "id": "lease-b1c5a9efa25131f3",
+      "projectId": "dev-nexus-dogfood",
+      "scope": {
+        "kind": "component",
+        "componentId": "dev-nexus"
+      },
+      "hostId": "BLPP-15398",
+      "agentId": null,
+      "workItemId": "github-4",
+      "branchName": "codex/dev-nexus/github-4-stale-mcp-runtime-detection",
+      "baseRef": "main",
+      "worktree": {
+        "kind": "component_worktree",
+        "base": "componentWorktreesRoot",
+        "componentId": "dev-nexus",
+        "relativePath": "codex-dev-nexus-github-4-stale-mcp-runtime-detection"
+      },
+      "writeScope": [
+        "src/nexusMcpServer.ts",
+        "src/nexusMcpServer.test.ts",
+        "src/nexusAutomation*.ts",
+        "src/nexusAutomation*.test.ts",
+        "src/cli.ts",
+        "src/cli.test.ts"
+      ],
+      "status": "merged",
+      "createdAt": "2026-05-20T06:05:36.135Z",
+      "lastSeenAt": "2026-05-20T06:16:30.000Z",
+      "updatedAt": "2026-05-20T06:16:30.000Z",
+      "refreshCount": 0,
+      "lastObservedHeadCommit": "c1b85aa",
+      "dirty": false,
+      "pushed": true,
+      "git": {
+        "repository": {
+          "kind": "component_worktree",
+          "base": "componentWorktreesRoot",
+          "componentId": "dev-nexus",
+          "relativePath": "codex-dev-nexus-github-4-stale-mcp-runtime-detection"
+        },
+        "upstream": null,
+        "ahead": null,
+        "behind": null,
+        "stagedCount": 0,
+        "unstagedCount": 0,
+        "untrackedCount": 0,
+        "warnings": [
+          "Current branch has no upstream configured."
+        ]
+      },
+      "notes": [
+        "Source branch merged through DevNexus PR #22 as merge commit 73e1571; required Node 24 checks and post-merge npm run check passed.",
+        "Remote review branch was deleted by PR merge cleanup."
+      ]
+    },
     {
       "kind": "dev-nexus.worktree.lease",
       "version": 1,
