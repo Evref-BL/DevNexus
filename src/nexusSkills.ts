@@ -647,6 +647,431 @@ handoffs, target-cycle facts, and human-in-the-loop approval gates.
 `,
 );
 
+const executeInitiativePlanSkill = adaptedSuperpowersSkill(
+  "execute-initiative-plan",
+  "execute-initiative-plan",
+  "Plan execution workflow adapted from Superpowers executing-plans. Use when an approved plan should be carried through in the current session with checkpoints, verification, and DevNexus records.",
+  ["skills/executing-plans/SKILL.md"],
+  `
+# Execute Initiative Plan
+
+Use this skill when an approved plan is ready to execute and the work should
+accumulate on one initiative or delivery surface.
+
+## Workflow
+
+1. Load the plan and its durable context: tracker anchor, initiative notes,
+   Product Requirements Document (PRD), design record, current branch, and
+   relevant workspace state.
+2. Review the plan before acting. Stop and raise concerns when tasks are
+   ambiguous, unsafe, out of date, missing verification, or split across the
+   wrong component, artifact, or publication surface.
+3. Confirm the current checkout is the intended owned surface. If not, use the
+   worktree preparation workflow before editing.
+4. Execute one slice at a time. Keep status current, follow referenced companion
+   skills, and preserve unrelated dirty changes.
+5. Run the verification named by the slice before marking it complete. If the
+   named check is unavailable, record why and choose the nearest useful check
+   only when the plan permits that substitution.
+6. Record progress through the configured DevNexus surface: work-item comment,
+   target-cycle fact, coordination handoff, initiative note, or pull request.
+7. Stop instead of guessing when a blocker, repeated verification failure,
+   unclear requirement, unsafe action, or publication authority issue appears.
+8. When all slices are complete, use the branch finishing workflow to verify,
+   publish or hand off, and clean up according to policy.
+
+## Guardrails
+
+- Do not start implementation from a plan you have not read critically.
+- Do not treat a plan as approval for destructive cleanup, live runtime actions,
+  provider writes, cost changes, or publication unless it says so explicitly.
+- Do not split one initiative into many unrelated final publications.
+- Do not continue after verification fails unless the next step is diagnosis.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/executing-plans/SKILL.md\`.
+This DevNexus adaptation changes plan execution to use initiative surfaces,
+component ownership, worktree policy, tracker records, and publication gates.
+`,
+);
+
+const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
+  "parallel-work-dispatch",
+  "parallel-work-dispatch",
+  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use only when independent slices can be delegated safely and the user has asked for subagents or parallel agent work.",
+  [
+    "skills/dispatching-parallel-agents/SKILL.md",
+    "skills/subagent-driven-development/SKILL.md",
+  ],
+  `
+# Parallel Work Dispatch
+
+Use this skill when the user has explicitly asked for subagents or parallel
+agent work, and the work can be split into independent domains.
+
+## Workflow
+
+1. Identify the independent domains. Good boundaries are separate components,
+   disjoint files, separate tracker items, unrelated failures, or independent
+   artifacts with no shared mutable state.
+2. Keep the coordinator local to the initiative surface. The coordinator owns
+   the plan, branch or artifact set, tracker anchor, integration order, and
+   final verification.
+3. Assign each worker one bounded task with an explicit write scope, expected
+   output, verification command, and handoff format. Tell workers they are not
+   alone in the codebase and must not revert edits made by others.
+4. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
+   paths for mutating work. Avoid parallel edits to the same file unless one
+   agent is explicitly the integrator.
+5. Dispatch only sidecar work that can progress while the coordinator continues
+   useful non-overlapping work. Keep immediate blockers local when waiting would
+   stall the critical path.
+6. Review returned work before integration: spec fit first, then implementation
+   quality, then conflict risk. Ask the worker to fix its own slice when review
+   finds issues.
+7. Integrate deliberately. Use DevNexus coordination status or integration
+   planning when multiple branches or handoffs exist, then run focused and
+   broader verification from the integration surface.
+8. Record the result in the tracker, target-cycle facts, coordination handoff,
+   or pull request so the parallel work does not vanish into chat history.
+
+## Guardrails
+
+- Do not dispatch subagents unless the user explicitly requested subagents,
+  delegation, or parallel agent work.
+- Do not delegate urgent blocking work when the coordinator's next action
+  depends on the result.
+- Do not give a worker the whole chat transcript when a focused prompt with
+  exact context would be safer.
+- Do not accept worker success reports without reviewing diffs and running the
+  relevant verification.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source paths:
+\`skills/dispatching-parallel-agents/SKILL.md\` and
+\`skills/subagent-driven-development/SKILL.md\`.
+This DevNexus adaptation adds explicit user authorization for subagents,
+DevNexus worktree ownership, disjoint write scopes, integration handoffs, and
+target-cycle records.
+`,
+);
+
+const requestWorkReviewSkill = adaptedSuperpowersSkill(
+  "request-work-review",
+  "request-work-review",
+  "Review-request workflow adapted from Superpowers requesting-code-review. Use before merging, publishing, or proceeding past a meaningful slice to verify requirements, risks, and implementation quality.",
+  ["skills/requesting-code-review/SKILL.md"],
+  `
+# Request Work Review
+
+Use this skill when a slice, artifact, or branch needs independent review
+before it becomes the basis for more work, publication, or cleanup.
+
+## Workflow
+
+1. Define the review target: branch range, changed files, document, artifact,
+   tracker item, or decision record.
+2. Gather review context without dumping history: objective, requirements,
+   plan slice, acceptance criteria, base revision, head revision, verification
+   already run, and known concerns.
+3. Choose the reviewer path that fits the workspace: subagent review when the
+   user has asked for subagents, human review when approval is required, or
+   provider-native pull request review when publication policy expects it.
+4. Ask the reviewer to report findings by severity with concrete file, line,
+   artifact, or requirement references. Require blockers to include the
+   smallest verification or change that would resolve them.
+5. Evaluate the feedback technically before acting. Fix critical and important
+   issues before proceeding, document rejected findings with evidence, and keep
+   minor follow-ups separate from the current done criteria.
+6. Re-run the relevant verification after fixes and update the durable record
+   with the review outcome.
+
+## Guardrails
+
+- Do not ask for review without a crisp target and requirements.
+- Do not use review as a substitute for running verification.
+- Do not proceed past critical or important findings without fixing them or
+  recording a reasoned rejection.
+- Do not hide required human approval inside an agent-only review.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/requesting-code-review/SKILL.md\`.
+This DevNexus adaptation broadens review beyond code while preserving concrete
+requirements, revision ranges, severity ordering, and verification evidence.
+`,
+);
+
+const receiveReviewFeedbackSkill = adaptedSuperpowersSkill(
+  "receive-review-feedback",
+  "receive-review-feedback",
+  "Review-feedback handling workflow adapted from Superpowers receiving-code-review. Use when responding to human, agent, or provider review feedback without blind agreement or unverified changes.",
+  ["skills/receiving-code-review/SKILL.md"],
+  `
+# Receive Review Feedback
+
+Use this skill when review feedback arrives from a human, subagent, pull
+request, issue comment, external reviewer, or automated check.
+
+## Workflow
+
+1. Read all feedback before editing. Group items by blocker, correctness,
+   requirement gap, quality concern, and optional follow-up.
+2. Restate unclear items in technical terms and ask for clarification before
+   implementing partial guesses.
+3. Verify each suggestion against code, documents, workspace policy, prior
+   decisions, and current requirements. External feedback is input to evaluate,
+   not an order to follow blindly.
+4. Push back with evidence when a suggestion is wrong, harmful, out of scope,
+   violates the initiative decision, or adds unused complexity.
+5. Implement accepted feedback in a safe order: blockers first, simple fixes,
+   then complex changes. Keep unrelated improvements out of the feedback patch.
+6. Test each meaningful fix with the smallest relevant verification, then run
+   the nearest broader check before claiming the feedback is resolved.
+7. Reply or record the outcome where the feedback lives, especially for
+   provider-native review threads, work-item comments, and pull requests.
+
+## Guardrails
+
+- Do not use performative agreement as a substitute for technical evaluation.
+- Do not batch unclear feedback with understood fixes.
+- Do not silently accept suggestions that conflict with prior user decisions.
+- Do not mark feedback resolved without fresh verification evidence or a clear
+  explanation of why verification was not run.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/receiving-code-review/SKILL.md\`.
+This DevNexus adaptation keeps the technical rigor of the upstream review flow
+while adding workspace policy, initiative decisions, and provider-thread
+recordkeeping.
+`,
+);
+
+const verifyBeforeCompletionSkill = adaptedSuperpowersSkill(
+  "verify-before-completion",
+  "verify-before-completion",
+  "Verification gate adapted from Superpowers verification-before-completion. Use before claiming work is complete, fixed, ready, published, or safe to hand off.",
+  ["skills/verification-before-completion/SKILL.md"],
+  `
+# Verify Before Completion
+
+Use this skill before claiming that work is complete, fixed, ready, published,
+or safe to hand off.
+
+## Workflow
+
+1. Name the claim you are about to make.
+2. Identify the command, inspection, review, or artifact check that can prove
+   that claim. Use the plan's verification when one exists.
+3. Run or perform the check freshly from the owning worktree or artifact
+   surface. Read the output, exit code, and failure count before summarizing.
+4. If verification fails, state the actual status with evidence and switch to
+   diagnosis or feedback handling. Do not soften the failure into a success
+   claim.
+5. If verification passes, report the command and outcome in the relevant
+   durable record: tracker item, target-cycle fact, handoff, pull request, or
+   final response.
+6. When verification cannot be run, say why, name the residual risk, and avoid
+   claiming the unverified property.
+
+## Claim Examples
+
+- "Tests pass" requires fresh test output.
+- "Build passes" requires a fresh build command.
+- "Bug fixed" requires the original reproduction or an equivalent regression
+  check.
+- "Requirements met" requires checking the plan or issue criteria, not just a
+  green test suite.
+- "Ready for review" requires a clean owned diff, current verification, and a
+  clear handoff.
+
+## Guardrails
+
+- Do not rely on previous runs, worker reports, assumptions, or partial logs for
+  a completion claim. Require fresh verification evidence.
+- Do not commit, push, open a pull request, close a work item, or request merge
+  while knowingly skipping the verification required by the claim.
+- Do not hide failed or skipped verification in optimistic language.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/verification-before-completion/SKILL.md\`.
+This DevNexus adaptation routes verification evidence into tracker records,
+target-cycle facts, handoffs, pull requests, and final responses.
+`,
+);
+
+const diagnoseSkill = adaptedSuperpowersSkill(
+  "diagnose",
+  "diagnose",
+  "Systematic debugging workflow adapted from Superpowers systematic-debugging. Use for defects, failed checks, regressions, or unexpected behavior before proposing fixes.",
+  ["skills/systematic-debugging/SKILL.md"],
+  `
+# Diagnose
+
+Use this skill when a defect, failed check, confusing behavior, or broken
+workflow needs root-cause analysis before a fix.
+
+## Workflow
+
+1. Reproduce the problem with the smallest command, scenario, fixture, or
+   artifact check available. Capture the exact input, output, error, and
+   environment.
+2. Read the full error and relevant recent changes before proposing fixes.
+3. Trace the failing boundary. In a DevNexus workspace, include component
+   source roots, generated support state, tracker/provider calls, MCP routing,
+   worktree setup, credentials, and publication policy when relevant.
+4. Compare against nearby working examples and project patterns. Prefer the
+   existing architecture unless evidence shows it is the cause.
+5. Form one concrete hypothesis and test it with the smallest change or probe
+   that can disprove it.
+6. Once the root cause is known, add or identify the failing test, reproduction,
+   or verification that proves the problem before implementing the fix.
+7. Make the smallest fix that addresses the cause, then verify the reproduction
+   and the nearest broader check.
+8. Record root cause, fix, verification, and residual risk in the tracker,
+   handoff, target-cycle fact, or pull request.
+
+## Guardrails
+
+- Do not patch symptoms before locating the cause.
+- Do not stack multiple speculative fixes in one test run.
+- Do not skip the reproduction because the issue looks obvious.
+- After repeated failed fixes, stop and question the architecture or task
+  boundary instead of trying one more guess.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/systematic-debugging/SKILL.md\`.
+This DevNexus adaptation adds multi-component workspace boundaries, generated
+support state, provider credentials, worktree setup, and durable root-cause
+records.
+`,
+);
+
+const tddSkill = adaptedSuperpowersSkill(
+  "tdd",
+  "tdd",
+  "Test-driven development workflow adapted from Superpowers test-driven-development. Use when adding or changing behavior that can be covered by an automated test or comparable executable check.",
+  ["skills/test-driven-development/SKILL.md"],
+  `
+# Test-Driven Development (TDD)
+
+Use this skill when adding or changing behavior that can be covered by an
+automated test or comparable executable check.
+
+## Workflow
+
+1. Identify the behavior, regression, or contract before editing production
+   code. If a test framework exists, use the closest focused test file.
+2. Write the smallest failing test that expresses one behavior. Use real code
+   and realistic fixtures; mock only when the boundary cannot be exercised
+   directly.
+3. Run the focused test and confirm it fails for the expected reason. A passing
+   test or unrelated error is not a valid red state.
+4. Implement the smallest change that makes the focused test pass. Avoid
+   unrelated cleanup, extra options, or speculative generalization.
+5. Run the focused test again and read the output. Fix production code when it
+   fails; do not weaken the test to match the implementation.
+6. Refactor only while the test remains green. Keep behavior changes and
+   structural cleanup distinguishable in the diff.
+7. Run the nearest broader relevant check before handoff, commit, or
+   publication.
+8. Summarize the behavior protected by the test and the verification evidence.
+
+## Guardrails
+
+- Do not write production behavior first and then backfill tests as if that were
+  Test-Driven Development (TDD).
+- Do not keep untested reference implementation around after deciding TDD is
+  required.
+- Do not add broad abstractions before a failing test creates pressure for
+  them.
+- If the work is documentation, operations, or research, choose the equivalent
+  executable or reviewable check rather than pretending a unit test is required.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/test-driven-development/SKILL.md\`.
+This DevNexus adaptation keeps red-green-refactor discipline while allowing
+non-code work to use the nearest executable or reviewable verification.
+`,
+);
+
+const writeAgentSkillSkill = adaptedSuperpowersSkill(
+  "write-agent-skill",
+  "write-agent-skill",
+  "Agent skill authoring workflow adapted from Superpowers writing-skills. Use when creating or revising DevNexus, component, or plugin skills with concise triggers, metadata, verification, and attribution.",
+  ["skills/writing-skills/SKILL.md"],
+  `
+# Write Agent Skill
+
+Use this skill when creating or revising DevNexus, component, plugin, or
+project-local agent skills.
+
+## Workflow
+
+1. Define the trigger first. A skill should activate for a specific recurring
+   situation, not because it is an interesting document.
+2. Read existing nearby skills before writing. Match local naming, frontmatter,
+   scope, supported agents, and projection expectations.
+3. Keep the skill short enough to use during real work. Put workflow steps,
+   guardrails, required tools, and handoff shape ahead of background rationale.
+4. Make it generic when the workflow is generic. Avoid coupling a project-wide
+   skill to one component, branch, tracker, or programming-only assumption
+   unless that is the point of the skill.
+5. Include attribution when adapted from another source: license, upstream
+   repository, tag or version, exact commit hash, and source path.
+6. Verify the skill materializes through DevNexus support state and projects
+   into configured agent-native directories. Add or update focused tests when
+   the skill is part of the curated pack.
+7. Try the skill on the current workflow if possible, then record notes for the
+   next refinement separately from the active skill text.
+
+## Guardrails
+
+- Do not create a bridge skill when the workflow belongs cleanly in the core or
+  component skill pack.
+- Do not make the skill verbose enough that agents will ignore it.
+- Do not import licensed text without preserving the required notice and exact
+  provenance.
+- Do not write a skill that conflicts with higher-priority agent, workspace, or
+  safety instructions.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/writing-skills/SKILL.md\`.
+This DevNexus adaptation adds curated-pack metadata, projection verification,
+license provenance, and generic workflow constraints.
+`,
+);
+
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "dev-nexus",
@@ -721,42 +1146,15 @@ coordination record, or another project-owned place where slices accumulate.
   ),
   designWithUserSkill,
   writeImplementationPlanSkill,
+  executeInitiativePlanSkill,
   prepareDevNexusWorktreeSkill,
+  parallelWorkDispatchSkill,
+  requestWorkReviewSkill,
+  receiveReviewFeedbackSkill,
+  verifyBeforeCompletionSkill,
   finishDevNexusBranchSkill,
-  curatedCoreSkill(
-    "diagnose",
-    "diagnose",
-    "Systematic debugging workflow for reproducing, isolating, fixing, and verifying defects in managed workspaces.",
-    `
-# Diagnose
-
-Use this skill when a defect, failed check, or confusing behavior needs a structured diagnosis.
-
-1. Reproduce the failure with the smallest command or scenario available.
-2. Record the observed behavior, expected behavior, and exact inputs.
-3. Isolate the likely boundary by reading the owning code before editing.
-4. Make the smallest behavior-changing patch that explains the reproduction.
-5. Verify with the focused reproduction first, then run the nearest broader check.
-6. Leave a compact note with the root cause, fix, verification, and remaining risk.
-`,
-  ),
-  curatedCoreSkill(
-    "tdd",
-    "tdd",
-    "Test-driven development workflow for adding behavior with focused red, green, and refactor steps.",
-    `
-# Test-Driven Development (TDD)
-
-Use this skill when adding or changing behavior that can be expressed with a focused automated test.
-
-1. Write the smallest failing test that captures the desired behavior or regression.
-2. Run that focused test and confirm it fails for the expected reason.
-3. Implement the smallest change that makes the focused test pass.
-4. Refactor only when the green state is preserved.
-5. Run the focused test again, then the nearest relevant suite.
-6. Summarize the behavioral contract the test now protects.
-`,
-  ),
+  diagnoseSkill,
+  tddSkill,
   curatedCoreSkill(
     "handoff",
     "handoff",
@@ -828,6 +1226,7 @@ Use this skill when a project first enables curated agent skills, or when skills
 9. Keep generated setup docs local to the project. Do not include external catalog or author names in generated skill names, headings, or operational instructions.
 `,
   ),
+  writeAgentSkillSkill,
   curatedCoreSkill(
     "grill-with-docs",
     "grill-with-docs",
