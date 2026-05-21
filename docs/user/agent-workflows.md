@@ -180,6 +180,11 @@ Prepared worktrees carry ownership metadata: component id, source root,
 generated path, branch, base ref, and owning work item. The generated path must
 resolve inside the component worktrees root.
 
+Worktree leases are advisory runtime records. They help other agents see active
+or stale work, but they are not hard locks and should not be committed as normal
+workspace state. DevNexus writes new leases to host-local runtime storage and
+keeps legacy `.dev-nexus/worktree-leases.json` files readable for migration.
+
 Generated worktrees can receive setup-only dependency projections. DevNexus
 links existing reviewed paths such as `node_modules` into the worktree, records
 the target in the worktree Git exclude file, and does not run an installer.
