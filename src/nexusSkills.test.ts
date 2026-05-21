@@ -331,6 +331,12 @@ describe("nexus skills", () => {
     expect(skillMarkdown["take-the-lead"]).toContain(
       "45effb4b7d7de1226ebba7ba304bccfcf0a37fdf",
     );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "choose the current skill chain",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "docs/user/skill-chains.md",
+    );
     expect(skillMarkdown["design-with-user"]).toContain(
       "use `grill-me` or",
     );

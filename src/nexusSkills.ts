@@ -1304,6 +1304,33 @@ constraints, approvals, and final direction.
 7. Close loops. When a decision is made, record what changed and continue from
    that decision instead of relitigating it.
 
+## Workflow Routing
+
+When leading multi-step work, choose the current skill chain before taking the
+next action. Say the chain when it matters, then invoke the next skill in that
+chain.
+
+- Unclear goal or scope: \`triage\` or \`design-with-user\`.
+- Existing plan that needs pressure: \`grill-me\`; use \`grill-with-docs\` when
+  code, glossary terms, docs, or Architecture Decision Records should decide.
+- Feature work: \`write-implementation-plan\` -> \`prepare-dev-nexus-worktree\`
+  -> \`tdd\` -> \`verify-before-completion\` -> \`request-work-review\` ->
+  \`finish-dev-nexus-branch\`.
+- Bugfix work: \`prepare-dev-nexus-worktree\` -> \`diagnose\` -> \`tdd\` ->
+  \`verify-before-completion\` -> review and finish.
+- Documentation work: \`documentation\` -> \`humanizer\` ->
+  \`verify-before-completion\` -> review and finish.
+- Architecture work: \`zoom-out\` -> \`architecture-review\` ->
+  \`architecture-deepening\` -> planning, implementation, verification, and
+  review.
+- Version or release work: \`initiative-workflow\` -> \`to-prd\` ->
+  \`to-issues\` -> \`write-implementation-plan\`, then execute and verify each
+  slice before final approval.
+
+In a DevNexus workspace, consult \`docs/user/skill-chains.md\` for the full
+workflow-composition diagrams when the route is unclear or the work spans a
+feature, bugfix, documentation, architecture, or version flow.
+
 ## Pairing
 
 - Use \`initiative-workflow\` when the led work spans multiple slices or surfaces.
