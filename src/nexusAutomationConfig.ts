@@ -184,6 +184,28 @@ export interface NexusAutomationGreenMainConfig {
   staleChecks: NexusAutomationGreenMainStaleCheckPolicy;
 }
 
+export interface NexusAutomationPublicationTrainBranchNamingConfig {
+  integrationPrefix: string;
+  candidatePrefix: string;
+  unscopedName: string;
+}
+
+export interface NexusAutomationPublicationTrainSelectorConfig {
+  statuses: WorkStatus[];
+  labels: string[];
+  milestones: string[];
+  assignees: string[];
+  providerQuery: string | null;
+}
+
+export interface NexusAutomationPublicationTrainConfig {
+  enabled: boolean;
+  activeVersionId: string | null;
+  branchNaming: NexusAutomationPublicationTrainBranchNamingConfig;
+  ciTiers?: NexusCiTierPolicyConfig | null;
+  selector: NexusAutomationPublicationTrainSelectorConfig;
+}
+
 export interface NexusAutomationPublicationConfig {
   strategy: NexusAutomationPublicationStrategy;
   remote: string | null;
@@ -200,6 +222,7 @@ export interface NexusAutomationPublicationConfig {
   manualActor: NexusPublicationActorConfig | null;
   commandEnvironment: Record<string, string>;
   greenMain?: NexusAutomationGreenMainConfig | null;
+  publicationTrain?: NexusAutomationPublicationTrainConfig | null;
 }
 
 export interface NexusAutomationPublicationPolicySummary {
@@ -336,6 +359,24 @@ export const defaultNexusAutomationGreenMainConfig:
     staleChecks: "block",
   };
 
+export const defaultNexusAutomationPublicationTrainConfig:
+  NexusAutomationPublicationTrainConfig = {
+    enabled: false,
+    activeVersionId: null,
+    branchNaming: {
+      integrationPrefix: "integration",
+      candidatePrefix: "candidate",
+      unscopedName: "manual",
+    },
+    selector: {
+      statuses: ["ready"],
+      labels: [],
+      milestones: [],
+      assignees: [],
+      providerQuery: null,
+    },
+  };
+
 export class NexusAutomationConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -453,6 +494,7 @@ export function normalizeNexusAutomationPublicationConfig(
   value: NexusAutomationPublicationConfig,
   pathName = "workspace config.automation.publication",
 ): NexusAutomationPublicationConfig {
+  const publicationTrain = normalizePublicationTrainConfig(value.publicationTrain);
   if (value.strategy === "green_main") {
     const greenMain = {
       ...defaultNexusAutomationGreenMainConfig,
@@ -488,6 +530,7 @@ export function normalizeNexusAutomationPublicationConfig(
 
     return {
       ...value,
+      ...(publicationTrain !== undefined ? { publicationTrain } : {}),
       greenMain: {
         ...greenMain,
         requiredChecks: [...greenMain.requiredChecks],
@@ -502,7 +545,51 @@ export function normalizeNexusAutomationPublicationConfig(
   }
 
   const { greenMain: _greenMain, ...withoutGreenMain } = value;
-  return withoutGreenMain;
+  return {
+    ...withoutGreenMain,
+    ...(publicationTrain !== undefined ? { publicationTrain } : {}),
+  };
+}
+
+function normalizePublicationTrainConfig(
+  value: NexusAutomationPublicationConfig["publicationTrain"],
+): NexusAutomationPublicationConfig["publicationTrain"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  return {
+    enabled: value.enabled,
+    activeVersionId: value.activeVersionId,
+    branchNaming: { ...value.branchNaming },
+    ...(value.ciTiers
+      ? {
+          ciTiers: {
+            enabled: value.ciTiers.enabled,
+            defaultTier: value.ciTiers.defaultTier,
+            tiers: value.ciTiers.tiers.map((tier) => ({
+              ...tier,
+              requiredChecks: [...tier.requiredChecks],
+              optionalChecks: [...tier.optionalChecks],
+              branchPatterns: [...tier.branchPatterns],
+              eventNames: [...tier.eventNames],
+            })),
+            fullMatrixBudget: { ...value.ciTiers.fullMatrixBudget },
+          },
+        }
+      : value.ciTiers === null
+        ? { ciTiers: null }
+        : {}),
+    selector: {
+      statuses: [...value.selector.statuses],
+      labels: [...value.selector.labels],
+      milestones: [...value.selector.milestones],
+      assignees: [...value.selector.assignees],
+      providerQuery: value.selector.providerQuery,
+    },
+  };
 }
 
 export function summarizeNexusAutomationPublicationPolicy(
@@ -1301,6 +1388,7 @@ export function validatePartialNexusAutomationPublicationConfig(
     ...optionalPublicationActorField(record, "manualActor", pathName),
     ...optionalCommandEnvironmentField(record, "commandEnvironment", pathName),
     ...optionalGreenMainPublicationField(record, "greenMain", pathName),
+    ...optionalPublicationTrainField(record, "publicationTrain", pathName),
   };
 }
 
@@ -1512,6 +1600,38 @@ function optionalStringArray(
   );
 }
 
+function optionalBranchPrefix(
+  value: unknown,
+  pathName: string,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const prefix = requiredNonEmptyString(value, pathName).replace(/\/+$/u, "");
+  if (prefix.length === 0 || /\s/u.test(prefix) || prefix.startsWith("/")) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a relative Git branch prefix without whitespace`,
+    );
+  }
+  return prefix;
+}
+
+function optionalBranchSegment(
+  value: unknown,
+  pathName: string,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const segment = requiredNonEmptyString(value, pathName);
+  if (segment.includes("/") || /\s/u.test(segment)) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a single Git branch path segment without whitespace`,
+    );
+  }
+  return segment;
+}
+
 function optionalCommandEnvironmentField<Key extends string>(
   record: Record<string, unknown>,
   key: Key,
@@ -1633,6 +1753,123 @@ function validateGreenMainPublicationConfig(
     staleChecks:
       staleChecks ??
       defaultNexusAutomationGreenMainConfig.staleChecks,
+  };
+}
+
+function optionalPublicationTrainField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusAutomationPublicationTrainConfig | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === null) {
+    return { [key]: null } as Record<Key, null>;
+  }
+
+  return {
+    [key]: validatePublicationTrainConfig(value, `${pathName}.${key}`),
+  } as Record<Key, NexusAutomationPublicationTrainConfig>;
+}
+
+function validatePublicationTrainConfig(
+  value: unknown,
+  pathName: string,
+): NexusAutomationPublicationTrainConfig {
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName) ??
+    defaultNexusAutomationPublicationTrainConfig.enabled;
+  const activeVersionId = optionalNullableString(
+    record.activeVersionId,
+    `${pathName}.activeVersionId`,
+  ) ?? defaultNexusAutomationPublicationTrainConfig.activeVersionId;
+  const branchNaming = validatePublicationTrainBranchNaming(
+    record.branchNaming,
+    `${pathName}.branchNaming`,
+  );
+  const ciTiers = record.ciTiers === undefined
+    ? undefined
+    : validateNexusCiTierPolicyConfig(record.ciTiers, `${pathName}.ciTiers`);
+  const selector = validatePublicationTrainSelector(
+    record.selector,
+    `${pathName}.selector`,
+  );
+
+  return {
+    enabled,
+    activeVersionId,
+    branchNaming,
+    ...(ciTiers !== undefined ? { ciTiers } : {}),
+    selector,
+  };
+}
+
+function validatePublicationTrainBranchNaming(
+  value: unknown,
+  pathName: string,
+): NexusAutomationPublicationTrainBranchNamingConfig {
+  if (value === undefined) {
+    return { ...defaultNexusAutomationPublicationTrainConfig.branchNaming };
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    integrationPrefix:
+      optionalBranchPrefix(record.integrationPrefix, `${pathName}.integrationPrefix`) ??
+      defaultNexusAutomationPublicationTrainConfig.branchNaming.integrationPrefix,
+    candidatePrefix:
+      optionalBranchPrefix(record.candidatePrefix, `${pathName}.candidatePrefix`) ??
+      defaultNexusAutomationPublicationTrainConfig.branchNaming.candidatePrefix,
+    unscopedName:
+      optionalBranchSegment(record.unscopedName, `${pathName}.unscopedName`) ??
+      defaultNexusAutomationPublicationTrainConfig.branchNaming.unscopedName,
+  };
+}
+
+function validatePublicationTrainSelector(
+  value: unknown,
+  pathName: string,
+): NexusAutomationPublicationTrainSelectorConfig {
+  if (value === undefined) {
+    return {
+      statuses: [...defaultNexusAutomationPublicationTrainConfig.selector.statuses],
+      labels: [...defaultNexusAutomationPublicationTrainConfig.selector.labels],
+      milestones: [...defaultNexusAutomationPublicationTrainConfig.selector.milestones],
+      assignees: [...defaultNexusAutomationPublicationTrainConfig.selector.assignees],
+      providerQuery:
+        defaultNexusAutomationPublicationTrainConfig.selector.providerQuery,
+    };
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    statuses: optionalArrayField(
+      record,
+      "statuses",
+      pathName,
+      validateWorkStatus,
+    ).statuses ?? [...defaultNexusAutomationPublicationTrainConfig.selector.statuses],
+    labels: optionalArrayField(
+      record,
+      "labels",
+      pathName,
+      requiredNonEmptyString,
+    ).labels ?? [...defaultNexusAutomationPublicationTrainConfig.selector.labels],
+    milestones: optionalArrayField(
+      record,
+      "milestones",
+      pathName,
+      requiredNonEmptyString,
+    ).milestones ?? [...defaultNexusAutomationPublicationTrainConfig.selector.milestones],
+    assignees: optionalArrayField(
+      record,
+      "assignees",
+      pathName,
+      requiredNonEmptyString,
+    ).assignees ?? [...defaultNexusAutomationPublicationTrainConfig.selector.assignees],
+    providerQuery:
+      optionalNullableString(record.providerQuery, `${pathName}.providerQuery`) ??
+      defaultNexusAutomationPublicationTrainConfig.selector.providerQuery,
   };
 }
 

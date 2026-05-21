@@ -1892,6 +1892,82 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts optional publication train policy without requiring public labels", () => {
+    const ciTiers = {
+      defaultTier: "remote_smoke" as const,
+      fullMatrixBudget: {
+        minimumIntervalMinutes: 60,
+        minimumChangeCount: 3,
+      },
+    };
+    const config = validateProjectConfig({
+      version: 1,
+      id: "publication-train-project",
+      name: "Publication Train Project",
+      automation: {
+        publication: {
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "0.2.0",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            ciTiers,
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "https://github.com/example/project.git",
+          defaultBranch: "main",
+          publication: {
+            publicationTrain: {
+              enabled: false,
+            },
+          },
+        },
+      ],
+    });
+
+    expect(config.automation?.publication.publicationTrain).toMatchObject({
+      enabled: true,
+      activeVersionId: "0.2.0",
+      branchNaming: {
+        integrationPrefix: "integration",
+        candidatePrefix: "candidate",
+        unscopedName: "manual",
+      },
+      selector: {
+        statuses: ["ready"],
+        labels: [],
+      },
+      ciTiers: {
+        defaultTier: "remote_smoke",
+        fullMatrixBudget: {
+          minimumIntervalMinutes: 60,
+          minimumChangeCount: 3,
+        },
+      },
+    });
+    expect(config.components[0]?.publication?.publicationTrain).toMatchObject({
+      enabled: false,
+      selector: {
+        labels: [],
+      },
+    });
+  });
+
   it("accepts publication identity and remote guardrails", () => {
     expect(
       validateProjectConfig({

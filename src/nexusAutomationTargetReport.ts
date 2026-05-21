@@ -61,6 +61,10 @@ import type {
 import {
   summarizeNexusAutomationPublicationPolicy,
 } from "./nexusAutomationConfig.js";
+import {
+  summarizeNexusPublicationTrainPolicy,
+  type NexusPublicationTrainPolicySummary,
+} from "./nexusPublicationTrainPolicy.js";
 import type {
   WorktreePublicationDecision,
   WorktreeVerificationRecord,
@@ -201,6 +205,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   publicationDecisions: NexusAutomationTargetReportPublicationDecisionSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
   publication: NexusAutomationPublicationPolicySummary | null;
+  publicationTrain: NexusPublicationTrainPolicySummary | null;
   authority: NexusAuthorityComponentSummary | null;
 }
 
@@ -900,6 +905,12 @@ function summarizeComponentProgress(options: {
               draft.component,
             ),
           )
+        : null,
+      publicationTrain: draft.component
+        ? summarizeNexusPublicationTrainPolicy({
+            projectConfig: options.projectConfig,
+            component: draft.component,
+          })
         : null,
       authority:
         options.authority?.components.find(

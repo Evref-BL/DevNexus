@@ -6133,8 +6133,30 @@ describe("dev-nexus cli", () => {
   it("prints compact version planning in target report text and json output", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
     saveProjectConfig(projectRoot, {
-      ...projectConfig(),
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
       versionPlanning: {
         versions: [
           {
@@ -6211,6 +6233,13 @@ describe("dev-nexus cli", () => {
       now: fixedClock("2026-05-16T10:05:00.000Z"),
     });
 
+    expect(textOutput.output()).toContain(
+      "Publication trains: 1 configured, 1 enabled.",
+    );
+    expect(textOutput.output()).toContain(
+      "primary: active=v-next candidate=candidate/v-next integration=integration/v-next tier=remote_smoke",
+    );
+    expect(textOutput.output()).toContain("Selector labels: none");
     expect(textOutput.output()).toContain("Version planning: 1 shown");
     expect(textOutput.output()).toContain(
       "v-next: blocked; scope 1/1 resolved",
@@ -6235,6 +6264,20 @@ describe("dev-nexus cli", () => {
             },
           ],
         },
+        componentProgress: [
+          {
+            componentId: "primary",
+            publicationTrain: {
+              enabled: true,
+              activeVersionId: "v-next",
+              candidateBranch: "candidate/v-next",
+              integrationBranch: "integration/v-next",
+              ciTierDefault: "remote_smoke",
+              selectorLabels: [],
+              requiresPublicLabel: false,
+            },
+          },
+        ],
       },
     });
   });

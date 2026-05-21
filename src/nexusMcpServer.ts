@@ -3850,7 +3850,8 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
       component.commitIds.length > 0 ||
       component.verification.length > 0 ||
       component.publicationDecisions.length > 0 ||
-      component.runs.length > 0,
+      component.runs.length > 0 ||
+      component.publicationTrain !== null,
   );
   return {
     version: report.version,
@@ -3934,6 +3935,25 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
             mode: component.publication.mode,
             targetBranch: component.publication.targetBranch,
             integrationPreference: component.publication.integrationPreference,
+          }
+        : null,
+      publicationTrain: component.publicationTrain
+        ? {
+            enabled: component.publicationTrain.enabled,
+            activeVersionId: component.publicationTrain.activeVersionId,
+            activeVersionFound: component.publicationTrain.activeVersionFound,
+            targetBranch: component.publicationTrain.targetBranch,
+            candidateBranch: component.publicationTrain.branches.candidateBranch,
+            integrationBranch:
+              component.publicationTrain.branches.integrationBranch,
+            ciTierDefault: component.publicationTrain.ciTiers.defaultTier,
+            fullMatrixBudget:
+              component.publicationTrain.ciTiers.fullMatrixBudget,
+            selectorLabels: component.publicationTrain.selector.labels,
+            requiresPublicLabel:
+              component.publicationTrain.selector.requiresPublicLabel,
+            warningCount: component.publicationTrain.warnings.length,
+            warnings: summaryItems(component.publicationTrain.warnings),
           }
         : null,
       authority: component.authority
