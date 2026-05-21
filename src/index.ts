@@ -57,6 +57,7 @@ export * from "./nexusProjectPluginRefresh.js";
 export * from "./nexusGreenMainPublication.js";
 export * from "./nexusPublicationPolicy.js";
 export * from "./nexusCandidateBranchPlan.js";
+export * from "./nexusPublicationProviderEvidence.js";
 export * from "./nexusPublicationTrainReadiness.js";
 export * from "./nexusQuickFix.js";
 export * from "./nexusRemoteExecution.js";

@@ -1042,6 +1042,96 @@ describe("dev-nexus cli", () => {
     );
   });
 
+  it("normalizes publication provider evidence from a saved JSON fixture", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-evidence-");
+    const evidenceFile = path.join(projectRoot, "evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 130,
+              url: "https://github.com/example/demo/pull/130",
+            },
+            headBranch: "codex/evidence",
+            headSha: "abc123",
+            targetBranch: "main",
+            intendedCiTier: "remote_smoke",
+            mergeability: "mergeable",
+            branchPolicy: "clear",
+            checks: [
+              {
+                name: "Node 24 check (ubuntu-latest)",
+                bucket: "pass",
+                workflow: "CI",
+              },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const textOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "evidence",
+        "normalize",
+        evidenceFile,
+        "--required-check",
+        "Node 24 check (ubuntu-latest)",
+      ],
+      { stdout: textOutput.writer },
+    );
+
+    expect(textOutput.output()).toContain(
+      "DevNexus publication provider evidence.",
+    );
+    expect(textOutput.output()).toContain("github pull_request codex/evidence");
+    expect(textOutput.output()).toContain(
+      "checks=success: all required checks are successful",
+    );
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "evidence",
+        "normalize",
+        evidenceFile,
+        "--required-check",
+        "Node 24 check (ubuntu-latest)",
+        "--json",
+      ],
+      { stdout: jsonOutput.writer },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      evidence: [
+        {
+          provider: "github",
+          sourceKind: "pull_request",
+          headBranch: "codex/evidence",
+          headSha: "abc123",
+          intendedCiTier: "remote_smoke",
+          mergeability: "mergeable",
+          branchPolicy: "clear",
+        },
+      ],
+      classifications: [
+        {
+          status: "success",
+        },
+      ],
+    });
+  });
+
   it("prints publication train readiness in text and JSON", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-train-readiness-");
     saveProjectConfig(

@@ -222,6 +222,12 @@ import {
   type NexusCandidateBranchPlan,
 } from "./nexusCandidateBranchPlan.js";
 import {
+  classifyNexusPublicationProviderEvidenceChecks,
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidenceCheckClassification,
+} from "./nexusPublicationProviderEvidence.js";
+import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthorityForCurrentActor,
@@ -989,6 +995,12 @@ interface ParsedPublicationCandidatePlanCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationEvidenceNormalizeCommand {
+  evidenceFile: string;
+  requiredChecks: string[];
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -1079,6 +1091,7 @@ export function usage(): string {
     "  dev-nexus remote-execution ssh-plan <workspace-root> <request-id> [options]",
     "  dev-nexus worktree prepare <workspace-root> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
+    "  dev-nexus publication evidence normalize <json-file> [options]",
     "  dev-nexus publication train-readiness <workspace-root> [options]",
     "  dev-nexus publication candidate-plan <workspace-root> [options]",
     "  dev-nexus quick-fix plan <workspace-root> --work-item <id> [options]",
@@ -1335,6 +1348,10 @@ export function usage(): string {
     "  --allow-rerun             allow one failed-run rerun when a reason is provided",
     "  --rerun-reason <text>",
     "  --rerun-attempted         mark the one allowed rerun as already used",
+    "  --json",
+    "",
+    "Options for publication evidence normalize:",
+    "  --required-check <name>   classify normalized evidence against a required check; repeatable",
     "  --json",
     "",
     "Options for publication train-readiness:",
@@ -2596,6 +2613,28 @@ async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "evidence" && argv[2] === "normalize") {
+    const parsed = parsePublicationEvidenceNormalizeCommand(argv);
+    const evidence = normalizeNexusPublicationProviderEvidence(
+      readPublicationTrainEvidenceInput(parsed.evidenceFile),
+    );
+    const classifications = parsed.requiredChecks.length > 0
+      ? evidence.map((item) =>
+          classifyNexusPublicationProviderEvidenceChecks({
+            evidence: item,
+            requiredChecks: parsed.requiredChecks,
+          }),
+        )
+      : [];
+    printPublicationEvidenceNormalizeResult(
+      evidence,
+      classifications,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "train-readiness") {
     const parsed = parsePublicationTrainReadinessCommand(argv);
     const report = buildNexusPublicationTrainReadinessReport({
@@ -2637,7 +2676,7 @@ async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires green-main plan, train-readiness, or candidate-plan",
+    "publication requires green-main plan, evidence normalize, train-readiness, or candidate-plan",
   );
 }
 
@@ -5669,6 +5708,46 @@ function parsePublicationTrainReadinessCommand(
         break;
       default:
         throw new Error(`Unknown publication train-readiness option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationEvidenceNormalizeCommand(
+  argv: string[],
+): ParsedPublicationEvidenceNormalizeCommand {
+  const [, scope, command, evidenceFile, ...rest] = argv;
+  if (scope !== "evidence" || command !== "normalize") {
+    throw new Error("publication requires evidence normalize");
+  }
+  if (!evidenceFile || evidenceFile.startsWith("--")) {
+    throw new Error("publication evidence normalize requires an evidence file");
+  }
+
+  const parsed: ParsedPublicationEvidenceNormalizeCommand = {
+    evidenceFile,
+    requiredChecks: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--required-check":
+        parsed.requiredChecks.push(next());
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication evidence normalize option: ${arg}`);
     }
   }
 
@@ -8901,6 +8980,39 @@ function printPublicationTrainReadinessReport(
   }
   for (const warning of report.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationEvidenceNormalizeResult(
+  evidence: NexusPublicationProviderEvidence[],
+  classifications: NexusPublicationProviderEvidenceCheckClassification[],
+  parsed: ParsedPublicationEvidenceNormalizeCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      evidence,
+      classifications,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication provider evidence.");
+  writeLine(stdout, `  Evidence records: ${evidence.length}`);
+  for (const [index, item] of evidence.entries()) {
+    const classification = classifications[index];
+    writeLine(
+      stdout,
+      `  ${index + 1}. ${item.provider} ${item.sourceKind} ${item.headBranch ?? item.headRef ?? "no-ref"}`,
+    );
+    writeLine(
+      stdout,
+      `     head=${item.headSha ?? "unknown"} target=${item.targetBranch ?? "unknown"} tier=${item.intendedCiTier ?? "unknown"}`,
+    );
+    if (classification) {
+      writeLine(stdout, `     checks=${classification.status}: ${classification.message}`);
+    }
   }
 }
 
