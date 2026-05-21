@@ -4430,15 +4430,14 @@ describe("dev-nexus cli", () => {
                 },
               },
               {
-                id: "github",
-                name: "GitHub",
+                id: "gitlab",
+                name: "GitLab",
                 enabled: true,
                 roles: ["coordination"],
                 workTracking: {
-                  provider: "github",
+                  provider: "gitlab",
                   repository: {
-                    owner: "example",
-                    name: "demo",
+                    id: "example/demo",
                   },
                 },
               },

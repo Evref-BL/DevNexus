@@ -4,6 +4,16 @@ import {
   type CreateWorkTrackerProviderOptions,
   WorkTrackingProviderServiceError,
 } from "./workTrackingProviderService.js";
+import {
+  automationWorkTrackerProviderOptions,
+} from "./nexusAutomationWorkTrackingCredentials.js";
+import {
+  loadProjectConfig,
+} from "./nexusProjectConfig.js";
+import {
+  resolvePrimaryProjectComponent,
+  resolveProjectComponents,
+} from "./nexusProjectLifecycle.js";
 import type {
   CreateWorkItemInput,
   ExternalRef,
@@ -75,6 +85,10 @@ export interface UpdateProjectWorkItemInput extends WorkItemProjectSelector {
 export interface AddProjectWorkItemCommentInput extends WorkItemProjectSelector {
   ref: WorkItemRef;
   body: string;
+}
+
+export interface ListProjectWorkItemCommentsInput extends WorkItemProjectSelector {
+  ref: WorkItemRef;
 }
 
 export interface SetProjectWorkItemStatusInput extends WorkItemProjectSelector {
@@ -268,6 +282,26 @@ export class WorkItemService {
     );
   }
 
+  async listComments(
+    input: ListProjectWorkItemCommentsInput,
+  ): Promise<WorkComment[]> {
+    const context = await this.resolveProviderContext(input, input.ref);
+    if (!context.provider.listComments) {
+      throw new WorkItemServiceError(
+        `Work tracking provider "${context.provider.provider}" does not support listing comments`,
+      );
+    }
+
+    return (
+      await context.provider.listComments(
+        normalizeWorkItemRef(
+          context.resolvedRef ?? input.ref,
+          context.provider.provider,
+        ),
+      )
+    ).map((comment) => annotateWorkComment(comment, context));
+  }
+
   async setStatus(input: SetProjectWorkItemStatusInput): Promise<WorkItem> {
     const context = await this.resolveProviderContext(input, input.ref);
     assertWorkTrackerCapability(
@@ -300,10 +334,41 @@ export class WorkItemService {
     }
 
     return createWorkTrackerProviderAsync(context.workTracking, {
-      ...this.providerOptions,
+      ...this.providerOptionsForContext(context),
       projectRoot: context.projectRoot,
       now: this.now,
     });
+  }
+
+  private providerOptionsForContext(
+    context: ResolvedWorkItemProjectContext,
+  ): Omit<CreateWorkTrackerProviderOptions, "projectRoot" | "now"> | undefined {
+    if (this.providerOptions?.credentials) {
+      return this.providerOptions;
+    }
+
+    try {
+      const projectConfig = loadProjectConfig(context.projectRoot);
+      const component = context.componentId
+        ? resolveProjectComponents(context.projectRoot, projectConfig).find(
+            (candidate) => candidate.id === context.componentId,
+          )
+        : resolvePrimaryProjectComponent(context.projectRoot, projectConfig);
+      if (!component) {
+        return this.providerOptions;
+      }
+
+      return automationWorkTrackerProviderOptions({
+        projectRoot: context.projectRoot,
+        projectConfig,
+        component,
+        workTrackingProvider: context.workTracking.provider,
+        baseOptions: this.providerOptions,
+        now: this.now,
+      });
+    } catch {
+      return this.providerOptions;
+    }
   }
 }
 

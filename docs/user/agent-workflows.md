@@ -5,6 +5,40 @@ eligible work, prepare worktrees, record progress, and report factual results.
 It does not decide what should be implemented. The user or launched
 coordinator agent owns that judgment.
 
+## Skill Role Chains
+
+DevNexus skills should compose as workflow verbs. A chain can describe the
+agent's operating mode without making every step a new process.
+
+Common chains:
+
+- New long-lived effort:
+  `initiative-workflow` -> `design-with-user` -> `grill-me` or
+  `grill-with-docs` -> `to-prd` -> `to-issues` ->
+  `write-implementation-plan` -> `execute-initiative-plan`.
+- Code change:
+  `prepare-dev-nexus-worktree` -> `tdd` or `diagnose` ->
+  `verify-before-completion` -> `request-work-review` ->
+  `finish-dev-nexus-branch`.
+- Architecture change:
+  `zoom-out` -> `architecture-review` -> `grill-with-docs` ->
+  `architecture-deepening` -> `write-implementation-plan`.
+- Documentation change:
+  `documentation` -> `humanizer` -> `verify-before-completion`.
+
+Some skills are overlays rather than phases. `dev-nexus` provides workspace
+infrastructure. `take-the-lead` changes the collaboration contract while the
+user keeps decision authority. `initiative-workflow` holds a durable objective
+and integration surface across slices.
+
+The decision skills have distinct roles:
+
+- `design-with-user` shapes unclear work collaboratively.
+- `grill-me` stress-tests an existing plan by asking one decision-tree question
+  at a time.
+- `grill-with-docs` stress-tests an existing plan against code, glossary terms,
+  domain docs, and Architecture Decision Records.
+
 ## MCP Server
 
 Start the generic stdio Model Context Protocol (MCP) server with:

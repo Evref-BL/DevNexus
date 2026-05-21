@@ -328,6 +328,13 @@ export class LocalWorkTrackerProvider implements WorkTrackerProvider {
     });
   }
 
+  async listComments(ref: WorkItemRef): Promise<WorkComment[]> {
+    const projectRoot = this.resolveProjectRoot();
+    const store = this.loadStore(projectRoot, "listComments");
+    const item = findWorkItem(store, ref);
+    return [...(store.comments[item.id] ?? [])];
+  }
+
   async setStatus(ref: WorkItemRef, status: WorkStatus): Promise<WorkItem> {
     return this.updateWorkItem(ref, { status });
   }

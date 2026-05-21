@@ -45,6 +45,30 @@ function projectConfig(
   };
 }
 
+function saveHomeConfig(
+  homePath: string,
+  authProfiles: Array<Record<string, unknown>>,
+): void {
+  fs.mkdirSync(homePath, { recursive: true });
+  fs.writeFileSync(
+    path.join(homePath, "dev-nexus.home.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles,
+        projects: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
 describe("work item discovery status", () => {
   it("reports defaults, configured trackers, roles, policy, capabilities, and readability", () => {
     const projectRoot = makeTempDir("dev-nexus-discovery-status-");
@@ -293,6 +317,129 @@ describe("work item discovery status", () => {
         status: "readable",
       },
     });
+  });
+
+  it("uses host auth profiles for GitHub tracker credential visibility", () => {
+    const projectRoot = makeTempDir("dev-nexus-discovery-status-");
+    const homePath = makeTempDir("dev-nexus-home-");
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+    saveHomeConfig(homePath, [
+      {
+        id: "dev-nexus-app",
+        actorId: "dev-nexus-automation-app",
+        provider: "github",
+        kind: "app",
+        credentialKind: "github_app",
+        account: "devnexus-automation",
+        host: "github.com",
+        command: "home:secrets/github-app-token.mjs --format token",
+        environmentKeys: ["GH_TOKEN"],
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      {
+        ...projectConfig([
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/core.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github-inbox",
+            workTrackers: [
+              {
+                id: "github-inbox",
+                name: "GitHub Inbox",
+                enabled: true,
+                roles: ["primary", "eligible_source"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "demo",
+                  },
+                },
+              },
+            ],
+            trackerDiscovery: {
+              scannedRoles: ["primary", "eligible_source"],
+              directExternalSelection: "allowed",
+              importRequiredFirst: false,
+              providerFilters: ["github"],
+              queryLimit: 25,
+              conflictWinner: "scanned_tracker",
+              missingCredentialBehavior: "skip",
+            },
+            relationships: [],
+          },
+        ]),
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            actor: {
+              id: "dev-nexus-automation-app",
+              kind: "app",
+              provider: "github",
+              handle: "devnexus-automation",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "dev-nexus-automation-app",
+              kind: "service_account",
+              provider: "github",
+              providerIdentity: "devnexus-automation",
+              displayName: "DevNexus Automation",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "dev-nexus-automation-app",
+              roles: ["maintainer"],
+              scope: { project: "discovery-demo" },
+            },
+          ],
+        },
+      },
+    );
+
+    const result = getNexusWorkItemDiscoveryStatus({
+      projectRoot,
+      homePath,
+      env: {},
+      credentialCommandRunner: (command, args) => {
+        commandRuns.push({ command, args });
+        return {
+          status: 0,
+          stdout: "installation-token",
+          stderr: "",
+        };
+      },
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.components[0]!.configuredTrackers[0]).toMatchObject({
+      id: "github-inbox",
+      credentials: {
+        status: "available",
+        message: expect.stringContaining("auth profile dev-nexus-app"),
+      },
+      readable: {
+        status: "readable",
+      },
+    });
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
   });
 
   it("keeps the default policy scoped to only the component default tracker", () => {

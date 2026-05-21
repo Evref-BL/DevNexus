@@ -311,6 +311,22 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
     return this.commentToWorkComment(comment, issueNumber);
   }
 
+  async listComments(ref: WorkItemRef): Promise<WorkComment[]> {
+    const issueNumber = issueNumberFromRef(ref);
+    const params = new URLSearchParams({
+      per_page: "100",
+      page: "1",
+    });
+    const comments = await this.requestJson<GitHubComment[]>(
+      "GET",
+      `${this.issuePath()}/${issueNumber}/comments?${params.toString()}`,
+    );
+
+    return comments.map((comment) =>
+      this.commentToWorkComment(comment, issueNumber),
+    );
+  }
+
   async setStatus(ref: WorkItemRef, status: WorkStatus): Promise<WorkItem> {
     return this.updateWorkItem(ref, { status });
   }

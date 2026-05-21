@@ -460,7 +460,7 @@ export async function getNexusCoordinationStatus(
         requireLinkedTarget: false,
       })
     : null;
-  const handoffs = readCoordinationHandoffs({
+  const handoffs = await readCoordinationHandoffs({
     context,
     tracker: coordinationTracker,
     logicalItemId: workItemId,
@@ -699,7 +699,7 @@ export async function getNexusCoordinationIntegrationPlan(
     targetBranch,
   });
   const targetRef = integrationTargetRef({ fetch, git, targetBranch });
-  const handoffCollection = readCoordinationHandoffs({
+  const handoffCollection = await readCoordinationHandoffs({
     context,
     tracker: coordinationTracker,
     logicalItemId: workItemId,
@@ -2035,16 +2035,24 @@ function coordinationHandoffCapability(
       recovery: null,
     };
   }
+  if (provider === "github") {
+    return {
+      read: true,
+      write: true,
+      reason: null,
+      recovery: null,
+    };
+  }
 
   return {
     read: false,
     write: false,
     reason:
       `Provider-backed coordination is incomplete for tracker "${tracker.tracker.id}" ` +
-      `provider "${provider}": DevNexus can add provider comments but cannot read ` +
-      "provider comments back through the work-tracker interface.",
+      `provider "${provider}": DevNexus cannot read provider comments back ` +
+      "through the work-tracker interface.",
     recovery:
-      "Use a local coordination tracker for durable handoffs, or rely on worktree leases and ordinary provider work-item comments until provider comment reads are implemented.",
+      "Use a local coordination tracker for durable handoffs, or rely on worktree leases and ordinary work-item comments until provider comment reads are implemented.",
   };
 }
 
@@ -2105,7 +2113,7 @@ function coordinationProviderCapabilityDiagnostic(options: {
   };
 }
 
-function readCoordinationHandoffs(options: {
+async function readCoordinationHandoffs(options: {
   context: ResolvedCoordinationContext;
   tracker: ResolvedCoordinationTracker;
   logicalItemId?: string;
@@ -2113,17 +2121,17 @@ function readCoordinationHandoffs(options: {
   missingTargetWarning: string | null;
   now: string;
   maxHandoffAgeMs: number;
-}): NexusCoordinationHandoffCollection {
+}): Promise<NexusCoordinationHandoffCollection> {
   const provider = options.tracker.tracker.workTracking.provider;
   const capability = coordinationHandoffCapability(options.tracker);
-  if (provider !== "local") {
+  if (!capability.read) {
     const diagnostic = coordinationProviderCapabilityDiagnostic({
       context: options.context,
       tracker: options.tracker,
       severity: "warning",
       capability: "read_handoffs",
       operation: "readCoordinationHandoffs",
-      stage: "provider_comment_read_unavailable",
+      stage: "provider_handoff_read_disabled",
     });
     return {
       available: false,
@@ -2147,6 +2155,35 @@ function readCoordinationHandoffs(options: {
       diagnostics: [],
       warnings: [options.missingTargetWarning],
     };
+  }
+  if (provider !== "local") {
+    let comments: CoordinationCommentSource[];
+    try {
+      comments = await readProviderCoordinationComments(options);
+    } catch (error) {
+      const diagnostic = coordinationTrackerReadDiagnostic({
+        context: options.context,
+        tracker: options.tracker,
+        storePath: null,
+        error,
+      });
+      throw new NexusCoordinationTrackerReadError(
+        diagnostic.message,
+        diagnostic,
+        { cause: error },
+      );
+    }
+
+    return summarizeCoordinationHandoffComments({
+      context: options.context,
+      tracker: options.tracker,
+      provider,
+      capability,
+      comments,
+      storePath: null,
+      now: options.now,
+      maxHandoffAgeMs: options.maxHandoffAgeMs,
+    });
   }
 
   const workTracking = options.tracker.tracker.workTracking as LocalWorkTrackingConfig;
@@ -2182,22 +2219,93 @@ function readCoordinationHandoffs(options: {
     : Object.entries(store.comments).flatMap(([workItemId, itemComments]) =>
         itemComments.map((comment) => ({ workItemId, comment })),
       );
+
+  return summarizeCoordinationHandoffComments({
+    context: options.context,
+    tracker: options.tracker,
+    provider,
+    capability,
+    comments,
+    storePath,
+    now: options.now,
+    maxHandoffAgeMs: options.maxHandoffAgeMs,
+  });
+}
+
+interface CoordinationCommentSource {
+  workItemId: string;
+  comment: WorkComment;
+}
+
+async function readProviderCoordinationComments(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+  logicalItemId?: string;
+  targetWorkItemId: string | null;
+}): Promise<CoordinationCommentSource[]> {
+  const service = workItemServiceForContext(options.context);
+  if (options.logicalItemId && options.targetWorkItemId) {
+    const comments = await service.listComments({
+      projectRoot: options.context.projectRoot,
+      componentId: options.context.component.id,
+      trackerId: options.tracker.tracker.id,
+      ref: { id: options.targetWorkItemId },
+    });
+    return comments.map((comment) => ({
+      workItemId: options.logicalItemId!,
+      comment,
+    }));
+  }
+
+  const workItems = await service.listWorkItems({
+    projectRoot: options.context.projectRoot,
+    componentId: options.context.component.id,
+    trackerId: options.tracker.tracker.id,
+  });
+  const commentSets = await Promise.all(
+    workItems.map(async (workItem) => {
+      const comments = await service.listComments({
+        projectRoot: options.context.projectRoot,
+        componentId: options.context.component.id,
+        trackerId: options.tracker.tracker.id,
+        ref: { id: workItem.id },
+      });
+      return comments.map((comment) => ({
+        workItemId: workItem.id,
+        comment,
+      }));
+    }),
+  );
+
+  return commentSets.flat();
+}
+
+function summarizeCoordinationHandoffComments(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+  provider: string;
+  capability: NexusCoordinationHandoffCapability;
+  comments: CoordinationCommentSource[];
+  storePath: string | null;
+  now: string;
+  maxHandoffAgeMs: number;
+}): NexusCoordinationHandoffCollection {
   const nowMs = Date.parse(options.now);
   const warnings: string[] = [];
   const diagnostics: NexusCoordinationDiagnostic[] = [];
   const records: NexusCoordinationHandoffSummary[] = [];
-  for (const { workItemId, comment } of comments) {
+  for (const { workItemId, comment } of options.comments) {
     const result = handoffSummaryFromComment({
-        comment,
-        fallbackWorkItemId: workItemId,
-        projectId: options.context.projectConfig.id,
-        componentId: options.context.component.id,
-        trackerId: options.tracker.tracker.id,
-        provider,
-        storePath,
-        nowMs,
-        maxHandoffAgeMs: options.maxHandoffAgeMs,
-      });
+      comment,
+      fallbackWorkItemId: workItemId,
+      projectId: options.context.projectConfig.id,
+      componentId: options.context.component.id,
+      trackerId: options.tracker.tracker.id,
+      provider: options.provider,
+      storePath: options.storePath,
+      nowMs,
+      maxHandoffAgeMs: options.maxHandoffAgeMs,
+    });
     if (result.record) {
       records.push(result.record);
     }
@@ -2218,10 +2326,10 @@ function readCoordinationHandoffs(options: {
 
   return {
     available: true,
-    capability,
+    capability: options.capability,
     tracker: options.tracker.summary,
     trackerId: options.tracker.tracker.id,
-    provider,
+    provider: options.provider,
     records,
     diagnostics,
     warnings,
@@ -2235,7 +2343,7 @@ function handoffSummaryFromComment(options: {
   componentId: string;
   trackerId: string | null;
   provider: string | null;
-  storePath: string;
+  storePath: string | null;
   nowMs: number;
   maxHandoffAgeMs: number;
 }): {
@@ -2343,20 +2451,25 @@ function parseCoordinationHandoffComment(
 function coordinationTrackerReadDiagnostic(options: {
   context: ResolvedCoordinationContext;
   tracker: ResolvedCoordinationTracker;
-  storePath: string;
+  storePath: string | null;
   error: unknown;
 }): NexusCoordinationTrackerReadDiagnostic {
   const localDiagnostic = localWorkTrackingDiagnostic(options.error);
   const stage = localDiagnostic?.stage ?? "read";
   const operation = localDiagnostic?.operation ?? "readCoordinationHandoffs";
-  const storePath = localDiagnostic?.storePath ?? path.resolve(options.storePath);
+  const storePath = localDiagnostic?.storePath
+    ? path.resolve(localDiagnostic.storePath)
+    : options.storePath
+      ? path.resolve(options.storePath)
+      : null;
   const trackerId = options.tracker.tracker.id;
   const provider = options.tracker.tracker.workTracking.provider;
   const componentId = options.context.component.id;
+  const location = storePath ? `at ${storePath}` : "from provider comments";
   const message =
     `Coordination handoff read failed for component "${componentId}" ` +
     `tracker "${trackerId ?? "default"}" provider "${provider ?? "unknown"}" ` +
-    `at ${storePath} during ${operation} (${stage}).`;
+    `${location} during ${operation} (${stage}).`;
 
   return {
     kind: "coordination_tracker_read_failure",
@@ -2392,7 +2505,7 @@ function coordinationHandoffCommentDiagnostic(options: {
   componentId: string;
   trackerId: string | null;
   provider: string | null;
-  storePath: string;
+  storePath: string | null;
   workItemId: string;
   comment: WorkComment;
   diagnostic: { stage: string; message: string; cause: string };
@@ -2403,7 +2516,7 @@ function coordinationHandoffCommentDiagnostic(options: {
     componentId: options.componentId,
     trackerId: options.trackerId,
     provider: options.provider,
-    storePath: path.resolve(options.storePath),
+    storePath: options.storePath ? path.resolve(options.storePath) : null,
     operation: "readCoordinationHandoffs",
     stage: options.diagnostic.stage,
     workItemId: options.workItemId,
