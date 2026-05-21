@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { createHostAuthProfileCredentialBroker } from "./nexusProviderCredentialBroker.js";
 import {
   assertWorkTrackerCapability,
   createWorkTrackerProvider,
@@ -66,6 +67,78 @@ describe("work tracking provider service", () => {
         projectKey: "NEX",
       }).capabilities.createItem,
     ).toBe(true);
+  });
+
+  it("can route provider credentials through a broker before creating a GitHub provider", async () => {
+    const calls: Array<{
+      url: string;
+      headers: Record<string, string>;
+    }> = [];
+    const provider = createWorkTrackerProvider(
+      {
+        provider: "github",
+        repository: { owner: "owner", name: "repo" },
+      },
+      {
+        credentials: {
+          broker: createHostAuthProfileCredentialBroker({
+            authProfiles: [
+              {
+                id: "dev-nexus-app",
+                actorId: "dev-nexus-automation-app",
+                provider: "github",
+                kind: "app",
+                credentialKind: "github_app",
+                account: "devnexus-automation",
+                host: "github.com",
+                environmentKeys: ["GH_TOKEN"],
+                purposes: ["api", "cli"],
+              },
+            ],
+            env: {
+              GH_TOKEN: "broker-token",
+            },
+          }),
+          actorId: "dev-nexus-automation-app",
+          providerIdentity: "devnexus-automation",
+        },
+        github: {
+          credentialRunner: false,
+          fetch: (async (input, init = {}) => {
+            calls.push({
+              url: String(input),
+              headers: init.headers as Record<string, string>,
+            });
+            return new Response(
+              JSON.stringify({
+                id: 1,
+                number: 7,
+                title: "Credentialed issue",
+                state: "open",
+                labels: [],
+              }),
+              {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    );
+
+    await expect(provider.getWorkItem({ id: "github-7" })).resolves.toMatchObject({
+      id: "github-7",
+      title: "Credentialed issue",
+    });
+    expect(calls).toMatchObject([
+      {
+        url: "https://api.github.com/repos/owner/repo/issues/7",
+        headers: {
+          Authorization: "Bearer broker-token",
+        },
+      },
+    ]);
   });
 
   it("creates the Vibe provider when API options are available", () => {

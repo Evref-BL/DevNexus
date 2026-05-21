@@ -8,6 +8,8 @@ import {
   type NexusAgentConfig,
 } from "./nexusProjectConfig.js";
 import type {
+  NexusHostingAuthProfileCredentialKind,
+  NexusHostingAuthProfileCredentialPurpose,
   NexusHostingAuthProfileConfig,
   NexusHostingAuthProfileKind,
 } from "./nexusProjectHosting.js";
@@ -180,6 +182,29 @@ function optionalStringArray(
   return values;
 }
 
+function optionalStringList(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): string[] | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new NexusConfigError(`${pathName}.${key} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new NexusConfigError(
+        `${pathName}.${key}[${index}] must be a non-empty string`,
+      );
+    }
+    return entry;
+  });
+}
+
 function validateHomeHostTransportKind(
   value: unknown,
   pathName: string,
@@ -216,6 +241,58 @@ function validateHostingAuthProfileKind(
   throw new NexusConfigError(`${pathName} must be human, automation, or app`);
 }
 
+function validateHostingAuthProfileCredentialKind(
+  value: unknown,
+  pathName: string,
+): NexusHostingAuthProfileCredentialKind | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (
+    value === "environment_token" ||
+    value === "provider_cli" ||
+    value === "git_credential" ||
+    value === "command_token" ||
+    value === "github_app" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be environment_token, provider_cli, git_credential, command_token, github_app, or unknown`,
+  );
+}
+
+function validateHostingAuthProfileCredentialPurpose(
+  value: unknown,
+  pathName: string,
+): NexusHostingAuthProfileCredentialPurpose {
+  if (value === "api" || value === "git" || value === "cli") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be api, git, or cli`);
+}
+
+function optionalCredentialPurposes(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): NexusHostingAuthProfileCredentialPurpose[] | undefined {
+  const values = optionalStringArray(record, key, pathName);
+  if (values === undefined) {
+    return undefined;
+  }
+
+  return values.map((value, index) =>
+    validateHostingAuthProfileCredentialPurpose(
+      value,
+      `${pathName}.${key}[${index}]`,
+    ),
+  );
+}
+
 function validateHostingAuthProfile(
   value: unknown,
   index: number,
@@ -224,6 +301,10 @@ function validateHostingAuthProfile(
   const record = assertRecord(value, pathName);
   const actorId = optionalString(record, "actorId", pathName);
   const kind = validateHostingAuthProfileKind(record.kind, `${pathName}.kind`);
+  const credentialKind = validateHostingAuthProfileCredentialKind(
+    record.credentialKind,
+    `${pathName}.credentialKind`,
+  );
   const account = optionalString(record, "account", pathName);
   const host = optionalString(record, "host", pathName);
   const sshHost = optionalString(record, "sshHost", pathName);
@@ -235,17 +316,20 @@ function validateHostingAuthProfile(
   const gitUserName = optionalString(record, "gitUserName", pathName);
   const gitUserEmail = optionalString(record, "gitUserEmail", pathName);
   const command = optionalString(record, "command", pathName);
+  const commandArgs = optionalStringList(record, "commandArgs", pathName);
   const environmentKeys = optionalStringArray(
     record,
     "environmentKeys",
     pathName,
   );
+  const purposes = optionalCredentialPurposes(record, "purposes", pathName);
 
   return {
     id: requiredString(record, "id", pathName),
     ...(actorId !== undefined ? { actorId } : {}),
     provider: validateHostingProviderName(record.provider, `${pathName}.provider`),
     ...(kind !== undefined ? { kind } : {}),
+    ...(credentialKind !== undefined ? { credentialKind } : {}),
     ...(account !== undefined ? { account } : {}),
     ...(host !== undefined ? { host } : {}),
     ...(sshHost !== undefined ? { sshHost } : {}),
@@ -253,7 +337,9 @@ function validateHostingAuthProfile(
     ...(gitUserName !== undefined ? { gitUserName } : {}),
     ...(gitUserEmail !== undefined ? { gitUserEmail } : {}),
     ...(command !== undefined ? { command } : {}),
+    ...(commandArgs !== undefined ? { commandArgs } : {}),
     ...(environmentKeys !== undefined ? { environmentKeys } : {}),
+    ...(purposes !== undefined ? { purposes } : {}),
   };
 }
 
