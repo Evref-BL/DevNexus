@@ -399,6 +399,12 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     expected: NexusPublicationActorConfig | null,
   ): Promise<NexusForgeObservedActor> {
     const isApp = expected?.kind === "app" || this.credential?.kind === "github_app";
+    const credentialActor = isApp
+      ? this.observedAppActorFromCredential()
+      : null;
+    if (credentialActor) {
+      return credentialActor;
+    }
     const response = await this.githubRestRequest<GitHubActorResponse>(
       isApp ? "/app" : "/user",
       { method: "GET", capability: "actor.verify" },
@@ -424,6 +430,12 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     expected: NexusPublicationActorConfig | null,
   ): NexusForgeObservedActor {
     const isApp = expected?.kind === "app" || this.credential?.kind === "github_app";
+    const credentialActor = isApp
+      ? this.observedAppActorFromCredential()
+      : null;
+    if (credentialActor) {
+      return credentialActor;
+    }
     const result = this.runGh(
       [
         "api",
@@ -448,6 +460,26 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       provider: "github",
       handle,
       source: isApp ? "github_cli_app" : "github_cli_user",
+      backend: this.backend,
+    };
+  }
+
+  private observedAppActorFromCredential(): NexusForgeObservedActor | null {
+    if (this.credential?.kind !== "github_app") {
+      return null;
+    }
+    const handle = clean(this.credential?.providerIdentity) ??
+      clean(this.credential?.account);
+    if (!handle) {
+      return null;
+    }
+
+    return {
+      provider: "github",
+      handle,
+      source: this.credential?.profileId
+        ? `credential:${this.credential.profileId}`
+        : "credential",
       backend: this.backend,
     };
   }

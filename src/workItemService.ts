@@ -4,6 +4,16 @@ import {
   type CreateWorkTrackerProviderOptions,
   WorkTrackingProviderServiceError,
 } from "./workTrackingProviderService.js";
+import {
+  automationWorkTrackerProviderOptions,
+} from "./nexusAutomationWorkTrackingCredentials.js";
+import {
+  loadProjectConfig,
+} from "./nexusProjectConfig.js";
+import {
+  resolvePrimaryProjectComponent,
+  resolveProjectComponents,
+} from "./nexusProjectLifecycle.js";
 import type {
   CreateWorkItemInput,
   ExternalRef,
@@ -300,10 +310,41 @@ export class WorkItemService {
     }
 
     return createWorkTrackerProviderAsync(context.workTracking, {
-      ...this.providerOptions,
+      ...this.providerOptionsForContext(context),
       projectRoot: context.projectRoot,
       now: this.now,
     });
+  }
+
+  private providerOptionsForContext(
+    context: ResolvedWorkItemProjectContext,
+  ): Omit<CreateWorkTrackerProviderOptions, "projectRoot" | "now"> | undefined {
+    if (this.providerOptions?.credentials) {
+      return this.providerOptions;
+    }
+
+    try {
+      const projectConfig = loadProjectConfig(context.projectRoot);
+      const component = context.componentId
+        ? resolveProjectComponents(context.projectRoot, projectConfig).find(
+            (candidate) => candidate.id === context.componentId,
+          )
+        : resolvePrimaryProjectComponent(context.projectRoot, projectConfig);
+      if (!component) {
+        return this.providerOptions;
+      }
+
+      return automationWorkTrackerProviderOptions({
+        projectRoot: context.projectRoot,
+        projectConfig,
+        component,
+        workTrackingProvider: context.workTracking.provider,
+        baseOptions: this.providerOptions,
+        now: this.now,
+      });
+    } catch {
+      return this.providerOptions;
+    }
   }
 }
 

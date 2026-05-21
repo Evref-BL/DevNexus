@@ -28,6 +28,11 @@ import {
 import {
   nexusWorkItemDiscoveryCredentialEnvironment,
 } from "./nexusWorkItemDiscoveryStatus.js";
+import {
+  automationWorkItemDiscoveryCredentialResolver,
+  automationWorkTrackerProviderOptions,
+  loadNexusAutomationAuthProfiles,
+} from "./nexusAutomationWorkTrackingCredentials.js";
 import type {
   WorkItem,
   WorkItemQuery,
@@ -169,6 +174,13 @@ export async function claimNexusEligibleWorkItem(
     projectConfig: options.projectConfig,
     env: options.env ?? process.env,
   });
+  const credentialResolver = automationWorkItemDiscoveryCredentialResolver({
+    env,
+    authProfiles: loadNexusAutomationAuthProfiles({
+      projectRoot,
+      projectConfig: options.projectConfig,
+    }),
+  });
   const selectorQuery =
     options.selectorQuery ??
     buildNexusAutomationWorkItemQuery(options.automationConfig);
@@ -180,8 +192,9 @@ export async function claimNexusEligibleWorkItem(
     selectorQuery,
     mode: options.mode,
     provider: options.provider,
-    providerFactory: options.providerFactory,
+    providerFactory: claimProviderFactory(options, projectRoot, env),
     providerOptions: options.providerOptions,
+    credentialResolver,
     env,
     now: options.now,
   });
@@ -364,8 +377,19 @@ async function inspectExistingWorkItemClaims(options: {
     selectorQuery,
     mode: options.options.mode,
     provider: options.options.provider,
-    providerFactory: options.options.providerFactory,
+    providerFactory: claimProviderFactory(
+      options.options,
+      options.projectRoot,
+      options.env,
+    ),
     providerOptions: options.options.providerOptions,
+    credentialResolver: automationWorkItemDiscoveryCredentialResolver({
+      env: options.env,
+      authProfiles: loadNexusAutomationAuthProfiles({
+        projectRoot: options.projectRoot,
+        projectConfig: options.options.projectConfig,
+      }),
+    }),
     env: options.env,
     now: options.options.now,
   });
@@ -577,7 +601,18 @@ async function resolveCandidateTracker(
     (options.providerFactory
       ? await options.providerFactory(context)
       : await createWorkTrackerProviderAsync(tracker.workTracking, {
-          ...providerOptionsWithEnv(options.providerOptions, env),
+          ...providerOptionsWithEnv(
+            automationWorkTrackerProviderOptions({
+              projectRoot,
+              projectConfig: options.projectConfig,
+              component,
+              workTrackingProvider: tracker.workTracking.provider,
+              baseOptions: options.providerOptions,
+              env,
+              now: options.now,
+            }),
+            env,
+          ),
           projectRoot,
           now: options.now,
         }));
@@ -623,6 +658,34 @@ function claimSelectableComponents(
       workTrackingCapabilityReport: tracker.workTrackingCapabilityReport,
     };
   });
+}
+
+function claimProviderFactory(
+  options: ClaimNexusEligibleWorkItemOptions,
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): NexusEligibleWorkClaimProviderFactory | undefined {
+  if (options.providerFactory) {
+    return options.providerFactory;
+  }
+
+  return (context) =>
+    createWorkTrackerProviderAsync(context.tracker.workTracking, {
+      ...providerOptionsWithEnv(
+        automationWorkTrackerProviderOptions({
+          projectRoot,
+          projectConfig: options.projectConfig,
+          component: context.component,
+          workTrackingProvider: context.tracker.workTracking.provider,
+          baseOptions: options.providerOptions,
+          env,
+          now: options.now,
+        }),
+        env,
+      ),
+      projectRoot,
+      now: options.now,
+    });
 }
 
 function providerOptionsWithEnv(

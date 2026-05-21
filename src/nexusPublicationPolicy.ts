@@ -1017,6 +1017,15 @@ function readPublicationActorStatus(options: {
     };
   }
 
+  const appProfileStatus = readGitHubAppActorStatusFromAuthProfile({
+    expected,
+    commandEnvironment,
+    authProfiles: options.authProfiles,
+  });
+  if (appProfileStatus) {
+    return appProfileStatus;
+  }
+
   const host = githubActorHost(options.component);
   const args =
     expected.kind === "app"
@@ -1081,6 +1090,101 @@ function readPublicationActorStatus(options: {
       ? `Observed ${observed.provider} actor ${observed.handle} matches publication policy.`
       : `Observed ${observed.provider} actor ${observed.handle} does not match expected actor ${expectedHandle}.`,
   };
+}
+
+function readGitHubAppActorStatusFromAuthProfile(options: {
+  expected: NexusPublicationActorConfig;
+  commandEnvironment: Record<string, string>;
+  authProfiles: NexusHostingAuthProfileConfig[];
+}): NexusPublicationActorStatus | null {
+  if (options.expected.kind !== "app") {
+    return null;
+  }
+  const profiles = options.authProfiles.filter((profile) =>
+    githubAppAuthProfileMatchesActor(profile, options.expected)
+  );
+  if (profiles.length === 0) {
+    return null;
+  }
+  if (profiles.length > 1) {
+    return {
+      status: "unavailable",
+      expected: options.expected,
+      observed: null,
+      commandEnvironment: options.commandEnvironment,
+      message: `Multiple host-local GitHub App auth profiles can satisfy publication actor ${options.expected.handle ?? options.expected.id ?? "unknown"}: ${profiles.map((profile) => profile.id).join(", ")}.`,
+    };
+  }
+
+  const profile = profiles[0]!;
+  const handle =
+    profile.githubApp?.slug?.trim() || profile.account?.trim() || null;
+  if (!handle) {
+    return {
+      status: "unavailable",
+      expected: options.expected,
+      observed: null,
+      commandEnvironment: options.commandEnvironment,
+      message: `Host-local GitHub App auth profile ${profile.id} does not declare an App slug or account handle.`,
+    };
+  }
+
+  const observed = {
+    provider: "github",
+    handle,
+    source: `authProfile:${profile.id}`,
+  };
+  const expectedHandle = options.expected.handle;
+  if (!expectedHandle) {
+    return {
+      status: "unchecked",
+      expected: options.expected,
+      observed,
+      commandEnvironment: options.commandEnvironment,
+      message: "Publication actor has no expected handle to compare.",
+    };
+  }
+
+  const matched = handlesEqual(expectedHandle, observed.handle);
+  return {
+    status: matched ? "matched" : "mismatched",
+    expected: options.expected,
+    observed,
+    commandEnvironment: options.commandEnvironment,
+    message: matched
+      ? `Host-local GitHub App auth profile ${profile.id} matches publication policy.`
+      : `Host-local GitHub App auth profile ${profile.id} declares actor ${observed.handle}, not expected actor ${expectedHandle}.`,
+  };
+}
+
+function githubAppAuthProfileMatchesActor(
+  profile: NexusHostingAuthProfileConfig,
+  expected: NexusPublicationActorConfig,
+): boolean {
+  if (!profileCanRepresentGitHubApp(profile)) {
+    return false;
+  }
+  if (expected.id && profile.actorId === expected.id) {
+    return true;
+  }
+  const handles = [profile.githubApp?.slug, profile.account]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return Boolean(
+    expected.handle &&
+      handles.some((handle) => handlesEqual(handle, expected.handle!)),
+  );
+}
+
+function profileCanRepresentGitHubApp(
+  profile: NexusHostingAuthProfileConfig,
+): boolean {
+  return (
+    profile.provider.toLowerCase() === "github" &&
+    (profile.kind === "app" ||
+      profile.credentialKind === "github_app" ||
+      Boolean(profile.githubApp))
+  );
 }
 
 function readPublicationGitIdentityStatus(options: {

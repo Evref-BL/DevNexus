@@ -62,6 +62,9 @@ import {
   createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
+import {
+  automationWorkTrackerProviderOptions,
+} from "./nexusAutomationWorkTrackingCredentials.js";
 import type {
   WorkComment,
   WorkItem,
@@ -805,7 +808,14 @@ async function createAutomationProvider(options: {
   }
 
   return createWorkTrackerProviderAsync(workTracking, {
-    ...options.options.providerOptions,
+    ...automationWorkTrackerProviderOptions({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      component: options.component,
+      baseOptions: options.options.providerOptions,
+      homePath: options.options.homePath,
+      now: options.options.now,
+    }),
     projectRoot: options.projectRoot,
     now: options.options.now,
   });

@@ -37,6 +37,7 @@ import type {
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
   getNexusWorkItemDiscoveryStatus,
+  nexusWorkItemDiscoveryCredentialEnvironment,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
   resolveNexusCurrentAutomationActor,
@@ -49,6 +50,11 @@ import {
   loadNexusHomeConfigFile,
   validateNexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
+import {
+  automationWorkItemDiscoveryCredentialResolver,
+  automationWorkTrackerProviderOptions,
+  loadNexusAutomationAuthProfiles,
+} from "./nexusAutomationWorkTrackingCredentials.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -181,11 +187,28 @@ export async function getNexusAutomationStatus(
   const automationConfig = projectConfig.automation ?? null;
   const components = resolveProjectComponents(projectRoot, projectConfig);
   const primaryComponent = resolvePrimaryProjectComponent(projectRoot, projectConfig);
+  const authProfiles = loadNexusAutomationAuthProfiles({
+    projectRoot,
+    projectConfig,
+    homePath: options.homePath,
+    authProfiles: options.authProfiles,
+  });
+  const discoveryEnv = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig,
+    env: options.env,
+  });
+  const credentialResolver =
+    options.credentialResolver ??
+    automationWorkItemDiscoveryCredentialResolver({
+      env: discoveryEnv,
+      authProfiles,
+    });
   const sourceRoot = primaryComponent.sourceRoot;
   const discoveryStatus = getNexusWorkItemDiscoveryStatus({
     projectRoot,
-    env: options.env,
-    credentialResolver: options.credentialResolver,
+    env: discoveryEnv,
+    credentialResolver,
   });
   const externalIssueVisibility = buildNexusExternalIssueVisibilitySummary({
     components,
@@ -321,7 +344,7 @@ export async function getNexusAutomationStatus(
       projectConfig,
       components,
       action: "status",
-      authProfiles: options.authProfiles,
+      authProfiles,
       homePath: options.homePath,
       gitRunner: options.gitRunner,
       actorRunner: options.publicationActorRunner,
@@ -380,8 +403,8 @@ export async function getNexusAutomationStatus(
         projectConfig,
       }),
       providerOptions: options.providerOptions,
-      credentialResolver: options.credentialResolver,
-      env: options.env,
+      credentialResolver,
+      env: discoveryEnv,
       now: options.now,
     });
     const componentEligibleWorkItems = eligibleWork.componentEligibleWorkItems;
@@ -504,7 +527,7 @@ export async function getNexusAutomationStatus(
     projectConfig,
     components,
     action: "status",
-    authProfiles: options.authProfiles,
+    authProfiles,
     homePath: options.homePath,
     gitRunner: options.gitRunner,
     actorRunner: options.publicationActorRunner,
@@ -673,7 +696,16 @@ async function createStatusProvider(options: {
   }
 
   return createWorkTrackerProviderAsync(workTracking, {
-    ...options.options.providerOptions,
+    ...automationWorkTrackerProviderOptions({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      component: options.component,
+      baseOptions: options.options.providerOptions,
+      homePath: options.options.homePath,
+      authProfiles: options.options.authProfiles,
+      env: options.options.env,
+      now: options.options.now,
+    }),
     projectRoot: options.projectRoot,
     now: options.options.now,
   });
@@ -726,7 +758,16 @@ async function createStatusComponentProvider(options: {
   }
 
   return createWorkTrackerProviderAsync(workTracking, {
-    ...options.options.providerOptions,
+    ...automationWorkTrackerProviderOptions({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      component: options.component,
+      baseOptions: options.options.providerOptions,
+      homePath: options.options.homePath,
+      authProfiles: options.options.authProfiles,
+      env: options.options.env,
+      now: options.options.now,
+    }),
     projectRoot: options.projectRoot,
     now: options.options.now,
   });
@@ -846,18 +887,33 @@ function statusEligibleWorkProviderFactory(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
 }): NexusEligibleWorkProviderFactory | undefined {
-  if (!options.options.providerFactory) {
-    return undefined;
-  }
+  return (context) => {
+    if (options.options.providerFactory) {
+      return options.options.providerFactory({
+        projectRoot: options.projectRoot,
+        sourceRoot: context.component.sourceRoot,
+        projectConfig: options.projectConfig,
+        component: context.component,
+        workTracking: context.tracker.workTracking,
+      });
+    }
 
-  return (context) =>
-    options.options.providerFactory!({
+    return createWorkTrackerProviderAsync(context.tracker.workTracking, {
+      ...automationWorkTrackerProviderOptions({
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+        component: context.component,
+        workTrackingProvider: context.tracker.workTracking.provider,
+        baseOptions: options.options.providerOptions,
+        homePath: options.options.homePath,
+        authProfiles: options.options.authProfiles,
+        env: options.options.env,
+        now: options.options.now,
+      }),
       projectRoot: options.projectRoot,
-      sourceRoot: context.component.sourceRoot,
-      projectConfig: options.projectConfig,
-      component: context.component,
-      workTracking: context.tracker.workTracking,
+      now: options.options.now,
     });
+  };
 }
 
 function currentAutomationActors(options: {
