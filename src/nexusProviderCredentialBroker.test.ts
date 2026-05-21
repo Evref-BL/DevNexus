@@ -20,7 +20,6 @@ function appProfile(
     account: "devnexus-automation",
     host: "github.com",
     environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
-    purposes: ["api", "cli"],
     ...overrides,
   };
 }
@@ -53,7 +52,7 @@ describe("provider credential broker", () => {
       actorId: "dev-nexus-automation-app",
       providerIdentity: "devnexus-automation",
       kind: "github_app",
-      purposes: ["api", "cli"],
+      purposes: ["api", "cli", "git"],
       authorizationHeader: "Bearer installation-token",
       env: {
         GH_TOKEN: "installation-token",
@@ -125,6 +124,67 @@ describe("provider credential broker", () => {
       {
         command: "/secrets/github-app-token.mjs",
         args: ["--repo", "DevNexus", "--format", "token"],
+      },
+    ]);
+  });
+
+  it("resolves command-backed GitHub App tokens for HTTPS Git transport", () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        appProfile({
+          command: "/secrets/github-app-token.mjs",
+          commandArgs: ["--repo", "{repository.name}", "--format", "json"],
+        }),
+      ],
+      commandRunner: (command, args) => {
+        calls.push({ command, args });
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            token: "installation-token",
+            expiresAt: "2026-05-21T13:00:00.000Z",
+            permissions: {
+              contents: "write",
+            },
+          }),
+          stderr: "",
+        };
+      },
+      now: "2026-05-21T12:30:00.000Z",
+    });
+
+    expect(
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "git",
+        profileId: "dev-nexus-app",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      }),
+    ).toMatchObject({
+      kind: "github_app",
+      authorizationHeader: "Bearer installation-token",
+      expiresAt: "2026-05-21T13:00:00.000Z",
+      permissions: {
+        contents: "write",
+      },
+      secret: {
+        kind: "token",
+        value: "installation-token",
+      },
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
+      },
+    });
+    expect(calls).toEqual([
+      {
+        command: "/secrets/github-app-token.mjs",
+        args: ["--repo", "DevNexus", "--format", "json"],
       },
     ]);
   });
@@ -202,6 +262,11 @@ describe("provider credential broker", () => {
       permissions: {
         contents: "write",
         issues: "write",
+      },
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
       },
       env: {
         GH_TOKEN: "installation-token",
@@ -353,6 +418,90 @@ describe("provider credential broker", () => {
     );
   });
 
+  it("mints GitHub App installation tokens asynchronously for Git transport", async () => {
+    const privateKey = testPrivateKey();
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        appProfile({
+          githubApp: {
+            appId: "12345",
+            privateKeyPath: "/secrets/app.private-key.pem",
+            installationAccount: "Evref-BL",
+            repositories: ["DevNexus"],
+          },
+        }),
+      ],
+      readFile: () => privateKey,
+      fetch: queuedFetch([], [
+        {
+          body: [
+            {
+              id: 987,
+              account: { login: "Evref-BL" },
+              repository_selection: "selected",
+            },
+          ],
+        },
+        {
+          status: 201,
+          body: {
+            token: "installation-token",
+            expires_at: "2026-05-21T13:00:00.000Z",
+            repository_selection: "selected",
+            permissions: {
+              contents: "write",
+            },
+            repositories: [{ name: "DevNexus" }],
+          },
+        },
+      ]),
+    });
+
+    expect(() =>
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "git",
+        profileId: "dev-nexus-app",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+    ).toThrow(NexusProviderCredentialBrokerError);
+    await expect(
+      resolveProviderCredential(broker, {
+        provider: "github",
+        purpose: "git",
+        profileId: "dev-nexus-app",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+    ).resolves.toMatchObject({
+      kind: "github_app",
+      authorizationHeader: "Bearer installation-token",
+      permissions: {
+        contents: "write",
+      },
+      secret: {
+        kind: "token",
+        value: "installation-token",
+      },
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
+      },
+    });
+  });
+
   it("keeps provider CLI and Git transport compatibility profiles separate from API tokens", () => {
     const broker = createHostAuthProfileCredentialBroker({
       authProfiles: [
@@ -441,6 +590,21 @@ describe("provider credential broker", () => {
         purpose: "git",
         profileId: "dev-nexus-app",
       }),
+      "expired_credential",
+    );
+    expectCredentialError(
+      () =>
+        createHostAuthProfileCredentialBroker({
+          authProfiles: [
+            appProfile({
+              purposes: ["api", "cli"],
+            }),
+          ],
+        }).resolveCredential({
+          provider: "github",
+          purpose: "git",
+          profileId: "dev-nexus-app",
+        }),
       "unsupported_purpose",
     );
     expectCredentialError(

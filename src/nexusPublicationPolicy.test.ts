@@ -4,14 +4,18 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertNexusPublicationGuard,
+  buildNexusPublicationGitPushPlan,
   defaultNexusAutomationConfig,
   getNexusPublicationStatus,
   loadProjectConfig,
+  prepareNexusPublicationGitPush,
+  pushNexusPublicationBranch,
   resolveProjectComponents,
   saveProjectConfig,
   type GitCommandResult,
   type GitRunner,
   type NexusHostingAuthProfileConfig,
+  type NexusPublicationGitPushRunner,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
 } from "./index.js";
@@ -813,6 +817,178 @@ describe("nexus publication policy", () => {
       ]),
     );
   });
+
+  it("plans App-token HTTPS Git pushes without embedding tokens in remotes or args", () => {
+    const policy = appPublicationPolicy();
+    const invocation = prepareNexusPublicationGitPush({
+      policy,
+      repositoryPath: "/repo/project",
+      branch: "feature/local-38",
+      targetBranch: "feature/local-38",
+      authProfiles: appAuthProfiles(),
+      credential: {
+        provider: "github",
+        host: "github.com",
+        profileId: "dev-nexus-app",
+        actorId: "dev-nexus-automation-app",
+        providerIdentity: "devnexus-automation",
+        account: "devnexus-automation",
+        kind: "github_app",
+        purposes: ["api", "cli", "git"],
+        permissions: {
+          contents: "write",
+        },
+        gitCredential: {
+          protocol: "https",
+          host: "github.com",
+          path: "Evref-BL/DevNexus.git",
+        },
+        secret: {
+          kind: "token",
+          value: "installation-token",
+        },
+      },
+    });
+
+    expect(invocation.plan).toMatchObject({
+      command: "git",
+      cwd: "/repo/project",
+      transport: "https_token",
+      remote: "https://github.com/Evref-BL/DevNexus.git",
+      refspec: "feature/local-38",
+      environment: {
+        GIT_AUTHOR_NAME: "devnexus-automation[bot]",
+        GIT_AUTHOR_EMAIL:
+          "286661136+devnexus-automation[bot]@users.noreply.github.com",
+        GIT_COMMITTER_NAME: "devnexus-automation[bot]",
+        GIT_COMMITTER_EMAIL:
+          "286661136+devnexus-automation[bot]@users.noreply.github.com",
+        GIT_TERMINAL_PROMPT: "0",
+      },
+      redactedEnvironment: {
+        DEV_NEXUS_GIT_TOKEN: "<redacted>",
+      },
+      secretEnvironmentKeys: ["DEV_NEXUS_GIT_TOKEN"],
+    });
+    expect(invocation.secretEnvironment).toEqual({
+      DEV_NEXUS_GIT_TOKEN: "installation-token",
+    });
+    expect(invocation.plan.args).toEqual([
+      "-c",
+      "credential.helper=",
+      "-c",
+      'credential.helper=!f() { echo username=x-access-token; echo password="$DEV_NEXUS_GIT_TOKEN"; }; f',
+      "push",
+      "https://github.com/Evref-BL/DevNexus.git",
+      "feature/local-38",
+    ]);
+    expect(JSON.stringify(invocation.plan)).not.toContain("installation-token");
+    expect(JSON.stringify(invocation.plan.redactedArgs)).not.toContain(
+      "installation-token",
+    );
+  });
+
+  it("runs App-token Git pushes with a scoped credential helper and redacted plan", () => {
+    const calls: Array<{
+      args: readonly string[];
+      cwd: string;
+      env: NodeJS.ProcessEnv;
+    }> = [];
+    const gitRunner: NexusPublicationGitPushRunner = (args, options) => {
+      calls.push({ args, cwd: options.cwd, env: options.env });
+      return {
+        args: [...args],
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+    const result = pushNexusPublicationBranch({
+      policy: appPublicationPolicy(),
+      repositoryPath: "/repo/project",
+      branch: "feature/local-38",
+      credential: {
+        provider: "github",
+        profileId: "dev-nexus-app",
+        actorId: "dev-nexus-automation-app",
+        kind: "github_app",
+        purposes: ["git"],
+        permissions: {
+          contents: "write",
+        },
+        gitCredential: {
+          protocol: "https",
+          host: "github.com",
+          path: "Evref-BL/DevNexus.git",
+        },
+        secret: {
+          kind: "token",
+          value: "installation-token",
+        },
+      },
+      authProfiles: appAuthProfiles(),
+      baseEnv: {
+        PATH: "/usr/bin",
+      },
+      gitRunner,
+    });
+
+    expect(result.git.exitCode).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      cwd: "/repo/project",
+      env: {
+        PATH: "/usr/bin",
+        DEV_NEXUS_GIT_TOKEN: "installation-token",
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    });
+    expect(calls[0]!.args.join(" ")).not.toContain("installation-token");
+    expect(JSON.stringify(result.plan)).not.toContain("installation-token");
+  });
+
+  it("fails closed when an App Git credential lacks a token", () => {
+    expect(() =>
+      buildNexusPublicationGitPushPlan({
+        policy: appPublicationPolicy(),
+        repositoryPath: "/repo/project",
+        branch: "feature/local-38",
+        credential: {
+          provider: "github",
+          profileId: "dev-nexus-app",
+          kind: "github_app",
+          purposes: ["git"],
+          gitCredential: {
+            protocol: "https",
+            host: "github.com",
+            path: "Evref-BL/DevNexus.git",
+          },
+        },
+      }),
+    ).toThrow(/does not include a token/u);
+  });
+
+  it("preserves configured remote pushes when no token credential is supplied", () => {
+    const plan = buildNexusPublicationGitPushPlan({
+      policy: projectConfig().automation!.publication,
+      repositoryPath: "/repo/project",
+      branch: "feature/local-38",
+      targetBranch: "main",
+      authProfiles: automationAuthProfiles(),
+    });
+
+    expect(plan).toMatchObject({
+      command: "git",
+      transport: "configured_remote",
+      remote: "bot",
+      refspec: "feature/local-38:main",
+      args: ["push", "bot", "feature/local-38:main"],
+      secretEnvironmentKeys: [],
+      redactedEnvironment: {
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    });
+  });
 });
 
 function automationAuthProfiles(): NexusHostingAuthProfileConfig[] {
@@ -828,6 +1004,36 @@ function automationAuthProfiles(): NexusHostingAuthProfileConfig[] {
       gitUserName: "Example Bot",
       gitUserEmail: "bot@example.invalid",
       environmentKeys: ["GH_CONFIG_DIR"],
+    },
+  ];
+}
+
+function appPublicationPolicy() {
+  const policy = projectConfig().automation!.publication;
+  return {
+    ...policy,
+    actor: {
+      kind: "app" as const,
+      provider: "github",
+      handle: "devnexus-automation",
+      id: null,
+    },
+  };
+}
+
+function appAuthProfiles(): NexusHostingAuthProfileConfig[] {
+  return [
+    {
+      id: "dev-nexus-app",
+      actorId: "dev-nexus-automation-app",
+      provider: "github",
+      kind: "app",
+      account: "devnexus-automation",
+      host: "github.com",
+      gitUserName: "devnexus-automation[bot]",
+      gitUserEmail:
+        "286661136+devnexus-automation[bot]@users.noreply.github.com",
+      environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
     },
   ];
 }

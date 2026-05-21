@@ -30,6 +30,7 @@ import {
   validateNexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
 import { resolveNexusProjectPath } from "./nexusPathResolver.js";
+import type { NexusResolvedProviderCredential } from "./nexusProviderCredentialBroker.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
@@ -65,6 +66,43 @@ export type NexusPublicationActorRunner = (
     env: NodeJS.ProcessEnv;
   },
 ) => NexusPublicationCommandResult;
+
+export type NexusPublicationGitPushTransport =
+  | "configured_remote"
+  | "https_token";
+
+export interface NexusPublicationGitPushPlan {
+  command: "git";
+  cwd: string;
+  args: string[];
+  redactedArgs: string[];
+  environment: Record<string, string>;
+  redactedEnvironment: Record<string, string>;
+  secretEnvironmentKeys: string[];
+  transport: NexusPublicationGitPushTransport;
+  remote: string;
+  refspec: string;
+  branch: string;
+  targetBranch: string | null;
+}
+
+export interface NexusPublicationGitPushInvocation {
+  plan: NexusPublicationGitPushPlan;
+  secretEnvironment: Record<string, string>;
+}
+
+export type NexusPublicationGitPushRunner = (
+  args: readonly string[],
+  options: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+  },
+) => GitCommandResult;
+
+export interface NexusPublicationGitPushResult {
+  plan: NexusPublicationGitPushPlan;
+  git: GitCommandResult;
+}
 
 export interface NexusPublicationGitStatus {
   repositoryPath: string | null;
@@ -486,6 +524,115 @@ export function publicationEnvironmentVariables(
     )
       .sort()
       .join(","),
+  };
+}
+
+export function buildNexusPublicationGitPushPlan(options: {
+  policy: NexusAutomationPublicationConfig;
+  repositoryPath: string;
+  branch: string;
+  targetBranch?: string | null;
+  credential?: NexusResolvedProviderCredential | null;
+  projectRoot?: string;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+}): NexusPublicationGitPushPlan {
+  return prepareNexusPublicationGitPush(options).plan;
+}
+
+export function prepareNexusPublicationGitPush(options: {
+  policy: NexusAutomationPublicationConfig;
+  repositoryPath: string;
+  branch: string;
+  targetBranch?: string | null;
+  credential?: NexusResolvedProviderCredential | null;
+  projectRoot?: string;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+}): NexusPublicationGitPushInvocation {
+  const repositoryPath = path.resolve(
+    requiredPublicationValue(options.repositoryPath, "repositoryPath"),
+  );
+  const branch = requiredPublicationValue(options.branch, "branch");
+  const targetBranch = options.targetBranch?.trim() || null;
+  const refspec =
+    targetBranch && targetBranch !== branch ? `${branch}:${targetBranch}` : branch;
+  const environment = {
+    ...publicationCommandEnvironment(options.policy, {
+      projectRoot: options.projectRoot,
+    }),
+    ...gitIdentityEnvironment(
+      resolveExpectedAutomationGitIdentity({
+        publication: options.policy,
+        authProfiles: options.authProfiles,
+      }),
+    ),
+    GIT_TERMINAL_PROMPT: "0",
+  };
+  const credential = options.credential ?? null;
+  if (
+    credential &&
+    (credential.secret?.kind === "token" ||
+      credential.kind === "github_app" ||
+      credential.gitCredential?.protocol === "https")
+  ) {
+    return prepareTokenBackedGitPush({
+      repositoryPath,
+      branch,
+      targetBranch,
+      refspec,
+      environment,
+      credential,
+    });
+  }
+
+  const remote = requiredPublicationValue(
+    options.policy.remote ?? defaultNexusAutomationConfig.publication.remote,
+    "publication remote",
+  );
+  const args = ["push", remote, refspec];
+  return {
+    plan: {
+      command: "git",
+      cwd: repositoryPath,
+      args,
+      redactedArgs: [...args],
+      environment,
+      redactedEnvironment: { ...environment },
+      secretEnvironmentKeys: [],
+      transport: "configured_remote",
+      remote,
+      refspec,
+      branch,
+      targetBranch,
+    },
+    secretEnvironment: {},
+  };
+}
+
+export function pushNexusPublicationBranch(options: {
+  policy: NexusAutomationPublicationConfig;
+  repositoryPath: string;
+  branch: string;
+  targetBranch?: string | null;
+  credential?: NexusResolvedProviderCredential | null;
+  projectRoot?: string;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  baseEnv?: NodeJS.ProcessEnv;
+  gitRunner?: NexusPublicationGitPushRunner;
+}): NexusPublicationGitPushResult {
+  const invocation = prepareNexusPublicationGitPush(options);
+  const gitRunner = options.gitRunner ?? defaultPublicationGitPushRunner;
+  const result = gitRunner(invocation.plan.args, {
+    cwd: invocation.plan.cwd,
+    env: {
+      ...(options.baseEnv ?? process.env),
+      ...invocation.plan.environment,
+      ...invocation.secretEnvironment,
+    },
+  });
+
+  return {
+    plan: invocation.plan,
+    git: result,
   };
 }
 
@@ -1179,6 +1326,138 @@ function publicationAuthorityAction(
   }
 }
 
+function prepareTokenBackedGitPush(options: {
+  repositoryPath: string;
+  branch: string;
+  targetBranch: string | null;
+  refspec: string;
+  environment: Record<string, string>;
+  credential: NexusResolvedProviderCredential;
+}): NexusPublicationGitPushInvocation {
+  const token = options.credential.secret?.value;
+  if (!token) {
+    throw new NexusPublicationPolicyError(
+      `Credential ${options.credential.profileId} does not include a token for Git push.`,
+    );
+  }
+  if (
+    options.credential.permissions?.contents &&
+    !publicationPermissionSatisfies(options.credential.permissions.contents, "write")
+  ) {
+    throw new NexusPublicationPolicyError(
+      `Credential ${options.credential.profileId} does not grant contents:write for Git push.`,
+    );
+  }
+
+  const remote = gitRemoteUrlFromCredential(options.credential);
+  const tokenEnvironmentKey = "DEV_NEXUS_GIT_TOKEN";
+  const helper =
+    `!f() { echo username=x-access-token; echo password="$${tokenEnvironmentKey}"; }; f`;
+  const args = [
+    "-c",
+    "credential.helper=",
+    "-c",
+    `credential.helper=${helper}`,
+    "push",
+    remote,
+    options.refspec,
+  ];
+  return {
+    plan: {
+      command: "git",
+      cwd: options.repositoryPath,
+      args,
+      redactedArgs: [...args],
+      environment: options.environment,
+      redactedEnvironment: {
+        ...options.environment,
+        [tokenEnvironmentKey]: "<redacted>",
+      },
+      secretEnvironmentKeys: [tokenEnvironmentKey],
+      transport: "https_token",
+      remote,
+      refspec: options.refspec,
+      branch: options.branch,
+      targetBranch: options.targetBranch,
+    },
+    secretEnvironment: {
+      [tokenEnvironmentKey]: token,
+    },
+  };
+}
+
+function gitRemoteUrlFromCredential(
+  credential: NexusResolvedProviderCredential,
+): string {
+  const gitCredential = credential.gitCredential;
+  if (!gitCredential) {
+    throw new NexusPublicationPolicyError(
+      `Credential ${credential.profileId} does not include a Git transport descriptor.`,
+    );
+  }
+  if (gitCredential.protocol !== "https") {
+    throw new NexusPublicationPolicyError(
+      `Credential ${credential.profileId} uses ${gitCredential.protocol} Git transport; token-backed publication requires https.`,
+    );
+  }
+  const host = gitCredential.host
+    .trim()
+    .replace(/^https?:\/\//u, "")
+    .replace(/\/+$/u, "");
+  const repositoryPath = gitCredential.path?.trim();
+  if (!host || !repositoryPath) {
+    throw new NexusPublicationPolicyError(
+      `Credential ${credential.profileId} must include Git host and repository path for token-backed publication.`,
+    );
+  }
+  const normalizedPath = repositoryPath
+    .replace(/^\/+/u, "")
+    .replace(/\.git$/u, "");
+  if (!normalizedPath.includes("/")) {
+    throw new NexusPublicationPolicyError(
+      `Credential ${credential.profileId} has an invalid Git repository path: ${repositoryPath}.`,
+    );
+  }
+
+  return `https://${host}/${normalizedPath}.git`;
+}
+
+function publicationPermissionSatisfies(
+  granted: string | undefined,
+  required: string,
+): boolean {
+  if (!granted) {
+    return false;
+  }
+  const levels = ["none", "read", "write", "admin"];
+  const grantedLevel = levels.indexOf(granted);
+  const requiredLevel = levels.indexOf(required);
+  if (grantedLevel === -1 || requiredLevel === -1) {
+    return granted === required;
+  }
+  return grantedLevel >= requiredLevel;
+}
+
+function defaultPublicationGitPushRunner(
+  args: readonly string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+): GitCommandResult {
+  const result = spawnSync("git", [...args], {
+    cwd: options.cwd,
+    env: options.env,
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+  });
+
+  return {
+    args: [...args],
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    exitCode: result.status,
+  };
+}
+
 function defaultPublicationActorRunner(
   command: string,
   args: readonly string[],
@@ -1274,6 +1553,14 @@ function githubActorHost(component: ResolvedNexusProjectComponent): string {
 
 function handlesEqual(left: string, right: string): boolean {
   return left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
+}
+
+function requiredPublicationValue(value: string | null | undefined, name: string): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    throw new NexusPublicationPolicyError(`${name} must be configured.`);
+  }
+  return trimmed;
 }
 
 function check(
