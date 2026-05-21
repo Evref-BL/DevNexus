@@ -18,6 +18,8 @@ question, or investigation names them directly.
 ## Current Reference
 
 - `dev-nexus-operating-model.md` - durable operating model and vocabulary.
+- `generic-ide-mcp-findings.md` - research note on generalizing the Pharo MCP
+  into language-neutral IDE/code-intelligence capabilities.
 
 ## Active Or Partly Active PRDs
 
