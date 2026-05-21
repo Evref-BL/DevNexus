@@ -10,6 +10,17 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  classifyNexusPublicationProviderEvidenceChecks,
+  findNexusPublicationProviderEvidence,
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderBranchPolicy,
+  type NexusPublicationProviderCheckInput,
+  type NexusPublicationProviderEvidenceInput,
+  type NexusPublicationProviderEvidenceSourceKind,
+  type NexusPublicationProviderMergeability,
+  type NexusPublicationProviderReviewTarget,
+} from "./nexusPublicationProviderEvidence.js";
+import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
@@ -56,20 +67,11 @@ export type NexusPublicationTrainNextAction =
   | "create_candidate_branch"
   | "request_human_decision";
 
-export interface NexusPublicationTrainProviderCheckInput {
-  name: string;
-  status?: string | null;
-  conclusion?: string | null;
-  bucket?: string | null;
-  stale?: boolean | null;
-  url?: string | null;
-}
+export type NexusPublicationTrainProviderCheckInput =
+  NexusPublicationProviderCheckInput;
 
-export interface NexusPublicationTrainProviderEvidenceInput {
-  branchName?: string | null;
-  headCommit?: string | null;
-  checks: NexusPublicationTrainProviderCheckInput[];
-}
+export type NexusPublicationTrainProviderEvidenceInput =
+  NexusPublicationProviderEvidenceInput;
 
 export interface NexusPublicationTrainHandoffInput {
   id: string;
@@ -122,6 +124,14 @@ export interface NexusPublicationTrainCheckEvidence {
 export interface NexusPublicationTrainEvidence {
   branchName: string | null;
   headCommit: string | null;
+  provider: string | null;
+  providerSourceKind: NexusPublicationProviderEvidenceSourceKind | null;
+  reviewTarget: NexusPublicationProviderReviewTarget | null;
+  headRef: string | null;
+  targetBranch: string | null;
+  intendedCiTier: string | null;
+  mergeability: NexusPublicationProviderMergeability | null;
+  branchPolicy: NexusPublicationProviderBranchPolicy | null;
   status: NexusPublicationTrainEvidenceStatus;
   requiredChecks: NexusPublicationTrainCheckEvidence[];
   message: string;
@@ -502,142 +512,77 @@ function evidenceForSource(options: {
   providerEvidence: NexusPublicationTrainProviderEvidenceInput[];
 }): NexusPublicationTrainEvidence {
   const requiredChecks = options.ciTier.requiredChecks;
+  const evidence = findNexusPublicationProviderEvidence(
+    normalizeNexusPublicationProviderEvidence(options.providerEvidence),
+    {
+      branchName: options.branchName,
+      headSha: options.source.headCommit,
+    },
+  );
+  const classification = classifyNexusPublicationProviderEvidenceChecks({
+    evidence,
+    requiredChecks,
+  });
+
   if (requiredChecks.length === 0) {
     return {
       branchName: options.branchName,
       headCommit: options.source.headCommit,
+      provider: evidence?.provider ?? null,
+      providerSourceKind: evidence?.sourceKind ?? null,
+      reviewTarget: evidence?.reviewTarget ?? null,
+      headRef: evidence?.headRef ?? null,
+      targetBranch: evidence?.targetBranch ?? null,
+      intendedCiTier: evidence?.intendedCiTier ?? null,
+      mergeability: evidence?.mergeability ?? null,
+      branchPolicy: evidence?.branchPolicy ?? null,
       status: "not_required",
       requiredChecks: [],
       message: "selected CI tier has no required provider checks",
     };
   }
 
-  const evidence = options.providerEvidence.find((candidate) =>
-    (options.branchName && candidate.branchName === options.branchName) ||
-    (options.source.headCommit && candidate.headCommit === options.source.headCommit)
-  );
   if (!evidence) {
     return {
       branchName: options.branchName,
       headCommit: options.source.headCommit,
+      provider: null,
+      providerSourceKind: null,
+      reviewTarget: null,
+      headRef: null,
+      targetBranch: null,
+      intendedCiTier: null,
+      mergeability: null,
+      branchPolicy: null,
       status: "unavailable",
-      requiredChecks: requiredChecks.map((name) => ({
-        name,
-        status: "unknown",
-        url: null,
+      requiredChecks: classification.requiredChecks.map((check) => ({
+        name: check.name,
+        status: check.status,
+        url: check.url,
       })),
       message: "provider check evidence is unavailable",
     };
   }
 
-  const checks = requiredChecks.map((name) => {
-    const check = evidence.checks.find((candidate) => candidate.name === name);
-    if (!check) {
-      return {
-        name,
-        status: "missing",
-        url: null,
-      } satisfies NexusPublicationTrainCheckEvidence;
-    }
-    return {
-      name,
-      status: checkEvidenceStatus(check),
-      url: check.url ?? null,
-    } satisfies NexusPublicationTrainCheckEvidence;
-  });
-
   return {
-    branchName: evidence.branchName ?? options.branchName,
-    headCommit: evidence.headCommit ?? options.source.headCommit,
-    status: evidenceStatus(checks),
-    requiredChecks: checks,
-    message: evidenceMessage(checks),
-  };
-}
-
-function checkEvidenceStatus(
-  check: NexusPublicationTrainProviderCheckInput,
-): NexusPublicationTrainCheckEvidenceStatus {
-  if (check.stale) {
-    return "stale";
-  }
-  const bucket = normalized(check.bucket);
-  if (bucket === "pass" || bucket === "success") {
-    return "success";
-  }
-  if (bucket === "fail" || bucket === "failure" || bucket === "failed") {
-    return "failed";
-  }
-  if (bucket === "pending" || bucket === "in_progress" || bucket === "queued") {
-    return "pending";
-  }
-
-  const conclusion = normalized(check.conclusion);
-  if (conclusion === "success" || conclusion === "neutral" || conclusion === "skipped") {
-    return "success";
-  }
-  if (
-    conclusion === "failure" ||
-    conclusion === "cancelled" ||
-    conclusion === "timed_out" ||
-    conclusion === "action_required"
-  ) {
-    return "failed";
-  }
-
-  const status = normalized(check.status);
-  if (status === "queued" || status === "pending" || status === "in_progress") {
-    return "pending";
-  }
-  if (status === "completed" && conclusion) {
-    return checkEvidenceStatus({
+    branchName: evidence.headBranch ?? options.branchName,
+    headCommit: evidence.headSha ?? options.source.headCommit,
+    provider: evidence.provider,
+    providerSourceKind: evidence.sourceKind,
+    reviewTarget: evidence.reviewTarget,
+    headRef: evidence.headRef,
+    targetBranch: evidence.targetBranch,
+    intendedCiTier: evidence.intendedCiTier,
+    mergeability: evidence.mergeability,
+    branchPolicy: evidence.branchPolicy,
+    status: classification.status,
+    requiredChecks: classification.requiredChecks.map((check) => ({
       name: check.name,
-      conclusion,
-    });
-  }
-
-  return "unknown";
-}
-
-function evidenceStatus(
-  checks: NexusPublicationTrainCheckEvidence[],
-): NexusPublicationTrainEvidenceStatus {
-  if (checks.some((check) => check.status === "failed")) {
-    return "failed";
-  }
-  if (checks.some((check) => check.status === "stale")) {
-    return "stale";
-  }
-  if (checks.some((check) => check.status === "pending")) {
-    return "pending";
-  }
-  if (checks.some((check) => check.status === "missing")) {
-    return "missing";
-  }
-  if (checks.some((check) => check.status === "unknown")) {
-    return "unavailable";
-  }
-  return "success";
-}
-
-function evidenceMessage(checks: NexusPublicationTrainCheckEvidence[]): string {
-  const status = evidenceStatus(checks);
-  if (status === "success") {
-    return "all required checks are successful";
-  }
-  if (status === "failed") {
-    return "one or more required checks failed";
-  }
-  if (status === "stale") {
-    return "one or more required checks are stale";
-  }
-  if (status === "pending") {
-    return "one or more required checks are pending";
-  }
-  if (status === "missing") {
-    return "one or more required checks are missing";
-  }
-  return "required check evidence is incomplete";
+      status: check.status,
+      url: check.url,
+    })),
+    message: classification.message,
+  };
 }
 
 function summarizeItems(
@@ -729,10 +674,6 @@ function nextAction(
     return "request_human_decision";
   }
   return "wait";
-}
-
-function normalized(value: string | null | undefined): string | null {
-  return value?.trim().toLowerCase() || null;
 }
 
 function required(value: unknown, name: string): string {

@@ -276,6 +276,57 @@ describe("publication train readiness", () => {
     });
   });
 
+  it("accepts normalized provider evidence metadata from generic providers", () => {
+    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    saveProjectConfig(projectRoot, projectConfig());
+    writeLeases(projectRoot, [
+      lease({
+        id: "lease-ready",
+        workItemId: "github-120",
+        branchName: "codex/ready",
+        lastObservedHeadCommit: "abc123",
+        pushed: true,
+        upstream: "origin/codex/ready",
+      }),
+    ]);
+
+    const providerEvidence: NexusPublicationTrainProviderEvidenceInput[] = [
+      {
+        provider: "generic",
+        sourceKind: "candidate_branch",
+        headBranch: "candidate/0.2.0",
+        headSha: "abc123",
+        targetBranch: "main",
+        intendedCiTier: "candidate_matrix",
+        mergeability: true,
+        branchPolicy: "clear",
+        checks: [
+          { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
+          { name: "Node 24 check (windows-latest)", bucket: "pass" },
+          { name: "Node 24 check (macos-latest)", bucket: "pass" },
+        ],
+      },
+    ];
+    const report = buildNexusPublicationTrainReadinessReport({
+      projectRoot,
+      providerEvidence,
+      now,
+    });
+
+    expect(report.components[0]?.items[0]?.evidence).toMatchObject({
+      branchName: "candidate/0.2.0",
+      headCommit: "abc123",
+      provider: "generic",
+      providerSourceKind: "candidate_branch",
+      targetBranch: "main",
+      intendedCiTier: "candidate_matrix",
+      mergeability: "mergeable",
+      branchPolicy: "clear",
+      status: "success",
+      message: "all required checks are successful",
+    });
+  });
+
   it("marks high-cost candidate tiers as waiting when CI budget is exhausted", () => {
     const projectRoot = makeTempDir("dev-nexus-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
