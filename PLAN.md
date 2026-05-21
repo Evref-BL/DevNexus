@@ -52,13 +52,13 @@ pull requests, and generated reports.
 
 ## Current Work Selection
 
-- The automation selector is `status:ready` plus `dogfood`, excluding
-  `blocked` and `unsafe-live-runtime`.
-- Current GitHub discovery reports no eligible work item. Remaining visible
-  dogfood issues are mostly `todo`, `blocked`, or dependency-gated.
-- Before heartbeat work can resume automatically, a human or coordinator should
-  promote one dependency-satisfied GitHub issue to `status:ready`, or explicitly
-  choose a one-off quick-fix/investigation outside the selector.
+- The automation selector is `status:ready`, excluding `blocked` and
+  `unsafe-live-runtime`; it no longer requires a public dogfood label.
+- Re-run eligible-work discovery after selector or issue-status changes before
+  assuming the heartbeat queue is empty.
+- The primary DevNexus component can use the active version-planning scope as a
+  publication train, with smoke-first CI by default and full matrix CI budgeted
+  by time or change count.
 
 ## Near-Term Candidates
 

@@ -263,6 +263,21 @@
             "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
+        },
+        "publicationTrain": {
+          "enabled": true,
+          "activeVersionId": "dogfood-version-planning",
+          "branchNaming": {
+            "integrationPrefix": "integration",
+            "candidatePrefix": "candidate",
+            "unscopedName": "manual"
+          },
+          "selector": {
+            "statuses": [
+              "ready"
+            ],
+            "labels": []
+          }
         }
       },
       "relationships": []
@@ -1043,9 +1058,7 @@
       "statuses": [
         "ready"
       ],
-      "labels": [
-        "dogfood"
-      ],
+      "labels": [],
       "excludeLabels": [
         "blocked",
         "unsafe-live-runtime"
@@ -1057,7 +1070,14 @@
     "verification": {
       "focusedCommands": [],
       "fullCommands": [],
-      "requirePassing": true
+      "requirePassing": true,
+      "ciTiers": {
+        "defaultTier": "remote_smoke",
+        "fullMatrixBudget": {
+          "minimumIntervalMinutes": 60,
+          "minimumChangeCount": 3
+        }
+      }
     },
     "ledger": {
       "path": ".dev-nexus/automation/runs.json",

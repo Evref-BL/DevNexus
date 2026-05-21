@@ -38,11 +38,10 @@ chooses implementation work.
   history was not fully backfilled into GitHub.
 - Eligible-work discovery scans configured `primary` and `eligible_source`
   tracker roles and currently lands on GitHub for all configured components.
-  The automation selector still requires `status:ready` plus `dogfood`, and
-  excludes `blocked` and `unsafe-live-runtime`.
-- There are currently visible GitHub issues, but no issue matches the automation
-  selector. Most remaining visible issues are `todo`, `blocked`, missing
-  `dogfood`, or excluded by safety labels.
+  The automation selector requires `status:ready`, excludes `blocked` and
+  `unsafe-live-runtime`, and does not require a public dogfood label.
+- After selector or issue-status changes, run eligible-work discovery before
+  assuming the heartbeat queue is empty.
 - The dogfood workspace repository records `origin` and `bot` remotes. Agent-created
   Git/GitHub activity must use the `Gabot-Darbot` automation identity via
   `GH_CONFIG_DIR=home:.config/gh-automation-github` and the `bot` remote unless
@@ -50,6 +49,10 @@ chooses implementation work.
 - Dogfood component publication uses green-main policy: branch or pull-request
   validation first, required Node 24 checks on Ubuntu, Windows, and macOS, then
   authorized merge after checks are green.
+- The primary DevNexus component can opt into a publication train for the
+  active version-planning scope. The train is intended to batch candidate
+  changes and use smoke-first CI by default, with full matrix CI budgeted by
+  time or change count.
 - The active scheduler path is DevNexus `automation coordinator-loop`.
   Heartbeats may wake that loop, but DevNexus owns lock, backoff, run facts, and
   relaunch decisions.
