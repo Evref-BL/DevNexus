@@ -12,6 +12,7 @@ import type {
   NexusHostingAuthProfileCredentialPurpose,
   NexusHostingAuthProfileConfig,
   NexusHostingAuthProfileKind,
+  NexusHostingGitHubAppCredentialConfig,
 } from "./nexusProjectHosting.js";
 import type {
   NexusHomeHostOverlayConfig,
@@ -293,6 +294,52 @@ function optionalCredentialPurposes(
   );
 }
 
+function validateHostingGitHubAppCredentialConfig(
+  value: unknown,
+  profilePathName: string,
+): NexusHostingGitHubAppCredentialConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const pathName = `${profilePathName}.githubApp`;
+  const record = assertRecord(value, pathName);
+  const appId = optionalString(record, "appId", pathName);
+  const clientId = optionalString(record, "clientId", pathName);
+  const slug = optionalString(record, "slug", pathName);
+  const installationAccount = optionalString(
+    record,
+    "installationAccount",
+    pathName,
+  );
+  const repositories = optionalStringArray(record, "repositories", pathName);
+  const apiBaseUrl = optionalString(record, "apiBaseUrl", pathName);
+  const tokenRefreshBufferSeconds = optionalPositiveInteger(
+    record,
+    "tokenRefreshBufferSeconds",
+    pathName,
+  );
+
+  if (appId === undefined && clientId === undefined) {
+    throw new NexusConfigError(
+      `${pathName}.appId or ${pathName}.clientId must be set`,
+    );
+  }
+
+  return {
+    ...(appId !== undefined ? { appId } : {}),
+    ...(clientId !== undefined ? { clientId } : {}),
+    ...(slug !== undefined ? { slug } : {}),
+    privateKeyPath: requiredString(record, "privateKeyPath", pathName),
+    ...(installationAccount !== undefined ? { installationAccount } : {}),
+    ...(repositories !== undefined ? { repositories } : {}),
+    ...(apiBaseUrl !== undefined ? { apiBaseUrl } : {}),
+    ...(tokenRefreshBufferSeconds !== undefined
+      ? { tokenRefreshBufferSeconds }
+      : {}),
+  };
+}
+
 function validateHostingAuthProfile(
   value: unknown,
   index: number,
@@ -323,6 +370,10 @@ function validateHostingAuthProfile(
     pathName,
   );
   const purposes = optionalCredentialPurposes(record, "purposes", pathName);
+  const githubApp = validateHostingGitHubAppCredentialConfig(
+    record.githubApp,
+    pathName,
+  );
 
   return {
     id: requiredString(record, "id", pathName),
@@ -340,6 +391,7 @@ function validateHostingAuthProfile(
     ...(commandArgs !== undefined ? { commandArgs } : {}),
     ...(environmentKeys !== undefined ? { environmentKeys } : {}),
     ...(purposes !== undefined ? { purposes } : {}),
+    ...(githubApp !== undefined ? { githubApp } : {}),
   };
 }
 
