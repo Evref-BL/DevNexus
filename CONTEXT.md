@@ -47,6 +47,11 @@ chooses implementation work.
   Git/GitHub activity must use the `Gabot-Darbot` automation identity via
   `GH_CONFIG_DIR=home:.config/gh-automation-github` and the `bot` remote unless
   the user explicitly says otherwise.
+- The `Gabot-Darbot` GitHub bot account currently has reduced/sanctioned
+  permissions. Agents should assume branch pushes may still work but PR creation
+  and other provider-side PR workflow steps may be blocked; after pushing any
+  branch, hand off the PR/review step to the user with branch, commit, and
+  verification details.
 - Dogfood component publication uses green-main policy: branch or pull-request
   validation first, required Node 24 checks on Ubuntu, Windows, and macOS, then
   authorized merge after checks are green.
@@ -83,6 +88,9 @@ chooses implementation work.
 - External coordination should use provider-native systems such as GitHub
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.
+- Because `Gabot-Darbot` is currently restricted, pushed source or metadata
+  branches require a human PR handoff instead of assuming the bot can open or
+  advance the pull request.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
 

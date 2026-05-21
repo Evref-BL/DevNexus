@@ -13,8 +13,8 @@ and ready for coordinator-driven work across its components.
 - Open local `ready`, `todo`, and `blocked` work was one-way synced to GitHub
   on 2026-05-20 and linked in `.dev-nexus/work-item-links.json`. Completed
   local history was not fully backfilled.
-- DevNexus source `main` is synced through PR #73 / merge commit `7c7ae9f`,
-  which includes the UTF-16 CLI JSON input fix.
+- DevNexus source `main` is synced through PR #126 / merge commit `eba69df`,
+  which includes the coordination handoff guard recovery fix.
 - Dogfood metadata `main` is synced through PR #19 / merge commit `79b3407`,
   which refreshed local archive statuses for GitHub #50 and #55.
 - The active automation selector is `status:ready` plus `dogfood`, excluding
@@ -33,6 +33,10 @@ and ready for coordinator-driven work across its components.
 - Agent-created Git/GitHub activity must use the configured `Gabot-Darbot`
   automation identity and `bot` remotes unless the user explicitly says
   otherwise.
+- The `Gabot-Darbot` GitHub bot account currently has reduced/sanctioned
+  permissions. Agents must not assume it can create or advance pull requests;
+  after any branch push, hand off the PR/review action to the user with branch,
+  commit, and verification details.
 - Component source publication uses green-main policy: branch/PR validation,
   required Node 24 checks on Ubuntu, Windows, and macOS, and authorized merge
   only after checks are green.
@@ -66,6 +70,8 @@ and ready for coordinator-driven work across its components.
 - Provider-native coordination remains incomplete enough that GitHub comments
   and GitHub issues should be treated as the durable human-visible record when
   coordination handoff readback is unavailable.
+- Bot-side PR creation/advancement may be unavailable under the current
+  `Gabot-Darbot` account restrictions. Published branches need human PR handoff.
 
 ## Next Direction
 

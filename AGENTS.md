@@ -24,6 +24,11 @@ separate from the older staging root.
   and GitHub activity, including pushes, issues, comments, and bridge messages,
   must use the configured bot/automation profile unless the user explicitly
   instructs otherwise.
+- The GitHub bot account currently has reduced/sanctioned permissions. Do not
+  assume it can create pull requests or perform the usual provider-side PR
+  workflow. After pushing any branch, leave a clear human handoff with the
+  branch name, commit, verification, and exact PR/review action needed from the
+  user.
 
 ## Per-Cycle Workflow
 
