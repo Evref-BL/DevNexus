@@ -261,5 +261,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("Work History");
     expect(module).toContain("selectedDetail");
     expect(module).toContain("overviewNodes");
+    expect(module).toContain("renderBranchGraph");
+    expect(module).toContain("dn-branch-svg");
+    expect(module).toContain("signalIcon");
   });
 });
