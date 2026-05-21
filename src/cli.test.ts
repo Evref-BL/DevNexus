@@ -159,11 +159,13 @@ function publicationTrainLease(options: {
   componentId: string;
   workItemId: string;
   branchName: string;
+  id?: string;
+  writeScope?: string[];
 }): NexusWorktreeLeaseRecord {
   return {
     kind: nexusWorktreeLeaseKind,
     version: 1,
-    id: "lease-cli-train",
+    id: options.id ?? "lease-cli-train",
     projectId: options.projectId,
     scope: {
       kind: "component",
@@ -180,7 +182,7 @@ function publicationTrainLease(options: {
       componentId: options.componentId,
       relativePath: "train-readiness",
     },
-    writeScope: ["src/nexusPublicationTrainReadiness.ts"],
+    writeScope: options.writeScope ?? ["src/nexusPublicationTrainReadiness.ts"],
     status: "ready",
     createdAt: "2026-05-21T10:00:00.000Z",
     lastSeenAt: "2026-05-21T10:00:00.000Z",
@@ -1193,6 +1195,161 @@ describe("dev-nexus cli", () => {
                 },
               },
             ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("prints publication candidate branch planning dry-runs in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-candidate-plan-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...defaultNexusAutomationConfig,
+          verification: {
+            ...defaultNexusAutomationConfig.verification,
+            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+          },
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "green_main",
+            targetBranch: "main",
+          },
+        },
+        versionPlanning: {
+          versions: [
+            {
+              id: "0.2.0",
+              objective: "Ship candidate planning.",
+              owningComponents: ["primary"],
+              targetBranch: "main",
+              scope: [
+                {
+                  kind: "work_item",
+                  status: "committed",
+                  componentId: "primary",
+                  trackerId: null,
+                  workItemId: "github-120",
+                },
+                {
+                  kind: "work_item",
+                  status: "committed",
+                  componentId: "primary",
+                  trackerId: null,
+                  workItemId: "github-121",
+                },
+              ],
+              readinessGates: [],
+              releasePolicy: {
+                tags: "none",
+                packages: "none",
+                providerRelease: "none",
+                releaseNotes: "none",
+                changelog: "none",
+              },
+            },
+          ],
+        },
+      }),
+    );
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        publicationTrainLease({
+          id: "lease-cli-candidate-120",
+          projectId: "demo-project",
+          componentId: "primary",
+          workItemId: "github-120",
+          branchName: "codex/train-readiness",
+        }),
+        publicationTrainLease({
+          id: "lease-cli-candidate-121",
+          projectId: "demo-project",
+          componentId: "primary",
+          workItemId: "github-121",
+          branchName: "codex/candidate-plan",
+          writeScope: ["src/nexusCandidateBranchPlan.ts"],
+        }),
+      ],
+    });
+
+    const textOutput = captureOutput();
+    await main(
+      ["publication", "candidate-plan", projectRoot, "--version", "0.2.0"],
+      {
+        stdout: textOutput.writer,
+        now: () => "2026-05-21T10:05:00.000Z",
+      },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus candidate branch plan.");
+    expect(textOutput.output()).toContain("Selected version: 0.2.0");
+    expect(textOutput.output()).toContain("Next action: create_integration_branch");
+    expect(textOutput.output()).toContain("Integration branch: integration/0.2.0");
+    expect(textOutput.output()).toContain("Candidate branch: candidate/0.2.0");
+    expect(textOutput.output()).toContain(
+      "Items: included=2; deferred=0; blocked=0; excluded=0",
+    );
+    expect(textOutput.output()).toContain(
+      "primary github-121 codex/candidate-plan -> eligible",
+    );
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "candidate-plan",
+        projectRoot,
+        "--full-matrix-budget-exhausted",
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+        now: () => "2026-05-21T10:05:00.000Z",
+      },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "wait",
+      summary: {
+        selectedVersionId: "0.2.0",
+        includedCount: 0,
+        deferredCount: 2,
+        blockedCount: 0,
+      },
+      plan: {
+        mutatesSource: false,
+        branches: {
+          integration: "integration/0.2.0",
+          candidate: "candidate/0.2.0",
+        },
+        deferred: [
+          {
+            workItemId: "github-120",
+            candidateEligibility: "wait",
+            reasons: expect.arrayContaining([
+              "full matrix CI budget is exhausted",
+            ]),
+          },
+          {
+            workItemId: "github-121",
+            candidateEligibility: "wait",
           },
         ],
       },
