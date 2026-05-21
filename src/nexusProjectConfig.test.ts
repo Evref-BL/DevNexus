@@ -1603,6 +1603,18 @@ describe("workspace config", () => {
               authProfile: "bot-github",
               invitationPolicy: "require_accepted",
             },
+            {
+              kind: "app",
+              providerIdentity: "devnexus-automation",
+              role: "automation",
+              requiredPermission: "write",
+              requiredProviderPermissions: {
+                contents: "write",
+                issues: "write",
+              },
+              authProfile: "devnexus-app",
+              invitationPolicy: "manual",
+            },
           ],
           provisioning: {
             allowCreate: false,
@@ -1654,6 +1666,18 @@ describe("workspace config", () => {
           requiredPermission: "admin",
           authProfile: "bot-github",
           invitationPolicy: "require_accepted",
+        },
+        {
+          kind: "app",
+          providerIdentity: "devnexus-automation",
+          role: "automation",
+          requiredPermission: "write",
+          requiredProviderPermissions: {
+            contents: "write",
+            issues: "write",
+          },
+          authProfile: "devnexus-app",
+          invitationPolicy: "manual",
         },
       ],
       provisioning: {
@@ -3144,6 +3168,33 @@ describe("workspace config", () => {
         },
       }),
     ).toThrow(/hosting\.access\[0\]\.requiredPermission/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-hosting-app-permissions",
+        name: "Invalid Hosting App Permissions",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        hosting: {
+          provider: "github",
+          namespace: "example",
+          access: [
+            {
+              kind: "app",
+              providerIdentity: "devnexus-automation",
+              role: "automation",
+              requiredPermission: "write",
+              requiredProviderPermissions: {
+                contents: true,
+              },
+            },
+          ],
+        },
+      }),
+    ).toThrow(/hosting\.access\[0\]\.requiredProviderPermissions\.contents/);
 
     expect(() =>
       validateProjectConfig({

@@ -11,6 +11,7 @@ import {
   type NexusProjectHostingConfig,
   type NexusProjectHostingPermissionSet,
   type NexusProjectHostingProviderAccessRecord,
+  type NexusProjectHostingProviderAppInstallationRecord,
   type NexusProjectHostingProviderAdapter,
   type NexusProjectHostingRepositoryRecord,
 } from "./nexusProjectHosting.js";
@@ -35,6 +36,21 @@ const authProfiles: NexusHostingAuthProfileConfig[] = [
     account: "example-bot",
     sshHost: "github.com-example-bot",
     githubCliConfigDir: "/home/alice/.config/gh-example-bot",
+  },
+  {
+    id: "devnexus-app",
+    provider: "github",
+    kind: "app",
+    credentialKind: "github_app",
+    account: "devnexus-automation",
+    host: "github.com",
+    githubApp: {
+      appId: "3794753",
+      slug: "devnexus-automation",
+      privateKeyPath: "/home/alice/.dev-nexus/devnexus-automation.pem",
+      installationAccount: "ExampleOrg",
+      repositories: ["example-suite-meta"],
+    },
   },
 ];
 
@@ -81,6 +97,10 @@ function provider(options: {
   permissions?: Record<string, Partial<NexusProjectHostingPermissionSet>>;
   actors?: Record<string, string | null>;
   access?: Record<string, NexusProjectHostingProviderAccessRecord>;
+  appInstallations?: Record<
+    string,
+    NexusProjectHostingProviderAppInstallationRecord | null
+  >;
 }): NexusProjectHostingProviderAdapter {
   const adapter: NexusProjectHostingProviderAdapter = {
     provider: "github",
@@ -109,6 +129,12 @@ function provider(options: {
       ] ?? {
         effectivePermission: null,
       };
+  }
+  if (options.appInstallations) {
+    adapter.getAppInstallation = async (input) =>
+      options.appInstallations?.[
+        `${input.principal.kind}:${input.principal.providerIdentity}`.toLowerCase()
+      ] ?? null;
   }
 
   return adapter;
@@ -270,6 +296,241 @@ describe("project hosting", () => {
       ],
       issues: [],
     });
+  });
+
+  it("reports installed GitHub Apps separately from collaborator access", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "app",
+          providerIdentity: "devnexus-automation",
+          role: "automation",
+          requiredPermission: "write",
+          requiredProviderPermissions: {
+            contents: "write",
+            issues: "write",
+            pull_requests: "write",
+          },
+          authProfile: "devnexus-app",
+          invitationPolicy: "manual",
+        },
+      ],
+    });
+
+    const result = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: provider({
+        repository: {
+          namespace: "ExampleOrg",
+          name: "example-suite-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        actors: {
+          "devnexus-app": "devnexus-automation",
+        },
+        appInstallations: {
+          "app:devnexus-automation": {
+            installed: true,
+            installationAccount: "ExampleOrg",
+            repositorySelection: "selected",
+            repositorySelected: true,
+            permissions: {
+              contents: "write",
+              issues: "write",
+              pull_requests: "write",
+            },
+          },
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "passed",
+      access: [],
+      appInstallations: [
+        {
+          providerIdentity: "devnexus-automation",
+          installationAccount: "ExampleOrg",
+          repositorySelection: "selected",
+          repositorySelected: true,
+          status: "installed",
+          missingPermissions: {},
+        },
+      ],
+      issues: [],
+    });
+    expect(result.authProfiles).toContainEqual(
+      expect.objectContaining({
+        id: "devnexus-app",
+        kind: "app",
+        status: "matched",
+      }),
+    );
+    expect(
+      planNexusProjectHosting({
+        hosting: config,
+        status: result,
+      }).actions,
+    ).toEqual([]);
+  });
+
+  it("distinguishes GitHub App installation, repository, and permission gaps", async () => {
+    const config = hosting({
+      access: [
+        {
+          kind: "app",
+          providerIdentity: "devnexus-automation",
+          role: "automation",
+          requiredPermission: "write",
+          requiredProviderPermissions: {
+            contents: "write",
+            issues: "write",
+          },
+          authProfile: "devnexus-app",
+          invitationPolicy: "manual",
+        },
+      ],
+    });
+    const repository = {
+      namespace: "ExampleOrg",
+      name: "example-suite-meta",
+      visibility: "private" as const,
+      defaultBranch: "main",
+    };
+
+    const missingInstallation = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: provider({
+        repository,
+        appInstallations: {
+          "app:devnexus-automation": null,
+        },
+      }),
+    });
+    expect(missingInstallation).toMatchObject({
+      ok: false,
+      status: "blocked",
+      appInstallations: [
+        {
+          providerIdentity: "devnexus-automation",
+          status: "missing",
+        },
+      ],
+      issues: [
+        {
+          code: "app_installation_missing",
+          severity: "blocker",
+        },
+      ],
+    });
+
+    const missingRepository = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: provider({
+        repository,
+        appInstallations: {
+          "app:devnexus-automation": {
+            installed: true,
+            installationAccount: "ExampleOrg",
+            repositorySelection: "selected",
+            repositorySelected: false,
+            permissions: {
+              contents: "write",
+              issues: "write",
+            },
+          },
+        },
+      }),
+    });
+    expect(missingRepository).toMatchObject({
+      ok: false,
+      status: "blocked",
+      appInstallations: [
+        {
+          providerIdentity: "devnexus-automation",
+          repositorySelected: false,
+          status: "repository_missing",
+        },
+      ],
+      issues: [
+        {
+          code: "app_repository_not_selected",
+          severity: "blocker",
+        },
+      ],
+    });
+    expect(
+      planNexusProjectHosting({
+        hosting: config,
+        status: missingRepository,
+      }).actions,
+    ).toMatchObject([
+      {
+        id: "app:devnexus-automation:select-repository",
+        kind: "select_app_repository",
+        disposition: "manual",
+      },
+    ]);
+
+    const missingPermission = await statusNexusProjectHosting({
+      project,
+      hosting: config,
+      authProfiles,
+      provider: provider({
+        repository,
+        appInstallations: {
+          "app:devnexus-automation": {
+            installed: true,
+            installationAccount: "ExampleOrg",
+            repositorySelection: "all",
+            repositorySelected: true,
+            permissions: {
+              contents: "write",
+              issues: "read",
+            },
+          },
+        },
+      }),
+    });
+    expect(missingPermission).toMatchObject({
+      ok: false,
+      status: "blocked",
+      appInstallations: [
+        {
+          providerIdentity: "devnexus-automation",
+          status: "permission_missing",
+          missingPermissions: {
+            issues: "write",
+          },
+        },
+      ],
+      issues: [
+        {
+          code: "app_permission_missing",
+          severity: "blocker",
+        },
+      ],
+    });
+    expect(
+      planNexusProjectHosting({
+        hosting: config,
+        status: missingPermission,
+      }).actions,
+    ).toMatchObject([
+      {
+        id: "app:devnexus-automation:permissions",
+        kind: "update_app_permissions",
+        disposition: "manual",
+      },
+    ]);
   });
 
   it("reports local remote, actor, access, and pending-invitation drift", async () => {
