@@ -2,10 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHostAuthProfileCredentialBroker } from "./nexusProviderCredentialBroker.js";
+import {
+  createHostAuthProfileCredentialBroker,
+  type NexusProviderCredentialBroker,
+  type NexusProviderCredentialRequest,
+} from "./nexusProviderCredentialBroker.js";
 import {
   assertWorkTrackerCapability,
   createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   workTrackerCapabilityReportForConfig,
   workTrackerCapabilitiesForConfig,
   WorkTrackingProviderServiceError,
@@ -139,6 +144,198 @@ describe("work tracking provider service", () => {
         },
       },
     ]);
+  });
+
+  it("resolves async broker credentials before creating a GitHub provider", async () => {
+    const credentialRequests: NexusProviderCredentialRequest[] = [];
+    const calls: Array<{
+      url: string;
+      headers: Record<string, string>;
+    }> = [];
+    const broker: NexusProviderCredentialBroker = {
+      resolveCredential: () => {
+        throw new Error("sync credential path should not run");
+      },
+      resolveCredentialAsync: async (request) => {
+        credentialRequests.push(request);
+        return {
+          provider: request.provider,
+          host: request.host ?? null,
+          profileId: "dev-nexus-app",
+          actorId: request.actorId ?? null,
+          providerIdentity: request.providerIdentity ?? null,
+          account: "devnexus-automation",
+          kind: "github_app",
+          purposes: ["api"],
+          permissions: { issues: "write" },
+          authorizationHeader: "Bearer app-token",
+          env: { GH_TOKEN: "app-token" },
+          secret: { kind: "token", value: "app-token" },
+        };
+      },
+    };
+
+    const provider = await createWorkTrackerProviderAsync(
+      {
+        provider: "github",
+        repository: { owner: "owner", name: "repo" },
+      },
+      {
+        credentials: {
+          broker,
+          actorId: "dev-nexus-automation-app",
+          providerIdentity: "devnexus-automation",
+          requiredPermissions: { issues: "write" },
+        },
+        github: {
+          credentialRunner: false,
+          fetch: (async (input, init = {}) => {
+            calls.push({
+              url: String(input),
+              headers: init.headers as Record<string, string>,
+            });
+            return new Response(
+              JSON.stringify({
+                id: 1,
+                number: 7,
+                title: "Credentialed issue",
+                state: "open",
+                labels: [],
+              }),
+              {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    );
+
+    await expect(provider.getWorkItem({ id: "github-7" })).resolves.toMatchObject({
+      id: "github-7",
+      title: "Credentialed issue",
+    });
+    expect(credentialRequests).toMatchObject([
+      {
+        provider: "github",
+        purpose: "api",
+        actorId: "dev-nexus-automation-app",
+        providerIdentity: "devnexus-automation",
+        repository: { owner: "owner", name: "repo" },
+        requiredPermissions: { issues: "write" },
+      },
+    ]);
+    expect(calls[0]?.headers.Authorization).toBe("Bearer app-token");
+  });
+
+  it("routes broker token environment through GitLab and Jira providers", async () => {
+    const credentialRequests: NexusProviderCredentialRequest[] = [];
+    const broker: NexusProviderCredentialBroker = {
+      resolveCredential: (request) => {
+        credentialRequests.push(request);
+        const token =
+          request.provider === "gitlab" ? "gitlab-broker-token" : "jira-broker-token";
+        return {
+          provider: request.provider,
+          host: request.host ?? null,
+          profileId: `${request.provider}-token`,
+          kind: "environment_token",
+          purposes: ["api"],
+          authorizationHeader: `Bearer ${token}`,
+          env:
+            request.provider === "gitlab"
+              ? { GITLAB_TOKEN: token }
+              : { JIRA_TOKEN: token },
+          secret: { kind: "token", value: token },
+        };
+      },
+    };
+    const gitlabCalls: Array<{ headers: Record<string, string> }> = [];
+    const jiraCalls: Array<{ headers: Record<string, string> }> = [];
+    const gitlabProvider = await createWorkTrackerProviderAsync(
+      {
+        provider: "gitlab",
+        repository: { id: "group/project" },
+      },
+      {
+        credentials: { broker },
+        gitlab: {
+          credentialRunner: false,
+          fetch: (async (_input, init = {}) => {
+            gitlabCalls.push({ headers: init.headers as Record<string, string> });
+            return new Response(
+              JSON.stringify({
+                id: 1001,
+                iid: 7,
+                title: "GitLab issue",
+                state: "opened",
+                labels: [],
+                assignees: [],
+                milestone: null,
+              }),
+              {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    );
+    const jiraProvider = await createWorkTrackerProviderAsync(
+      {
+        provider: "jira",
+        host: "https://example.atlassian.net",
+        projectKey: "NEX",
+      },
+      {
+        credentials: { broker },
+        jira: {
+          credentialRunner: false,
+          fetch: (async (_input, init = {}) => {
+            jiraCalls.push({ headers: init.headers as Record<string, string> });
+            return new Response(
+              JSON.stringify({
+                id: "10001",
+                key: "NEX-1",
+                fields: {
+                  summary: "Jira issue",
+                  description: null,
+                  status: { name: "To Do", statusCategory: { key: "new" } },
+                  labels: [],
+                  assignee: null,
+                  created: null,
+                  updated: null,
+                  resolutiondate: null,
+                  issuetype: { name: "Task" },
+                  project: { key: "NEX", id: "10000" },
+                },
+              }),
+              {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    );
+
+    await expect(gitlabProvider.getWorkItem({ id: "gitlab-7" })).resolves.toMatchObject({
+      id: "gitlab-7",
+      title: "GitLab issue",
+    });
+    await expect(jiraProvider.getWorkItem({ id: "NEX-1" })).resolves.toMatchObject({
+      id: "jira-NEX-1",
+      title: "Jira issue",
+    });
+    expect(credentialRequests.map((request) => request.provider)).toEqual([
+      "gitlab",
+      "jira",
+    ]);
+    expect(gitlabCalls[0]?.headers["PRIVATE-TOKEN"]).toBe("gitlab-broker-token");
+    expect(jiraCalls[0]?.headers.Authorization).toBe("Bearer jira-broker-token");
   });
 
   it("creates the Vibe provider when API options are available", () => {

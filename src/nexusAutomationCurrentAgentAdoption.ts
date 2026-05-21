@@ -89,7 +89,7 @@ import {
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import type {
@@ -472,7 +472,7 @@ export async function adoptNexusAutomationCurrentAgent(
 
     components = resolveProjectComponents(projectRoot, projectConfig);
     sourceRoot = resolvePrimaryProjectComponent(projectRoot, projectConfig).sourceRoot;
-    const componentProviders = createCurrentAgentComponentProviders({
+    const componentProviders = await createCurrentAgentComponentProviders({
       options,
       projectRoot,
       projectConfig,
@@ -1034,31 +1034,33 @@ export function recordNexusAutomationCurrentAgentAdoptionResult(
   };
 }
 
-function createCurrentAgentComponentProviders(options: {
+async function createCurrentAgentComponentProviders(options: {
   options: AdoptNexusAutomationCurrentAgentOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
-}): NexusAutomationAgentLaunchComponentProvider[] {
-  return options.components
-    .filter((component) => component.workTracking)
-    .map((component) => ({
-      component,
-      provider: createCurrentAgentProvider({
-        options: options.options,
-        projectRoot: options.projectRoot,
-        projectConfig: options.projectConfig,
+}): Promise<NexusAutomationAgentLaunchComponentProvider[]> {
+  return Promise.all(
+    options.components
+      .filter((component) => component.workTracking)
+      .map(async (component) => ({
         component,
-      }),
-    }));
+        provider: await createCurrentAgentProvider({
+          options: options.options,
+          projectRoot: options.projectRoot,
+          projectConfig: options.projectConfig,
+          component,
+        }),
+      })),
+  );
 }
 
-function createCurrentAgentProvider(options: {
+async function createCurrentAgentProvider(options: {
   options: AdoptNexusAutomationCurrentAgentOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationCurrentAgentAdoptionError(
@@ -1078,7 +1080,7 @@ function createCurrentAgentProvider(options: {
     } satisfies NexusAutomationProviderContext);
   }
 
-  return createWorkTrackerProvider(workTracking as WorkTrackingConfig, {
+  return createWorkTrackerProviderAsync(workTracking as WorkTrackingConfig, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,

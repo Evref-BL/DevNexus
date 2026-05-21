@@ -1,6 +1,6 @@
 import {
   assertWorkTrackerCapability,
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
   WorkTrackingProviderServiceError,
 } from "./workTrackingProviderService.js";
@@ -50,7 +50,7 @@ export type WorkItemProjectResolver = (
 
 export type WorkItemProviderFactory = (
   context: ResolvedWorkItemProjectContext,
-) => WorkTrackerProvider;
+) => WorkTrackerProvider | Promise<WorkTrackerProvider>;
 
 export interface WorkItemServiceOptions {
   resolveProject: WorkItemProjectResolver;
@@ -144,7 +144,7 @@ export class WorkItemService {
         ...(selectedTracker.resolvedRef
           ? { resolvedRef: selectedTracker.resolvedRef }
           : {}),
-        provider: this.createProvider(selectedProjectContext),
+        provider: await this.createProvider(selectedProjectContext),
       };
     } catch (error) {
       if (error instanceof WorkTrackingProviderServiceError) {
@@ -294,12 +294,12 @@ export class WorkItemService {
 
   private createProvider(
     context: ResolvedWorkItemProjectContext,
-  ): WorkTrackerProvider {
+  ): Promise<WorkTrackerProvider> {
     if (this.providerFactory) {
-      return this.providerFactory(context);
+      return Promise.resolve(this.providerFactory(context));
     }
 
-    return createWorkTrackerProvider(context.workTracking, {
+    return createWorkTrackerProviderAsync(context.workTracking, {
       ...this.providerOptions,
       projectRoot: context.projectRoot,
       now: this.now,

@@ -59,7 +59,7 @@ import {
   type WorktreeVerificationInput,
 } from "./worktreeExecutionMetadata.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import type {
@@ -111,7 +111,7 @@ export interface NexusAutomationProviderContext {
 
 export type NexusAutomationWorkTrackerProviderFactory = (
   context: NexusAutomationProviderContext,
-) => WorkTrackerProvider;
+) => WorkTrackerProvider | Promise<WorkTrackerProvider>;
 
 export type NexusAutomationPreflightStatus = "passed" | "failed";
 
@@ -311,7 +311,7 @@ export async function runNexusAutomationOnce(
       projectConfig,
       primaryComponent.id,
     );
-    provider = createAutomationProvider({
+    provider = await createAutomationProvider({
       options,
       projectRoot,
       sourceRoot,
@@ -778,13 +778,13 @@ export function generateNexusAutomationRunId(
   return `run-${timestamp}-${suffix}`;
 }
 
-function createAutomationProvider(options: {
+async function createAutomationProvider(options: {
   options: RunNexusAutomationOnceOptions;
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationRunOnceError(
@@ -804,7 +804,7 @@ function createAutomationProvider(options: {
     });
   }
 
-  return createWorkTrackerProvider(workTracking, {
+  return createWorkTrackerProviderAsync(workTracking, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,

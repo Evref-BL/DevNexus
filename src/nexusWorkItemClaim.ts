@@ -22,7 +22,7 @@ import type {
 } from "./nexusProjectLifecycle.js";
 import {
   assertWorkTrackerCapability,
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import {
@@ -81,7 +81,7 @@ export interface NexusWorkItemClaimSkippedCandidate {
 
 export type NexusEligibleWorkClaimProviderFactory = (
   context: NexusEligibleWorkProviderContext,
-) => WorkTrackerProvider;
+) => WorkTrackerProvider | Promise<WorkTrackerProvider>;
 
 export interface ClaimNexusEligibleWorkItemOptions {
   projectRoot: string;
@@ -214,7 +214,7 @@ export async function claimNexusEligibleWorkItem(
 
   const skippedCandidates: NexusWorkItemClaimSkippedCandidate[] = [];
   for (const candidate of eligibleWork.eligibleWorkItems) {
-    const resolved = resolveCandidateTracker(
+    const resolved = await resolveCandidateTracker(
       options,
       projectRoot,
       components,
@@ -373,7 +373,7 @@ async function inspectExistingWorkItemClaims(options: {
   const staleClaims: ClaimInspectionCandidate[] = [];
 
   for (const candidate of eligibleWork.eligibleWorkItems) {
-    const resolved = resolveCandidateTracker(
+    const resolved = await resolveCandidateTracker(
       options.options,
       options.projectRoot,
       options.components,
@@ -540,17 +540,17 @@ function claimObservation(
   };
 }
 
-function resolveCandidateTracker(
+async function resolveCandidateTracker(
   options: ClaimNexusEligibleWorkItemOptions,
   projectRoot: string,
   components: ResolvedNexusProjectComponent[],
   candidate: NexusEligibleWorkItem,
   env: NodeJS.ProcessEnv,
-): {
+): Promise<{
   component: ResolvedNexusProjectComponent;
   tracker: ResolvedNexusProjectWorkTracker;
   provider: WorkTrackerProvider;
-} | null {
+} | null> {
   const component = components.find(
     (item) => item.id === candidate.componentId,
   );
@@ -574,12 +574,13 @@ function resolveCandidateTracker(
   };
   const provider =
     options.provider ??
-    options.providerFactory?.(context) ??
-    createWorkTrackerProvider(tracker.workTracking, {
-      ...providerOptionsWithEnv(options.providerOptions, env),
-      projectRoot,
-      now: options.now,
-    });
+    (options.providerFactory
+      ? await options.providerFactory(context)
+      : await createWorkTrackerProviderAsync(tracker.workTracking, {
+          ...providerOptionsWithEnv(options.providerOptions, env),
+          projectRoot,
+          now: options.now,
+        }));
 
   return {
     component,

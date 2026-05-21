@@ -107,7 +107,7 @@ import type {
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import {
@@ -482,7 +482,7 @@ export async function runNexusAutomationAgentLaunchOnce(
 
     components = resolveProjectComponents(projectRoot, projectConfig);
     sourceRoot = resolvePrimaryProjectComponent(projectRoot, projectConfig).sourceRoot;
-    componentProviders = createAgentLaunchComponentProviders({
+    componentProviders = await createAgentLaunchComponentProviders({
       options,
       projectRoot,
       projectConfig,
@@ -1216,31 +1216,33 @@ export function generateNexusAutomationAgentRunId(
   return `agent-${timestamp}-${suffix}`;
 }
 
-function createAgentLaunchComponentProviders(options: {
+async function createAgentLaunchComponentProviders(options: {
   options: RunNexusAutomationAgentLaunchOnceOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
-}): NexusAutomationAgentLaunchComponentProvider[] {
-  return options.components
-    .filter((component) => component.workTracking)
-    .map((component) => ({
-      component,
-      provider: createAgentLaunchProvider({
-        options: options.options,
-        projectRoot: options.projectRoot,
-        projectConfig: options.projectConfig,
+}): Promise<NexusAutomationAgentLaunchComponentProvider[]> {
+  return Promise.all(
+    options.components
+      .filter((component) => component.workTracking)
+      .map(async (component) => ({
         component,
-      }),
-    }));
+        provider: await createAgentLaunchProvider({
+          options: options.options,
+          projectRoot: options.projectRoot,
+          projectConfig: options.projectConfig,
+          component,
+        }),
+      })),
+  );
 }
 
-function createAgentLaunchProvider(options: {
+async function createAgentLaunchProvider(options: {
   options: RunNexusAutomationAgentLaunchOnceOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationAgentLaunchError(
@@ -1260,7 +1262,7 @@ function createAgentLaunchProvider(options: {
     } satisfies NexusAutomationProviderContext);
   }
 
-  return createWorkTrackerProvider(workTracking as WorkTrackingConfig, {
+  return createWorkTrackerProviderAsync(workTracking as WorkTrackingConfig, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,

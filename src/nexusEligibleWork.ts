@@ -20,7 +20,7 @@ import {
   type NexusWorkItemDiscoveryCredentialResolver,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import {
@@ -52,7 +52,7 @@ export interface NexusEligibleWorkProviderContext {
 
 export type NexusEligibleWorkProviderFactory = (
   context: NexusEligibleWorkProviderContext,
-) => WorkTrackerProvider;
+) => WorkTrackerProvider | Promise<WorkTrackerProvider>;
 
 export interface ListNexusEligibleWorkOptions {
   projectRoot: string;
@@ -212,7 +212,7 @@ async function listDefaultEligibleWork(
     if (!tracker) {
       continue;
     }
-    const provider = createProvider(options, component, tracker);
+    const provider = await createProvider(options, component, tracker);
     const listed = await provider.listWorkItems({
       ...options.selectorQuery,
       projectRoot: options.projectRoot,
@@ -392,7 +392,7 @@ async function scanDiscoveryTracker(options: {
   options.state.result.trackerResults.push(trackerResult);
 
   let listed: WorkItem[];
-  const provider = createProvider(
+  const provider = await createProvider(
     options.options,
     options.component,
     options.tracker,
@@ -1311,21 +1311,23 @@ function createProvider(
   options: ListNexusEligibleWorkOptions,
   component: ResolvedNexusProjectComponent,
   tracker: ResolvedNexusProjectWorkTracker,
-): WorkTrackerProvider {
+): Promise<WorkTrackerProvider> {
   if (options.provider) {
-    return options.provider;
+    return Promise.resolve(options.provider);
   }
   if (options.providerFactory) {
-    return options.providerFactory({
-      projectRoot: options.projectRoot,
-      projectConfig: options.projectConfig,
-      component,
-      tracker,
-      workTracking: tracker.workTracking,
-    });
+    return Promise.resolve(
+      options.providerFactory({
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+        component,
+        tracker,
+        workTracking: tracker.workTracking,
+      }),
+    );
   }
 
-  return createWorkTrackerProvider(tracker.workTracking, {
+  return createWorkTrackerProviderAsync(tracker.workTracking, {
     ...providerOptionsWithEnv(options.providerOptions, options.env),
     projectRoot: options.projectRoot,
     now: options.now,
