@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   coordinationHandoffCommentMarker,
   createDefaultNexusHomeConfigBase,
@@ -210,6 +210,27 @@ function providerCoordinationProjectConfig(options: {
       },
     ],
   };
+}
+
+function unsupportedProviderCoordinationProjectConfig(options: {
+  sourceRoot: string;
+  worktreesRoot: string;
+  primaryStorePath: string;
+}): NexusProjectConfig {
+  const config = providerCoordinationProjectConfig(options);
+  config.components[0]!.workTrackers[1] = {
+    id: "coordination",
+    name: "GitLab Coordination",
+    enabled: true,
+    roles: ["coordination"],
+    workTracking: {
+      provider: "gitlab",
+      repository: {
+        id: "example/demo",
+      },
+    },
+  };
+  return config;
 }
 
 function multiComponentProjectConfig(options: {
@@ -547,6 +568,8 @@ async function createFixtureWorkItem(
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -1252,7 +1275,151 @@ describe("nexus coordination", () => {
     ).toHaveLength(1);
   });
 
-  it("marks provider-backed coordination handoffs incomplete and blocks write-only records", async () => {
+  it("reads GitHub-backed coordination handoffs from provider comments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-180");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      providerCoordinationProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+      }),
+    );
+
+    const record = {
+      kind: "dev-nexus.coordination.handoff",
+      version: 1,
+      createdAt: "2026-05-18T08:00:00.000Z",
+      projectId: "coordination-demo",
+      projectRoot,
+      componentId: "dev-nexus",
+      componentName: "DevNexus",
+      workItemId: "github-7",
+      logicalItemId: "github-7",
+      selectedWorkItemRef: null,
+      coordinationTargetRef: null,
+      trackerReferences: [],
+      hostId: "linux-host",
+      agentId: "codex",
+      status: "ready",
+      leaseId: null,
+      repositoryPath: worktreePath,
+      branch: "codex/provider-handoff",
+      upstream: "origin/codex/provider-handoff",
+      baseRef: "origin/main",
+      headCommit: "abc123def456",
+      dirty: false,
+      ahead: 1,
+      behind: 0,
+      pushed: true,
+      changedAreas: ["src/nexusCoordination.ts"],
+      decisions: ["Read GitHub coordination comments."],
+      verificationSummary: "focused tests passed",
+      integrationPreference: "review_handoff",
+      note: "provider readback",
+    };
+    const bodies = [
+      [
+        {
+          id: 7001,
+          number: 7,
+          title: "Provider handoff target",
+          body: null,
+          state: "open",
+          labels: [],
+          assignees: [],
+          created_at: "2026-05-18T07:55:00.000Z",
+          updated_at: "2026-05-18T08:05:00.000Z",
+          html_url: "https://github.com/example/demo/issues/7",
+        },
+      ],
+      [
+        {
+          id: 9001,
+          node_id: "IC_provider_handoff",
+          body: [
+            coordinationHandoffCommentMarker,
+            "",
+            "```json",
+            JSON.stringify(record, null, 2),
+            "```",
+          ].join("\n"),
+          user: { login: "devnexus-automation[bot]" },
+          created_at: "2026-05-18T08:01:00.000Z",
+          updated_at: "2026-05-18T08:01:00.000Z",
+          html_url:
+            "https://github.com/example/demo/issues/7#issuecomment-9001",
+        },
+      ],
+    ];
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+    const fetchMock: typeof fetch = async (input, init = {}) => {
+      calls.push({
+        url: String(input),
+        method: init.method,
+      });
+      const body = bodies.shift();
+      if (!body) {
+        return new Response(JSON.stringify({ message: "unexpected request" }), {
+          status: 500,
+        });
+      }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("GITHUB_TOKEN", "coordination-test-token");
+
+    const status = await getNexusCoordinationStatus({
+      projectRoot,
+      componentId: "dev-nexus",
+      trackerRole: "coordination",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:15:00.000Z",
+    });
+
+    expect(status.handoffs).toMatchObject({
+      available: true,
+      capability: {
+        read: true,
+        write: true,
+      },
+      trackerId: "coordination",
+      provider: "github",
+      diagnostics: [],
+      warnings: [],
+      records: [
+        {
+          workItemId: "github-7",
+          status: "ready",
+          branch: "codex/provider-handoff",
+          commentId: "github-comment-9001",
+          changedAreas: ["src/nexusCoordination.ts"],
+          decisions: ["Read GitHub coordination comments."],
+        },
+      ],
+    });
+    expect(calls).toEqual([
+      {
+        url: "https://api.github.com/repos/example/demo/issues?state=all&per_page=100&page=1",
+        method: "GET",
+      },
+      {
+        url: "https://api.github.com/repos/example/demo/issues/7/comments?per_page=100&page=1",
+        method: "GET",
+      },
+    ]);
+  });
+
+  it("marks non-GitHub provider-backed coordination handoffs incomplete and blocks write-only records", async () => {
     const projectRoot = makeTempDir("dev-nexus-coordination-project-");
     const sourceRoot = path.join(projectRoot, "source");
     const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-179");
@@ -1261,7 +1428,7 @@ describe("nexus coordination", () => {
     fs.mkdirSync(worktreePath, { recursive: true });
     saveProjectConfig(
       projectRoot,
-      providerCoordinationProjectConfig({
+      unsupportedProviderCoordinationProjectConfig({
         sourceRoot,
         worktreesRoot: "worktrees/dev-nexus",
         primaryStorePath,
@@ -1307,7 +1474,7 @@ describe("nexus coordination", () => {
           capability: "read_handoffs",
           operation: "readCoordinationHandoffs",
           trackerId: "coordination",
-          provider: "github",
+          provider: "gitlab",
         },
       ],
     });
@@ -1339,7 +1506,7 @@ describe("nexus coordination", () => {
         capability: "write_handoffs",
         operation: "createCoordinationHandoff",
         trackerId: "coordination",
-        provider: "github",
+        provider: "gitlab",
       },
     });
     expect(
