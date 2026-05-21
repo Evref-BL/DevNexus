@@ -162,6 +162,14 @@ import {
   type NexusCiFailureReplay,
 } from "./nexusCiFailureIntake.js";
 import {
+  buildNexusDashboardSnapshot,
+  type NexusDashboardSnapshot,
+} from "./nexusDashboard.js";
+import {
+  startNexusDashboardServer,
+  type NexusDashboardServerHandle,
+} from "./nexusDashboardServer.js";
+import {
   buildNexusSetupCheck,
   buildNexusSetupPlan,
   listNexusSetupFlows,
@@ -393,6 +401,10 @@ export interface DevNexusCliDependencies {
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
   workItemClaimLeaseTokenFactory?: () => string;
+  dashboardServerStarter?: (
+    options: Parameters<typeof startNexusDashboardServer>[0],
+  ) => Promise<NexusDashboardServerHandle>;
+  dashboardServerWaiter?: (handle: NexusDashboardServerHandle) => Promise<void>;
 }
 
 interface ProjectHostingStatusCliResult {
@@ -1067,6 +1079,15 @@ interface ParsedHostCheckCommand {
   json?: boolean;
 }
 
+interface ParsedDashboardCommand {
+  projectRoot: string;
+  host?: string;
+  port?: number;
+  homePath?: string;
+  mode?: NexusEligibleWorkMode;
+  json?: boolean;
+}
+
 export function usage(): string {
   return [
     "Usage:",
@@ -1128,6 +1149,9 @@ export function usage(): string {
     "  dev-nexus work-item sync-plan <workspace-root> --source-tracker <id> --target-tracker <id> [options]",
     "  dev-nexus work-item sync-execute <workspace-root> --source-tracker <id> --target-tracker <id> --credentials available [options]",
     "  dev-nexus ci-failure-intake plan <workspace-root> --input <json-file> [options]",
+    "  dev-nexus dashboard snapshot <workspace-root> [options]",
+    "  dev-nexus dashboard weave <workspace-root> [options]",
+    "  dev-nexus dashboard serve <workspace-root> [options]",
     "  dev-nexus automation status <workspace-root> [options]",
     "  dev-nexus automation eligible-work <workspace-root> [options]",
     "  dev-nexus automation agent-profiles <workspace-root> [options]",
@@ -1551,6 +1575,14 @@ export function usage(): string {
     "  --input <json-file>         manual replay payload with policy, failure, and optional existingWorkItems",
     "  --json",
     "",
+    "Options for dashboard:",
+    "  --host <host>               serve only; defaults to 127.0.0.1",
+    "  --port <port>               serve only; defaults to a random free port",
+    "  --home <path>               host-local home config for auth profiles",
+    "  --mode <default|discovery>  eligible-work mode used in the snapshot",
+    "  --discovery                 shortcut for --mode discovery",
+    "  --json",
+    "",
     "Options for automation status:",
     "  --home <path>             host-local home config for auth profiles",
     "  --json",
@@ -1765,6 +1797,9 @@ async function mainUnchecked(
   if (argv[0] === "ci-failure-intake") {
     return handleCiFailureIntakeCommand(argv, dependencies);
   }
+  if (argv[0] === "dashboard") {
+    return handleDashboardCommand(argv, dependencies);
+  }
   if (argv[0] === "automation") {
     return handleAutomationCommand(argv, dependencies);
   }
@@ -1774,8 +1809,88 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, or --help",
   );
+}
+
+async function handleDashboardCommand(
+  argv: string[],
+  dependencies: DevNexusCliDependencies,
+): Promise<number> {
+  const command = argv[1];
+  if (command === "snapshot") {
+    const parsed = parseDashboardCommand(argv, "dashboard snapshot");
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot: parsed.projectRoot,
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardSnapshotResult(
+      snapshot,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "weave") {
+    const parsed = parseDashboardCommand(argv, "dashboard weave");
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot: parsed.projectRoot,
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardWeaveResult(
+      snapshot,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (command === "serve") {
+    const parsed = parseDashboardCommand(argv, "dashboard serve");
+    const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
+    const handle = await starter({
+      projectRoot: parsed.projectRoot,
+      homePath: parsed.homePath,
+      eligibleWorkMode: parsed.mode,
+      host: parsed.host,
+      port: parsed.port,
+      gitRunner: dependencies.gitRunner,
+      now: dependencies.now,
+    });
+    printDashboardServeResult(
+      handle,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    await (dependencies.dashboardServerWaiter ?? waitForDashboardServer)(handle);
+    return 0;
+  }
+
+  throw new Error("dashboard requires snapshot, weave, or serve");
+}
+
+async function waitForDashboardServer(
+  handle: NexusDashboardServerHandle,
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const stop = (): void => {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+      void handle.close().then(
+        () => resolve(),
+        () => resolve(),
+      );
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
 }
 
 async function handleHomeCommand(
@@ -7451,6 +7566,53 @@ function parseEligibleWorkMode(
   throw new Error(`${optionName} must be default or discovery`);
 }
 
+function parseDashboardCommand(
+  argv: string[],
+  commandName: string,
+): ParsedDashboardCommand {
+  const [, , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error(`${commandName} requires a workspace root`);
+  }
+
+  const parsed: ParsedDashboardCommand = { projectRoot };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--host":
+        parsed.host = next();
+        break;
+      case "--port":
+        parsed.port = parseNonNegativeInteger(next(), arg);
+        break;
+      case "--home":
+        parsed.homePath = next();
+        break;
+      case "--mode":
+        parsed.mode = parseEligibleWorkMode(next(), arg);
+        break;
+      case "--discovery":
+        parsed.mode = "discovery";
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown ${commandName} option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parseAutomationAgentProfilesCommand(
   argv: string[],
 ): ParsedAutomationAgentProfilesCommand {
@@ -9406,6 +9568,74 @@ interface NexusQuickFixCommandStepLike {
   command: string;
   environment: Record<string, string>;
   note: string | null;
+}
+
+function printDashboardSnapshotResult(
+  snapshot: NexusDashboardSnapshot,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, snapshot };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus dashboard snapshot: ${snapshot.project.name}`);
+  writeLine(stdout, `  Root: ${snapshot.project.root}`);
+  writeLine(stdout, `  Summary: ${snapshot.summary}`);
+  writeLine(stdout, `  Components: ${snapshot.components.length}`);
+  writeLine(stdout, `  Signals: ${snapshot.signals.length}`);
+  writeLine(stdout, `  Weave nodes: ${snapshot.weave.nodes.length}`);
+  writeLine(stdout, `  Weave edges: ${snapshot.weave.edges.length}`);
+  if (snapshot.blockers.length > 0) {
+    writeLine(stdout, "  Blockers:");
+    for (const blocker of snapshot.blockers.slice(0, 5)) {
+      writeLine(stdout, `    ${blocker}`);
+    }
+  }
+}
+
+function printDashboardWeaveResult(
+  snapshot: NexusDashboardSnapshot,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, weave: snapshot.weave };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus dashboard weave: ${snapshot.project.name}`);
+  writeLine(stdout, `  Lanes: ${snapshot.weave.lanes.length}`);
+  writeLine(stdout, `  Nodes: ${snapshot.weave.nodes.length}`);
+  writeLine(stdout, `  Edges: ${snapshot.weave.edges.length}`);
+}
+
+function printDashboardServeResult(
+  handle: NexusDashboardServerHandle,
+  parsed: ParsedDashboardCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    dashboard: {
+      projectRoot: handle.projectRoot,
+      host: handle.host,
+      port: handle.port,
+      url: handle.url,
+    },
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus dashboard server started.");
+  writeLine(stdout, `  Project root: ${handle.projectRoot}`);
+  writeLine(stdout, `  URL: ${handle.url}`);
+  writeLine(stdout, "  Press Ctrl+C to stop.");
 }
 
 function printWorkItemCreateResult(

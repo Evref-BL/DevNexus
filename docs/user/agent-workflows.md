@@ -65,6 +65,42 @@ These JSON commands are compact by default. Use `--full --json` only when you
 need raw workspace config, full ledgers, target-state markdown, or complete
 handoff details for diagnostics.
 
+## Dashboard Cockpit
+
+The dashboard commands expose a read-only project cockpit for humans and for
+GUI hosts that want to embed DevNexus project pages. Use the JSON commands as
+the stable data contract, and use the local server for an operator-facing web
+view:
+
+```bash
+dev-nexus dashboard snapshot <workspace-root> --json
+dev-nexus dashboard weave <workspace-root> --json
+dev-nexus dashboard serve <workspace-root>
+```
+
+`dashboard snapshot` combines project components, automation status, eligible
+work, target reports, worktree leases, publication and authority blockers, an
+event stream, and the current work weave. `dashboard weave` returns only the
+graph-shaped lineage data so another app can render it with its own navigation,
+auth, tenant, and project shell.
+
+The local server exposes:
+
+```text
+GET /api/projects
+GET /api/dashboard
+GET /api/snapshot
+GET /api/weave
+GET /api/events
+GET /assets/dev-nexus-dashboard.js
+```
+
+The browser module exports `mountDevNexusDashboard(root, options)` and
+`fetchDevNexusDashboard(baseUrl)`. A multi-tenant orchestration app should treat
+these as embeddable cockpit primitives: the host owns tenant selection,
+authentication, persistence, and policy; DevNexus owns the project-specific
+workspace facts and capability-gated next actions.
+
 Then record the work it selected:
 
 ```bash
