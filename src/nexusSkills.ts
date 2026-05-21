@@ -1165,6 +1165,65 @@ verification, diagnosis, and handoff skills for the slices themselves.
 - Refine the workflow notes separately when the skill needs more detail.
 `,
   ),
+  curatedCoreSkill(
+    "take-the-lead",
+    "take-the-lead",
+    "Agent-led collaboration workflow for when the user asks the agent to lead, drive, coordinate, decide the next steps, or act like a team lead while the user keeps final decision authority. Use when the user says take the lead, drive this, lead the work, be the team lead, keep us moving, or asks for role reversal where the agent recommends and executes while the user decides at gates.",
+    `
+# Take The Lead
+
+Use this skill when the user explicitly asks the agent to lead the work or
+reverse the usual roles. Agent leads the process; the user decides goals,
+constraints, approvals, and final direction.
+
+## Operating Contract
+
+1. State the objective, your recommended next step, and the assumptions you are
+   making.
+2. Gather context before asking questions. Ask only for decisions the user must
+   make, and include your recommendation when you have one.
+3. Keep momentum: choose the next reversible action, execute it, then report the
+   result and next decision point.
+4. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+   open-ended option dumps.
+5. Track commitments, blockers, verification, and the next action so the user
+   can decide from state, not from memory.
+6. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+   credentials, external provider writes, publication, destructive cleanup, or
+   live runtime gates.
+7. Close loops. When a decision is made, record what changed and continue from
+   that decision instead of relitigating it.
+
+## Pairing
+
+- Use \`initiative-workflow\` when the led work spans multiple slices or surfaces.
+- Use design, planning, diagnosis, review, verification, and handoff skills for
+  the actual work mode.
+- In a DevNexus workspace, record durable facts through work items,
+  target-cycle facts, coordination handoffs, and publication policy.
+
+## Guardrails
+
+- Do not seize control when the user asked for a direct answer, review, or small
+  fix.
+- Do not treat your recommendation as approval. The user decides at gates.
+- Do not hide uncertainty; lead by making uncertainty explicit and reducing it.
+- Do not override higher-priority instructions, workspace policy, or safety
+  gates.
+- Do not create status theater. Keep updates short, concrete, and tied to the
+  next decision or action.
+
+## Reference
+
+OpenAI's Agents SDK human-in-the-loop guide describes the approval pattern this
+skill follows at decision gates: pause sensitive action, surface the pending
+decision, approve or reject, then resume from durable state.
+Source: openai/openai-agents-python docs/human_in_the_loop.md at
+45effb4b7d7de1226ebba7ba304bccfcf0a37fdf.
+https://github.com/openai/openai-agents-python/blob/45effb4b7d7de1226ebba7ba304bccfcf0a37fdf/docs/human_in_the_loop.md
+https://openai.github.io/openai-agents-python/human_in_the_loop/
+`,
+  ),
   designWithUserSkill,
   writeImplementationPlanSkill,
   executeInitiativePlanSkill,

@@ -228,12 +228,13 @@ describe("nexus skills", () => {
     expect(fs.existsSync(path.join(projectRoot, ".claude"))).toBe(false);
   });
 
-  it("includes planning and documentation skills with expanded acronyms", () => {
+  it("includes core workflow skills with expanded acronyms and attribution", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
     expect(skillIds).toEqual([
       "dev-nexus",
       "initiative-workflow",
+      "take-the-lead",
       "design-with-user",
       "write-implementation-plan",
       "execute-initiative-plan",
@@ -299,6 +300,18 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
       "do not force all work into a programming model",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Agent leads the process; the user decides",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "human-in-the-loop",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "https://openai.github.io/openai-agents-python/human_in_the_loop/",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "45effb4b7d7de1226ebba7ba304bccfcf0a37fdf",
     );
     expect(skillMarkdown["design-with-user"]).toContain(
       "Adapted from `obra/superpowers` version `5.1.0`",
