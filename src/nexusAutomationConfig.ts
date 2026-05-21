@@ -1,4 +1,8 @@
 import type { WorkStatus } from "./workTrackingTypes.js";
+import {
+  validateNexusCiTierPolicyConfig,
+  type NexusCiTierPolicyConfig,
+} from "./nexusCiTierPolicy.js";
 
 export type NexusAutomationMode = "run_once" | "agent_launch";
 export type NexusAutomationEligibleWorkMode = "default" | "discovery";
@@ -53,6 +57,7 @@ export interface NexusAutomationVerificationConfig {
   focusedCommands: string[];
   fullCommands: string[];
   requirePassing: boolean;
+  ciTiers?: NexusCiTierPolicyConfig | null;
 }
 
 export interface NexusAutomationLedgerConfig {
@@ -649,7 +654,22 @@ function validateVerificationConfig(
       requiredNonEmptyString,
     ),
     ...optionalBooleanField(record, "requirePassing", pathName),
+    ...optionalCiTierPolicyField(record, "ciTiers", pathName),
   };
+}
+
+function optionalCiTierPolicyField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusCiTierPolicyConfig | null>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  return {
+    [key]: validateNexusCiTierPolicyConfig(value, `${pathName}.${key}`) ?? null,
+  } as Record<Key, NexusCiTierPolicyConfig | null>;
 }
 
 function validateLedgerConfig(

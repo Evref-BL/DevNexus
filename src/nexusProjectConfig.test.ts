@@ -1845,6 +1845,53 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts CI tier policy in workspace and component verification config", () => {
+    const ciTiers = {
+      defaultTier: "remote_smoke" as const,
+      fullMatrixBudget: {
+        minimumIntervalMinutes: 60,
+        minimumChangeCount: 3,
+      },
+    };
+    const config = validateProjectConfig({
+      version: 1,
+      id: "tiered-ci-project",
+      name: "Tiered CI Project",
+      automation: {
+        verification: {
+          ciTiers,
+        },
+      },
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "https://github.com/example/project.git",
+          defaultBranch: "main",
+          verification: {
+            ciTiers,
+          },
+        },
+      ],
+    });
+
+    expect(config.automation?.verification.ciTiers).toMatchObject({
+      defaultTier: "remote_smoke",
+      fullMatrixBudget: {
+        minimumIntervalMinutes: 60,
+        minimumChangeCount: 3,
+      },
+    });
+    expect(config.components[0]?.verification?.ciTiers).toMatchObject({
+      defaultTier: "remote_smoke",
+      tiers: expect.arrayContaining([
+        expect.objectContaining({ id: "protected_target" }),
+      ]),
+    });
+  });
+
   it("accepts publication identity and remote guardrails", () => {
     expect(
       validateProjectConfig({
