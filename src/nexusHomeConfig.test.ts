@@ -123,10 +123,17 @@ describe("home config primitives", () => {
             credentialKind: "github_app",
             account: "devnexus-automation",
             host: "github.com",
-            command: path.join(homePath, "github-app-token.mjs"),
-            commandArgs: ["--repo", "{repository.name}", "--format", "token"],
             environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
             purposes: ["api", "cli"],
+            githubApp: {
+              appId: "12345",
+              clientId: "Iv23example",
+              slug: "devnexus-automation",
+              privateKeyPath: path.join(homePath, "app.private-key.pem"),
+              installationAccount: "Evref-BL",
+              repositories: ["DevNexus"],
+              tokenRefreshBufferSeconds: 300,
+            },
           },
         ],
       }).authProfiles,
@@ -157,10 +164,17 @@ describe("home config primitives", () => {
         credentialKind: "github_app",
         account: "devnexus-automation",
         host: "github.com",
-        command: path.join(homePath, "github-app-token.mjs"),
-        commandArgs: ["--repo", "{repository.name}", "--format", "token"],
         environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
         purposes: ["api", "cli"],
+        githubApp: {
+          appId: "12345",
+          clientId: "Iv23example",
+          slug: "devnexus-automation",
+          privateKeyPath: path.join(homePath, "app.private-key.pem"),
+          installationAccount: "Evref-BL",
+          repositories: ["DevNexus"],
+          tokenRefreshBufferSeconds: 300,
+        },
       },
     ]);
 
@@ -184,6 +198,26 @@ describe("home config primitives", () => {
         projects: [],
       }),
     ).toThrow(/Auth profile id is duplicated/);
+
+    expect(() =>
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        authProfiles: [
+          {
+            id: "github-app",
+            provider: "github",
+            githubApp: {
+              privateKeyPath: path.join(homePath, "app.private-key.pem"),
+            },
+          },
+        ],
+        projects: [],
+      }),
+    ).toThrow(/githubApp\.appId or authProfiles\[0\]\.githubApp\.clientId/);
   });
 
   it("validates host-local host overlays by stable host id", () => {

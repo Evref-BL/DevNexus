@@ -95,6 +95,17 @@ export type NexusHostingAuthProfileCredentialKind =
 
 export type NexusHostingAuthProfileCredentialPurpose = "api" | "git" | "cli";
 
+export interface NexusHostingGitHubAppCredentialConfig {
+  appId?: string;
+  clientId?: string;
+  slug?: string;
+  privateKeyPath: string;
+  installationAccount?: string;
+  repositories?: string[];
+  apiBaseUrl?: string;
+  tokenRefreshBufferSeconds?: number;
+}
+
 export interface NexusHostingAuthProfileConfig {
   id: string;
   actorId?: string;
@@ -111,6 +122,7 @@ export interface NexusHostingAuthProfileConfig {
   commandArgs?: string[];
   environmentKeys?: string[];
   purposes?: NexusHostingAuthProfileCredentialPurpose[];
+  githubApp?: NexusHostingGitHubAppCredentialConfig;
 }
 
 export interface NexusProjectHostingProjectIdentity {
