@@ -232,6 +232,39 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
       });
     }
 
+    if (
+      request.purpose === "git" &&
+      isGitHubAppTransportCredentialProfile(profile, request)
+    ) {
+      const tokenCredential = this.resolveEnvironmentToken(
+        profile,
+        request,
+        purposes,
+      );
+      if (tokenCredential) {
+        return withGitHubAppGitCredential(tokenCredential, profile, request);
+      }
+      if (profile.command) {
+        return withGitHubAppGitCredential(
+          this.resolveCommandCredential(profile, request, purposes),
+          profile,
+          request,
+        );
+      }
+      if (isGitHubAppCredentialProfile(profile, request)) {
+        throw new NexusProviderCredentialBrokerError(
+          "async_required",
+          `Auth profile ${profile.id} uses GitHub App token exchange and must be resolved asynchronously.`,
+          { profileId: profile.id },
+        );
+      }
+      throw new NexusProviderCredentialBrokerError(
+        "missing_secret",
+        `Auth profile ${profile.id} does not expose a usable GitHub App Git credential for ${request.provider}.`,
+        { profileId: profile.id },
+      );
+    }
+
     if (request.purpose === "git") {
       return this.resolveGitCredential(profile, request, purposes);
     }
@@ -278,6 +311,35 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
         kind: profile.credentialKind ?? "provider_cli",
         env: { GH_CONFIG_DIR: profile.githubCliConfigDir },
       });
+    }
+
+    if (
+      request.purpose === "git" &&
+      isGitHubAppTransportCredentialProfile(profile, request)
+    ) {
+      const tokenCredential = this.resolveEnvironmentToken(
+        profile,
+        request,
+        purposes,
+      );
+      if (tokenCredential) {
+        return withGitHubAppGitCredential(tokenCredential, profile, request);
+      }
+      if (isGitHubAppCredentialProfile(profile, request)) {
+        return this.resolveGitHubAppCredential(profile, request, purposes);
+      }
+      if (profile.command) {
+        return withGitHubAppGitCredential(
+          this.resolveCommandCredential(profile, request, purposes),
+          profile,
+          request,
+        );
+      }
+      throw new NexusProviderCredentialBrokerError(
+        "missing_secret",
+        `Auth profile ${profile.id} does not expose a usable GitHub App Git credential for ${request.provider}.`,
+        { profileId: profile.id },
+      );
     }
 
     if (request.purpose === "git") {
@@ -539,6 +601,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
       request.requiredPermissions,
       tokenResponse.permissions,
     );
+    const gitCredential = githubAppGitCredential(profile, request);
 
     const credential = credentialBase(profile, request, purposes, {
       kind: profile.credentialKind ?? "github_app",
@@ -548,6 +611,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
         : {}),
       authorizationHeader: `Bearer ${token}`,
       env: tokenEnvironment(profile, request, token),
+      ...(gitCredential ? { gitCredential } : {}),
       secret: { kind: "token", value: token },
     });
     this.githubAppCache.set(cacheKey, {
@@ -708,6 +772,7 @@ function credentialPurposes(
   if (profile.githubApp) {
     purposes.add("api");
     purposes.add("cli");
+    purposes.add("git");
   }
   if (profile.githubCliConfigDir) {
     purposes.add("cli");
@@ -743,6 +808,17 @@ function credentialBase(
     purposes,
     ...credential,
   };
+}
+
+function withGitHubAppGitCredential(
+  credential: NexusResolvedProviderCredential,
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+): NexusResolvedProviderCredential {
+  const gitCredential = githubAppGitCredential(profile, request);
+  return gitCredential
+    ? { ...credential, gitCredential }
+    : credential;
 }
 
 function tokenFromEnvironment(
@@ -960,6 +1036,49 @@ function gitRepositoryPath(
   return repository.path ?? repository.id ?? null;
 }
 
+function githubAppGitCredential(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+): NexusProviderGitCredentialDescriptor | null {
+  const path = gitRepositoryPath(request.repository);
+  return {
+    protocol: "https",
+    host: normalizeGitHubAppGitHost(
+      profile.githubApp?.apiBaseUrl ?? profile.host ?? request.host,
+    ),
+    ...(path ? { path } : {}),
+  };
+}
+
+function normalizeGitHubAppGitHost(hostOrApiBaseUrl?: string | null): string {
+  const value = hostOrApiBaseUrl?.trim();
+  if (!value) {
+    return "github.com";
+  }
+  if (
+    value === "github.com" ||
+    value === "https://github.com" ||
+    value === "api.github.com" ||
+    value === "https://api.github.com"
+  ) {
+    return "github.com";
+  }
+
+  try {
+    const url = new URL(
+      value.startsWith("http://") || value.startsWith("https://")
+        ? value
+        : `https://${value}`,
+    );
+    return url.hostname === "api.github.com" ? "github.com" : url.hostname;
+  } catch {
+    return value
+      .replace(/^https?:\/\//u, "")
+      .replace(/\/.*$/u, "")
+      .replace(/^api\.github\.com$/u, "github.com");
+  }
+}
+
 function isGitHubAppCredentialProfile(
   profile: NexusHostingAuthProfileConfig,
   request: NexusProviderCredentialRequest,
@@ -968,6 +1087,19 @@ function isGitHubAppCredentialProfile(
     normalizeProviderName(profile.provider) === "github" &&
     normalizeProviderName(request.provider) === "github" &&
     Boolean(profile.githubApp)
+  );
+}
+
+function isGitHubAppTransportCredentialProfile(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+): boolean {
+  return (
+    normalizeProviderName(profile.provider) === "github" &&
+    normalizeProviderName(request.provider) === "github" &&
+    (profile.kind === "app" ||
+      profile.credentialKind === "github_app" ||
+      Boolean(profile.githubApp))
   );
 }
 
