@@ -218,6 +218,10 @@ import {
   type NexusPublicationTrainReadinessReport,
 } from "./nexusPublicationTrainReadiness.js";
 import {
+  buildNexusCandidateBranchPlan,
+  type NexusCandidateBranchPlan,
+} from "./nexusCandidateBranchPlan.js";
+import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthorityForCurrentActor,
@@ -975,6 +979,16 @@ interface ParsedPublicationTrainReadinessCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationCandidatePlanCommand {
+  projectRoot: string;
+  versionId?: string | null;
+  evidenceFile?: string;
+  integrationBranchName?: string | null;
+  candidateBranchName?: string | null;
+  fullMatrixBudgetAvailable?: boolean;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -1066,6 +1080,7 @@ export function usage(): string {
     "  dev-nexus worktree prepare <workspace-root> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus publication train-readiness <workspace-root> [options]",
+    "  dev-nexus publication candidate-plan <workspace-root> [options]",
     "  dev-nexus quick-fix plan <workspace-root> --work-item <id> [options]",
     "  dev-nexus quick-fix start <workspace-root> --work-item <id> [options]",
     "  dev-nexus quick-fix finish <workspace-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
@@ -1325,6 +1340,15 @@ export function usage(): string {
     "Options for publication train-readiness:",
     "  --version <id>            limit grouping to a configured version",
     "  --evidence-file <json>    provider check evidence array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "  --full-matrix-budget-available",
+    "  --full-matrix-budget-exhausted",
+    "  --json",
+    "",
+    "Options for publication candidate-plan:",
+    "  --version <id>            select the version scope to batch; optional",
+    "  --evidence-file <json>    provider check evidence array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "  --integration-branch <branch>",
+    "  --candidate-branch <branch>",
     "  --full-matrix-budget-available",
     "  --full-matrix-budget-exhausted",
     "  --json",
@@ -2591,7 +2615,30 @@ async function handlePublicationCommand(
     return 0;
   }
 
-  throw new Error("publication requires green-main plan or train-readiness");
+  if (argv[1] === "candidate-plan") {
+    const parsed = parsePublicationCandidatePlanCommand(argv);
+    const plan = buildNexusCandidateBranchPlan({
+      projectRoot: parsed.projectRoot,
+      versionId: parsed.versionId,
+      integrationBranchName: parsed.integrationBranchName,
+      candidateBranchName: parsed.candidateBranchName,
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      now: dependencies.now,
+    });
+    printPublicationCandidatePlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error(
+    "publication requires green-main plan, train-readiness, or candidate-plan",
+  );
 }
 
 async function handleQuickFixCommand(
@@ -5622,6 +5669,60 @@ function parsePublicationTrainReadinessCommand(
         break;
       default:
         throw new Error(`Unknown publication train-readiness option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationCandidatePlanCommand(
+  argv: string[],
+): ParsedPublicationCandidatePlanCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "candidate-plan") {
+    throw new Error("publication requires candidate-plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication candidate-plan requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationCandidatePlanCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--version":
+        parsed.versionId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--integration-branch":
+        parsed.integrationBranchName = next();
+        break;
+      case "--candidate-branch":
+        parsed.candidateBranchName = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication candidate-plan option: ${arg}`);
     }
   }
 
@@ -8800,6 +8901,75 @@ function printPublicationTrainReadinessReport(
   }
   for (const warning of report.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationCandidatePlan(
+  plan: NexusCandidateBranchPlan,
+  parsed: ParsedPublicationCandidatePlanCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: plan.nextAction,
+      summary: plan.summary,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus candidate branch plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Selected version: ${plan.selectedVersion.id ?? "unscoped"}`);
+  writeLine(stdout, `  Next action: ${plan.nextAction}`);
+  writeLine(stdout, `  Integration branch: ${plan.branches.integration}`);
+  writeLine(stdout, `  Candidate branch: ${plan.branches.candidate}`);
+  writeLine(
+    stdout,
+    `  Items: included=${plan.summary.includedCount}; deferred=${plan.summary.deferredCount}; blocked=${plan.summary.blockedCount}; excluded=${plan.summary.excludedCount}`,
+  );
+  if (plan.candidateCiTier) {
+    writeLine(
+      stdout,
+      `  Candidate CI tier: ${plan.candidateCiTier.tier.id}${plan.candidateCiTier.budgetLimited ? " (budget limited)" : ""}`,
+    );
+  }
+  writeCandidatePlanItems(stdout, "Included", plan.included);
+  writeCandidatePlanItems(stdout, "Deferred", plan.deferred);
+  writeCandidatePlanItems(stdout, "Blocked", plan.blocked);
+  writeCandidatePlanItems(stdout, "Excluded", plan.excluded);
+  if (plan.changedAreaOverlaps.length > 0) {
+    writeLine(stdout, "  Changed-area overlaps:");
+    for (const overlap of plan.changedAreaOverlaps) {
+      writeLine(
+        stdout,
+        `    ${overlap.changedArea}: ${overlap.workItemIds.join(", ")} (${overlap.branches.join(", ")})`,
+      );
+    }
+  }
+  for (const warning of plan.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function writeCandidatePlanItems(
+  stdout: TextWriter,
+  label: string,
+  items: NexusCandidateBranchPlan["included"],
+): void {
+  if (items.length === 0) {
+    return;
+  }
+  writeLine(stdout, `  ${label}:`);
+  for (const item of items) {
+    writeLine(
+      stdout,
+      `    ${item.componentId} ${item.workItemId ?? "no-work-item"} ${item.branchName ?? "no-branch"} -> ${item.candidateEligibility}`,
+    );
+    if (item.reasons.length > 0) {
+      writeLine(stdout, `      reasons: ${item.reasons.join("; ")}`);
+    }
   }
 }
 
