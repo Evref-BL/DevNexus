@@ -78,7 +78,7 @@ import {
   type NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import type { GitRunner } from "./gitWorktreeService.js";
@@ -283,7 +283,7 @@ export async function getNexusAutomationStatus(
   }
 
   if (automationConfig.mode === "agent_launch") {
-    const componentProviders = createStatusComponentProviders({
+    const componentProviders = await createStatusComponentProviders({
       options,
       projectRoot,
       projectConfig,
@@ -491,7 +491,7 @@ export async function getNexusAutomationStatus(
     });
   }
 
-  const provider = createStatusProvider({
+  const provider = await createStatusProvider({
     options,
     projectRoot,
     sourceRoot,
@@ -646,13 +646,13 @@ export function readNexusAutomationStatusLock(
   }
 }
 
-function createStatusProvider(options: {
+async function createStatusProvider(options: {
   options: GetNexusAutomationStatusOptions;
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationStatusError(
@@ -672,38 +672,40 @@ function createStatusProvider(options: {
     } satisfies NexusAutomationProviderContext);
   }
 
-  return createWorkTrackerProvider(workTracking, {
+  return createWorkTrackerProviderAsync(workTracking, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,
   });
 }
 
-function createStatusComponentProviders(options: {
+async function createStatusComponentProviders(options: {
   options: GetNexusAutomationStatusOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
-}): NexusAutomationAgentLaunchComponentProvider[] {
-  return options.components
-    .filter((component) => component.workTracking)
-    .map((component) => ({
-      component,
-      provider: createStatusComponentProvider({
-        options: options.options,
-        projectRoot: options.projectRoot,
-        projectConfig: options.projectConfig,
+}): Promise<NexusAutomationAgentLaunchComponentProvider[]> {
+  return Promise.all(
+    options.components
+      .filter((component) => component.workTracking)
+      .map(async (component) => ({
         component,
-      }),
-    }));
+        provider: await createStatusComponentProvider({
+          options: options.options,
+          projectRoot: options.projectRoot,
+          projectConfig: options.projectConfig,
+          component,
+        }),
+      })),
+  );
 }
 
-function createStatusComponentProvider(options: {
+async function createStatusComponentProvider(options: {
   options: GetNexusAutomationStatusOptions;
   projectRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationStatusError(
@@ -723,7 +725,7 @@ function createStatusComponentProvider(options: {
     } satisfies NexusAutomationProviderContext);
   }
 
-  return createWorkTrackerProvider(workTracking, {
+  return createWorkTrackerProviderAsync(workTracking, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,

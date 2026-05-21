@@ -19,6 +19,7 @@ import type {
   NexusProviderCredentialRequest,
   NexusResolvedProviderCredential,
 } from "./nexusProviderCredentialBroker.js";
+import { resolveProviderCredential } from "./nexusProviderCredentialBroker.js";
 import {
   createLocalWorkTrackerProvider,
   localWorkTrackerCapabilities,
@@ -60,6 +61,7 @@ export interface CreateWorkTrackerProviderCredentialOptions {
   providerIdentity?: string | null;
   host?: string | null;
   repository?: WorkTrackingRepositoryConfig | null;
+  requiredPermissions?: Record<string, string>;
 }
 
 export class WorkTrackingProviderServiceError extends Error {
@@ -86,10 +88,30 @@ export function createWorkTrackerProvider(
   config: WorkTrackingConfig,
   options: CreateWorkTrackerProviderOptions = {},
 ): WorkTrackerProvider {
-  const providerName = config.provider;
   const credential = workTrackerUsesProviderCredentials(config)
     ? resolveWorkTrackerCredential(config, options.credentials)
     : undefined;
+
+  return createWorkTrackerProviderFromCredential(config, options, credential);
+}
+
+export async function createWorkTrackerProviderAsync(
+  config: WorkTrackingConfig,
+  options: CreateWorkTrackerProviderOptions = {},
+): Promise<WorkTrackerProvider> {
+  const credential = workTrackerUsesProviderCredentials(config)
+    ? await resolveWorkTrackerCredentialAsync(config, options.credentials)
+    : undefined;
+
+  return createWorkTrackerProviderFromCredential(config, options, credential);
+}
+
+function createWorkTrackerProviderFromCredential(
+  config: WorkTrackingConfig,
+  options: CreateWorkTrackerProviderOptions,
+  credential: NexusResolvedProviderCredential | undefined,
+): WorkTrackerProvider {
+  const providerName = config.provider;
 
   if (config.provider === "local") {
     return createLocalWorkTrackerProvider({
@@ -157,7 +179,30 @@ function resolveWorkTrackerCredential(
     return undefined;
   }
 
-  const request: NexusProviderCredentialRequest = {
+  return options.broker.resolveCredential(
+    workTrackerCredentialRequest(config, options),
+  );
+}
+
+async function resolveWorkTrackerCredentialAsync(
+  config: WorkTrackingConfig,
+  options: CreateWorkTrackerProviderCredentialOptions | undefined,
+): Promise<NexusResolvedProviderCredential | undefined> {
+  if (!options) {
+    return undefined;
+  }
+
+  return resolveProviderCredential(
+    options.broker,
+    workTrackerCredentialRequest(config, options),
+  );
+}
+
+function workTrackerCredentialRequest(
+  config: WorkTrackingConfig,
+  options: CreateWorkTrackerProviderCredentialOptions,
+): NexusProviderCredentialRequest {
+  return {
     provider: config.provider,
     purpose: options.purpose ?? "api",
     host: options.host ?? config.host ?? null,
@@ -165,8 +210,10 @@ function resolveWorkTrackerCredential(
     actorId: options.actorId ?? null,
     providerIdentity: options.providerIdentity ?? null,
     repository: options.repository ?? config.repository ?? null,
+    ...(options.requiredPermissions
+      ? { requiredPermissions: options.requiredPermissions }
+      : {}),
   };
-  return options.broker.resolveCredential(request);
 }
 
 function credentialOptions(

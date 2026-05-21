@@ -10,7 +10,7 @@ import {
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
-  createWorkTrackerProvider,
+  createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import type {
@@ -29,7 +29,7 @@ export interface EnqueueNexusAutomationWorkItemProviderContext {
 
 export type EnqueueNexusAutomationWorkItemProviderFactory = (
   context: EnqueueNexusAutomationWorkItemProviderContext,
-) => WorkTrackerProvider;
+) => WorkTrackerProvider | Promise<WorkTrackerProvider>;
 
 export interface EnqueueNexusAutomationWorkItemOptions {
   projectRoot: string;
@@ -97,7 +97,7 @@ export async function enqueueNexusAutomationWorkItem(
     options.description ?? null,
   );
 
-  const provider = resolveProvider({
+  const provider = await resolveProvider({
     options,
     projectRoot,
     sourceRoot,
@@ -129,13 +129,13 @@ export async function enqueueNexusAutomationWorkItem(
   };
 }
 
-function resolveProvider(options: {
+async function resolveProvider(options: {
   options: EnqueueNexusAutomationWorkItemOptions;
   projectRoot: string;
   sourceRoot: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
-}): WorkTrackerProvider {
+}): Promise<WorkTrackerProvider> {
   const workTracking = options.component.workTracking;
   if (!workTracking) {
     throw new NexusAutomationEnqueueError(
@@ -155,7 +155,7 @@ function resolveProvider(options: {
     });
   }
 
-  return createWorkTrackerProvider(workTracking, {
+  return createWorkTrackerProviderAsync(workTracking, {
     ...options.options.providerOptions,
     projectRoot: options.projectRoot,
     now: options.options.now,

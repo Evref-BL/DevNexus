@@ -2,6 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  createHostAuthProfileCredentialBroker,
+  type NexusProviderCredentialBroker,
+} from "./nexusProviderCredentialBroker.js";
 import { createLocalWorkTrackerProvider } from "./workTrackingLocalProvider.js";
 import {
   createWorkItemService,
@@ -199,6 +203,124 @@ describe("work item service", () => {
       }),
     ).resolves.toMatchObject({
       id: "local-1",
+    });
+  });
+
+  it("uses async provider credentials when constructing configured GitHub trackers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      workTracking: {
+        provider: "github",
+        repository: { owner: "example", name: "tracked-project" },
+      },
+    });
+    const calls: Array<{
+      url: string;
+      headers: Record<string, string>;
+    }> = [];
+    const broker: NexusProviderCredentialBroker = {
+      resolveCredential: () => {
+        throw new Error("sync credential path should not run");
+      },
+      resolveCredentialAsync: async (request) => ({
+        provider: request.provider,
+        host: request.host ?? null,
+        profileId: "dev-nexus-app",
+        actorId: request.actorId ?? null,
+        providerIdentity: request.providerIdentity ?? null,
+        account: "devnexus-automation",
+        kind: "github_app",
+        purposes: ["api"],
+        authorizationHeader: "Bearer service-app-token",
+        env: { GH_TOKEN: "service-app-token" },
+        secret: { kind: "token", value: "service-app-token" },
+      }),
+    };
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      providerOptions: {
+        credentials: {
+          broker,
+          actorId: "dev-nexus-automation-app",
+          providerIdentity: "devnexus-automation",
+        },
+        github: {
+          credentialRunner: false,
+          fetch: (async (input, init = {}) => {
+            calls.push({
+              url: String(input),
+              headers: init.headers as Record<string, string>,
+            });
+            return new Response(
+              JSON.stringify({
+                id: 1,
+                number: 7,
+                title: "Credentialed issue",
+                state: "open",
+                labels: [],
+              }),
+              {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    });
+
+    await expect(
+      service.getWorkItem({ project: "tracked-project", id: "github-7" }),
+    ).resolves.toMatchObject({
+      id: "github-7",
+      title: "Credentialed issue",
+      trackerRef: {
+        provider: "github",
+      },
+    });
+    expect(calls).toMatchObject([
+      {
+        url: "https://api.github.com/repos/example/tracked-project/issues/7",
+        headers: {
+          Authorization: "Bearer service-app-token",
+        },
+      },
+    ]);
+  });
+
+  it("fails with an explicit credential error when the automation profile is missing", async () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const project = createProjectContext(projectRoot, {
+      workTracking: {
+        provider: "github",
+        repository: { owner: "example", name: "tracked-project" },
+      },
+    });
+    const service = createWorkItemService({
+      resolveProject: createProjectResolver(project),
+      providerOptions: {
+        credentials: {
+          broker: createHostAuthProfileCredentialBroker({
+            authProfiles: [],
+            env: {},
+          }),
+          actorId: "dev-nexus-automation-app",
+          providerIdentity: "devnexus-automation",
+        },
+        github: {
+          credentialRunner: false,
+          fetch: (async () => {
+            throw new Error("provider call should not run");
+          }) as typeof fetch,
+        },
+      },
+    });
+
+    await expect(
+      service.getWorkItem({ project: "tracked-project", id: "github-7" }),
+    ).rejects.toMatchObject({
+      name: "NexusProviderCredentialBrokerError",
+      code: "missing_profile",
     });
   });
 
