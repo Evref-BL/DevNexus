@@ -263,6 +263,11 @@ describe("nexus dashboard", () => {
     expect(module).toContain("overviewNodes");
     expect(module).toContain("renderBranchGraph");
     expect(module).toContain("dn-branch-svg");
+    expect(module).toContain("const rowHeight = 34");
+    expect(module).toContain("data-row-height");
+    expect(module).toContain("dn-history-chip");
+    expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
+    expect(module).toContain("-webkit-line-clamp: 3");
     expect(module).toContain("signalIcon");
   });
 });
