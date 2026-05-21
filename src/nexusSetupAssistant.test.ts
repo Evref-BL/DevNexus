@@ -194,6 +194,83 @@ describe("nexus setup assistant", () => {
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
   });
 
+  it("builds GitHub App setup guidance without a machine-user auth path", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-app-");
+    writeProject(projectRoot, {
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "mac-demo-meta",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        authProfile: "human-github",
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "app",
+            role: "automation",
+            protocol: "https",
+            authProfile: "devnexus-app",
+          },
+        ],
+        access: [
+          {
+            kind: "app",
+            providerIdentity: "devnexus-automation",
+            role: "automation",
+            requiredPermission: "write",
+            requiredProviderPermissions: {
+              contents: "write",
+              issues: "write",
+              pull_requests: "write",
+            },
+            authProfile: "devnexus-app",
+            invitationPolicy: "manual",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "github-workspace-repository",
+      platform: "macos",
+    });
+    const authStep = plan.steps.find((step) => step.id === "configure-auth-profile")!;
+    const connectStep = plan.steps.find((step) => step.id === "connect-workspace-repository")!;
+
+    expect(authStep.summary).toContain("GitHub App profile");
+    expect(authStep.commands).toContain(
+      'mkdir -p "$HOME/.dev-nexus/secrets/github-apps/devnexus-app"',
+    );
+    expect(authStep.manualInstructions.join("\n")).toContain(
+      "kind=app, credentialKind=github_app",
+    );
+    expect(JSON.stringify(authStep)).not.toContain("GH_CONFIG_DIR");
+    expect(JSON.stringify(authStep)).not.toContain("ssh -T");
+    expect(connectStep.commands).toContain(
+      "git remote set-url origin git@github.com:ExampleOrg/mac-demo-meta.git",
+    );
+    expect(connectStep.commands).toContain(
+      "git remote get-url app >/dev/null 2>&1 && git remote set-url app https://github.com/ExampleOrg/mac-demo-meta.git || git remote add app https://github.com/ExampleOrg/mac-demo-meta.git",
+    );
+    expect(connectStep.commands).toContain("git remote get-url app");
+    expect(connectStep.commands).not.toContain("git fetch --dry-run app");
+    expect(connectStep.manualInstructions.join("\n")).toContain(
+      "short-lived installation token",
+    );
+    expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
+  });
+
   it("marks GitHub workspace repository repository creation as approval-required when policy allows creation", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-github-create-");
     writeProject(projectRoot, {
@@ -519,6 +596,98 @@ describe("nexus setup assistant", () => {
         id: "github-workspace-repository-final-report",
       }),
     );
+  });
+
+  it("reports host-local GitHub App profile metadata without exposing key paths", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-github-app-check-");
+    const homeRoot = path.join(projectRoot, "home");
+    writeHome(homeRoot, [
+      {
+        id: "human-github",
+        provider: "github",
+        kind: "human",
+        account: "alice",
+        host: "github.com",
+      },
+      {
+        id: "devnexus-app",
+        actorId: "dev-nexus-automation-app",
+        provider: "github",
+        kind: "app",
+        credentialKind: "github_app",
+        account: "devnexus-automation",
+        host: "github.com",
+        environmentKeys: ["GH_TOKEN", "GITHUB_TOKEN"],
+        githubApp: {
+          appId: "3794753",
+          slug: "devnexus-automation",
+          privateKeyPath: path.join(homeRoot, "devnexus-automation.pem"),
+          installationAccount: "ExampleOrg",
+          repositories: ["mac-demo"],
+        },
+      },
+    ]);
+    writeProject(projectRoot, {
+      home: homeRoot,
+      hosting: {
+        provider: "github",
+        namespace: "ExampleOrg",
+        repository: {
+          name: "mac-demo",
+          visibility: "private",
+          defaultBranch: "main",
+        },
+        authProfile: "human-github",
+        remotes: [
+          {
+            name: "origin",
+            role: "human",
+            protocol: "ssh",
+          },
+          {
+            name: "app",
+            role: "automation",
+            protocol: "https",
+            authProfile: "devnexus-app",
+          },
+        ],
+        access: [
+          {
+            kind: "app",
+            providerIdentity: "devnexus-automation",
+            role: "automation",
+            requiredPermission: "write",
+            requiredProviderPermissions: {
+              contents: "write",
+              issues: "write",
+            },
+            authProfile: "devnexus-app",
+            invitationPolicy: "manual",
+          },
+        ],
+        provisioning: {
+          allowCreate: false,
+        },
+      },
+    });
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "github-workspace-repository",
+      platform: "macos",
+    });
+    const appProfileCheck = check.checks.find(
+      (entry) => entry.id === "github-hosting-auth-profile-devnexus-app",
+    );
+
+    expect(appProfileCheck).toMatchObject({
+      status: "passed",
+      summary: expect.stringContaining("credential=github_app"),
+    });
+    expect(appProfileCheck?.summary).toContain("installation=ExampleOrg");
+    expect(appProfileCheck?.summary).toContain("repositories=mac-demo");
+    expect(appProfileCheck?.summary).toContain("privateKeyPath=set");
+    expect(appProfileCheck?.summary).not.toContain(homeRoot);
   });
 
   it("blocks setup when an existing component source root is not a clean expected Git checkout", () => {

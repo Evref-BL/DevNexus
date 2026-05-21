@@ -173,8 +173,9 @@ workspace files. Raw tokens, passwords, private keys, SSH keys, and provider CLI
 state do not belong in answer files.
 
 Answer files may reference host-local credential context by id, such as a
-GitHub CLI profile, GitLab CLI profile, environment-variable name, or token
-store id. See [Providers, auth, and hosting](providers-auth-hosting.md).
+GitHub App profile, GitHub CLI profile, GitLab CLI profile,
+environment-variable name, or token store id. See
+[Providers, auth, and hosting](providers-auth-hosting.md).
 
 ## Low-Level Commands
 
@@ -192,5 +193,6 @@ become the primary component of a new DevNexus workspace.
   providers, active targets, generated support, and stale provider files.
 - [Multi-tracker work tracking](multi-tracker.md) explains local and provider
   trackers, link records, and sync planning.
-- [Providers, auth, and hosting](providers-auth-hosting.md) explains user
-  accounts, bot accounts, provider CLI profiles, and workspace repository hosting.
+- [Providers, auth, and hosting](providers-auth-hosting.md) explains GitHub
+  Apps, user accounts, machine-user accounts, provider CLI profiles, and
+  workspace repository hosting.

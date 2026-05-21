@@ -25,8 +25,9 @@ publication rules agents need before they edit code.
 
 - [Agent workflows](user/agent-workflows.md) covers worktrees, automation loops,
   result files, and coordination handoffs.
-- [Providers, auth, and hosting](user/providers-auth-hosting.md) covers GitHub,
-  GitLab, Jira, bot accounts, user accounts, and workspace repository hosting.
+- [Providers, auth, and hosting](user/providers-auth-hosting.md) covers GitHub
+  Apps, GitHub CLI profiles, GitLab, Jira, user accounts, machine-user accounts,
+  and workspace repository hosting.
 - [Multi-tracker work tracking](user/multi-tracker.md) covers local and
   provider-backed trackers.
 
