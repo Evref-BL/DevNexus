@@ -213,6 +213,11 @@ import {
   type NexusGreenMainPublicationPlan,
 } from "./nexusGreenMainPublication.js";
 import {
+  buildNexusPublicationTrainReadinessReport,
+  type NexusPublicationTrainProviderEvidenceInput,
+  type NexusPublicationTrainReadinessReport,
+} from "./nexusPublicationTrainReadiness.js";
+import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthorityForCurrentActor,
@@ -962,6 +967,14 @@ interface ParsedPublicationGreenMainPlanCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationTrainReadinessCommand {
+  projectRoot: string;
+  versionId?: string | null;
+  evidenceFile?: string;
+  fullMatrixBudgetAvailable?: boolean;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -1052,6 +1065,7 @@ export function usage(): string {
     "  dev-nexus remote-execution ssh-plan <workspace-root> <request-id> [options]",
     "  dev-nexus worktree prepare <workspace-root> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
+    "  dev-nexus publication train-readiness <workspace-root> [options]",
     "  dev-nexus quick-fix plan <workspace-root> --work-item <id> [options]",
     "  dev-nexus quick-fix start <workspace-root> --work-item <id> [options]",
     "  dev-nexus quick-fix finish <workspace-root> --work-item <id> --pr-url <url> --merge-commit <sha> --verification <text> [options]",
@@ -1306,6 +1320,13 @@ export function usage(): string {
     "  --allow-rerun             allow one failed-run rerun when a reason is provided",
     "  --rerun-reason <text>",
     "  --rerun-attempted         mark the one allowed rerun as already used",
+    "  --json",
+    "",
+    "Options for publication train-readiness:",
+    "  --version <id>            limit grouping to a configured version",
+    "  --evidence-file <json>    provider check evidence array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "  --full-matrix-budget-available",
+    "  --full-matrix-budget-exhausted",
     "  --json",
     "",
     "Options for quick-fix plan/start/finish:",
@@ -2551,7 +2572,26 @@ async function handlePublicationCommand(
     return 0;
   }
 
-  throw new Error("publication requires green-main plan");
+  if (argv[1] === "train-readiness") {
+    const parsed = parsePublicationTrainReadinessCommand(argv);
+    const report = buildNexusPublicationTrainReadinessReport({
+      projectRoot: parsed.projectRoot,
+      versionId: parsed.versionId,
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      now: dependencies.now,
+    });
+    printPublicationTrainReadinessReport(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  throw new Error("publication requires green-main plan or train-readiness");
 }
 
 async function handleQuickFixCommand(
@@ -5540,6 +5580,54 @@ function parsePublicationGreenMainPlanCommand(
   return parsed as ParsedPublicationGreenMainPlanCommand;
 }
 
+function parsePublicationTrainReadinessCommand(
+  argv: string[],
+): ParsedPublicationTrainReadinessCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "train-readiness") {
+    throw new Error("publication requires train-readiness");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication train-readiness requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationTrainReadinessCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--version":
+        parsed.versionId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication train-readiness option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function readGreenMainChecksInput(
   inputPath: string,
 ): NexusGreenMainCheckRunInput[] {
@@ -5560,6 +5648,31 @@ function readGreenMainChecksInput(
 
   throw new Error(
     "publication green-main checks file must be an array or an object with checks",
+  );
+}
+
+function readPublicationTrainEvidenceInput(
+  inputPath: string,
+): NexusPublicationTrainProviderEvidenceInput[] {
+  const raw = readCliJsonFile(inputPath, "publication train readiness evidence");
+  if (Array.isArray(raw)) {
+    return raw as NexusPublicationTrainProviderEvidenceInput[];
+  }
+  if (raw !== null && typeof raw === "object") {
+    const record = raw as {
+      evidence?: unknown;
+      providerEvidence?: unknown;
+    };
+    if (Array.isArray(record.evidence)) {
+      return record.evidence as NexusPublicationTrainProviderEvidenceInput[];
+    }
+    if (Array.isArray(record.providerEvidence)) {
+      return record.providerEvidence as NexusPublicationTrainProviderEvidenceInput[];
+    }
+  }
+
+  throw new Error(
+    "publication train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
   );
 }
 
@@ -8638,6 +8751,55 @@ function printPublicationGreenMainPlan(
   writeLine(stdout, "  Commands:");
   for (const step of Object.values(plan.commands)) {
     writeLine(stdout, `    ${step.title}: ${formatGreenMainStep(step)}`);
+  }
+}
+
+function printPublicationTrainReadinessReport(
+  report: NexusPublicationTrainReadinessReport,
+  parsed: ParsedPublicationTrainReadinessCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: report.nextAction,
+      summary: report.summary,
+      report,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication train readiness.");
+  writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
+  writeLine(stdout, `  Next action: ${report.nextAction}`);
+  writeLine(
+    stdout,
+    `  Branches: ${report.summary.itemCount}; eligible=${report.summary.eligibleCount}; blocked=${report.summary.blockedCount}; needsVerification=${report.summary.needsVerificationCount}; needsScope=${report.summary.needsScopeCount}`,
+  );
+  if (report.summary.budgetLimitedCount > 0) {
+    writeLine(stdout, `  CI budget limited: ${report.summary.budgetLimitedCount}`);
+  }
+  for (const version of report.versions) {
+    writeLine(
+      stdout,
+      `  Version ${version.versionId ?? "unscoped"}: ${version.itemCount} branch(es), ${version.eligibleCount} eligible`,
+    );
+    for (const item of version.items) {
+      writeLine(
+        stdout,
+        `    ${item.componentId} ${item.workItemId ?? "no-work-item"} ${item.branchName ?? "no-branch"} -> ${item.candidateEligibility}`,
+      );
+      writeLine(
+        stdout,
+        `      next=${item.ciTier.tier.id} evidence=${item.evidence.status}`,
+      );
+      if (item.reasons.length > 0) {
+        writeLine(stdout, `      reasons: ${item.reasons.join("; ")}`);
+      }
+    }
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
   }
 }
 
