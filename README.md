@@ -167,7 +167,8 @@ dev-nexus worktree prepare <workspace-root> --component <component-id> --work-it
 ```
 
 For provider-native issue fixes, pull requests, required checks, automation, and
-publication policy, see [Agent workflows](docs/user/agent-workflows.md).
+publication policy, see [Agent workflows](docs/user/agent-workflows.md) and
+[Publication workflows](docs/user/publication-workflows.md).
 
 Refresh generated agent configuration when workspace settings change:
 
@@ -185,6 +186,9 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
   GitHub, GitLab, Jira, bot accounts, user accounts, and workspace repository
   hosting.
+- [Publication workflows](docs/user/publication-workflows.md) explains the
+  simple review-handoff default and the optional green-main, CI tier, and
+  publication train paths.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
   files.
