@@ -59,6 +59,7 @@ export interface NexusProjectHostingAccessPrincipalConfig {
   providerIdentity: string;
   role: NexusProjectHostingAccessRole;
   requiredPermission: NexusProjectHostingRequiredPermission;
+  requiredProviderPermissions?: Record<string, string>;
   authProfile?: string;
   invitationPolicy: NexusProjectHostingInvitationPolicy;
 }
@@ -180,10 +181,24 @@ export interface NexusProjectHostingProviderAccessInput
   authProfile?: NexusHostingAuthProfileConfig;
 }
 
+export interface NexusProjectHostingProviderAppInstallationInput
+  extends NexusProjectHostingProviderRepositoryInput {
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  authProfile?: NexusHostingAuthProfileConfig;
+}
+
 export interface NexusProjectHostingProviderAccessRecord {
   effectivePermission: NexusProjectHostingRequiredPermission | null;
   pendingInvitation?: boolean;
   invitationId?: string | null;
+}
+
+export interface NexusProjectHostingProviderAppInstallationRecord {
+  installed: boolean;
+  installationAccount?: string | null;
+  repositorySelection?: "all" | "selected" | string | null;
+  repositorySelected?: boolean | null;
+  permissions?: Record<string, string>;
 }
 
 export type NexusProjectHostingProviderAccessRepairOperation =
@@ -258,6 +273,9 @@ export interface NexusProjectHostingProviderAdapter {
   getAccess?(
     input: NexusProjectHostingProviderAccessInput,
   ): Promise<NexusProjectHostingProviderAccessRecord>;
+  getAppInstallation?(
+    input: NexusProjectHostingProviderAppInstallationInput,
+  ): Promise<NexusProjectHostingProviderAppInstallationRecord | null>;
   createRepository?(
     input: NexusProjectHostingProviderCreateRepositoryInput,
   ): Promise<NexusProjectHostingProviderMutationResult>;
@@ -331,6 +349,14 @@ export type NexusProjectHostingAccessStatus =
   | "unsupported"
   | "unchecked";
 
+export type NexusProjectHostingAppInstallationStatus =
+  | "installed"
+  | "missing"
+  | "repository_missing"
+  | "permission_missing"
+  | "unsupported"
+  | "unchecked";
+
 export interface NexusProjectHostingLocalRemoteRecord {
   name: string;
   url: string | null;
@@ -382,6 +408,20 @@ export interface NexusProjectHostingAccessStatusRecord {
   status: NexusProjectHostingAccessStatus;
 }
 
+export interface NexusProjectHostingAppInstallationStatusRecord {
+  providerIdentity: string;
+  role: NexusProjectHostingAccessRole;
+  requiredPermission: NexusProjectHostingRequiredPermission;
+  requiredProviderPermissions: Record<string, string>;
+  authProfile: string | null;
+  installationAccount: string | null;
+  repositorySelection: string | null;
+  repositorySelected: boolean | null;
+  permissions: Record<string, string>;
+  missingPermissions: Record<string, string>;
+  status: NexusProjectHostingAppInstallationStatus;
+}
+
 export interface NexusProjectHostingStatusResult {
   ok: boolean;
   status: NexusProjectHostingStatusLevel;
@@ -393,6 +433,7 @@ export interface NexusProjectHostingStatusResult {
   remotes: NexusProjectHostingRemoteStatusRecord[];
   authProfiles: NexusProjectHostingAuthProfileStatusRecord[];
   access: NexusProjectHostingAccessStatusRecord[];
+  appInstallations: NexusProjectHostingAppInstallationStatusRecord[];
   issues: NexusProjectHostingPreflightIssue[];
 }
 
@@ -417,6 +458,9 @@ export type NexusProjectHostingPlanActionKind =
   | "create_repository"
   | "add_local_remote"
   | "update_local_remote"
+  | "install_app"
+  | "select_app_repository"
+  | "update_app_permissions"
   | "invite_collaborator"
   | "add_collaborator"
   | "update_collaborator_permission"
@@ -645,6 +689,7 @@ export async function statusNexusProjectHosting(
       remotes: [],
       authProfiles: [],
       access: [],
+      appInstallations: [],
       issues: [issue],
     });
   }
@@ -689,6 +734,7 @@ export async function statusNexusProjectHosting(
     defaultBranch: null,
   };
   let access = uncheckedHostingAccessRecords(hosting);
+  let appInstallations = uncheckedHostingAppInstallationRecords(hosting);
 
   if (options.provider.provider !== hosting.provider) {
     issues.push({
@@ -718,6 +764,15 @@ export async function statusNexusProjectHosting(
           issues,
         })
       : uncheckedHostingAccessRecords(hosting);
+    appInstallations = repositoryRecord
+      ? await hostingAppInstallationStatus({
+          hosting,
+          authProfileById,
+          provider: options.provider,
+          repositoryName,
+          issues,
+        })
+      : uncheckedHostingAppInstallationRecords(hosting);
   }
 
   return hostingStatusResult({
@@ -729,6 +784,7 @@ export async function statusNexusProjectHosting(
     remotes,
     authProfiles,
     access,
+    appInstallations,
     issues,
   });
 }
@@ -755,6 +811,7 @@ export function statusNexusProjectHostingLocal(
       remotes: [],
       authProfiles: [],
       access: [],
+      appInstallations: [],
       issues: [issue],
     });
   }
@@ -809,6 +866,7 @@ export function statusNexusProjectHostingLocal(
     remotes,
     authProfiles,
     access: uncheckedHostingAccessRecords(hosting),
+    appInstallations: uncheckedHostingAppInstallationRecords(hosting),
     issues,
   });
 }
@@ -916,6 +974,17 @@ export function planNexusProjectHosting(
       hosting,
       repository,
       providerMutationAuthProfile,
+    });
+    if (action) {
+      actions.push(action);
+    }
+  }
+
+  for (const appInstallation of status.appInstallations) {
+    const action = appInstallationPlanAction({
+      appInstallation,
+      hosting,
+      repository,
     });
     if (action) {
       actions.push(action);
@@ -2202,8 +2271,13 @@ async function hostingAccessStatus(options: {
   repositoryName: string;
   issues: NexusProjectHostingPreflightIssue[];
 }): Promise<NexusProjectHostingAccessStatusRecord[]> {
+  const principals = nonAppAccessPrincipals(options.hosting);
+  if (principals.length === 0) {
+    return [];
+  }
+
   if (!options.provider.getAccess) {
-    for (const principal of options.hosting.access) {
+    for (const principal of principals) {
       options.issues.push({
         code: "provider_access_unsupported",
         severity: "warning",
@@ -2215,13 +2289,13 @@ async function hostingAccessStatus(options: {
         providerIdentity: principal.providerIdentity,
       });
     }
-    return options.hosting.access.map((principal) =>
+    return principals.map((principal) =>
       uncheckedHostingAccessRecord(principal, "unsupported"),
     );
   }
 
   const statuses: NexusProjectHostingAccessStatusRecord[] = [];
-  for (const principal of options.hosting.access) {
+  for (const principal of principals) {
     const authProfile = principal.authProfile
       ? options.authProfileById.get(principal.authProfile)
       : undefined;
@@ -2235,6 +2309,59 @@ async function hostingAccessStatus(options: {
       hostingAccessStatusRecord({
         principal,
         access,
+        issues: options.issues,
+      }),
+    );
+  }
+
+  return statuses;
+}
+
+async function hostingAppInstallationStatus(options: {
+  hosting: NexusProjectHostingConfig;
+  authProfileById: Map<string, NexusHostingAuthProfileConfig>;
+  provider: NexusProjectHostingProviderAdapter;
+  repositoryName: string;
+  issues: NexusProjectHostingPreflightIssue[];
+}): Promise<NexusProjectHostingAppInstallationStatusRecord[]> {
+  const appPrincipals = appAccessPrincipals(options.hosting);
+  if (appPrincipals.length === 0) {
+    return [];
+  }
+
+  if (!options.provider.getAppInstallation) {
+    for (const principal of appPrincipals) {
+      options.issues.push({
+        code: "provider_app_installation_unsupported",
+        severity: "warning",
+        message:
+          `Hosting provider ${options.provider.provider} does not expose ` +
+          `App installation status for ${principal.providerIdentity}.`,
+        authProfile: principal.authProfile,
+        principalKind: principal.kind,
+        providerIdentity: principal.providerIdentity,
+      });
+    }
+    return appPrincipals.map((principal) =>
+      uncheckedHostingAppInstallationRecord(principal, "unsupported"),
+    );
+  }
+
+  const statuses: NexusProjectHostingAppInstallationStatusRecord[] = [];
+  for (const principal of appPrincipals) {
+    const authProfile = principal.authProfile
+      ? options.authProfileById.get(principal.authProfile)
+      : undefined;
+    const installation = await options.provider.getAppInstallation({
+      namespace: options.hosting.namespace,
+      repositoryName: options.repositoryName,
+      principal,
+      authProfile,
+    });
+    statuses.push(
+      hostingAppInstallationStatusRecord({
+        principal,
+        installation,
         issues: options.issues,
       }),
     );
@@ -2325,10 +2452,94 @@ function hostingAccessStatusRecord(options: {
   });
 }
 
+function hostingAppInstallationStatusRecord(options: {
+  principal: NexusProjectHostingAccessPrincipalConfig;
+  installation: NexusProjectHostingProviderAppInstallationRecord | null;
+  issues: NexusProjectHostingPreflightIssue[];
+}): NexusProjectHostingAppInstallationStatusRecord {
+  if (!options.installation?.installed) {
+    options.issues.push({
+      code: "app_installation_missing",
+      severity: "blocker",
+      message:
+        `App installation is missing for ${options.principal.providerIdentity}; ` +
+        "install the App on the hosting account before using it for automation.",
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return appInstallationStatusRecord(options.principal, {
+      installationAccount: null,
+      repositorySelection: null,
+      repositorySelected: null,
+      permissions: {},
+      missingPermissions: requiredProviderPermissions(options.principal),
+      status: "missing",
+    });
+  }
+
+  const repositorySelected = options.installation.repositorySelected ?? null;
+  if (repositorySelected === false) {
+    options.issues.push({
+      code: "app_repository_not_selected",
+      severity: "blocker",
+      message:
+        `App ${options.principal.providerIdentity} is installed, but the ` +
+        "component repository is not selected for the installation.",
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return appInstallationStatusRecord(options.principal, {
+      installationAccount: options.installation.installationAccount ?? null,
+      repositorySelection: options.installation.repositorySelection ?? null,
+      repositorySelected,
+      permissions: options.installation.permissions ?? {},
+      missingPermissions: requiredProviderPermissions(options.principal),
+      status: "repository_missing",
+    });
+  }
+
+  const permissions = options.installation.permissions ?? {};
+  const missingPermissions = missingProviderPermissions(
+    requiredProviderPermissions(options.principal),
+    permissions,
+  );
+  if (Object.keys(missingPermissions).length > 0) {
+    options.issues.push({
+      code: "app_permission_missing",
+      severity: "blocker",
+      message:
+        `App ${options.principal.providerIdentity} is missing required ` +
+        `permissions: ${providerPermissionSummary(missingPermissions)}.`,
+      authProfile: options.principal.authProfile,
+      principalKind: options.principal.kind,
+      providerIdentity: options.principal.providerIdentity,
+    });
+    return appInstallationStatusRecord(options.principal, {
+      installationAccount: options.installation.installationAccount ?? null,
+      repositorySelection: options.installation.repositorySelection ?? null,
+      repositorySelected,
+      permissions,
+      missingPermissions,
+      status: "permission_missing",
+    });
+  }
+
+  return appInstallationStatusRecord(options.principal, {
+    installationAccount: options.installation.installationAccount ?? null,
+    repositorySelection: options.installation.repositorySelection ?? null,
+    repositorySelected,
+    permissions,
+    missingPermissions: {},
+    status: "installed",
+  });
+}
+
 function uncheckedHostingAccessRecords(
   hosting: NexusProjectHostingConfig,
 ): NexusProjectHostingAccessStatusRecord[] {
-  return hosting.access.map((principal) =>
+  return nonAppAccessPrincipals(hosting).map((principal) =>
     uncheckedHostingAccessRecord(principal, "unchecked"),
   );
 }
@@ -2341,6 +2552,31 @@ function uncheckedHostingAccessRecord(
     effectivePermission: null,
     pendingInvitation: null,
     invitationId: null,
+    status,
+  });
+}
+
+function uncheckedHostingAppInstallationRecords(
+  hosting: NexusProjectHostingConfig,
+): NexusProjectHostingAppInstallationStatusRecord[] {
+  return appAccessPrincipals(hosting).map((principal) =>
+    uncheckedHostingAppInstallationRecord(principal, "unchecked"),
+  );
+}
+
+function uncheckedHostingAppInstallationRecord(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+  status: Extract<
+    NexusProjectHostingAppInstallationStatus,
+    "unchecked" | "unsupported"
+  >,
+): NexusProjectHostingAppInstallationStatusRecord {
+  return appInstallationStatusRecord(principal, {
+    installationAccount: null,
+    repositorySelection: null,
+    repositorySelected: null,
+    permissions: {},
+    missingPermissions: {},
     status,
   });
 }
@@ -2366,6 +2602,88 @@ function accessStatusRecord(
     invitationId: status.invitationId,
     status: status.status,
   };
+}
+
+function appInstallationStatusRecord(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+  status: {
+    installationAccount: string | null;
+    repositorySelection: string | null;
+    repositorySelected: boolean | null;
+    permissions: Record<string, string>;
+    missingPermissions: Record<string, string>;
+    status: NexusProjectHostingAppInstallationStatus;
+  },
+): NexusProjectHostingAppInstallationStatusRecord {
+  return {
+    providerIdentity: principal.providerIdentity,
+    role: principal.role,
+    requiredPermission: principal.requiredPermission,
+    requiredProviderPermissions: requiredProviderPermissions(principal),
+    authProfile: principal.authProfile ?? null,
+    installationAccount: status.installationAccount,
+    repositorySelection: status.repositorySelection,
+    repositorySelected: status.repositorySelected,
+    permissions: status.permissions,
+    missingPermissions: status.missingPermissions,
+    status: status.status,
+  };
+}
+
+function nonAppAccessPrincipals(
+  hosting: NexusProjectHostingConfig,
+): NexusProjectHostingAccessPrincipalConfig[] {
+  return hosting.access.filter((principal) => principal.kind !== "app");
+}
+
+function appAccessPrincipals(
+  hosting: NexusProjectHostingConfig,
+): NexusProjectHostingAccessPrincipalConfig[] {
+  return hosting.access.filter((principal) => principal.kind === "app");
+}
+
+function requiredProviderPermissions(
+  principal: NexusProjectHostingAccessPrincipalConfig,
+): Record<string, string> {
+  return principal.requiredProviderPermissions ?? {};
+}
+
+function missingProviderPermissions(
+  required: Record<string, string>,
+  observed: Record<string, string>,
+): Record<string, string> {
+  const missing: Record<string, string> = {};
+  for (const [permission, level] of Object.entries(required)) {
+    const observedLevel = observed[permission];
+    if (
+      !observedLevel ||
+      providerPermissionRank(observedLevel) < providerPermissionRank(level)
+    ) {
+      missing[permission] = level;
+    }
+  }
+  return missing;
+}
+
+function providerPermissionRank(level: string): number {
+  switch (level.trim().toLowerCase()) {
+    case "none":
+      return 0;
+    case "read":
+      return 1;
+    case "write":
+      return 2;
+    case "admin":
+      return 3;
+    default:
+      return -1;
+  }
+}
+
+function providerPermissionSummary(permissions: Record<string, string>): string {
+  return Object.entries(permissions)
+    .map(([permission, level]) => `${permission}:${level}`)
+    .join(", ");
 }
 
 function permissionAllows(
@@ -2399,6 +2717,7 @@ function hostingStatusResult(options: {
   remotes: NexusProjectHostingRemoteStatusRecord[];
   authProfiles: NexusProjectHostingAuthProfileStatusRecord[];
   access: NexusProjectHostingAccessStatusRecord[];
+  appInstallations: NexusProjectHostingAppInstallationStatusRecord[];
   issues: NexusProjectHostingPreflightIssue[];
 }): NexusProjectHostingStatusResult {
   const hasBlocker = options.issues.some(
@@ -2525,6 +2844,126 @@ function accessPlanAction(options: {
     case "unchecked":
       return null;
   }
+}
+
+function appInstallationPlanAction(options: {
+  appInstallation: NexusProjectHostingAppInstallationStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+}): NexusProjectHostingPlanAction | null {
+  switch (options.appInstallation.status) {
+    case "missing":
+      return appInstallationManualPlanAction({
+        ...options,
+        kind: "install_app",
+        suffix: "install",
+        current: {
+          installed: false,
+        },
+        desired: {
+          installed: true,
+          installationAccount: options.hosting.namespace,
+        },
+        reason:
+          `Install App ${options.appInstallation.providerIdentity} on ` +
+          `${options.hosting.namespace} before using it for automation.`,
+      });
+    case "repository_missing":
+      return appInstallationManualPlanAction({
+        ...options,
+        kind: "select_app_repository",
+        suffix: "select-repository",
+        current: {
+          repositorySelected: false,
+          repositorySelection: options.appInstallation.repositorySelection,
+        },
+        desired: {
+          repositorySelected: true,
+        },
+        reason:
+          `Select repository ${options.repository?.name ?? "unknown"} in ` +
+          `the ${options.appInstallation.providerIdentity} App installation.`,
+      });
+    case "permission_missing":
+      return appInstallationManualPlanAction({
+        ...options,
+        kind: "update_app_permissions",
+        suffix: "permissions",
+        current: {
+          permissions: options.appInstallation.permissions,
+        },
+        desired: {
+          permissions: options.appInstallation.requiredProviderPermissions,
+        },
+        reason:
+          `Update App ${options.appInstallation.providerIdentity} permissions: ` +
+          providerPermissionSummary(options.appInstallation.missingPermissions),
+      });
+    case "unsupported":
+      return hostingPlanAction({
+        id: `app:${normalizePlanIdPart(
+          options.appInstallation.providerIdentity,
+        )}:unsupported`,
+        kind: "unsupported_provider_operation",
+        provider: options.hosting.provider,
+        repository: options.repository,
+        target: {
+          type: "principal",
+          kind: "app",
+          providerIdentity: options.appInstallation.providerIdentity,
+        },
+        current: {
+          status: "unsupported",
+        },
+        desired: {
+          installed: true,
+          repositorySelected: true,
+          permissions: options.appInstallation.requiredProviderPermissions,
+        },
+        mutationClass: "read_only",
+        disposition: "blocked",
+        reason:
+          `Provider ${options.hosting.provider} did not report App ` +
+          `installation state for ${options.appInstallation.providerIdentity}.`,
+        authProfile: options.appInstallation.authProfile,
+      });
+    case "installed":
+    case "unchecked":
+      return null;
+  }
+}
+
+function appInstallationManualPlanAction(options: {
+  appInstallation: NexusProjectHostingAppInstallationStatusRecord;
+  hosting: NexusProjectHostingConfig;
+  repository: NexusProjectHostingPlanActionRepository | null;
+  kind: Extract<
+    NexusProjectHostingPlanActionKind,
+    "install_app" | "select_app_repository" | "update_app_permissions"
+  >;
+  suffix: string;
+  current: Record<string, unknown>;
+  desired: Record<string, unknown>;
+  reason: string;
+}): NexusProjectHostingPlanAction {
+  return hostingPlanAction({
+    id: `app:${normalizePlanIdPart(options.appInstallation.providerIdentity)}:` +
+      options.suffix,
+    kind: options.kind,
+    provider: options.hosting.provider,
+    repository: options.repository,
+    target: {
+      type: "principal",
+      kind: "app",
+      providerIdentity: options.appInstallation.providerIdentity,
+    },
+    current: options.current,
+    desired: options.desired,
+    mutationClass: "read_only",
+    disposition: "manual",
+    reason: options.reason,
+    authProfile: options.appInstallation.authProfile,
+  });
 }
 
 function accessRepairPlanAction(options: {

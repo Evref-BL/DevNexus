@@ -2478,6 +2478,11 @@ function validateProjectHostingAccessPrincipalConfig(
   const pathName = `workspace config.hosting.access[${index}]`;
   const record = assertRecord(value, pathName);
   const authProfile = optionalString(record, "authProfile", pathName);
+  const requiredProviderPermissions = optionalStringRecord(
+    record,
+    "requiredProviderPermissions",
+    pathName,
+  );
 
   return {
     kind: validateProjectHostingAccessPrincipalKind(
@@ -2490,6 +2495,9 @@ function validateProjectHostingAccessPrincipalConfig(
       record.requiredPermission,
       `${pathName}.requiredPermission`,
     ),
+    ...(requiredProviderPermissions !== undefined
+      ? { requiredProviderPermissions }
+      : {}),
     ...(authProfile !== undefined ? { authProfile } : {}),
     invitationPolicy: validateProjectHostingInvitationPolicy(
       record.invitationPolicy,
