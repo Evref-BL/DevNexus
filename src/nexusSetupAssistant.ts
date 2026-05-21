@@ -801,7 +801,7 @@ function joinExistingProjectSteps(options: {
       title: "Install prerequisites",
       kind: "manual",
       scope: "host-local",
-      summary: "Install Git, Node.js 24 or newer, GitHub CLI, and DevNexus on this machine.",
+      summary: "Install Git, Node.js 22 or newer, GitHub CLI, and DevNexus on this machine.",
       commands: platformCommands(options.platform, {
         macos: [
           "brew install git gh node",

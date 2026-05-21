@@ -435,7 +435,6 @@ interface ParsedProjectSetupCommand {
   projectRoot?: string;
   homePath?: string;
   answersPath?: string;
-  yes?: boolean;
   dryRun?: boolean;
   json?: boolean;
 }
@@ -444,7 +443,6 @@ interface ParsedProjectComponentAddCommand {
   projectRoot: string;
   homePath?: string;
   answersPath: string;
-  yes?: boolean;
   dryRun?: boolean;
   json?: boolean;
 }
@@ -1074,6 +1072,7 @@ export function usage(): string {
     "  dev-nexus mcp-stdio",
     "  dev-nexus home init [home-path] [options]",
     "  dev-nexus workspace create <name> [options]",
+    "  dev-nexus workspace init [workspace-root] [options]",
     "  dev-nexus workspace setup [workspace-root] [options]",
     "  dev-nexus workspace component add <workspace-root> [options]",
     "  dev-nexus workspace import <source-root> [options]",
@@ -1164,18 +1163,16 @@ export function usage(): string {
     "  --tracker-project-id <id>",
     "  --json",
     "",
-    "Options for workspace setup:",
+    "Options for workspace init/setup:",
     "  --home <path>",
     "  --answers <json-file>     setup answers for non-interactive automation",
-    "  --yes                     apply local setup writes after preview validation",
-    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --dry-run                 preview only; omit to apply local setup writes",
     "  --json",
     "",
     "Options for workspace component add:",
     "  --answers <json-file>     component answers with one or more components",
     "  --home <path>",
-    "  --yes                     apply local workspace config/scaffold writes after preview validation",
-    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --dry-run                 preview only; omit to update local workspace config/scaffold",
     "  --json",
     "",
     "Options for workspace import:",
@@ -1666,10 +1663,13 @@ export function usage(): string {
 export function projectSetupUsage(): string {
   return [
     "Usage:",
+    "  dev-nexus workspace init [workspace-root] [options]",
+    "",
+    "Alias:",
     "  dev-nexus workspace setup [workspace-root] [options]",
     "",
     "User quickstart:",
-    "  dev-nexus workspace setup",
+    "  dev-nexus workspace init",
     "",
     "Run from the directory you want to use, or pass [workspace-root] for scripted setup.",
     "",
@@ -1678,8 +1678,7 @@ export function projectSetupUsage(): string {
     "Options:",
     "  --home <path>",
     "  --answers <json-file>     setup answers for non-interactive automation",
-    "  --yes                     apply local setup writes after preview validation",
-    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --dry-run                 preview only; omit to apply local setup writes",
     "  --json",
     "",
     "Provider mutations are not part of workspace setup.",
@@ -1695,8 +1694,7 @@ export function projectComponentAddUsage(): string {
     "Options:",
     "  --answers <json-file>     component answers with one or more components",
     "  --home <path>",
-    "  --yes                     apply local workspace config/scaffold writes after preview validation",
-    "  --dry-run                 preview only; default when --yes is omitted",
+    "  --dry-run                 preview only; omit to update local workspace config/scaffold",
     "  --json",
     "",
     "Provider mutations are not part of component add.",
@@ -1833,7 +1831,7 @@ async function handleProjectCommand(
     return 0;
   }
 
-  if (command === "setup") {
+  if (command === "init" || command === "setup") {
     if (argvRequestsHelp(argv)) {
       writeLine(dependencies.stdout ?? process.stdout, projectSetupUsage());
       return 0;
@@ -1851,25 +1849,25 @@ async function handleProjectCommand(
     }
 
     const proposal = previewNexusProjectSetup(answers);
-    if (parsed.yes) {
-      assertCliMutationAllowed(dependencies, {
-        projectRoot: proposal.answers.project.root,
-        command: "workspace setup",
-        mutationClass: "worktree_bootstrap",
-        targetPath: proposal.answers.project.root,
-      });
-      const result = await applyNexusProjectSetup({
-        answers,
-        ...(dependencies.projectGitRunner
-          ? { projectGitRunner: dependencies.projectGitRunner }
-          : {}),
-      });
-      printProjectSetupApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
-      return 0;
+    if (parsed.dryRun) {
+      printProjectSetupPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
+      return proposal.status === "ready" ? 0 : 2;
     }
 
-    printProjectSetupPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
-    return proposal.status === "ready" ? 0 : 2;
+    assertCliMutationAllowed(dependencies, {
+      projectRoot: proposal.answers.project.root,
+      command: command === "init" ? "workspace init" : "workspace setup",
+      mutationClass: "worktree_bootstrap",
+      targetPath: proposal.answers.project.root,
+    });
+    const result = await applyNexusProjectSetup({
+      answers,
+      ...(dependencies.projectGitRunner
+        ? { projectGitRunner: dependencies.projectGitRunner }
+        : {}),
+    });
+    printProjectSetupApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
+    return 0;
   }
 
   if (command === "component") {
@@ -1930,7 +1928,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("workspace requires create, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
+  throw new Error("workspace requires create, init, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -1953,24 +1951,24 @@ async function handleProjectComponentCommand(
     projectRoot: parsed.projectRoot,
     answers,
   });
-  if (parsed.yes) {
-    assertCliMutationAllowed(dependencies, {
-      projectRoot: parsed.projectRoot,
-      command: "workspace component add",
-      mutationClass: "project_state",
-      targetPath: parsed.projectRoot,
-    });
-    const result = await applyNexusProjectComponentAdd({
-      projectRoot: parsed.projectRoot,
-      answers,
-      ...(parsed.homePath ? { homePath: resolvedCommandHomePath(parsed.homePath) } : {}),
-    });
-    printProjectComponentAddApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
-    return 0;
+  if (parsed.dryRun) {
+    printProjectComponentAddPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
+    return proposal.status === "ready" ? 0 : 2;
   }
 
-  printProjectComponentAddPreviewResult(proposal, parsed, dependencies.stdout ?? process.stdout);
-  return proposal.status === "ready" ? 0 : 2;
+  assertCliMutationAllowed(dependencies, {
+    projectRoot: parsed.projectRoot,
+    command: "workspace component add",
+    mutationClass: "project_state",
+    targetPath: parsed.projectRoot,
+  });
+  const result = await applyNexusProjectComponentAdd({
+    projectRoot: parsed.projectRoot,
+    answers,
+    ...(parsed.homePath ? { homePath: resolvedCommandHomePath(parsed.homePath) } : {}),
+  });
+  printProjectComponentAddApplyResult(result, parsed, dependencies.stdout ?? process.stdout);
+  return 0;
 }
 
 async function handleProjectHostingCommand(
@@ -4244,9 +4242,6 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
       case "--answers":
         parsed.answersPath = next();
         break;
-      case "--yes":
-        parsed.yes = true;
-        break;
       case "--dry-run":
         parsed.dryRun = true;
         break;
@@ -4256,10 +4251,6 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
       default:
         throw new Error(`Unknown workspace setup option: ${arg}`);
     }
-  }
-
-  if (parsed.yes && parsed.dryRun) {
-    throw new Error("workspace setup --yes and --dry-run are mutually exclusive");
   }
 
   return parsed;
@@ -4291,9 +4282,6 @@ function parseProjectComponentAddCommand(argv: string[]): ParsedProjectComponent
       case "--home":
         parsed.homePath = next();
         break;
-      case "--yes":
-        parsed.yes = true;
-        break;
       case "--dry-run":
         parsed.dryRun = true;
         break;
@@ -4311,10 +4299,6 @@ function parseProjectComponentAddCommand(argv: string[]): ParsedProjectComponent
   if (!parsed.answersPath) {
     throw new Error("workspace component add requires --answers <json-file>");
   }
-  if (parsed.yes && parsed.dryRun) {
-    throw new Error("workspace component add --yes and --dry-run are mutually exclusive");
-  }
-
   return parsed as ParsedProjectComponentAddCommand;
 }
 
@@ -7886,7 +7870,7 @@ function printProjectSetupPreviewResult(
     applied: false,
     proposal,
     nextAction: proposal.status === "ready"
-      ? "Review the preview, then rerun with --yes to apply local setup writes."
+      ? "Review the preview, then rerun without --dry-run to apply local setup writes."
       : "Fix the reported setup diagnostics before applying.",
   };
   if (parsed.json) {
@@ -7921,7 +7905,7 @@ function printProjectSetupApplyResult(
     return;
   }
 
-  writeLine(stdout, "DevNexus workspace setup applied.");
+  writeLine(stdout, "DevNexus workspace initialized.");
   writeLine(stdout, `  Root: ${result.projectRoot}`);
   writeLine(stdout, `  Config: ${result.projectConfigPath}`);
   writeLine(stdout, `  Worktrees: ${result.worktreesRoot}`);
@@ -7940,7 +7924,7 @@ function printProjectComponentAddPreviewResult(
     applied: false,
     proposal,
     nextAction: proposal.status === "ready"
-      ? "Review the component topology preview, then rerun with --yes to update the project."
+      ? "Review the component topology preview, then rerun without --dry-run to update the project."
       : "Fix the reported component topology diagnostics before applying.",
   };
   if (parsed.json) {

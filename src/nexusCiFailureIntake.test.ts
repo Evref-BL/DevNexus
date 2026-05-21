@@ -15,9 +15,9 @@ const policy: NexusCiFailureIntakePolicy = {
   allowed: {
     repositories: [{ owner: "Evref-BL", name: "DevNexus" }],
     branches: ["main", "codex/dev-nexus/local-166-ci-failure-intake"],
-    workflows: ["Node 24 check"],
+    workflows: ["Node 22 check"],
     events: ["pull_request", "workflow_run"],
-    checkNames: ["Node 24 check (ubuntu-latest)"],
+    checkNames: ["Node 22 check (ubuntu-latest)"],
   },
   workItem: {
     componentId: "dev-nexus",
@@ -43,9 +43,9 @@ const failure: NexusCiFailureReplay = {
   event: "pull_request",
   runId: "26130000000",
   runUrl: "https://github.com/Evref-BL/DevNexus/actions/runs/26130000000",
-  workflowName: "Node 24 check",
-  checkName: "Node 24 check (ubuntu-latest)",
-  jobName: "Node 24 check (ubuntu-latest)",
+  workflowName: "Node 22 check",
+  checkName: "Node 22 check (ubuntu-latest)",
+  jobName: "Node 22 check (ubuntu-latest)",
   headSha: "abcdef1234567890",
   headBranch: "codex/dev-nexus/local-166-ci-failure-intake",
   conclusion: "failure",
@@ -74,7 +74,7 @@ describe("CI failure intake planning", () => {
       trackerId: "local",
       status: "ready",
       title:
-        "CI failure: Node 24 check / Node 24 check (ubuntu-latest) on codex/dev-nexus/local-166-ci-failure-intake",
+        "CI failure: Node 22 check / Node 22 check (ubuntu-latest) on codex/dev-nexus/local-166-ci-failure-intake",
       labels: expect.arrayContaining([
         "dogfood",
         "ci",
@@ -84,7 +84,7 @@ describe("CI failure intake planning", () => {
       ]),
     });
     expect(plan.action.workItem?.description).toContain(
-      "CI-Failure-Dedupe-Key: github-actions:Evref-BL/DevNexus:abcdef1234567890:Node 24 check:Node 24 check (ubuntu-latest)",
+      "CI-Failure-Dedupe-Key: github-actions:Evref-BL/DevNexus:abcdef1234567890:Node 22 check:Node 22 check (ubuntu-latest)",
     );
     expect(plan.action.workItem?.description).toContain(
       "Run: https://github.com/Evref-BL/DevNexus/actions/runs/26130000000",

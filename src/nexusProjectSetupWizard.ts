@@ -346,7 +346,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
 
 export function renderNexusProjectSetupRequiredAnswers(): string {
   return [
-    "workspace setup requires --answers <json-file> in non-interactive mode.",
+    "workspace init/setup requires --answers <json-file> in non-interactive mode.",
     "Required answer paths:",
     ...nexusProjectSetupRequiredAnswerPaths.map((answer) => `- ${answer}`),
   ].join("\n");
@@ -394,7 +394,9 @@ async function promptForNexusProjectSetupAnswers(options: {
     options.stdout.write(
       [
         "DevNexus user quickstart",
-        "Answer the workspace and primary component prompts. Add more components when the first workspace has more than one source folder. DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
+        "Answer the workspace and component prompts.",
+        "Press Enter on a component source path to create it under components/<id>, or type an existing path to reference it.",
+        "DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
     );
@@ -411,17 +413,14 @@ async function promptForNexusProjectSetupAnswers(options: {
     const componentPath = await askWithDefault(
       rl,
       "Primary component source path",
-      ".",
+      path.join("components", componentId),
     );
     const components: NexusProjectSetupAnswers["components"] = [
       {
         id: componentId,
         name: componentId,
         role: "primary",
-        source: {
-          kind: "reference_existing",
-          path: componentPath,
-        },
+        source: wizardComponentSource(projectRoot, componentPath),
       },
     ];
 
@@ -441,10 +440,7 @@ async function promptForNexusProjectSetupAnswers(options: {
         id: additionalComponentId,
         name: additionalComponentId,
         role,
-        source: {
-          kind: "reference_existing",
-          path: additionalComponentPath,
-        },
+        source: wizardComponentSource(projectRoot, additionalComponentPath),
       });
     }
 
@@ -478,6 +474,33 @@ async function promptForNexusProjectSetupAnswers(options: {
   } finally {
     rl.close();
   }
+}
+
+function wizardComponentSource(
+  projectRoot: string,
+  sourcePath: string,
+): NexusProjectSetupAnswers["components"][number]["source"] {
+  const resolvedPath = path.isAbsolute(sourcePath)
+    ? path.resolve(sourcePath)
+    : path.resolve(projectRoot, sourcePath);
+  if (fs.existsSync(resolvedPath) || !isSameOrInsidePath(projectRoot, resolvedPath)) {
+    return {
+      kind: "reference_existing",
+      path: sourcePath,
+    };
+  }
+
+  return {
+    kind: "create_local",
+    path: sourcePath,
+    initializeGit: true,
+  };
+}
+
+function isSameOrInsidePath(parentPath: string, childPath: string): boolean {
+  const relativePath = path.relative(path.resolve(parentPath), path.resolve(childPath));
+  return relativePath === "" ||
+    (!!relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
 async function askAdditionalComponentRole(

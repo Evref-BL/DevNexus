@@ -33,10 +33,10 @@ workspaces and separate workspace state.
 ## Interactive Setup
 
 For a user in a terminal, create or choose the DevNexus workspace directory, then
-run setup from that directory:
+run init from that directory:
 
 ```bash
-dev-nexus workspace setup
+dev-nexus workspace init
 ```
 
 Use the existing folder paths as component source roots when prompted. Pick one
@@ -126,13 +126,13 @@ Agents and repeatable setup flows can use an answer file.
 Preview local writes:
 
 ```bash
-dev-nexus workspace setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --json
+dev-nexus workspace init "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --dry-run --json
 ```
 
 Apply the local setup:
 
 ```bash
-dev-nexus workspace setup "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --yes
+dev-nexus workspace init "/Users/alice/dev-nexus/rocket-shop-suite" --answers ./rocket-shop.setup.json --json
 ```
 
 ## Workspace-Local Components

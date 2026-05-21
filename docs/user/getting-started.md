@@ -8,7 +8,7 @@ Read [Concepts](concepts.md) when a term is unfamiliar.
 
 ## Requirements
 
-- Node.js 24 or newer.
+- Node.js 22 or newer.
 - Git, if any component is a Git repository.
 - An agent you plan to use, such as Codex or Claude.
 
@@ -36,15 +36,17 @@ node /path/to/dev-nexus/dist/cli.js diagnostics cli-version-skew --installed-com
 ## Create The First Workspace
 
 Create or choose the directory you want to use as the DevNexus workspace root.
-From that directory, start the guided setup command:
+From that directory, start the guided init command:
 
 ```bash
-dev-nexus workspace setup
+dev-nexus workspace init
 ```
 
-For a user in a terminal, setup asks the minimum first-workspace questions. The
+For a user in a terminal, init asks the minimum first-workspace questions. The
 DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
 one.
+Press Enter for a component source path to create it under `components/<id>`, or
+type an existing path to reference it.
 
 Setup creates or updates:
 
@@ -64,7 +66,7 @@ packages are explicit later steps.
 Open the DevNexus workspace root in the agent:
 
 ```text
-the directory where you ran dev-nexus workspace setup
+the directory where you ran dev-nexus workspace init
 ```
 
 Do not open a component repository when you expect DevNexus tools and generated
@@ -115,8 +117,8 @@ After the first setup, add components with the component-add flow instead of
 manual JSON editing:
 
 ```bash
+dev-nexus workspace component add <workspace-root> --answers ./component-add.json --dry-run --json
 dev-nexus workspace component add <workspace-root> --answers ./component-add.json --json
-dev-nexus workspace component add <workspace-root> --answers ./component-add.json --yes
 ```
 
 The preview reports common topology mistakes before writing. It checks for
@@ -164,8 +166,8 @@ Answer files are useful for agents, CI, repeatable onboarding, and documented
 examples:
 
 ```bash
-dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --json
-dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --yes
+dev-nexus workspace init <workspace-root> --answers ./dev-nexus.setup.json --dry-run --json
+dev-nexus workspace init <workspace-root> --answers ./dev-nexus.setup.json --json
 ```
 
 The preview command prints planned local writes. The apply command writes local
@@ -179,7 +181,8 @@ environment-variable name, or token store id. See
 
 ## Low-Level Commands
 
-`workspace setup` is the first-workspace command.
+`workspace init` is the first-workspace command. `workspace setup` is an alias
+for the same local setup flow.
 
 Use `workspace create` only when you want a low-level local scaffold. Use
 `workspace import <source-root>` only when one existing source checkout should

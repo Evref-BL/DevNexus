@@ -103,7 +103,7 @@ protected target validation.
               "api"
             ],
             "checkNames": [
-              "Node 24 check"
+              "Node 22 check"
             ]
           }
         ],
@@ -135,9 +135,9 @@ protected target validation.
         "directTargetPush": "blocked",
         "mergeAuthority": "authorized_merge",
         "requiredChecks": [
-          "Node 24 check (ubuntu-latest)",
-          "Node 24 check (windows-latest)",
-          "Node 24 check (macos-latest)"
+          "Node 22 check (ubuntu-latest)",
+          "Node 22 check (windows-latest)",
+          "Node 22 check (macos-latest)"
         ],
         "staleChecks": "block"
       },

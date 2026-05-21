@@ -17,9 +17,9 @@ import type { NexusPublicationProviderEvidenceInput } from "./nexusPublicationPr
 const tempDirs: string[] = [];
 const now = "2026-05-21T11:30:00.000Z";
 const nodeChecks = [
-  "Node 24 check (ubuntu-latest)",
-  "Node 24 check (windows-latest)",
-  "Node 24 check (macos-latest)",
+  "Node 22 check (ubuntu-latest)",
+  "Node 22 check (windows-latest)",
+  "Node 22 check (macos-latest)",
 ];
 const mergeGroupTrigger: NexusMergeQueueWorkflowTriggerInput[] = [
   {
