@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
+import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
 import type { NexusPublicationActorConfig } from "./nexusAutomationConfig.js";
 import type { NexusPublicationProviderEvidenceInput } from "./nexusPublicationProviderEvidence.js";
 import type { NexusResolvedProviderCredential } from "./nexusProviderCredentialBroker.js";
@@ -88,6 +89,21 @@ export interface NexusForgePublicationCommandResult {
   stdout: string;
   stderr: string;
   error?: Error;
+}
+
+export type NexusForgePublicationOperationArgument =
+  | string
+  | number
+  | boolean
+  | null;
+
+export interface NexusForgePublicationOperationPlan {
+  provider: string;
+  repository: string;
+  capability: NexusForgePublicationCapability;
+  backendPreference: NexusForgePublicationBackendPreference;
+  command: string | null;
+  arguments: Record<string, NexusForgePublicationOperationArgument>;
 }
 
 export type NexusForgePublicationCommandRunner = (
@@ -252,6 +268,28 @@ export function selectNexusForgePublicationBackend(options: {
   }
 
   return "github_cli";
+}
+
+export function buildNexusForgePublicationOperationPlan(options: {
+  repository: NexusForgeRepositoryRef;
+  capability: NexusForgePublicationCapability;
+  backendPreference?: NexusForgePublicationBackendPreference;
+  arguments?: Record<string, NexusForgePublicationOperationArgument>;
+  cliArgs?: string[];
+}): NexusForgePublicationOperationPlan {
+  const provider = normalizeProvider(options.repository.provider);
+  const backendPreference = options.backendPreference ?? "auto";
+  return {
+    provider,
+    repository: `${options.repository.owner}/${options.repository.name}`,
+    capability: options.capability,
+    backendPreference,
+    command:
+      provider === "github" && options.cliArgs
+        ? forgePublicationCommand(["gh", ...options.cliArgs])
+        : null,
+    arguments: { ...(options.arguments ?? {}) },
+  };
 }
 
 class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
@@ -891,6 +929,10 @@ function parseJsonArray<T>(value: string, label: string): T[] {
     "invalid_provider_response",
     `${label} response was not a JSON array.`,
   );
+}
+
+function forgePublicationCommand(args: string[]): string {
+  return args.map(shellQuoteArgument).join(" ");
 }
 
 function stringField(record: Record<string, unknown>, key: string): string | null {

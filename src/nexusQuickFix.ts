@@ -16,6 +16,13 @@ import type {
   NexusAutomationPublicationConfig,
 } from "./nexusAutomationConfig.js";
 import { safeDirectoryName } from "./gitWorktreeService.js";
+import {
+  buildNexusForgePublicationOperationPlan,
+  type NexusForgePublicationCapability,
+  type NexusForgePublicationOperationArgument,
+  type NexusForgePublicationOperationPlan,
+  type NexusForgeRepositoryRef,
+} from "./nexusForgePublication.js";
 
 export interface NexusQuickFixPlanOptions {
   projectRoot: string;
@@ -32,6 +39,7 @@ export interface NexusQuickFixCommandStep {
   id: string;
   title: string;
   command: string;
+  operation?: NexusForgePublicationOperationPlan | null;
   environment: Record<string, string>;
   note: string | null;
 }
@@ -82,6 +90,7 @@ export function buildNexusQuickFixPlan(
   const component = resolveQuickFixComponent(projectRoot, projectConfig, options);
   const tracker = githubTracker(component);
   const repository = githubRepository(tracker);
+  const forgeRepository = githubForgeRepository(repository);
   const issueNumber = issueNumberFromWorkItemId(options.workItemId);
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
   const topic = options.topic?.trim() || `quick-fix-${options.workItemId}`;
@@ -95,6 +104,98 @@ export function buildNexusQuickFixPlan(
   const commandEnvironment = { ...publication.commandEnvironment };
   const targetBranch = publication.targetBranch ?? component.defaultBranch ?? "main";
   const repoArg = `${repository.owner}/${repository.name}`;
+  const actorKind = publication.actor?.kind === "app" ? "app" : "user";
+  const actorVerify = quickFixForgeOperation({
+    repository: forgeRepository,
+    capability: "actor.verify",
+    args: {
+      actorKind,
+      expected: publication.actor?.handle ?? null,
+    },
+    cliArgs: [
+      "api",
+      actorKind === "app" ? "app" : "user",
+      "--jq",
+      actorKind === "app" ? ".slug" : ".login",
+      "--hostname",
+      repository.host ?? "github.com",
+    ],
+  });
+  const openPullRequest = quickFixForgeOperation({
+    repository: forgeRepository,
+    capability: "pull_request.upsert",
+    args: {
+      head: branchName,
+      base: targetBranch,
+      title: `<issue ${issueNumber} title>`,
+      body: `<summary, verification, closes #${issueNumber}>`,
+    },
+    cliArgs: [
+      "pr",
+      "create",
+      "--repo",
+      repoArg,
+      "--head",
+      branchName,
+      "--base",
+      targetBranch,
+      "--title",
+      `<issue ${issueNumber} title>`,
+      "--body",
+      `<summary, verification, closes #${issueNumber}>`,
+    ],
+  });
+  const waitChecks = quickFixForgeOperation({
+    repository: forgeRepository,
+    capability: "pull_request.checks",
+    args: {
+      number: "<pr-number>",
+      watch: true,
+    },
+    cliArgs: [
+      "pr",
+      "checks",
+      "<pr-number>",
+      "--repo",
+      repoArg,
+      "--watch",
+    ],
+  });
+  const mergePullRequest = quickFixForgeOperation({
+    repository: forgeRepository,
+    capability: "pull_request.merge",
+    args: {
+      number: "<pr-number>",
+      method: "merge",
+      deleteBranch: true,
+    },
+    cliArgs: [
+      "pr",
+      "merge",
+      "<pr-number>",
+      "--repo",
+      repoArg,
+      "--merge",
+      "--delete-branch",
+    ],
+  });
+  const closeIssue = quickFixForgeOperation({
+    repository: forgeRepository,
+    capability: "issue.close",
+    args: {
+      number: issueNumber,
+      comment: "<merged PR, commit, verification, cleanup summary>",
+    },
+    cliArgs: [
+      "issue",
+      "close",
+      String(issueNumber),
+      "--repo",
+      repoArg,
+      "--comment",
+      `<merged PR, commit, verification, cleanup summary>`,
+    ],
+  });
   const worktreeCommand = quickFixCommand([
     "dev-nexus",
     "worktree",
@@ -155,21 +256,17 @@ export function buildNexusQuickFixPlan(
     startSteps: [
       {
         id: "validate-bot-identity",
-        title: "Validate automation GitHub identity",
-        command: quickFixCommand([
-          "gh",
-          "auth",
-          "status",
-          "--hostname",
-          repository.host ?? "github.com",
-        ]),
+        title: "Validate automation forge actor",
+        command: actorVerify.command ?? "",
+        operation: actorVerify,
         environment: commandEnvironment,
-        note: "Run before provider writes so quick fixes do not fall back to a human account.",
+        note: "Run before provider writes so quick fixes do not fall back to an unintended actor.",
       },
       {
         id: "prepare-worktree",
         title: "Prepare isolated source worktree",
         command: worktreeCommand,
+        operation: null,
         environment: {},
         note: "Use the prepared worktree for source and Git commands.",
       },
@@ -188,6 +285,7 @@ export function buildNexusQuickFixPlan(
           "--add-label",
           "status:in_progress",
         ]),
+        operation: null,
         environment: commandEnvironment,
         note: "Skip when the issue is already claimed.",
       },
@@ -209,58 +307,31 @@ export function buildNexusQuickFixPlan(
           publication.remote ?? "bot",
           branchName,
         ]),
+        operation: null,
         environment: commandEnvironment,
         note: "Use the automation remote from publication policy.",
       },
       {
         id: "open-pr",
         title: "Open or update the pull request",
-        command: quickFixCommand([
-          "gh",
-          "pr",
-          "create",
-          "--repo",
-          repoArg,
-          "--head",
-          branchName,
-          "--base",
-          targetBranch,
-          "--title",
-          `<issue ${issueNumber} title>`,
-          "--body",
-          `<summary, verification, closes #${issueNumber}>`,
-        ]),
+        command: openPullRequest.command ?? "",
+        operation: openPullRequest,
         environment: commandEnvironment,
-        note: "Use gh pr edit instead when a PR already exists.",
+        note: "Use the facade update operation instead when a PR already exists.",
       },
       {
         id: "wait-required-checks",
         title: "Wait for required green-main checks",
-        command: quickFixCommand([
-          "gh",
-          "pr",
-          "checks",
-          "<pr-number>",
-          "--repo",
-          repoArg,
-          "--watch",
-        ]),
+        command: waitChecks.command ?? "",
+        operation: waitChecks,
         environment: commandEnvironment,
         note: requiredChecksNote(publication.greenMain?.requiredChecks ?? []),
       },
       {
         id: "merge-pr",
         title: "Merge after checks are green",
-        command: quickFixCommand([
-          "gh",
-          "pr",
-          "merge",
-          "<pr-number>",
-          "--repo",
-          repoArg,
-          "--merge",
-          "--delete-branch",
-        ]),
+        command: mergePullRequest.command ?? "",
+        operation: mergePullRequest,
         environment: commandEnvironment,
         note: "Only run when required checks are passing and publication authority allows merge.",
       },
@@ -274,22 +345,15 @@ export function buildNexusQuickFixPlan(
           "origin",
           targetBranch,
         ]),
+        operation: null,
         environment: {},
         note: `Run from ${component.sourceRoot}.`,
       },
       {
         id: "close-issue",
         title: "Close the provider-native issue",
-        command: quickFixCommand([
-          "gh",
-          "issue",
-          "close",
-          String(issueNumber),
-          "--repo",
-          repoArg,
-          "--comment",
-          `<merged PR, commit, verification, cleanup summary>`,
-        ]),
+        command: closeIssue.command ?? "",
+        operation: closeIssue,
         environment: commandEnvironment,
         note: "Remove status:in_progress or add a done label if the tracker uses one.",
       },
@@ -304,6 +368,7 @@ export function buildNexusQuickFixPlan(
           "--component",
           component.id,
         ]),
+        operation: null,
         environment: {},
         note: "Use the cleanup plan before deleting anything ambiguous.",
       },
@@ -385,6 +450,17 @@ function githubRepository(tracker: ResolvedNexusProjectWorkTracker): {
   };
 }
 
+function githubForgeRepository(
+  repository: ReturnType<typeof githubRepository>,
+): NexusForgeRepositoryRef {
+  return {
+    provider: "github",
+    owner: repository.owner,
+    name: repository.name,
+    host: repository.host,
+  };
+}
+
 function issueNumberFromWorkItemId(workItemId: string): number {
   const match = /(?:^|[-#])(\d+)$/.exec(workItemId.trim());
   if (!match) {
@@ -398,6 +474,21 @@ function issueNumberFromWorkItemId(workItemId: string): number {
 
 function quickFixCommand(args: string[]): string {
   return args.map(shellQuoteArgument).join(" ");
+}
+
+function quickFixForgeOperation(options: {
+  repository: NexusForgeRepositoryRef;
+  capability: NexusForgePublicationCapability;
+  args: Record<string, NexusForgePublicationOperationArgument>;
+  cliArgs: string[];
+}): NexusForgePublicationOperationPlan {
+  return buildNexusForgePublicationOperationPlan({
+    repository: options.repository,
+    capability: options.capability,
+    backendPreference: "auto",
+    arguments: options.args,
+    cliArgs: options.cliArgs,
+  });
 }
 
 function required(value: string | undefined, name: string): string {
@@ -422,9 +513,6 @@ function quickFixWarnings(
   const warnings: string[] = [];
   if (!publication.remote) {
     warnings.push("Publication policy does not name an automation remote.");
-  }
-  if (!publication.commandEnvironment.GH_CONFIG_DIR) {
-    warnings.push("Publication policy does not set GH_CONFIG_DIR.");
   }
   if (publication.strategy === "local_only") {
     warnings.push("Publication policy is local_only; PR publication is blocked.");

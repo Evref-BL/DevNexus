@@ -681,7 +681,7 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("DevNexus quick-fix plan.");
     expect(output.output()).toContain("Issue: example/demo#50 (github-50)");
-    expect(output.output()).toContain("Validate automation GitHub identity");
+    expect(output.output()).toContain("Validate automation forge actor");
     expect(output.output()).toContain("worktree prepare");
     expect(output.output()).toContain("Skipped bookkeeping:");
 
