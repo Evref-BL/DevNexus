@@ -30,6 +30,8 @@ import {
   planNexusProjectHosting,
   statusNexusProjectHostingLocal,
   type NexusHostingAuthProfileConfig,
+  type NexusProjectHostingAccessPrincipalConfig,
+  type NexusProjectHostingExpectedRemote,
   type NexusProjectHostingPlanResult,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
@@ -493,10 +495,15 @@ function sharedHostRegistryHostLocalDetailsCheck(
 }
 
 interface MetaProjectRemotePlan {
+  humanRemoteName: string;
   humanRemote: string;
+  automationRemoteName: string;
   botRemote: string;
+  automationAuthProfileId: string | null;
   automationAuthProfileDirectory: string;
   automationSshHost: string;
+  automationAuthKind: "github_app" | "provider_cli";
+  automationProviderIdentity: string | null;
 }
 
 interface MetaProjectHostingGuide {
@@ -526,26 +533,60 @@ function metaProjectRemotePlan(
       remotes.find((remote) => remote.role === "automation") ??
       remotes.find((remote) => remote.name === "bot") ??
       humanRemote;
+    const automationPrincipal = automationPrincipalForRemote(
+      projectConfig,
+      botRemote,
+    );
+    const automationAuthKind =
+      automationPrincipal?.kind === "app" ? "github_app" : "provider_cli";
 
     return {
+      humanRemoteName: humanRemote.name,
       humanRemote: humanRemote.url,
+      automationRemoteName: botRemote.name,
       botRemote: botRemote.url,
+      automationAuthProfileId: botRemote.authProfile,
       automationAuthProfileDirectory: authProfileConfigDirectory(
         botRemote.authProfile,
       ),
       automationSshHost:
         sshHostFromGitRemote(botRemote.url) ?? "<automation-ssh-host>",
+      automationAuthKind,
+      automationProviderIdentity: automationPrincipal?.providerIdentity ?? null,
     };
   }
 
   const metaRemote = projectConfig.repo.remoteUrl ?? "<workspace-repository-url>";
   const botRemote = metaRemote;
   return {
+    humanRemoteName: "origin",
     humanRemote: humanRemoteFromAutomationRemote(metaRemote),
+    automationRemoteName: "bot",
     botRemote,
+    automationAuthProfileId: null,
     automationAuthProfileDirectory: authProfileConfigDirectory(null),
     automationSshHost: sshHostFromGitRemote(botRemote) ?? "<automation-ssh-host>",
+    automationAuthKind: "provider_cli",
+    automationProviderIdentity: null,
   };
+}
+
+function automationPrincipalForRemote(
+  projectConfig: NexusProjectConfig,
+  remote: NexusProjectHostingExpectedRemote,
+): NexusProjectHostingAccessPrincipalConfig | null {
+  const access = projectConfig.hosting?.access ?? [];
+  if (remote.authProfile) {
+    return access.find((principal) =>
+      principal.role === "automation" &&
+      principal.authProfile === remote.authProfile
+    ) ?? null;
+  }
+
+  return access.find((principal) =>
+    principal.role === "automation" &&
+    principal.kind === "app"
+  ) ?? null;
 }
 
 function metaProjectHostingGuide(
@@ -595,6 +636,118 @@ function sshHostFromGitRemote(remoteUrl: string): string | null {
   return match?.[1] ?? null;
 }
 
+function automationAuthProfileSummary(plan: MetaProjectRemotePlan): string {
+  if (plan.automationAuthKind === "github_app") {
+    return "Configure the host-local GitHub App profile used for automation.";
+  }
+
+  return "Create or verify the isolated GitHub CLI and SSH profile used by the automation actor.";
+}
+
+function automationAuthProfileCommands(
+  plan: MetaProjectRemotePlan,
+  platform: NexusSetupPlatform,
+  setupCheckFlowId: NexusSetupFlowId,
+): string[] {
+  if (plan.automationAuthKind === "github_app") {
+    const appDirectory = plan.automationAuthProfileId ??
+      plan.automationProviderIdentity ??
+      "github-app";
+    return [
+      ...platformCommands(platform, {
+        macos: [
+          `mkdir -p "$HOME/.dev-nexus/secrets/github-apps/${appDirectory}"`,
+        ],
+        windows: [
+          `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.dev-nexus\\secrets\\github-apps\\${appDirectory}"`,
+        ],
+        linux: [
+          `mkdir -p "$HOME/.dev-nexus/secrets/github-apps/${appDirectory}"`,
+        ],
+      }),
+      `dev-nexus setup check . ${setupCheckFlowId} --json`,
+    ];
+  }
+
+  return platformCommands(platform, {
+    macos: [
+      `mkdir -p "$HOME/.config/${plan.automationAuthProfileDirectory}" "$HOME/.ssh"`,
+      `GH_CONFIG_DIR="$HOME/.config/${plan.automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+      `ssh -T git@${plan.automationSshHost}`,
+    ],
+    windows: [
+      `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.config\\${plan.automationAuthProfileDirectory}"`,
+      `$env:GH_CONFIG_DIR="$env:USERPROFILE\\.config\\${plan.automationAuthProfileDirectory}"; gh auth login --hostname github.com --git-protocol ssh --web`,
+      `ssh -T git@${plan.automationSshHost}`,
+    ],
+    linux: [
+      `mkdir -p "$HOME/.config/${plan.automationAuthProfileDirectory}" "$HOME/.ssh"`,
+      `GH_CONFIG_DIR="$HOME/.config/${plan.automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
+      `ssh -T git@${plan.automationSshHost}`,
+    ],
+  });
+}
+
+function automationAuthProfileInstructions(
+  plan: MetaProjectRemotePlan,
+): string[] {
+  if (plan.automationAuthKind === "github_app") {
+    return [
+      "Create or reuse the GitHub App manually, then install it on the organization or account that owns the repositories.",
+      "Store the downloaded private key under DevNexus home or another host-local secret store, not in the shared workspace repository.",
+      "Add a DevNexus home auth profile with kind=app, credentialKind=github_app, appId or clientId, privateKeyPath, installationAccount, selected repositories, and intended purposes.",
+      "Keep issued installation tokens out of config; DevNexus should mint short-lived tokens through the provider facade when an operation needs them.",
+      "GitHub CLI can still be used for human actions or as an adapter backend, but the workspace should depend on the DevNexus auth profile id.",
+    ];
+  }
+
+  return [
+    "Keep bot/app tokens and private keys host-local; do not commit them to the workspace repository.",
+    "If using an SSH host alias, configure it in ~/.ssh/config before validating the bot remote.",
+  ];
+}
+
+function automationAuthProfileChecks(
+  plan: MetaProjectRemotePlan,
+  setupCheckFlowId: NexusSetupFlowId,
+): string[] {
+  if (plan.automationAuthKind === "github_app") {
+    return [
+      `dev-nexus setup check . ${setupCheckFlowId} --json`,
+      "dev-nexus workspace hosting status . --json",
+    ];
+  }
+
+  return [
+    `GH_CONFIG_DIR="$HOME/.config/${plan.automationAuthProfileDirectory}" gh auth status --hostname github.com`,
+    `ssh -T git@${plan.automationSshHost}`,
+    `git ls-remote ${plan.botRemote} HEAD`,
+  ];
+}
+
+function remoteSetCommand(name: string, url: string): string {
+  return `git remote get-url ${name} >/dev/null 2>&1 && git remote set-url ${name} ${url} || git remote add ${name} ${url}`;
+}
+
+function automationRemoteFetchCommands(plan: MetaProjectRemotePlan): string[] {
+  if (plan.automationAuthKind === "github_app") {
+    return ["dev-nexus workspace hosting status . --json"];
+  }
+
+  return [`git fetch ${plan.automationRemoteName}`];
+}
+
+function automationRemoteCheckCommands(plan: MetaProjectRemotePlan): string[] {
+  if (plan.automationAuthKind === "github_app") {
+    return [
+      `git remote get-url ${plan.automationRemoteName}`,
+      "dev-nexus workspace hosting status . --json",
+    ];
+  }
+
+  return [`git fetch --dry-run ${plan.automationRemoteName}`];
+}
+
 function parseGitHubRemote(
   remoteUrl: string,
 ): { namespace: string; repository: string } | null {
@@ -631,12 +784,8 @@ function joinExistingProjectSteps(options: {
   projectConfig: NexusProjectConfig;
   platform: NexusSetupPlatform;
 }): NexusSetupStep[] {
-  const {
-    humanRemote,
-    botRemote,
-    automationAuthProfileDirectory,
-    automationSshHost,
-  } = metaProjectRemotePlan(options.projectConfig);
+  const remotePlan = metaProjectRemotePlan(options.projectConfig);
+  const { humanRemote, botRemote } = remotePlan;
   const devNexusCommand = "dev-nexus";
   const projectRootForPlatform = planProjectRootPath(
     options.projectConfig,
@@ -718,49 +867,36 @@ function joinExistingProjectSteps(options: {
       title: "Configure automation auth profile",
       kind: "manual",
       scope: "host-local",
-      summary: "Create or verify the isolated GitHub CLI and SSH profile used by the bot or app actor.",
-      commands: platformCommands(options.platform, {
-        macos: [
-          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
-          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-        windows: [
-          `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"`,
-          `$env:GH_CONFIG_DIR="$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"; gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-        linux: [
-          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
-          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-      }),
-      manualInstructions: [
-        "Keep bot/app tokens and private keys host-local; do not commit them to the workspace repository.",
-        "If using an SSH host alias, configure it in ~/.ssh/config before validating the bot remote.",
-      ],
-      checks: [
-        `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth status --hostname github.com`,
-        `git ls-remote ${botRemote} HEAD`,
-      ],
+      summary: automationAuthProfileSummary(remotePlan),
+      commands: automationAuthProfileCommands(
+        remotePlan,
+        options.platform,
+        "join-existing-project",
+      ),
+      manualInstructions: automationAuthProfileInstructions(remotePlan),
+      checks: automationAuthProfileChecks(remotePlan, "join-existing-project"),
     },
     {
       id: "configure-workspace-remotes",
       title: "Configure workspace repository remotes",
       kind: "automated",
       scope: "host-local",
-      summary: "Set origin for human work and bot for automation publication.",
+      summary: "Set the human and automation remotes for workspace publication.",
       commands: [
-        `git remote set-url origin ${humanRemote}`,
-        `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
-        "git fetch origin",
-        "git fetch bot",
+        `git remote set-url ${remotePlan.humanRemoteName} ${humanRemote}`,
+        remoteSetCommand(remotePlan.automationRemoteName, botRemote),
+        `git fetch ${remotePlan.humanRemoteName}`,
+        ...automationRemoteFetchCommands(remotePlan),
       ],
       manualInstructions: [
-        "Run these from the DevNexus workspace root after both accounts can read the private repository.",
+        "Run these from the DevNexus workspace root after the human and automation auth profiles are configured.",
+        "For GitHub App remotes, DevNexus injects short-lived credentials for publication operations instead of expecting a persistent Git credential helper.",
       ],
-      checks: ["git remote -v", "git fetch --dry-run origin", "git fetch --dry-run bot"],
+      checks: [
+        "git remote -v",
+        `git fetch --dry-run ${remotePlan.humanRemoteName}`,
+        ...automationRemoteCheckCommands(remotePlan),
+      ],
     },
     {
       id: "prepare-component-checkouts",
@@ -867,12 +1003,8 @@ function githubMetaProjectSteps(options: {
   projectConfig: NexusProjectConfig;
   platform: NexusSetupPlatform;
 }): NexusSetupStep[] {
-  const {
-    humanRemote,
-    botRemote,
-    automationAuthProfileDirectory,
-    automationSshHost,
-  } = metaProjectRemotePlan(options.projectConfig);
+  const remotePlan = metaProjectRemotePlan(options.projectConfig);
+  const { humanRemote, botRemote } = remotePlan;
   const guide = metaProjectHostingGuide(options.projectConfig);
   const devNexusCommand = "dev-nexus";
   return [
@@ -898,34 +1030,17 @@ function githubMetaProjectSteps(options: {
       title: "Configure host-local auth profile",
       kind: "manual",
       scope: "host-local",
-      summary: "Configure SSH and GitHub CLI auth for the selected automation actor.",
-      commands: platformCommands(options.platform, {
-        macos: [
-          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
-          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-        windows: [
-          `New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"`,
-          `$env:GH_CONFIG_DIR="$env:USERPROFILE\\.config\\${automationAuthProfileDirectory}"; gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-        linux: [
-          `mkdir -p "$HOME/.config/${automationAuthProfileDirectory}" "$HOME/.ssh"`,
-          `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth login --hostname github.com --git-protocol ssh --web`,
-          `ssh -T git@${automationSshHost}`,
-        ],
-      }),
-      manualInstructions: [
-        "Create an SSH host alias such as github.com-<bot> in ~/.ssh/config or the Windows user SSH config before validating the bot remote.",
-        "Do not commit tokens, private keys, or gh config directories.",
-        "Keep GH_CONFIG_DIR, SSH key paths, GitHub App private keys, and wrapper commands in host-local DevNexus home config or shell state, not in the shared workspace repository.",
-      ],
-      checks: [
-        "gh auth status --hostname github.com",
-        `GH_CONFIG_DIR="$HOME/.config/${automationAuthProfileDirectory}" gh auth status --hostname github.com`,
-        `ssh -T git@${automationSshHost}`,
-      ],
+      summary: automationAuthProfileSummary(remotePlan),
+      commands: automationAuthProfileCommands(
+        remotePlan,
+        options.platform,
+        "github-workspace-repository",
+      ),
+      manualInstructions: automationAuthProfileInstructions(remotePlan),
+      checks: automationAuthProfileChecks(
+        remotePlan,
+        "github-workspace-repository",
+      ),
     },
     {
       id: "connect-workspace-repository",
@@ -942,27 +1057,27 @@ function githubMetaProjectSteps(options: {
         ...(guide.allowCreate
           ? [`${devNexusCommand} workspace hosting apply . --json`]
           : []),
-        `git remote set-url origin ${humanRemote}`,
-        `git remote get-url bot >/dev/null 2>&1 && git remote set-url bot ${botRemote} || git remote add bot ${botRemote}`,
+        `git remote set-url ${remotePlan.humanRemoteName} ${humanRemote}`,
+        remoteSetCommand(remotePlan.automationRemoteName, botRemote),
         "git remote -v",
-        "git fetch --dry-run origin",
-        "git fetch --dry-run bot",
+        `git fetch --dry-run ${remotePlan.humanRemoteName}`,
+        ...automationRemoteCheckCommands(remotePlan),
       ],
       manualInstructions: [
         guide.allowCreate
           ? "Treat workspace hosting apply as an approval-required operation; review the plan first and run apply only after confirming the selected namespace, actor permissions, and no-secret boundary."
           : "If workspace hosting status or plan reports a missing repository, create it manually in the provider or update hosting metadata; apply will not create it while allowCreate is false.",
-        "Use origin for human/manual access and bot for the automation actor remote so later publication guardrails can distinguish actors.",
+        "Use separate human and automation remotes so later publication guardrails can distinguish actors.",
+        "For GitHub App remotes, DevNexus should resolve a short-lived installation token only for the operation that needs it.",
         "Do not push until repository existence, remotes, and actor permissions are verified.",
       ],
       checks: [
         `${devNexusCommand} workspace hosting status . --json`,
         `${devNexusCommand} workspace hosting plan . --json`,
         `git ls-remote ${humanRemote} HEAD`,
-        `git ls-remote ${botRemote} HEAD`,
         "git remote -v",
-        "git fetch --dry-run origin",
-        "git fetch --dry-run bot",
+        `git fetch --dry-run ${remotePlan.humanRemoteName}`,
+        ...automationRemoteCheckCommands(remotePlan),
       ],
     },
     {
@@ -2596,14 +2711,17 @@ function hostingAuthProfileChecks(
     return [];
   }
 
-  const requiredProfileIds = Array.from(new Set(
-    expectedNexusProjectHostingRemotes({
+  const requiredProfileIds = Array.from(new Set([
+    ...expectedNexusProjectHostingRemotes({
       project: projectConfig,
       hosting: projectConfig.hosting,
     })
       .map((remote) => remote.authProfile)
       .filter((authProfile): authProfile is string => Boolean(authProfile)),
-  ));
+    ...(projectConfig.hosting.access ?? [])
+      .map((principal) => principal.authProfile)
+      .filter((authProfile): authProfile is string => Boolean(authProfile)),
+  ]));
   if (requiredProfileIds.length === 0) {
     return [{
       id: "github-hosting-auth-profile",
@@ -2647,11 +2765,22 @@ function hostingAuthProfileChecks(
     }
 
     const details = [
+      profile.kind ? `kind=${profile.kind}` : null,
+      profile.credentialKind ? `credential=${profile.credentialKind}` : null,
       profile.actorId ? `actor=${profile.actorId}` : null,
       profile.account ? `account=${profile.account}` : null,
       profile.sshHost ? `sshHost=${profile.sshHost}` : null,
       profile.githubCliConfigDir ? "ghConfigDir=set" : null,
       profile.command ? "command=set" : null,
+      profile.githubApp?.slug ? `app=${profile.githubApp.slug}` : null,
+      profile.githubApp?.installationAccount
+        ? `installation=${profile.githubApp.installationAccount}`
+        : null,
+      profile.githubApp ? "privateKeyPath=set" : null,
+      profile.githubApp?.repositories &&
+        profile.githubApp.repositories.length > 0
+        ? `repositories=${profile.githubApp.repositories.join(",")}`
+        : null,
       profile.environmentKeys && profile.environmentKeys.length > 0
         ? `envKeys=${profile.environmentKeys.join(",")}`
         : null,
