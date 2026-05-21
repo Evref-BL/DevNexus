@@ -602,8 +602,8 @@ export function buildNexusDashboardWeave(options: {
       id: authorityNodeId,
       kind: "authority",
       laneId: "authority",
-      label: "Authority",
-      detail: options.authority.summary,
+      label: "Bot permissions",
+      detail: authorityDashboardSummary(options.authority),
       status: options.authority.blockedActionCount > 0 ? "blocked" : "ready",
       timestamp: null,
       href: null,
@@ -645,6 +645,19 @@ export function buildNexusDashboardWeave(options: {
     nodes,
     edges,
   };
+}
+
+function authorityDashboardSummary(authority: NexusDashboardAuthoritySummary): string {
+  const componentCount = authority.components.length;
+  const blocked = authority.blockedActionCount;
+  const fallbacks = authority.fallbackActionCount;
+  if (blocked > 0) {
+    return `${blocked} provider ${plural(blocked, "action", "actions")} blocked. The automation bot needs a human handoff for publication.`;
+  }
+  if (fallbacks > 0) {
+    return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} use handoff instead of direct automation.`;
+  }
+  return `Publication permissions are ready for ${componentCount} ${plural(componentCount, "component", "components")}.`;
 }
 
 function statusOptions(

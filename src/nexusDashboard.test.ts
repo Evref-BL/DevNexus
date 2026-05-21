@@ -258,8 +258,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("color-scheme");
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
-    expect(module).toContain("Work History");
-    expect(module).toContain("Worktree lanes");
+    expect(module).toContain("Workspace Activity");
+    expect(module).toContain("Parallel work map");
+    expect(module).toContain("Bot permissions");
     expect(module).toContain("selectedDetail");
     expect(module).toContain("timelineLanes");
     expect(module).toContain("renderBranchGraph");
