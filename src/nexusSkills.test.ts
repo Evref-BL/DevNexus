@@ -95,6 +95,30 @@ describe("nexus skills", () => {
         paths: ["skills/brainstorming/SKILL.md"],
       },
     });
+    for (const [id, sourcePath] of [
+      ["write-implementation-plan", "skills/writing-plans/SKILL.md"],
+      ["prepare-dev-nexus-worktree", "skills/using-git-worktrees/SKILL.md"],
+      ["finish-dev-nexus-branch", "skills/finishing-a-development-branch/SKILL.md"],
+    ] as const) {
+      const skill = result.installed.find((entry) => entry.id === id);
+      expect(skill?.sourceControl).toBe("support");
+      expect(
+        fs.readFileSync(path.join(skill?.skillRoot ?? "", "LICENSE"), "utf8"),
+      ).toContain("Copyright (c) 2025 Jesse Vincent");
+      expect(
+        JSON.parse(fs.readFileSync(skill?.manifestPath ?? "", "utf8")),
+      ).toMatchObject({
+        id,
+        license: "MIT",
+        source: {
+          type: "git",
+          uri: "https://github.com/obra/superpowers",
+          tag: "v5.1.0",
+          commit: "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+          paths: [sourcePath],
+        },
+      });
+    }
   });
 
   it("projects selected skills into configured agent-native directories", () => {
@@ -197,6 +221,9 @@ describe("nexus skills", () => {
       "dev-nexus",
       "initiative-workflow",
       "design-with-user",
+      "write-implementation-plan",
+      "prepare-dev-nexus-worktree",
+      "finish-dev-nexus-branch",
       "diagnose",
       "tdd",
       "handoff",
@@ -255,6 +282,33 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["design-with-user"]).toContain(
       "generic initiatives",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "skills/writing-plans/SKILL.md",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "one initiative or delivery surface",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "human-in-the-loop gates",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "skills/using-git-worktrees/SKILL.md",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "worktree_prepare",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "workspace/meta worktree",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "skills/finishing-a-development-branch/SKILL.md",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "green-main policy",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "Do not silently",
     );
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(

@@ -448,6 +448,205 @@ DevNexus durable records, and risk-scaled design gates.
 `,
 );
 
+const writeImplementationPlanSkill = adaptedSuperpowersSkill(
+  "write-implementation-plan",
+  "write-implementation-plan",
+  "Implementation planning workflow adapted from Superpowers writing-plans. Use after design or requirements are approved and before execution when work needs owned slices, DevNexus component or artifact scope, acceptance criteria, and verification.",
+  ["skills/writing-plans/SKILL.md"],
+  `
+# Write Implementation Plan
+
+Use this skill when approved requirements need to become executable work. The
+agent leads the plan; the user decides scope, risk, and approval gates.
+
+## Workflow
+
+1. Read the source requirements first: tracker issue, Product Requirements
+   Document (PRD), initiative notes, relevant code, existing docs, and recent
+   decisions.
+2. Confirm the work belongs to one initiative or delivery surface. If the
+   request covers independent objectives, propose separate plans before
+   execution.
+3. Map the changed surfaces before writing tasks. Name the owning component,
+   files or artifacts, tracker anchor, expected worktree, and command working
+   directory where those are knowable.
+4. Split the work into bounded slices. Each slice needs one owner, one scope,
+   dependencies, acceptance criteria, verification commands, and handoff notes.
+5. Prefer Test-Driven Development (TDD) for behavior changes that can be tested
+   cleanly. Include the focused failing test target, minimal implementation
+   target, and nearest broader check.
+6. Be concrete enough for another agent to execute without guessing: exact
+   paths, exact commands, expected outcomes, and explicit blockers. Do not use
+   placeholders such as TBD, TODO, "similar to above", or "add tests".
+7. Mark human-in-the-loop gates for publication, destructive cleanup, external
+   provider writes, product decisions, cost, security, or live runtime actions.
+8. Save a durable plan only when it needs to survive the chat. In a DevNexus
+   workspace, prefer the configured tracker, issue comment, PRD, initiative
+   notes, or target-cycle facts over an ad hoc file.
+9. End with the recommended execution mode: subagents for independent disjoint
+   slices, inline execution for tightly coupled work, or blocked with the
+   smallest decision needed.
+
+## Plan Shape
+
+Use this shape when writing a saved implementation plan:
+
+1. Goal and done criteria.
+2. Integration surface and tracker anchor.
+3. Component, artifact, or document ownership.
+4. Task slices with files, acceptance criteria, steps, verification, and
+   handoff.
+5. Human approval gates and publication path.
+6. Open questions and blockers.
+
+## Guardrails
+
+- Do not plan implementation before design approval when the design changes
+  behavior, scope, publication, cost, safety, or long-lived direction.
+- Do not hide unresolved product or architecture decisions inside a task list.
+- Do not create many unrelated final publications for one initiative.
+- Do not make the plan programming-centric when the work is documentation,
+  research, operations, or another artifact workflow.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/writing-plans/SKILL.md\`.
+This DevNexus adaptation changes the workflow to use initiative surfaces,
+component ownership, tracker anchors, approval gates, and DevNexus verification
+records directly.
+`,
+);
+
+const prepareDevNexusWorktreeSkill = adaptedSuperpowersSkill(
+  "prepare-dev-nexus-worktree",
+  "prepare-dev-nexus-worktree",
+  "DevNexus worktree preparation workflow adapted from Superpowers using-git-worktrees. Use before mutating component source or workspace metadata so work happens in an owned isolated surface with preserved context and verification.",
+  ["skills/using-git-worktrees/SKILL.md"],
+  `
+# Prepare DevNexus Worktree
+
+Use this skill before mutating component source, workspace metadata, generated
+skills, planning documents, or another durable project surface.
+
+## Workflow
+
+1. Identify the owning surface: component source, workspace metadata, docs,
+   tracker state, or another artifact. Confirm the tracker anchor or initiative
+   surface when one exists.
+2. Inspect Git status, branch, remotes, upstream, and ahead/behind state before
+   editing. Preserve unrelated dirty changes and report blockers instead of
+   reverting them.
+3. Detect whether the current checkout is already an owned isolated worktree. If
+   it is, adopt it and continue there. Do not create nested worktrees.
+4. In a DevNexus workspace, use DevNexus worktree tooling such as
+   \`worktree_prepare\` or \`dev-nexus worktree prepare\`. Use a component
+   worktree for source changes and a workspace/meta worktree for files such as
+   \`dev-nexus.project.json\`, \`.dev-nexus/**\`, projected skills,
+   \`PLAN.md\`, \`CONTEXT.md\`, target state, or dogfood docs.
+5. Choose a branch name that matches the initiative or tracker item and the
+   workspace branch policy. Keep one long-lived initiative branch when slices
+   should accumulate before final publication.
+6. Let configured setup do its job. Prefer projected dependencies, generated
+   context bundles, and skill projection over ad hoc package installation.
+7. Run the smallest useful baseline verification for the planned work. If the
+   baseline fails, record the failure and decide whether the current slice owns
+   the fix before proceeding.
+8. Record the prepared surface where the workspace can find it: work-item
+   comment, coordination handoff, target-cycle facts, or initiative notes.
+
+## Guardrails
+
+- Do not hand-roll \`git worktree add\` in a DevNexus-managed workspace when
+  DevNexus worktree tooling is available.
+- Do not mutate a shared checkout for work that should happen in an isolated
+  worktree.
+- Do not install dependencies or run live services unless workspace policy and
+  runner safety allow it.
+- Do not delete or clean up an owned worktree until integration status and
+  publication policy are clear.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/using-git-worktrees/SKILL.md\`.
+This DevNexus adaptation replaces generic worktree fallback behavior with
+DevNexus component worktrees, workspace/meta worktrees, setup projection,
+coordination handoffs, and shared-checkout guards.
+`,
+);
+
+const finishDevNexusBranchSkill = adaptedSuperpowersSkill(
+  "finish-dev-nexus-branch",
+  "finish-dev-nexus-branch",
+  "DevNexus branch completion workflow adapted from Superpowers finishing-a-development-branch. Use when implementation is ready to verify, record, publish, hand off, or clean up under component policy and human approval gates.",
+  ["skills/finishing-a-development-branch/SKILL.md"],
+  `
+# Finish DevNexus Branch
+
+Use this skill when a slice or initiative branch is ready for verification,
+handoff, publication, or cleanup.
+
+## Workflow
+
+1. Run fresh focused verification first, then the nearest broader relevant
+   check. Read the output before making any completion claim.
+2. Inspect Git status, diff, commits ahead of the base branch, remotes, and
+   upstream. Separate owned changes from unrelated dirty state.
+3. Confirm durable records are current: work item status or comment, initiative
+   notes, coordination handoff, target-cycle facts, and verification summary.
+4. Read the component publication policy and current authority. Do not silently
+   fall back to a human account when policy expects an automation actor.
+5. If publication is allowed, use the configured remote, credential profile,
+   target branch, and review path. For green-main policy, prefer branch or pull
+   request validation and required checks before merge.
+6. If publication authority is blocked, leave a human handoff with branch name,
+   commit ids, verification commands and outcomes, target branch, and the exact
+   PR or review action needed.
+7. Ask for explicit human approval before merge, release, destructive cleanup,
+   force deletion, live-runtime action, or provider mutation that policy marks
+   approval-required.
+8. Clean up only after integration is factual: fetched target branch, branch is
+   merged or intentionally preserved, worktree ownership is clear, and no
+   unrelated changes would be lost.
+9. Close or move the tracker item only when the publication state matches the
+   workspace definition of done, or when the user explicitly chooses a different
+   terminal state.
+
+## Handoff Checklist
+
+- Branch and worktree path.
+- Tracker anchor and initiative surface.
+- Commit ids and changed areas.
+- Verification commands with pass, fail, or not-run status.
+- Publication decision: direct integration, review handoff, local only,
+  blocked, or not decided.
+- Human action required, if any.
+
+## Guardrails
+
+- Do not claim work is complete without fresh verification evidence.
+- Do not merge, push, open a pull request, delete a branch, or remove a
+  worktree without the required policy and approval state.
+- Do not hide provider-auth problems by using the wrong account.
+- Do not clean up worktrees that another chat or host may still own.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/finishing-a-development-branch/SKILL.md\`.
+This DevNexus adaptation changes the finish flow to use component publication
+policy, authority checks, App/bot credential expectations, coordination
+handoffs, target-cycle facts, and human-in-the-loop approval gates.
+`,
+);
+
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
     "dev-nexus",
@@ -521,6 +720,9 @@ coordination record, or another project-owned place where slices accumulate.
 `,
   ),
   designWithUserSkill,
+  writeImplementationPlanSkill,
+  prepareDevNexusWorktreeSkill,
+  finishDevNexusBranchSkill,
   curatedCoreSkill(
     "diagnose",
     "diagnose",
