@@ -33,6 +33,7 @@ const workStatuses = new Set<WorkStatus>([
 export interface GitHubWorkTrackerProviderOptions {
   config: GitHubWorkTrackingConfig;
   token?: string | null;
+  authorizationHeader?: string | null;
   fetch?: typeof fetch;
   apiBaseUrl?: string | null;
   graphqlApiUrl?: string | null;
@@ -169,6 +170,10 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
       "apiVersion",
     );
     this.capabilities = githubWorkTrackerCapabilitiesForConfig(options.config);
+    const explicitAuthorizationHeader = optionalNonEmptyString(
+      options.authorizationHeader,
+      "authorizationHeader",
+    );
     const token =
       optionalNonEmptyString(options.token, "token") ??
       optionalNonEmptyString(
@@ -176,7 +181,8 @@ export class GitHubWorkTrackerProvider implements WorkTrackerProvider {
         "GITHUB_TOKEN",
       ) ??
       optionalNonEmptyString((options.env ?? process.env).GH_TOKEN, "GH_TOKEN");
-    this.staticAuthorizationHeader = token ? `Bearer ${token}` : undefined;
+    this.staticAuthorizationHeader =
+      explicitAuthorizationHeader ?? (token ? `Bearer ${token}` : undefined);
     this.credentialRunner =
       options.credentialRunner === false
         ? undefined

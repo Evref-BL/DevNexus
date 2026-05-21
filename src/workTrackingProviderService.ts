@@ -13,6 +13,12 @@ import {
   jiraWorkTrackerCapabilitiesForConfig,
   type JiraWorkTrackerProviderOptions,
 } from "./workTrackingJiraProvider.js";
+import type {
+  NexusProviderCredentialBroker,
+  NexusProviderCredentialPurpose,
+  NexusProviderCredentialRequest,
+  NexusResolvedProviderCredential,
+} from "./nexusProviderCredentialBroker.js";
 import {
   createLocalWorkTrackerProvider,
   localWorkTrackerCapabilities,
@@ -33,15 +39,27 @@ import type {
   WorkTrackingConfig,
   WorkTrackerProvider,
   TrackerCapabilities,
+  WorkTrackingRepositoryConfig,
 } from "./workTrackingTypes.js";
 
 export interface CreateWorkTrackerProviderOptions {
   projectRoot?: string;
   now?: () => Date | string;
+  credentials?: CreateWorkTrackerProviderCredentialOptions;
   github?: Omit<GitHubWorkTrackerProviderOptions, "config">;
   gitlab?: Omit<GitLabWorkTrackerProviderOptions, "config">;
   jira?: Omit<JiraWorkTrackerProviderOptions, "config">;
   vibeKanban?: Omit<VibeWorkTrackerProviderOptions, "config">;
+}
+
+export interface CreateWorkTrackerProviderCredentialOptions {
+  broker: NexusProviderCredentialBroker;
+  purpose?: NexusProviderCredentialPurpose;
+  profileId?: string | null;
+  actorId?: string | null;
+  providerIdentity?: string | null;
+  host?: string | null;
+  repository?: WorkTrackingRepositoryConfig | null;
 }
 
 export class WorkTrackingProviderServiceError extends Error {
@@ -69,6 +87,9 @@ export function createWorkTrackerProvider(
   options: CreateWorkTrackerProviderOptions = {},
 ): WorkTrackerProvider {
   const providerName = config.provider;
+  const credential = workTrackerUsesProviderCredentials(config)
+    ? resolveWorkTrackerCredential(config, options.credentials)
+    : undefined;
 
   if (config.provider === "local") {
     return createLocalWorkTrackerProvider({
@@ -94,6 +115,7 @@ export function createWorkTrackerProvider(
   if (config.provider === "github") {
     return createGitHubWorkTrackerProvider({
       ...options.github,
+      ...credentialOptions(options.github?.env, credential),
       config: config as GitHubWorkTrackingConfig,
     });
   }
@@ -101,6 +123,7 @@ export function createWorkTrackerProvider(
   if (config.provider === "gitlab") {
     return createGitLabWorkTrackerProvider({
       ...options.gitlab,
+      env: mergedCredentialEnv(options.gitlab?.env, credential),
       config: config as GitLabWorkTrackingConfig,
     });
   }
@@ -108,6 +131,7 @@ export function createWorkTrackerProvider(
   if (config.provider === "jira") {
     return createJiraWorkTrackerProvider({
       ...options.jira,
+      env: mergedCredentialEnv(options.jira?.env, credential),
       config: config as JiraWorkTrackingConfig,
     });
   }
@@ -115,6 +139,61 @@ export function createWorkTrackerProvider(
   throw new WorkTrackingProviderServiceError(
     `Work tracking provider is not available in DevNexus core: ${providerName}`,
   );
+}
+
+function workTrackerUsesProviderCredentials(config: WorkTrackingConfig): boolean {
+  return (
+    config.provider === "github" ||
+    config.provider === "gitlab" ||
+    config.provider === "jira"
+  );
+}
+
+function resolveWorkTrackerCredential(
+  config: WorkTrackingConfig,
+  options: CreateWorkTrackerProviderCredentialOptions | undefined,
+): NexusResolvedProviderCredential | undefined {
+  if (!options) {
+    return undefined;
+  }
+
+  const request: NexusProviderCredentialRequest = {
+    provider: config.provider,
+    purpose: options.purpose ?? "api",
+    host: options.host ?? config.host ?? null,
+    profileId: options.profileId ?? null,
+    actorId: options.actorId ?? null,
+    providerIdentity: options.providerIdentity ?? null,
+    repository: options.repository ?? config.repository ?? null,
+  };
+  return options.broker.resolveCredential(request);
+}
+
+function credentialOptions(
+  env: Record<string, string | undefined> | undefined,
+  credential: NexusResolvedProviderCredential | undefined,
+): Pick<GitHubWorkTrackerProviderOptions, "authorizationHeader" | "env"> {
+  const mergedEnv = mergedCredentialEnv(env, credential);
+  return {
+    ...(credential?.authorizationHeader
+      ? { authorizationHeader: credential.authorizationHeader }
+      : {}),
+    ...(mergedEnv ? { env: mergedEnv } : {}),
+  };
+}
+
+function mergedCredentialEnv(
+  env: Record<string, string | undefined> | undefined,
+  credential: NexusResolvedProviderCredential | undefined,
+): Record<string, string | undefined> | undefined {
+  if (!credential?.env) {
+    return env;
+  }
+
+  return {
+    ...(env ?? {}),
+    ...credential.env,
+  };
 }
 
 export function workTrackerCapabilityReportForConfig(

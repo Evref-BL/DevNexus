@@ -85,11 +85,22 @@ export interface NexusProjectHostingConfig {
 
 export type NexusHostingAuthProfileKind = "human" | "automation" | "app";
 
+export type NexusHostingAuthProfileCredentialKind =
+  | "environment_token"
+  | "provider_cli"
+  | "git_credential"
+  | "command_token"
+  | "github_app"
+  | "unknown";
+
+export type NexusHostingAuthProfileCredentialPurpose = "api" | "git" | "cli";
+
 export interface NexusHostingAuthProfileConfig {
   id: string;
   actorId?: string;
   provider: string;
   kind?: NexusHostingAuthProfileKind;
+  credentialKind?: NexusHostingAuthProfileCredentialKind;
   account?: string;
   host?: string;
   sshHost?: string;
@@ -97,7 +108,9 @@ export interface NexusHostingAuthProfileConfig {
   gitUserName?: string;
   gitUserEmail?: string;
   command?: string;
+  commandArgs?: string[];
   environmentKeys?: string[];
+  purposes?: NexusHostingAuthProfileCredentialPurpose[];
 }
 
 export interface NexusProjectHostingProjectIdentity {
