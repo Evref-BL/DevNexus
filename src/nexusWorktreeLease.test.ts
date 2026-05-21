@@ -6,6 +6,7 @@ import {
   collectNexusWorktreeLeaseGitFacts,
   createOrRefreshNexusWorktreeLease,
   listNexusWorktreeLeases,
+  nexusWorktreeLeaseLegacyStorePath,
   nexusWorktreeLeaseStorePath,
   parseNexusWorktreeLeaseStatus,
   readNexusWorktreeLeaseStore,
@@ -116,6 +117,89 @@ afterEach(() => {
 });
 
 describe("nexus worktree leases", () => {
+  it("stores leases in runtime Git metadata instead of the tracked workspace store", () => {
+    const { projectRoot, worktreePath } = initLeaseFixture();
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "mac-mini",
+      workItemId: "local-99",
+      branchName: "codex/dev-nexus/local-99",
+      worktreePath,
+      status: "working",
+      gitFacts: {},
+      now: "2026-05-18T10:00:00.000Z",
+    });
+
+    expect(nexusWorktreeLeaseStorePath(projectRoot)).toBe(
+      path.join(projectRoot, ".git", "dev-nexus", "worktree-leases.json"),
+    );
+    expect(fs.existsSync(nexusWorktreeLeaseStorePath(projectRoot))).toBe(true);
+    expect(fs.existsSync(nexusWorktreeLeaseLegacyStorePath(projectRoot))).toBe(false);
+  });
+
+  it("stores leases under a linked gitdir for Git worktree checkouts", () => {
+    const { projectRoot } = initLeaseFixture();
+    const gitDir = path.join(projectRoot, "..", "linked-git-dir");
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".git"),
+      `gitdir: ${path.relative(projectRoot, gitDir)}\n`,
+      "utf8",
+    );
+
+    expect(nexusWorktreeLeaseStorePath(projectRoot)).toBe(
+      path.join(gitDir, "dev-nexus", "worktree-leases.json"),
+    );
+  });
+
+  it("reads legacy tracked lease stores without continuing to write them", () => {
+    const { projectRoot, worktreePath } = initLeaseFixture();
+    const lease = createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "windows-devbox",
+      workItemId: "local-99",
+      branchName: "codex/dev-nexus/local-99",
+      worktreePath,
+      status: "working",
+      gitFacts: {},
+      now: "2026-05-18T10:00:00.000Z",
+    });
+    const runtimeStore = fs.readFileSync(nexusWorktreeLeaseStorePath(projectRoot), "utf8");
+    fs.rmSync(nexusWorktreeLeaseStorePath(projectRoot), { force: true });
+    fs.mkdirSync(path.dirname(nexusWorktreeLeaseLegacyStorePath(projectRoot)), {
+      recursive: true,
+    });
+    fs.writeFileSync(nexusWorktreeLeaseLegacyStorePath(projectRoot), runtimeStore, "utf8");
+
+    expect(readNexusWorktreeLeaseStore(projectRoot).leases).toMatchObject([
+      { id: lease.id, status: "working" },
+    ]);
+
+    createOrRefreshNexusWorktreeLease({
+      projectRoot,
+      componentId: "dev-nexus",
+      hostId: "windows-devbox",
+      workItemId: "local-99",
+      branchName: "codex/dev-nexus/local-99",
+      worktreePath,
+      status: "ready",
+      gitFacts: {},
+      now: "2026-05-18T10:05:00.000Z",
+    });
+
+    expect(readNexusWorktreeLeaseStore(projectRoot).leases).toMatchObject([
+      { id: lease.id, status: "ready", refreshCount: 1 },
+    ]);
+    expect(
+      JSON.parse(fs.readFileSync(nexusWorktreeLeaseLegacyStorePath(projectRoot), "utf8"))
+        .leases[0].status,
+    ).toBe("working");
+  });
+
   it("creates and refreshes advisory component lease records without absolute paths", () => {
     const { projectRoot, sourceRoot, worktreePath } = initLeaseFixture();
 

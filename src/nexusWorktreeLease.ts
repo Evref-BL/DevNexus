@@ -20,6 +20,8 @@ import {
 
 export const nexusWorktreeLeaseKind = "dev-nexus.worktree.lease";
 export const nexusWorktreeLeaseStoreFileName = "worktree-leases.json";
+export const nexusWorktreeLeaseRuntimeDirectoryName = "dev-nexus";
+export const nexusWorktreeLeaseProjectRuntimeDirectoryName = "runtime";
 export const defaultNexusWorktreeLeaseStaleAfterMs = 24 * 60 * 60 * 1000;
 
 export type NexusWorktreeLeaseStatus =
@@ -188,8 +190,27 @@ export class NexusWorktreeLeaseError extends Error {
 }
 
 export function nexusWorktreeLeaseStorePath(projectRoot: string): string {
+  const resolvedProjectRoot = resolvedLeaseProjectRoot(projectRoot);
+  const gitDir = projectGitDirectory(resolvedProjectRoot);
+  if (gitDir) {
+    return path.join(
+      gitDir,
+      nexusWorktreeLeaseRuntimeDirectoryName,
+      nexusWorktreeLeaseStoreFileName,
+    );
+  }
+
   return path.join(
-    path.resolve(requiredNonEmptyString(projectRoot, "projectRoot")),
+    resolvedProjectRoot,
+    ".dev-nexus",
+    nexusWorktreeLeaseProjectRuntimeDirectoryName,
+    nexusWorktreeLeaseStoreFileName,
+  );
+}
+
+export function nexusWorktreeLeaseLegacyStorePath(projectRoot: string): string {
+  return path.join(
+    resolvedLeaseProjectRoot(projectRoot),
     ".dev-nexus",
     nexusWorktreeLeaseStoreFileName,
   );
@@ -206,14 +227,14 @@ export function emptyNexusWorktreeLeaseStore(): NexusWorktreeLeaseStore {
 export function readNexusWorktreeLeaseStore(
   projectRoot: string,
 ): NexusWorktreeLeaseStore {
-  const storePath = nexusWorktreeLeaseStorePath(projectRoot);
-  if (!fs.existsSync(storePath)) {
-    return emptyNexusWorktreeLeaseStore();
-  }
-
-  return normalizeNexusWorktreeLeaseStore(
-    JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, "")),
+  const runtimeStore = readNexusWorktreeLeaseStoreFile(
+    nexusWorktreeLeaseStorePath(projectRoot),
   );
+  const legacyStore = readNexusWorktreeLeaseStoreFile(
+    nexusWorktreeLeaseLegacyStorePath(projectRoot),
+  );
+
+  return mergeNexusWorktreeLeaseStores([legacyStore, runtimeStore]);
 }
 
 export function writeNexusWorktreeLeaseStore(
@@ -501,6 +522,65 @@ function resolveLeaseContext(options: {
       componentId: component.id,
     },
     component,
+  };
+}
+
+function resolvedLeaseProjectRoot(projectRoot: string): string {
+  return path.resolve(requiredNonEmptyString(projectRoot, "projectRoot"));
+}
+
+function projectGitDirectory(projectRoot: string): string | null {
+  const dotGitPath = path.join(projectRoot, ".git");
+  if (!fs.existsSync(dotGitPath)) {
+    return null;
+  }
+  const dotGit = fs.statSync(dotGitPath);
+  if (dotGit.isDirectory()) {
+    return dotGitPath;
+  }
+  if (!dotGit.isFile()) {
+    return null;
+  }
+
+  const firstLine = fs.readFileSync(dotGitPath, "utf8").split(/\r?\n/u)[0] ?? "";
+  const match = /^gitdir:\s*(.+)\s*$/iu.exec(firstLine);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return path.resolve(projectRoot, match[1]);
+}
+
+function readNexusWorktreeLeaseStoreFile(
+  storePath: string,
+): NexusWorktreeLeaseStore {
+  if (!fs.existsSync(storePath)) {
+    return emptyNexusWorktreeLeaseStore();
+  }
+
+  return normalizeNexusWorktreeLeaseStore(
+    JSON.parse(fs.readFileSync(storePath, "utf8").replace(/^\uFEFF/, "")),
+  );
+}
+
+function mergeNexusWorktreeLeaseStores(
+  stores: NexusWorktreeLeaseStore[],
+): NexusWorktreeLeaseStore {
+  const records = new Map<string, NexusWorktreeLeaseRecord>();
+  let updatedAt: string | null = null;
+  for (const store of stores) {
+    if (store.updatedAt && (!updatedAt || store.updatedAt > updatedAt)) {
+      updatedAt = store.updatedAt;
+    }
+    for (const lease of store.leases) {
+      records.set(lease.id, lease);
+    }
+  }
+
+  return {
+    version: 1,
+    updatedAt,
+    leases: [...records.values()],
   };
 }
 

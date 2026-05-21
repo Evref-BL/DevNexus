@@ -15,8 +15,8 @@ The workspace root contains:
 
 - `dev-nexus.project.json`, the shared workspace configuration
 - `AGENTS.md`, the first file agents should read
-- `.dev-nexus/`, support state such as work items, target facts, leases, and
-  setup records
+- `.dev-nexus/`, support state such as work items, target facts, and setup
+  records
 - generated agent configuration, such as `.codex/config.toml` or `.mcp.json`
 
 One DevNexus workspace can coordinate one component or many components.
@@ -47,6 +47,15 @@ The home can store a registry of workspaces and host-local setup facts. It is no
 the workspace root and it is not where component source code normally lives.
 
 Most users should let DevNexus use the default home.
+
+## Runtime State
+
+DevNexus also records host-local runtime facts that should not dirty the
+workspace checkout. Worktree leases are in this category: they are advisory
+ownership hints for active branches and generated worktrees, not durable project
+history. When the workspace is a Git repository, DevNexus stores worktree lease
+state under Git metadata. It can still read the old tracked
+`.dev-nexus/worktree-leases.json` file for migration compatibility.
 
 ## Work Item
 
