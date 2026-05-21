@@ -9997,6 +9997,24 @@ function printAutomationTargetReportResult(
   if (result.authority) {
     printAuthorityProjectSummary(result.authority, stdout);
   }
+  const publicationTrains = result.componentProgress
+    .map((component) => component.publicationTrain)
+    .filter((train): train is NonNullable<typeof train> => train !== null);
+  if (publicationTrains.length > 0) {
+    writeLine(
+      stdout,
+      `  Publication trains: ${publicationTrains.length} configured, ${publicationTrains.filter((train) => train.enabled).length} enabled.`,
+    );
+    for (const train of publicationTrains) {
+      writeLine(
+        stdout,
+        `    ${train.componentId}: active=${train.activeVersionId ?? "unscoped"} candidate=${train.branches.candidateBranch} integration=${train.branches.integrationBranch} tier=${train.ciTiers.defaultTier} budget=${formatPublicationTrainBudget(train)}`,
+      );
+      if (train.selector.labels.length === 0) {
+        writeLine(stdout, "      Selector labels: none");
+      }
+    }
+  }
   if (result.versionPlanning) {
     writeLine(
       stdout,
@@ -10048,6 +10066,21 @@ function printAutomationScheduleResult(
     writeLine(stdout, `  Last status: ${lastTick.status.status}`);
     writeLine(stdout, `  Last action: ${lastTick.action}`);
   }
+}
+
+function formatPublicationTrainBudget(
+  train: NonNullable<
+    NexusAutomationTargetReport["componentProgress"][number]["publicationTrain"]
+  >,
+): string {
+  const budget = train.ciTiers.fullMatrixBudget;
+  const interval = budget.minimumIntervalMinutes === null
+    ? "interval=none"
+    : `interval=${budget.minimumIntervalMinutes}m`;
+  const changes = budget.minimumChangeCount === null
+    ? "changes=none"
+    : `changes=${budget.minimumChangeCount}`;
+  return `${interval},${changes}`;
 }
 
 function printAutomationCoordinatorLoopResult(

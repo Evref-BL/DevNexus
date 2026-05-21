@@ -216,6 +216,38 @@ describe("nexus automation target report", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const config = projectConfig({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        target: {
+          ...defaultNexusAutomationConfig.target,
+          id: "dogfood",
+          objective: "Use this project until no eligible work remains.",
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "local_only",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            ciTiers: {
+              defaultTier: "remote_smoke",
+              fullMatrixBudget: {
+                minimumIntervalMinutes: 60,
+                minimumChangeCount: 3,
+              },
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
       versionPlanning: {
         versions: [
           {
@@ -363,6 +395,29 @@ describe("nexus automation target report", () => {
           ],
         },
       ],
+    });
+    expect(report.componentProgress[0]?.publicationTrain).toMatchObject({
+      enabled: true,
+      activeVersionId: "v-next",
+      activeVersionFound: true,
+      objective: "Ship the next DevNexus version.",
+      targetBranch: "main",
+      branches: {
+        integrationBranch: "integration/v-next",
+        candidateBranch: "candidate/v-next",
+      },
+      selector: {
+        labels: [],
+        requiresPublicLabel: false,
+      },
+      ciTiers: {
+        defaultTier: "remote_smoke",
+        source: "publication_train",
+        fullMatrixBudget: {
+          minimumIntervalMinutes: 60,
+          minimumChangeCount: 3,
+        },
+      },
     });
 
     const eligibleWork = await getNexusAutomationEligibleWorkSummary({
