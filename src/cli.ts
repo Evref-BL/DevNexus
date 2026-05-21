@@ -222,6 +222,11 @@ import {
   type NexusCandidateBranchPlan,
 } from "./nexusCandidateBranchPlan.js";
 import {
+  buildNexusMergeQueueReadinessReport,
+  type NexusMergeQueueReadinessReport,
+  type NexusMergeQueueWorkflowTriggerInput,
+} from "./nexusMergeQueueReadiness.js";
+import {
   classifyNexusPublicationProviderEvidenceChecks,
   normalizeNexusPublicationProviderEvidence,
   type NexusPublicationProviderEvidence,
@@ -1001,6 +1006,15 @@ interface ParsedPublicationEvidenceNormalizeCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationMergeQueueReadinessCommand {
+  projectRoot: string;
+  componentId?: string;
+  mergeQueueEnabled?: boolean | null;
+  evidenceFile?: string;
+  workflowTriggersFile?: string;
+  json?: boolean;
+}
+
 interface ParsedAutomationScheduleCommand {
   projectRoot: string;
   command?: string;
@@ -1092,6 +1106,7 @@ export function usage(): string {
     "  dev-nexus worktree prepare <workspace-root> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus publication evidence normalize <json-file> [options]",
+    "  dev-nexus publication merge-queue-readiness <workspace-root> [options]",
     "  dev-nexus publication train-readiness <workspace-root> [options]",
     "  dev-nexus publication candidate-plan <workspace-root> [options]",
     "  dev-nexus quick-fix plan <workspace-root> --work-item <id> [options]",
@@ -1352,6 +1367,14 @@ export function usage(): string {
     "",
     "Options for publication evidence normalize:",
     "  --required-check <name>   classify normalized evidence against a required check; repeatable",
+    "  --json",
+    "",
+    "Options for publication merge-queue-readiness:",
+    "  --component <id>          defaults to the primary component",
+    "  --merge-queue-enabled",
+    "  --merge-queue-disabled",
+    "  --evidence-file <json>    provider evidence array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "  --workflow-triggers-file <json> workflow trigger array or {\"workflowTriggers\": [...]}",
     "  --json",
     "",
     "Options for publication train-readiness:",
@@ -2635,6 +2658,28 @@ async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "merge-queue-readiness") {
+    const parsed = parsePublicationMergeQueueReadinessCommand(argv);
+    const report = buildNexusMergeQueueReadinessReport({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      mergeQueueEnabled: parsed.mergeQueueEnabled,
+      workflowTriggers: parsed.workflowTriggersFile
+        ? readPublicationWorkflowTriggersInput(parsed.workflowTriggersFile)
+        : [],
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      now: dependencies.now,
+    });
+    printPublicationMergeQueueReadinessReport(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "train-readiness") {
     const parsed = parsePublicationTrainReadinessCommand(argv);
     const report = buildNexusPublicationTrainReadinessReport({
@@ -2676,7 +2721,7 @@ async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires green-main plan, evidence normalize, train-readiness, or candidate-plan",
+    "publication requires green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
   );
 }
 
@@ -5754,6 +5799,57 @@ function parsePublicationEvidenceNormalizeCommand(
   return parsed;
 }
 
+function parsePublicationMergeQueueReadinessCommand(
+  argv: string[],
+): ParsedPublicationMergeQueueReadinessCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "merge-queue-readiness") {
+    throw new Error("publication requires merge-queue-readiness");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication merge-queue-readiness requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationMergeQueueReadinessCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--merge-queue-enabled":
+        parsed.mergeQueueEnabled = true;
+        break;
+      case "--merge-queue-disabled":
+        parsed.mergeQueueEnabled = false;
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--workflow-triggers-file":
+        parsed.workflowTriggersFile = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication merge-queue-readiness option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function parsePublicationCandidatePlanCommand(
   argv: string[],
 ): ParsedPublicationCandidatePlanCommand {
@@ -5853,6 +5949,31 @@ function readPublicationTrainEvidenceInput(
 
   throw new Error(
     "publication train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+  );
+}
+
+function readPublicationWorkflowTriggersInput(
+  inputPath: string,
+): NexusMergeQueueWorkflowTriggerInput[] {
+  const raw = readCliJsonFile(inputPath, "publication workflow triggers");
+  if (Array.isArray(raw)) {
+    return raw as NexusMergeQueueWorkflowTriggerInput[];
+  }
+  if (raw !== null && typeof raw === "object") {
+    const record = raw as {
+      workflowTriggers?: unknown;
+      workflows?: unknown;
+    };
+    if (Array.isArray(record.workflowTriggers)) {
+      return record.workflowTriggers as NexusMergeQueueWorkflowTriggerInput[];
+    }
+    if (Array.isArray(record.workflows)) {
+      return record.workflows as NexusMergeQueueWorkflowTriggerInput[];
+    }
+  }
+
+  throw new Error(
+    "publication workflow triggers file must be an array, {\"workflowTriggers\": [...]}, or {\"workflows\": [...]}",
   );
 }
 
@@ -9013,6 +9134,51 @@ function printPublicationEvidenceNormalizeResult(
     if (classification) {
       writeLine(stdout, `     checks=${classification.status}: ${classification.message}`);
     }
+  }
+}
+
+function printPublicationMergeQueueReadinessReport(
+  report: NexusMergeQueueReadinessReport,
+  parsed: ParsedPublicationMergeQueueReadinessCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: report.nextAction,
+      report,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus merge queue readiness.");
+  writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
+  writeLine(stdout, `  Component: ${report.component.id}`);
+  writeLine(stdout, `  Target branch: ${report.targetBranch}`);
+  writeLine(
+    stdout,
+    `  Merge queue: ${report.mergeQueue.enabled ? "enabled" : "disabled"} workflowTrigger=${report.mergeQueue.workflowTriggerStatus}`,
+  );
+  writeLine(stdout, `  Next action: ${report.nextAction}`);
+  writeLine(
+    stdout,
+    `  Candidate matrix: ${report.candidateMatrixEvidence.length} evidence record(s)`,
+  );
+  for (const item of report.candidateMatrixEvidence) {
+    writeLine(
+      stdout,
+      `    ${item.headRef ?? "no-ref"} ${item.intendedCiTier ?? "no-tier"} -> ${item.status}`,
+    );
+  }
+  writeLine(
+    stdout,
+    `  Protected target gate: ${report.protectedTargetGate.status} - ${report.protectedTargetGate.message}`,
+  );
+  for (const blocker of report.blockers) {
+    writeLine(stdout, `  Blocker: ${blocker}`);
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
   }
 }
 

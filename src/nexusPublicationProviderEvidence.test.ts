@@ -190,6 +190,16 @@ describe("publication provider evidence facade", () => {
       "merge_queue_group",
       "scheduled_validation",
     ]);
+    expect(
+      findNexusPublicationProviderEvidence(evidence, {
+        sourceKind: "merge_queue_group",
+        targetBranch: "main",
+        intendedCiTier: "protected_target",
+      }),
+    ).toMatchObject({
+      sourceKind: "merge_queue_group",
+      headRef: "refs/heads/gh-readonly-queue/main/pr-130",
+    });
   });
 
   it("reports missing required checks separately from missing provider evidence", () => {

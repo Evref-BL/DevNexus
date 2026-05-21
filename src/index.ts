@@ -55,6 +55,7 @@ export * from "./nexusProjectHosting.js";
 export * from "./nexusProjectHostingIntegrationFixture.js";
 export * from "./nexusProjectPluginRefresh.js";
 export * from "./nexusGreenMainPublication.js";
+export * from "./nexusMergeQueueReadiness.js";
 export * from "./nexusPublicationPolicy.js";
 export * from "./nexusCandidateBranchPlan.js";
 export * from "./nexusPublicationProviderEvidence.js";

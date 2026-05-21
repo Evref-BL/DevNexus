@@ -217,6 +217,10 @@ export function findNexusPublicationProviderEvidence(
     return true;
   });
 
+  if (!match.branchName && !match.headRef && !match.headSha) {
+    return candidates[0] ?? null;
+  }
+
   return candidates.find((candidate) => matchesRef(candidate, match)) ?? null;
 }
 

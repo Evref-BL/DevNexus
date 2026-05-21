@@ -1132,6 +1132,160 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints merge queue readiness from mocked provider and workflow evidence", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-merge-queue-");
+    const evidenceFile = path.join(projectRoot, "merge-queue-evidence.json");
+    const workflowTriggersFile = path.join(projectRoot, "workflow-triggers.json");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...defaultNexusAutomationConfig,
+          verification: {
+            ...defaultNexusAutomationConfig.verification,
+            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+          },
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "green_main",
+            targetBranch: "main",
+            greenMain: {
+              integrationPreference: "pull_request",
+              integrationBranch: null,
+              directTargetPush: "blocked",
+              mergeAuthority: "authorized_merge",
+              requiredChecks: [
+                "Node 24 check (ubuntu-latest)",
+                "Node 24 check (windows-latest)",
+                "Node 24 check (macos-latest)",
+              ],
+              staleChecks: "block",
+            },
+          },
+        },
+      }),
+    );
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "candidate_branch",
+            headRef: "candidate/0.2.0",
+            targetBranch: "main",
+            intendedCiTier: "candidate_matrix",
+            checks: [
+              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 24 check (windows-latest)", bucket: "pass" },
+              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+            ],
+          },
+          {
+            provider: "github",
+            sourceKind: "merge_queue_group",
+            headRef: "refs/heads/gh-readonly-queue/main/pr-130",
+            targetBranch: "main",
+            intendedCiTier: "protected_target",
+            checks: [
+              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 24 check (windows-latest)", bucket: "pass" },
+              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+    fs.writeFileSync(
+      workflowTriggersFile,
+      JSON.stringify({
+        workflowTriggers: [
+          {
+            workflowName: "CI",
+            events: ["pull_request", "merge_group"],
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const textOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "merge-queue-readiness",
+        projectRoot,
+        "--component",
+        "primary",
+        "--merge-queue-enabled",
+        "--evidence-file",
+        evidenceFile,
+        "--workflow-triggers-file",
+        workflowTriggersFile,
+      ],
+      { stdout: textOutput.writer, now: () => "2026-05-21T11:30:00.000Z" },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus merge queue readiness.");
+    expect(textOutput.output()).toContain(
+      "Merge queue: enabled workflowTrigger=present",
+    );
+    expect(textOutput.output()).toContain("Next action: wait");
+    expect(textOutput.output()).toContain("Protected target gate: success");
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "merge-queue-readiness",
+        projectRoot,
+        "--component",
+        "primary",
+        "--merge-queue-enabled",
+        "--evidence-file",
+        evidenceFile,
+        "--workflow-triggers-file",
+        workflowTriggersFile,
+        "--json",
+      ],
+      { stdout: jsonOutput.writer, now: () => "2026-05-21T11:30:00.000Z" },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "wait",
+      report: {
+        mergeQueue: {
+          enabled: true,
+          workflowTriggerStatus: "present",
+        },
+        candidateMatrixEvidence: [
+          {
+            sourceKind: "candidate_branch",
+            status: "success",
+          },
+        ],
+        protectedTargetGate: {
+          sourceKind: "merge_queue_group",
+          status: "success",
+        },
+      },
+    });
+  });
+
   it("prints publication train readiness in text and JSON", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-train-readiness-");
     saveProjectConfig(
