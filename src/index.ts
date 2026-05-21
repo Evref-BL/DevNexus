@@ -30,6 +30,7 @@ export * from "./nexusCoordinationRequest.js";
 export * from "./nexusCleanupPlan.js";
 export * from "./nexusCliVersionSkewDiagnostic.js";
 export * from "./nexusCiFailureIntake.js";
+export * from "./nexusCiTierPolicy.js";
 export * from "./nexusCoreMcpTools.js";
 export * from "./nexusWorkerContextBundle.js";
 export * from "./nexusEligibleWork.js";

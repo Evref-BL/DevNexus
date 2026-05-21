@@ -81,6 +81,7 @@ import {
   validateNexusVersionPlanningConfig,
   type NexusVersionPlanningConfig,
 } from "./nexusVersionPlanningConfig.js";
+import { validateNexusCiTierPolicyConfig } from "./nexusCiTierPolicy.js";
 
 export const devNexusProjectConfigFileName = "dev-nexus.project.json";
 export const nexusProjectWorktreesDirectoryName = "worktrees";
@@ -3644,11 +3645,15 @@ function validateComponentVerificationConfig(
   const focusedCommands = optionalStringArray(record, "focusedCommands", pathName);
   const fullCommands = optionalStringArray(record, "fullCommands", pathName);
   const requirePassing = optionalBoolean(record, "requirePassing", pathName);
+  const ciTiers = record.ciTiers === undefined
+    ? undefined
+    : validateNexusCiTierPolicyConfig(record.ciTiers, `${pathName}.ciTiers`);
 
   return {
     ...(focusedCommands !== undefined ? { focusedCommands } : {}),
     ...(fullCommands !== undefined ? { fullCommands } : {}),
     ...(requirePassing !== undefined ? { requirePassing } : {}),
+    ...(ciTiers !== undefined ? { ciTiers } : {}),
   };
 }
 
