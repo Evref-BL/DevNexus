@@ -374,6 +374,64 @@ function adaptedSuperpowersSkill(
   };
 }
 
+const mattPocockSkillsSource = {
+  uri: "https://github.com/mattpocock/skills",
+  commit: "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
+};
+
+const mattPocockSkillsLicenseText = `MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+
+function adaptedMattPocockSkill(
+  id: string,
+  name: string,
+  description: string,
+  sourcePaths: string[],
+  body: string,
+): NexusSkillDefinition {
+  return {
+    manifest: {
+      id,
+      name,
+      description,
+      version: "0.1.0-dev-nexus.0",
+      license: "MIT",
+      source: {
+        type: "git",
+        ...mattPocockSkillsSource,
+        paths: sourcePaths,
+      },
+      supportedAgents: ["codex", "claude"],
+      materialization: "copy",
+      sourceControl: "support",
+    },
+    files: {
+      [nexusSkillMarkdownFileName]: skillMarkdown(name, description, body),
+      LICENSE: mattPocockSkillsLicenseText,
+    },
+  };
+}
+
 const humanizerSkill: NexusSkillDefinition = {
   manifest: {
     id: "humanizer",
@@ -400,7 +458,7 @@ const humanizerSkill: NexusSkillDefinition = {
 const designWithUserSkill = adaptedSuperpowersSkill(
   "design-with-user",
   "design-with-user",
-  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be clarified before execution.",
+  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be shaped before execution.",
   ["skills/brainstorming/SKILL.md"],
   `
 # Design With User
@@ -436,6 +494,8 @@ scope, and risk decisions.
   approval.
 - Do not ask questions whose answers are discoverable from local context.
 - Do not hide unresolved decisions inside an implementation plan.
+- If the user already has a plan and wants it challenged, use \`grill-me\` or
+  \`grill-with-docs\` before returning to collaborative design.
 
 ## Attribution
 
@@ -445,6 +505,56 @@ Vincent / Prime Radiant. Source path:
 \`skills/brainstorming/SKILL.md\`.
 This DevNexus adaptation changes the workflow to support generic initiatives,
 DevNexus durable records, and risk-scaled design gates.
+`,
+);
+
+const grillMeSkill = adaptedMattPocockSkill(
+  "grill-me",
+  "grill-me",
+  "Plan and design interrogation workflow adapted from Matt Pocock's grill-me. Use when the user asks to be grilled, stress-test a plan, challenge assumptions, resolve a decision tree, or reach shared understanding through one-question-at-a-time pressure.",
+  ["skills/productivity/grill-me/SKILL.md"],
+  `
+# Grill Me
+
+Use this skill when the user wants a plan, design, proposal, or decision tree
+challenged through direct questioning. This is the general-purpose interview
+mode: the agent probes, recommends, and resolves branches; the user answers and
+decides.
+
+## Workflow
+
+1. State the plan or assumption being grilled so the target is explicit.
+2. Walk the decision tree one branch at a time. Resolve dependencies between
+   decisions before moving deeper.
+3. Ask one question at a time. Make it specific enough that the user can answer
+   or reject the premise.
+4. Include your recommended answer for each question, with the reason and the
+   tradeoff.
+5. If the answer can be discovered from code, docs, tracker state, or project
+   history, inspect that source instead of asking.
+6. Track resolved answers and open branches compactly so the conversation does
+   not lose state.
+7. Stop when the remaining uncertainty is explicit enough to design, plan,
+   reject, or defer.
+
+## Boundaries
+
+- Use \`design-with-user\` when no concrete plan exists and the goal is
+  collaborative shaping.
+- Use \`grill-with-docs\` when the challenge depends on domain docs, glossary
+  terms, Architecture Decision Records (ADRs), or code reality.
+- Do not turn grilling into broad debate. Keep each question tied to a decision
+  or assumption.
+- Do not ask multiple questions disguised as one.
+
+## Attribution
+
+Adapted from \`mattpocock/skills\` at commit
+\`b8be62ffacb0118fa3eaa29a0923c87c8c11985c\`, licensed under MIT by Matt
+Pocock. Source path:
+\`skills/productivity/grill-me/SKILL.md\`.
+This DevNexus adaptation adds role boundaries, durable-state expectations, and
+DevNexus-compatible source attribution.
 `,
 );
 
@@ -1225,6 +1335,7 @@ https://openai.github.io/openai-agents-python/human_in_the_loop/
 `,
   ),
   designWithUserSkill,
+  grillMeSkill,
   writeImplementationPlanSkill,
   executeInitiativePlanSkill,
   prepareDevNexusWorktreeSkill,
@@ -1310,19 +1421,27 @@ Use this skill when a project first enables curated agent skills, or when skills
   curatedCoreSkill(
     "grill-with-docs",
     "grill-with-docs",
-    "Plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records.",
+    "Evidence-backed plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records. Use when the challenge depends on durable project knowledge, not for general plan interrogation.",
     `
 # Grill With Docs
 
-Use this skill when a plan, design, or feature direction needs to be challenged before implementation.
+Use this skill when a plan, design, or feature direction needs to be challenged
+against durable project knowledge before implementation. This is not the
+general "grill me" interview mode; it is the docs, vocabulary, Architecture
+Decision Record (ADR), and code-reality variant.
 
 1. Read existing domain documentation first: root \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, and nearby \`docs/adr\` files when they exist.
 2. Cross-check the user's plan against code reality, existing glossary terms, and Architecture Decision Records (ADRs).
-3. Ask one high-leverage question at a time. Include your recommended answer, and explore the codebase instead of asking when the answer is discoverable.
+3. Ask one evidence-backed question at a time. Include your recommended answer, and explore the codebase instead of asking when the answer is discoverable.
 4. Challenge overloaded or vague words immediately. Propose one canonical term and record avoided aliases when the user confirms it.
 5. Capture resolved domain vocabulary in \`CONTEXT.md\` as a glossary, not a specification or implementation note.
 6. Offer an Architecture Decision Record only for decisions that are hard to reverse, surprising without context, and based on a real trade-off.
 7. Keep documentation updates small and inline with the conversation so decisions are not lost between runs.
+
+Use \`grill-me\` for a general one-question-at-a-time interrogation of a plan.
+Use \`design-with-user\` when the goal is collaborative shaping rather than
+challenge. Use \`architecture-review\` when the main task is evaluating module
+boundaries or long-lived contracts.
 
 Glossary entries should define workspace-specific concepts in one sentence, list avoided aliases where useful, and describe important relationships. Architecture Decision Records should briefly state the context, decision, and reason; optional sections belong only when they add real value.
 `,
