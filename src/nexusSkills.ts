@@ -374,6 +374,64 @@ function adaptedSuperpowersSkill(
   };
 }
 
+const mattPocockSkillsSource = {
+  uri: "https://github.com/mattpocock/skills",
+  commit: "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
+};
+
+const mattPocockSkillsLicenseText = `MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+
+function adaptedMattPocockSkill(
+  id: string,
+  name: string,
+  description: string,
+  sourcePaths: string[],
+  body: string,
+): NexusSkillDefinition {
+  return {
+    manifest: {
+      id,
+      name,
+      description,
+      version: "0.1.0-dev-nexus.0",
+      license: "MIT",
+      source: {
+        type: "git",
+        ...mattPocockSkillsSource,
+        paths: sourcePaths,
+      },
+      supportedAgents: ["codex", "claude"],
+      materialization: "copy",
+      sourceControl: "support",
+    },
+    files: {
+      [nexusSkillMarkdownFileName]: skillMarkdown(name, description, body),
+      LICENSE: mattPocockSkillsLicenseText,
+    },
+  };
+}
+
 const humanizerSkill: NexusSkillDefinition = {
   manifest: {
     id: "humanizer",
@@ -400,7 +458,7 @@ const humanizerSkill: NexusSkillDefinition = {
 const designWithUserSkill = adaptedSuperpowersSkill(
   "design-with-user",
   "design-with-user",
-  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be clarified before execution.",
+  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be shaped before execution.",
   ["skills/brainstorming/SKILL.md"],
   `
 # Design With User
@@ -436,6 +494,8 @@ scope, and risk decisions.
   approval.
 - Do not ask questions whose answers are discoverable from local context.
 - Do not hide unresolved decisions inside an implementation plan.
+- If the user already has a plan and wants it challenged, use \`grill-me\` or
+  \`grill-with-docs\` before returning to collaborative design.
 
 ## Attribution
 
@@ -445,6 +505,56 @@ Vincent / Prime Radiant. Source path:
 \`skills/brainstorming/SKILL.md\`.
 This DevNexus adaptation changes the workflow to support generic initiatives,
 DevNexus durable records, and risk-scaled design gates.
+`,
+);
+
+const grillMeSkill = adaptedMattPocockSkill(
+  "grill-me",
+  "grill-me",
+  "Plan and design interrogation workflow adapted from Matt Pocock's grill-me. Use when the user asks to be grilled, stress-test a plan, challenge assumptions, resolve a decision tree, or reach shared understanding through one-question-at-a-time pressure.",
+  ["skills/productivity/grill-me/SKILL.md"],
+  `
+# Grill Me
+
+Use this skill when the user wants a plan, design, proposal, or decision tree
+challenged through direct questioning. This is the general-purpose interview
+mode: the agent probes, recommends, and resolves branches; the user answers and
+decides.
+
+## Workflow
+
+1. State the plan or assumption being grilled so the target is explicit.
+2. Walk the decision tree one branch at a time. Resolve dependencies between
+   decisions before moving deeper.
+3. Ask one question at a time. Make it specific enough that the user can answer
+   or reject the premise.
+4. Include your recommended answer for each question, with the reason and the
+   tradeoff.
+5. If the answer can be discovered from code, docs, tracker state, or project
+   history, inspect that source instead of asking.
+6. Track resolved answers and open branches compactly so the conversation does
+   not lose state.
+7. Stop when the remaining uncertainty is explicit enough to design, plan,
+   reject, or defer.
+
+## Boundaries
+
+- Use \`design-with-user\` when no concrete plan exists and the goal is
+  collaborative shaping.
+- Use \`grill-with-docs\` when the challenge depends on domain docs, glossary
+  terms, Architecture Decision Records (ADRs), or code reality.
+- Do not turn grilling into broad debate. Keep each question tied to a decision
+  or assumption.
+- Do not ask multiple questions disguised as one.
+
+## Attribution
+
+Adapted from \`mattpocock/skills\` at commit
+\`b8be62ffacb0118fa3eaa29a0923c87c8c11985c\`, licensed under MIT by Matt
+Pocock. Source path:
+\`skills/productivity/grill-me/SKILL.md\`.
+This DevNexus adaptation adds role boundaries, durable-state expectations, and
+DevNexus-compatible source attribution.
 `,
 );
 
@@ -1102,49 +1212,130 @@ Use this skill when working inside a DevNexus-managed workspace.
   curatedCoreSkill(
     "initiative-workflow",
     "initiative-workflow",
-    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, or planning where slices should accumulate under one durable objective and integration or publication surface before final delivery. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid many separate final pull requests or publications.",
+    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, planning, or coordination where slices should accumulate under one durable objective, tracker anchor, and integration or publication surface. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid scattered pull requests, artifacts, or status threads.",
     `
 # Initiative Workflow
 
-Use this skill when work should continue through multiple slices before final delivery.
-Do not use it for small one-turn tasks that can be finished and verified directly.
+Use this skill when work should continue across multiple slices, turns,
+agents, artifacts, approvals, or review surfaces before final delivery. Do not
+use it for small one-turn tasks that can be finished and verified directly.
 
 An initiative is a durable work frame with one objective, one tracker anchor,
-one integration surface, and explicit done criteria. The surface may be a Git
-branch, artifact directory, document set, tracker epic, release train,
-coordination record, or another project-owned place where slices accumulate.
+one integration surface, and explicit done criteria. It is the outer frame for
+coherent long-running work, not a separate "take the lead" persona or a
+project-management ceremony. The surface may be a Git branch, pull request,
+artifact directory, document set, tracker epic, release train, coordination
+record, or another project-owned place where slices accumulate.
 
 ## Workflow
 
-1. Establish the initiative: objective, owner or coordinator, tracker anchor,
-   expected outputs, constraints, and done criteria.
-2. Choose the integration surface before starting slices. For Git-backed work,
-   use one long-lived branch or equivalent review surface; for non-code work,
-   choose the artifact, document, tracker, or coordination surface.
-3. Slice work so each slice has one owner, one scope, one verification path, and
-   a clear contribution to the initiative surface.
-4. Route slice results into the initiative surface instead of publishing many
-   unrelated final artifacts.
-5. Keep durable notes for decisions, blockers, provenance, reviews,
-   verification, and handoffs. In a DevNexus workspace, use DevNexus work items,
-   target-cycle facts, coordination handoffs, and publication policy.
-6. Ask for human decisions at scope, risk, approval, and publication gates. Do
-   not infer approval from silence or unrelated status changes.
-7. Publish only when the initiative is coherent, reviewed, verified, and meets
-   its done criteria.
-8. Close with a compact handoff: what shipped, what was verified, what remains,
-   and where the durable record lives.
+1. Establish the frame: objective, reason, owner or coordinator, tracker
+   anchor, expected outputs, constraints, non-goals, and done criteria.
+2. Choose the integration surface before the first slice. For Git-backed work,
+   use one branch or review surface; for non-code work, choose the document set,
+   artifact directory, tracker, release train, or coordination record.
+3. Inventory current state: prior decisions, active branches or artifacts,
+   verification already run, blockers, and unrelated work that must be
+   preserved.
+4. Slice by independently reviewable progress. Each slice needs one owner, one
+   scope, one verification path, and a clear contribution to the initiative
+   surface.
+5. Route every slice back to the initiative surface. If a slice wants a new
+   surface or objective, decide whether it belongs here or should become a
+   separate initiative.
+6. Keep a compact initiative log: decisions, blockers, provenance, review
+   state, verification, publication status, and handoffs. In a DevNexus
+   workspace, prefer work items, target-cycle facts, coordination handoffs, and
+   publication policy over ad hoc notes.
+7. Make recommendations at scope, risk, approval, and publication gates, but
+   the user decides. Do not infer approval from silence or unrelated status
+   changes.
+8. Reassess periodically. If the objective, risk, or done criteria changed,
+   update the frame, split the work, or stop before more slices accumulate.
+9. Publish or close only when the initiative is coherent, reviewed, verified,
+   approved where required, and meets its done criteria.
+10. Close with a compact handoff: what shipped, what was verified, what remains,
+    and where the durable record lives.
+
+## Companion Skills
+
+Use this as the outer frame. Use design, planning, worktree, execution, review,
+verification, diagnosis, and handoff skills for the slices themselves.
 
 ## Guardrails
 
 - Keep the initiative generic; do not force all work into a programming model.
-- Prefer one final publication path over many unrelated final publications.
+- Prefer one final publication path over many unrelated final publications,
+  unless the initiative explicitly owns multiple coordinated surfaces.
 - Do not let the initiative hide unrelated work, unresolved blockers, or
   unreviewed risky changes.
+- Do not turn a small direct fix into ceremony.
+- Do not couple the workflow to a generic "take the lead" skill; normal
+  collaboration rules still apply.
 - Refine the workflow notes separately when the skill needs more detail.
 `,
   ),
+  curatedCoreSkill(
+    "take-the-lead",
+    "take-the-lead",
+    "Agent-led collaboration workflow for when the user asks the agent to lead, drive, coordinate, decide the next steps, or act like a team lead while the user keeps final decision authority. Use when the user says take the lead, drive this, lead the work, be the team lead, keep us moving, or asks for role reversal where the agent recommends and executes while the user decides at gates.",
+    `
+# Take The Lead
+
+Use this skill when the user explicitly asks the agent to lead the work or
+reverse the usual roles. Agent leads the process; the user decides goals,
+constraints, approvals, and final direction.
+
+## Operating Contract
+
+1. State the objective, your recommended next step, and the assumptions you are
+   making.
+2. Gather context before asking questions. Ask only for decisions the user must
+   make, and include your recommendation when you have one.
+3. Keep momentum: choose the next reversible action, execute it, then report the
+   result and next decision point.
+4. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+   open-ended option dumps.
+5. Track commitments, blockers, verification, and the next action so the user
+   can decide from state, not from memory.
+6. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+   credentials, external provider writes, publication, destructive cleanup, or
+   live runtime gates.
+7. Close loops. When a decision is made, record what changed and continue from
+   that decision instead of relitigating it.
+
+## Pairing
+
+- Use \`initiative-workflow\` when the led work spans multiple slices or surfaces.
+- Use design, planning, diagnosis, review, verification, and handoff skills for
+  the actual work mode.
+- In a DevNexus workspace, record durable facts through work items,
+  target-cycle facts, coordination handoffs, and publication policy.
+
+## Guardrails
+
+- Do not seize control when the user asked for a direct answer, review, or small
+  fix.
+- Do not treat your recommendation as approval. The user decides at gates.
+- Do not hide uncertainty; lead by making uncertainty explicit and reducing it.
+- Do not override higher-priority instructions, workspace policy, or safety
+  gates.
+- Do not create status theater. Keep updates short, concrete, and tied to the
+  next decision or action.
+
+## Reference
+
+OpenAI's Agents SDK human-in-the-loop guide describes the approval pattern this
+skill follows at decision gates: pause sensitive action, surface the pending
+decision, approve or reject, then resume from durable state.
+Source: openai/openai-agents-python docs/human_in_the_loop.md at
+45effb4b7d7de1226ebba7ba304bccfcf0a37fdf.
+https://github.com/openai/openai-agents-python/blob/45effb4b7d7de1226ebba7ba304bccfcf0a37fdf/docs/human_in_the_loop.md
+https://openai.github.io/openai-agents-python/human_in_the_loop/
+`,
+  ),
   designWithUserSkill,
+  grillMeSkill,
   writeImplementationPlanSkill,
   executeInitiativePlanSkill,
   prepareDevNexusWorktreeSkill,
@@ -1230,19 +1421,27 @@ Use this skill when a project first enables curated agent skills, or when skills
   curatedCoreSkill(
     "grill-with-docs",
     "grill-with-docs",
-    "Plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records.",
+    "Evidence-backed plan-grilling workflow for stress-testing product or architecture decisions against code, domain vocabulary, glossary docs, and Architecture Decision Records. Use when the challenge depends on durable project knowledge, not for general plan interrogation.",
     `
 # Grill With Docs
 
-Use this skill when a plan, design, or feature direction needs to be challenged before implementation.
+Use this skill when a plan, design, or feature direction needs to be challenged
+against durable project knowledge before implementation. This is not the
+general "grill me" interview mode; it is the docs, vocabulary, Architecture
+Decision Record (ADR), and code-reality variant.
 
 1. Read existing domain documentation first: root \`CONTEXT.md\`, \`CONTEXT-MAP.md\`, and nearby \`docs/adr\` files when they exist.
 2. Cross-check the user's plan against code reality, existing glossary terms, and Architecture Decision Records (ADRs).
-3. Ask one high-leverage question at a time. Include your recommended answer, and explore the codebase instead of asking when the answer is discoverable.
+3. Ask one evidence-backed question at a time. Include your recommended answer, and explore the codebase instead of asking when the answer is discoverable.
 4. Challenge overloaded or vague words immediately. Propose one canonical term and record avoided aliases when the user confirms it.
 5. Capture resolved domain vocabulary in \`CONTEXT.md\` as a glossary, not a specification or implementation note.
 6. Offer an Architecture Decision Record only for decisions that are hard to reverse, surprising without context, and based on a real trade-off.
 7. Keep documentation updates small and inline with the conversation so decisions are not lost between runs.
+
+Use \`grill-me\` for a general one-question-at-a-time interrogation of a plan.
+Use \`design-with-user\` when the goal is collaborative shaping rather than
+challenge. Use \`architecture-review\` when the main task is evaluating module
+boundaries or long-lived contracts.
 
 Glossary entries should define workspace-specific concepts in one sentence, list avoided aliases where useful, and describe important relationships. Architecture Decision Records should briefly state the context, decision, and reason; optional sections belong only when they add real value.
 `,

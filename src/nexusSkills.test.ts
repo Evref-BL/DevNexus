@@ -95,6 +95,23 @@ describe("nexus skills", () => {
         paths: ["skills/brainstorming/SKILL.md"],
       },
     });
+    const grillMe = result.installed.find((skill) => skill.id === "grill-me");
+    expect(grillMe?.sourceControl).toBe("support");
+    expect(
+      fs.readFileSync(path.join(grillMe?.skillRoot ?? "", "LICENSE"), "utf8"),
+    ).toContain("Copyright (c) 2026 Matt Pocock");
+    expect(
+      JSON.parse(fs.readFileSync(grillMe?.manifestPath ?? "", "utf8")),
+    ).toMatchObject({
+      id: "grill-me",
+      license: "MIT",
+      source: {
+        type: "git",
+        uri: "https://github.com/mattpocock/skills",
+        commit: "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
+        paths: ["skills/productivity/grill-me/SKILL.md"],
+      },
+    });
     for (const [id, sourcePaths] of [
       ["write-implementation-plan", ["skills/writing-plans/SKILL.md"]],
       ["execute-initiative-plan", ["skills/executing-plans/SKILL.md"]],
@@ -228,13 +245,15 @@ describe("nexus skills", () => {
     expect(fs.existsSync(path.join(projectRoot, ".claude"))).toBe(false);
   });
 
-  it("includes planning and documentation skills with expanded acronyms", () => {
+  it("includes core workflow skills with expanded acronyms and attribution", () => {
     const skillIds = defaultCoreSkillPack.map((skill) => skill.manifest.id);
 
     expect(skillIds).toEqual([
       "dev-nexus",
       "initiative-workflow",
+      "take-the-lead",
       "design-with-user",
+      "grill-me",
       "write-implementation-plan",
       "execute-initiative-plan",
       "prepare-dev-nexus-worktree",
@@ -289,13 +308,43 @@ describe("nexus skills", () => {
       "one integration surface",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
-      "do not force all work into a programming model",
+      "outer frame",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
-      "target-cycle facts",
+      "user decides",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "separate initiative",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "do not force all work into a programming model",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Agent leads the process; the user decides",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "human-in-the-loop",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "https://openai.github.io/openai-agents-python/human_in_the_loop/",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "45effb4b7d7de1226ebba7ba304bccfcf0a37fdf",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "use `grill-me` or",
+    );
+    expect(skillMarkdown["grill-me"]).toContain(
+      "general-purpose interview",
+    );
+    expect(skillMarkdown["grill-me"]).toContain(
+      "b8be62ffacb0118fa3eaa29a0923c87c8c11985c",
     );
     expect(skillMarkdown["design-with-user"]).toContain(
       "Adapted from `obra/superpowers` version `5.1.0`",
+    );
+    expect(skillMarkdown["grill-with-docs"]).toContain(
+      "general \"grill me\" interview mode",
     );
     expect(skillMarkdown["design-with-user"]).toContain(
       "skills/brainstorming/SKILL.md",
