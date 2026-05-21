@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createHostAuthProfileCredentialBroker,
@@ -123,6 +124,51 @@ describe("provider credential broker", () => {
     expect(calls).toEqual([
       {
         command: "/secrets/github-app-token.mjs",
+        args: ["--repo", "DevNexus", "--format", "token"],
+      },
+    ]);
+  });
+
+  it("resolves home-relative command helpers with inline arguments", () => {
+    const homePath = path.join("/tmp", "dev-nexus-home");
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        appProfile({
+          command:
+            "home:secrets/github-apps/devnexus-automation/github-app-token.mjs --repo {repository.name} --format token",
+        }),
+      ],
+      homePath,
+      commandRunner: (command, args) => {
+        calls.push({ command, args });
+        return {
+          status: 0,
+          stdout: "issued-token",
+          stderr: "",
+        };
+      },
+    });
+
+    expect(
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "dev-nexus-app",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      }),
+    ).toMatchObject({
+      authorizationHeader: "Bearer issued-token",
+    });
+    expect(calls).toEqual([
+      {
+        command: path.join(
+          homePath,
+          "secrets/github-apps/devnexus-automation/github-app-token.mjs",
+        ),
         args: ["--repo", "DevNexus", "--format", "token"],
       },
     ]);

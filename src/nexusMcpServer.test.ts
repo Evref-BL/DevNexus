@@ -662,6 +662,77 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("loads default-home auth profiles for path-selected project status", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const homePath = makeTempDir("dev-nexus-home-");
+    const previousHome = process.env.DEV_NEXUS_HOME;
+    saveHomeConfig(homePath, [
+      {
+        id: "dev-nexus-app",
+        actorId: "dev-nexus-automation-app",
+        provider: "github",
+        kind: "app",
+        account: "devnexus-automation",
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            actor: {
+              id: "dev-nexus-automation-app",
+              kind: "app",
+              provider: "github",
+              handle: "devnexus-automation",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "dev-nexus-automation-app",
+              kind: "service_account",
+              provider: "github",
+              providerIdentity: "devnexus-automation",
+              displayName: "DevNexus Automation",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "dev-nexus-automation-app",
+              roles: ["maintainer"],
+              scope: { project: "mcp-demo" },
+            },
+          ],
+        },
+      }),
+    );
+
+    try {
+      process.env.DEV_NEXUS_HOME = homePath;
+      const result = toolJson(
+        await callDevNexusMcpTool("project_status", {
+          project: projectRoot,
+        }),
+      );
+
+      expect(result.project.authority.problemComponents[0].actor).toMatchObject({
+        status: "matched",
+        actorId: "dev-nexus-automation-app",
+        handle: "devnexus-automation",
+      });
+    } finally {
+      if (previousHome === undefined) {
+        delete process.env.DEV_NEXUS_HOME;
+      } else {
+        process.env.DEV_NEXUS_HOME = previousHome;
+      }
+    }
+  });
+
   it("returns project hosting status and plan through MCP tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-hosting-");
     saveProjectConfig(
@@ -2443,6 +2514,156 @@ describe("DevNexus MCP server", () => {
     expect(toolJson(oversizedList)).toMatchObject({
       ok: false,
       error: "arguments.limit must be at most 100",
+    });
+  });
+
+  it("uses host auth profiles when MCP opens GitHub work-item providers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    const homePath = path.join(projectRoot, "home");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const commandRuns: Array<{ command: string; args: string[] }> = [];
+    const requests: Array<{ url: string; headers: Record<string, string> }> = [];
+    saveHomeConfig(homePath, [
+      {
+        id: "dev-nexus-app",
+        actorId: "dev-nexus-automation-app",
+        provider: "github",
+        kind: "app",
+        credentialKind: "github_app",
+        account: "devnexus-automation",
+        host: "github.com",
+        command: "home:secrets/github-app-token.mjs --format token",
+        environmentKeys: ["GH_TOKEN"],
+      },
+    ]);
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        home: homePath,
+        automation: {
+          ...defaultNexusAutomationConfig,
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            actor: {
+              id: "dev-nexus-automation-app",
+              kind: "app",
+              provider: "github",
+              handle: "devnexus-automation",
+            },
+          },
+        },
+        authority: {
+          actors: [
+            {
+              id: "dev-nexus-automation-app",
+              kind: "service_account",
+              provider: "github",
+              providerIdentity: "devnexus-automation",
+              displayName: "DevNexus Automation",
+            },
+          ],
+          roleBindings: [
+            {
+              actorId: "dev-nexus-automation-app",
+              roles: ["maintainer"],
+              scope: { project: "mcp-demo" },
+            },
+          ],
+        },
+        components: [
+          {
+            id: "primary",
+            name: "MCP Demo",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:mcp/demo.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                name: "GitHub",
+                enabled: true,
+                roles: ["primary"],
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "mcp-demo",
+                  },
+                },
+              },
+            ],
+            relationships: [],
+          },
+        ],
+      }),
+    );
+
+    const result = toolJson(
+      await callDevNexusMcpTool(
+        "work_item_get",
+        {
+          projectRoot,
+          componentId: "primary",
+          trackerId: "github",
+          id: "github-7",
+        },
+        {
+          workItemCredentialCommandRunner: (command, args) => {
+            commandRuns.push({ command, args });
+            return {
+              status: 0,
+              stdout: "installation-token",
+              stderr: "",
+            };
+          },
+          workItemProviderOptions: {
+            github: {
+              credentialRunner: false,
+              fetch: (async (input, init = {}) => {
+                requests.push({
+                  url: String(input),
+                  headers: init.headers as Record<string, string>,
+                });
+                return new Response(
+                  JSON.stringify({
+                    id: 7,
+                    number: 7,
+                    title: "Credentialed GitHub issue",
+                    state: "open",
+                    labels: [],
+                  }),
+                  {
+                    status: 200,
+                    headers: { "content-type": "application/json" },
+                  },
+                );
+              }) as typeof fetch,
+            },
+          },
+        },
+      ),
+    );
+
+    expect(result.error).toBeUndefined();
+    expect(result).toMatchObject({ ok: true });
+    expect(result.workItem).toMatchObject({
+      id: "github-7",
+      title: "Credentialed GitHub issue",
+    });
+    expect(commandRuns).toEqual([
+      {
+        command: path.join(homePath, "secrets/github-app-token.mjs"),
+        args: ["--format", "token"],
+      },
+    ]);
+    expect(requests[0]).toMatchObject({
+      url: "https://api.github.com/repos/example/mcp-demo/issues/7",
+      headers: {
+        Authorization: "Bearer installation-token",
+      },
     });
   });
 

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import type {
   NexusHostingAuthProfileConfig,
   NexusHostingAuthProfileCredentialKind,
@@ -94,6 +95,8 @@ export type NexusProviderCredentialCommandRunner = (
 
 export interface HostAuthProfileCredentialBrokerOptions {
   authProfiles: NexusHostingAuthProfileConfig[];
+  projectRoot?: string;
+  homePath?: string;
   env?: Record<string, string | undefined>;
   now?: Date | string | (() => Date | string);
   commandRunner?: NexusProviderCredentialCommandRunner;
@@ -193,6 +196,8 @@ export function defaultProviderCredentialCommandRunner(
 
 class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
   private readonly authProfiles: NexusHostingAuthProfileConfig[];
+  private readonly projectRoot: string;
+  private readonly homePath?: string;
   private readonly env: Record<string, string | undefined>;
   private readonly now: () => Date;
   private readonly commandRunner: NexusProviderCredentialCommandRunner;
@@ -202,6 +207,8 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
 
   constructor(options: HostAuthProfileCredentialBrokerOptions) {
     this.authProfiles = options.authProfiles;
+    this.projectRoot = options.projectRoot ?? process.cwd();
+    this.homePath = options.homePath;
     this.env = options.env ?? process.env;
     this.now = normalizeNow(options.now);
     this.commandRunner =
@@ -228,7 +235,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     if (request.purpose === "cli" && profile.githubCliConfigDir) {
       return credentialBase(profile, request, purposes, {
         kind: profile.credentialKind ?? "provider_cli",
-        env: { GH_CONFIG_DIR: profile.githubCliConfigDir },
+        env: { GH_CONFIG_DIR: this.resolveConfiguredPath(profile.githubCliConfigDir) },
       });
     }
 
@@ -309,7 +316,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     if (request.purpose === "cli" && profile.githubCliConfigDir) {
       return credentialBase(profile, request, purposes, {
         kind: profile.credentialKind ?? "provider_cli",
-        env: { GH_CONFIG_DIR: profile.githubCliConfigDir },
+        env: { GH_CONFIG_DIR: this.resolveConfiguredPath(profile.githubCliConfigDir) },
       });
     }
 
@@ -425,10 +432,12 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     request: NexusProviderCredentialRequest,
     purposes: NexusProviderCredentialPurpose[],
   ): NexusResolvedProviderCredential {
-    const args = (profile.commandArgs ?? []).map((arg) =>
-      expandCommandArg(arg, request),
+    const command = credentialCommandInvocation(profile, request, (value) =>
+      this.resolveConfiguredPath(value),
     );
-    const result = this.commandRunner(profile.command!, args, { env: this.env });
+    const result = this.commandRunner(command.command, command.args, {
+      env: this.env,
+    });
     if (result.status !== 0 || result.error) {
       const detail =
         result.stderr.trim() || result.stdout.trim() || result.error?.message;
@@ -528,7 +537,10 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     request: NexusProviderCredentialRequest,
     purposes: NexusProviderCredentialPurpose[],
   ): Promise<NexusResolvedProviderCredential> {
-    const githubApp = profile.githubApp!;
+    const githubApp = {
+      ...profile.githubApp!,
+      privateKeyPath: this.resolveConfiguredPath(profile.githubApp!.privateKeyPath),
+    };
     const installationAccount = githubApp.installationAccount ?? profile.account;
     if (!installationAccount) {
       throw new NexusProviderCredentialBrokerError(
@@ -662,6 +674,14 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
 
     return payload as T;
   }
+
+  private resolveConfiguredPath(value: string): string {
+    return resolvePortableCredentialPath({
+      value,
+      projectRoot: this.projectRoot,
+      homePath: this.homePath,
+    });
+  }
 }
 
 function normalizeNow(
@@ -686,6 +706,118 @@ function dateFromValue(value: Date | string): Date {
     );
   }
   return date;
+}
+
+function credentialCommandInvocation(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+  resolvePath: (value: string) => string,
+): { command: string; args: string[] } {
+  const commandLine = requiredCommand(profile);
+  const splitCommand =
+    profile.commandArgs && profile.commandArgs.length > 0
+      ? { command: commandLine, args: profile.commandArgs }
+      : splitCredentialCommandLine(commandLine, profile.id);
+
+  return {
+    command: resolvePath(expandCommandArg(splitCommand.command, request)),
+    args: splitCommand.args.map((arg) =>
+      resolvePath(expandCommandArg(arg, request)),
+    ),
+  };
+}
+
+function requiredCommand(profile: NexusHostingAuthProfileConfig): string {
+  const command = profile.command?.trim();
+  if (!command) {
+    throw new NexusProviderCredentialBrokerError(
+      "missing_secret",
+      `Auth profile ${profile.id} does not configure a credential command.`,
+      { profileId: profile.id },
+    );
+  }
+
+  return command;
+}
+
+function splitCredentialCommandLine(
+  commandLine: string,
+  profileId: string,
+): { command: string; args: string[] } {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "'" | "\"" | null = null;
+  let escaping = false;
+  for (const character of commandLine) {
+    if (escaping) {
+      current += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) {
+        quote = null;
+      } else {
+        current += character;
+      }
+      continue;
+    }
+    if (character === "'" || character === "\"") {
+      quote = character;
+      continue;
+    }
+    if (/\s/u.test(character)) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += character;
+  }
+  if (escaping) {
+    current += "\\";
+  }
+  if (quote) {
+    throw new NexusProviderCredentialBrokerError(
+      "invalid_command_output",
+      `Credential command for profile ${profileId} has an unterminated quote.`,
+      { profileId },
+    );
+  }
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+  const [command, ...args] = tokens;
+  if (!command) {
+    throw new NexusProviderCredentialBrokerError(
+      "missing_secret",
+      `Auth profile ${profileId} does not configure a credential command.`,
+      { profileId },
+    );
+  }
+
+  return { command, args };
+}
+
+function resolvePortableCredentialPath(options: {
+  value: string;
+  projectRoot: string;
+  homePath?: string;
+}): string {
+  if (!/^(componentsRoot|projectRoot|projectParent|home|sourcesRoot):/u.test(options.value)) {
+    return options.value;
+  }
+
+  return resolveNexusProjectPath({
+    projectRoot: options.projectRoot,
+    value: options.value,
+    ...(options.homePath ? { homePath: options.homePath } : {}),
+  });
 }
 
 function normalizeProviderName(provider: string): string {
