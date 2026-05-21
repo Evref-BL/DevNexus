@@ -8,6 +8,7 @@ import {
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
   nexusWorktreeLeaseKind,
+  renderNexusDashboardClientModule,
   saveProjectConfig,
   writeNexusWorktreeLeaseStore,
   type GitCommandResult,
@@ -242,5 +243,19 @@ describe("nexus dashboard", () => {
       ]),
     );
     expect(snapshot.weave.edges.some((edge) => edge.kind === "selected")).toBe(true);
+  });
+
+  it("renders a client module with explicit light and dark mode controls", () => {
+    const module = renderNexusDashboardClientModule();
+
+    expect(module).toContain("dev-nexus-dashboard-theme");
+    expect(module).toContain("data-dev-nexus-theme");
+    expect(module).toContain("data-theme-mode=\"system\"");
+    expect(module).toContain("data-theme-mode=\"light\"");
+    expect(module).toContain("data-theme-mode=\"dark\"");
+    expect(module).toContain(":root[data-dev-nexus-theme='light']");
+    expect(module).toContain(":root[data-dev-nexus-theme='dark']");
+    expect(module).toContain("color-scheme");
+    expect(module).toContain("prefers-color-scheme");
   });
 });

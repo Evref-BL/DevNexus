@@ -99,7 +99,9 @@ The browser module exports `mountDevNexusDashboard(root, options)` and
 `fetchDevNexusDashboard(baseUrl)`. A multi-tenant orchestration app should treat
 these as embeddable cockpit primitives: the host owns tenant selection,
 authentication, persistence, and policy; DevNexus owns the project-specific
-workspace facts and capability-gated next actions.
+workspace facts and capability-gated next actions. The mounted dashboard
+includes a persisted `system` / `light` / `dark` theme control; hosts can set
+the initial mode with `mountDevNexusDashboard(root, { theme: "light" })`.
 
 Then record the work it selected:
 
