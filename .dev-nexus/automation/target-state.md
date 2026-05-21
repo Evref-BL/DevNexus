@@ -32,13 +32,14 @@ and ready for coordinator-driven work across its components.
 
 ## Current Decisions
 
-- Agent-created Git/GitHub activity must use the configured `Gabot-Darbot`
-  automation identity and `bot` remotes unless the user explicitly says
-  otherwise.
-- The `Gabot-Darbot` GitHub bot account currently has reduced/sanctioned
-  permissions. Agents must not assume it can create or advance pull requests;
-  after any branch push, hand off the PR/review action to the user with branch,
-  commit, and verification details.
+- Agent-created GitHub activity for Evref-BL repositories should use the
+  DevNexus Automation GitHub App (`devnexus-automation[bot]`) through the
+  host-local App profile and installation-token helper. The former
+  `Gabot-Darbot` machine-user identity is not the active automation actor.
+- App-backed Git transport and publication are not complete yet. Component
+  source publication remains green-main guarded and must not rely on the old
+  bot SSH profile; use handoff/manual integration until credential brokering,
+  the forge facade, and App HTTPS push support land.
 - Component source publication uses green-main policy: branch/PR validation,
   required Node 24 checks on Ubuntu, Windows, and macOS, and authorized merge
   only after checks are green.
@@ -71,8 +72,9 @@ and ready for coordinator-driven work across its components.
 - Provider-native coordination remains incomplete enough that GitHub comments
   and GitHub issues should be treated as the durable human-visible record when
   coordination handoff readback is unavailable.
-- Bot-side PR creation/advancement may be unavailable under the current
-  `Gabot-Darbot` account restrictions. Published branches need human PR handoff.
+- App-backed publication is incomplete. Published branches need human PR
+  handoff or an explicitly configured non-bot fallback until the credential
+  broker, forge facade, and App HTTPS push support land.
 
 ## Next Direction
 

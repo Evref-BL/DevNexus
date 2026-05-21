@@ -22,13 +22,6 @@
         "name": "origin",
         "role": "human",
         "protocol": "ssh"
-      },
-      {
-        "name": "bot",
-        "role": "automation",
-        "protocol": "ssh",
-        "authProfile": "bot-github",
-        "sshHost": "github.com-bot"
       }
     ],
     "provisioning": {
@@ -38,13 +31,14 @@
   "authority": {
     "actors": [
       {
-        "id": "dogfood-automation-bot",
-        "kind": "machine_user",
+        "id": "dev-nexus-automation-app",
+        "kind": "service_account",
         "provider": "github",
-        "providerIdentity": "Gabot-Darbot",
-        "displayName": "Gabot-Darbot",
+        "providerIdentity": "devnexus-automation",
+        "displayName": "DevNexus Automation",
         "handles": {
-          "github": "Gabot-Darbot"
+          "github": "devnexus-automation[bot]",
+          "githubApp": "devnexus-automation"
         }
       },
       {
@@ -60,7 +54,7 @@
     ],
     "roleBindings": [
       {
-        "actorId": "dogfood-automation-bot",
+        "actorId": "dev-nexus-automation-app",
         "roles": [
           "maintainer"
         ],
@@ -247,12 +241,9 @@
       },
       "publication": {
         "strategy": "green_main",
-        "remote": "bot",
+        "remote": "app",
         "targetBranch": "main",
         "push": false,
-        "commandEnvironment": {
-          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-        },
         "greenMain": {
           "integrationPreference": "pull_request",
           "directTargetPush": "blocked",
@@ -278,6 +269,16 @@
             ],
             "labels": []
           }
+        },
+        "actor": {
+          "kind": "app",
+          "provider": "github",
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
+        },
+        "gitIdentity": {
+          "name": "devnexus-automation[bot]",
+          "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
         }
       },
       "relationships": []
@@ -343,12 +344,9 @@
       ],
       "publication": {
         "strategy": "green_main",
-        "remote": "bot",
+        "remote": "app",
         "targetBranch": "main",
         "push": false,
-        "commandEnvironment": {
-          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-        },
         "greenMain": {
           "integrationPreference": "pull_request",
           "directTargetPush": "blocked",
@@ -359,6 +357,16 @@
             "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
+        },
+        "actor": {
+          "kind": "app",
+          "provider": "github",
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
+        },
+        "gitIdentity": {
+          "name": "devnexus-automation[bot]",
+          "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
         }
       },
       "relationships": [
@@ -438,12 +446,9 @@
       },
       "publication": {
         "strategy": "green_main",
-        "remote": "bot",
+        "remote": "app",
         "targetBranch": "main",
         "push": false,
-        "commandEnvironment": {
-          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-        },
         "greenMain": {
           "integrationPreference": "pull_request",
           "directTargetPush": "blocked",
@@ -454,6 +459,16 @@
             "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
+        },
+        "actor": {
+          "kind": "app",
+          "provider": "github",
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
+        },
+        "gitIdentity": {
+          "name": "devnexus-automation[bot]",
+          "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
         }
       },
       "relationships": [
@@ -518,12 +533,9 @@
       },
       "publication": {
         "strategy": "green_main",
-        "remote": "bot",
+        "remote": "app",
         "targetBranch": "main",
         "push": false,
-        "commandEnvironment": {
-          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-        },
         "greenMain": {
           "integrationPreference": "pull_request",
           "directTargetPush": "blocked",
@@ -534,6 +546,16 @@
             "Node 24 check (macos-latest)"
           ],
           "staleChecks": "block"
+        },
+        "actor": {
+          "kind": "app",
+          "provider": "github",
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
+        },
+        "gitIdentity": {
+          "name": "devnexus-automation[bot]",
+          "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
         }
       },
       "relationships": [
@@ -598,12 +620,9 @@
       },
       "publication": {
         "strategy": "green_main",
-        "remote": "bot",
+        "remote": "app",
         "targetBranch": "main",
         "push": false,
-        "commandEnvironment": {
-          "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-        },
         "greenMain": {
           "integrationPreference": "pull_request",
           "directTargetPush": "blocked",
@@ -614,6 +633,16 @@
             "macos-latest Node 24 check"
           ],
           "staleChecks": "block"
+        },
+        "actor": {
+          "kind": "app",
+          "provider": "github",
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
+        },
+        "gitIdentity": {
+          "name": "devnexus-automation[bot]",
+          "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
         }
       },
       "relationships": [
@@ -1115,7 +1144,7 @@
           "executor": "codex",
           "model": "gpt-5.5",
           "reasoning": "xhigh",
-            "command": "codex",
+          "command": "codex",
           "args": [
             "exec",
             "--model",
@@ -1124,18 +1153,18 @@
             "model_reasoning_effort=xhigh",
             "-c",
             "approval_policy=never",
-              "--sandbox",
-              "danger-full-access",
-              "--cd",
-              "projectRoot:",
-              "--add-dir",
-              "sourcesRoot:dev-nexus",
-              "--add-dir",
-              "sourcesRoot:dev-nexus-pharo",
-              "--add-dir",
-              "sourcesRoot:dev-nexus-typescript",
-              "--output-last-message",
-              "projectRoot:.dev-nexus/automation/last-codex-message.md",
+            "--sandbox",
+            "danger-full-access",
+            "--cd",
+            "projectRoot:",
+            "--add-dir",
+            "sourcesRoot:dev-nexus",
+            "--add-dir",
+            "sourcesRoot:dev-nexus-pharo",
+            "--add-dir",
+            "sourcesRoot:dev-nexus-typescript",
+            "--output-last-message",
+            "projectRoot:.dev-nexus/automation/last-codex-message.md",
             "Use the DevNexus dogfood coordinator instructions in AGENTS.md. Read DEV_NEXUS_AGENT_CONTEXT_FILE, inspect DevNexus eligible work and agent profiles, choose the largest safe bounded batch from eligible work items, and use parallel subagents for independent items when useful, respecting DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS and disjoint component/worktree write scopes. Update work items and target cycle records, supervise subagent results, verify and publish according to component policy, and write JSON to DEV_NEXUS_AGENT_RESULT_FILE before exiting."
           ]
         },
@@ -1144,17 +1173,17 @@
           "executor": "codex",
           "model": "gpt-5.4-mini",
           "reasoning": "medium",
-            "command": "codex",
+          "command": "codex",
           "args": [
             "exec",
             "--model",
             "gpt-5.4-mini",
             "-c",
             "approval_policy=never",
-              "--sandbox",
-              "workspace-write",
-              "--cd",
-              "projectRoot:",
+            "--sandbox",
+            "workspace-write",
+            "--cd",
+            "projectRoot:",
             "Read DEV_NEXUS_AGENT_CONTEXT_FILE and handle a small bounded verification or documentation work item."
           ]
         }
@@ -1180,14 +1209,14 @@
     },
     "publication": {
       "strategy": "green_main",
-      "remote": "bot",
+      "remote": "app",
       "targetBranch": "main",
       "push": false,
       "actor": {
-        "kind": "machine_user",
+        "kind": "app",
         "provider": "github",
-        "handle": "Gabot-Darbot",
-        "id": "dogfood-automation-bot"
+        "handle": "devnexus-automation",
+        "id": "dev-nexus-automation-app"
       },
       "manualRemote": "origin",
       "manualActor": {
@@ -1196,15 +1225,16 @@
         "handle": "Gabriel-Darbord",
         "id": "dogfood-human-maintainer"
       },
-      "commandEnvironment": {
-        "GH_CONFIG_DIR": "home:.config/gh-automation-github"
-      },
       "greenMain": {
         "integrationPreference": "pull_request",
         "directTargetPush": "blocked",
         "mergeAuthority": "authorized_merge",
         "requiredChecks": [],
         "staleChecks": "block"
+      },
+      "gitIdentity": {
+        "name": "devnexus-automation[bot]",
+        "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
       }
     }
   }

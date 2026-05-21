@@ -42,15 +42,13 @@ chooses implementation work.
   `unsafe-live-runtime`, and does not require a public dogfood label.
 - After selector or issue-status changes, run eligible-work discovery before
   assuming the heartbeat queue is empty.
-- The dogfood workspace repository records `origin` and `bot` remotes. Agent-created
-  Git/GitHub activity must use the `Gabot-Darbot` automation identity via
-  `GH_CONFIG_DIR=home:.config/gh-automation-github` and the `bot` remote unless
-  the user explicitly says otherwise.
-- The `Gabot-Darbot` GitHub bot account currently has reduced/sanctioned
-  permissions. Agents should assume branch pushes may still work but PR creation
-  and other provider-side PR workflow steps may be blocked; after pushing any
-  branch, hand off the PR/review step to the user with branch, commit, and
-  verification details.
+- Agent-created GitHub activity for Evref-BL repositories should use the
+  DevNexus Automation GitHub App (`devnexus-automation[bot]`) through the
+  host-local App profile and installation-token helper. The former
+  `Gabot-Darbot` machine-user identity is not the active automation actor.
+  App-backed Git transport and publication are still being implemented, so
+  source publication remains guarded by green-main handoff policy until the
+  credential broker, forge facade, and App HTTPS push path land.
 - Dogfood component publication uses green-main policy: branch or pull-request
   validation first, required Node 24 checks on Ubuntu, Windows, and macOS, then
   authorized merge after checks are green.
@@ -91,9 +89,9 @@ chooses implementation work.
 - External coordination should use provider-native systems such as GitHub
   Issues, GitHub pull requests, GitLab, or Jira while DevNexus stores neutral
   request and response state.
-- Because `Gabot-Darbot` is currently restricted, pushed source or metadata
-  branches require a human PR handoff instead of assuming the bot can open or
-  advance the pull request.
+- App-backed publication is still incomplete. Until the credential broker,
+  forge facade, and App HTTPS push path land, pushed source or metadata branches
+  require a human PR handoff or an explicitly configured non-bot fallback.
 - Live Pharo images, PLexus open/close, Docker, package installs, and
   destructive runtime cleanup require an approved isolated runner profile.
 
