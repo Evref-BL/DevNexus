@@ -134,6 +134,11 @@ The older `quick-fix` helper is a specialized GitHub path. Keep it in
 provider-specific runbooks or CLI help until DevNexus has a neutral provider
 facade for issue status, request creation, checks, and merge decisions.
 
+The default publication posture is `review_handoff`: an agent prepares a branch
+and records verification, then a user or maintainer decides what to publish. See
+[Publication workflows](publication-workflows.md) before opting into
+green-main, CI tiers, merge queues, or publication trains.
+
 For green-main publication, save provider check data and let DevNexus classify
 the pull request or merge request before any merge attempt. Check collection is
 provider-specific until DevNexus has a neutral collector adapter, but the
@@ -151,6 +156,15 @@ The plan reports required-check state, failed job names, platform labels,
 available failing step or test details, merge refusal reasons, and the exact
 merge or rerun command only when policy allows it. Unknown failures stay manual
 investigation items.
+
+Advanced publication helpers are opt-in planning commands. Use them only after
+the workspace policy enables the matching workflow:
+
+```bash
+dev-nexus publication train-readiness <workspace-root> --version v-next
+dev-nexus publication candidate-plan <workspace-root> --version v-next
+dev-nexus publication merge-queue-readiness <workspace-root> --component core
+```
 
 Prepared worktrees carry ownership metadata: component id, source root,
 generated path, branch, base ref, and owning work item. The generated path must

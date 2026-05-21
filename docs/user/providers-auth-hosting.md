@@ -154,6 +154,11 @@ dev-nexus workspace hosting apply <workspace-root>
 
 Publication policy describes what agents may do after verification.
 
+The default posture is `review_handoff`. It keeps the first workspace simple:
+the agent prepares a branch or handoff, records verification, and leaves
+publication to the user or maintainer. Version planning, publication trains, CI
+tiers, merge queues, and remote runners are optional additions.
+
 Common postures:
 
 - `local_only`: record work locally, no publication.
@@ -161,6 +166,9 @@ Common postures:
 - `direct_integration`: integrate directly when policy allows.
 - `green_main`: validate through required checks before merging to the target
   branch.
+
+See [Publication workflows](publication-workflows.md) for the simple default
+configuration and the opt-in green-main, CI tier, and publication train path.
 
 For hosted workspaces, prefer explicit bot remotes and bot auth profiles for
 agent-created Git and provider activity.
