@@ -43,15 +43,15 @@ describe("nexus skills", () => {
     expect(
       fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"),
     ).toContain(".dev-nexus/skills/");
-    const diagnose = result.installed.find((skill) => skill.id === "diagnose");
-    expect(diagnose?.sourceControl).toBe("support");
-    expect(fs.readFileSync(diagnose?.skillPath ?? "", "utf8")).toContain(
-      "name: diagnose",
+    const devNexus = result.installed.find((skill) => skill.id === "dev-nexus");
+    expect(devNexus?.sourceControl).toBe("support");
+    expect(fs.readFileSync(devNexus?.skillPath ?? "", "utf8")).toContain(
+      "name: dev-nexus",
     );
     expect(
-      JSON.parse(fs.readFileSync(diagnose?.manifestPath ?? "", "utf8")),
+      JSON.parse(fs.readFileSync(devNexus?.manifestPath ?? "", "utf8")),
     ).toMatchObject({
-      id: "diagnose",
+      id: "dev-nexus",
       source: {
         type: "curated",
         uri: "dev-nexus:core",
@@ -75,6 +75,64 @@ describe("nexus skills", () => {
         commit: "8b3a17889fbf12bedae20974a3c9f9de746ed754",
       },
     });
+    const designWithUser = result.installed.find(
+      (skill) => skill.id === "design-with-user",
+    );
+    expect(designWithUser?.sourceControl).toBe("support");
+    expect(
+      fs.readFileSync(path.join(designWithUser?.skillRoot ?? "", "LICENSE"), "utf8"),
+    ).toContain("Copyright (c) 2025 Jesse Vincent");
+    expect(
+      JSON.parse(fs.readFileSync(designWithUser?.manifestPath ?? "", "utf8")),
+    ).toMatchObject({
+      id: "design-with-user",
+      license: "MIT",
+      source: {
+        type: "git",
+        uri: "https://github.com/obra/superpowers",
+        tag: "v5.1.0",
+        commit: "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+        paths: ["skills/brainstorming/SKILL.md"],
+      },
+    });
+    for (const [id, sourcePaths] of [
+      ["write-implementation-plan", ["skills/writing-plans/SKILL.md"]],
+      ["execute-initiative-plan", ["skills/executing-plans/SKILL.md"]],
+      ["prepare-dev-nexus-worktree", ["skills/using-git-worktrees/SKILL.md"]],
+      [
+        "parallel-work-dispatch",
+        [
+          "skills/dispatching-parallel-agents/SKILL.md",
+          "skills/subagent-driven-development/SKILL.md",
+        ],
+      ],
+      ["request-work-review", ["skills/requesting-code-review/SKILL.md"]],
+      ["receive-review-feedback", ["skills/receiving-code-review/SKILL.md"]],
+      ["verify-before-completion", ["skills/verification-before-completion/SKILL.md"]],
+      ["finish-dev-nexus-branch", ["skills/finishing-a-development-branch/SKILL.md"]],
+      ["diagnose", ["skills/systematic-debugging/SKILL.md"]],
+      ["tdd", ["skills/test-driven-development/SKILL.md"]],
+      ["write-agent-skill", ["skills/writing-skills/SKILL.md"]],
+    ] as const) {
+      const skill = result.installed.find((entry) => entry.id === id);
+      expect(skill?.sourceControl).toBe("support");
+      expect(
+        fs.readFileSync(path.join(skill?.skillRoot ?? "", "LICENSE"), "utf8"),
+      ).toContain("Copyright (c) 2025 Jesse Vincent");
+      expect(
+        JSON.parse(fs.readFileSync(skill?.manifestPath ?? "", "utf8")),
+      ).toMatchObject({
+        id,
+        license: "MIT",
+        source: {
+          type: "git",
+          uri: "https://github.com/obra/superpowers",
+          tag: "v5.1.0",
+          commit: "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+          paths: sourcePaths,
+        },
+      });
+    }
   });
 
   it("projects selected skills into configured agent-native directories", () => {
@@ -175,12 +233,23 @@ describe("nexus skills", () => {
 
     expect(skillIds).toEqual([
       "dev-nexus",
+      "initiative-workflow",
+      "design-with-user",
+      "write-implementation-plan",
+      "execute-initiative-plan",
+      "prepare-dev-nexus-worktree",
+      "parallel-work-dispatch",
+      "request-work-review",
+      "receive-review-feedback",
+      "verify-before-completion",
+      "finish-dev-nexus-branch",
       "diagnose",
       "tdd",
       "handoff",
       "triage",
       "architecture-review",
       "setup-agent-skills",
+      "write-agent-skill",
       "grill-with-docs",
       "documentation",
       "humanizer",
@@ -216,7 +285,89 @@ describe("nexus skills", () => {
     expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
     expect(skillMarkdown["dev-nexus"]).toContain("workspace/meta worktree");
     expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "one integration surface",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "do not force all work into a programming model",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "target-cycle facts",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "Adapted from `obra/superpowers` version `5.1.0`",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "skills/brainstorming/SKILL.md",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "generic initiatives",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "skills/writing-plans/SKILL.md",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "one initiative or delivery surface",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "human-in-the-loop gates",
+    );
+    expect(skillMarkdown["execute-initiative-plan"]).toContain(
+      "skills/executing-plans/SKILL.md",
+    );
+    expect(skillMarkdown["execute-initiative-plan"]).toContain(
+      "initiative or delivery surface",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "skills/using-git-worktrees/SKILL.md",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "worktree_prepare",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "workspace/meta worktree",
+    );
+    expect(skillMarkdown["parallel-work-dispatch"]).toContain(
+      "skills/dispatching-parallel-agents/SKILL.md",
+    );
+    expect(skillMarkdown["parallel-work-dispatch"]).toContain(
+      "must not revert edits made by others",
+    );
+    expect(skillMarkdown["request-work-review"]).toContain(
+      "skills/requesting-code-review/SKILL.md",
+    );
+    expect(skillMarkdown["request-work-review"]).toContain(
+      "severity with concrete file",
+    );
+    expect(skillMarkdown["receive-review-feedback"]).toContain(
+      "skills/receiving-code-review/SKILL.md",
+    );
+    expect(skillMarkdown["receive-review-feedback"]).toContain(
+      "External feedback is input to evaluate",
+    );
+    expect(skillMarkdown["verify-before-completion"]).toContain(
+      "skills/verification-before-completion/SKILL.md",
+    );
+    expect(skillMarkdown["verify-before-completion"]).toContain(
+      "fresh verification",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "skills/finishing-a-development-branch/SKILL.md",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "green-main policy",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "Do not silently",
+    );
+    expect(skillMarkdown.diagnose).toContain(
+      "skills/systematic-debugging/SKILL.md",
+    );
+    expect(skillMarkdown.diagnose).toContain("root cause");
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
+    expect(skillMarkdown.tdd).toContain(
+      "skills/test-driven-development/SKILL.md",
+    );
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",
     );
@@ -248,6 +399,12 @@ describe("nexus skills", () => {
       "autonomous agent-ready (AFK)",
     );
     expect(skillMarkdown["setup-agent-skills"]).not.toContain("matt");
+    expect(skillMarkdown["write-agent-skill"]).toContain(
+      "skills/writing-skills/SKILL.md",
+    );
+    expect(skillMarkdown["write-agent-skill"]).toContain(
+      "exact commit hash",
+    );
     expect(skillMarkdown["to-issues"]).toContain(
       "Product Requirements Document (PRD)",
     );
