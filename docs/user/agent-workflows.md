@@ -84,6 +84,10 @@ event stream, and the current work weave. `dashboard weave` returns only the
 graph-shaped lineage data so another app can render it with its own navigation,
 auth, tenant, and project shell.
 
+The served cockpit uses the same snapshot but intentionally folds the weave into
+an interactive work-history view with click-to-inspect details. The API keeps
+the full graph; the browser view defaults to a curated overview.
+
 The local server exposes:
 
 ```text

@@ -257,5 +257,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain(":root[data-dev-nexus-theme='dark']");
     expect(module).toContain("color-scheme");
     expect(module).toContain("prefers-color-scheme");
+    expect(module).toContain("data-select-id");
+    expect(module).toContain("Work History");
+    expect(module).toContain("selectedDetail");
+    expect(module).toContain("overviewNodes");
   });
 });
