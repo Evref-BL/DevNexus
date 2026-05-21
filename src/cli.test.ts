@@ -7,13 +7,16 @@ import {
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
+  defaultNexusPublicationTrainCiTierPolicy,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
+  nexusWorktreeLeaseKind,
   readNexusAutomationRunLedger,
   readNexusAutomationTargetCycleLedger,
   saveProjectConfig,
   shellQuoteArgument,
+  writeNexusWorktreeLeaseStore,
   type NexusEligibleWorkClaimProviderFactory,
   type GitCommandResult,
   type GitRunner,
@@ -28,6 +31,7 @@ import {
   type WorkItemQuery,
   type WorkItemRef,
   type WorkTrackerProvider,
+  type NexusWorktreeLeaseRecord,
 } from "./index.js";
 
 const tempDirs: string[] = [];
@@ -147,6 +151,60 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     },
     ...overrides,
+  };
+}
+
+function publicationTrainLease(options: {
+  projectId: string;
+  componentId: string;
+  workItemId: string;
+  branchName: string;
+}): NexusWorktreeLeaseRecord {
+  return {
+    kind: nexusWorktreeLeaseKind,
+    version: 1,
+    id: "lease-cli-train",
+    projectId: options.projectId,
+    scope: {
+      kind: "component",
+      componentId: options.componentId,
+    },
+    hostId: "host-1",
+    agentId: null,
+    workItemId: options.workItemId,
+    branchName: options.branchName,
+    baseRef: "main",
+    worktree: {
+      kind: "component_worktree",
+      base: "componentWorktreesRoot",
+      componentId: options.componentId,
+      relativePath: "train-readiness",
+    },
+    writeScope: ["src/nexusPublicationTrainReadiness.ts"],
+    status: "ready",
+    createdAt: "2026-05-21T10:00:00.000Z",
+    lastSeenAt: "2026-05-21T10:00:00.000Z",
+    updatedAt: "2026-05-21T10:00:00.000Z",
+    refreshCount: 0,
+    lastObservedHeadCommit: "abc123",
+    dirty: false,
+    pushed: true,
+    git: {
+      repository: {
+        kind: "component_worktree",
+        base: "componentWorktreesRoot",
+        componentId: options.componentId,
+        relativePath: "train-readiness",
+      },
+      upstream: `origin/${options.branchName}`,
+      ahead: 0,
+      behind: 0,
+      stagedCount: 0,
+      unstagedCount: 0,
+      untrackedCount: 0,
+      warnings: [],
+    },
+    notes: [],
   };
 }
 
@@ -980,6 +1038,165 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(invalidOutput.output()).error.message).toContain(
       invalidChecksFile,
     );
+  });
+
+  it("prints publication train readiness in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-train-readiness-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        components: [
+          {
+            id: "primary",
+            name: "Primary",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "git@example.invalid:demo/project.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            relationships: [],
+          },
+        ],
+        automation: {
+          ...defaultNexusAutomationConfig,
+          verification: {
+            ...defaultNexusAutomationConfig.verification,
+            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+          },
+          publication: {
+            ...defaultNexusAutomationConfig.publication,
+            strategy: "green_main",
+            targetBranch: "main",
+          },
+        },
+        versionPlanning: {
+          versions: [
+            {
+              id: "0.2.0",
+              objective: "Ship train readiness.",
+              owningComponents: ["primary"],
+              targetBranch: "main",
+              scope: [
+                {
+                  kind: "work_item",
+                  status: "committed",
+                  componentId: "primary",
+                  trackerId: null,
+                  workItemId: "github-120",
+                },
+              ],
+              readinessGates: [],
+              releasePolicy: {
+                tags: "none",
+                packages: "none",
+                providerRelease: "none",
+                releaseNotes: "none",
+                changelog: "none",
+              },
+            },
+          ],
+        },
+      }),
+    );
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        publicationTrainLease({
+          projectId: "demo-project",
+          componentId: "primary",
+          workItemId: "github-120",
+          branchName: "codex/train-readiness",
+        }),
+      ],
+    });
+    const evidenceFile = path.join(projectRoot, "train-evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            branchName: "candidate/0.2.0",
+            checks: [
+              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 24 check (windows-latest)", bucket: "pass" },
+              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const textOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "train-readiness",
+        projectRoot,
+        "--evidence-file",
+        evidenceFile,
+      ],
+      {
+        stdout: textOutput.writer,
+        now: () => "2026-05-21T10:05:00.000Z",
+      },
+    );
+
+    expect(textOutput.output()).toContain(
+      "DevNexus publication train readiness.",
+    );
+    expect(textOutput.output()).toContain("Next action: create_candidate_branch");
+    expect(textOutput.output()).toContain("Version 0.2.0: 1 branch(es), 1 eligible");
+    expect(textOutput.output()).toContain(
+      "primary github-120 codex/train-readiness -> eligible",
+    );
+    expect(textOutput.output()).toContain(
+      "next=candidate_matrix evidence=success",
+    );
+
+    const jsonOutput = captureOutput();
+    await main(
+      [
+        "publication",
+        "train-readiness",
+        projectRoot,
+        "--full-matrix-budget-exhausted",
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+        now: () => "2026-05-21T10:05:00.000Z",
+      },
+    );
+
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "wait",
+      summary: {
+        itemCount: 1,
+        eligibleCount: 0,
+        budgetLimitedCount: 1,
+      },
+      report: {
+        components: [
+          {
+            items: [
+              {
+                workItemId: "github-120",
+                candidateEligibility: "wait",
+                ciTier: {
+                  tier: {
+                    id: "remote_smoke",
+                  },
+                  budgetLimited: true,
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
   });
 
   it("keeps onboarding documentation command examples on the CLI surface", () => {
