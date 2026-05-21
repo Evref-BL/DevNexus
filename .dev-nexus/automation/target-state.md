@@ -17,11 +17,13 @@ and ready for coordinator-driven work across its components.
   which includes the coordination handoff guard recovery fix.
 - Dogfood metadata `main` is synced through PR #19 / merge commit `79b3407`,
   which refreshed local archive statuses for GitHub #50 and #55.
-- The active automation selector is `status:ready` plus `dogfood`, excluding
-  `blocked` and `unsafe-live-runtime`.
-- Current eligible-work discovery reports no matching work item. Open GitHub
-  issues still exist, but they are `todo`, `blocked`, missing `dogfood`, or
-  excluded by safety labels.
+- The active automation selector is `status:ready`, excluding `blocked` and
+  `unsafe-live-runtime`; it does not require a public dogfood label.
+- The primary DevNexus component has a publication-train policy for the active
+  version-planning scope. It defaults candidate work to smoke-first CI and
+  budgets full matrix CI by time or change count.
+- Re-run eligible-work discovery after selector or issue-status changes before
+  assuming the heartbeat queue is empty.
 - DevNexus runtime projection policy is source-current: fresh shells should use
   the refreshed global `dev-nexus` command built from
   `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus`, while generated MCP
@@ -58,9 +60,8 @@ and ready for coordinator-driven work across its components.
 
 ## Active Blockers
 
-- No work is currently eligible for the heartbeat selector. A human or
-  coordinator must promote a dependency-satisfied issue to `status:ready`, or
-  explicitly choose work outside the selector.
+- Heartbeat selection needs a fresh eligible-work check after selector or
+  issue-status changes; do not assume public dogfood labels are required.
 - Several remaining items are blocked on human policy decisions, especially
   live runtime/remote-host policy, advanced authority/self-approval policy,
   DevNexus-Research license posture, and sync/mirroring policy.
