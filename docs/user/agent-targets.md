@@ -141,7 +141,7 @@ configuration.
 For interactive setup, choose only the agent providers this workspace will
 actually use first. For answer-file setup, list the desired providers in the
 setup answers and review the generated `dev-nexus.project.json` before applying
-with `--yes`.
+without `--dry-run`.
 
 After setup, verify the selected target surfaces:
 

@@ -95,8 +95,8 @@ function saveGreenMainProject(): string {
               directTargetPush: "blocked",
               mergeAuthority: "authorized_merge",
               requiredChecks: [
-                "Node 24 check (ubuntu-latest)",
-                "Node 24 check (windows-latest)",
+                "Node 22 check (ubuntu-latest)",
+                "Node 22 check (windows-latest)",
               ],
               staleChecks: "block",
             },
@@ -126,12 +126,12 @@ describe("green-main publication planning", () => {
       headBranch: "codex/primary/green-main",
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
           link: "https://github.com/example/demo/actions/runs/1001/job/1",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "pass",
           link: "https://github.com/example/demo/actions/runs/1002/job/2",
         },
@@ -176,11 +176,11 @@ describe("green-main publication planning", () => {
       prNumber: 12,
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "fail",
           workflow: "Node CI",
           link: "https://github.com/example/demo/actions/runs/1002/job/2",
@@ -199,7 +199,7 @@ describe("green-main publication planning", () => {
     expect(plan.rerun.decision).toBe("blocked_policy");
     expect(plan.failedJobs).toMatchObject([
       {
-        name: "Node 24 check (windows-latest)",
+        name: "Node 22 check (windows-latest)",
         platform: "windows-latest",
         workflow: "Node CI",
         runId: "1002",
@@ -219,11 +219,11 @@ describe("green-main publication planning", () => {
       prNumber: 12,
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "fail",
           link: "https://github.com/example/demo/actions/runs/1002/job/2",
         },
@@ -241,11 +241,11 @@ describe("green-main publication planning", () => {
       prNumber: 12,
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "fail",
           link: "https://github.com/example/demo/actions/runs/1002/job/2",
         },
@@ -272,11 +272,11 @@ describe("green-main publication planning", () => {
       prNumber: 12,
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "fail",
         },
       ],

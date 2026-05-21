@@ -51,7 +51,7 @@ describe("quick-fix planning", () => {
       remote: "bot",
       targetBranch: "main",
       commandEnvironment: {},
-      requiredChecks: ["Node 24 check (ubuntu-latest)"],
+      requiredChecks: ["Node 22 check (ubuntu-latest)"],
     });
     expect(plan.startSteps[0]!.operation).toMatchObject({
       provider: "github",
@@ -192,7 +192,7 @@ function projectConfig(
             integrationPreference: "pull_request",
             directTargetPush: "blocked",
             mergeAuthority: "authorized_merge",
-            requiredChecks: ["Node 24 check (ubuntu-latest)"],
+            requiredChecks: ["Node 22 check (ubuntu-latest)"],
             staleChecks: "block",
           },
         },

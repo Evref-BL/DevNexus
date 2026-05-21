@@ -201,8 +201,9 @@ Example:
 }
 ```
 
-`workspace setup` records hosting intent and reports the next commands. It does
-not create repositories or mutate provider state.
+`workspace init` records hosting intent and reports the next commands.
+`workspace setup` is an alias for the same local setup flow. Neither command
+creates repositories or mutates provider state.
 
 Inspect hosting state:
 

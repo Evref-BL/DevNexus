@@ -211,7 +211,7 @@ describe("version readiness reporter", () => {
             kind: "checks_green",
             required: true,
             components: ["core"],
-            checkNames: ["Node 24 check (ubuntu-latest)"],
+            checkNames: ["Node 22 check (ubuntu-latest)"],
           },
           { kind: "release_authority", required: true, components: ["core"] },
         ],
@@ -238,7 +238,7 @@ describe("version readiness reporter", () => {
           ],
         }),
         greenMainValidation: [
-          greenMain("core", "green", ["Node 24 check (ubuntu-latest)"]),
+          greenMain("core", "green", ["Node 22 check (ubuntu-latest)"]),
         ],
       },
     });

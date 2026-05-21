@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -9,14 +10,24 @@ import {
 } from "./index.js";
 
 const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
+const tempDirs: string[] = [];
 
 afterEach(() => {
+  for (const tempDir of tempDirs.splice(0)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
   if (originalDevNexusHome === undefined) {
     delete process.env.DEV_NEXUS_HOME;
   } else {
     process.env.DEV_NEXUS_HOME = originalDevNexusHome;
   }
 });
+
+function makeTempDir(prefix: string): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return tempDir;
+}
 
 function ttyInput(): NodeJS.ReadStream {
   const stream = new PassThrough() as NodeJS.ReadStream;
@@ -46,6 +57,7 @@ function captureOutput(options: {
 describe("nexus workspace setup wizard", () => {
   it("uses the TTY path as the user quickstart without prompting for home", async () => {
     const defaultHome = path.join(os.tmpdir(), "dev-nexus-user-quickstart-home");
+    const projectRoot = makeTempDir("dev-nexus-quickstart-project-");
     process.env.DEV_NEXUS_HOME = defaultHome;
     const stdin = ttyInput();
     const promptAnswers = [
@@ -72,7 +84,7 @@ describe("nexus workspace setup wizard", () => {
     });
 
     const answersPromise = loadNexusProjectSetupAnswers({
-      projectRoot: "/tmp/quickstart-project",
+      projectRoot,
       stdin,
       stdout: stdout.stream,
     });
@@ -86,7 +98,7 @@ describe("nexus workspace setup wizard", () => {
       project: {
         id: "quickstart-demo",
         name: "Quickstart Demo",
-        root: "/tmp/quickstart-project",
+        root: projectRoot,
         initializeGit: true,
       },
       components: [
@@ -94,8 +106,9 @@ describe("nexus workspace setup wizard", () => {
           id: "primary",
           role: "primary",
           source: {
-            kind: "reference_existing",
-            path: ".",
+            kind: "create_local",
+            path: "components/primary",
+            initializeGit: true,
           },
         },
       ],
@@ -111,13 +124,14 @@ describe("nexus workspace setup wizard", () => {
   });
 
   it("collects additional components through an explicit repeat prompt", async () => {
+    const projectRoot = makeTempDir("dev-nexus-multi-component-project-");
     const stdin = ttyInput();
     const promptAnswers = [
       "",
       "Multi Component Demo",
       "",
       "core",
-      ".",
+      "",
       "yes",
       "api",
       "packages/api",
@@ -145,7 +159,7 @@ describe("nexus workspace setup wizard", () => {
     });
 
     const answers = await loadNexusProjectSetupAnswers({
-      projectRoot: "/tmp/multi-component-project",
+      projectRoot,
       stdin,
       stdout: stdout.stream,
     });
@@ -157,8 +171,9 @@ describe("nexus workspace setup wizard", () => {
         name: "core",
         role: "primary",
         source: {
-          kind: "reference_existing",
-          path: ".",
+          kind: "create_local",
+          path: "components/core",
+          initializeGit: true,
         },
       },
       {
@@ -166,8 +181,9 @@ describe("nexus workspace setup wizard", () => {
         name: "api",
         role: "dependency",
         source: {
-          kind: "reference_existing",
+          kind: "create_local",
           path: "packages/api",
+          initializeGit: true,
         },
       },
       {
@@ -175,14 +191,58 @@ describe("nexus workspace setup wizard", () => {
         name: "paper",
         role: "optional",
         source: {
-          kind: "reference_existing",
+          kind: "create_local",
           path: "docs/paper",
+          initializeGit: true,
         },
       },
     ]);
     expect(stdout.output()).toContain("Add another component? (yes/no)");
     expect(stdout.output()).toContain("Additional component role");
     expect(stdout.output()).toContain("Additional components cannot use role primary.");
+  });
+
+  it("does not create missing outside paths from the user quickstart defaults", async () => {
+    const projectRoot = makeTempDir("dev-nexus-outside-path-project-");
+    const missingOutsidePath = path.join(
+      os.tmpdir(),
+      `dev-nexus-missing-outside-${process.pid}-${Date.now()}`,
+    );
+    const stdin = ttyInput();
+    const promptAnswers = [
+      "",
+      "Outside Path Demo",
+      "",
+      "external",
+      missingOutsidePath,
+      "",
+      "",
+      "",
+      "",
+    ];
+    const stdout = captureOutput({
+      onWrite(chunk) {
+        if (!chunk.includes(": ") || promptAnswers.length === 0) {
+          return;
+        }
+        const answer = promptAnswers.shift()!;
+        queueMicrotask(() => {
+          stdin.write(`${answer}\n`);
+        });
+      },
+    });
+
+    const answers = await loadNexusProjectSetupAnswers({
+      projectRoot,
+      stdin,
+      stdout: stdout.stream,
+    });
+    stdin.destroy();
+
+    expect(answers?.components[0]?.source).toEqual({
+      kind: "reference_existing",
+      path: missingOutsidePath,
+    });
   });
 
   it("builds first-run next actions from the applied workspace config", () => {
