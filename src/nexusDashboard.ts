@@ -92,6 +92,7 @@ export interface NexusDashboardProviderAction {
   href: string;
   provider: "github" | "web";
   kind: NexusDashboardProviderActionKind;
+  title: string | null;
 }
 
 export interface BuildNexusDashboardSnapshotOptions
@@ -658,7 +659,7 @@ export function buildNexusDashboardWeave(options: {
       id: authorityNodeId,
       kind: "authority",
       laneId: "authority",
-      label: "Bot permissions",
+      label: "Human approval",
       detail: authorityDashboardSummary(options.authority),
       status: options.authority.blockedActionCount > 0 ? "blocked" : "ready",
       timestamp: null,
@@ -711,10 +712,10 @@ function authorityDashboardSummary(authority: NexusDashboardAuthoritySummary): s
   const blocked = authority.blockedActionCount;
   const fallbacks = authority.fallbackActionCount;
   if (blocked > 0) {
-    return `${blocked} provider ${plural(blocked, "action", "actions")} blocked. The automation bot needs a human handoff for publication.`;
+    return `${blocked} provider ${plural(blocked, "action", "actions")} need human approval. Review or open the provider item manually.`;
   }
   if (fallbacks > 0) {
-    return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} use handoff instead of direct automation.`;
+    return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} need a human approval path.`;
   }
   return `Publication permissions are ready for ${componentCount} ${plural(componentCount, "component", "components")}.`;
 }
@@ -785,6 +786,7 @@ function providerActionsForHref(
         href: normalized,
         provider: "github",
         kind: "pull-request",
+        title: null,
       },
     ];
   }
@@ -796,6 +798,7 @@ function providerActionsForHref(
         href: normalized,
         provider: "github",
         kind: "issue",
+        title: null,
       },
     ];
   }
@@ -805,6 +808,7 @@ function providerActionsForHref(
       href: normalized,
       provider: normalized.startsWith("https://github.com/") ? "github" : "web",
       kind: "provider-link",
+      title: null,
     },
   ];
 }
@@ -826,33 +830,84 @@ function providerActionsFromText(
   if (repositoryUrl) {
     for (const match of text.matchAll(/\b(?:PR|pull request)\s*#(\d+)\b/giu)) {
       const number = match[1];
+      const title = actionTitleFromText(text, number);
       actions.push({
-        label: `Open PR #${number}`,
+        label: actionLabel("pull-request", number, title),
         href: `${repositoryUrl}/pull/${number}`,
         provider: "github",
         kind: "pull-request",
+        title,
       });
     }
     for (const match of text.matchAll(/\b(?:issue|GitHub)\s*#(\d+)\b/giu)) {
       const number = match[1];
+      const title = actionTitleFromText(text, number);
       actions.push({
-        label: `Open issue #${number}`,
+        label: actionLabel("issue", number, title),
         href: `${repositoryUrl}/issues/${number}`,
         provider: "github",
         kind: "issue",
+        title,
       });
     }
     for (const match of text.matchAll(/\bgithub-(\d+)\b/giu)) {
       const number = match[1];
+      const title = actionTitleFromText(text, number);
       actions.push({
-        label: `Open issue #${number}`,
+        label: actionLabel("issue", number, title),
         href: `${repositoryUrl}/issues/${number}`,
         provider: "github",
         kind: "issue",
+        title,
       });
     }
   }
   return uniqueProviderActions(actions).slice(0, 3);
+}
+
+function actionLabel(
+  kind: NexusDashboardProviderActionKind,
+  number: string,
+  title: string | null,
+): string {
+  const prefix = kind === "pull-request" ? `PR #${number}` : `#${number}`;
+  return title ? `${prefix}: ${title}` : prefix;
+}
+
+function actionTitleFromText(text: string, number: string): string | null {
+  const branch = new RegExp(
+    `(?:github-${escapeRegExp(number)}|#${escapeRegExp(number)})(?:[-_/])([A-Za-z0-9][A-Za-z0-9/_-]{2,80})`,
+    "iu",
+  ).exec(text);
+  if (branch?.[1]) {
+    return compactActionTitle(branch[1]);
+  }
+  const providerTitle = new RegExp(
+    `(?:\\b(?:PR|pull request|issue|GitHub)\\s*)?#${escapeRegExp(number)}\\s*[:\\-]\\s*([^.;\\n]{3,80})`,
+    "iu",
+  ).exec(text);
+  if (providerTitle?.[1]) {
+    return compactActionTitle(providerTitle[1]);
+  }
+  const completed = new RegExp(
+    `Completed\\s+([^.;\\n]{1,80}?)\\s+(?:via|in)\\s+[^.;\\n]*#${escapeRegExp(number)}`,
+    "iu",
+  ).exec(text);
+  if (completed?.[1]) {
+    return compactActionTitle(completed[1]);
+  }
+  return null;
+}
+
+function compactActionTitle(value: string): string | null {
+  const text = value
+    .replace(/[/_-]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (!text) {
+    return null;
+  }
+  return text.length > 54 ? `${text.slice(0, 51)}...` : text;
 }
 
 function inferComponentIdFromText(
@@ -880,14 +935,22 @@ function authorityProviderActions(
   providerUrls: NexusDashboardProviderUrls,
 ): NexusDashboardProviderAction[] {
   return uniqueProviderActions(
-    authority.components.flatMap((component) =>
-      providerActionsFromText(
-        [...component.blockedActions, ...component.warnings].join(" "),
-        providerUrls,
-        component.componentId,
+    [
+      ...authority.components.flatMap((component) =>
+        providerActionsFromText(
+          [...component.blockedActions, ...component.warnings].join(" "),
+          providerUrls,
+          component.componentId,
+        ),
       ),
-    ),
-  );
+      ...authority.components.flatMap((component) =>
+        providerActionsForHref(
+          componentProviderUrl(providerUrls, component.componentId),
+          `Open ${component.componentId} repo`,
+        ),
+      ),
+    ],
+  ).slice(0, 3);
 }
 
 function uniqueProviderActions(

@@ -192,7 +192,7 @@ describe("nexus dashboard", () => {
         projectId: "dashboard-demo",
         targetId: "dashboard",
         status: "dispatched",
-        summary: "Completed via DevNexus PR #66.",
+        summary: "Completed via DevNexus PR #66: provider links.",
         workItems: [
           {
             componentId: "primary",
@@ -247,7 +247,7 @@ describe("nexus dashboard", () => {
       href: "https://github.com/Evref-BL/DevNexus/pull/66",
       actions: [
         {
-          label: "Open PR #66",
+          label: "PR #66: provider links",
           href: "https://github.com/Evref-BL/DevNexus/pull/66",
           provider: "github",
           kind: "pull-request",
@@ -258,7 +258,7 @@ describe("nexus dashboard", () => {
       href: "https://github.com/Evref-BL/DevNexus/issues/114",
       actions: [
         {
-          label: "Open issue #114",
+          label: "#114: dashboard",
           href: "https://github.com/Evref-BL/DevNexus/issues/114",
           provider: "github",
           kind: "issue",
@@ -285,14 +285,16 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-select-id");
     expect(module).toContain("Workspace Activity");
     expect(module).toContain("Parallel work map");
-    expect(module).toContain("Bot permissions");
+    expect(module).toContain("Human approval");
     expect(module).toContain("selectedDetail");
     expect(module).toContain("timelineLanes");
     expect(module).toContain("renderBranchGraph");
     expect(module).toContain("dn-branch-svg");
     expect(module).toContain("const rowHeight = 34");
     expect(module).toContain("data-row-height");
-    expect(module).toContain("dn-history-chip");
+    expect(module).toContain("renderRailLabels");
+    expect(module).toContain("providerIcon");
+    expect(module).toContain("externalLinkIcon");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
     expect(module).toContain("-webkit-line-clamp: 3");
     expect(module).toContain("dn-action-strip");
