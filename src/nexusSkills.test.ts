@@ -289,10 +289,16 @@ describe("nexus skills", () => {
       "one integration surface",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
-      "do not force all work into a programming model",
+      "outer frame",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
-      "target-cycle facts",
+      "user decides",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "separate initiative",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "do not force all work into a programming model",
     );
     expect(skillMarkdown["design-with-user"]).toContain(
       "Adapted from `obra/superpowers` version `5.1.0`",

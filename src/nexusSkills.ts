@@ -1102,45 +1102,66 @@ Use this skill when working inside a DevNexus-managed workspace.
   curatedCoreSkill(
     "initiative-workflow",
     "initiative-workflow",
-    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, or planning where slices should accumulate under one durable objective and integration or publication surface before final delivery. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid many separate final pull requests or publications.",
+    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, planning, or coordination where slices should accumulate under one durable objective, tracker anchor, and integration or publication surface. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid scattered pull requests, artifacts, or status threads.",
     `
 # Initiative Workflow
 
-Use this skill when work should continue through multiple slices before final delivery.
-Do not use it for small one-turn tasks that can be finished and verified directly.
+Use this skill when work should continue across multiple slices, turns,
+agents, artifacts, approvals, or review surfaces before final delivery. Do not
+use it for small one-turn tasks that can be finished and verified directly.
 
 An initiative is a durable work frame with one objective, one tracker anchor,
-one integration surface, and explicit done criteria. The surface may be a Git
-branch, artifact directory, document set, tracker epic, release train,
-coordination record, or another project-owned place where slices accumulate.
+one integration surface, and explicit done criteria. It is the outer frame for
+coherent long-running work, not a separate "take the lead" persona or a
+project-management ceremony. The surface may be a Git branch, pull request,
+artifact directory, document set, tracker epic, release train, coordination
+record, or another project-owned place where slices accumulate.
 
 ## Workflow
 
-1. Establish the initiative: objective, owner or coordinator, tracker anchor,
-   expected outputs, constraints, and done criteria.
-2. Choose the integration surface before starting slices. For Git-backed work,
-   use one long-lived branch or equivalent review surface; for non-code work,
-   choose the artifact, document, tracker, or coordination surface.
-3. Slice work so each slice has one owner, one scope, one verification path, and
-   a clear contribution to the initiative surface.
-4. Route slice results into the initiative surface instead of publishing many
-   unrelated final artifacts.
-5. Keep durable notes for decisions, blockers, provenance, reviews,
-   verification, and handoffs. In a DevNexus workspace, use DevNexus work items,
-   target-cycle facts, coordination handoffs, and publication policy.
-6. Ask for human decisions at scope, risk, approval, and publication gates. Do
-   not infer approval from silence or unrelated status changes.
-7. Publish only when the initiative is coherent, reviewed, verified, and meets
-   its done criteria.
-8. Close with a compact handoff: what shipped, what was verified, what remains,
-   and where the durable record lives.
+1. Establish the frame: objective, reason, owner or coordinator, tracker
+   anchor, expected outputs, constraints, non-goals, and done criteria.
+2. Choose the integration surface before the first slice. For Git-backed work,
+   use one branch or review surface; for non-code work, choose the document set,
+   artifact directory, tracker, release train, or coordination record.
+3. Inventory current state: prior decisions, active branches or artifacts,
+   verification already run, blockers, and unrelated work that must be
+   preserved.
+4. Slice by independently reviewable progress. Each slice needs one owner, one
+   scope, one verification path, and a clear contribution to the initiative
+   surface.
+5. Route every slice back to the initiative surface. If a slice wants a new
+   surface or objective, decide whether it belongs here or should become a
+   separate initiative.
+6. Keep a compact initiative log: decisions, blockers, provenance, review
+   state, verification, publication status, and handoffs. In a DevNexus
+   workspace, prefer work items, target-cycle facts, coordination handoffs, and
+   publication policy over ad hoc notes.
+7. Make recommendations at scope, risk, approval, and publication gates, but
+   the user decides. Do not infer approval from silence or unrelated status
+   changes.
+8. Reassess periodically. If the objective, risk, or done criteria changed,
+   update the frame, split the work, or stop before more slices accumulate.
+9. Publish or close only when the initiative is coherent, reviewed, verified,
+   approved where required, and meets its done criteria.
+10. Close with a compact handoff: what shipped, what was verified, what remains,
+    and where the durable record lives.
+
+## Companion Skills
+
+Use this as the outer frame. Use design, planning, worktree, execution, review,
+verification, diagnosis, and handoff skills for the slices themselves.
 
 ## Guardrails
 
 - Keep the initiative generic; do not force all work into a programming model.
-- Prefer one final publication path over many unrelated final publications.
+- Prefer one final publication path over many unrelated final publications,
+  unless the initiative explicitly owns multiple coordinated surfaces.
 - Do not let the initiative hide unrelated work, unresolved blockers, or
   unreviewed risky changes.
+- Do not turn a small direct fix into ceremony.
+- Do not couple the workflow to a generic "take the lead" skill; normal
+  collaboration rules still apply.
 - Refine the workflow notes separately when the skill needs more detail.
 `,
   ),
