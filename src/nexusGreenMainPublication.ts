@@ -14,6 +14,13 @@ import {
   type ResolvedNexusProjectComponent,
   type ResolvedNexusProjectWorkTracker,
 } from "./nexusProjectLifecycle.js";
+import {
+  buildNexusForgePublicationOperationPlan,
+  type NexusForgePublicationCapability,
+  type NexusForgePublicationOperationArgument,
+  type NexusForgePublicationOperationPlan,
+  type NexusForgeRepositoryRef,
+} from "./nexusForgePublication.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 
 export type NexusGreenMainPublicationPlanStatus =
@@ -124,6 +131,7 @@ export interface NexusGreenMainCommandStep {
   title: string;
   enabled: boolean;
   command: string | null;
+  operation?: NexusForgePublicationOperationPlan | null;
   environment: Record<string, string>;
   note: string | null;
 }
@@ -194,6 +202,7 @@ export function buildNexusGreenMainPublicationPlan(
   const tracker = githubTracker(component);
   const repository = githubRepository(tracker);
   const repoArg = `${repository.owner}/${repository.name}`;
+  const forgeRepository = githubForgeRepository(repository);
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
   const greenMain = {
     ...defaultNexusAutomationGreenMainConfig,
@@ -228,6 +237,7 @@ export function buildNexusGreenMainPublicationPlan(
   const commandEnvironment = { ...publication.commandEnvironment };
   const commands = commandSteps({
     repoArg,
+    repository: forgeRepository,
     prNumber: options.prNumber,
     headBranch: options.headBranch ?? null,
     targetBranch,
@@ -321,6 +331,7 @@ function githubTracker(
 function githubRepository(tracker: ResolvedNexusProjectWorkTracker): {
   owner: string;
   name: string;
+  host: string | null;
 } {
   const workTracking = tracker.workTracking;
   if (workTracking.provider !== "github") {
@@ -335,6 +346,18 @@ function githubRepository(tracker: ResolvedNexusProjectWorkTracker): {
   return {
     owner: workTracking.repository.owner,
     name: workTracking.repository.name,
+    host: workTracking.host ?? "github.com",
+  };
+}
+
+function githubForgeRepository(
+  repository: ReturnType<typeof githubRepository>,
+): NexusForgeRepositoryRef {
+  return {
+    provider: "github",
+    owner: repository.owner,
+    name: repository.name,
+    host: repository.host,
   };
 }
 
@@ -552,6 +575,7 @@ function rerunPlan(options: {
 
 function commandSteps(options: {
   repoArg: string;
+  repository: NexusForgeRepositoryRef;
   prNumber: number;
   headBranch: string | null;
   targetBranch: string;
@@ -562,40 +586,95 @@ function commandSteps(options: {
 }): NexusGreenMainPublicationPlan["commands"] {
   const prRef = String(options.prNumber);
   const openOrUpdate = options.prNumber
-    ? greenMainCommand([
-        "gh",
-        "pr",
-        "edit",
-        prRef,
-        "--repo",
-        options.repoArg,
-        "--body-file",
-        "<body-file>",
-      ])
-    : options.headBranch
-      ? greenMainCommand([
-          "gh",
+    ? greenMainForgeOperation({
+        repository: options.repository,
+        capability: "pull_request.upsert",
+        args: {
+          number: options.prNumber,
+          bodyFile: "<body-file>",
+        },
+        cliArgs: [
           "pr",
-          "create",
+          "edit",
+          prRef,
           "--repo",
           options.repoArg,
-          "--head",
-          options.headBranch,
-          "--base",
-          options.targetBranch,
-          "--title",
-          "<title>",
           "--body-file",
           "<body-file>",
-        ])
+        ],
+      })
+    : options.headBranch
+      ? greenMainForgeOperation({
+          repository: options.repository,
+          capability: "pull_request.upsert",
+          args: {
+            head: options.headBranch,
+            base: options.targetBranch,
+            title: "<title>",
+            bodyFile: "<body-file>",
+          },
+          cliArgs: [
+            "pr",
+            "create",
+            "--repo",
+            options.repoArg,
+            "--head",
+            options.headBranch,
+            "--base",
+            options.targetBranch,
+            "--title",
+            "<title>",
+            "--body-file",
+            "<body-file>",
+          ],
+        })
       : null;
+  const waitRequiredChecks = greenMainForgeOperation({
+    repository: options.repository,
+    capability: "pull_request.checks",
+    args: {
+      number: options.prNumber,
+      required: true,
+      watch: true,
+    },
+    cliArgs: [
+      "pr",
+      "checks",
+      prRef,
+      "--repo",
+      options.repoArg,
+      "--required",
+      "--watch",
+    ],
+  });
+  const merge = options.merge.allowed
+    ? greenMainForgeOperation({
+        repository: options.repository,
+        capability: "pull_request.merge",
+        args: {
+          number: options.prNumber,
+          method: "merge",
+          deleteBranch: true,
+        },
+        cliArgs: [
+          "pr",
+          "merge",
+          prRef,
+          "--repo",
+          options.repoArg,
+          "--merge",
+          "--delete-branch",
+        ],
+      })
+    : null;
 
   return {
     openOrUpdatePullRequest: {
       id: "open-or-update-pr",
       title: "Open or update pull request",
       enabled: openOrUpdate !== null,
-      command: openOrUpdate,
+      command: openOrUpdate?.command ?? null,
+      operation: openOrUpdate,
       environment: options.commandEnvironment,
       note: "Use the configured automation identity for provider writes.",
     },
@@ -603,16 +682,8 @@ function commandSteps(options: {
       id: "wait-required-checks",
       title: "Wait for required checks",
       enabled: true,
-      command: greenMainCommand([
-        "gh",
-        "pr",
-        "checks",
-        prRef,
-        "--repo",
-        options.repoArg,
-        "--required",
-        "--watch",
-      ]),
+      command: waitRequiredChecks.command,
+      operation: waitRequiredChecks,
       environment: options.commandEnvironment,
       note: "Read-only check watch; exit code 8 means checks are still pending.",
     },
@@ -621,6 +692,7 @@ function commandSteps(options: {
       title: "Rerun failed GitHub Actions run",
       enabled: options.rerun.decision === "rerun_once" && options.rerun.command !== null,
       command: options.rerun.command,
+      operation: null,
       environment: options.commandEnvironment,
       note: options.rerun.reason,
     },
@@ -628,18 +700,8 @@ function commandSteps(options: {
       id: "merge-pr",
       title: "Merge pull request",
       enabled: options.merge.allowed,
-      command: options.merge.allowed
-        ? greenMainCommand([
-            "gh",
-            "pr",
-            "merge",
-            prRef,
-            "--repo",
-            options.repoArg,
-            "--merge",
-            "--delete-branch",
-          ])
-        : null,
+      command: merge?.command ?? null,
+      operation: merge,
       environment: options.commandEnvironment,
       note: options.merge.reason,
     },
@@ -656,12 +718,28 @@ function commandSteps(options: {
             options.targetBranch,
           ])
         : null,
+      operation: null,
       environment: {},
       note: options.merge.allowed
         ? "Run from the component source checkout after provider merge."
         : options.merge.reason,
     },
   };
+}
+
+function greenMainForgeOperation(options: {
+  repository: NexusForgeRepositoryRef;
+  capability: NexusForgePublicationCapability;
+  args: Record<string, NexusForgePublicationOperationArgument>;
+  cliArgs: string[];
+}): NexusForgePublicationOperationPlan {
+  return buildNexusForgePublicationOperationPlan({
+    repository: options.repository,
+    capability: options.capability,
+    backendPreference: "auto",
+    arguments: options.args,
+    cliArgs: options.cliArgs,
+  });
 }
 
 function failedJob(check: NexusGreenMainCheckRunInput): NexusGreenMainFailedJob {
@@ -737,9 +815,6 @@ function warnings(
   const result: string[] = [];
   if (publication.strategy !== "green_main") {
     result.push("Publication policy is not green_main.");
-  }
-  if (!publication.commandEnvironment.GH_CONFIG_DIR) {
-    result.push("Publication policy does not set GH_CONFIG_DIR.");
   }
   if (greenMain.requiredChecks.length === 0) {
     result.push("Green-main policy does not configure required checks.");

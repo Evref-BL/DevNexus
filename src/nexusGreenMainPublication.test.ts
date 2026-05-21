@@ -89,9 +89,6 @@ function saveGreenMainProject(): string {
             strategy: "green_main",
             remote: "bot",
             targetBranch: "main",
-            commandEnvironment: {
-              GH_CONFIG_DIR: "home:.config/gh-automation-github",
-            },
             greenMain: {
               integrationPreference: "pull_request",
               integrationBranch: null,
@@ -145,6 +142,28 @@ describe("green-main publication planning", () => {
     expect(plan.merge.allowed).toBe(true);
     expect(plan.commands.merge.enabled).toBe(true);
     expect(plan.commands.merge.command).toContain("gh pr merge 12");
+    expect(plan.commands.merge.operation).toMatchObject({
+      provider: "github",
+      repository: "example/demo",
+      capability: "pull_request.merge",
+      backendPreference: "auto",
+      arguments: {
+        number: 12,
+        method: "merge",
+        deleteBranch: true,
+      },
+    });
+    expect(plan.commands.waitRequiredChecks.operation).toMatchObject({
+      capability: "pull_request.checks",
+      arguments: {
+        number: 12,
+        required: true,
+        watch: true,
+      },
+    });
+    expect(plan.warnings).not.toContain(
+      "Publication policy does not set GH_CONFIG_DIR.",
+    );
     expect(plan.rerun.decision).toBe("not_needed");
   });
 

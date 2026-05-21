@@ -50,11 +50,49 @@ describe("quick-fix planning", () => {
       strategy: "green_main",
       remote: "bot",
       targetBranch: "main",
-      commandEnvironment: {
-        GH_CONFIG_DIR: "home:.config/gh-automation-github",
-      },
+      commandEnvironment: {},
       requiredChecks: ["Node 24 check (ubuntu-latest)"],
     });
+    expect(plan.startSteps[0]!.operation).toMatchObject({
+      provider: "github",
+      repository: "example/demo",
+      capability: "actor.verify",
+      backendPreference: "auto",
+    });
+    expect(plan.finishSteps.find((step) => step.id === "open-pr")?.operation)
+      .toMatchObject({
+        capability: "pull_request.upsert",
+        arguments: {
+          head: "codex/core/quick-fix-mode",
+          base: "main",
+        },
+      });
+    expect(
+      plan.finishSteps.find((step) => step.id === "wait-required-checks")
+        ?.operation,
+    ).toMatchObject({
+      capability: "pull_request.checks",
+      arguments: {
+        number: "<pr-number>",
+        watch: true,
+      },
+    });
+    expect(plan.finishSteps.find((step) => step.id === "merge-pr")?.operation)
+      .toMatchObject({
+        capability: "pull_request.merge",
+        arguments: {
+          number: "<pr-number>",
+          method: "merge",
+          deleteBranch: true,
+        },
+      });
+    expect(plan.finishSteps.find((step) => step.id === "close-issue")?.operation)
+      .toMatchObject({
+        capability: "issue.close",
+        arguments: {
+          number: 50,
+        },
+      });
     expect(plan.startSteps.map((step) => step.id)).toEqual([
       "validate-bot-identity",
       "prepare-worktree",
@@ -150,9 +188,6 @@ function projectConfig(
           strategy: "green_main",
           remote: "bot",
           targetBranch: "main",
-          commandEnvironment: {
-            GH_CONFIG_DIR: "home:.config/gh-automation-github",
-          },
           greenMain: {
             integrationPreference: "pull_request",
             directTargetPush: "blocked",
