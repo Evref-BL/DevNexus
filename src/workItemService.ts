@@ -87,6 +87,10 @@ export interface AddProjectWorkItemCommentInput extends WorkItemProjectSelector 
   body: string;
 }
 
+export interface ListProjectWorkItemCommentsInput extends WorkItemProjectSelector {
+  ref: WorkItemRef;
+}
+
 export interface SetProjectWorkItemStatusInput extends WorkItemProjectSelector {
   ref: WorkItemRef;
   status: WorkStatus;
@@ -276,6 +280,26 @@ export class WorkItemService {
       ),
       context,
     );
+  }
+
+  async listComments(
+    input: ListProjectWorkItemCommentsInput,
+  ): Promise<WorkComment[]> {
+    const context = await this.resolveProviderContext(input, input.ref);
+    if (!context.provider.listComments) {
+      throw new WorkItemServiceError(
+        `Work tracking provider "${context.provider.provider}" does not support listing comments`,
+      );
+    }
+
+    return (
+      await context.provider.listComments(
+        normalizeWorkItemRef(
+          context.resolvedRef ?? input.ref,
+          context.provider.provider,
+        ),
+      )
+    ).map((comment) => annotateWorkComment(comment, context));
   }
 
   async setStatus(input: SetProjectWorkItemStatusInput): Promise<WorkItem> {

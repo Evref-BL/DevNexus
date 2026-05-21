@@ -614,6 +614,52 @@ describe("GitHub work tracker provider", () => {
     );
   });
 
+  it("lists issue comments for coordination handoff readback", async () => {
+    const fake = queuedFetch([
+      {
+        body: [
+          {
+            id: 9001,
+            node_id: "IC_node",
+            body: "Recorded from DevNexus",
+            user: { login: "octocat" },
+            created_at: "2026-05-15T11:00:00Z",
+            updated_at: "2026-05-15T11:01:00Z",
+            html_url:
+              "https://github.com/example/project/issues/7#issuecomment-9001",
+          },
+        ],
+      },
+    ]);
+    const provider = createGitHubWorkTrackerProvider({
+      config: githubConfig(),
+      fetch: fake.fetch,
+      env: {},
+      credentialRunner: false,
+    });
+
+    await expect(provider.listComments({ id: "github-7" })).resolves.toEqual([
+      expect.objectContaining({
+        id: "github-comment-9001",
+        body: "Recorded from DevNexus",
+        author: "octocat",
+        createdAt: "2026-05-15T11:00:00Z",
+        updatedAt: "2026-05-15T11:01:00Z",
+        externalRef: expect.objectContaining({
+          provider: "github",
+          itemId: "9001",
+          itemNumber: 7,
+          nodeId: "IC_node",
+        }),
+      }),
+    ]);
+    expect(fake.calls[0]).toMatchObject({
+      url:
+        "https://api.github.com/repos/example/project/issues/7/comments?per_page=100&page=1",
+      method: "GET",
+    });
+  });
+
   it("normalizes public GitHub and Enterprise host values to API base URLs", () => {
     expect(normalizeGitHubApiBaseUrl(undefined)).toBe(defaultGitHubApiBaseUrl);
     expect(normalizeGitHubApiBaseUrl("https://github.com")).toBe(

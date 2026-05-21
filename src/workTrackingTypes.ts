@@ -279,5 +279,6 @@ export interface WorkTrackerProvider {
   getWorkItem(ref: WorkItemRef): Promise<WorkItem>;
   updateWorkItem(ref: WorkItemRef, patch: WorkItemPatch): Promise<WorkItem>;
   addComment(ref: WorkItemRef, body: string): Promise<WorkComment>;
+  listComments?(ref: WorkItemRef): Promise<WorkComment[]>;
   setStatus?(ref: WorkItemRef, status: WorkStatus): Promise<WorkItem>;
 }
