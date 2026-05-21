@@ -36,6 +36,7 @@ export * from "./nexusWorkerContextBundle.js";
 export * from "./nexusEligibleWork.js";
 export * from "./nexusEligibleWorkSummary.js";
 export * from "./nexusExternalIssueVisibility.js";
+export * from "./nexusForgePublication.js";
 export * from "./nexusWorkItemDiscoveryStatus.js";
 export * from "./nexusWorkItemClaim.js";
 export * from "./nexusWorkItemRouting.js";
