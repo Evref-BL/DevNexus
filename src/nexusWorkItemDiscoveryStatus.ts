@@ -1,9 +1,19 @@
 import path from "node:path";
+import { defaultNexusHomePath } from "./nexusHomeConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
   type NormalizedNexusProjectTrackerDiscoveryPolicy,
 } from "./nexusProjectConfig.js";
+import { resolveNexusCurrentAutomationActor } from "./nexusAuthority.js";
+import {
+  createHostAuthProfileCredentialBroker,
+  NexusProviderCredentialBrokerError,
+  type NexusProviderCredentialBroker,
+  type NexusProviderCredentialCommandRunner,
+} from "./nexusProviderCredentialBroker.js";
+import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
@@ -13,7 +23,11 @@ import type {
   WorkTrackerCapabilityReport,
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
-import { publicationCommandEnvironment } from "./nexusPublicationPolicy.js";
+import {
+  loadNexusPublicationAuthProfiles,
+  publicationCommandEnvironment,
+  resolveNexusPublicationPolicy,
+} from "./nexusPublicationPolicy.js";
 
 export type NexusWorkItemDiscoveryCredentialStatus =
   | "not_required"
@@ -51,7 +65,12 @@ export interface NexusWorkItemDiscoveryTrackerSelection {
 
 export interface GetNexusWorkItemDiscoveryStatusOptions {
   projectRoot: string;
+  homePath?: string;
   env?: NodeJS.ProcessEnv;
+  now?: Date | string | (() => Date | string);
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  credentialBroker?: NexusProviderCredentialBroker;
+  credentialCommandRunner?: NexusProviderCredentialCommandRunner;
   credentialResolver?: NexusWorkItemDiscoveryCredentialResolver;
 }
 
@@ -107,15 +126,47 @@ export function getNexusWorkItemDiscoveryStatus(
   const projectRoot = path.resolve(requiredNonEmptyString(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
   const components = resolveProjectComponents(projectRoot, projectConfig);
+  const homePath = resolveDiscoveryHomePath({
+    projectRoot,
+    projectConfig,
+    homePath: options.homePath,
+  });
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig,
+    env: options.env,
+  });
+  const authProfiles =
+    options.authProfiles ??
+    loadNexusPublicationAuthProfiles({
+      projectRoot,
+      projectConfig,
+      homePath,
+    });
+  const credentialBroker =
+    options.credentialBroker ??
+    (authProfiles.length > 0
+      ? createHostAuthProfileCredentialBroker({
+          authProfiles,
+          projectRoot,
+          homePath,
+          env,
+          now: options.now,
+          ...(options.credentialCommandRunner
+            ? { commandRunner: options.credentialCommandRunner }
+            : {}),
+        })
+      : undefined);
   const credentialResolver =
     options.credentialResolver ??
-    defaultNexusWorkItemDiscoveryCredentialResolver(
-      nexusWorkItemDiscoveryCredentialEnvironment({
-        projectRoot,
-        projectConfig,
-        env: options.env,
-      }),
-    );
+    defaultNexusWorkItemDiscoveryCredentialResolver({
+      env,
+      projectRoot,
+      projectConfig,
+      components,
+      authProfiles,
+      credentialBroker,
+    });
   const componentStatuses = components.map((component) =>
     componentDiscoveryStatus(component, credentialResolver),
   );
@@ -151,6 +202,24 @@ export function nexusWorkItemDiscoveryCredentialEnvironment(options: {
         })
       : {}),
   };
+}
+
+function resolveDiscoveryHomePath(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): string {
+  if (options.homePath?.trim()) {
+    return path.resolve(options.homePath);
+  }
+  if (options.projectConfig.home?.trim()) {
+    return resolveNexusProjectPath({
+      projectRoot: options.projectRoot,
+      value: options.projectConfig.home,
+    });
+  }
+
+  return defaultNexusHomePath();
 }
 
 function componentDiscoveryStatus(
@@ -318,8 +387,16 @@ function trackerReadableStatus(options: {
 }
 
 export function defaultNexusWorkItemDiscoveryCredentialResolver(
-  env: NodeJS.ProcessEnv,
+  input: NodeJS.ProcessEnv | {
+    env: NodeJS.ProcessEnv;
+    projectRoot?: string;
+    projectConfig?: NexusProjectConfig;
+    components?: ResolvedNexusProjectComponent[];
+    authProfiles?: NexusHostingAuthProfileConfig[];
+    credentialBroker?: NexusProviderCredentialBroker;
+  },
 ): NexusWorkItemDiscoveryCredentialResolver {
+  const options = isCredentialResolverOptions(input) ? input : { env: input };
   return (input) => {
     if (input.provider === "local") {
       return {
@@ -328,12 +405,16 @@ export function defaultNexusWorkItemDiscoveryCredentialResolver(
         message: "Local tracker files are readable without provider credentials.",
       };
     }
-    if (providerEnvironmentCredentialAvailable(input.provider, env)) {
+    if (providerEnvironmentCredentialAvailable(input.provider, options.env)) {
       return {
         status: "available",
         required: true,
         message: `Provider credentials are available for ${input.provider}.`,
       };
+    }
+    const brokerCredential = providerBrokerCredentialAvailable(input, options);
+    if (brokerCredential) {
+      return brokerCredential;
     }
 
     return {
@@ -341,6 +422,109 @@ export function defaultNexusWorkItemDiscoveryCredentialResolver(
       required: true,
       message: `No configured ${input.provider} credentials were detected for read-only discovery.`,
     };
+  };
+}
+
+function isCredentialResolverOptions(
+  input: NodeJS.ProcessEnv | {
+    env: NodeJS.ProcessEnv;
+  },
+): input is { env: NodeJS.ProcessEnv } {
+  return "env" in input && typeof input.env === "object";
+}
+
+function providerBrokerCredentialAvailable(
+  input: NexusWorkItemDiscoveryCredentialCheckInput,
+  options: {
+    projectRoot?: string;
+    projectConfig?: NexusProjectConfig;
+    components?: ResolvedNexusProjectComponent[];
+    authProfiles?: NexusHostingAuthProfileConfig[];
+    credentialBroker?: NexusProviderCredentialBroker;
+  },
+): NexusWorkItemDiscoveryCredentialCheck | null {
+  if (!options.credentialBroker) {
+    return null;
+  }
+  const currentActor = discoveryCredentialCurrentActor(input, options);
+  try {
+    const credential = options.credentialBroker.resolveCredential({
+      provider: input.provider,
+      purpose: "api",
+      host: input.workTracking.host ?? null,
+      profileId: currentActor.profileId,
+      actorId: currentActor.actorId,
+      providerIdentity: currentActor.providerIdentity,
+      repository: input.workTracking.repository ?? null,
+    });
+    return {
+      status: "available",
+      required: true,
+      message:
+        `Provider credentials are available for ${input.provider} ` +
+        `through auth profile ${credential.profileId}.`,
+    };
+  } catch (error) {
+    if (
+      error instanceof NexusProviderCredentialBrokerError &&
+      error.code === "async_required"
+    ) {
+      return {
+        status: "available",
+        required: true,
+        message:
+          `Provider credentials are configured for ${input.provider}; ` +
+          "token exchange runs asynchronously when the provider is used.",
+      };
+    }
+    if (
+      error instanceof NexusProviderCredentialBrokerError &&
+      error.code !== "missing_profile" &&
+      error.code !== "wrong_actor"
+    ) {
+      return {
+        status: "missing",
+        required: true,
+        message:
+          `Configured ${input.provider} credentials are not usable: ` +
+          error.message,
+      };
+    }
+  }
+
+  return null;
+}
+
+function discoveryCredentialCurrentActor(
+  input: NexusWorkItemDiscoveryCredentialCheckInput,
+  options: {
+    projectConfig?: NexusProjectConfig;
+    components?: ResolvedNexusProjectComponent[];
+    authProfiles?: NexusHostingAuthProfileConfig[];
+  },
+): {
+  profileId: string | null;
+  actorId: string | null;
+  providerIdentity: string | null;
+} {
+  const projectConfig = options.projectConfig;
+  const component = options.components?.find(
+    (candidate) => candidate.id === input.componentId,
+  );
+  if (!projectConfig || !component) {
+    return { profileId: null, actorId: null, providerIdentity: null };
+  }
+  const publication = resolveNexusPublicationPolicy(projectConfig, component);
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: projectConfig.authority,
+    componentId: component.id,
+    publication,
+    authProfiles: options.authProfiles ?? [],
+  });
+  return {
+    profileId: currentActor.profileId,
+    actorId: currentActor.expectedActorId,
+    providerIdentity: currentActor.expectedHandle,
   };
 }
 

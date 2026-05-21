@@ -41,7 +41,6 @@ import {
 } from "./nexusRunnerProfile.js";
 import {
   getNexusPublicationStatuses,
-  loadNexusPublicationAuthProfiles,
   publicationEnvironmentVariables,
   publicationProcessEnvironment,
   publicationPreflightChecks,
@@ -92,6 +91,14 @@ import {
 import type {
   NexusWorkItemDiscoveryCredentialResolver,
 } from "./nexusWorkItemDiscoveryStatus.js";
+import {
+  nexusWorkItemDiscoveryCredentialEnvironment,
+} from "./nexusWorkItemDiscoveryStatus.js";
+import {
+  automationWorkItemDiscoveryCredentialResolver,
+  automationWorkTrackerProviderOptions,
+  loadNexusAutomationAuthProfiles,
+} from "./nexusAutomationWorkTrackingCredentials.js";
 import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
@@ -366,6 +373,22 @@ export async function runNexusAutomationAgentLaunchOnce(
   const projectRoot = path.resolve(requiredNonEmptyString(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
   const automationConfig = projectConfig.automation ?? null;
+  const authProfiles = loadNexusAutomationAuthProfiles({
+    projectRoot,
+    projectConfig,
+    homePath: options.homePath,
+  });
+  const discoveryEnv = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig,
+    env: options.env,
+  });
+  const credentialResolver =
+    options.credentialResolver ??
+    automationWorkItemDiscoveryCredentialResolver({
+      env: discoveryEnv,
+      authProfiles,
+    });
   const runId = options.runId ?? generateNexusAutomationAgentRunId(options.now);
   let sourceRoot: string | null = null;
   let components: ResolvedNexusProjectComponent[] = [];
@@ -534,11 +557,6 @@ export async function runNexusAutomationAgentLaunchOnce(
       });
     }
 
-    const authProfiles = loadNexusPublicationAuthProfiles({
-      projectRoot,
-      projectConfig,
-      homePath: options.homePath,
-    });
     const publication = getNexusPublicationStatuses({
       projectRoot,
       projectConfig,
@@ -613,8 +631,8 @@ export async function runNexusAutomationAgentLaunchOnce(
         projectConfig,
       }),
       providerOptions: options.providerOptions,
-      credentialResolver: options.credentialResolver,
-      env: options.env,
+      credentialResolver,
+      env: discoveryEnv,
       now: options.now,
     });
     componentEligibleWorkItems = eligibleWork.componentEligibleWorkItems;
@@ -726,7 +744,7 @@ export async function runNexusAutomationAgentLaunchOnce(
             projectConfig,
           }),
           providerOptions: options.providerOptions,
-          env: options.env,
+          env: discoveryEnv,
           owner: workItemClaimOwner({
             options,
             runId,
@@ -1263,7 +1281,15 @@ async function createAgentLaunchProvider(options: {
   }
 
   return createWorkTrackerProviderAsync(workTracking as WorkTrackingConfig, {
-    ...options.options.providerOptions,
+    ...automationWorkTrackerProviderOptions({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      component: options.component,
+      baseOptions: options.options.providerOptions,
+      homePath: options.options.homePath,
+      env: options.options.env,
+      now: options.options.now,
+    }),
     projectRoot: options.projectRoot,
     now: options.options.now,
   });
@@ -1661,18 +1687,32 @@ function agentLaunchEligibleWorkProviderFactory(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
 }): NexusEligibleWorkProviderFactory | undefined {
-  if (!options.options.providerFactory) {
-    return undefined;
-  }
+  return (context) => {
+    if (options.options.providerFactory) {
+      return options.options.providerFactory({
+        projectRoot: options.projectRoot,
+        sourceRoot: context.component.sourceRoot,
+        projectConfig: options.projectConfig,
+        component: context.component,
+        workTracking: context.tracker.workTracking,
+      });
+    }
 
-  return (context) =>
-    options.options.providerFactory!({
+    return createWorkTrackerProviderAsync(context.tracker.workTracking, {
+      ...automationWorkTrackerProviderOptions({
+        projectRoot: options.projectRoot,
+        projectConfig: options.projectConfig,
+        component: context.component,
+        workTrackingProvider: context.tracker.workTracking.provider,
+        baseOptions: options.options.providerOptions,
+        homePath: options.options.homePath,
+        env: options.options.env,
+        now: options.options.now,
+      }),
       projectRoot: options.projectRoot,
-      sourceRoot: context.component.sourceRoot,
-      projectConfig: options.projectConfig,
-      component: context.component,
-      workTracking: context.tracker.workTracking,
+      now: options.options.now,
     });
+  };
 }
 
 export function readNexusAutomationAgentResultFile(

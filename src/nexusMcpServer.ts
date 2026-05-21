@@ -19,6 +19,7 @@ import {
   validateNexusHomeConfigBase,
   type NexusHomeConfigBase,
 } from "./nexusHomeConfig.js";
+import { resolveNexusProjectPath } from "./nexusPathResolver.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -49,6 +50,10 @@ import {
 import {
   getNexusWorkItemDiscoveryStatus,
 } from "./nexusWorkItemDiscoveryStatus.js";
+import {
+  createHostAuthProfileCredentialBroker,
+  type NexusProviderCredentialCommandRunner,
+} from "./nexusProviderCredentialBroker.js";
 import {
   claimNexusEligibleWorkItem,
   type NexusEligibleWorkClaimProviderFactory,
@@ -151,6 +156,10 @@ import {
   type WorkItemProjectSelector,
 } from "./workItemService.js";
 import {
+  createWorkTrackerProviderAsync,
+  type CreateWorkTrackerProviderOptions,
+} from "./workTrackingProviderService.js";
+import {
   createWorkItemSyncPlan,
   defaultWorkItemSyncPolicy,
   executeWorkItemSync,
@@ -212,6 +221,8 @@ export interface DevNexusMcpToolContext {
   mcpRuntimeStartedAt?: Date | string;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
+  workItemProviderOptions?: CreateWorkTrackerProviderOptions;
+  workItemCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
   workItemClaimLeaseTokenFactory?: () => string;
 }
@@ -1880,6 +1891,7 @@ export async function callDevNexusMcpTool(
           ok: true,
           ...getNexusWorkItemDiscoveryStatus({
             projectRoot: projectRootFromArgs(args),
+            homePath: optionalString(args, "homePath", "arguments"),
           }),
         });
       case "work_item_claim_next": {
@@ -2278,8 +2290,86 @@ function workItemServiceFromArgs(
   const homePath = homePathFromArgs(args);
   return createWorkItemService({
     resolveProject: (selector) => resolveWorkItemProject(selector, homePath),
+    providerFactory: (projectContext) =>
+      createMcpWorkItemProvider(projectContext, projectContext.homePath, context),
     now: context.now,
   });
+}
+
+function createMcpWorkItemProvider(
+  projectContext: ResolvedWorkItemProjectContext,
+  homePath: string,
+  context: DevNexusMcpToolContext,
+) {
+  return createWorkTrackerProviderAsync(projectContext.workTracking, {
+    ...mcpWorkItemProviderOptions(projectContext, homePath, context),
+    projectRoot: projectContext.projectRoot,
+    now: context.now,
+  });
+}
+
+function mcpWorkItemProviderOptions(
+  projectContext: ResolvedWorkItemProjectContext,
+  homePath: string,
+  context: DevNexusMcpToolContext,
+): CreateWorkTrackerProviderOptions | undefined {
+  const credentials =
+    context.workItemProviderOptions?.credentials ??
+    mcpWorkItemCredentialOptions(projectContext, homePath, context);
+  return {
+    ...context.workItemProviderOptions,
+    ...(credentials ? { credentials } : {}),
+  };
+}
+
+function mcpWorkItemCredentialOptions(
+  projectContext: ResolvedWorkItemProjectContext,
+  homePath: string,
+  context: DevNexusMcpToolContext,
+): CreateWorkTrackerProviderOptions["credentials"] | undefined {
+  const projectConfig = loadProjectConfig(projectContext.projectRoot);
+  const component = resolveProjectComponents(
+    projectContext.projectRoot,
+    projectConfig,
+  ).find((candidate) => candidate.id === projectContext.componentId);
+  if (!component) {
+    return undefined;
+  }
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot: projectContext.projectRoot,
+    projectConfig,
+    homePath,
+  });
+  if (authProfiles.length === 0) {
+    return undefined;
+  }
+  const publication = resolveNexusPublicationPolicy(projectConfig, component);
+  const currentActor = resolveNexusCurrentAutomationActor({
+    authority: projectConfig.authority,
+    componentId: component.id,
+    publication,
+    authProfiles,
+  });
+  if (!currentActor.profileId && !currentActor.expectedActorId) {
+    return undefined;
+  }
+
+  return {
+    broker: createHostAuthProfileCredentialBroker({
+      authProfiles,
+      projectRoot: projectContext.projectRoot,
+      homePath,
+      now: context.now,
+      ...(context.workItemCredentialCommandRunner
+        ? { commandRunner: context.workItemCredentialCommandRunner }
+        : {}),
+    }),
+    profileId: currentActor.profileId,
+    actorId: currentActor.expectedActorId,
+    providerIdentity: currentActor.expectedHandle,
+    host: projectContext.workTracking.host ?? null,
+    repository: projectContext.workTracking.repository ?? null,
+  };
 }
 
 function assertMcpWorkItemAuthorityAllowed(
@@ -2314,7 +2404,7 @@ function resolveMcpWorkItemAuthority(
     throw new Error(`Workspace component is not configured: ${resolved.componentId}`);
   }
   const publication = resolveNexusPublicationPolicy(config, component);
-  const authProfiles = projectHostingAuthProfiles(config, homePath);
+  const authProfiles = projectHostingAuthProfiles(config, resolved.homePath);
   const currentActor = resolveNexusCurrentAutomationActor({
     authority: config.authority,
     componentId: component.id,
@@ -2708,7 +2798,9 @@ function resolveWorkItemProject(
   }
 
   return {
-    homePath: config.home ?? homePath,
+    homePath: config.home
+      ? resolveNexusProjectPath({ projectRoot, value: config.home })
+      : homePath,
     projectRoot,
     projectId: config.id,
     projectName: config.name,
@@ -2885,26 +2977,28 @@ async function projectHostingStatusFromArgs(
 
 function projectStatusFromArgs(args: Record<string, unknown>): NexusProjectStatusBase {
   const project = requiredString(args, "project", "arguments");
-  const homePath = optionalString(args, "homePath", "arguments");
-  if (homePath) {
+  const homePath = optionalString(args, "homePath", "arguments") ?? defaultNexusHomePath();
+  try {
     return getNexusProjectStatus({
       homePath,
       homeStore: fileProjectHomeStore(),
       project,
     }).project;
-  }
-
-  try {
-    return buildNexusProjectStatusForPath(project);
-  } catch (pathError) {
+  } catch (homeError) {
+    if (optionalString(args, "homePath", "arguments")) {
+      throw homeError;
+    }
     try {
-      return getNexusProjectStatus({
-        homePath: defaultNexusHomePath(),
-        homeStore: fileProjectHomeStore(),
-        project,
-      }).project;
-    } catch {
-      throw pathError;
+      return buildNexusProjectStatusForPath(project);
+    } catch (pathError) {
+      if (
+        path.isAbsolute(project) ||
+        project.startsWith(".") ||
+        project.includes(path.sep)
+      ) {
+        throw pathError;
+      }
+      throw homeError;
     }
   }
 }

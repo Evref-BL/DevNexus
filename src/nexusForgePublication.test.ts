@@ -46,20 +46,14 @@ describe("nexus forge publication facade", () => {
     });
   });
 
-  it("verifies GitHub App actors through the REST backend", async () => {
+  it("verifies GitHub App actors from credential metadata without calling /app", async () => {
     const calls: CapturedFetchCall[] = [];
     const adapter = createNexusForgePublicationAdapter({
       repository: githubRepository(),
       credential: restCredential({
         kind: "github_app",
       }),
-      fetch: queuedFetch(calls, [
-        {
-          body: {
-            slug: "devnexus-automation",
-          },
-        },
-      ]),
+      fetch: queuedFetch(calls, []),
     });
 
     await expect(
@@ -76,7 +70,7 @@ describe("nexus forge publication facade", () => {
       observed: {
         provider: "github",
         handle: "devnexus-automation",
-        source: "github_rest_app",
+        source: "credential:dev-nexus-app",
         backend: "github_rest",
       },
       metadata: {
@@ -85,13 +79,7 @@ describe("nexus forge publication facade", () => {
         capability: "actor.verify",
       },
     });
-    expect(calls).toEqual([
-      expect.objectContaining({
-        method: "GET",
-        url: "https://api.github.com/app",
-      }),
-    ]);
-    expect(calls[0]!.headers.authorization).toBe("Bearer installation-token");
+    expect(calls).toEqual([]);
   });
 
   it("creates, updates, merges, and closes GitHub resources through REST", async () => {
@@ -408,7 +396,11 @@ describe("nexus forge publication facade", () => {
   it("reports provider request failures with capability context", async () => {
     const adapter = createNexusForgePublicationAdapter({
       repository: githubRepository(),
-      credential: restCredential(),
+      credential: restCredential({
+        kind: "environment_token",
+        providerIdentity: "alice",
+        account: "alice",
+      }),
       fetch: queuedFetch([], [
         {
           status: 403,
