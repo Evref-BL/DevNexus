@@ -2990,7 +2990,14 @@ function projectStatusFromArgs(args: Record<string, unknown>): NexusProjectStatu
     }
     try {
       return buildNexusProjectStatusForPath(project);
-    } catch {
+    } catch (pathError) {
+      if (
+        path.isAbsolute(project) ||
+        project.startsWith(".") ||
+        project.includes(path.sep)
+      ) {
+        throw pathError;
+      }
       throw homeError;
     }
   }

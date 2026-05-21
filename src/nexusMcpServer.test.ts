@@ -3129,6 +3129,11 @@ describe("DevNexus MCP server", () => {
 
   it("returns workspace status diagnostics for plugin MCP core tool overlap", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-plugin-overlap-");
+    const missingHomePath = path.join(
+      makeTempDir("dev-nexus-mcp-missing-home-"),
+      "missing",
+    );
+    const previousHome = process.env.DEV_NEXUS_HOME;
     fs.writeFileSync(
       path.join(projectRoot, "dev-nexus.project.json"),
       `${JSON.stringify({
@@ -3152,21 +3157,30 @@ describe("DevNexus MCP server", () => {
       }, null, 2)}\n`,
     );
 
-    const result = toolJson(
-      await callDevNexusMcpTool("project_status", {
-        project: projectRoot,
-      }),
-    );
+    try {
+      process.env.DEV_NEXUS_HOME = missingHomePath;
+      const result = toolJson(
+        await callDevNexusMcpTool("project_status", {
+          project: projectRoot,
+        }),
+      );
 
-    expect(result).toMatchObject({
-      ok: false,
-      error: expect.stringContaining(
-        "plugin id workflow-tools server workflow_tools duplicate tools: work_item_list",
-      ),
-    });
-    expect(result.error).toContain(
-      "Generic DevNexus operations belong to dev_nexus",
-    );
+      expect(result).toMatchObject({
+        ok: false,
+        error: expect.stringContaining(
+          "plugin id workflow-tools server workflow_tools duplicate tools: work_item_list",
+        ),
+      });
+      expect(result.error).toContain(
+        "Generic DevNexus operations belong to dev_nexus",
+      );
+    } finally {
+      if (previousHome === undefined) {
+        delete process.env.DEV_NEXUS_HOME;
+      } else {
+        process.env.DEV_NEXUS_HOME = previousHome;
+      }
+    }
   });
 
   it("targets component-scoped work items through MCP tool arguments", async () => {
