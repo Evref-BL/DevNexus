@@ -20,7 +20,9 @@ export interface NexusProjectSkillAgentTarget {
 export interface NexusSkillSource {
   type: "curated" | "git" | "url" | "local";
   uri?: string;
+  tag?: string;
   commit?: string;
+  paths?: string[];
   checksum?: string;
 }
 
@@ -313,6 +315,65 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
 
+const superpowersSource = {
+  uri: "https://github.com/obra/superpowers",
+  tag: "v5.1.0",
+  commit: "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+};
+
+const superpowersLicenseText = `MIT License
+
+Copyright (c) 2025 Jesse Vincent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+
+function adaptedSuperpowersSkill(
+  id: string,
+  name: string,
+  description: string,
+  sourcePaths: string[],
+  body: string,
+): NexusSkillDefinition {
+  return {
+    manifest: {
+      id,
+      name,
+      description,
+      version: "5.1.0-dev-nexus.0",
+      license: "MIT",
+      source: {
+        type: "git",
+        ...superpowersSource,
+        paths: sourcePaths,
+      },
+      supportedAgents: ["codex", "claude"],
+      materialization: "copy",
+      sourceControl: "support",
+    },
+    files: {
+      [nexusSkillMarkdownFileName]: skillMarkdown(name, description, body),
+      LICENSE: superpowersLicenseText,
+    },
+  };
+}
+
 const humanizerSkill: NexusSkillDefinition = {
   manifest: {
     id: "humanizer",
@@ -335,6 +396,57 @@ const humanizerSkill: NexusSkillDefinition = {
     LICENSE: humanizerLicenseText,
   },
 };
+
+const designWithUserSkill = adaptedSuperpowersSkill(
+  "design-with-user",
+  "design-with-user",
+  "Collaborative design workflow adapted from Superpowers brainstorming. Use before multi-step creative, product, code, documentation, research, operations, or workflow changes when intent, scope, tradeoffs, or success criteria need to be clarified before execution.",
+  ["skills/brainstorming/SKILL.md"],
+  `
+# Design With User
+
+Use this skill before starting multi-step work whose shape is not already clear.
+Keep the agent active in leading the design, while the user owns product,
+scope, and risk decisions.
+
+## Workflow
+
+1. Read the relevant project context first: existing docs, tracker item, current
+   files, recent decisions, and any active initiative surface.
+2. Decide whether the request is small enough to execute directly. If it is not,
+   keep designing before implementation.
+3. Ask only the questions needed to remove real ambiguity. Prefer one focused
+   question at a time, and state your recommended answer when you have one.
+4. Offer two or three viable approaches when meaningful. Lead with the
+   recommended approach and name the tradeoffs.
+5. Present the design at the right size for the work. Cover objective, scope,
+   major parts, data or artifact flow, risks, verification, and done criteria.
+6. Get explicit user approval before implementation when the design changes
+   behavior, scope, publication, cost, safety, or long-lived project direction.
+7. Record the durable design only when it needs to survive the chat. In a
+   DevNexus workspace, prefer the configured tracker, a Product Requirements
+   Document (PRD), target-cycle facts, or initiative notes over ad hoc files.
+8. Hand off to planning or execution with the approved scope and open decisions
+   clearly separated.
+
+## Guardrails
+
+- Do not turn every small fix into ceremony; scale the design to the risk.
+- Do not write code, mutate durable artifacts, or publish before required
+  approval.
+- Do not ask questions whose answers are discoverable from local context.
+- Do not hide unresolved decisions inside an implementation plan.
+
+## Attribution
+
+Adapted from \`obra/superpowers\` version \`5.1.0\` at commit
+\`f2cbfbefebbfef77321e4c9abc9e949826bea9d7\`, licensed under MIT by Jesse
+Vincent / Prime Radiant. Source path:
+\`skills/brainstorming/SKILL.md\`.
+This DevNexus adaptation changes the workflow to support generic initiatives,
+DevNexus durable records, and risk-scaled design gates.
+`,
+);
 
 export const defaultCoreSkillPack: readonly NexusSkillDefinition[] = [
   curatedCoreSkill(
@@ -363,6 +475,52 @@ Use this skill when working inside a DevNexus-managed workspace.
 15. When running under a DevNexus-launched cycle, write the configured result file with status, summary, commits, verification, publication decision, and error or blocker details before exiting.
 `,
   ),
+  curatedCoreSkill(
+    "initiative-workflow",
+    "initiative-workflow",
+    "Long-lived initiative workflow for multi-step work across code, docs, research, operations, or planning where slices should accumulate under one durable objective and integration or publication surface before final delivery. Use when the user says initiative, feature, bugfix campaign, release train, research project, documentation rewrite, long-running workflow, or asks to avoid many separate final pull requests or publications.",
+    `
+# Initiative Workflow
+
+Use this skill when work should continue through multiple slices before final delivery.
+Do not use it for small one-turn tasks that can be finished and verified directly.
+
+An initiative is a durable work frame with one objective, one tracker anchor,
+one integration surface, and explicit done criteria. The surface may be a Git
+branch, artifact directory, document set, tracker epic, release train,
+coordination record, or another project-owned place where slices accumulate.
+
+## Workflow
+
+1. Establish the initiative: objective, owner or coordinator, tracker anchor,
+   expected outputs, constraints, and done criteria.
+2. Choose the integration surface before starting slices. For Git-backed work,
+   use one long-lived branch or equivalent review surface; for non-code work,
+   choose the artifact, document, tracker, or coordination surface.
+3. Slice work so each slice has one owner, one scope, one verification path, and
+   a clear contribution to the initiative surface.
+4. Route slice results into the initiative surface instead of publishing many
+   unrelated final artifacts.
+5. Keep durable notes for decisions, blockers, provenance, reviews,
+   verification, and handoffs. In a DevNexus workspace, use DevNexus work items,
+   target-cycle facts, coordination handoffs, and publication policy.
+6. Ask for human decisions at scope, risk, approval, and publication gates. Do
+   not infer approval from silence or unrelated status changes.
+7. Publish only when the initiative is coherent, reviewed, verified, and meets
+   its done criteria.
+8. Close with a compact handoff: what shipped, what was verified, what remains,
+   and where the durable record lives.
+
+## Guardrails
+
+- Keep the initiative generic; do not force all work into a programming model.
+- Prefer one final publication path over many unrelated final publications.
+- Do not let the initiative hide unrelated work, unresolved blockers, or
+  unreviewed risky changes.
+- Refine the workflow notes separately when the skill needs more detail.
+`,
+  ),
+  designWithUserSkill,
   curatedCoreSkill(
     "diagnose",
     "diagnose",

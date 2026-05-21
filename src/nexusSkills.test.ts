@@ -75,6 +75,26 @@ describe("nexus skills", () => {
         commit: "8b3a17889fbf12bedae20974a3c9f9de746ed754",
       },
     });
+    const designWithUser = result.installed.find(
+      (skill) => skill.id === "design-with-user",
+    );
+    expect(designWithUser?.sourceControl).toBe("support");
+    expect(
+      fs.readFileSync(path.join(designWithUser?.skillRoot ?? "", "LICENSE"), "utf8"),
+    ).toContain("Copyright (c) 2025 Jesse Vincent");
+    expect(
+      JSON.parse(fs.readFileSync(designWithUser?.manifestPath ?? "", "utf8")),
+    ).toMatchObject({
+      id: "design-with-user",
+      license: "MIT",
+      source: {
+        type: "git",
+        uri: "https://github.com/obra/superpowers",
+        tag: "v5.1.0",
+        commit: "f2cbfbefebbfef77321e4c9abc9e949826bea9d7",
+        paths: ["skills/brainstorming/SKILL.md"],
+      },
+    });
   });
 
   it("projects selected skills into configured agent-native directories", () => {
@@ -175,6 +195,8 @@ describe("nexus skills", () => {
 
     expect(skillIds).toEqual([
       "dev-nexus",
+      "initiative-workflow",
+      "design-with-user",
       "diagnose",
       "tdd",
       "handoff",
@@ -216,6 +238,24 @@ describe("nexus skills", () => {
     expect(skillMarkdown["dev-nexus"]).toContain("worktree_prepare");
     expect(skillMarkdown["dev-nexus"]).toContain("workspace/meta worktree");
     expect(skillMarkdown["dev-nexus"]).toContain("dependency_projection");
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "one integration surface",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "do not force all work into a programming model",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "target-cycle facts",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "Adapted from `obra/superpowers` version `5.1.0`",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "skills/brainstorming/SKILL.md",
+    );
+    expect(skillMarkdown["design-with-user"]).toContain(
+      "generic initiatives",
+    );
     expect(skillMarkdown.tdd).toContain("Test-Driven Development (TDD)");
     expect(skillMarkdown["grill-with-docs"]).toContain(
       "Architecture Decision Records (ADRs)",
