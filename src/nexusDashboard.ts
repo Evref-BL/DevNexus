@@ -903,8 +903,8 @@ function buildDashboardEvents(options: {
       time: options.generatedAt,
       source: "actual",
       severity: "info",
-      title: "Dashboard snapshot generated",
-      body: "The dashboard API read local DevNexus project state.",
+      title: "Snapshot refreshed",
+      body: "Read local DevNexus state.",
       relatedNodeIds: ["project"],
     },
   ];
@@ -915,7 +915,7 @@ function buildDashboardEvents(options: {
       time: options.generatedAt,
       source: "actual",
       severity: options.automation.status === "blocked" ? "warning" : "info",
-      title: `Automation is ${options.automation.status}`,
+      title: `Automation ${options.automation.status}`,
       body: compactDetail(options.automation.summary),
       relatedNodeIds: ["project"],
     });
@@ -927,7 +927,7 @@ function buildDashboardEvents(options: {
       time: options.generatedAt,
       source: "actual",
       severity: options.eligibleWork.eligibleWorkItemCount > 0 ? "success" : "info",
-      title: `${options.eligibleWork.eligibleWorkItemCount} eligible work item(s)`,
+      title: `${options.eligibleWork.eligibleWorkItemCount} ready ${plural(options.eligibleWork.eligibleWorkItemCount, "item", "items")}`,
       body: compactDetail(options.eligibleWork.summary),
       relatedNodeIds: ["project"],
     });
@@ -998,44 +998,62 @@ function dashboardSignals(
       label: "Components",
       value: String(components.length),
       tone: components.every((component) => component.sourceRootExists) ? "good" : "danger",
-      detail: "Configured DevNexus components in this workspace.",
+      detail: "Ready",
     },
     {
       id: "automation",
       label: "Automation",
       value: automation?.status ?? "unknown",
       tone: automationTone(automation?.status),
-      detail: compactDetail(automation?.summary ?? "Automation status could not be loaded."),
+      detail: automationDetail(automation),
     },
     {
       id: "eligible-work",
       label: "Eligible Work",
       value: String(eligibleWork?.eligibleWorkItemCount ?? 0),
       tone: eligibleWork && eligibleWork.eligibleWorkItemCount > 0 ? "active" : "neutral",
-      detail: compactDetail(eligibleWork?.summary ?? "Eligible work summary could not be loaded."),
+      detail: eligibleWork?.eligibleWorkItemCount
+        ? `${eligibleWork.eligibleWorkItemCount} ready`
+        : "No ready items",
     },
     {
       id: "worktrees",
       label: "Worktrees",
       value: String(worktrees.activeCount),
       tone: worktrees.activeCount > 0 ? "active" : "neutral",
-      detail: `${worktrees.staleCount} stale advisory lease(s).`,
+      detail: worktrees.staleCount > 0
+        ? `${worktrees.staleCount} stale ${plural(worktrees.staleCount, "lease", "leases")}`
+        : "Current",
     },
     {
       id: "blockers",
       label: "Blockers",
       value: String(blockers.length),
       tone: blockers.length > 0 ? "warn" : "good",
-      detail: blockers.length > 0 ? compactDetail(blockers[0]!) : "No dashboard-visible blockers.",
+      detail: blockers.length > 0 ? "Needs attention" : "Clear",
     },
     {
       id: "git",
       label: "Dirty Components",
       value: String(dirtyComponents),
       tone: dirtyComponents > 0 ? "warn" : "good",
-      detail: "Component source checkout status from Git.",
+      detail: dirtyComponents > 0 ? `${dirtyComponents} dirty` : "Clean",
     },
   ];
+}
+
+function automationDetail(automation: NexusAutomationStatus | null): string {
+  if (!automation) {
+    return "Status unavailable";
+  }
+  if (automation.status === "blocked" && /github|token|credential|auth/iu.test(automation.summary)) {
+    return "GitHub auth blocked";
+  }
+  return compactDetail(automation.summary);
+}
+
+function plural(count: number, singular: string, pluralValue: string): string {
+  return count === 1 ? singular : pluralValue;
 }
 
 function compactDetail(value: string): string {
@@ -1050,11 +1068,12 @@ function dashboardSummary(
   worktrees: NexusDashboardWorktreeSummary,
   blockers: string[],
 ): string {
+  const readyCount = eligibleWork?.eligibleWorkItemCount ?? 0;
   return [
-    `${components.length} component(s)`,
-    `${eligibleWork?.eligibleWorkItemCount ?? 0} eligible work item(s)`,
-    `${worktrees.activeCount} active worktree lease(s)`,
-    `${blockers.length} blocker(s)`,
+    `${components.length} ${plural(components.length, "component", "components")}`,
+    readyCount > 0 ? `${readyCount} ready ${plural(readyCount, "item", "items")}` : "no ready items",
+    `${worktrees.activeCount} ${plural(worktrees.activeCount, "worktree", "worktrees")}`,
+    blockers.length > 0 ? `${blockers.length} ${plural(blockers.length, "blocker", "blockers")}` : "no blockers",
     automation ? `automation ${automation.status}` : "automation unknown",
   ].join(", ");
 }

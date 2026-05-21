@@ -259,8 +259,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
     expect(module).toContain("Work History");
+    expect(module).toContain("Worktree lanes");
     expect(module).toContain("selectedDetail");
-    expect(module).toContain("overviewNodes");
+    expect(module).toContain("timelineLanes");
     expect(module).toContain("renderBranchGraph");
     expect(module).toContain("dn-branch-svg");
     expect(module).toContain("const rowHeight = 34");
@@ -268,6 +269,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("dn-history-chip");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
     expect(module).toContain("-webkit-line-clamp: 3");
+    expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
   });
 });
