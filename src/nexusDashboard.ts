@@ -82,6 +82,18 @@ export type NexusDashboardWeaveEdgeKind =
   | "blocked-by"
   | "published-by";
 
+export type NexusDashboardProviderActionKind =
+  | "issue"
+  | "pull-request"
+  | "provider-link";
+
+export interface NexusDashboardProviderAction {
+  label: string;
+  href: string;
+  provider: "github" | "web";
+  kind: NexusDashboardProviderActionKind;
+}
+
 export interface BuildNexusDashboardSnapshotOptions
   extends Pick<
     GetNexusAutomationStatusOptions,
@@ -131,6 +143,7 @@ export interface NexusDashboardComponentSummary {
   name: string;
   kind: ResolvedNexusProjectComponent["kind"];
   role: ResolvedNexusProjectComponent["role"];
+  remoteUrl: string | null;
   sourceRoot: string;
   sourceRootExists: boolean;
   worktreesRoot: string;
@@ -148,6 +161,11 @@ export interface NexusDashboardProjectSummary {
   componentCount: number;
   defaultBranch: string | null;
   remoteUrl: string | null;
+}
+
+interface NexusDashboardProviderUrls {
+  project: string | null;
+  components: Map<string, string | null>;
 }
 
 export interface NexusDashboardPublicationSummary {
@@ -205,6 +223,8 @@ export interface NexusDashboardEvent {
   title: string;
   body: string;
   relatedNodeIds: string[];
+  href: string | null;
+  actions: NexusDashboardProviderAction[];
 }
 
 export interface NexusDashboardWeaveLane {
@@ -222,6 +242,7 @@ export interface NexusDashboardWeaveNode {
   status: string;
   timestamp: string | null;
   href: string | null;
+  actions: NexusDashboardProviderAction[];
 }
 
 export interface NexusDashboardWeaveEdge {
@@ -295,6 +316,7 @@ export async function buildNexusDashboardSnapshot(
   const componentSummaries = components.map((component) =>
     summarizeComponent(component, gitRunner),
   );
+  const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
   const cycles = readTargetCycles(projectRoot, projectConfig);
   const runs = readRuns(projectRoot, projectConfig);
   const worktrees = summarizeWorktrees(worktreeCollection.value);
@@ -317,6 +339,7 @@ export async function buildNexusDashboardSnapshot(
     cycles,
     runs,
     blockers,
+    providerUrls,
   });
   const weave = buildNexusDashboardWeave({
     generatedAt,
@@ -329,6 +352,7 @@ export async function buildNexusDashboardSnapshot(
     runs,
     authority,
     blockers,
+    providerUrls,
   });
 
   return {
@@ -362,6 +386,7 @@ export function buildNexusDashboardWeave(options: {
   runs: NexusAutomationRunRecord[];
   authority: NexusDashboardAuthoritySummary | null;
   blockers: string[];
+  providerUrls: NexusDashboardProviderUrls;
 }): NexusDashboardWeave {
   const lanes: NexusDashboardWeaveLane[] = [
     { id: "project", label: "Project", nodeIds: [] },
@@ -369,7 +394,7 @@ export function buildNexusDashboardWeave(options: {
     { id: "work", label: "Work", nodeIds: [] },
     { id: "branches", label: "Branches", nodeIds: [] },
     { id: "cycles", label: "Cycles", nodeIds: [] },
-    { id: "authority", label: "Authority", nodeIds: [] },
+    { id: "authority", label: "Policy", nodeIds: [] },
   ];
   const nodes: NexusDashboardWeaveNode[] = [];
   const edges: NexusDashboardWeaveEdge[] = [];
@@ -396,11 +421,13 @@ export function buildNexusDashboardWeave(options: {
     detail: options.projectRoot,
     status: "active",
     timestamp: null,
-    href: null,
+    href: options.providerUrls.project,
+    actions: providerActionsForHref(options.providerUrls.project, "Open repository"),
   });
 
   for (const component of options.components) {
     const componentNodeId = nodeId("component", component.id);
+    const repositoryUrl = componentProviderUrl(options.providerUrls, component.id);
     addNode({
       id: componentNodeId,
       kind: "component",
@@ -409,7 +436,8 @@ export function buildNexusDashboardWeave(options: {
       detail: `${component.role} component`,
       status: component.sourceRootExists ? "ready" : "missing",
       timestamp: null,
-      href: null,
+      href: repositoryUrl,
+      actions: providerActionsForHref(repositoryUrl, "Open repository"),
     });
     addEdge({
       id: edgeId(projectNodeId, componentNodeId, "contains"),
@@ -430,6 +458,7 @@ export function buildNexusDashboardWeave(options: {
         status: "configured",
         timestamp: null,
         href: null,
+        actions: [],
       });
       addEdge({
         id: edgeId(componentNodeId, trackerNodeId, "tracks"),
@@ -452,6 +481,7 @@ export function buildNexusDashboardWeave(options: {
         status: component.git.dirty ? "dirty" : "clean",
         timestamp: null,
         href: null,
+        actions: providerActionsFromText(component.git.branch ?? "", options.providerUrls, component.id),
       });
       addNode({
         id: commitNodeId,
@@ -462,6 +492,7 @@ export function buildNexusDashboardWeave(options: {
         status: "head",
         timestamp: null,
         href: null,
+        actions: [],
       });
       addEdge({
         id: edgeId(componentNodeId, branchNodeId, "owns"),
@@ -482,6 +513,10 @@ export function buildNexusDashboardWeave(options: {
 
   for (const item of eligibleWorkItems(options.eligibleWork)) {
     const workItemNodeId = nodeId("work-item", `${item.componentId}-${item.id}`);
+    const actions = uniqueProviderActions([
+      ...providerActionsForHref(item.webUrl),
+      ...providerActionsFromText(`${item.id} ${item.title}`, options.providerUrls, item.componentId),
+    ]);
     addNode({
       id: workItemNodeId,
       kind: "work-item",
@@ -490,7 +525,8 @@ export function buildNexusDashboardWeave(options: {
       detail: item.id,
       status: item.status,
       timestamp: item.updatedAt,
-      href: item.webUrl,
+      href: item.webUrl ?? firstActionHref(actions),
+      actions,
     });
     addEdge({
       id: edgeId(nodeId("component", item.componentId), workItemNodeId, "owns"),
@@ -503,6 +539,11 @@ export function buildNexusDashboardWeave(options: {
 
   for (const worktree of options.worktrees.records) {
     const worktreeNodeId = nodeId("worktree", worktree.id);
+    const actions = providerActionsFromText(
+      `${worktree.workItemId ?? ""} ${worktree.branchName ?? worktree.id}`,
+      options.providerUrls,
+      worktree.componentId,
+    );
     addNode({
       id: worktreeNodeId,
       kind: "worktree",
@@ -511,7 +552,8 @@ export function buildNexusDashboardWeave(options: {
       detail: `${worktree.effectiveStatus} on ${worktree.hostId}`,
       status: worktree.effectiveStatus,
       timestamp: worktree.updatedAt,
-      href: null,
+      href: firstActionHref(actions),
+      actions,
     });
     if (worktree.componentId) {
       addEdge({
@@ -535,6 +577,7 @@ export function buildNexusDashboardWeave(options: {
 
   for (const cycle of options.cycles.slice(-8)) {
     const cycleNodeId = nodeId("target-cycle", cycle.id);
+    const actions = providerActionsFromText(cycleActionText(cycle), options.providerUrls);
     addNode({
       id: cycleNodeId,
       kind: "target-cycle",
@@ -543,7 +586,8 @@ export function buildNexusDashboardWeave(options: {
       detail: cycle.summary ?? cycle.status,
       status: cycle.status,
       timestamp: cycle.finishedAt ?? cycle.startedAt,
-      href: null,
+      href: firstActionHref(actions),
+      actions,
     });
     addEdge({
       id: edgeId(projectNodeId, cycleNodeId, "records"),
@@ -555,6 +599,11 @@ export function buildNexusDashboardWeave(options: {
     for (const item of cycle.workItems.slice(0, 8)) {
       const workItemNodeId = nodeId("work-item", `${item.componentId}-${item.id}`);
       const cycleStatus = item.cycleStatus ?? "referenced";
+      const actions = providerActionsFromText(
+        `${item.id} ${item.title ?? ""}`,
+        options.providerUrls,
+        item.componentId,
+      );
       addNode({
         id: workItemNodeId,
         kind: "work-item",
@@ -563,7 +612,8 @@ export function buildNexusDashboardWeave(options: {
         detail: item.id,
         status: cycleStatus,
         timestamp: cycle.finishedAt ?? cycle.startedAt,
-        href: null,
+        href: firstActionHref(actions),
+        actions,
       });
       addEdge({
         id: edgeId(cycleNodeId, workItemNodeId, "selected"),
@@ -577,6 +627,11 @@ export function buildNexusDashboardWeave(options: {
 
   for (const run of options.runs.slice(-6)) {
     const runNodeId = nodeId("run", run.id);
+    const actions = providerActionsFromText(
+      `${run.summary ?? ""} ${run.error ?? ""} ${run.workItemId ?? ""} ${run.branchName ?? ""}`,
+      options.providerUrls,
+      run.componentId,
+    );
     addNode({
       id: runNodeId,
       kind: "run",
@@ -585,7 +640,8 @@ export function buildNexusDashboardWeave(options: {
       detail: run.summary ?? run.status,
       status: run.status,
       timestamp: run.finishedAt ?? run.startedAt,
-      href: null,
+      href: firstActionHref(actions),
+      actions,
     });
     addEdge({
       id: edgeId(projectNodeId, runNodeId, "records"),
@@ -607,6 +663,7 @@ export function buildNexusDashboardWeave(options: {
       status: options.authority.blockedActionCount > 0 ? "blocked" : "ready",
       timestamp: null,
       href: null,
+      actions: authorityProviderActions(options.authority, options.providerUrls),
     });
     addEdge({
       id: edgeId(projectNodeId, authorityNodeId, "published-by"),
@@ -619,6 +676,7 @@ export function buildNexusDashboardWeave(options: {
 
   options.blockers.slice(0, 8).forEach((blocker, index) => {
     const blockerNodeId = nodeId("blocker", String(index));
+    const actions = providerActionsFromText(blocker, options.providerUrls);
     addNode({
       id: blockerNodeId,
       kind: "blocker",
@@ -627,7 +685,8 @@ export function buildNexusDashboardWeave(options: {
       detail: blocker,
       status: "blocked",
       timestamp: null,
-      href: null,
+      href: firstActionHref(actions),
+      actions,
     });
     addEdge({
       id: edgeId(projectNodeId, blockerNodeId, "blocked-by"),
@@ -658,6 +717,208 @@ function authorityDashboardSummary(authority: NexusDashboardAuthoritySummary): s
     return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} use handoff instead of direct automation.`;
   }
   return `Publication permissions are ready for ${componentCount} ${plural(componentCount, "component", "components")}.`;
+}
+
+function dashboardProviderUrls(
+  projectConfig: NexusProjectConfig,
+  components: NexusDashboardComponentSummary[],
+): NexusDashboardProviderUrls {
+  const project = githubRepositoryUrl(projectConfig.repo.remoteUrl);
+  return {
+    project,
+    components: new Map(
+      components.map((component) => [
+        component.id,
+        githubRepositoryUrl(component.remoteUrl) ?? project,
+      ]),
+    ),
+  };
+}
+
+function componentProviderUrl(
+  providerUrls: NexusDashboardProviderUrls,
+  componentId: string | null | undefined,
+): string | null {
+  return componentId ? providerUrls.components.get(componentId) ?? providerUrls.project : providerUrls.project;
+}
+
+function githubRepositoryUrl(remoteUrl: string | null | undefined): string | null {
+  if (!remoteUrl) {
+    return null;
+  }
+  const trimmed = remoteUrl.trim();
+  const direct = /^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?(?:[/?#].*)?$/iu.exec(trimmed);
+  if (direct) {
+    return `https://github.com/${direct[1]}/${stripGitSuffix(direct[2] ?? "")}`;
+  }
+  const ssh = /^git@github(?:-[^:]+)?\.com:([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/iu.exec(trimmed);
+  if (ssh) {
+    return `https://github.com/${ssh[1]}/${stripGitSuffix(ssh[2] ?? "")}`;
+  }
+  const sshUrl = /^ssh:\/\/git@github(?:-[^/]+)?\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?(?:[/?#].*)?$/iu.exec(trimmed);
+  if (sshUrl) {
+    return `https://github.com/${sshUrl[1]}/${stripGitSuffix(sshUrl[2] ?? "")}`;
+  }
+  return null;
+}
+
+function stripGitSuffix(value: string): string {
+  return value.replace(/\.git$/iu, "");
+}
+
+function providerActionsForHref(
+  href: string | null | undefined,
+  labelOverride?: string,
+): NexusDashboardProviderAction[] {
+  if (!href) {
+    return [];
+  }
+  const normalized = normalizeProviderHref(href);
+  if (!normalized) {
+    return [];
+  }
+  const pull = /\/pull\/(\d+)(?:[/?#].*)?$/iu.exec(normalized);
+  if (pull) {
+    return [
+      {
+        label: labelOverride ?? `Open PR #${pull[1]}`,
+        href: normalized,
+        provider: "github",
+        kind: "pull-request",
+      },
+    ];
+  }
+  const issue = /\/issues\/(\d+)(?:[/?#].*)?$/iu.exec(normalized);
+  if (issue) {
+    return [
+      {
+        label: labelOverride ?? `Open issue #${issue[1]}`,
+        href: normalized,
+        provider: "github",
+        kind: "issue",
+      },
+    ];
+  }
+  return [
+    {
+      label: labelOverride ?? "Open provider",
+      href: normalized,
+      provider: normalized.startsWith("https://github.com/") ? "github" : "web",
+      kind: "provider-link",
+    },
+  ];
+}
+
+function providerActionsFromText(
+  value: string | null | undefined,
+  providerUrls: NexusDashboardProviderUrls,
+  componentId?: string | null,
+): NexusDashboardProviderAction[] {
+  const text = value ?? "";
+  const repositoryUrl = componentProviderUrl(
+    providerUrls,
+    componentId ?? inferComponentIdFromText(text, providerUrls),
+  );
+  const actions: NexusDashboardProviderAction[] = [];
+  for (const match of text.matchAll(/https:\/\/github\.com\/[^\s<>()"'`]+/giu)) {
+    actions.push(...providerActionsForHref(match[0].replace(/[.,;:]+$/u, "")));
+  }
+  if (repositoryUrl) {
+    for (const match of text.matchAll(/\b(?:PR|pull request)\s*#(\d+)\b/giu)) {
+      const number = match[1];
+      actions.push({
+        label: `Open PR #${number}`,
+        href: `${repositoryUrl}/pull/${number}`,
+        provider: "github",
+        kind: "pull-request",
+      });
+    }
+    for (const match of text.matchAll(/\b(?:issue|GitHub)\s*#(\d+)\b/giu)) {
+      const number = match[1];
+      actions.push({
+        label: `Open issue #${number}`,
+        href: `${repositoryUrl}/issues/${number}`,
+        provider: "github",
+        kind: "issue",
+      });
+    }
+    for (const match of text.matchAll(/\bgithub-(\d+)\b/giu)) {
+      const number = match[1];
+      actions.push({
+        label: `Open issue #${number}`,
+        href: `${repositoryUrl}/issues/${number}`,
+        provider: "github",
+        kind: "issue",
+      });
+    }
+  }
+  return uniqueProviderActions(actions).slice(0, 3);
+}
+
+function inferComponentIdFromText(
+  text: string,
+  providerUrls: NexusDashboardProviderUrls,
+): string | null {
+  const componentIds = [...providerUrls.components.keys()].sort(
+    (left, right) => right.length - left.length,
+  );
+  for (const componentId of componentIds) {
+    const pattern = new RegExp(`(^|[^A-Za-z0-9_-])${escapeRegExp(componentId)}([^A-Za-z0-9_-]|$)`, "u");
+    if (pattern.test(text)) {
+      return componentId;
+    }
+  }
+  return null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function authorityProviderActions(
+  authority: NexusDashboardAuthoritySummary,
+  providerUrls: NexusDashboardProviderUrls,
+): NexusDashboardProviderAction[] {
+  return uniqueProviderActions(
+    authority.components.flatMap((component) =>
+      providerActionsFromText(
+        [...component.blockedActions, ...component.warnings].join(" "),
+        providerUrls,
+        component.componentId,
+      ),
+    ),
+  );
+}
+
+function uniqueProviderActions(
+  actions: NexusDashboardProviderAction[],
+): NexusDashboardProviderAction[] {
+  const seen = new Set<string>();
+  const unique: NexusDashboardProviderAction[] = [];
+  for (const action of actions) {
+    if (!action.href || seen.has(action.href)) {
+      continue;
+    }
+    seen.add(action.href);
+    unique.push(action);
+  }
+  return unique;
+}
+
+function firstActionHref(actions: NexusDashboardProviderAction[]): string | null {
+  return actions[0]?.href ?? null;
+}
+
+function normalizeProviderHref(href: string): string | null {
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function statusOptions(
@@ -703,6 +964,7 @@ function summarizeComponent(
     name: component.name,
     kind: component.kind,
     role: component.role,
+    remoteUrl: component.remoteUrl,
     sourceRoot: component.sourceRoot,
     sourceRootExists: component.sourceRootExists,
     worktreesRoot: component.worktreesRoot,
@@ -894,10 +1156,38 @@ function dashboardBlockers(options: {
     ...(options.targetReport.ok ? [] : [`Target report unavailable: ${options.targetReport.error?.message ?? "unknown error"}`]),
     ...(options.automation.value?.eligibleWorkBlockers ?? []),
     ...(options.eligibleWork.value?.blockers ?? []),
+    ...(options.targetReport.value?.activeBlockers.map(activeBlockerText) ?? []),
     ...(options.targetReport.value?.blockers ?? []),
     ...options.worktreeWarnings,
   ];
   return [...new Set(blockers)].slice(0, 20);
+}
+
+function activeBlockerText(
+  blocker: NexusAutomationTargetReport["activeBlockers"][number],
+): string {
+  const work = [blocker.workItemTitle, blocker.workItemId].filter(Boolean).join(" ");
+  const source = [blocker.componentId, blocker.trackerProvider, blocker.trackerId]
+    .filter(Boolean)
+    .join(" · ");
+  return [work || blocker.source, blocker.message, source].filter(Boolean).join(" · ");
+}
+
+function cycleActionText(cycle: NexusAutomationTargetCycleRecord): string {
+  return [
+    cycle.id,
+    cycle.summary,
+    ...cycle.notes,
+    ...cycle.blockers,
+    ...cycle.workItems.flatMap((item) => [
+      item.componentId,
+      item.id,
+      item.title,
+      item.notes,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildDashboardEvents(options: {
@@ -909,6 +1199,7 @@ function buildDashboardEvents(options: {
   cycles: NexusAutomationTargetCycleRecord[];
   runs: NexusAutomationRunRecord[];
   blockers: string[];
+  providerUrls: NexusDashboardProviderUrls;
 }): NexusDashboardEvent[] {
   const events: NexusDashboardEvent[] = [
     {
@@ -919,10 +1210,13 @@ function buildDashboardEvents(options: {
       title: "Snapshot refreshed",
       body: "Read local DevNexus state.",
       relatedNodeIds: ["project"],
+      href: options.providerUrls.project,
+      actions: providerActionsForHref(options.providerUrls.project, "Open repository"),
     },
   ];
 
   if (options.automation) {
+    const actions = providerActionsFromText(options.automation.summary, options.providerUrls);
     events.push({
       id: "automation-status",
       time: options.generatedAt,
@@ -931,10 +1225,13 @@ function buildDashboardEvents(options: {
       title: `Automation ${options.automation.status}`,
       body: compactDetail(options.automation.summary),
       relatedNodeIds: ["project"],
+      href: firstActionHref(actions),
+      actions,
     });
   }
 
   if (options.eligibleWork) {
+    const actions = providerActionsFromText(options.eligibleWork.summary, options.providerUrls);
     events.push({
       id: "eligible-work",
       time: options.generatedAt,
@@ -943,10 +1240,13 @@ function buildDashboardEvents(options: {
       title: `${options.eligibleWork.eligibleWorkItemCount} ready ${plural(options.eligibleWork.eligibleWorkItemCount, "item", "items")}`,
       body: compactDetail(options.eligibleWork.summary),
       relatedNodeIds: ["project"],
+      href: firstActionHref(actions),
+      actions,
     });
   }
 
   for (const cycle of options.cycles.slice(-8).reverse()) {
+    const actions = providerActionsFromText(cycleActionText(cycle), options.providerUrls);
     events.push({
       id: `target-cycle-${cycle.id}`,
       time: cycle.finishedAt ?? cycle.startedAt,
@@ -955,10 +1255,13 @@ function buildDashboardEvents(options: {
       title: `Target cycle ${cycle.status}`,
       body: cycle.summary ?? cycle.id,
       relatedNodeIds: [nodeId("target-cycle", cycle.id)],
+      href: firstActionHref(actions),
+      actions,
     });
   }
 
   for (const run of options.runs.slice(-5).reverse()) {
+    const actions = providerActionsFromText(`${run.summary ?? ""} ${run.error ?? ""} ${run.workItemId ?? ""} ${run.branchName ?? ""}`, options.providerUrls, run.componentId);
     events.push({
       id: `run-${run.id}`,
       time: run.finishedAt ?? run.startedAt,
@@ -967,10 +1270,13 @@ function buildDashboardEvents(options: {
       title: `Run ${run.status}`,
       body: run.summary ?? run.id,
       relatedNodeIds: [nodeId("run", run.id)],
+      href: firstActionHref(actions),
+      actions,
     });
   }
 
   for (const worktree of options.worktrees.records.slice(0, 8)) {
+    const actions = providerActionsFromText(`${worktree.workItemId ?? ""} ${worktree.branchName ?? worktree.id}`, options.providerUrls, worktree.componentId);
     events.push({
       id: `worktree-${worktree.id}`,
       time: worktree.updatedAt,
@@ -979,10 +1285,13 @@ function buildDashboardEvents(options: {
       title: `Worktree ${worktree.effectiveStatus}`,
       body: `${worktree.branchName ?? worktree.id} on ${worktree.hostId}`,
       relatedNodeIds: [nodeId("worktree", worktree.id)],
+      href: firstActionHref(actions),
+      actions,
     });
   }
 
   options.blockers.slice(0, 8).forEach((blocker, index) => {
+    const actions = providerActionsFromText(blocker, options.providerUrls);
     events.push({
       id: `blocker-${index}`,
       time: options.generatedAt,
@@ -991,6 +1300,8 @@ function buildDashboardEvents(options: {
       title: "Active blocker",
       body: compactDetail(blocker),
       relatedNodeIds: [nodeId("blocker", String(index))],
+      href: firstActionHref(actions),
+      actions,
     });
   });
 

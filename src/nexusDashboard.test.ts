@@ -37,7 +37,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
     home: null,
     repo: {
       kind: "git",
-      remoteUrl: "git@example.invalid:dashboard/demo.git",
+      remoteUrl: "git@github.com:Evref-BL/DevNexus.git",
       defaultBranch: "main",
       sourceRoot: "source",
     },
@@ -126,7 +126,7 @@ function worktreeLease(projectId: string): NexusWorktreeLeaseRecord {
     hostId: "host-1",
     agentId: "agent-1",
     workItemId: "local-1",
-    branchName: "codex/primary/dashboard",
+    branchName: "codex/dev-nexus/github-114-dashboard",
     baseRef: "main",
     worktree: {
       kind: "component_worktree",
@@ -192,7 +192,7 @@ describe("nexus dashboard", () => {
         projectId: "dashboard-demo",
         targetId: "dashboard",
         status: "dispatched",
-        summary: "Dispatched dashboard work.",
+        summary: "Completed via DevNexus PR #66.",
         workItems: [
           {
             componentId: "primary",
@@ -243,6 +243,31 @@ describe("nexus dashboard", () => {
       ]),
     );
     expect(snapshot.weave.edges.some((edge) => edge.kind === "selected")).toBe(true);
+    expect(snapshot.weave.nodes.find((node) => node.id === "target-cycle:cycle-1")).toMatchObject({
+      href: "https://github.com/Evref-BL/DevNexus/pull/66",
+      actions: [
+        {
+          label: "Open PR #66",
+          href: "https://github.com/Evref-BL/DevNexus/pull/66",
+          provider: "github",
+          kind: "pull-request",
+        },
+      ],
+    });
+    expect(snapshot.weave.nodes.find((node) => node.id === "worktree:lease-dashboard")).toMatchObject({
+      href: "https://github.com/Evref-BL/DevNexus/issues/114",
+      actions: [
+        {
+          label: "Open issue #114",
+          href: "https://github.com/Evref-BL/DevNexus/issues/114",
+          provider: "github",
+          kind: "issue",
+        },
+      ],
+    });
+    expect(snapshot.events.find((event) => event.id === "target-cycle-cycle-1")).toMatchObject({
+      href: "https://github.com/Evref-BL/DevNexus/pull/66",
+    });
   });
 
   it("renders a client module with explicit light and dark mode controls", () => {
@@ -270,6 +295,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("dn-history-chip");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
     expect(module).toContain("-webkit-line-clamp: 3");
+    expect(module).toContain("dn-action-strip");
+    expect(module).toContain("target=\"_blank\"");
     expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
   });
