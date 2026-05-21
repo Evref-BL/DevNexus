@@ -4,8 +4,25 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches:
+      - main
+      - candidate/**
+      - release/**
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
+    inputs:
+      validation_tier:
+        description: "Validation tier to run"
+        required: true
+        default: full
+        type: choice
+        options:
+          - auto
+          - smoke
+          - full
 
 permissions:
   contents: read
@@ -15,17 +32,165 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Node 24 check (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  classify:
+    name: CI tier decision
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      reason: ${{ steps.tier.outputs.reason }}
+      tier: ${{ steps.tier.outputs.tier }}
+      run_ubuntu: ${{ steps.tier.outputs.run_ubuntu }}
+      run_windows: ${{ steps.tier.outputs.run_windows }}
+      run_macos: ${{ steps.tier.outputs.run_macos }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select validation tier
+        id: tier
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref || '' }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          DISPATCH_TIER: ${{ inputs.validation_tier || 'auto' }}
+        run: |
+          set -euo pipefail
+
+          tier="smoke"
+          reason="ordinary branch validation"
+
+          case "$EVENT_NAME" in
+            push)
+              tier="full"
+              reason="push to integration or publication branch"
+              ;;
+            merge_group)
+              tier="full"
+              reason="merge queue validation"
+              ;;
+            schedule)
+              tier="full"
+              reason="scheduled drift validation"
+              ;;
+            workflow_dispatch)
+              if [[ "$DISPATCH_TIER" == "full" ]]; then
+                tier="full"
+                reason="manual full validation"
+              elif [[ "$DISPATCH_TIER" == "smoke" ]]; then
+                tier="smoke"
+                reason="manual smoke validation"
+              else
+                tier="full"
+                reason="manual auto validation defaults to full"
+              fi
+              ;;
+            pull_request)
+              if [[ "$PR_HEAD_REF" == candidate/* || "$PR_HEAD_REF" == integration/* || "$PR_HEAD_REF" == release/* ]]; then
+                tier="full"
+                reason="publication candidate branch"
+              else
+                mapfile -t changed_files < <(git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA")
+                source_changes=false
+                for file in "${changed_files[@]}"; do
+                  case "$file" in
+                    docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE*)
+                      ;;
+                    *)
+                      source_changes=true
+                      ;;
+                  esac
+                done
+
+                if [[ "$source_changes" == "false" ]]; then
+                  tier="none"
+                  reason="documentation-only pull request"
+                fi
+              fi
+              ;;
+          esac
+
+          run_ubuntu=false
+          run_windows=false
+          run_macos=false
+          case "$tier" in
+            full)
+              run_ubuntu=true
+              run_windows=true
+              run_macos=true
+              ;;
+            smoke)
+              run_ubuntu=true
+              ;;
+            none)
+              ;;
+          esac
+
+          {
+            echo "tier=$tier"
+            echo "reason=$reason"
+            echo "run_ubuntu=$run_ubuntu"
+            echo "run_windows=$run_windows"
+            echo "run_macos=$run_macos"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "CI tier: $tier ($reason)"
+
+  check-ubuntu:
+    name: Node 24 check (ubuntu-latest)
+    needs: classify
+    if: needs.classify.outputs.run_ubuntu == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run checks
+        run: npm run check
+
+  check-windows:
+    name: Node 24 check (windows-latest)
+    needs: classify
+    if: needs.classify.outputs.run_windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run checks
+        run: npm run check
+
+  check-macos:
+    name: Node 24 check (macos-latest)
+    needs: classify
+    if: needs.classify.outputs.run_macos == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
