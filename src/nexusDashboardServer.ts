@@ -6,6 +6,7 @@ import http, {
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import {
+  buildNexusDashboardHostActionQueue,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   type BuildNexusDashboardHostSnapshotOptions,
@@ -468,33 +469,15 @@ export function renderNexusDashboardClientModule(): string {
     "}",
     "",
     "function renderHostActionQueue(host) {",
-    "  const attention = [...(host?.workspaces ?? [])].filter(hostWorkspaceNeedsAttention).sort(compareHostAttention);",
-    "  const body = attention.length ? attention.slice(0, 8).map(renderHostActionCard).join('') : '<p>No workspace needs attention.</p>';",
-    "  return `<section class=\"dn-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host HITL</span><h2>Action Queue</h2></div><span class=\"dn-count\">${escapeHtml(`${attention.length} workspaces`)}</span></div><div class=\"dn-host-action-list\">${body}</div></section>`;",
+    "  const actions = host?.actionQueue ?? [];",
+    "  const body = actions.length ? actions.slice(0, 8).map(renderHostActionCard).join('') : '<p>No workspace needs attention.</p>';",
+    "  return `<section class=\"dn-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host HITL</span><h2>Action Queue</h2></div><span class=\"dn-count\">${escapeHtml(`${actions.length} actions`)}</span></div><div class=\"dn-host-action-list\">${body}</div></section>`;",
     "}",
     "",
-    "function renderHostActionCard(workspace) {",
-    "  const reasons = hostWorkspaceReasons(workspace).join(' · ');",
-    "  return `<button class=\"dn-host-action-card\" type=\"button\" data-workspace-id=\"${escapeHtml(workspace.id)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(workspace.name)}</strong><span class=\"dn-thread-decision decision-${workspace.tone === 'danger' ? 'rescue' : 'review'}\">${escapeHtml(workspaceToneLabel(workspace))}</span></span><span class=\"dn-card-meta\">${escapeHtml(reasons)}</span><p title=\"${escapeHtml(formatDisplayText(workspace.summary))}\">${escapeHtml(formatDisplayText(workspace.summary))}</p></button>`;",
-    "}",
-    "",
-    "function hostWorkspaceNeedsAttention(workspace) {",
-    "  return workspace.tone === 'danger' || workspace.tone === 'warn';",
-    "}",
-    "",
-    "function hostWorkspaceReasons(workspace) {",
-    "  const reasons = [];",
-    "  if (workspace.needsDecisionCount > 0) reasons.push(`${workspace.needsDecisionCount} need review`);",
-    "  if (workspace.blockerCount > 0) reasons.push(`${workspace.blockerCount} blockers`);",
-    "  if (workspace.dirtyComponentCount > 0) reasons.push(`${workspace.dirtyComponentCount} dirty`);",
-    "  if (workspace.error) reasons.push('unavailable');",
-    "  return reasons.length ? reasons : ['needs attention'];",
-    "}",
-    "",
-    "function compareHostAttention(left, right) {",
-    "  const leftScore = left.needsDecisionCount * 8 + left.blockerCount * 5 + left.dirtyComponentCount * 3 + (left.error ? 20 : 0);",
-    "  const rightScore = right.needsDecisionCount * 8 + right.blockerCount * 5 + right.dirtyComponentCount * 3 + (right.error ? 20 : 0);",
-    "  return rightScore - leftScore || left.name.localeCompare(right.name);",
+    "function renderHostActionCard(action) {",
+    "  const updated = action.updatedAt ? ` · ${formatTime(action.updatedAt)}` : '';",
+    "  const detail = formatDisplayText(action.detail);",
+    "  return `<button class=\"dn-host-action-card action-${escapeAttribute(action.kind)}\" type=\"button\" data-workspace-id=\"${escapeHtml(action.workspaceId)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(action.workspaceName)}</strong><span class=\"dn-thread-decision decision-${action.tone === 'danger' ? 'rescue' : 'review'}\">${escapeHtml(action.state)}</span></span><span class=\"dn-card-meta\">${escapeHtml(action.reason)}${escapeHtml(updated)}</span><p title=\"${escapeHtml(detail)}\">${escapeHtml(truncate(detail, 110))}</p><span class=\"dn-action-label\">${escapeHtml(action.primaryAction?.label ?? 'Open workspace')}</span></button>`;",
     "}",
     "",
     "function renderHostNavButton(selectedWorkspaceId) {",
@@ -1395,11 +1378,9 @@ function mergeDashboardHostSnapshots(
     ...selectedHost,
     workspaceCount: workspaces.length,
     needsAttentionCount: workspaces.filter((workspace) =>
-      workspace.needsDecisionCount > 0 ||
-      workspace.blockerCount > 0 ||
-      workspace.automationStatus === "blocked" ||
-      workspace.error !== null
+      workspace.tone === "danger" || workspace.tone === "warn"
     ).length,
+    actionQueue: buildNexusDashboardHostActionQueue(workspaces),
     workspaces,
   };
 }

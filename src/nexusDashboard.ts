@@ -386,11 +386,42 @@ export interface NexusDashboardHostWorkspaceRecord {
   dirtyComponentCount: number;
   threadCount: number;
   needsDecisionCount: number;
+  staleThreadCount: number;
+  approvalCount: number;
   blockerCount: number;
   pluginCount: number;
   automationStatus: string | null;
   eligibleWorkCount: number | null;
+  updatedAt: string | null;
   error: NexusDashboardDataError | null;
+}
+
+export type NexusDashboardHostActionKind =
+  | "workspace-error"
+  | "approval"
+  | "blocker"
+  | "thread"
+  | "dirty";
+
+export interface NexusDashboardHostPrimaryAction {
+  label: string;
+  kind: "open-workspace" | "review" | "rescue";
+  workspaceId: string;
+}
+
+export interface NexusDashboardHostActionItem {
+  id: string;
+  kind: NexusDashboardHostActionKind;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceRoot: string;
+  reason: string;
+  detail: string;
+  state: string;
+  tone: NexusDashboardSignalTone;
+  updatedAt: string | null;
+  primaryAction: NexusDashboardHostPrimaryAction;
+  providerAction: NexusDashboardProviderAction | null;
 }
 
 export interface NexusDashboardHostSnapshot {
@@ -401,6 +432,7 @@ export interface NexusDashboardHostSnapshot {
   currentProjectRoot: string | null;
   workspaceCount: number;
   needsAttentionCount: number;
+  actionQueue: NexusDashboardHostActionItem[];
   workspaces: NexusDashboardHostWorkspaceRecord[];
 }
 
@@ -541,6 +573,7 @@ export async function buildNexusDashboardHostSnapshot(
       }),
     ),
   );
+  const actionQueue = buildNexusDashboardHostActionQueue(workspaces);
 
   return {
     version: 1,
@@ -552,6 +585,7 @@ export async function buildNexusDashboardHostSnapshot(
     needsAttentionCount: workspaces.filter((workspace) =>
       dashboardHostWorkspaceNeedsAttention(workspace),
     ).length,
+    actionQueue,
     workspaces,
   };
 }
@@ -599,11 +633,13 @@ async function dashboardHostWorkspaceRecord(options: {
   current: boolean;
 } & BuildNexusDashboardHostSnapshotOptions): Promise<NexusDashboardHostWorkspaceRecord> {
   const root = path.resolve(options.reference.projectRoot);
+  const gitRunner = options.gitRunner ?? defaultGitRunner;
+  const generatedAt = isoString(options.now?.() ?? new Date());
   const localFacts = capture(() => {
     const projectConfig = loadProjectConfig(root);
     const components = resolveProjectComponents(root, projectConfig);
     const componentSummaries = components.map((component) =>
-      summarizeComponent(component, options.gitRunner ?? defaultGitRunner),
+      summarizeComponent(component, gitRunner),
     );
     const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
     const worktreeCollection = capture(() =>
@@ -650,15 +686,48 @@ async function dashboardHostWorkspaceRecord(options: {
       dirtyComponentCount: 0,
       threadCount: 0,
       needsDecisionCount: 0,
+      staleThreadCount: 0,
+      approvalCount: 0,
       blockerCount: 0,
       pluginCount: 0,
       automationStatus: null,
       eligibleWorkCount: null,
+      updatedAt: null,
       error: localFacts.error,
     };
   }
 
   const value = localFacts.value;
+  const [automation, eligibleWork] = await Promise.all([
+    captureAsync(() =>
+      getNexusAutomationStatus({
+        ...statusOptions({ ...options, projectRoot: root }, root, gitRunner),
+      }),
+    ),
+    captureAsync(() =>
+      getNexusEligibleWorkSummary({
+        ...statusOptions({ ...options, projectRoot: root }, root, gitRunner),
+      }),
+    ),
+  ]);
+  const authority = summarizeAuthority(automation.value?.authority ?? null);
+  const approvalCount = authority
+    ? authority.blockedActionCount +
+      authority.waitingActionCount +
+      authority.fallbackActionCount
+    : 0;
+  const eligibleBlockerCount = uniqueNonEmptyStrings([
+    ...(automation.value?.eligibleWorkBlockers ?? []),
+    ...(eligibleWork.value?.blockers ?? []),
+  ]).length;
+  const blockerCount =
+    eligibleBlockerCount > 0 || automation.value?.status === "blocked"
+      ? Math.max(eligibleBlockerCount, 1)
+      : 0;
+  const updatedAt = latestIsoString([
+    ...value.threads.records.map((thread) => thread.updatedAt),
+    generatedAt,
+  ]);
   const project = projectSummary(
     root,
     value.projectConfig,
@@ -670,11 +739,16 @@ async function dashboardHostWorkspaceRecord(options: {
     root: project.root,
     registered: options.registered,
     current: options.current,
-    generatedAt: isoString(options.now?.() ?? new Date()),
-    summary: dashboardHostWorkspaceSummary(value),
+    generatedAt,
+    summary: dashboardHostWorkspaceSummary({
+      ...value,
+      approvalCount,
+      blockerCount,
+      eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+    }),
     tone: dashboardHostWorkspaceTone({
-      automationStatus: null,
-      blockerCount: value.blockerCount,
+      automationStatus: automation.value?.status ?? null,
+      blockerCount,
       dirtyComponentCount: value.dirtyComponentCount,
       needsDecisionCount: value.threads.needsDecisionCount,
       threadCount: value.threads.totalCount,
@@ -684,10 +758,13 @@ async function dashboardHostWorkspaceRecord(options: {
     dirtyComponentCount: value.dirtyComponentCount,
     threadCount: value.threads.totalCount,
     needsDecisionCount: value.threads.needsDecisionCount,
-    blockerCount: value.blockerCount,
+    staleThreadCount: value.threads.archiveCandidateCount + value.threads.forgetCandidateCount,
+    approvalCount,
+    blockerCount,
     pluginCount: value.plugins.enabledCount,
-    automationStatus: null,
-    eligibleWorkCount: null,
+    automationStatus: automation.value?.status ?? null,
+    eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+    updatedAt,
     error: null,
   };
 }
@@ -699,6 +776,8 @@ function dashboardHostWorkspaceSummary(value: {
   blockerCount: number;
   warningCount: number;
   dirtyComponentCount: number;
+  approvalCount: number;
+  eligibleWorkCount: number | null;
 }): string {
   const review = value.threads.needsDecisionCount > 0
     ? `${value.threads.needsDecisionCount} need review`
@@ -709,7 +788,16 @@ function dashboardHostWorkspaceSummary(value: {
   const warnings = value.warningCount > 0
     ? `${value.warningCount} warnings`
     : "no warnings";
-  return `${value.componentSummaries.length} components, ${value.threads.totalCount} active threads, ${review}, ${dirty}, ${warnings}, ${value.plugins.enabledCount} plugins`;
+  const approvals = value.approvalCount > 0
+    ? `${value.approvalCount} approvals`
+    : "no approvals";
+  const blockers = value.blockerCount > 0
+    ? `${value.blockerCount} blockers`
+    : "no blockers";
+  const ready = value.eligibleWorkCount && value.eligibleWorkCount > 0
+    ? `${value.eligibleWorkCount} ready`
+    : "no ready work";
+  return `${value.componentSummaries.length} components, ${value.threads.totalCount} active threads, ${review}, ${approvals}, ${blockers}, ${dirty}, ${ready}, ${warnings}, ${value.plugins.enabledCount} plugins`;
 }
 
 function dashboardHostWorkspaceTone(options: {
@@ -740,6 +828,126 @@ function dashboardHostWorkspaceNeedsAttention(
   workspace: NexusDashboardHostWorkspaceRecord,
 ): boolean {
   return workspace.tone === "danger" || workspace.tone === "warn";
+}
+
+export function buildNexusDashboardHostActionQueue(
+  workspaces: NexusDashboardHostWorkspaceRecord[],
+): NexusDashboardHostActionItem[] {
+  return workspaces
+    .flatMap((workspace) => dashboardHostActionItems(workspace))
+    .sort(compareDashboardHostActions);
+}
+
+function dashboardHostActionItems(
+  workspace: NexusDashboardHostWorkspaceRecord,
+): NexusDashboardHostActionItem[] {
+  const items: NexusDashboardHostActionItem[] = [];
+  const add = (
+    kind: NexusDashboardHostActionKind,
+    reason: string,
+    detail: string,
+    state: string,
+    tone: NexusDashboardSignalTone,
+    label: string,
+  ): void => {
+    items.push({
+      id: `host-action:${workspace.id}:${kind}`,
+      kind,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      workspaceRoot: workspace.root,
+      reason,
+      detail,
+      state,
+      tone,
+      updatedAt: workspace.updatedAt ?? workspace.generatedAt,
+      primaryAction: {
+        label,
+        kind: kind === "dirty" ? "rescue" : "review",
+        workspaceId: workspace.id,
+      },
+      providerAction: null,
+    });
+  };
+
+  if (workspace.error) {
+    add(
+      "workspace-error",
+      "Workspace unavailable",
+      workspace.summary,
+      "unavailable",
+      "danger",
+      "Review workspace",
+    );
+    return items;
+  }
+  if (workspace.approvalCount > 0) {
+    add(
+      "approval",
+      `${workspace.approvalCount} ${plural(workspace.approvalCount, "approval", "approvals")} needed`,
+      "Provider automation needs approval before it can continue.",
+      "approval needed",
+      "warn",
+      "Review approval",
+    );
+  }
+  if (workspace.blockerCount > 0 || workspace.automationStatus === "blocked") {
+    add(
+      "blocker",
+      `${Math.max(workspace.blockerCount, 1)} ${plural(Math.max(workspace.blockerCount, 1), "blocker", "blockers")}`,
+      "Automation or tracked work is blocked.",
+      "blocked",
+      "danger",
+      "Review blocker",
+    );
+  }
+  if (workspace.needsDecisionCount > 0) {
+    add(
+      "thread",
+      `${workspace.needsDecisionCount} ${plural(workspace.needsDecisionCount, "thread", "threads")} need review`,
+      "Unfinished work needs continue, archive, forget, or rescue.",
+      workspace.staleThreadCount > 0 ? "stale threads" : "review needed",
+      "warn",
+      "Review threads",
+    );
+  }
+  if (workspace.dirtyComponentCount > 0) {
+    add(
+      "dirty",
+      `${workspace.dirtyComponentCount} dirty ${plural(workspace.dirtyComponentCount, "component", "components")}`,
+      "Local component checkouts have uncommitted changes.",
+      "dirty",
+      "warn",
+      "Rescue changes",
+    );
+  }
+
+  return items;
+}
+
+function compareDashboardHostActions(
+  left: NexusDashboardHostActionItem,
+  right: NexusDashboardHostActionItem,
+): number {
+  return dashboardHostActionScore(right) - dashboardHostActionScore(left) ||
+    (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") ||
+    left.workspaceName.localeCompare(right.workspaceName) ||
+    left.kind.localeCompare(right.kind);
+}
+
+function dashboardHostActionScore(item: NexusDashboardHostActionItem): number {
+  switch (item.kind) {
+    case "workspace-error":
+      return 100;
+    case "blocker":
+      return 90;
+    case "approval":
+      return 80;
+    case "thread":
+      return 60;
+    case "dirty":
+      return 50;
+  }
 }
 
 export function buildNexusDashboardWeave(options: {
@@ -2286,6 +2494,25 @@ function dataError(error: unknown): NexusDashboardDataError {
     name: error instanceof Error ? error.name : "Error",
     message: error instanceof Error ? error.message : String(error),
   };
+}
+
+function uniqueNonEmptyStrings(values: string[]): string[] {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    unique.push(normalized);
+  }
+  return unique;
+}
+
+function latestIsoString(values: Array<string | null | undefined>): string | null {
+  const present = values.filter((value): value is string => Boolean(value));
+  return present.length ? present.sort().at(-1) ?? null : null;
 }
 
 function nodeId(kind: string, id: string): string {

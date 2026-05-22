@@ -18,6 +18,23 @@ GET /assets/dev-nexus-dashboard.js
 a selected workspace. In host mode, callers can use the host payload to choose a
 workspace, then request workspace drill-down data.
 
+## Host Payload
+
+The host payload includes registered workspaces and a ranked `actionQueue`.
+Embedders should use `actionQueue` for the "what needs me now?" surface instead
+of re-sorting workspace counters in the browser.
+
+Each host action has:
+
+- workspace id, name, and root
+- kind, reason, state, tone, and updated time
+- compact detail text
+- primary action
+- optional provider action
+
+The queue is read-only guidance. Provider writes, cleanup, archive, forget, and
+assistant actions still need their own explicit action contract.
+
 ## Browser Module
 
 ```js

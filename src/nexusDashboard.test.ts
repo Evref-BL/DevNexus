@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appendNexusAutomationRunRecord,
   appendNexusAutomationTargetCycleRecord,
+  buildNexusDashboardHostActionQueue,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   CodexAppServerJsonRpcClient,
@@ -26,6 +27,7 @@ import {
   type NexusDashboardCodexChatStartOptions,
   type NexusDashboardCodexChatStartResult,
   type NexusDashboardCodexChatStarter,
+  type NexusDashboardHostWorkspaceRecord,
   type NexusProjectConfig,
   type NexusWorktreeLeaseRecord,
 } from "./index.js";
@@ -255,6 +257,34 @@ function worktreeLease(
       ...lease.git,
       ...overrides.git,
     },
+  };
+}
+
+function hostWorkspace(
+  overrides: Partial<NexusDashboardHostWorkspaceRecord> = {},
+): NexusDashboardHostWorkspaceRecord {
+  return {
+    id: "workspace",
+    name: "Workspace",
+    root: "/workspace",
+    registered: true,
+    current: false,
+    generatedAt: "2026-05-21T10:00:00.000Z",
+    summary: "Workspace is ready.",
+    tone: "good",
+    componentCount: 1,
+    dirtyComponentCount: 0,
+    threadCount: 0,
+    needsDecisionCount: 0,
+    staleThreadCount: 0,
+    approvalCount: 0,
+    blockerCount: 0,
+    pluginCount: 0,
+    automationStatus: "idle",
+    eligibleWorkCount: 0,
+    updatedAt: "2026-05-21T10:00:00.000Z",
+    error: null,
+    ...overrides,
   };
 }
 
@@ -553,6 +583,92 @@ describe("nexus dashboard", () => {
           registered: true,
           componentCount: 1,
           pluginCount: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("builds a ranked host action queue from workspace attention signals", () => {
+    const actions = buildNexusDashboardHostActionQueue([
+      hostWorkspace({
+        id: "dirty",
+        name: "Dirty Workspace",
+        dirtyComponentCount: 2,
+        tone: "warn",
+      }),
+      hostWorkspace({
+        id: "approval",
+        name: "Approval Workspace",
+        approvalCount: 3,
+        tone: "warn",
+      }),
+      hostWorkspace({
+        id: "thread",
+        name: "Thread Workspace",
+        threadCount: 4,
+        needsDecisionCount: 2,
+        staleThreadCount: 1,
+        tone: "warn",
+      }),
+      hostWorkspace({
+        id: "blocked",
+        name: "Blocked Workspace",
+        blockerCount: 1,
+        automationStatus: "blocked",
+        tone: "danger",
+      }),
+      hostWorkspace({
+        id: "broken",
+        name: "Broken Workspace",
+        summary: "Workspace snapshot is unavailable.",
+        tone: "danger",
+        error: {
+          name: "Error",
+          message: "Missing project config",
+        },
+      }),
+    ]);
+
+    expect(actions.map((action) => action.kind)).toEqual([
+      "workspace-error",
+      "blocker",
+      "approval",
+      "thread",
+      "dirty",
+    ]);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "host-action:broken:workspace-error",
+          workspaceId: "broken",
+          reason: "Workspace unavailable",
+          state: "unavailable",
+          primaryAction: {
+            label: "Review workspace",
+            kind: "review",
+            workspaceId: "broken",
+          },
+        }),
+        expect.objectContaining({
+          id: "host-action:approval:approval",
+          reason: "3 approvals needed",
+          primaryAction: expect.objectContaining({
+            label: "Review approval",
+          }),
+        }),
+        expect.objectContaining({
+          id: "host-action:thread:thread",
+          reason: "2 threads need review",
+          state: "stale threads",
+        }),
+        expect.objectContaining({
+          id: "host-action:dirty:dirty",
+          reason: "2 dirty components",
+          primaryAction: {
+            label: "Rescue changes",
+            kind: "rescue",
+            workspaceId: "dirty",
+          },
         }),
       ]),
     );
