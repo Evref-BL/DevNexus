@@ -60,7 +60,8 @@ describe("initiative finalization plan", () => {
         cliCommand:
           "dev-nexus publication pull-request upsert " +
           `${projectRoot} --component primary --head feat/codex-goals --base main ` +
-          '--title "Finalize initiative codex-goals"',
+          '--title "Finalize initiative codex-goals" --body ' +
+          '"Finalize initiative codex-goals. Head: feat/codex-goals Base: main Review target: main Run initiative-finalization with current provider evidence before publication."',
       },
       reviewReadiness: {
         status: "needs_final_pull_request",

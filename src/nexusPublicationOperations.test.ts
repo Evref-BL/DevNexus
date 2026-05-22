@@ -1154,6 +1154,59 @@ describe("publication CLI operations", () => {
     ]);
   });
 
+  it("normalizes escaped line breaks in inline pull request bodies", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const escapedLineBreak = `${String.fromCharCode(92)}n`;
+    const requests: Array<{ body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      requests.push({
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return new Response(
+        JSON.stringify({
+          number: 191,
+          html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+          state: "open",
+          title: "Add App publication commands",
+        }),
+        { status: 201 },
+      );
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "upsert",
+        projectRoot,
+        "--head",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        ["Summary.", "", "Verification."].join(escapedLineBreak),
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(requests).toEqual([
+      {
+        body: expect.objectContaining({
+          body: ["Summary.", "", "Verification."].join(String.fromCharCode(10)),
+        }),
+      },
+    ]);
+  });
+
   it("prints pull request evidence through the configured App API credential path", async () => {
     const { projectRoot } = createPublicationProject();
     const stdout = textWriter();
