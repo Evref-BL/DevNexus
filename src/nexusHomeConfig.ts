@@ -255,13 +255,14 @@ function validateHostingAuthProfileCredentialKind(
     value === "git_credential" ||
     value === "command_token" ||
     value === "github_app" ||
+    value === "github_app_user_token" ||
     value === "unknown"
   ) {
     return value;
   }
 
   throw new NexusConfigError(
-    `${pathName} must be environment_token, provider_cli, git_credential, command_token, github_app, or unknown`,
+    `${pathName} must be environment_token, provider_cli, git_credential, command_token, github_app, github_app_user_token, or unknown`,
   );
 }
 

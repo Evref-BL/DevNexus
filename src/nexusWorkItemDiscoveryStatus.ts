@@ -520,6 +520,7 @@ function discoveryCredentialCurrentActor(
     componentId: component.id,
     publication,
     authProfiles: options.authProfiles ?? [],
+    repository: component.remoteUrl,
   });
   return {
     profileId: currentActor.profileId,

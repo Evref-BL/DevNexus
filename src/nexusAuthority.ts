@@ -260,6 +260,7 @@ export interface ResolveNexusCurrentAutomationActorOptions {
   componentId: string;
   publication: NexusAutomationPublicationConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
+  repository?: string | null;
 }
 
 export type NexusEffectiveAuthorityStatus =
@@ -877,12 +878,22 @@ export function resolveNexusCurrentAutomationActor(
     });
   }
 
-  const mechanismMatchedProfiles = validKindProfiles
+  const repositoryMatchedProfiles = filterProfilesForPublicationRepository(
+    validKindProfiles,
+    options.repository,
+  );
+  const candidateProfiles =
+    repositoryMatchedProfiles.length > 0
+      ? repositoryMatchedProfiles
+      : validKindProfiles;
+  const mechanismMatchedProfiles = candidateProfiles
     .map((profile) => authProfileResolution(profile, expected, options.publication))
-    .filter((profile) => profile.mechanisms.some((mechanism) => mechanism !== "actorId"));
+    .filter((profile) =>
+      profile.mechanisms.some((mechanism) => mechanism !== "actorId")
+    );
   const selectedProfiles = mechanismMatchedProfiles.length > 0
     ? mechanismMatchedProfiles
-    : validKindProfiles.map((profile) =>
+    : candidateProfiles.map((profile) =>
         authProfileResolution(profile, expected, options.publication)
       );
   if (selectedProfiles.length > 1) {
@@ -951,6 +962,7 @@ export function summarizeNexusAuthorityForComponent(
       componentId: options.componentId,
       publication: options.publication,
       authProfiles: options.authProfiles,
+      repository: options.repository,
     });
   const actorId = currentActor.expectedActorId;
   const actor = actorId
@@ -2396,6 +2408,102 @@ function authProfileMechanisms(
   }
 
   return uniqueValues(mechanisms);
+}
+
+function filterProfilesForPublicationRepository(
+  profiles: NexusHostingAuthProfileConfig[],
+  repository: string | null | undefined,
+): NexusHostingAuthProfileConfig[] {
+  const repositoryRef = parseGitHubRepositoryRef(repository);
+  if (!repositoryRef) {
+    return [];
+  }
+  return profiles.filter((profile) =>
+    githubAppProfileIncludesRepository(profile, repositoryRef)
+  );
+}
+
+function githubAppProfileIncludesRepository(
+  profile: NexusHostingAuthProfileConfig,
+  repository: { host: string; owner: string; name: string },
+): boolean {
+  if (profile.provider.toLowerCase() !== "github" || !profile.githubApp) {
+    return false;
+  }
+  const profileHost = profile.host?.trim() || "github.com";
+  if (!handlesEqual(profileHost, repository.host)) {
+    return false;
+  }
+  const installationAccount = profile.githubApp.installationAccount?.trim();
+  if (
+    installationAccount &&
+    !handlesEqual(installationAccount, repository.owner)
+  ) {
+    return false;
+  }
+  const repositories = profile.githubApp.repositories ?? [];
+  if (repositories.length === 0) {
+    return true;
+  }
+  return repositories.some((name) => handlesEqual(name, repository.name));
+}
+
+function parseGitHubRepositoryRef(
+  repository: string | null | undefined,
+): { host: string; owner: string; name: string } | null {
+  const normalized = repository?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const ownerName = /^([^/\s:]+)\/([^/\s:]+?)(?:\.git)?$/u.exec(normalized);
+  if (ownerName) {
+    return {
+      host: "github.com",
+      owner: ownerName[1]!,
+      name: ownerName[2]!,
+    };
+  }
+
+  const scp = /^(?:[^@]+@)?([^:]+):([^/]+)\/(.+)$/u.exec(normalized);
+  if (scp) {
+    return normalizeGitHubRepositoryRef(scp[1]!, scp[2]!, scp[3]!);
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (
+      url.protocol !== "https:" &&
+      url.protocol !== "http:" &&
+      url.protocol !== "ssh:"
+    ) {
+      return null;
+    }
+    const [owner, name, ...extra] = url.pathname.replace(/^\/+/u, "").split("/");
+    if (extra.length > 0) {
+      return null;
+    }
+    return normalizeGitHubRepositoryRef(url.hostname, owner, name);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGitHubRepositoryRef(
+  host: string | undefined,
+  owner: string | undefined,
+  name: string | undefined,
+): { host: string; owner: string; name: string } | null {
+  const normalizedOwner = owner?.trim();
+  const normalizedName = name?.trim().replace(/\.git$/u, "");
+  if (!normalizedOwner || !normalizedName || normalizedName.includes("/")) {
+    return null;
+  }
+  return {
+    host: host?.trim() || "github.com",
+    owner: normalizedOwner,
+    name: normalizedName,
+  };
 }
 
 function providerMatches(

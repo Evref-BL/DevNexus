@@ -2712,6 +2712,7 @@ function resolveCoordinationMutationAuthority(options: {
     componentId: options.context.component.id,
     publication,
     authProfiles: [],
+    repository: options.context.component.remoteUrl,
   });
 
   return resolveNexusEffectiveAuthorityForCurrentActor({

@@ -1381,6 +1381,11 @@ function resolvePublicationAuthority(options: {
     componentId: options.component.id,
     publication: options.policy,
     authProfiles: options.authProfiles,
+    repository:
+      options.component.remoteUrl ??
+      options.git.pushUrl ??
+      options.git.remoteUrl ??
+      null,
   });
   const authProfile = currentActor.profileId
     ? options.authProfiles.find((profile) => profile.id === currentActor.profileId) ??

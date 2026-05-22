@@ -92,6 +92,7 @@ export type NexusHostingAuthProfileCredentialKind =
   | "git_credential"
   | "command_token"
   | "github_app"
+  | "github_app_user_token"
   | "unknown";
 
 export type NexusHostingAuthProfileCredentialPurpose = "api" | "git" | "cli";

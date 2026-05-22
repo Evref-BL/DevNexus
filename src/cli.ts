@@ -3975,6 +3975,7 @@ function resolveCliWorkItemAuthority(
     componentId: component.id,
     publication,
     authProfiles,
+    repository: component.remoteUrl,
   });
 
   return resolveNexusEffectiveAuthorityForCurrentActor({
@@ -11476,6 +11477,7 @@ function workItemImportExecutionAuthorityFromProject(
     componentId: component.id,
     publication,
     authProfiles,
+    repository: component.remoteUrl,
   });
   const authProfile = currentActor.profileId
     ? authProfiles.find((profile) => profile.id === currentActor.profileId) ?? null

@@ -638,7 +638,7 @@ function sshHostFromGitRemote(remoteUrl: string): string | null {
 
 function automationAuthProfileSummary(plan: MetaProjectRemotePlan): string {
   if (plan.automationAuthKind === "github_app") {
-    return "Configure the host-local GitHub App profile used for automation.";
+    return "Configure the host-local GitHub App profile for installation-token automation.";
   }
 
   return "Create or verify the isolated GitHub CLI and SSH profile used by the automation actor.";
@@ -697,6 +697,7 @@ function automationAuthProfileInstructions(
       "Store the downloaded private key under DevNexus home or another host-local secret store, not in the shared workspace repository.",
       "Add a DevNexus home auth profile with kind=app, credentialKind=github_app, appId or clientId, privateKeyPath, installationAccount, selected repositories, and intended purposes.",
       "Keep issued installation tokens out of config; DevNexus should mint short-lived tokens through the provider facade when an operation needs them.",
+      "If project policy wants a human actor with the App as the credential path, configure a separate kind=human, credentialKind=github_app_user_token profile backed by a host-local user-token helper.",
       "GitHub CLI can still be used for human actions or as an adapter backend, but the workspace should depend on the DevNexus auth profile id.",
     ];
   }

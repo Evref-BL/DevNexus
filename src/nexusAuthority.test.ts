@@ -247,6 +247,51 @@ describe("nexus current automation actor resolution", () => {
     ]);
   });
 
+  it("uses GitHub App installation repository metadata to disambiguate actor profiles", () => {
+    const result = resolveNexusCurrentAutomationActor({
+      authority,
+      componentId: "dev-nexus",
+      publication,
+      repository: "git@github.com:Evref-BL/DevNexus.git",
+      authProfiles: [
+        automationProfile({
+          id: "evref-app",
+          actorId: "example-bot-actor",
+          kind: "app",
+          credentialKind: "github_app",
+          githubApp: {
+            appId: "1",
+            slug: "Example-Bot",
+            privateKeyPath: "/secrets/app.pem",
+            installationAccount: "Evref-BL",
+            repositories: ["DevNexus"],
+          },
+        }),
+        automationProfile({
+          id: "dogfood-app",
+          actorId: "example-bot-actor",
+          kind: "app",
+          credentialKind: "github_app",
+          githubApp: {
+            appId: "1",
+            slug: "Example-Bot",
+            privateKeyPath: "/secrets/app.pem",
+            installationAccount: "Gabot-Darbot",
+            repositories: ["dev-nexus-dogfood"],
+          },
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      status: "matched",
+      expectedActorId: "example-bot-actor",
+      profileId: "evref-app",
+      warnings: [],
+    });
+    expect(result.profiles.map((profile) => profile.id)).toEqual(["evref-app"]);
+  });
+
   it("does not let a human profile satisfy an automation actor", () => {
     const result = resolveNexusCurrentAutomationActor({
       authority,

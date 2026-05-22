@@ -465,6 +465,11 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
 
     const commandToken = parseCommandTokenResult(result.stdout, profile);
     assertNotExpired(commandToken.expiresAt, this.now(), profile.id);
+    assertCredentialPermissionMetadata(
+      profile,
+      request.requiredPermissions,
+      commandToken.permissions,
+    );
     const token =
       commandToken.token ?? tokenFromEnvironment(commandToken.env, profile);
     if (!token && !commandToken.authorizationHeader) {
@@ -1030,6 +1035,22 @@ function withGitHubAppGitCredential(
     : credential;
 }
 
+function assertCredentialPermissionMetadata(
+  profile: NexusHostingAuthProfileConfig,
+  requiredPermissions: Record<string, string> | undefined,
+  grantedPermissions: Record<string, string> | undefined,
+): void {
+  if (!requiredPermissions || !grantedPermissions) {
+    return;
+  }
+  assertPermissionSet(
+    profile,
+    requiredPermissions,
+    grantedPermissions,
+    "Credential",
+  );
+}
+
 function tokenFromEnvironment(
   env: Record<string, string | undefined> | undefined,
   profile: NexusHostingAuthProfileConfig,
@@ -1308,6 +1329,7 @@ function isGitHubAppTransportCredentialProfile(
     normalizeProviderName(request.provider) === "github" &&
     (profile.kind === "app" ||
       profile.credentialKind === "github_app" ||
+      profile.credentialKind === "github_app_user_token" ||
       Boolean(profile.githubApp))
   );
 }
@@ -1463,6 +1485,20 @@ function assertGitHubAppPermissions(
   requiredPermissions: Record<string, string> | undefined,
   grantedPermissions: Record<string, string> | undefined,
 ): void {
+  assertPermissionSet(
+    profile,
+    requiredPermissions,
+    grantedPermissions,
+    "GitHub App profile",
+  );
+}
+
+function assertPermissionSet(
+  profile: NexusHostingAuthProfileConfig,
+  requiredPermissions: Record<string, string> | undefined,
+  grantedPermissions: Record<string, string> | undefined,
+  subject: string,
+): void {
   if (!requiredPermissions) {
     return;
   }
@@ -1472,7 +1508,7 @@ function assertGitHubAppPermissions(
     if (!permissionSatisfies(granted, required)) {
       throw new NexusProviderCredentialBrokerError(
         "missing_permission",
-        `GitHub App profile ${profile.id} requires ${permission}:${required}, but granted ${
+        `${subject} ${profile.id} requires ${permission}:${required}, but granted ${
           granted ?? "none"
         }.`,
         { profileId: profile.id },

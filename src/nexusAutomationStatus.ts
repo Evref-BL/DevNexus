@@ -945,6 +945,7 @@ function currentAutomationActors(options: {
         publicationByComponent.get(component.id)?.policy ??
         localOnlyPublicationPolicy(),
       authProfiles,
+      repository: component.remoteUrl,
     })
   );
 }

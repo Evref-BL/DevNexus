@@ -25,6 +25,7 @@ DevNexus should reference credential context, not store secrets.
 Typical credential methods:
 
 - GitHub App installation tokens minted from a host-local private key
+- GitHub App user access tokens supplied by a host-local OAuth/token helper
 - provider CLI profiles, such as `gh` for GitHub or `glab` for GitLab
 - environment-variable names, such as `GITHUB_TOKEN`
 - SSH host aliases, such as `github.com-bot`
@@ -76,6 +77,18 @@ Example:
         "repositories": ["example-suite"],
         "tokenRefreshBufferSeconds": 300
       }
+    },
+    {
+      "id": "alice-devnexus-app-user",
+      "actorId": "alice",
+      "provider": "github",
+      "kind": "human",
+      "credentialKind": "github_app_user_token",
+      "account": "alice",
+      "host": "github.com",
+      "environmentKeys": ["GH_TOKEN"],
+      "purposes": ["api", "git"],
+      "command": "/home/alice/.dev-nexus/secrets/github-apps/devnexus-automation/user-token.mjs --repo {repository.owner}/{repository.name}"
     }
   ]
 }
@@ -92,6 +105,16 @@ work because the App is installed on accounts and repositories instead of being
 treated as a regular user. The App can be public and reusable across
 organizations, or private to one account. Each organization or user still
 installs it and chooses all repositories or selected repositories.
+
+DevNexus distinguishes these GitHub App modes:
+
+- App identity/JWT: used only to ask GitHub for App or installation tokens.
+- Installation token/server-to-server: GitHub attributes API actions to the
+  App, such as `devnexus-automation[bot]`. This is the default organization
+  automation mode.
+- User access token/user-to-server: GitHub attributes API actions to the
+  authorizing user and shows the App as the programmatic access path. Use this
+  only when project policy wants a human to be the visible actor.
 
 Create the App in GitHub first. For a normal DevNexus automation App, start
 with these settings:
@@ -130,6 +153,14 @@ repository DevNexus needs to read or write. DevNexus hosting status reports
 three different App problems separately: the App is not installed, the
 repository is not selected, or the installation is missing a required
 permission.
+
+For human-attributed automation, the App also needs a user authorization flow.
+Use either a callback URL for a web OAuth flow or enable device flow for a
+headless/CLI flow. Store user access tokens, refresh tokens, client secrets,
+and any helper state in host-local secret storage. In shared DevNexus config,
+reference only the auth profile id and a host-local command or environment key.
+GitHub limits user-to-server tokens to the intersection of the user's access,
+the App installation's repository access, and the App's granted permissions.
 
 `gh` can still be useful. A user may keep using `gh` for manual GitHub actions,
 and a DevNexus adapter may use `gh` as one backend. Workspace workflows should
@@ -240,8 +271,10 @@ configuration and the opt-in green-main, CI tier, and publication train path.
 
 For hosted workspaces, prefer explicit automation remotes and auth profiles for
 agent-created Git and provider activity. With GitHub Apps, the remote can be a
-plain HTTPS repository URL while DevNexus injects a short-lived installation
-token only for the Git operation that needs it.
+plain HTTPS repository URL while DevNexus injects a short-lived token only for
+the Git operation that needs it. Use an installation-token profile when the App
+should be the actor, and a `github_app_user_token` profile when a human actor
+should be visible with the App recorded as the credential path.
 
 ## Authority Roles
 
