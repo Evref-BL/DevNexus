@@ -14,6 +14,15 @@ export function parsePositiveInteger(value: string, optionName: string): number 
   return parsed;
 }
 
+export function parseNonNegativeInteger(value: string, optionName: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${optionName} must be a non-negative integer`);
+  }
+
+  return parsed;
+}
+
 export function readCliJsonFile(inputPath: string, description: string): unknown {
   const resolvedPath = path.resolve(inputPath);
   let raw: Buffer;
