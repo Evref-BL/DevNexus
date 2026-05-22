@@ -5877,6 +5877,12 @@ describe("dev-nexus cli", () => {
             mode: "direct",
             source: "agent_target",
           },
+          {
+            agent: "codex",
+            serverName: "dev_nexus_gateway",
+            mode: "direct",
+            source: "agent_target",
+          },
         ],
         pluginServers: [
           {
@@ -5897,6 +5903,68 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(false);
+  });
+
+  it("projects the gateway MCP server alongside direct targets when needed", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-gateway-refresh-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [
+          {
+            agent: "codex",
+            exposure: "direct",
+          },
+        ],
+      },
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              targetAgents: ["codex"],
+              tools: [{ name: "workflow_search" }],
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "refresh", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload.agentTargets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          agent: "codex",
+          serverName: "dev_nexus",
+          effectiveExposure: "direct",
+        }),
+        expect.objectContaining({
+          agent: "codex",
+          serverName: "dev_nexus_gateway",
+          effectiveExposure: "direct",
+        }),
+      ]),
+    );
+    const codexConfig = fs.readFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "utf8",
+    );
+    expect(codexConfig).toContain("[mcp_servers.dev_nexus]");
+    expect(codexConfig).toContain("[mcp_servers.dev_nexus_gateway]");
+    expect(codexConfig).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-gateway-stdio"]`);
+    expect(codexConfig).not.toContain("workflow_mcp");
   });
 
   it("reports project MCP context budget without writing agent config", async () => {

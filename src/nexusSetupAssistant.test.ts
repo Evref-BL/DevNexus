@@ -1703,7 +1703,7 @@ describe("nexus setup assistant", () => {
       (step) => step.id === "refresh-agent-mcp-and-skills",
     )!;
     const checks = refreshStep.checks.join("\n");
-    expect(refreshStep.checks).not.toContain("test -f .codex/config.toml");
+    expect(refreshStep.checks).toContain("test -f .codex/config.toml");
     expect(checks).toContain("direct_runtime");
     expect(checks).not.toContain("gateway_runtime");
     expect(checks).not.toContain("hidden_runtime");
@@ -1717,8 +1717,11 @@ describe("nexus setup assistant", () => {
       platform: "windows",
     });
 
-    expect(setupCheck.checks).not.toContainEqual(
-      expect.objectContaining({ id: "agent-mcp-config-codex" }),
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-codex",
+        status: "warning",
+      }),
     );
     expect(setupCheck.checks).toContainEqual(
       expect.objectContaining({
@@ -1731,6 +1734,13 @@ describe("nexus setup assistant", () => {
             source: "workspace",
           }),
         },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus_gateway",
+        status: "warning",
+        summary: expect.stringContaining("cannot confirm dev_nexus_gateway is configured"),
       }),
     );
     expect(setupCheck.checks).toContainEqual(

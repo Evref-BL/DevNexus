@@ -28,6 +28,10 @@ import {
   resolveNexusMcpExposure,
   type NexusMcpExposureResolution,
 } from "./nexusMcpExposurePolicy.js";
+import {
+  defaultNexusMcpGatewayServerName,
+  nexusMcpGatewayAgentTargets,
+} from "./nexusMcpGatewayProjection.js";
 import { findForbiddenSharedHostLocalDetails } from "./nexusHostRegistry.js";
 import {
   deriveNexusProjectHostingRepositoryName,
@@ -277,11 +281,16 @@ export function buildNexusSetupCheck(options: {
   }));
 
   const agentMcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const checkedAgentMcpConfigPaths = new Set<string>();
   for (const target of agentMcpTargets) {
     const exposure = projectConfig
-      ? agentMcpTargetExposure(projectConfig, target)
+      ? agentMcpTargetExposure(target)
       : null;
-    if (!exposure || exposure.mode === "direct") {
+    if (
+      (!exposure || exposure.mode === "direct") &&
+      !checkedAgentMcpConfigPaths.has(target.configPath)
+    ) {
+      checkedAgentMcpConfigPaths.add(target.configPath);
       checks.push(pathCheck({
         id: `agent-mcp-config-${target.agent}`,
         title: `${target.agent} MCP config`,
@@ -375,7 +384,7 @@ export function buildNexusMcpRuntimeFreshnessChecks(options: {
     ...agentMcpTargets.map((target) =>
       agentMcpServerConfiguredCheck(
         target,
-        agentMcpTargetExposure(options.projectConfig, target),
+        agentMcpTargetExposure(target),
       )
     ),
     ...pluginMcpServerChecks(projectRoot, options.projectConfig),
@@ -1145,11 +1154,21 @@ function setupAgentMcpTargets(
     return [];
   }
 
+  const agentTargets = projectConfig
+    ? activeNexusProjectMcpAgentTargets(projectConfig)
+    : undefined;
+  const gatewayTargets = projectConfig && agentTargets
+    ? nexusMcpGatewayAgentTargets({
+        projectConfig,
+        selectedTargets: agentTargets,
+      })
+    : [];
+
   return resolveNexusProjectAgentMcpTargets({
     projectRoot,
     mcpConfig: projectConfig?.mcp,
-    ...(projectConfig
-      ? { agentTargets: activeNexusProjectMcpAgentTargets(projectConfig) }
+    ...(agentTargets
+      ? { agentTargets: [...agentTargets, ...gatewayTargets] }
       : {}),
   });
 }
@@ -1159,15 +1178,16 @@ function agentMcpConfigCheckCommands(
   projectRoot: string,
   platform: NexusSetupPlatform,
 ): string[] {
-  return setupAgentMcpTargets(projectRoot, projectConfig)
+  const commands = setupAgentMcpTargets(projectRoot, projectConfig)
     .map((target) => ({
       target,
-      exposure: agentMcpTargetExposure(projectConfig, target),
+      exposure: agentMcpTargetExposure(target),
     }))
     .filter(({ exposure }) => exposure.mode === "direct")
     .map(({ target }) =>
       `test -f ${shellPathPlaceholder(setupCommandPath(target.configPathRelative, platform))}`,
     );
+  return [...new Set(commands)];
 }
 
 function pluginProjectionCheckCommands(
@@ -1177,7 +1197,8 @@ function pluginProjectionCheckCommands(
 ): string[] {
   const commands: string[] = [];
   const skillTargets = setupAgentSkillTargets(projectConfig);
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { capability } of pluginProjectedSkillCapabilities(projectConfig)) {
     const matchingSkillTargets = skillTargetsForCapability(capability, skillTargets);
@@ -1402,7 +1423,8 @@ function pluginMcpServerChecks(
   projectConfig: NexusProjectConfig,
 ): NexusSetupCheckResult[] {
   const checks: NexusSetupCheckResult[] = [];
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
@@ -1666,7 +1688,7 @@ function liveMcpRuntimeChecks(options: {
   const expectedTargets = [
     ...options.agentMcpTargets
       .filter((target) =>
-        agentMcpTargetExposure(options.projectConfig, target).mode === "direct"
+        agentMcpTargetExposure(target).mode === "direct"
       )
       .map(agentMcpRuntimeExpectedTarget),
     ...pluginMcpRuntimeExpectedTargets(options.projectRoot, options.projectConfig),
@@ -1737,7 +1759,8 @@ function pluginMcpRuntimeExpectedTargets(
   projectConfig: NexusProjectConfig,
 ): NexusMcpRuntimeExpectedTarget[] {
   const expectedTargets: NexusMcpRuntimeExpectedTarget[] = [];
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
@@ -1831,17 +1854,16 @@ function mcpTargetsForCapability(
 }
 
 function agentMcpTargetExposure(
-  projectConfig: NexusProjectConfig,
   target: MaterializedNexusAgentMcpTarget,
 ): NexusMcpExposureResolution {
-  return resolveNexusMcpExposure({
-    workspaceExposure: projectConfig.mcp?.exposure,
-    agentTarget:
-      configuredMcpAgentTargetForMaterialized(projectConfig, target) ?? {
-        agent: target.agent,
-        provider: target.provider,
-      },
-  });
+  return {
+    applicable: true,
+    mode: target.effectiveExposure,
+    source: target.exposureSource,
+    declaredMode: null,
+    path: target.exposurePath,
+    reason: target.exposureReason,
+  };
 }
 
 function pluginMcpServerExposure(

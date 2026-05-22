@@ -3,6 +3,7 @@ export function usage(): string {
     "Usage:",
     "  dev-nexus --help",
     "  dev-nexus mcp-stdio",
+    "  dev-nexus mcp-gateway-stdio",
     "  dev-nexus home init [home-path] [options]",
     "  dev-nexus workspace create <name> [options]",
     "  dev-nexus workspace init [workspace-root] [options]",

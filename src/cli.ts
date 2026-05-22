@@ -201,6 +201,10 @@ import {
   type NexusAgentProjectionCleanupPlan,
 } from "./nexusAgentProjectionCleanup.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
+import { runDevNexusMcpGatewayStdioServer } from "./nexusMcpGateway.js";
+import {
+  nexusMcpGatewayAgentTargets,
+} from "./nexusMcpGatewayProjection.js";
 import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
@@ -985,9 +989,13 @@ async function mainUnchecked(
     await runDevNexusMcpStdioServer();
     return 0;
   }
+  if (argv[0] === "mcp-gateway-stdio") {
+    await runDevNexusMcpGatewayStdioServer();
+    return 0;
+  }
 
   throw new Error(
-    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1279,15 +1287,19 @@ async function handleProjectMcpCommand(
   const parsed = parseProjectMcpRefreshCommand(argv);
   const projectRoot = path.resolve(parsed.projectRoot);
   const projectConfig = loadProjectConfig(projectRoot);
+  const selectedTargets = selectNexusProjectMcpAgentTargets(
+    projectConfig,
+    parsed.agents,
+  );
+  const gatewayTargets = nexusMcpGatewayAgentTargets({
+    projectConfig,
+    selectedTargets,
+  });
   if (parsed.dryRun) {
-    const selectedTargets = selectNexusProjectMcpAgentTargets(
-      projectConfig,
-      parsed.agents,
-    );
     const agentTargets = resolveNexusProjectAgentMcpTargets({
       projectRoot,
       mcpConfig: projectConfig.mcp,
-      agentTargets: selectedTargets,
+      agentTargets: [...selectedTargets, ...gatewayTargets],
     });
     const result: ProjectMcpRefreshDryRunResult = {
       agentTargets,
@@ -1316,10 +1328,7 @@ async function handleProjectMcpCommand(
   const result = materializeNexusProjectAgentMcpConfig({
     projectRoot,
     mcpConfig: projectConfig.mcp,
-    agentTargets: selectNexusProjectMcpAgentTargets(
-      projectConfig,
-      parsed.agents,
-    ),
+    agentTargets: [...selectedTargets, ...gatewayTargets],
   });
   printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
   return 0;
