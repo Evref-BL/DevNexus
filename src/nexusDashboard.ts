@@ -496,6 +496,7 @@ export interface NexusDashboardHostWorkspaceRecord {
   automationStatus: string | null;
   eligibleWorkCount: number | null;
   firstReadyWorkSelectionId: string | null;
+  firstReadyWorkProviderAction: NexusDashboardProviderAction | null;
   updatedAt: string | null;
   error: NexusDashboardDataError | null;
 }
@@ -955,6 +956,7 @@ async function dashboardHostWorkspaceRecord(options: {
       automationStatus: null,
       eligibleWorkCount: null,
       firstReadyWorkSelectionId: null,
+      firstReadyWorkProviderAction: null,
       updatedAt: null,
       error: localFacts.error,
     };
@@ -1029,6 +1031,7 @@ async function dashboardHostWorkspaceRecord(options: {
     automationStatus: automation.value?.status ?? null,
     eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
     firstReadyWorkSelectionId: firstReadyWorkSelectionId(eligibleWork.value),
+    firstReadyWorkProviderAction: firstReadyWorkProviderAction(eligibleWork.value, dashboardProviderUrls(value.projectConfig, value.componentSummaries)),
     updatedAt,
     error: null,
   };
@@ -1044,6 +1047,26 @@ function firstReadyWorkSelectionId(
   return firstItem
     ? `tracked-work:${firstItem.componentId}:${firstItem.id}`
     : null;
+}
+
+function firstReadyWorkProviderAction(
+  eligibleWork: NexusEligibleWorkSummary | null,
+  providerUrls: NexusDashboardProviderUrls,
+): NexusDashboardProviderAction | null {
+  const firstItem = eligibleWork?.components
+    .flatMap((component) => component.workItems)
+    .find((item) => item.webUrl || /\b#\d+\b/u.test(`${item.id} ${item.title}`));
+  if (!firstItem) {
+    return null;
+  }
+  return uniqueProviderActions([
+    ...providerActionsForHref(firstItem.webUrl),
+    ...providerActionsFromText(
+      `${firstItem.id} ${firstItem.title}`,
+      providerUrls,
+      firstItem.componentId,
+    ),
+  ])[0] ?? null;
 }
 
 function dashboardHostWorkspaceSummary(value: {
@@ -1155,7 +1178,9 @@ function dashboardHostActionItems(
           ? workspace.firstReadyWorkSelectionId
           : null,
       },
-      providerAction: null,
+      providerAction: kind === "ready-work"
+        ? workspace.firstReadyWorkProviderAction
+        : null,
     });
   };
 

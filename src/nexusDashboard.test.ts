@@ -346,6 +346,7 @@ function hostWorkspace(
     automationStatus: "idle",
     eligibleWorkCount: 0,
     firstReadyWorkSelectionId: null,
+    firstReadyWorkProviderAction: null,
     updatedAt: "2026-05-21T10:00:00.000Z",
     error: null,
     ...overrides,
@@ -893,6 +894,13 @@ describe("nexus dashboard", () => {
         name: "Ready Workspace",
         eligibleWorkCount: 2,
         firstReadyWorkSelectionId: "tracked-work:primary:github-42",
+        firstReadyWorkProviderAction: {
+          label: "#42: ready work",
+          href: "https://github.com/Evref-BL/DevNexus/issues/42",
+          provider: "github",
+          kind: "issue",
+          title: "ready work",
+        },
         tone: "active",
       }),
       hostWorkspace({
@@ -957,6 +965,9 @@ describe("nexus dashboard", () => {
             workspaceId: "ready",
             targetSelectionId: "tracked-work:primary:github-42",
           },
+          providerAction: expect.objectContaining({
+            href: "https://github.com/Evref-BL/DevNexus/issues/42",
+          }),
         }),
         expect.objectContaining({
           id: "host-action:dirty:dirty",
@@ -1020,6 +1031,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("filteredHostActions");
     expect(module).toContain("filteredHostWorkspaces");
     expect(module).toContain("host-action-queue");
+    expect(module).toContain("dn-host-action-shell");
     expect(module).toContain("host-workspaces");
     expect(module).toContain("dn-host-sticky-panel");
     expect(module).toContain("data-workspace-id");
