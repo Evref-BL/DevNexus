@@ -85,6 +85,7 @@ export function automationWorkTrackerProviderOptions(options: {
     componentId: options.component.id,
     publication,
     authProfiles,
+    repository: options.component.remoteUrl,
   });
   if (
     !currentActor.profileId ||

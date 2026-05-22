@@ -186,8 +186,8 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 - [First workspace from existing components](docs/user/first-workspace-existing-components.md)
   shows how to coordinate several existing folders in one workspace.
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
-  GitHub Apps, GitHub CLI profiles, GitLab, Jira, user accounts, machine-user
-  accounts, and workspace repository hosting.
+  GitHub Apps, user-to-server profiles, GitHub CLI profiles, GitLab, Jira, user
+  accounts, machine-user accounts, and workspace repository hosting.
 - [Publication workflows](docs/user/publication-workflows.md) explains the
   simple review-handoff default and the optional green-main, CI tier, and
   publication train paths.

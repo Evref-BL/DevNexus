@@ -135,6 +135,18 @@ describe("home config primitives", () => {
               tokenRefreshBufferSeconds: 300,
             },
           },
+          {
+            id: "alice-devnexus-app-user",
+            actorId: "alice",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "alice",
+            host: "github.com",
+            environmentKeys: ["GH_TOKEN"],
+            purposes: ["api", "git"],
+            command: path.join(homePath, "github-app-user-token.mjs"),
+          },
         ],
       }).authProfiles,
     ).toEqual([
@@ -175,6 +187,18 @@ describe("home config primitives", () => {
           repositories: ["DevNexus"],
           tokenRefreshBufferSeconds: 300,
         },
+      },
+      {
+        id: "alice-devnexus-app-user",
+        actorId: "alice",
+        provider: "github",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "alice",
+        host: "github.com",
+        environmentKeys: ["GH_TOKEN"],
+        purposes: ["api", "git"],
+        command: path.join(homePath, "github-app-user-token.mjs"),
       },
     ]);
 

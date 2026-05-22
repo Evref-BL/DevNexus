@@ -175,8 +175,8 @@ workspace files. Raw tokens, passwords, private keys, SSH keys, and provider CLI
 state do not belong in answer files.
 
 Answer files may reference host-local credential context by id, such as a
-GitHub App profile, GitHub CLI profile, GitLab CLI profile,
-environment-variable name, or token store id. See
+GitHub App installation profile, GitHub App user-to-server profile, GitHub CLI
+profile, GitLab CLI profile, environment-variable name, or token store id. See
 [Providers, auth, and hosting](providers-auth-hosting.md).
 
 ## Low-Level Commands

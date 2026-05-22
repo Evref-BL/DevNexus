@@ -626,6 +626,17 @@ describe("nexus setup assistant", () => {
           repositories: ["mac-demo"],
         },
       },
+      {
+        id: "alice-devnexus-app-user",
+        actorId: "alice",
+        provider: "github",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "alice",
+        host: "github.com",
+        command: path.join(homeRoot, "github-app-user-token.mjs"),
+        environmentKeys: ["GH_TOKEN"],
+      },
     ]);
     writeProject(projectRoot, {
       home: homeRoot,
@@ -664,6 +675,18 @@ describe("nexus setup assistant", () => {
             authProfile: "devnexus-app",
             invitationPolicy: "manual",
           },
+          {
+            kind: "human",
+            providerIdentity: "alice",
+            role: "human",
+            requiredPermission: "write",
+            requiredProviderPermissions: {
+              contents: "write",
+              pull_requests: "write",
+            },
+            authProfile: "alice-devnexus-app-user",
+            invitationPolicy: "manual",
+          },
         ],
         provisioning: {
           allowCreate: false,
@@ -688,6 +711,19 @@ describe("nexus setup assistant", () => {
     expect(appProfileCheck?.summary).toContain("repositories=mac-demo");
     expect(appProfileCheck?.summary).toContain("privateKeyPath=set");
     expect(appProfileCheck?.summary).not.toContain(homeRoot);
+
+    const userTokenProfileCheck = check.checks.find(
+      (entry) => entry.id === "github-hosting-auth-profile-alice-devnexus-app-user",
+    );
+    expect(userTokenProfileCheck).toMatchObject({
+      status: "warning",
+      summary: expect.stringContaining("credential=github_app_user_token"),
+      nextAction: expect.stringContaining("user-token helper"),
+    });
+    expect(userTokenProfileCheck?.summary).toContain(
+      "user authorization was not checked",
+    );
+    expect(userTokenProfileCheck?.summary).not.toContain(homeRoot);
   });
 
   it("blocks setup when an existing component source root is not a clean expected Git checkout", () => {

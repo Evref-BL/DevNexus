@@ -129,6 +129,7 @@ export interface NexusForgePublicationAdapter {
     base: string;
     title: string;
     body?: string | null;
+    draft?: boolean;
   }): Promise<NexusForgePullRequestResult>;
   inspectPullRequestChecks(options: {
     number: number;
@@ -490,12 +491,14 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     base: string;
     title: string;
     body?: string | null;
+    draft?: boolean;
   }): Promise<NexusForgePullRequestResult> {
     const body = {
       head: options.head,
       base: options.base,
       title: options.title,
       ...(options.body !== undefined ? { body: options.body ?? "" } : {}),
+      ...(!options.number && options.draft === true ? { draft: true } : {}),
     };
     const response = await this.githubRestRequest<GitHubPullRequestResponse>(
       options.number
@@ -516,6 +519,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
     base: string;
     title: string;
     body?: string | null;
+    draft?: boolean;
   }): NexusForgePullRequestResult {
     const args = options.number
       ? [
@@ -539,6 +543,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
           options.base,
           "--title",
           options.title,
+          ...(options.draft === true ? ["--draft"] : []),
           ...(options.body !== undefined ? ["--body", options.body ?? ""] : []),
         ];
     const result = this.runGh(args, "pull_request.upsert");

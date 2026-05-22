@@ -2352,6 +2352,7 @@ function mcpWorkItemCredentialOptions(
     componentId: component.id,
     publication,
     authProfiles,
+    repository: component.remoteUrl,
   });
   if (!currentActor.profileId && !currentActor.expectedActorId) {
     return undefined;
@@ -2413,6 +2414,7 @@ function resolveMcpWorkItemAuthority(
     componentId: component.id,
     publication,
     authProfiles,
+    repository: component.remoteUrl,
   });
 
   return resolveNexusEffectiveAuthorityForCurrentActor({
@@ -3612,6 +3614,7 @@ function workItemImportExecutionAuthorityFromArgs(
     componentId: component.id,
     publication,
     authProfiles,
+    repository: component.remoteUrl,
   });
   const authProfile = currentActor.profileId
     ? authProfiles.find((profile) => profile.id === currentActor.profileId) ?? null
