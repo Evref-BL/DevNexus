@@ -34,6 +34,10 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  projectPluginCapabilityProjections,
+  type NexusPluginCapabilityProjection,
+} from "./nexusPluginCapabilities.js";
+import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
@@ -257,6 +261,25 @@ export interface NexusDashboardThreadSummary {
   records: NexusDashboardThreadRecord[];
 }
 
+export interface NexusDashboardPluginRecord {
+  id: string;
+  name: string;
+  version: string | null;
+  enabled: boolean;
+  capabilityCount: number;
+  projectedSkillCount: number;
+  mcpServerCount: number;
+  setupActionCount: number;
+  dependencyProjectionCount: number;
+}
+
+export interface NexusDashboardPluginSummary {
+  totalCount: number;
+  enabledCount: number;
+  capabilityCount: number;
+  records: NexusDashboardPluginRecord[];
+}
+
 export interface NexusDashboardEvent {
   id: string;
   time: string;
@@ -316,6 +339,7 @@ export interface NexusDashboardSnapshot {
   targetReport: NexusDashboardDataResult<NexusAutomationTargetReport>;
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
+  plugins: NexusDashboardPluginSummary;
   publication: NexusDashboardPublicationSummary[];
   authority: NexusDashboardAuthoritySummary | null;
   blockers: string[];
@@ -363,6 +387,7 @@ export async function buildNexusDashboardSnapshot(
   const cycles = readTargetCycles(projectRoot, projectConfig);
   const runs = readRuns(projectRoot, projectConfig);
   const worktrees = summarizeWorktrees(worktreeCollection.value);
+  const plugins = summarizePlugins(projectConfig);
   const cleanupPlan = capture(() =>
     buildNexusCleanupPlan({
       projectRoot,
@@ -384,7 +409,6 @@ export async function buildNexusDashboardSnapshot(
     automation,
     eligibleWork,
     targetReport,
-    worktreeWarnings: worktrees.warnings,
   });
   const events = buildDashboardEvents({
     generatedAt,
@@ -417,13 +441,14 @@ export async function buildNexusDashboardSnapshot(
     projectRoot,
     project: projectSummary(projectRoot, projectConfig, componentSummaries),
     summary: dashboardSummary(componentSummaries, automation.value, eligibleWork.value, threads, blockers),
-    signals: dashboardSignals(componentSummaries, automation.value, eligibleWork.value, threads, blockers),
+    signals: dashboardSignals(componentSummaries, automation.value, eligibleWork.value, threads, plugins, blockers),
     components: componentSummaries,
     automation,
     eligibleWork,
     targetReport,
     worktrees,
     threads,
+    plugins,
     publication,
     authority,
     blockers,
@@ -715,7 +740,7 @@ export function buildNexusDashboardWeave(options: {
       id: authorityNodeId,
       kind: "authority",
       laneId: "authority",
-      label: "Human approval",
+      label: "Approval",
       detail: authorityDashboardSummary(options.authority),
       status: options.authority.blockedActionCount > 0 ? "blocked" : "ready",
       timestamp: null,
@@ -768,10 +793,10 @@ function authorityDashboardSummary(authority: NexusDashboardAuthoritySummary): s
   const blocked = authority.blockedActionCount;
   const fallbacks = authority.fallbackActionCount;
   if (blocked > 0) {
-    return `${blocked} provider ${plural(blocked, "action", "actions")} need human approval. Review or open the provider item manually.`;
+    return `${blocked} provider ${plural(blocked, "action", "actions")} need approval. Review or open the provider item manually.`;
   }
   if (fallbacks > 0) {
-    return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} need a human approval path.`;
+    return `${fallbacks} provider ${plural(fallbacks, "action", "actions")} need an approval path.`;
   }
   return `Publication permissions are ready for ${componentCount} ${plural(componentCount, "component", "components")}.`;
 }
@@ -1454,6 +1479,39 @@ function compactThreadBranch(value: string): string {
   return parts.length > 2 ? parts.slice(-2).join("/") : value;
 }
 
+function summarizePlugins(
+  projectConfig: NexusProjectConfig,
+): NexusDashboardPluginSummary {
+  const projections = projectPluginCapabilityProjections(projectConfig);
+  const records = projections.map(pluginDashboardRecord);
+  return {
+    totalCount: records.length,
+    enabledCount: records.filter((record) => record.enabled).length,
+    capabilityCount: records.reduce((count, record) => count + record.capabilityCount, 0),
+    records,
+  };
+}
+
+function pluginDashboardRecord(
+  plugin: NexusPluginCapabilityProjection,
+): NexusDashboardPluginRecord {
+  return {
+    id: plugin.pluginId,
+    name: plugin.pluginName ?? plugin.pluginId,
+    version: plugin.version,
+    enabled: true,
+    capabilityCount: plugin.capabilityCount,
+    projectedSkillCount: plugin.capabilities.filter((capability) => capability.kind === "projected_skill").length,
+    mcpServerCount: plugin.capabilities.filter((capability) => capability.kind === "mcp_server").length,
+    setupActionCount: plugin.capabilities.filter((capability) =>
+      capability.kind === "setup_obligation" ||
+      capability.kind === "environment_hint" ||
+      capability.kind === "cleanup_hook",
+    ).length,
+    dependencyProjectionCount: plugin.capabilities.filter((capability) => capability.kind === "dependency_projection").length,
+  };
+}
+
 function summarizePublication(
   automationStatus: NexusAutomationStatus | null,
 ): NexusDashboardPublicationSummary[] {
@@ -1506,7 +1564,6 @@ function dashboardBlockers(options: {
   automation: NexusDashboardDataResult<NexusAutomationStatus>;
   eligibleWork: NexusDashboardDataResult<NexusEligibleWorkSummary>;
   targetReport: NexusDashboardDataResult<NexusAutomationTargetReport>;
-  worktreeWarnings: string[];
 }): string[] {
   const blockers = [
     ...(options.automation.ok ? [] : [`Automation status unavailable: ${options.automation.error?.message ?? "unknown error"}`]),
@@ -1516,7 +1573,6 @@ function dashboardBlockers(options: {
     ...(options.eligibleWork.value?.blockers ?? []),
     ...(options.targetReport.value?.activeBlockers.map(activeBlockerText) ?? []),
     ...(options.targetReport.value?.blockers ?? []),
-    ...options.worktreeWarnings,
   ];
   return [...new Set(blockers)].slice(0, 20);
 }
@@ -1671,9 +1727,9 @@ function dashboardSignals(
   automation: NexusAutomationStatus | null,
   eligibleWork: NexusEligibleWorkSummary | null,
   threads: NexusDashboardThreadSummary,
+  plugins: NexusDashboardPluginSummary,
   blockers: string[],
 ): NexusDashboardSignal[] {
-  const dirtyComponents = components.filter((component) => component.git?.dirty).length;
   return [
     {
       id: "components",
@@ -1717,11 +1773,13 @@ function dashboardSignals(
       detail: blockers.length > 0 ? "Needs attention" : "Clear",
     },
     {
-      id: "git",
-      label: "Dirty Components",
-      value: String(dirtyComponents),
-      tone: dirtyComponents > 0 ? "warn" : "good",
-      detail: dirtyComponents > 0 ? `${dirtyComponents} dirty` : "Clean",
+      id: "plugins",
+      label: "Plugins",
+      value: String(plugins.enabledCount),
+      tone: plugins.enabledCount > 0 ? "active" : "neutral",
+      detail: plugins.capabilityCount > 0
+        ? `${plugins.capabilityCount} ${plural(plugins.capabilityCount, "capability", "capabilities")}`
+        : "No plugins",
     },
   ];
 }

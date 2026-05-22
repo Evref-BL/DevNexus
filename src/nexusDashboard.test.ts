@@ -62,6 +62,31 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
         targetBranch: "main",
       },
     },
+    plugins: [
+      {
+        id: "dev-nexus-typescript",
+        name: "DevNexus TypeScript",
+        version: "0.1.0-test",
+        enabled: true,
+        capabilities: [
+          {
+            kind: "projected_skill",
+            id: "skill-typescript-diagnose",
+            skillId: "typescript-diagnose",
+          },
+          {
+            kind: "mcp_server",
+            id: "mcp-typescript-diagnostics",
+            serverName: "dev-nexus-typescript",
+            tools: [
+              {
+                name: "typescript.diagnostics",
+              },
+            ],
+          },
+        ],
+      },
+    ],
     ...overrides,
   };
 }
@@ -257,6 +282,11 @@ describe("nexus dashboard", () => {
         activeCount: 1,
         needsDecisionCount: 1,
       },
+      plugins: {
+        enabledCount: 1,
+        totalCount: 1,
+        capabilityCount: 2,
+      },
     });
     expect(snapshot.threads.records).toEqual(
       expect.arrayContaining([
@@ -284,6 +314,20 @@ describe("nexus dashboard", () => {
       value: "2",
       detail: "1 needs review",
     });
+    expect(snapshot.signals.find((signal) => signal.id === "plugins")).toMatchObject({
+      label: "Plugins",
+      value: "1",
+      detail: "2 capabilities",
+    });
+    expect(snapshot.plugins.records).toEqual([
+      expect.objectContaining({
+        id: "dev-nexus-typescript",
+        name: "DevNexus TypeScript",
+        capabilityCount: 2,
+        mcpServerCount: 1,
+        projectedSkillCount: 1,
+      }),
+    ]);
     expect(snapshot.weave.nodes.map((node) => node.id)).toEqual(
       expect.arrayContaining([
         "project",
@@ -335,19 +379,24 @@ describe("nexus dashboard", () => {
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
     expect(module).toContain("Workspace Activity");
-    expect(module).toContain("Thread Inbox");
+    expect(module).toContain("Action Needed");
+    expect(module).toContain("HITL queue");
+    expect(module).toContain("Plugins");
     expect(module).toContain("renderThreadInbox");
+    expect(module).toContain("renderPlugins");
     expect(module).toContain("Parallel work map");
-    expect(module).toContain("Human approval");
+    expect(module).toContain("Approval");
+    expect(module).not.toContain("Human approval");
     expect(module).toContain("selectedDetail");
     expect(module).toContain("timelineLanes");
     expect(module).toContain("renderBranchGraph");
     expect(module).toContain("dn-branch-svg");
     expect(module).toContain("const rowHeight = 34");
     expect(module).toContain("data-row-height");
-    expect(module).toContain("renderRailLabels");
     expect(module).toContain("providerIcon");
     expect(module).toContain("externalLinkIcon");
+    expect(module).not.toContain("renderRailLabels");
+    expect(module).not.toContain("threadDetail");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
     expect(module).toContain("-webkit-line-clamp: 3");
     expect(module).toContain("dn-action-strip");
