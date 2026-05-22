@@ -503,6 +503,12 @@ export interface NexusDashboardPluginRecord {
   name: string;
   version: string | null;
   enabled: boolean;
+  state: "enabled" | "disabled" | "available";
+  source: "configured" | "local";
+  packageName: string | null;
+  sourcePath: string | null;
+  refreshCommand: string | null;
+  detail: string;
   capabilityCount: number;
   projectedSkillCount: number;
   mcpServerCount: number;
@@ -517,6 +523,8 @@ export interface NexusDashboardPluginRecord {
 export interface NexusDashboardPluginSummary {
   totalCount: number;
   enabledCount: number;
+  configuredCount: number;
+  availableCount: number;
   capabilityCount: number;
   records: NexusDashboardPluginRecord[];
 }
@@ -753,7 +761,7 @@ export async function buildNexusDashboardSnapshot(
     componentSummaries,
     worktreeCollection.value,
   );
-  const plugins = summarizePlugins(projectConfig);
+  const plugins = summarizePlugins(projectRoot, projectConfig, components);
   const cleanupPlan = capture(() =>
     buildNexusCleanupPlan({
       projectRoot,
@@ -1089,7 +1097,7 @@ async function dashboardHostWorkspaceRecord(options: {
       runs,
       threadResolutions,
     );
-    const plugins = summarizePlugins(projectConfig);
+    const plugins = summarizePlugins(root, projectConfig, components);
     const dirtyComponentCount = componentSummaries.filter((component) =>
       Boolean(component.git?.dirty),
     ).length;
@@ -2683,16 +2691,29 @@ type DashboardPluginCapability =
   | NonNullable<NexusProjectConfig["plugins"]>[number]["capabilities"][number];
 
 function summarizePlugins(
+  projectRoot: string,
   projectConfig: NexusProjectConfig,
+  components: ResolvedNexusProjectComponent[],
 ): NexusDashboardPluginSummary {
   const projections = projectPluginCapabilityProjections(projectConfig);
   const projectionsById = new Map(projections.map((projection) => [projection.pluginId, projection]));
-  const records = (projectConfig.plugins ?? []).map((plugin) =>
+  const configuredRecords = (projectConfig.plugins ?? []).map((plugin) =>
     pluginDashboardRecord(plugin, projectionsById.get(plugin.id))
   );
+  const configuredKeys = new Set(
+    configuredRecords.flatMap((record) => pluginRecordKeys(record)),
+  );
+  const availableRecords = localPluginCandidates(projectRoot, components)
+    .filter((candidate) =>
+      pluginRecordKeys(candidate).every((key) => !configuredKeys.has(key))
+    )
+    .map((candidate) => localPluginDashboardRecord(projectRoot, candidate));
+  const records = [...configuredRecords, ...availableRecords];
   return {
     totalCount: records.length,
-    enabledCount: records.filter((record) => record.enabled).length,
+    enabledCount: configuredRecords.filter((record) => record.enabled).length,
+    configuredCount: configuredRecords.length,
+    availableCount: availableRecords.length,
     capabilityCount: records.reduce((count, record) => count + record.capabilityCount, 0),
     records,
   };
@@ -2708,6 +2729,12 @@ function pluginDashboardRecord(
     name: plugin.name ?? plugin.id,
     version: plugin.version ?? null,
     enabled: plugin.enabled !== false,
+    state: plugin.enabled !== false ? "enabled" : "disabled",
+    source: "configured",
+    packageName: null,
+    sourcePath: null,
+    refreshCommand: null,
+    detail: plugin.enabled !== false ? "Configured for this workspace." : "Configured but disabled.",
     capabilityCount: capabilities.length,
     projectedSkillCount: capabilities.filter((capability) => capability.kind === "projected_skill").length,
     mcpServerCount: capabilities.filter((capability) => capability.kind === "mcp_server").length,
@@ -2738,6 +2765,149 @@ function pluginDashboardRecord(
       .map((capability) => `${capability.source} -> ${capability.target}`)
       .slice(0, 2),
   };
+}
+
+interface LocalPluginCandidate {
+  id: string;
+  name: string;
+  version: string | null;
+  packageName: string | null;
+  sourcePath: string;
+  detail: string;
+}
+
+function localPluginCandidates(
+  projectRoot: string,
+  components: ResolvedNexusProjectComponent[],
+): LocalPluginCandidate[] {
+  const candidates: LocalPluginCandidate[] = [];
+  const seenPaths = new Set<string>();
+  for (const component of components) {
+    if (!component.sourceRootExists) {
+      continue;
+    }
+    const pluginsRoot = path.join(component.sourceRoot, "plugins");
+    if (!isDirectory(pluginsRoot)) {
+      continue;
+    }
+    for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      const pluginRoot = path.resolve(pluginsRoot, entry.name);
+      if (seenPaths.has(pluginRoot) || samePath(pluginRoot, projectRoot)) {
+        continue;
+      }
+      seenPaths.add(pluginRoot);
+      const candidate = readLocalPluginCandidate(pluginRoot, entry.name);
+      if (candidate) {
+        candidates.push(candidate);
+      }
+    }
+  }
+  return candidates.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function readLocalPluginCandidate(
+  pluginRoot: string,
+  fallbackId: string,
+): LocalPluginCandidate | null {
+  const packagePath = path.join(pluginRoot, "package.json");
+  if (!fs.existsSync(packagePath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(packagePath, "utf8")) as Record<string, unknown>;
+    const packageName = typeof raw.name === "string" && raw.name.trim()
+      ? raw.name.trim()
+      : null;
+    const id = pluginIdFromPackageName(packageName, fallbackId);
+    const description = typeof raw.description === "string" && raw.description.trim()
+      ? raw.description.trim()
+      : "Local DevNexus plugin package.";
+    return {
+      id,
+      name: titleCasePluginId(id),
+      version: typeof raw.version === "string" && raw.version.trim()
+        ? raw.version.trim()
+        : null,
+      packageName,
+      sourcePath: pluginRoot,
+      detail: description,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function localPluginDashboardRecord(
+  projectRoot: string,
+  candidate: LocalPluginCandidate,
+): NexusDashboardPluginRecord {
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    version: candidate.version,
+    enabled: false,
+    state: "available",
+    source: "local",
+    packageName: candidate.packageName,
+    sourcePath: candidate.sourcePath,
+    refreshCommand:
+      `dev-nexus workspace plugin refresh ${shellQuote(projectRoot)} --from ${shellQuote(candidate.sourcePath)}`,
+    detail: candidate.detail,
+    capabilityCount: 0,
+    projectedSkillCount: 0,
+    mcpServerCount: 0,
+    setupActionCount: 0,
+    dependencyProjectionCount: 0,
+    projectedSkills: [],
+    mcpServers: [],
+    setupHints: [],
+    dependencyHints: [],
+  };
+}
+
+function pluginRecordKeys(
+  record: Pick<NexusDashboardPluginRecord, "id" | "name" | "packageName"> | LocalPluginCandidate,
+): string[] {
+  const values = [record.id, record.name, record.packageName ?? null]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return values.map(normalizePluginKey);
+}
+
+function normalizePluginKey(value: string): string {
+  return value.trim().toLowerCase().replace(/^@[^/]+\//u, "");
+}
+
+function pluginIdFromPackageName(packageName: string | null, fallbackId: string): string {
+  return normalizePluginKey(packageName ?? fallbackId);
+}
+
+function titleCasePluginId(id: string): string {
+  const words = id.split(/[-_]+/u).filter(Boolean).map((word) => {
+    const lower = word.toLowerCase();
+    if (lower === "dev") {
+      return "Dev";
+    }
+    if (lower === "nexus") {
+      return "Nexus";
+    }
+    return `${lower.slice(0, 1).toUpperCase()}${lower.slice(1)}`;
+  });
+  return words.join(" ").replace(/^Dev Nexus/u, "DevNexus");
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/gu, "'\\''")}'`;
+}
+
+function isDirectory(directoryPath: string): boolean {
+  try {
+    return fs.statSync(directoryPath).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function pluginSetupHint(capability: DashboardPluginCapability): string {

@@ -46,6 +46,11 @@ Plugin enable and plugin setup controls should be visible but disabled until a
 trusted plugin source and setup policy exist. The disabled label should name the
 action, and the tooltip should name the missing policy.
 
+Local plugin packages discovered under a component `plugins/` directory can show
+`Copy command`. That copies the explicit `dev-nexus workspace plugin refresh`
+command for the current workspace; it does not run install or setup from the
+browser.
+
 ## Assistant Actions
 
 Assistant actions should use provider-neutral language by default. Use `Start

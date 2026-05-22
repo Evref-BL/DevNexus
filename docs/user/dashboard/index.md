@@ -36,6 +36,8 @@ diagnostics mode.
 - [Data contracts](data-contracts.md) describes routes and embeddable payloads.
 - [Visual QA](visual-qa.md) describes repeatable visual guardrails and the
   remaining human review step.
+- [Plugin source notes](plugin-source-notes.md) parks marketplace research that
+  is useful later but not active scope.
 
 ## Commands
 
