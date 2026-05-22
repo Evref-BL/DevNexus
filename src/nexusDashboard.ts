@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   defaultGitRunner,
@@ -740,6 +741,7 @@ export interface NexusDashboardHostSnapshot {
   version: 1;
   contract: NexusDashboardEmbeddingContract;
   generatedAt: string;
+  hostId: string;
   homePath: string;
   homeError: NexusDashboardDataError | null;
   currentProjectRoot: string | null;
@@ -1111,6 +1113,7 @@ export async function buildNexusDashboardHostSnapshot(
       hostMode: true,
     }),
     generatedAt,
+    hostId: dashboardHostId(),
     homePath,
     homeError: home.error,
     currentProjectRoot,
@@ -1165,6 +1168,7 @@ export async function buildNexusDashboardHostProjectIndex(
       hostMode: true,
     }),
     generatedAt,
+    hostId: dashboardHostId(),
     homePath,
     homeError: home.error,
     currentProjectRoot,
@@ -1177,6 +1181,10 @@ export async function buildNexusDashboardHostProjectIndex(
     actionQueue: [],
     workspaces,
   };
+}
+
+function dashboardHostId(): string {
+  return process.env.DEV_NEXUS_HOST_ID?.trim() || os.hostname() || "local";
 }
 
 export function nexusDashboardHostWorkspaceReferenceMatches(

@@ -75,6 +75,7 @@ async function loadDashboardClientTestHooks(): Promise<{
   renderLaneKey: (
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
+  renderHostDashboard: (host: unknown, themeMode?: string, hostFocus?: string) => string;
   renderHostOverview: (host: unknown, snapshot?: unknown, selectedWorkspaceId?: string, options?: unknown) => string;
   renderPlugins: (plugins: unknown) => string;
   renderSignal: (signal: unknown, selectedId?: string | null) => string;
@@ -116,7 +117,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostOverview, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1602,6 +1603,35 @@ describe("nexus dashboard", () => {
     expect(hostHtml).toContain(">current<");
     expect(hostHtml).not.toContain("decision-rescue\">registered");
     expect(hostHtml).not.toContain("decision-continue\">registered");
+  });
+
+  it("renders a compact host header with colocated path actions and host identity", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderHostDashboard({
+      version: 1,
+      generatedAt: "2026-05-23T08:15:00.000Z",
+      hostId: "Mac.lan",
+      homePath: "/Users/gabriel.darbord/.dev-nexus",
+      workspaceCount: 1,
+      needsAttentionCount: 0,
+      partial: false,
+      actionQueue: [],
+      workspaces: [],
+    }, "dark");
+
+    expect(html).toContain("dn-host-identity");
+    expect(html).toContain("Mac.lan");
+    expect(html).toContain("dn-header-path-row");
+    expect(html).toContain("dn-header-path");
+    expect(html).toContain("/Users/gabriel.darbord/.dev-nexus");
+    expect(html).toContain('data-open-target="home"');
+    expect(html).toContain("dn-header-stamp");
+    expect(html).toContain("Generated");
+    expect(html).not.toContain('class="dn-meta"');
+    expect(html.indexOf("dn-header-path")).toBeLessThan(
+      html.indexOf("data-open-target=\"home\""),
+    );
   });
 
   it("makes HITL threads selectable with the same chat actions as the queue", async () => {
