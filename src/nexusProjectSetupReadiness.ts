@@ -358,8 +358,27 @@ function authInventoryCheck(
       path.isAbsolute(homePath) ? homePath : path.resolve(projectRoot, homePath),
       validateNexusHomeConfigBase,
     );
-    const configured = new Set((homeConfig.authProfiles ?? []).map((profile) => profile.id));
+    const profileById = new Map(
+      (homeConfig.authProfiles ?? []).map((profile) => [profile.id, profile]),
+    );
+    const configured = new Set(profileById.keys());
     const missing = referencedProfiles.filter((profile) => !configured.has(profile));
+    const githubAppUserProfiles = referencedProfiles.filter(
+      (profile) =>
+        profileById.get(profile)?.credentialKind === "github_app_user_token",
+    );
+    if (missing.length === 0 && githubAppUserProfiles.length > 0) {
+      return {
+        id: "auth-inventory",
+        title: "Auth inventory",
+        status: "warning",
+        summary:
+          `Referenced auth profile(s) are present in DevNexus home: ${referencedProfiles.join(", ")}. ` +
+          `GitHub App user-to-server profile(s) require host-local authorization checks: ${githubAppUserProfiles.join(", ")}.`,
+        nextAction:
+          "Run the configured GitHub App user-token helper status/auth command and verify the authorizing user, refresh token, App installation, selected repository, and requested permissions before provider operations.",
+      };
+    }
     return {
       id: "auth-inventory",
       title: "Auth inventory",
