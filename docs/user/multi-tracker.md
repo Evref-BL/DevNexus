@@ -150,7 +150,7 @@ dev-nexus work-item sync-plan <workspace-root> \
   --source-tracker primary \
   --target-tracker github \
   --open \
-  --label dogfood \
+  --label automation \
   --field title \
   --field description \
   --field status \
@@ -280,5 +280,5 @@ When an agent is assigned a canonical local item:
 - Do not update a mirror as if it were canonical unless the assignment names
   that tracker or the component default has been changed.
 
-This keeps local dogfood work fast and recoverable while still letting shared
+This keeps local workspace work fast and recoverable while still letting shared
 providers carry coordination, migration, or review state.

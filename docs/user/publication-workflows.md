@@ -103,7 +103,7 @@ protected target validation.
               "api"
             ],
             "checkNames": [
-              "Node 24 check"
+              "Node 22 check"
             ]
           }
         ],
@@ -135,9 +135,9 @@ protected target validation.
         "directTargetPush": "blocked",
         "mergeAuthority": "authorized_merge",
         "requiredChecks": [
-          "Node 24 check (ubuntu-latest)",
-          "Node 24 check (windows-latest)",
-          "Node 24 check (macos-latest)"
+          "Node 22 check (ubuntu-latest)",
+          "Node 22 check (windows-latest)",
+          "Node 22 check (macos-latest)"
         ],
         "staleChecks": "block"
       },
@@ -209,5 +209,5 @@ check decisions. Add CI tiers when hosted CI cost or platform coverage needs
 policy. Add publication trains when the team wants to batch related work before
 final publication.
 
-Dogfood workspaces can use the advanced path to reduce CI noise and protect
+Self-hosting workspaces can use the advanced path to reduce CI noise and protect
 shared branches. That is an opt-in operating profile, not the DevNexus default.

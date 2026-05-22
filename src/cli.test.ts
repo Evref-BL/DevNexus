@@ -408,6 +408,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus home init");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus workspace status");
+    expect(output.output()).toContain("dev-nexus workspace init");
     expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("dev-nexus workspace component add");
     expect(output.output()).toContain("dev-nexus workspace hosting status");
@@ -435,24 +436,36 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
-  it("prints focused workspace setup help", async () => {
+  it("prints focused workspace init help", async () => {
+    const output = captureOutput();
+
+    await expect(
+      main(["workspace", "init", "--help"], { stdout: output.writer }),
+    ).resolves.toBe(0);
+
+    expect(output.output()).toContain("Usage:");
+    expect(output.output()).toContain("dev-nexus workspace init [workspace-root] [options]");
+    expect(output.output()).toContain("User quickstart:");
+    expect(output.output()).toContain("dev-nexus workspace init");
+    expect(output.output()).toContain("Run from the directory you want to use");
+    expect(output.output()).toContain("DevNexus home defaults to");
+    expect(output.output()).toContain("--answers <json-file>");
+    expect(output.output()).toContain("--dry-run");
+    expect(output.output()).toContain("--json");
+    expect(output.output()).not.toContain("--yes");
+    expect(output.output()).toContain("Provider mutations are not part of workspace setup.");
+  });
+
+  it("keeps workspace setup as an alias for workspace init", async () => {
     const output = captureOutput();
 
     await expect(
       main(["workspace", "setup", "--help"], { stdout: output.writer }),
     ).resolves.toBe(0);
 
-    expect(output.output()).toContain("Usage:");
-    expect(output.output()).toContain("dev-nexus workspace setup [workspace-root] [options]");
-    expect(output.output()).toContain("User quickstart:");
+    expect(output.output()).toContain("dev-nexus workspace init");
+    expect(output.output()).toContain("Alias:");
     expect(output.output()).toContain("dev-nexus workspace setup");
-    expect(output.output()).toContain("Run from the directory you want to use");
-    expect(output.output()).toContain("DevNexus home defaults to");
-    expect(output.output()).toContain("--answers <json-file>");
-    expect(output.output()).toContain("--yes");
-    expect(output.output()).toContain("--dry-run");
-    expect(output.output()).toContain("--json");
-    expect(output.output()).toContain("Provider mutations are not part of workspace setup.");
   });
 
   it("prints focused workspace component add help", async () => {
@@ -467,9 +480,9 @@ describe("dev-nexus cli", () => {
       "dev-nexus workspace component add <workspace-root> [options]",
     );
     expect(output.output()).toContain("--answers <json-file>");
-    expect(output.output()).toContain("--yes");
     expect(output.output()).toContain("--dry-run");
     expect(output.output()).toContain("--json");
+    expect(output.output()).not.toContain("--yes");
     expect(output.output()).toContain("Provider mutations are not part of component add.");
   });
 
@@ -577,7 +590,7 @@ describe("dev-nexus cli", () => {
       main(["project", "setup", "--help"], { stdout: output.writer }),
     ).resolves.toBe(0);
 
-    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("dev-nexus workspace init");
   });
 
   it("refreshes a local project plugin and materializes skills and MCP config", async () => {
@@ -762,7 +775,7 @@ describe("dev-nexus cli", () => {
                 integrationPreference: "pull_request",
                 directTargetPush: "blocked",
                 mergeAuthority: "authorized_merge",
-                requiredChecks: ["Node 24 check (ubuntu-latest)"],
+                requiredChecks: ["Node 22 check (ubuntu-latest)"],
                 staleChecks: "block",
               },
             },
@@ -906,11 +919,11 @@ describe("dev-nexus cli", () => {
         {
           checks: [
             {
-              name: "Node 24 check (ubuntu-latest)",
+              name: "Node 22 check (ubuntu-latest)",
               bucket: "pass",
             },
             {
-              name: "Node 24 check (windows-latest)",
+              name: "Node 22 check (windows-latest)",
               bucket: "fail",
               link: "https://github.com/example/demo/actions/runs/1002/job/2",
               failure: {
@@ -971,8 +984,8 @@ describe("dev-nexus cli", () => {
                 directTargetPush: "blocked",
                 mergeAuthority: "authorized_merge",
                 requiredChecks: [
-                  "Node 24 check (ubuntu-latest)",
-                  "Node 24 check (windows-latest)",
+                  "Node 22 check (ubuntu-latest)",
+                  "Node 22 check (windows-latest)",
                 ],
                 staleChecks: "block",
               },
@@ -1004,7 +1017,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("Pull request: example/demo#12");
     expect(output.output()).toContain("Status: failed");
     expect(output.output()).toContain("Merge: blocked");
-    expect(output.output()).toContain("Node 24 check (windows-latest):");
+    expect(output.output()).toContain("Node 22 check (windows-latest):");
     expect(output.output()).toContain("Step: Run npm test");
 
     const jsonOutput = captureOutput();
@@ -1044,11 +1057,11 @@ describe("dev-nexus cli", () => {
     const greenChecksJson = JSON.stringify({
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           bucket: "pass",
         },
         {
-          name: "Node 24 check (windows-latest)",
+          name: "Node 22 check (windows-latest)",
           bucket: "pass",
         },
       ],
@@ -1176,7 +1189,7 @@ describe("dev-nexus cli", () => {
             branchPolicy: "clear",
             checks: [
               {
-                name: "Node 24 check (ubuntu-latest)",
+                name: "Node 22 check (ubuntu-latest)",
                 bucket: "pass",
                 workflow: "CI",
               },
@@ -1195,7 +1208,7 @@ describe("dev-nexus cli", () => {
         "normalize",
         evidenceFile,
         "--required-check",
-        "Node 24 check (ubuntu-latest)",
+        "Node 22 check (ubuntu-latest)",
       ],
       { stdout: textOutput.writer },
     );
@@ -1216,7 +1229,7 @@ describe("dev-nexus cli", () => {
         "normalize",
         evidenceFile,
         "--required-check",
-        "Node 24 check (ubuntu-latest)",
+        "Node 22 check (ubuntu-latest)",
         "--json",
       ],
       { stdout: jsonOutput.writer },
@@ -1278,9 +1291,9 @@ describe("dev-nexus cli", () => {
               directTargetPush: "blocked",
               mergeAuthority: "authorized_merge",
               requiredChecks: [
-                "Node 24 check (ubuntu-latest)",
-                "Node 24 check (windows-latest)",
-                "Node 24 check (macos-latest)",
+                "Node 22 check (ubuntu-latest)",
+                "Node 22 check (windows-latest)",
+                "Node 22 check (macos-latest)",
               ],
               staleChecks: "block",
             },
@@ -1299,9 +1312,9 @@ describe("dev-nexus cli", () => {
             targetBranch: "main",
             intendedCiTier: "candidate_matrix",
             checks: [
-              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
-              { name: "Node 24 check (windows-latest)", bucket: "pass" },
-              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 22 check (windows-latest)", bucket: "pass" },
+              { name: "Node 22 check (macos-latest)", bucket: "pass" },
             ],
           },
           {
@@ -1311,9 +1324,9 @@ describe("dev-nexus cli", () => {
             targetBranch: "main",
             intendedCiTier: "protected_target",
             checks: [
-              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
-              { name: "Node 24 check (windows-latest)", bucket: "pass" },
-              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 22 check (windows-latest)", bucket: "pass" },
+              { name: "Node 22 check (macos-latest)", bucket: "pass" },
             ],
           },
         ],
@@ -1475,9 +1488,9 @@ describe("dev-nexus cli", () => {
           {
             branchName: "candidate/0.2.0",
             checks: [
-              { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
-              { name: "Node 24 check (windows-latest)", bucket: "pass" },
-              { name: "Node 24 check (macos-latest)", bucket: "pass" },
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              { name: "Node 22 check (windows-latest)", bucket: "pass" },
+              { name: "Node 22 check (macos-latest)", bucket: "pass" },
             ],
           },
         ],
@@ -2604,7 +2617,15 @@ describe("dev-nexus cli", () => {
     const previewOutput = captureOutput();
     await expect(
       main(
-        ["project", "setup", projectRoot, "--answers", answersPath, "--json"],
+        [
+          "project",
+          "setup",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--dry-run",
+          "--json",
+        ],
         { stdout: previewOutput.writer },
       ),
     ).resolves.toBe(0);
@@ -2629,7 +2650,6 @@ describe("dev-nexus cli", () => {
           projectRoot,
           "--answers",
           answersPath,
-          "--yes",
           "--json",
         ],
         { stdout: applyOutput.writer },
@@ -2748,6 +2768,7 @@ describe("dev-nexus cli", () => {
           projectRoot,
           "--answers",
           answersPath,
+          "--dry-run",
           "--json",
         ],
         { stdout: previewOutput.writer },
@@ -2805,7 +2826,6 @@ describe("dev-nexus cli", () => {
           projectRoot,
           "--answers",
           answersPath,
-          "--yes",
           "--json",
         ],
         { stdout: applyOutput.writer },
@@ -2986,7 +3006,6 @@ describe("dev-nexus cli", () => {
         projectRoot,
         "--answers",
         setupAnswersPath,
-        "--yes",
         "--json",
       ], { stdout: setupOutput.writer }),
     ).resolves.toBe(0);
@@ -3001,6 +3020,7 @@ describe("dev-nexus cli", () => {
           projectRoot,
           "--answers",
           componentAnswersPath,
+          "--dry-run",
           "--json",
         ],
         { stdout: previewOutput.writer },
@@ -3026,7 +3046,6 @@ describe("dev-nexus cli", () => {
           projectRoot,
           "--answers",
           componentAnswersPath,
-          "--yes",
           "--json",
         ],
         { stdout: applyOutput.writer },

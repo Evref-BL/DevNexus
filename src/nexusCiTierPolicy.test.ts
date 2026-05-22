@@ -8,9 +8,9 @@ import {
 } from "./nexusCiTierPolicy.js";
 
 const fullMatrixChecks = [
-  "Node 24 check (ubuntu-latest)",
-  "Node 24 check (windows-latest)",
-  "Node 24 check (macos-latest)",
+  "Node 22 check (ubuntu-latest)",
+  "Node 22 check (windows-latest)",
+  "Node 22 check (macos-latest)",
 ];
 
 describe("nexus CI tier policy", () => {
@@ -40,10 +40,10 @@ describe("nexus CI tier policy", () => {
     });
 
     expect(decision.tier.id).toBe("remote_smoke");
-    expect(decision.requiredChecks).toEqual(["Node 24 check (ubuntu-latest)"]);
+    expect(decision.requiredChecks).toEqual(["Node 22 check (ubuntu-latest)"]);
     expect(decision.skippedChecks).toEqual([
-      "Node 24 check (windows-latest)",
-      "Node 24 check (macos-latest)",
+      "Node 22 check (windows-latest)",
+      "Node 22 check (macos-latest)",
     ]);
     expect(decision.summary).toContain("ordinary branch validation");
   });
@@ -73,7 +73,7 @@ describe("nexus CI tier policy", () => {
 
     expect(decision.tier.id).toBe("remote_smoke");
     expect(decision.reasonCodes).toContain("metadata_only");
-    expect(decision.requiredChecks).toEqual(["Node 24 check (ubuntu-latest)"]);
+    expect(decision.requiredChecks).toEqual(["Node 22 check (ubuntu-latest)"]);
   });
 
   it("escalates cross-platform risk and candidate branches to the matrix tier", () => {
@@ -135,7 +135,7 @@ describe("nexus CI tier policy", () => {
       "candidate_branch",
       "budget_exhausted",
     ]);
-    expect(decision.requiredChecks).toEqual(["Node 24 check (ubuntu-latest)"]);
+    expect(decision.requiredChecks).toEqual(["Node 22 check (ubuntu-latest)"]);
   });
 
   it("validates configured policies before resolution", () => {

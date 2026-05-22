@@ -5,39 +5,15 @@ eligible work, prepare worktrees, record progress, and report factual results.
 It does not decide what should be implemented. The user or launched
 coordinator agent owns that judgment.
 
-## Skill Role Chains
+## Skill Chains
 
-DevNexus skills should compose as workflow verbs. A chain can describe the
-agent's operating mode without making every step a new process.
+DevNexus skills compose as workflow verbs. The canonical diagrams live in
+[Skill Chains](skill-chains.md), which maps feature, bugfix, architecture,
+documentation, and version-publishing flows.
 
-Common chains:
-
-- New long-lived effort:
-  `initiative-workflow` -> `design-with-user` -> `grill-me` or
-  `grill-with-docs` -> `to-prd` -> `to-issues` ->
-  `write-implementation-plan` -> `execute-initiative-plan`.
-- Code change:
-  `prepare-dev-nexus-worktree` -> `tdd` or `diagnose` ->
-  `verify-before-completion` -> `request-work-review` ->
-  `finish-dev-nexus-branch`.
-- Architecture change:
-  `zoom-out` -> `architecture-review` -> `grill-with-docs` ->
-  `architecture-deepening` -> `write-implementation-plan`.
-- Documentation change:
-  `documentation` -> `humanizer` -> `verify-before-completion`.
-
-Some skills are overlays rather than phases. `dev-nexus` provides workspace
-infrastructure. `take-the-lead` changes the collaboration contract while the
-user keeps decision authority. `initiative-workflow` holds a durable objective
-and integration surface across slices.
-
-The decision skills have distinct roles:
-
-- `design-with-user` shapes unclear work collaboratively.
-- `grill-me` stress-tests an existing plan by asking one decision-tree question
-  at a time.
-- `grill-with-docs` stress-tests an existing plan against code, glossary terms,
-  domain docs, and Architecture Decision Records.
+Agents should not rely on the diagrams being loaded automatically. Skills such
+as `take-the-lead` include compact routing rules and can use the skill-chain
+page as supporting context when the workspace docs are available.
 
 ## MCP Server
 
@@ -245,6 +221,11 @@ dev-nexus publication merge-queue-readiness <workspace-root> --component core
 Prepared worktrees carry ownership metadata: component id, source root,
 generated path, branch, base ref, and owning work item. The generated path must
 resolve inside the component worktrees root.
+
+Worktree leases are advisory runtime records. They help other agents see active
+or stale work, but they are not hard locks and should not be committed as normal
+workspace state. DevNexus writes new leases to host-local runtime storage and
+keeps legacy `.dev-nexus/worktree-leases.json` files readable for migration.
 
 Generated worktrees can receive setup-only dependency projections. DevNexus
 links existing reviewed paths such as `node_modules` into the worktree, records

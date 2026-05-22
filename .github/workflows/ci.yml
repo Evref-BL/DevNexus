@@ -140,7 +140,7 @@ jobs:
           echo "CI tier: $tier ($reason)"
 
   check-ubuntu:
-    name: Node 24 check (ubuntu-latest)
+    name: Node 22 check (ubuntu-latest)
     needs: classify
     if: needs.classify.outputs.run_ubuntu == 'true'
     runs-on: ubuntu-latest
@@ -153,7 +153,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -163,7 +163,7 @@ jobs:
         run: npm run check
 
   check-windows:
-    name: Node 24 check (windows-latest)
+    name: Node 22 check (windows-latest)
     needs: classify
     if: needs.classify.outputs.run_windows == 'true'
     runs-on: windows-latest
@@ -176,7 +176,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -186,7 +186,7 @@ jobs:
         run: npm run check
 
   check-macos:
-    name: Node 24 check (macos-latest)
+    name: Node 22 check (macos-latest)
     needs: classify
     if: needs.classify.outputs.run_macos == 'true'
     runs-on: macos-latest
@@ -199,7 +199,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

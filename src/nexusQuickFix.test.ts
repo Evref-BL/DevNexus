@@ -51,7 +51,7 @@ describe("quick-fix planning", () => {
       remote: "bot",
       targetBranch: "main",
       commandEnvironment: {},
-      requiredChecks: ["Node 24 check (ubuntu-latest)"],
+      requiredChecks: ["Node 22 check (ubuntu-latest)"],
     });
     expect(plan.startSteps[0]!.operation).toMatchObject({
       provider: "github",
@@ -105,7 +105,7 @@ describe("quick-fix planning", () => {
       "cleanup-worktree",
     );
     expect(plan.skippedBookkeeping.join("\n")).toContain(
-      "dogfood metadata PR",
+      "workspace metadata PR",
     );
     expect(plan.warnings).toEqual([]);
   });
@@ -192,7 +192,7 @@ function projectConfig(
             integrationPreference: "pull_request",
             directTargetPush: "blocked",
             mergeAuthority: "authorized_merge",
-            requiredChecks: ["Node 24 check (ubuntu-latest)"],
+            requiredChecks: ["Node 22 check (ubuntu-latest)"],
             staleChecks: "block",
           },
         },

@@ -183,6 +183,15 @@ describe("nexus cleanup plan", () => {
     createOrRefreshNexusWorktreeLease({
       projectRoot: fixture.projectRoot,
       componentId: "primary",
+      branchName: "codex/primary/stale-merged",
+      worktreePath: path.join(fixture.worktreesRoot, "stale-merged"),
+      status: "working",
+      now: () => "2026-05-16T10:00:00.000Z",
+      gitFacts: { headCommit: "staleMerged123" },
+    });
+    createOrRefreshNexusWorktreeLease({
+      projectRoot: fixture.projectRoot,
+      componentId: "primary",
       branchName: "codex/primary/ready",
       worktreePath: path.join(fixture.worktreesRoot, "ready"),
       status: "ready",
@@ -213,17 +222,19 @@ describe("nexus cleanup plan", () => {
       gitRunner: cleanupGitRunner(fixture, {
         branches: [
           "codex/primary/stale",
+          "codex/primary/stale-merged",
           "codex/primary/ready",
           "codex/primary/abandoned",
           "codex/primary/superseded",
         ],
         upstreams: {
           "codex/primary/stale": "origin/codex/primary/stale",
+          "codex/primary/stale-merged": "origin/codex/primary/stale-merged",
           "codex/primary/ready": "origin/codex/primary/ready",
           "codex/primary/abandoned": "origin/codex/primary/abandoned",
           "codex/primary/superseded": "origin/codex/primary/superseded",
         },
-        mergedRefs: ["recordedMerged123"],
+        mergedRefs: ["codex/primary/stale-merged", "recordedMerged123"],
       }),
       now: () => "2026-05-18T10:00:00.000Z",
     });
@@ -231,6 +242,12 @@ describe("nexus cleanup plan", () => {
     expect(candidateFor(plan, "codex/primary/stale")).toMatchObject({
       classifications: expect.arrayContaining(["stale", "blocked"]),
     });
+    expect(candidateFor(plan, "codex/primary/stale-merged")).toMatchObject({
+      safeToDelete: true,
+      classifications: expect.arrayContaining(["stale", "merged", "safe"]),
+    });
+    expect(candidateFor(plan, "codex/primary/stale-merged").classifications)
+      .not.toContain("blocked");
     expect(candidateFor(plan, "codex/primary/ready")).toMatchObject({
       classifications: expect.arrayContaining(["active_lease", "blocked"]),
     });

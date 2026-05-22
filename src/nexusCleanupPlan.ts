@@ -435,8 +435,15 @@ function classifyCleanupCandidate(
       classifications.push("abandoned", "blocked");
       blockers.push("Lease marks this work as abandoned; preserve or explicitly archive before cleanup.");
     } else if (lease.stale) {
-      classifications.push("stale", "blocked");
-      blockers.push("Lease is stale; refresh ownership or inspect manually before cleanup.");
+      classifications.push("stale");
+      if (mergedIntoTarget === true) {
+        proof.push(
+          "Lease is stale, but Git proves the branch is contained in the target branch.",
+        );
+      } else {
+        classifications.push("blocked");
+        blockers.push("Lease is stale; refresh ownership or inspect manually before cleanup.");
+      }
     } else if (!["merged"].includes(lease.record.status)) {
       classifications.push("active_lease", "blocked");
       blockers.push(`Lease status ${lease.record.status} indicates active or pending work.`);

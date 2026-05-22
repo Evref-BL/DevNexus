@@ -104,9 +104,9 @@ describe("publication train readiness", () => {
           id: "candidate_matrix",
         },
         requiredChecks: [
-          "Node 24 check (ubuntu-latest)",
-          "Node 24 check (windows-latest)",
-          "Node 24 check (macos-latest)",
+          "Node 22 check (ubuntu-latest)",
+          "Node 22 check (windows-latest)",
+          "Node 22 check (macos-latest)",
         ],
       },
       evidence: {
@@ -257,9 +257,9 @@ describe("publication train readiness", () => {
       {
         branchName: "candidate/0.2.0",
         checks: [
-          { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
-          { name: "Node 24 check (windows-latest)", bucket: "pending" },
-          { name: "Node 24 check (macos-latest)", bucket: "pass" },
+          { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+          { name: "Node 22 check (windows-latest)", bucket: "pending" },
+          { name: "Node 22 check (macos-latest)", bucket: "pass" },
         ],
       },
     ];
@@ -301,9 +301,9 @@ describe("publication train readiness", () => {
         mergeability: true,
         branchPolicy: "clear",
         checks: [
-          { name: "Node 24 check (ubuntu-latest)", bucket: "pass" },
-          { name: "Node 24 check (windows-latest)", bucket: "pass" },
-          { name: "Node 24 check (macos-latest)", bucket: "pass" },
+          { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+          { name: "Node 22 check (windows-latest)", bucket: "pass" },
+          { name: "Node 22 check (macos-latest)", bucket: "pass" },
         ],
       },
     ];

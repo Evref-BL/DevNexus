@@ -6,9 +6,9 @@ import {
 } from "./nexusPublicationProviderEvidence.js";
 
 const nodeChecks = [
-  "Node 24 check (ubuntu-latest)",
-  "Node 24 check (windows-latest)",
-  "Node 24 check (macos-latest)",
+  "Node 22 check (ubuntu-latest)",
+  "Node 22 check (windows-latest)",
+  "Node 22 check (macos-latest)",
 ];
 
 describe("publication provider evidence facade", () => {
@@ -31,11 +31,11 @@ describe("publication provider evidence facade", () => {
         branchPolicy: "clear",
         checks: [
           {
-            name: "Node 24 check (ubuntu-latest)",
+            name: "Node 22 check (ubuntu-latest)",
             status: "completed",
             conclusion: "success",
             workflow: "CI",
-            jobName: "Node 24 check (ubuntu-latest)",
+            jobName: "Node 22 check (ubuntu-latest)",
             detailsUrl: "https://github.com/Evref-BL/DevNexus/actions/runs/1",
           },
         ],
@@ -58,10 +58,10 @@ describe("publication provider evidence facade", () => {
       branchPolicy: "clear",
       checks: [
         {
-          name: "Node 24 check (ubuntu-latest)",
+          name: "Node 22 check (ubuntu-latest)",
           status: "success",
           workflowName: "CI",
-          jobName: "Node 24 check (ubuntu-latest)",
+          jobName: "Node 22 check (ubuntu-latest)",
           runId: "1",
         },
       ],

@@ -116,15 +116,15 @@ describe("README onboarding guardrails", () => {
 
   it("keeps the user quickstart before automation-only setup examples", () => {
     const readme = repoFile("README.md");
-    const userSetup = readme.indexOf("dev-nexus workspace setup");
+    const userSetup = readme.indexOf("dev-nexus workspace init");
     const answerFileSetup = readme.indexOf("--answers ./dev-nexus.setup.json");
     expect(userSetup).toBeGreaterThan(-1);
     expect(answerFileSetup).toBeGreaterThan(userSetup);
 
     const firstSetupLine = readme
       .split(/\r?\n/u)
-      .find((line) => line.includes("dev-nexus workspace setup"))!;
-    expect(firstSetupLine.trim()).toBe("dev-nexus workspace setup");
+      .find((line) => line.includes("dev-nexus workspace init"))!;
+    expect(firstSetupLine.trim()).toBe("dev-nexus workspace init");
     expect(firstSetupLine).not.toContain("--answers");
     expect(firstSetupLine).not.toContain("--json");
     expect(firstSetupLine).not.toContain("--yes");
@@ -234,7 +234,7 @@ describe("first-workspace quickstart smoke", () => {
       "Quickstart Smoke",
       "",
       "core",
-      ".",
+      "",
       "yes",
       "api",
       "packages/api",

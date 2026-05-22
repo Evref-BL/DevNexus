@@ -58,7 +58,7 @@ describe("version planning config", () => {
               {
                 kind: "checks_green",
                 components: ["dev-nexus", "dev-nexus-pharo"],
-                checkNames: ["Node 24 check (ubuntu-latest)"],
+                checkNames: ["Node 22 check (ubuntu-latest)"],
               },
               {
                 kind: "release_authority",
@@ -101,7 +101,7 @@ describe("version planning config", () => {
               },
               {
                 "checkNames": [
-                  "Node 24 check (ubuntu-latest)",
+                  "Node 22 check (ubuntu-latest)",
                 ],
                 "components": [
                   "dev-nexus",

@@ -105,10 +105,10 @@ export class NexusCiTierPolicyError extends Error {
   }
 }
 
-const node24FullChecks = [
-  "Node 24 check (ubuntu-latest)",
-  "Node 24 check (windows-latest)",
-  "Node 24 check (macos-latest)",
+const node22FullChecks = [
+  "Node 22 check (ubuntu-latest)",
+  "Node 22 check (windows-latest)",
+  "Node 22 check (macos-latest)",
 ];
 
 export const defaultNexusCiTierDefinitions: NexusCiTierDefinition[] = [
@@ -125,7 +125,7 @@ export const defaultNexusCiTierDefinitions: NexusCiTierDefinition[] = [
     id: "remote_smoke",
     name: "Cheap remote smoke",
     cost: "low",
-    requiredChecks: ["Node 24 check (ubuntu-latest)"],
+    requiredChecks: ["Node 22 check (ubuntu-latest)"],
     optionalChecks: [],
     branchPatterns: [],
     eventNames: ["pull_request", "workflow_dispatch"],
@@ -134,7 +134,7 @@ export const defaultNexusCiTierDefinitions: NexusCiTierDefinition[] = [
     id: "candidate_matrix",
     name: "Candidate matrix",
     cost: "high",
-    requiredChecks: [...node24FullChecks],
+    requiredChecks: [...node22FullChecks],
     optionalChecks: [],
     branchPatterns: ["candidate/**", "integration/**", "release/**"],
     eventNames: ["pull_request", "push", "workflow_dispatch"],
@@ -143,7 +143,7 @@ export const defaultNexusCiTierDefinitions: NexusCiTierDefinition[] = [
     id: "protected_target",
     name: "Protected target gate",
     cost: "high",
-    requiredChecks: [...node24FullChecks],
+    requiredChecks: [...node22FullChecks],
     optionalChecks: [],
     branchPatterns: ["main"],
     eventNames: ["push", "merge_group", "workflow_dispatch"],
@@ -152,7 +152,7 @@ export const defaultNexusCiTierDefinitions: NexusCiTierDefinition[] = [
     id: "scheduled_drift",
     name: "Scheduled drift check",
     cost: "high",
-    requiredChecks: [...node24FullChecks],
+    requiredChecks: [...node22FullChecks],
     optionalChecks: [],
     branchPatterns: [],
     eventNames: ["schedule"],

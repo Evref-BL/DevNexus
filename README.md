@@ -17,7 +17,7 @@ edits code, reviews changes, verifies results, and decides what to publish.
 
 ## Install
 
-DevNexus requires Node.js 24 or newer.
+DevNexus requires Node.js 22 or newer.
 
 ```bash
 npm install -g @evref-bl/dev-nexus
@@ -69,13 +69,15 @@ Create or choose a directory for the DevNexus workspace. From that directory,
 run:
 
 ```bash
-dev-nexus workspace setup
+dev-nexus workspace init
 ```
 
-The setup command guides you through the first workspace. It uses `~/.dev-nexus`
+The init command guides you through the first workspace. It uses `~/.dev-nexus`
 as the default home, uses or asks for the workspace root, asks for the primary
 component and any extra components, creates local work tracking by default, and
 generates agent files.
+Press Enter for a component source path to create it under `components/<id>`, or
+type an existing path to reference it.
 
 After setup:
 
@@ -114,7 +116,7 @@ Components:
 - load-test-lab
 ```
 
-Use one `workspace setup` run for that shape. Do not create four DevNexus
+Use one `workspace init` run for that shape. Do not create four DevNexus
 workspaces unless you truly want four separate agent workspaces.
 
 For a detailed version of this example, see
@@ -125,14 +127,14 @@ For a detailed version of this example, see
 Users should usually start with the interactive command:
 
 ```bash
-dev-nexus workspace setup
+dev-nexus workspace init
 ```
 
 Agents, CI jobs, and reproducible onboarding scripts can use answer files:
 
 ```bash
-dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --json
-dev-nexus workspace setup <workspace-root> --answers ./dev-nexus.setup.json --yes
+dev-nexus workspace init <workspace-root> --answers ./dev-nexus.setup.json --dry-run --json
+dev-nexus workspace init <workspace-root> --answers ./dev-nexus.setup.json --json
 ```
 
 The first command previews local writes. The second applies them. Provider

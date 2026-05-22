@@ -17,6 +17,7 @@ const sidebars = {
         "user/providers-auth-hosting",
         "user/agent-targets",
         "user/agent-workflows",
+        "user/skill-chains",
         "user/multi-tracker",
         "user/authority-roles",
       ],
