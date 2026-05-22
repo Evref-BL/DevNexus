@@ -1117,6 +1117,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderOpenMenu");
     expect(module).toContain("chevronDownIcon");
     expect(module).toContain("dn-open-chevron");
+    expect(module).toContain("dn-open-chevron-shell");
+    expect(module).toContain("min-width: 94px");
     expect(module).toContain(".dn-open-menu[open] .dn-open-chevron");
     expect(module).toContain("/api/local/open");
     expect(module).toContain("data-open-target");
@@ -1125,6 +1127,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("VS Code");
     expect(module).toContain("Terminal");
     expect(module).not.toContain("<span aria-hidden=\"true\">v</span>");
+    expect(module).not.toContain("min-width: 116px");
     expect(module).not.toContain("Copy brief");
     expect(module).toContain("Start chat");
     expect(module).toContain("Resume chat");
