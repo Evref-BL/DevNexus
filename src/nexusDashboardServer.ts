@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   buildNexusDashboardHostActionQueue,
+  buildNexusDashboardHostProjectIndex,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   nexusDashboardEmbeddingContract,
@@ -369,6 +370,8 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-loading-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 16px; overflow: hidden; }",
     ".dn-loader { width: 34px; height: 34px; border: 3px solid color-mix(in srgb, var(--dn-active) 22%, var(--dn-border)); border-top-color: var(--dn-active); border-radius: 999px; animation: dn-spin 820ms linear infinite; }",
     ".dn-loading-copy { display: grid; gap: 8px; min-width: 0; }",
+    ".dn-inline-loading { display: flex; gap: 9px; align-items: center; min-width: 0; color: var(--dn-muted); font-weight: 760; }",
+    ".dn-inline-loading::before { content: ''; width: 12px; height: 12px; border: 2px solid color-mix(in srgb, var(--dn-active) 24%, var(--dn-border)); border-top-color: var(--dn-active); border-radius: 999px; animation: dn-spin 820ms linear infinite; }",
     ".dn-skeleton-stack { display: grid; gap: 8px; margin-top: 4px; }",
     ".dn-skeleton { position: relative; height: 12px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dn-surface-raised) 80%, var(--dn-active) 20%); }",
     ".dn-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dn-active) 24%, transparent), transparent); animation: dn-shimmer 1.35s ease-in-out infinite; }",
@@ -386,6 +389,13 @@ export function renderNexusDashboardClientModule(): string {
     "  const response = await fetch(`${baseUrl}/api/host${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
     "  if (!response.ok) throw new Error(`Host API returned ${response.status}`);",
     "  return response.json();",
+    "}",
+    "",
+    "export async function fetchDevNexusDashboardProjects(baseUrl = '', workspaceId = '') {",
+    "  const response = await fetch(`${baseUrl}/api/projects${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
+    "  if (!response.ok) throw new Error(`Projects API returned ${response.status}`);",
+    "  const payload = await response.json();",
+    "  return payload.host ?? { version: 1, partial: true, generatedAt: new Date().toISOString(), workspaceCount: payload.projects?.length ?? 0, needsAttentionCount: 0, actionQueue: [], workspaces: payload.projects ?? [] };",
     "}",
     "",
     "function workspaceQuery(workspaceId) {",
@@ -481,6 +491,12 @@ export function renderNexusDashboardClientModule(): string {
     "    try {",
     "      const workspaceId = selectedWorkspaceId;",
     "      if (!workspaceId) {",
+    "        const shell = await fetchDevNexusDashboardProjects(baseUrl);",
+    "        if (workspaceId !== selectedWorkspaceId) return;",
+    "        latestHost = shell;",
+    "        latestSnapshot = null;",
+    "        latestError = null;",
+    "        renderCurrent();",
     "        const host = await fetchDevNexusDashboardHost(baseUrl);",
     "        if (workspaceId !== selectedWorkspaceId) return;",
     "        latestHost = host;",
@@ -491,6 +507,7 @@ export function renderNexusDashboardClientModule(): string {
     "        return;",
     "      }",
     "      const shouldRefreshHost = !latestHost || Date.now() - lastHostRefreshAt >= hostRefreshMs;",
+    "      if (shouldRefreshHost && !latestHost) void refreshHostShell();",
     "      const snapshot = await fetchDevNexusDashboard(baseUrl, workspaceId);",
     "      if (workspaceId !== selectedWorkspaceId) return;",
     "      latestSnapshot = snapshot;",
@@ -515,6 +532,21 @@ export function renderNexusDashboardClientModule(): string {
     "      if (workspaceId !== selectedWorkspaceId) return;",
     "      latestHost = host;",
     "      lastHostRefreshAt = Date.now();",
+    "      renderCurrent();",
+    "    } catch {",
+    "      latestHost = null;",
+    "    } finally {",
+    "      hostInFlight = false;",
+    "    }",
+    "  }",
+    "  async function refreshHostShell() {",
+    "    if (hostInFlight || latestHost) return;",
+    "    hostInFlight = true;",
+    "    try {",
+    "      const workspaceId = selectedWorkspaceId;",
+    "      const host = await fetchDevNexusDashboardProjects(baseUrl, workspaceId);",
+    "      if (workspaceId !== selectedWorkspaceId) return;",
+    "      latestHost = host;",
     "      renderCurrent();",
     "    } catch {",
     "      latestHost = null;",
@@ -560,7 +592,7 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderHostDashboard(host, themeMode, hostFocus = 'components') {",
     "  const focus = normalizeHostFocus(hostFocus);",
-    "  const summary = `${host.workspaceCount} workspaces, ${host.needsAttentionCount} need attention`;",
+    "  const summary = host.partial === true ? `${host.workspaceCount} workspaces, loading signals` : `${host.workspaceCount} workspaces, ${host.needsAttentionCount} need attention`;",
     "  return `<div class=\"dn-shell dn-host-dashboard\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>Host Cockpit</h1><p>${escapeHtml(summary)}</p></div><div class=\"dn-header-actions\">${renderOpenMenu('home', 'Home')}<div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(host.generatedAt))}</strong><span>Home</span><strong title=\"${escapeHtml(host.homePath)}\">${escapeHtml(compactPath(host.homePath))}</strong></div>${renderThemeToggle(themeMode)}</div></header>${renderHostSignals(host, focus)}<section class=\"dn-host-main-grid\">${renderHostActionQueue(host, focus)}${renderHostOverview(host, null, '', { hostMode: true, focus })}</section></div>`;",
     "}",
     "",
@@ -570,11 +602,12 @@ export function renderNexusDashboardClientModule(): string {
     "  const totalHitl = sumBy(workspaces, (workspace) => workspace.needsDecisionCount);",
     "  const readyWork = sumBy(workspaces, (workspace) => workspace.eligibleWorkCount);",
     "  const plugins = sumBy(workspaces, (workspace) => workspace.pluginCount);",
+    "  const loading = host?.partial === true;",
     "  const signals = [",
     "    { id: 'components', label: 'Workspaces', value: String(host?.workspaceCount ?? workspaces.length), detail: 'Registered and local project cockpits' },",
-    "    { id: 'blockers', label: 'Needs attention', value: String(host?.needsAttentionCount ?? 0), detail: 'Workspaces with approvals, dirty state, or errors' },",
-    "    { id: 'worktrees', label: 'Threads', value: String(totalThreads), detail: `${totalHitl} need action` },",
-    "    { id: 'eligible-work', label: 'Tracked work', value: String(readyWork), detail: readyWork ? 'Ready issues and work items' : 'No ready work' },",
+    "    { id: 'blockers', label: 'Needs attention', value: loading ? '...' : String(host?.needsAttentionCount ?? 0), detail: loading ? 'Loading signals' : 'Workspaces with approvals, dirty state, or errors' },",
+    "    { id: 'worktrees', label: 'Threads', value: loading ? '...' : String(totalThreads), detail: loading ? 'Loading thread state' : `${totalHitl} need action` },",
+    "    { id: 'eligible-work', label: 'Tracked work', value: loading ? '...' : String(readyWork), detail: loading ? 'Loading tracked work' : (readyWork ? 'Ready issues and work items' : 'No ready work') },",
     "    { id: 'plugins', label: 'Plugins', value: String(plugins), detail: 'Installed DevNexus plugin instances' },",
     "  ];",
     "  return `<section class=\"dn-signals\" aria-label=\"Host signals\">${signals.map((signal) => `<button class=\"dn-signal dn-host-signal signal-${escapeAttribute(signal.id)} ${signal.id === hostFocus ? 'selected' : ''}\" type=\"button\" data-host-focus=\"${escapeHtml(signal.id)}\"><span class=\"dn-signal-top\"><span class=\"dn-signal-icon\">${signalIcon(signal.id)}</span><span class=\"dn-label\">${escapeHtml(signal.label)}</span></span><strong>${escapeHtml(signal.value)}</strong><p>${escapeHtml(signal.detail)}</p></button>`).join('')}</section>`;",
@@ -589,7 +622,7 @@ export function renderNexusDashboardClientModule(): string {
     "  const allActions = host?.actionQueue ?? [];",
     "  const actions = filteredHostActions(allActions, hostFocus, host?.workspaces ?? []);",
     "  const accentMap = workspaceAccentMap(host?.workspaces ?? []);",
-    "  const body = actions.length ? actions.slice(0, 8).map((action) => renderHostActionCard(action, accentMap)).join('') : `<p>${escapeHtml(emptyHostActionText(hostFocus))}</p>`;",
+    "  const body = host?.partial === true ? renderInlineLoading('Loading action queue') : (actions.length ? actions.slice(0, 8).map((action) => renderHostActionCard(action, accentMap)).join('') : `<p>${escapeHtml(emptyHostActionText(hostFocus))}</p>`);",
     "  return `<section class=\"dn-panel dn-host-action-panel\" id=\"host-action-queue\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host HITL</span><h2>${escapeHtml(hostActionQueueTitle(hostFocus))}</h2></div><span class=\"dn-count\">${escapeHtml(`${actions.length} of ${allActions.length} actions`)}</span></div><div class=\"dn-host-action-list\">${body}</div></section>`;",
     "}",
     "",
@@ -651,7 +684,7 @@ export function renderNexusDashboardClientModule(): string {
     "  if (!allWorkspaces.length) return '';",
     "  const workspaces = filteredHostWorkspaces(allWorkspaces, options.focus);",
     "  const accentMap = workspaceAccentMap(allWorkspaces);",
-    "  const count = options.hostMode ? `${workspaces.length} shown · ${host.workspaceCount ?? allWorkspaces.length} total` : `${host.needsAttentionCount ?? 0} need attention · ${host.workspaceCount ?? allWorkspaces.length} workspaces`;",
+    "  const count = host?.partial === true ? `Loading signals · ${host.workspaceCount ?? allWorkspaces.length} workspaces` : (options.hostMode ? `${workspaces.length} shown · ${host.workspaceCount ?? allWorkspaces.length} total` : `${host.needsAttentionCount ?? 0} need attention · ${host.workspaceCount ?? allWorkspaces.length} workspaces`);",
     "  const sticky = options.hostMode ? ' dn-host-sticky-panel' : '';",
     "  const body = workspaces.length ? workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId, !options.hostMode, accentMap)).join('') : `<p>${escapeHtml(emptyHostWorkspaceText(options.focus))}</p>`;",
     "  return `<section class=\"dn-panel dn-host-panel${sticky}\" id=\"host-workspaces\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>${escapeHtml(hostWorkspaceTitle(options.focus))}</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${body}</div></section>`;",
@@ -659,12 +692,16 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId = '', highlightCurrent = true, accentMap = null) {",
     "  const current = highlightCurrent && workspace.current ? 'current' : (workspace.registered ? 'registered' : 'local');",
-    "  const status = workspace.error ? 'unavailable' : workspaceToneLabel(workspace);",
-    "  const detail = formatDisplayText(workspace.summary);",
+    "  const status = workspace.loading ? 'loading' : (workspace.error ? 'unavailable' : workspaceToneLabel(workspace));",
+    "  const detail = workspace.loading ? 'Loading workspace signals.' : formatDisplayText(workspace.summary);",
     "  const title = workspace.current && snapshot ? snapshot.project.name : workspace.name;",
-    "  const meta = [`${workspace.componentCount} components`, `${workspace.needsDecisionCount} active HITL`, `${workspace.threadCount} active`, `${workspace.pluginCount} plugins`];",
+    "  const meta = workspace.loading ? [`${workspace.componentCount} components`, 'signals loading', `${workspace.pluginCount} plugins`] : [`${workspace.componentCount} components`, `${workspace.needsDecisionCount} active HITL`, `${workspace.threadCount} active`, `${workspace.pluginCount} plugins`];",
     "  const selected = workspace.id === selectedWorkspaceId || (highlightCurrent && !selectedWorkspaceId && workspace.current) ? 'selected' : '';",
     "  return `<button class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)} ${selected}\" style=\"${projectAccentStyle(workspace.id, accentMap)}\" type=\"button\" data-workspace-id=\"${escapeHtml(workspace.id)}\" aria-label=\"Open ${escapeHtml(title)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></button>`;",
+    "}",
+    "",
+    "function renderInlineLoading(label) {",
+    "  return `<p class=\"dn-inline-loading\">${escapeHtml(label)}</p>`;",
     "}",
     "",
     "function workspaceToneLabel(workspace) {",
@@ -1885,11 +1922,11 @@ async function routeDashboardRequest(
       return;
     }
     if (url.pathname === "/api/projects") {
-      const host = await buildDashboardHostForRequest(
+      const host = await buildDashboardProjectIndexForRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      sendJson(response, { projects: host.workspaces });
+      sendJson(response, { host, projects: host.workspaces });
       return;
     }
     response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
@@ -2069,7 +2106,7 @@ async function resolveDashboardWorkspaceSelection(
     };
   }
 
-  const baseHost = await buildNexusDashboardHostSnapshot(snapshotOptions);
+  const baseHost = await buildNexusDashboardHostProjectIndex(snapshotOptions);
   const matches = baseHost.workspaces.filter((workspace) =>
     workspace.id === workspaceId
   );
@@ -2110,6 +2147,27 @@ async function buildDashboardHostForRequest(
     workspaceId,
   );
   const selectedHost = await buildNexusDashboardHostSnapshot(
+    selection.snapshotOptions,
+  );
+  if (!selection.baseHost) {
+    return selectedHost;
+  }
+
+  return mergeDashboardHostSnapshots(selectedHost, selection.baseHost);
+}
+
+async function buildDashboardProjectIndexForRequest(
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  workspaceId: string | null,
+): Promise<NexusDashboardHostSnapshot> {
+  if (!workspaceId) {
+    return buildNexusDashboardHostProjectIndex(snapshotOptions);
+  }
+  const selection = await resolveDashboardWorkspaceSelection(
+    snapshotOptions,
+    workspaceId,
+  );
+  const selectedHost = await buildNexusDashboardHostProjectIndex(
     selection.snapshotOptions,
   );
   if (!selection.baseHost) {

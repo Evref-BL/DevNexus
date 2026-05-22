@@ -1934,6 +1934,128 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves a host project shell without probing workspace Git state", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-project-shell-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-project-shell-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "project-shell",
+      name: "Project Shell",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      gitRunner: () => {
+        throw new Error("project shell must not run Git");
+      },
+      now: fixedClock("2026-05-21T10:24:00.000Z"),
+    });
+
+    try {
+      const response = await fetch(`${server.url}api/projects`);
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.host).toMatchObject({
+        version: 1,
+        workspaceCount: 1,
+        partial: true,
+      });
+      expect(payload.projects).toEqual([
+        expect.objectContaining({
+          id: "project-shell",
+          name: "Project Shell",
+          root: registeredRoot,
+          loading: true,
+          componentCount: 1,
+        }),
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("resolves selected workspace dashboard data without probing unrelated workspaces", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-selected-shell-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-selected-registered-");
+    const currentRoot = makeTempDir("dev-nexus-dashboard-selected-current-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "selected-registered",
+      name: "Selected Registered",
+    });
+    const currentConfig = projectConfig({
+      id: "selected-current",
+      name: "Selected Current",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveProjectConfig(currentRoot, currentConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const baseGitRunner = fakeGitRunner();
+    const server = await startNexusDashboardServer({
+      projectRoot: currentRoot,
+      homePath,
+      gitRunner: (args, cwd) => {
+        if (cwd?.startsWith(registeredRoot)) {
+          throw new Error("selected workspace lookup must not probe registered Git");
+        }
+        return baseGitRunner(args, cwd);
+      },
+      now: fixedClock("2026-05-21T10:24:30.000Z"),
+    });
+
+    try {
+      const response = await fetch(
+        `${server.url}api/dashboard?workspace=selected-current`,
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.project).toMatchObject({
+        id: "selected-current",
+        root: currentRoot,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves host cockpit data without a current workspace root", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");

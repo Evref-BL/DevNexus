@@ -653,6 +653,7 @@ export interface NexusDashboardHostWorkspaceRecord {
   root: string;
   registered: boolean;
   current: boolean;
+  loading?: boolean;
   generatedAt: string | null;
   summary: string;
   tone: NexusDashboardSignalTone;
@@ -712,6 +713,7 @@ export interface NexusDashboardHostSnapshot {
   selectedWorkspaceId: string | null;
   workspaceCount: number;
   needsAttentionCount: number;
+  partial?: boolean;
   actionQueue: NexusDashboardHostActionItem[];
   workspaces: NexusDashboardHostWorkspaceRecord[];
 }
@@ -896,6 +898,61 @@ export async function buildNexusDashboardHostSnapshot(
       dashboardHostWorkspaceNeedsAttention(workspace),
     ).length,
     actionQueue,
+    workspaces,
+  };
+}
+
+export async function buildNexusDashboardHostProjectIndex(
+  options: BuildNexusDashboardHostSnapshotOptions = {},
+): Promise<NexusDashboardHostSnapshot> {
+  const generatedAt = isoString(options.now?.() ?? new Date());
+  const homePath = path.resolve(options.homePath ?? defaultNexusHomePath());
+  const home = capture(() =>
+    loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
+  );
+  const currentProjectRoot =
+    options.currentProjectRoot !== undefined
+      ? options.currentProjectRoot
+        ? path.resolve(
+            nonEmptyString(options.currentProjectRoot, "currentProjectRoot"),
+          )
+        : null
+      : options.projectRoot
+        ? path.resolve(nonEmptyString(options.projectRoot, "projectRoot"))
+        : null;
+  const workspaceReferences = dashboardHostWorkspaceReferences(
+    home.value,
+    currentProjectRoot,
+  );
+  const workspaces = workspaceReferences.map((workspace) =>
+    dashboardHostWorkspaceShellRecord({
+      generatedAt,
+      reference: workspace.reference,
+      registered: workspace.registered,
+      current: workspace.current,
+    }),
+  );
+  const selectedWorkspace = selectedDashboardHostWorkspace(workspaces);
+
+  return {
+    version: 1,
+    contract: nexusDashboardEmbeddingContract({
+      scope: "host",
+      selectedWorkspaceId: selectedWorkspace?.id ?? null,
+      selectedWorkspaceRoot: selectedWorkspace?.root ?? null,
+      hostMode: true,
+    }),
+    generatedAt,
+    homePath,
+    homeError: home.error,
+    currentProjectRoot,
+    selectedWorkspaceId: selectedWorkspace?.id ?? null,
+    workspaceCount: workspaces.length,
+    needsAttentionCount: workspaces.filter((workspace) =>
+      dashboardHostWorkspaceNeedsAttention(workspace),
+    ).length,
+    partial: true,
+    actionQueue: [],
     workspaces,
   };
 }
@@ -1218,6 +1275,79 @@ async function dashboardHostWorkspaceRecord(options: {
     firstReadyWorkSelectionId: firstReadyWorkSelectionId(eligibleWork.value),
     firstReadyWorkProviderAction: firstReadyWorkProviderAction(eligibleWork.value, dashboardProviderUrls(value.projectConfig, value.componentSummaries)),
     updatedAt,
+    error: null,
+  };
+}
+
+function dashboardHostWorkspaceShellRecord(options: {
+  generatedAt: string;
+  reference: NexusProjectReference;
+  registered: boolean;
+  current: boolean;
+}): NexusDashboardHostWorkspaceRecord {
+  const root = path.resolve(options.reference.projectRoot);
+  const localFacts = capture(() => {
+    const projectConfig = loadProjectConfig(root);
+    const components = resolveProjectComponents(root, projectConfig);
+    return {
+      projectConfig,
+      components,
+    };
+  });
+
+  if (!localFacts.value) {
+    return {
+      id: options.reference.id,
+      name: options.reference.name,
+      root,
+      registered: options.registered,
+      current: options.current,
+      loading: false,
+      generatedAt: null,
+      summary: localFacts.error?.message ?? "Workspace project record is unavailable.",
+      tone: "danger",
+      componentCount: 0,
+      dirtyComponentCount: 0,
+      threadCount: 0,
+      needsDecisionCount: 0,
+      staleThreadCount: 0,
+      approvalCount: 0,
+      blockerCount: 0,
+      pluginCount: 0,
+      automationStatus: null,
+      eligibleWorkCount: null,
+      firstReadyWorkSelectionId: null,
+      firstReadyWorkProviderAction: null,
+      updatedAt: null,
+      error: localFacts.error,
+    };
+  }
+
+  return {
+    id: localFacts.value.projectConfig.id,
+    name: localFacts.value.projectConfig.name,
+    root,
+    registered: options.registered,
+    current: options.current,
+    loading: true,
+    generatedAt: options.generatedAt,
+    summary: "Loading workspace signals.",
+    tone: "neutral",
+    componentCount: localFacts.value.components.length,
+    dirtyComponentCount: 0,
+    threadCount: 0,
+    needsDecisionCount: 0,
+    staleThreadCount: 0,
+    approvalCount: 0,
+    blockerCount: 0,
+    pluginCount: (localFacts.value.projectConfig.plugins ?? []).filter(
+      (plugin) => plugin.enabled !== false,
+    ).length,
+    automationStatus: null,
+    eligibleWorkCount: null,
+    firstReadyWorkSelectionId: null,
+    firstReadyWorkProviderAction: null,
+    updatedAt: null,
     error: null,
   };
 }
