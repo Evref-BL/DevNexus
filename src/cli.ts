@@ -10,6 +10,7 @@ import {
   writeLine,
   type TextWriter,
 } from "./cliSupport.js";
+import { handleHostCommand } from "./cliHostCommand.js";
 import { handlePublicationCommand } from "./cliPublicationCommand.js";
 import {
   parseQuickFixPlanCommand,
@@ -154,12 +155,6 @@ import {
   planNexusSshExecution,
   type NexusSshExecutionPlan,
 } from "./nexusSshExecutionPlan.js";
-import {
-  checkNexusHostCapabilities,
-  type NexusHostCheckMode,
-  type NexusHostCheckMockFacts,
-  type NexusHostCheckResult,
-} from "./nexusHostCheck.js";
 import {
   buildNexusCleanupPlan,
   type NexusCleanupPlan,
@@ -978,14 +973,6 @@ interface ParsedAutomationCurrentAgentRecordCommand {
   projectRoot: string;
   runId: string;
   result: NexusAutomationCurrentAgentAdoptionResultInput;
-  json?: boolean;
-}
-
-interface ParsedHostCheckCommand {
-  projectRoot: string;
-  hostId?: string;
-  mode: NexusHostCheckMode;
-  mockFacts?: NexusHostCheckMockFacts;
   json?: boolean;
 }
 
@@ -2239,27 +2226,6 @@ async function handleDiagnosticsCommand(
   }
 
   throw new Error("diagnostics requires cli-version-skew");
-}
-
-async function handleHostCommand(
-  argv: string[],
-  dependencies: DevNexusCliDependencies,
-): Promise<number> {
-  if (argv[1] === "check") {
-    const parsed = parseHostCheckCommand(argv);
-    const result = checkNexusHostCapabilities({
-      projectRoot: parsed.projectRoot,
-      hostId: parsed.hostId,
-      mode: parsed.mode,
-      mockFacts: parsed.mockFacts,
-      commandRunner: dependencies.commandRunner,
-      now: dependencies.now,
-    });
-    printHostCheckResult(result, parsed, dependencies.stdout ?? process.stdout);
-    return 0;
-  }
-
-  throw new Error("host requires check");
 }
 
 async function handleCoordinationCommand(
@@ -5073,51 +5039,6 @@ function parseCoordinationRequestCommand(
   }
 
   return parsed as ParsedCoordinationRequestCommand;
-}
-
-function parseHostCheckCommand(argv: string[]): ParsedHostCheckCommand {
-  const [, , projectRoot, ...rest] = argv;
-  if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("host check requires a workspace root");
-  }
-
-  const parsed: ParsedHostCheckCommand = {
-    projectRoot,
-    mode: "local",
-  };
-  for (let index = 0; index < rest.length; index += 1) {
-    const arg = rest[index]!;
-    const next = (): string => {
-      index += 1;
-      if (index >= rest.length) {
-        throw new Error(`${arg} requires a value`);
-      }
-
-      return rest[index]!;
-    };
-
-    switch (arg) {
-      case "--host":
-        parsed.hostId = next();
-        break;
-      case "--mock-remote":
-        parsed.mode = "mock-remote";
-        break;
-      case "--mock-facts":
-        parsed.mode = "mock-remote";
-        parsed.mockFacts = JSON.parse(
-          fs.readFileSync(next(), "utf8").replace(/^\uFEFF/u, ""),
-        ) as NexusHostCheckMockFacts;
-        break;
-      case "--json":
-        parsed.json = true;
-        break;
-      default:
-        throw new Error(`Unknown host check option: ${arg}`);
-    }
-  }
-
-  return parsed;
 }
 
 function parseRemoteExecutionRequestCreateCommand(
@@ -8209,34 +8130,6 @@ function printRemoteExecutionRequestCreateResult(
   writeLine(stdout, `  Status: ${request.status}`);
   writeLine(stdout, `  Runner profile: ${request.runnerProfileId}`);
   writeLine(stdout, `  Command profile: ${request.commandProfileId}`);
-}
-
-function printHostCheckResult(
-  result: NexusHostCheckResult,
-  parsed: ParsedHostCheckCommand,
-  stdout: TextWriter,
-): void {
-  const payload = { ok: true, result };
-  if (parsed.json) {
-    writeJson(stdout, payload);
-    return;
-  }
-
-  writeLine(stdout, `DevNexus host check: ${result.status}.`);
-  writeLine(stdout, `  Host: ${result.target.hostId} (${result.target.mode})`);
-  writeLine(stdout, `  Platform: ${result.platform.tag}`);
-  writeLine(stdout, `  Shell: ${result.shellKind}`);
-  writeLine(
-    stdout,
-    `  Capabilities: ${result.configuredCapabilities.join(",") || "none"}`,
-  );
-  writeLine(stdout, `  MCP: ${result.mcp.status} ${result.mcp.serverNames.join(",") || "none"}`);
-  for (const check of result.commandChecks) {
-    writeLine(stdout, `  ${check.id}: ${check.status}`);
-  }
-  for (const action of result.nextActions) {
-    writeLine(stdout, `  Next: ${action}`);
-  }
 }
 
 function printRemoteExecutionResultRecordResult(
