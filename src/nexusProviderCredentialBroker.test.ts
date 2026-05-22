@@ -534,6 +534,39 @@ describe("provider credential broker", () => {
     );
   });
 
+  it("reports refresh-required GitHub App user token helper output distinctly", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          status: "refresh_required",
+          login: "Gabriel-Darbord",
+        }),
+        stderr: "",
+      }),
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+      }),
+      "refresh_required",
+    );
+  });
+
   it("mints and caches GitHub App installation tokens with repository and permission metadata", async () => {
     const privateKey = testPrivateKey();
     const calls: Array<{

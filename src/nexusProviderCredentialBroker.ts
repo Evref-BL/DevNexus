@@ -23,6 +23,7 @@ export type NexusProviderCredentialErrorCode =
   | "expired_credential"
   | "unsupported_purpose"
   | "async_required"
+  | "refresh_required"
   | "installation_not_found"
   | "repository_not_selected"
   | "missing_permission"
@@ -1147,6 +1148,7 @@ function parseCommandTokenJson(
   }
 
   const record = value as Record<string, unknown>;
+  assertCommandTokenJsonIsUsable(record, profile);
   const token =
     optionalString(record.token) ??
     optionalString(record.accessToken) ??
@@ -1169,6 +1171,25 @@ function parseCommandTokenJson(
     ...parseScopes(record.scopes),
     ...parsePermissions(record.permissions),
   };
+}
+
+function assertCommandTokenJsonIsUsable(
+  record: Record<string, unknown>,
+  profile: NexusHostingAuthProfileConfig,
+): void {
+  const status = optionalString(record.status) ?? optionalString(record.code);
+  if (
+    record.refreshRequired === true ||
+    record.refresh_required === true ||
+    status === "refresh_required" ||
+    status === "refresh_needed"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "refresh_required",
+      `Credential command for profile ${profile.id} reported that user authorization must be refreshed.`,
+      { profileId: profile.id },
+    );
+  }
 }
 
 function parseEnvironmentOutput(output: string): Record<string, string> {
