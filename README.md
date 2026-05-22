@@ -41,8 +41,11 @@ dev-nexus diagnostics cli-version-skew --json
   folder. One DevNexus workspace can have many components.
 - A **provider** is an external tool or service DevNexus can reference, such as
   GitHub, GitLab, Jira, Codex, or Claude.
-- A **work item** is a task or issue owned by a component. Work items can live
-  in DevNexus' local tracker or in providers such as GitHub, GitLab, or Jira.
+- A **work item** is the neutral tracker record owned by a component. It can
+  represent a task, bug, story, Product Backlog Item, epic, initiative, or
+  impediment, depending on the component's tracker conventions. Work items can
+  live in DevNexus' local tracker or in providers such as GitHub, GitLab, or
+  Jira.
 - The **DevNexus home** is user-local state, normally `~/.dev-nexus`. Most
   users do not need to choose or manage it.
 - **Agent files** are generated files such as `AGENTS.md`, skills, context, and

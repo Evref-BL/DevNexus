@@ -332,6 +332,9 @@ describe("nexus skills", () => {
       "separate initiative",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
+      "independently reviewable vertical progress",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
       "do not force all work into a programming model",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
@@ -357,6 +360,18 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "routing map for substantial led work",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Sizing And Routing Call",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "largest coherent vertical slice",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Product Backlog Item or story",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Estimate the shape of the work",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "recommended next action",
@@ -402,6 +417,9 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
       "selected delivery topology",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "bounded vertical slices",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
       "human-in-the-loop gates",
@@ -522,6 +540,9 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["to-issues"]).toContain(
       "Product Requirements Document (PRD)",
+    );
+    expect(skillMarkdown["to-issues"]).toContain(
+      "Split the work into vertical slices",
     );
     expect(skillMarkdown["to-issues"]).toContain("human-in-the-loop (HITL)");
     expect(skillMarkdown["to-issues"]).toContain(
