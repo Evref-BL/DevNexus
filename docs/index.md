@@ -35,6 +35,9 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [Initiative delivery topology PRD](dev/initiative-delivery-topology-prd.md)
+  describes the planned long-running initiative, stacked review, and
+  integration-branch workflow.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the
   current Codex and Claude plugin exposure, runtime, distribution, and uninstall
   decisions.

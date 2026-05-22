@@ -4052,6 +4052,26 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
             selectorLabels: component.publicationTrain.selector.labels,
             requiresPublicLabel:
               component.publicationTrain.selector.requiresPublicLabel,
+            initiativeDelivery: component.publicationTrain.initiativeDelivery
+              ? {
+                  enabled: component.publicationTrain.initiativeDelivery.enabled,
+                  activeScopeId:
+                    component.publicationTrain.initiativeDelivery.activeScopeId,
+                  topology:
+                    component.publicationTrain.initiativeDelivery.defaultTopology,
+                  integrationBranch:
+                    component.publicationTrain.initiativeDelivery.branchPlan
+                      .integrationBranch,
+                  sliceBranchPattern:
+                    component.publicationTrain.initiativeDelivery.branchPlan
+                      .sliceBranchPattern,
+                  finalPublicationTarget:
+                    component.publicationTrain.initiativeDelivery.branchPlan
+                      .finalPublicationTarget,
+                  providerNoise:
+                    component.publicationTrain.initiativeDelivery.providerNoise,
+                }
+              : null,
             warningCount: component.publicationTrain.warnings.length,
             warnings: summaryItems(component.publicationTrain.warnings),
           }

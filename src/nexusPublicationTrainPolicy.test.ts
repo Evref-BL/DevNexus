@@ -52,6 +52,20 @@ describe("publication train policy", () => {
         integrationBranch: "integration/0.2.0",
         candidateBranch: "candidate/0.2.0",
       },
+      initiativeDelivery: {
+        enabled: true,
+        activeScopeId: "initiative-a",
+        branchSlug: "initiative-a",
+        defaultTopology: "hybrid",
+        defaultIntentPrefix: "feat",
+        providerNoise: "status_only",
+        branchPlan: {
+          integrationBranch: "feat/initiative-a",
+          sliceBranchPattern: "feat/initiative-a/{slice}",
+          defaultSliceBaseBranch: "feat/initiative-a",
+          finalPublicationTarget: "main",
+        },
+      },
       selector: {
         statuses: ["ready"],
         labels: [],
@@ -116,6 +130,14 @@ function projectConfig(
             integrationPrefix: "integration",
             candidatePrefix: "candidate",
             unscopedName: "manual",
+          },
+          initiativeDelivery: {
+            enabled: true,
+            activeInitiativeId: "initiative-a",
+            defaultTopology: "hybrid",
+            branchNaming: {
+              defaultIntentPrefix: "feat",
+            },
           },
           ciTiers: {
             enabled: true,

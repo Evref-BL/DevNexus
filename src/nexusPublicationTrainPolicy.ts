@@ -7,6 +7,10 @@ import {
   mergeNexusCiTierPolicy,
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
+import {
+  summarizeNexusInitiativeDeliveryPolicy,
+  type NexusInitiativeDeliveryPolicySummary,
+} from "./nexusInitiativeDeliveryPolicy.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
@@ -47,6 +51,7 @@ export interface NexusPublicationTrainPolicySummary {
   objective: string | null;
   targetBranch: string;
   branches: NexusPublicationTrainBranchPolicySummary;
+  initiativeDelivery: NexusInitiativeDeliveryPolicySummary | null;
   selector: NexusPublicationTrainSelectorPolicySummary;
   ciTiers: NexusPublicationTrainCiTierPolicySummary;
   warnings: string[];
@@ -120,6 +125,14 @@ export function summarizeNexusPublicationTrainPolicy(options: {
         train.branchNaming.unscopedName,
       ),
     },
+    initiativeDelivery: train.initiativeDelivery
+      ? summarizeNexusInitiativeDeliveryPolicy({
+          config: train.initiativeDelivery,
+          fallbackScopeId: activeVersionId,
+          unscopedName: train.branchNaming.unscopedName,
+          targetBranch,
+        })
+      : null,
     selector: {
       statuses: [...train.selector.statuses],
       labels: [...train.selector.labels],

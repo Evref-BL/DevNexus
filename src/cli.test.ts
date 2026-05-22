@@ -6788,6 +6788,14 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
+            initiativeDelivery: {
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+              },
+            },
             ciTiers: defaultNexusPublicationTrainCiTierPolicy,
             selector: {
               statuses: ["ready"],
@@ -6877,6 +6885,9 @@ describe("dev-nexus cli", () => {
     expect(textOutput.output()).toContain(
       "primary: active=v-next candidate=candidate/v-next integration=integration/v-next tier=remote_smoke",
     );
+    expect(textOutput.output()).toContain(
+      "Initiative delivery: topology=hybrid active=codex-goals integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+    );
     expect(textOutput.output()).toContain("Selector labels: none");
     expect(textOutput.output()).toContain("Version planning: 1 shown");
     expect(textOutput.output()).toContain(
@@ -6910,6 +6921,14 @@ describe("dev-nexus cli", () => {
               activeVersionId: "v-next",
               candidateBranch: "candidate/v-next",
               integrationBranch: "integration/v-next",
+              initiativeDelivery: {
+                activeScopeId: "codex-goals",
+                topology: "hybrid",
+                integrationBranch: "feat/codex-goals",
+                sliceBranchPattern: "feat/codex-goals/{slice}",
+                finalPublicationTarget: "main",
+                providerNoise: "status_only",
+              },
               ciTierDefault: "remote_smoke",
               selectorLabels: [],
               requiresPublicLabel: false,

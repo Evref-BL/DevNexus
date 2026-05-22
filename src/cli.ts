@@ -7609,6 +7609,12 @@ function printAutomationTargetReportResult(
         stdout,
         `    ${train.componentId}: active=${train.activeVersionId ?? "unscoped"} candidate=${train.branches.candidateBranch} integration=${train.branches.integrationBranch} tier=${train.ciTiers.defaultTier} budget=${formatPublicationTrainBudget(train)}`,
       );
+      if (train.initiativeDelivery) {
+        writeLine(
+          stdout,
+          `      Initiative delivery: topology=${train.initiativeDelivery.defaultTopology} active=${train.initiativeDelivery.activeScopeId} integration=${train.initiativeDelivery.branchPlan.integrationBranch ?? "none"} slices=${train.initiativeDelivery.branchPlan.sliceBranchPattern}`,
+        );
+      }
       if (train.selector.labels.length === 0) {
         writeLine(stdout, "      Selector labels: none");
       }
