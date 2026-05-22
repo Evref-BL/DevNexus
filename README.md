@@ -75,10 +75,10 @@ dev-nexus workspace init
 The init command uses `~/.dev-nexus` as the default home, uses or asks for the
 workspace root, asks what you are setting up, creates local work tracking by
 default, and generates agent files.
-Choose `project` for an existing Git repository or one-project setup; the primary
-component defaults to `.`. Choose `workspace` when one DevNexus root should
-coordinate several components; the primary component defaults to `components/<id>`
-unless you type another path.
+Choose `project` when the workspace root is also the primary component source
+root, usually an existing Git repository. You can still add related components.
+Choose `workspace` when a separate DevNexus root should coordinate components;
+the primary component defaults to `components/<id>` unless you type another path.
 See [Getting started](docs/user/getting-started.md) for what those choices mean.
 
 After init:

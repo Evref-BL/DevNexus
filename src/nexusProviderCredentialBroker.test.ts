@@ -1,4 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,6 +9,7 @@ import {
   resolveProviderCredential,
   type NexusProviderCredentialCommandRunner,
 } from "./nexusProviderCredentialBroker.js";
+import { writeNexusGitHubAppUserToken } from "./nexusGitHubAppUserAuth.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 
 function appProfile(
@@ -390,6 +393,171 @@ describe("provider credential broker", () => {
         args: ["--repo", "Evref-BL/DevNexus"],
       },
     ]);
+  });
+
+  it("resolves host-local GitHub App user tokens without a custom helper command", async () => {
+    const homePath = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-user-token-"));
+    fs.rmSync(homePath, { recursive: true, force: true });
+    writeNexusGitHubAppUserToken({
+      homePath,
+      profile: appProfile({
+        id: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "Gabriel-Darbord",
+        purposes: ["api", "git"],
+        githubApp: {
+          clientId: "Iv23client",
+          slug: "devnexus-automation",
+          installationAccount: "Evref-BL",
+          repositories: ["DevNexus"],
+        },
+      }),
+      token: {
+        accessToken: "ghu_access",
+        expiresAt: "2026-05-22T18:00:00.000Z",
+        refreshToken: "ghr_refresh",
+        refreshTokenExpiresAt: "2026-11-22T10:00:00.000Z",
+        login: "Gabriel-Darbord",
+        tokenType: "bearer",
+      },
+      now: () => new Date("2026-05-22T10:00:00.000Z"),
+    });
+    const broker = createHostAuthProfileCredentialBroker({
+      homePath,
+      now: "2026-05-22T12:00:00.000Z",
+      authProfiles: [
+        appProfile({
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          purposes: ["api", "git"],
+          githubApp: {
+            clientId: "Iv23client",
+            slug: "devnexus-automation",
+            installationAccount: "Evref-BL",
+            repositories: ["DevNexus"],
+          },
+        }),
+      ],
+    });
+
+    await expect(
+      resolveProviderCredential(broker, {
+        provider: "github",
+        purpose: "git",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+    ).resolves.toMatchObject({
+      kind: "github_app_user_token",
+      profileId: "gabriel-devnexus-app-user",
+      actorId: "gabriel",
+      providerIdentity: "Gabriel-Darbord",
+      authorizationHeader: "Bearer ghu_access",
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
+      },
+      secret: {
+        kind: "token",
+        value: "ghu_access",
+      },
+    });
+    fs.rmSync(homePath, { recursive: true, force: true });
+  });
+
+  it("refreshes expired stored GitHub App user tokens during async resolution", async () => {
+    const homePath = fs.mkdtempSync(path.join(os.tmpdir(), "dev-nexus-user-token-refresh-"));
+    fs.rmSync(homePath, { recursive: true, force: true });
+    const profile = appProfile({
+      id: "gabriel-devnexus-app-user",
+      actorId: "gabriel",
+      kind: "human",
+      credentialKind: "github_app_user_token",
+      account: "Gabriel-Darbord",
+      purposes: ["api", "git"],
+      githubApp: {
+        clientId: "Iv23client",
+        slug: "devnexus-automation",
+        installationAccount: "Evref-BL",
+        repositories: ["DevNexus"],
+      },
+    });
+    writeNexusGitHubAppUserToken({
+      homePath,
+      profile,
+      token: {
+        accessToken: "ghu_old",
+        expiresAt: "2026-05-22T09:00:00.000Z",
+        refreshToken: "ghr_refresh",
+        refreshTokenExpiresAt: "2026-11-22T10:00:00.000Z",
+        login: "Gabriel-Darbord",
+        tokenType: "bearer",
+      },
+      now: () => new Date("2026-05-22T08:00:00.000Z"),
+    });
+    const requests: Array<{ url: string; body: string }> = [];
+    const broker = createHostAuthProfileCredentialBroker({
+      homePath,
+      now: "2026-05-22T10:00:00.000Z",
+      authProfiles: [profile],
+      fetch: (async (input, init) => {
+        requests.push({
+          url: String(input),
+          body: String(init?.body ?? ""),
+        });
+        return new Response(
+          JSON.stringify({
+            access_token: "ghu_new",
+            expires_in: 28800,
+            refresh_token: "ghr_new",
+            refresh_token_expires_in: 15897600,
+            token_type: "bearer",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }) as typeof fetch,
+    });
+
+    await expect(
+      resolveProviderCredential(broker, {
+        provider: "github",
+        purpose: "api",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+      }),
+    ).resolves.toMatchObject({
+      authorizationHeader: "Bearer ghu_new",
+      secret: {
+        value: "ghu_new",
+      },
+    });
+    expect(requests).toEqual([
+      {
+        url: "https://github.com/login/oauth/access_token",
+        body: "client_id=Iv23client&grant_type=refresh_token&refresh_token=ghr_refresh",
+      },
+    ]);
+    fs.rmSync(homePath, { recursive: true, force: true });
   });
 
   it("checks command-backed GitHub App user token permission metadata", () => {

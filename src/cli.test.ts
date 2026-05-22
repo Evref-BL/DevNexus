@@ -358,6 +358,15 @@ function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
   };
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -376,6 +385,7 @@ describe("dev-nexus cli", () => {
     await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
 
     expect(output.output()).toContain("dev-nexus home init");
+    expect(output.output()).toContain("dev-nexus auth github-app user login");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus workspace status");
     expect(output.output()).toContain("dev-nexus workspace init");
@@ -401,6 +411,147 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation run-once");
     expect(output.output()).toContain("dev-nexus automation schedule");
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
+  });
+
+  it("logs in, reports status, and logs out of GitHub App user auth", async () => {
+    const homePath = makeTempDir("dev-nexus-home-");
+    saveHomeConfig(homePath, [
+      {
+        id: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        provider: "github",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "Gabriel-Darbord",
+        host: "github.com",
+        purposes: ["api", "git"],
+        githubApp: {
+          clientId: "Iv23client",
+          slug: "devnexus-automation",
+          installationAccount: "Evref-BL",
+          repositories: ["DevNexus"],
+        },
+      },
+    ]);
+    const requests: Array<{ url: string; method: string; authorization: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init = {}) => {
+      const url = String(input);
+      requests.push({
+        url,
+        method: init.method ?? "GET",
+        authorization: new Headers(init.headers).get("authorization"),
+      });
+      if (url === "https://github.com/login/device/code") {
+        return jsonResponse({
+          device_code: "device-code",
+          user_code: "WDJB-MJHT",
+          verification_uri: "https://github.com/login/device",
+          expires_in: 900,
+          interval: 5,
+        });
+      }
+      if (url === "https://github.com/login/oauth/access_token") {
+        return jsonResponse({
+          access_token: "ghu_access",
+          expires_in: 28800,
+          refresh_token: "ghr_refresh",
+          refresh_token_expires_in: 15897600,
+          token_type: "bearer",
+        });
+      }
+      if (url === "https://api.github.com/user") {
+        return jsonResponse({
+          login: "Gabriel-Darbord",
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    const loginOutput = captureOutput();
+
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "login",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        {
+          stdout: loginOutput.writer,
+          fetch: fetchImpl,
+          now: fixedClock("2026-05-22T10:00:00.000Z"),
+          sleep: async () => undefined,
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(loginOutput.output())).toMatchObject({
+      ok: true,
+      result: {
+        profileId: "gabriel-devnexus-app-user",
+        login: "Gabriel-Darbord",
+        userCode: "WDJB-MJHT",
+        status: {
+          state: "authorized",
+        },
+      },
+    });
+    expect(requests).toHaveLength(3);
+
+    const statusOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "status",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        {
+          stdout: statusOutput.writer,
+          now: fixedClock("2026-05-22T11:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(statusOutput.output())).toMatchObject({
+      ok: true,
+      status: {
+        state: "authorized",
+        login: "Gabriel-Darbord",
+      },
+    });
+
+    const logoutOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "logout",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        { stdout: logoutOutput.writer },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(logoutOutput.output())).toMatchObject({
+      ok: true,
+      removed: true,
+    });
   });
 
   it("prints focused workspace init help", async () => {
