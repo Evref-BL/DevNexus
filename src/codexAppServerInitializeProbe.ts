@@ -331,6 +331,24 @@ function capabilityStatuses(
   return [
     ...required,
     status(
+      "thread_goal_set",
+      false,
+      capabilities.threadGoalSet.available,
+      capabilities.threadGoalSet.method,
+    ),
+    status(
+      "thread_goal_get",
+      false,
+      capabilities.threadGoalGet.available,
+      capabilities.threadGoalGet.method,
+    ),
+    status(
+      "thread_goal_clear",
+      false,
+      capabilities.threadGoalClear.available,
+      capabilities.threadGoalClear.method,
+    ),
+    status(
       "mcp_status",
       false,
       capabilities.mcp.statusList.available,

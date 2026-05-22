@@ -51,6 +51,9 @@ describe("Codex app-server capability adapter", () => {
       "turn/start",
       "turn/interrupt",
       "thread/read",
+      "thread/goal/set",
+      "thread/goal/get",
+      "thread/goal/clear",
       "plugin/list",
     ]);
     const client = new CodexAppServerJsonRpcClient({ transport });
@@ -60,6 +63,9 @@ describe("Codex app-server capability adapter", () => {
     expect(adapter.advertisedMethods).toEqual([
       "plugin/list",
       "thread/fork",
+      "thread/goal/clear",
+      "thread/goal/get",
+      "thread/goal/set",
       "thread/read",
       "thread/start",
       "turn/interrupt",
@@ -73,6 +79,9 @@ describe("Codex app-server capability adapter", () => {
       available: true,
       method: "thread/read",
     });
+    expect(adapter.capabilities.threadGoalSet.available).toBe(true);
+    expect(adapter.capabilities.threadGoalGet.available).toBe(true);
+    expect(adapter.capabilities.threadGoalClear.available).toBe(true);
     expect(transport.requests.map((request) => request.method)).toEqual([
       "initialize",
     ]);
@@ -120,7 +129,19 @@ describe("Codex app-server capability adapter", () => {
     ).rejects.toThrow(
       "Codex app-server is missing required JSON-RPC capabilities: thread/fork, turn/interrupt, thread/read or thread/list",
     );
+    try {
+      await initializeCodexAppServerCapabilityAdapter({ client });
+    } catch (error) {
+      expect(error).toMatchObject({
+        missingCapabilities: [
+          "thread/fork",
+          "turn/interrupt",
+          "thread/read or thread/list",
+        ],
+      });
+    }
     expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
       "initialize",
       "initialize",
     ]);
