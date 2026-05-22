@@ -166,6 +166,43 @@ describe("agent-client adapter wrapper", () => {
     ]);
   });
 
+  it("routes doctor to setup check so adapter readiness appears in output", () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-wrapper-doctor-");
+    const sourceRoot = makeTempDir("dev-nexus-agent-wrapper-doctor-source-");
+    const sourceCliPath = writeSourceRuntime(sourceRoot);
+    writeProject(projectRoot);
+
+    const plan = planNexusAgentClientAdapterCommand({
+      client: "claude",
+      entrypoint: "doctor",
+      projectRoot,
+      sourceRoot,
+      sourceCliPath,
+      commandRunner: (command, args, options) => ({
+        command,
+        args,
+        cwd: options.cwd,
+        stdout: command === "node" ? "v22.11.0\n" : "10.9.0\n",
+        stderr: "",
+        exitCode: 0,
+      }),
+      commandLocator: () => null,
+    });
+
+    expect(plan.invocation).toMatchObject({
+      command: "node",
+      args: [
+        sourceCliPath,
+        "setup",
+        "check",
+        projectRoot,
+        "join-existing-project",
+        "--json",
+      ],
+      mutationClass: "none",
+    });
+  });
+
   it("discovers the project root from MCP roots before the process cwd", () => {
     const projectRoot = makeTempDir("dev-nexus-agent-wrapper-root-");
     const childRoot = path.join(projectRoot, "packages", "demo");

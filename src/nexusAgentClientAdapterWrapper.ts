@@ -318,7 +318,13 @@ function adapterEntrypointArgs(options: {
       "--json",
     ];
   }
-  return ["diagnostics", "cli-version-skew", "--json"];
+  return [
+    "setup",
+    "check",
+    options.projectRoot,
+    options.setupFlowId ?? "join-existing-project",
+    "--json",
+  ];
 }
 
 function adapterAdvisoryPlan(

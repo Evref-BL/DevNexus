@@ -3,9 +3,17 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {
+  currentNexusCliScriptPath,
   resolveNexusProjectAgentMcpTargets,
   type MaterializedNexusAgentMcpTarget,
 } from "./nexusAgentMcpConfig.js";
+import {
+  planNexusAgentClientAdapterCommand,
+} from "./nexusAgentClientAdapterWrapper.js";
+import type {
+  NexusAgentClientRuntimeCommandLocator,
+  NexusAgentClientRuntimeCommandRunner,
+} from "./nexusAgentClientRuntimeResolver.js";
 import {
   buildNexusProjectAgentProjectionStatus,
   type NexusAgentProjectionPathStatus,
@@ -173,6 +181,19 @@ export interface RecordNexusSetupStepResult {
   state: NexusSetupState;
 }
 
+export interface NexusSetupAgentClientAdapterDiagnosticsOptions {
+  sourceRoot?: string | null;
+  sourceCliPath?: string | null;
+  projectLocalRuntimeRoot?: string | null;
+  pluginLocalRuntimeRoot?: string | null;
+  pluginDataRoot?: string | null;
+  manualGlobalCommand?: string | null;
+  env?: NodeJS.ProcessEnv;
+  commandRunner?: NexusAgentClientRuntimeCommandRunner;
+  commandLocator?: NexusAgentClientRuntimeCommandLocator;
+  fileExists?: (filePath: string) => boolean;
+}
+
 const setupFlows: NexusSetupFlowSummary[] = [
   {
     id: "github-workspace-repository",
@@ -233,6 +254,7 @@ export function buildNexusSetupCheck(options: {
   projectRoot: string;
   flowId: NexusSetupFlowId | string;
   platform?: NexusSetupPlatform | string;
+  agentClientAdapter?: false | NexusSetupAgentClientAdapterDiagnosticsOptions;
 }): NexusSetupCheck {
   const flow = setupFlow(options.flowId);
   const platform = normalizeSetupPlatform(options.platform);
@@ -292,7 +314,16 @@ export function buildNexusSetupCheck(options: {
   if (projectConfig) {
     checks.push(sharedHostRegistryHostLocalDetailsCheck(projectRoot));
     checks.push(...agentProjectionStatusChecks(projectRoot, projectConfig));
-    checks.push(...pluginProjectionChecks(projectRoot, projectConfig));
+    const pluginChecks = pluginProjectionChecks(projectRoot, projectConfig);
+    checks.push(...pluginChecks);
+    checks.push(...agentClientAdapterReadinessChecks({
+      projectRoot,
+      projectConfig,
+      agentMcpTargets,
+      platform: localPathPlatform,
+      pluginChecks,
+      diagnostics: options.agentClientAdapter,
+    }));
   }
 
   if (flow.id === "github-workspace-repository" && projectConfig) {
@@ -1207,6 +1238,210 @@ function pluginProjectionChecks(
     ...pluginProjectedSkillChecks(projectRoot, projectConfig),
     ...pluginMcpServerChecks(projectRoot, projectConfig),
   ];
+}
+
+function agentClientAdapterReadinessChecks(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  agentMcpTargets: readonly MaterializedNexusAgentMcpTarget[];
+  platform: NexusSetupPlatform;
+  pluginChecks: readonly NexusSetupCheckResult[];
+  diagnostics?: false | NexusSetupAgentClientAdapterDiagnosticsOptions;
+}): NexusSetupCheckResult[] {
+  if (options.diagnostics === false) {
+    return [];
+  }
+  if (options.diagnostics === undefined && !fs.existsSync(currentNexusCliScriptPath())) {
+    return [];
+  }
+
+  const diagnostics = options.diagnostics ?? {};
+  const seenAgents = new Set<string>();
+  return options.agentMcpTargets.flatMap((target) => {
+    const key = `${target.agent}\0${target.provider}`;
+    if (seenAgents.has(key)) {
+      return [];
+    }
+    seenAgents.add(key);
+    return [agentClientAdapterReadinessCheck({
+      ...options,
+      target,
+      diagnostics,
+    })];
+  });
+}
+
+function agentClientAdapterReadinessCheck(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  target: MaterializedNexusAgentMcpTarget;
+  platform: NexusSetupPlatform;
+  pluginChecks: readonly NexusSetupCheckResult[];
+  diagnostics: NexusSetupAgentClientAdapterDiagnosticsOptions;
+}): NexusSetupCheckResult {
+  const client = options.target.provider.trim().toLowerCase();
+  const checkBase = {
+    id: `agent-client-adapter-${setupCheckIdPart(options.target.agent)}`,
+    title: `${options.target.agent} agent-client adapter`,
+  };
+  const pluginSummary = agentClientPluginProjectionSummary({
+    projectConfig: options.projectConfig,
+    target: options.target,
+    pluginChecks: options.pluginChecks,
+  });
+
+  if (client !== "codex" && client !== "claude") {
+    return {
+      ...checkBase,
+      status: "warning",
+      summary:
+        `${options.target.provider} is not supported by DevNexus ` +
+        `agent-client adapter diagnostics yet; pluginProjection=${pluginSummary}.`,
+      nextAction:
+        `Use existing MCP setup checks for ${options.target.provider}, ` +
+        `or add adapter readiness support before shipping a ${options.target.provider} plugin.`,
+      details: {
+        agent: options.target.agent,
+        provider: options.target.provider,
+        supportedClients: ["codex", "claude"],
+      },
+    };
+  }
+
+  const sourceCliPath =
+    options.diagnostics.sourceCliPath !== undefined
+      ? options.diagnostics.sourceCliPath
+      : currentNexusCliScriptPath();
+  const sourceRoot =
+    options.diagnostics.sourceRoot !== undefined
+      ? options.diagnostics.sourceRoot
+      : sourceCliPath
+        ? path.dirname(path.dirname(sourceCliPath))
+        : null;
+  const plan = planNexusAgentClientAdapterCommand({
+    client,
+    entrypoint: "status",
+    projectRoot: options.projectRoot,
+    platform: options.platform,
+    sourceRoot,
+    sourceCliPath,
+    projectLocalRuntimeRoot: options.diagnostics.projectLocalRuntimeRoot,
+    pluginLocalRuntimeRoot: options.diagnostics.pluginLocalRuntimeRoot,
+    pluginDataRoot: options.diagnostics.pluginDataRoot,
+    manualGlobalCommand: options.diagnostics.manualGlobalCommand,
+    env: options.diagnostics.env,
+    commandRunner: options.diagnostics.commandRunner,
+    commandLocator: options.diagnostics.commandLocator ?? (() => null),
+    fileExists: options.diagnostics.fileExists,
+  });
+  const mcpCheck = agentMcpServerConfiguredCheck(options.target);
+  const mcpState = agentClientMcpState(mcpCheck, options.target);
+  const selected = plan.runtime.selected;
+  const runtimeMode = selected?.mode ?? "none";
+  const runtimeVersion = selected?.packageVersion ?? "unknown";
+  const commandLine = plan.invocation?.commandLine ?? "unavailable";
+  const status: NexusSetupCheckStatus = !plan.invocation
+    ? "blocked"
+    : mcpCheck.status === "passed"
+      ? plan.status === "warning" ? "warning" : "passed"
+      : "warning";
+
+  return {
+    ...checkBase,
+    status,
+    summary:
+      `${options.target.provider} adapter readiness: runtime=${runtimeMode}; ` +
+      `version=${runtimeVersion}; node=${plan.runtime.node.summary}; ` +
+      `npm=${plan.runtime.npm.summary}; mcp=${mcpState}; ` +
+      `pluginProjection=${pluginSummary}; command=${commandLine}.`,
+    nextAction: agentClientAdapterNextAction({ plan, mcpCheck }),
+    details: {
+      client,
+      runtimeStatus: plan.runtime.status,
+      selectedRuntimeMode: runtimeMode,
+      selectedRuntimeVersion: runtimeVersion,
+      mcpStatus: mcpCheck.status,
+      mcpSummary: mcpCheck.summary,
+      diagnostics: plan.diagnostics,
+      advisory: plan.advisory,
+    },
+  };
+}
+
+function agentClientMcpState(
+  mcpCheck: NexusSetupCheckResult,
+  target: MaterializedNexusAgentMcpTarget,
+): string {
+  if (target.configStatus === "unsupported") {
+    return "unsupported";
+  }
+  if (!fs.existsSync(target.configPath)) {
+    return "missing";
+  }
+  if (mcpCheck.status === "passed") {
+    return "ready";
+  }
+  if (mcpCheck.summary.includes("stale or unexpected")) {
+    return "stale";
+  }
+  return "warning";
+}
+
+function agentClientAdapterNextAction(options: {
+  plan: ReturnType<typeof planNexusAgentClientAdapterCommand>;
+  mcpCheck: NexusSetupCheckResult;
+}): string | null {
+  if (!options.plan.invocation) {
+    const packageOperation = options.plan.advisory.packageOperations[0];
+    if (packageOperation?.command) {
+      return `${packageOperation.summary} Approve and run: ${packageOperation.command}`;
+    }
+    return options.plan.diagnostics[0] ?? "Install or configure a DevNexus runtime.";
+  }
+
+  if (options.mcpCheck.status !== "passed") {
+    return options.mcpCheck.nextAction;
+  }
+
+  return null;
+}
+
+function agentClientPluginProjectionSummary(options: {
+  projectConfig: NexusProjectConfig;
+  target: MaterializedNexusAgentMcpTarget;
+  pluginChecks: readonly NexusSetupCheckResult[];
+}): string {
+  const skillCapabilities = pluginProjectedSkillCapabilities(options.projectConfig)
+    .filter(({ capability }) =>
+      capabilityTargetsAgent(capability.targetAgents, options.target));
+  const mcpCapabilities = pluginMcpServerCapabilities(options.projectConfig)
+    .filter(({ capability }) =>
+      capabilityTargetsAgent(capability.targetAgents, options.target));
+  const matchingCheckStatuses = options.pluginChecks
+    .filter((check) =>
+      check.id.endsWith(`-${setupCheckIdPart(options.target.agent)}`) ||
+      check.title.startsWith(`${options.target.agent} `))
+    .map((check) => check.status);
+  const nonPassedCount = matchingCheckStatuses
+    .filter((status) => status !== "passed")
+    .length;
+
+  return [
+    `skills:${skillCapabilities.length}`,
+    `mcp:${mcpCapabilities.length}`,
+    `nonPassed:${nonPassedCount}`,
+  ].join(",");
+}
+
+function capabilityTargetsAgent(
+  targetAgents: readonly string[] | undefined,
+  target: MaterializedNexusAgentMcpTarget,
+): boolean {
+  if (!targetAgents || targetAgents.length === 0) {
+    return true;
+  }
+  const agents = new Set(targetAgents);
+  return agents.has(target.agent) || agents.has(target.provider);
 }
 
 function agentProjectionStatusChecks(
