@@ -35,6 +35,9 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [PostgreSQL claim authority initiative](dev/postgresql-claim-authority.md)
+  tracks the long-lived design and slice plan for strong multi-host claim
+  coordination.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the
   current Codex and Claude plugin exposure, runtime, distribution, and uninstall
   decisions.
