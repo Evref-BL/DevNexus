@@ -26,6 +26,8 @@ diagnostics mode.
 
 ## Documentation
 
+- [Product model](product-model.md) defines the scope model, page order, and
+  vocabulary for the redesign.
 - [UX principles](ux-principles.md) records source-backed design constraints.
 - [Host cockpit](host-cockpit.md) describes the host-wide page.
 - [Workspace cockpit](workspace-cockpit.md) describes the workspace drill-down.
