@@ -6,6 +6,10 @@ import {
   materializeNexusProjectAgentMcpConfig,
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
+import {
+  resolveNexusMcpExposure,
+  type NexusResolvedMcpExposureMode,
+} from "./nexusMcpExposurePolicy.js";
 import type {
   NexusPluginMcpServerCapability,
   NexusPluginProjectedSkillCapability,
@@ -40,7 +44,12 @@ export interface RefreshNexusProjectPluginOptions {
 export interface NexusProjectPluginRefreshSkippedMcpServer {
   serverName: string;
   capabilityIds: string[];
-  reason: "missing_command" | "no_matching_targets";
+  reason:
+    | "missing_command"
+    | "no_matching_targets"
+    | "hidden_exposure"
+    | "gateway_pending";
+  exposureMode?: NexusResolvedMcpExposureMode;
 }
 
 export interface RefreshNexusProjectPluginResult {
@@ -102,6 +111,7 @@ interface PluginMcpServerProjection {
   command: string | null;
   args: string[];
   targetAgents: string[] | null;
+  exposure?: NexusPluginMcpServerCapability["exposure"];
   capabilityIds: string[];
 }
 
@@ -183,12 +193,22 @@ export async function refreshNexusProjectPlugin(
           });
           continue;
         }
+        const directTargets = directMcpTargetsForProjection(
+          nextConfig,
+          nextPlugin,
+          server,
+          matchingTargets,
+        );
+        if (directTargets.length === 0) {
+          skippedMcpServers.push(skipForExposure(server, nextConfig, nextPlugin, matchingTargets[0]!));
+          continue;
+        }
 
         mcpProjectionResults.push(
           materializeNexusProjectAgentMcpConfig({
             projectRoot,
             mcpConfig: nextConfig.mcp,
-            agentTargets: matchingTargets.map((target) => ({
+            agentTargets: directTargets.map((target) => ({
               ...target,
               serverName: server.serverName,
               command: server.command!,
@@ -208,12 +228,24 @@ export async function refreshNexusProjectPlugin(
         });
         continue;
       }
-      if (mcpTargetsForProjection(mcpTargets, server).length === 0) {
+      const matchingTargets = mcpTargetsForProjection(mcpTargets, server);
+      if (matchingTargets.length === 0) {
         skippedMcpServers.push({
           serverName: server.serverName,
           capabilityIds: server.capabilityIds,
           reason: "no_matching_targets",
         });
+        continue;
+      }
+      if (
+        directMcpTargetsForProjection(
+          nextConfig,
+          nextPlugin,
+          server,
+          matchingTargets,
+        ).length === 0
+      ) {
+        skippedMcpServers.push(skipForExposure(server, nextConfig, nextPlugin, matchingTargets[0]!));
       }
     }
   }
@@ -964,6 +996,7 @@ function pluginMcpServerProjections(
       command: null,
       args: [],
       targetAgents: null,
+      exposure: undefined,
       capabilityIds: [],
     };
     if (capability.command) {
@@ -983,6 +1016,16 @@ function pluginMcpServerProjections(
       existing.targetAgents,
       capability.targetAgents,
     );
+    if (
+      existing.exposure &&
+      capability.exposure &&
+      existing.exposure !== capability.exposure
+    ) {
+      throw new Error(
+        `Plugin MCP server ${capability.serverName} declares conflicting exposure modes`,
+      );
+    }
+    existing.exposure = existing.exposure ?? capability.exposure;
     existing.capabilityIds.push(capability.id);
     projections.set(capability.serverName, existing);
   }
@@ -1014,6 +1057,57 @@ function mcpTargetsForProjection(
     const provider = (target.provider ?? target.agent).trim().toLowerCase();
     return selected.size === 0 || selected.has(agent) || selected.has(provider);
   });
+}
+
+function directMcpTargetsForProjection(
+  config: NexusProjectConfig,
+  plugin: NexusProjectPluginConfig,
+  projection: PluginMcpServerProjection,
+  targets: readonly NexusProjectAgentMcpTarget[],
+): NexusProjectAgentMcpTarget[] {
+  return targets.filter(
+    (target) =>
+      resolveNexusMcpExposure({
+        workspaceExposure: config.mcp?.exposure,
+        agentTarget: target,
+        plugin,
+        server: projectionToMcpServerCapability(projection),
+      }).mode === "direct",
+  );
+}
+
+function skipForExposure(
+  projection: PluginMcpServerProjection,
+  config: NexusProjectConfig,
+  plugin: NexusProjectPluginConfig,
+  target: NexusProjectAgentMcpTarget,
+): NexusProjectPluginRefreshSkippedMcpServer {
+  const resolution = resolveNexusMcpExposure({
+    workspaceExposure: config.mcp?.exposure,
+    agentTarget: target,
+    plugin,
+    server: projectionToMcpServerCapability(projection),
+  });
+  return {
+    serverName: projection.serverName,
+    capabilityIds: projection.capabilityIds,
+    reason: resolution.mode === "gateway" ? "gateway_pending" : "hidden_exposure",
+    exposureMode: resolution.mode,
+  };
+}
+
+function projectionToMcpServerCapability(
+  projection: PluginMcpServerProjection,
+): NexusPluginMcpServerCapability {
+  return {
+    kind: "mcp_server",
+    id: projection.capabilityIds[0] ?? projection.serverName,
+    serverName: projection.serverName,
+    ...(projection.command ? { command: projection.command } : {}),
+    args: projection.args,
+    ...(projection.targetAgents ? { targetAgents: projection.targetAgents } : {}),
+    ...(projection.exposure ? { exposure: projection.exposure } : {}),
+  };
 }
 
 function normalizedSelection(values: readonly string[]): Set<string> {

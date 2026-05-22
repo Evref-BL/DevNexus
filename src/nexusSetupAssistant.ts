@@ -21,8 +21,17 @@ import {
   activeNexusProjectSkillAgentTargets,
   loadProjectConfig,
   projectConfigPath,
+  type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import {
+  resolveNexusMcpExposure,
+  type NexusMcpExposureResolution,
+} from "./nexusMcpExposurePolicy.js";
+import {
+  defaultNexusMcpGatewayServerName,
+  nexusMcpGatewayAgentTargets,
+} from "./nexusMcpGatewayProjection.js";
 import { findForbiddenSharedHostLocalDetails } from "./nexusHostRegistry.js";
 import {
   deriveNexusProjectHostingRepositoryName,
@@ -272,21 +281,31 @@ export function buildNexusSetupCheck(options: {
   }));
 
   const agentMcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const checkedAgentMcpConfigPaths = new Set<string>();
   for (const target of agentMcpTargets) {
-    checks.push(pathCheck({
-      id: `agent-mcp-config-${target.agent}`,
-      title: `${target.agent} MCP config`,
-      pathName: target.configPath,
-      passedSummary:
-        `${target.provider} MCP config exists for this workspace root: ${target.configPathRelative}.`,
-      blockedSummary:
-        `${target.provider} MCP config has not been projected or manually configured for this machine: ${target.configPathRelative}.`,
-      nextAction:
-        "Run dev-nexus workspace mcp refresh . after installing DevNexus.",
-      missingStatus: "warning",
-    }));
-    checks.push(agentMcpServerConfiguredCheck(target));
-    checks.push(...agentMcpCapabilityGapChecks(target));
+    const exposure = projectConfig
+      ? agentMcpTargetExposure(target)
+      : null;
+    if (
+      (!exposure || exposure.mode === "direct") &&
+      !checkedAgentMcpConfigPaths.has(target.configPath)
+    ) {
+      checkedAgentMcpConfigPaths.add(target.configPath);
+      checks.push(pathCheck({
+        id: `agent-mcp-config-${target.agent}`,
+        title: `${target.agent} MCP config`,
+        pathName: target.configPath,
+        passedSummary:
+          `${target.provider} MCP config exists for this workspace root: ${target.configPathRelative}.`,
+        blockedSummary:
+          `${target.provider} MCP config has not been projected or manually configured for this machine: ${target.configPathRelative}.`,
+        nextAction:
+          "Run dev-nexus workspace mcp refresh . after installing DevNexus.",
+        missingStatus: "warning",
+      }));
+      checks.push(...agentMcpCapabilityGapChecks(target));
+    }
+    checks.push(agentMcpServerConfiguredCheck(target, exposure ?? undefined));
   }
 
   if (projectConfig) {
@@ -364,7 +383,12 @@ export function buildNexusMcpRuntimeFreshnessChecks(options: {
   const projectRoot = path.resolve(options.projectRoot);
   const agentMcpTargets = setupAgentMcpTargets(projectRoot, options.projectConfig);
   const staticChecks = [
-    ...agentMcpTargets.map(agentMcpServerConfiguredCheck),
+    ...agentMcpTargets.map((target) =>
+      agentMcpServerConfiguredCheck(
+        target,
+        agentMcpTargetExposure(target),
+      )
+    ),
     ...pluginMcpServerChecks(projectRoot, options.projectConfig),
   ].filter((check) => check.summary.includes("stale or unexpected"));
   const liveProcesses = options.liveProcesses === false
@@ -1132,11 +1156,21 @@ function setupAgentMcpTargets(
     return [];
   }
 
+  const agentTargets = projectConfig
+    ? activeNexusProjectMcpAgentTargets(projectConfig)
+    : undefined;
+  const gatewayTargets = projectConfig && agentTargets
+    ? nexusMcpGatewayAgentTargets({
+        projectConfig,
+        selectedTargets: agentTargets,
+      })
+    : [];
+
   return resolveNexusProjectAgentMcpTargets({
     projectRoot,
     mcpConfig: projectConfig?.mcp,
-    ...(projectConfig
-      ? { agentTargets: activeNexusProjectMcpAgentTargets(projectConfig) }
+    ...(agentTargets
+      ? { agentTargets: [...agentTargets, ...gatewayTargets] }
       : {}),
   });
 }
@@ -1146,10 +1180,16 @@ function agentMcpConfigCheckCommands(
   projectRoot: string,
   platform: NexusSetupPlatform,
 ): string[] {
-  return setupAgentMcpTargets(projectRoot, projectConfig).map(
-    (target) =>
+  const commands = setupAgentMcpTargets(projectRoot, projectConfig)
+    .map((target) => ({
+      target,
+      exposure: agentMcpTargetExposure(target),
+    }))
+    .filter(({ exposure }) => exposure.mode === "direct")
+    .map(({ target }) =>
       `test -f ${shellPathPlaceholder(setupCommandPath(target.configPathRelative, platform))}`,
-  );
+    );
+  return [...new Set(commands)];
 }
 
 function pluginProjectionCheckCommands(
@@ -1159,7 +1199,8 @@ function pluginProjectionCheckCommands(
 ): string[] {
   const commands: string[] = [];
   const skillTargets = setupAgentSkillTargets(projectConfig);
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { capability } of pluginProjectedSkillCapabilities(projectConfig)) {
     const matchingSkillTargets = skillTargetsForCapability(capability, skillTargets);
@@ -1185,8 +1226,17 @@ function pluginProjectionCheckCommands(
     }
   }
 
-  for (const { capability } of pluginMcpServerCapabilities(projectConfig)) {
+  for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
+      const exposure = pluginMcpServerExposure(
+        projectConfig,
+        target,
+        plugin,
+        capability,
+      );
+      if (exposure.mode !== "direct") {
+        continue;
+      }
       const marker =
         target.configSchema === "codex.mcp_servers"
           ? `[mcp_servers.${capability.serverName}]`
@@ -1375,14 +1425,22 @@ function pluginMcpServerChecks(
   projectConfig: NexusProjectConfig,
 ): NexusSetupCheckResult[] {
   const checks: NexusSetupCheckResult[] = [];
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
+      const exposure = pluginMcpServerExposure(
+        projectConfig,
+        target,
+        plugin,
+        capability,
+      );
       checks.push(pluginMcpServerCheck({
         projectRoot,
         plugin,
         capability,
+        exposure,
         agent: target.agent,
         provider: target.provider,
         configPath: target.configPath,
@@ -1399,6 +1457,7 @@ function pluginMcpServerCheck(options: {
   projectRoot: string;
   plugin: NexusProjectPluginConfig;
   capability: NexusPluginMcpServerCapability;
+  exposure: NexusMcpExposureResolution;
   agent: string;
   provider: string;
   configPath: string;
@@ -1411,14 +1470,39 @@ function pluginMcpServerCheck(options: {
   const checkBase = {
     id: `plugin-${setupCheckIdPart(options.plugin.id)}-mcp-${setupCheckIdPart(serverName)}-${setupCheckIdPart(options.agent)}`,
     title: `${options.agent} MCP server ${serverName}`,
+    details: mcpExposureDetails(options.exposure),
   };
+
+  if (options.exposure.mode === "hidden") {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary:
+        `Plugin ${pluginLabel} MCP server ${serverName} is intentionally hidden for ${options.provider}; ` +
+        `${mcpExposureSummary(options.exposure)}. Direct MCP config is not expected.`,
+      nextAction: null,
+    };
+  }
+
+  if (options.exposure.mode === "gateway") {
+    return {
+      ...checkBase,
+      status: "warning",
+      summary:
+        `Plugin ${pluginLabel} MCP server ${serverName} is planned for DevNexus gateway registration for ${options.provider}; ` +
+        `${mcpExposureSummary(options.exposure)}. Direct MCP config is not expected.`,
+      nextAction:
+        "Use the MCP gateway projection path once it is available; do not project this plugin MCP server directly unless its exposure is changed to direct.",
+    };
+  }
 
   if (!fs.existsSync(configPath)) {
     return {
       ...checkBase,
       status: "warning",
       summary:
-        `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.provider} MCP config is missing.`,
+        `Plugin ${pluginLabel} declares MCP server ${serverName}, but ${options.provider} MCP config is missing; ` +
+        `${mcpExposureSummary(options.exposure)}.`,
       nextAction:
         `Refresh ${options.provider} MCP config at ${options.configPathRelative}, then run the plugin-specific MCP setup or refresh step for ${pluginLabel}.`,
     };
@@ -1448,7 +1532,8 @@ function pluginMcpServerCheck(options: {
         status: "warning",
         summary:
           `Plugin MCP server ${serverName} is configured for ${options.provider}, but its command line is stale or unexpected. ` +
-          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.`,
+          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}. ` +
+          `${mcpExposureSummary(options.exposure)}.`,
         nextAction:
           `Refresh ${options.provider} MCP config for ${serverName}, then reload or restart the agent session so it uses the updated command.`,
       };
@@ -1458,7 +1543,8 @@ function pluginMcpServerCheck(options: {
         ...checkBase,
         status: "warning",
         summary:
-          `Plugin MCP server ${serverName} is configured for ${options.provider}, but command ${commandLine.command} is not available on PATH.`,
+          `Plugin MCP server ${serverName} is configured for ${options.provider}, but command ${commandLine.command} is not available on PATH; ` +
+          `${mcpExposureSummary(options.exposure)}.`,
         nextAction:
           `Install or expose ${commandLine.command} for this host, or update ${options.configPathRelative} to use the configured plugin MCP command.`,
       };
@@ -1467,7 +1553,9 @@ function pluginMcpServerCheck(options: {
     return {
       ...checkBase,
       status: "passed",
-      summary: `Plugin MCP server ${serverName} is configured for ${options.provider}.`,
+      summary:
+        `Plugin MCP server ${serverName} is configured for ${options.provider}; ` +
+        `${mcpExposureSummary(options.exposure)}.`,
       nextAction: null,
     };
   }
@@ -1477,8 +1565,8 @@ function pluginMcpServerCheck(options: {
     status: "warning",
     summary:
       configured === false
-        ? `Plugin ${pluginLabel} declares MCP server ${serverName}, but it is not configured for ${options.provider}.`
-        : `Plugin ${pluginLabel} declares MCP server ${serverName}, but DevNexus cannot inspect ${options.provider} MCP config schema ${options.configSchema} yet.`,
+        ? `Plugin ${pluginLabel} declares MCP server ${serverName}, but it is not configured for ${options.provider}; ${mcpExposureSummary(options.exposure)}.`
+        : `Plugin ${pluginLabel} declares MCP server ${serverName}, but DevNexus cannot inspect ${options.provider} MCP config schema ${options.configSchema} yet; ${mcpExposureSummary(options.exposure)}.`,
     nextAction:
       configured === false
         ? `Run the plugin-specific MCP setup or refresh step so ${options.provider} can access ${serverName}.`
@@ -1488,11 +1576,36 @@ function pluginMcpServerCheck(options: {
 
 function agentMcpServerConfiguredCheck(
   target: MaterializedNexusAgentMcpTarget,
+  exposure?: NexusMcpExposureResolution,
 ): NexusSetupCheckResult {
   const checkBase = {
     id: `agent-mcp-server-${setupCheckIdPart(target.agent)}-${setupCheckIdPart(target.serverName)}`,
     title: `${target.agent} MCP server ${target.serverName}`,
+    ...(exposure ? { details: mcpExposureDetails(exposure) } : {}),
   };
+
+  if (exposure?.mode === "hidden") {
+    return {
+      ...checkBase,
+      status: "passed",
+      summary:
+        `DevNexus MCP server ${target.serverName} is intentionally hidden for ${target.provider}; ` +
+        `${mcpExposureSummary(exposure)}. Direct MCP config is not expected.`,
+      nextAction: null,
+    };
+  }
+
+  if (exposure?.mode === "gateway") {
+    return {
+      ...checkBase,
+      status: "warning",
+      summary:
+        `DevNexus MCP server ${target.serverName} is planned for gateway projection for ${target.provider}; ` +
+        `${mcpExposureSummary(exposure)}. Direct MCP config is not expected.`,
+      nextAction:
+        "Use the MCP gateway projection path once it is available, or change this target exposure to direct.",
+    };
+  }
 
   if (!fs.existsSync(target.configPath)) {
     return {
@@ -1528,7 +1641,8 @@ function agentMcpServerConfiguredCheck(
         status: "warning",
         summary:
           `DevNexus MCP server ${target.serverName} is configured for ${target.provider}, but its command line is stale or unexpected. ` +
-          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.`,
+          `Current: ${formatMcpCommandLine(commandLine)}. Expected: ${formatMcpCommandLine(expectedCommandLine)}.` +
+          (exposure ? ` ${mcpExposureSummary(exposure)}.` : ""),
         nextAction:
           `Run dev-nexus workspace mcp refresh . and reload or restart the ${target.provider} session so it uses ${formatMcpCommandLine(expectedCommandLine)}.`,
       };
@@ -1538,7 +1652,8 @@ function agentMcpServerConfiguredCheck(
       ...checkBase,
       status: "passed",
       summary:
-        `DevNexus MCP server ${target.serverName} is configured for ${target.provider}.`,
+        `DevNexus MCP server ${target.serverName} is configured for ${target.provider}` +
+        (exposure ? `; ${mcpExposureSummary(exposure)}.` : "."),
       nextAction: null,
     };
   }
@@ -1573,7 +1688,11 @@ function liveMcpRuntimeChecks(options: {
   liveProcesses: readonly NexusMcpRuntimeProcess[];
 }): NexusSetupCheckResult[] {
   const expectedTargets = [
-    ...options.agentMcpTargets.map(agentMcpRuntimeExpectedTarget),
+    ...options.agentMcpTargets
+      .filter((target) =>
+        agentMcpTargetExposure(target).mode === "direct"
+      )
+      .map(agentMcpRuntimeExpectedTarget),
     ...pluginMcpRuntimeExpectedTargets(options.projectRoot, options.projectConfig),
   ];
   const checks: NexusSetupCheckResult[] = [];
@@ -1642,10 +1761,20 @@ function pluginMcpRuntimeExpectedTargets(
   projectConfig: NexusProjectConfig,
 ): NexusMcpRuntimeExpectedTarget[] {
   const expectedTargets: NexusMcpRuntimeExpectedTarget[] = [];
-  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig);
+  const mcpTargets = setupAgentMcpTargets(projectRoot, projectConfig)
+    .filter((target) => target.serverName !== defaultNexusMcpGatewayServerName);
 
   for (const { plugin, capability } of pluginMcpServerCapabilities(projectConfig)) {
     for (const target of mcpTargetsForCapability(capability, mcpTargets)) {
+      const exposure = pluginMcpServerExposure(
+        projectConfig,
+        target,
+        plugin,
+        capability,
+      );
+      if (exposure.mode !== "direct") {
+        continue;
+      }
       const configured = fs.existsSync(target.configPath)
         ? configuredMcpServerCommandLine({
             provider: target.provider,
@@ -1724,6 +1853,73 @@ function mcpTargetsForCapability(
   return mcpTargets.filter((target) =>
     targetAgents.has(target.agent) || targetAgents.has(target.provider),
   );
+}
+
+function agentMcpTargetExposure(
+  target: MaterializedNexusAgentMcpTarget,
+): NexusMcpExposureResolution {
+  return {
+    applicable: true,
+    mode: target.effectiveExposure,
+    source: target.exposureSource,
+    declaredMode: null,
+    path: target.exposurePath,
+    reason: target.exposureReason,
+  };
+}
+
+function pluginMcpServerExposure(
+  projectConfig: NexusProjectConfig,
+  target: MaterializedNexusAgentMcpTarget,
+  plugin: NexusProjectPluginConfig,
+  capability: NexusPluginMcpServerCapability,
+): NexusMcpExposureResolution {
+  return resolveNexusMcpExposure({
+    workspaceExposure: projectConfig.mcp?.exposure,
+    agentTarget:
+      configuredMcpAgentTargetForMaterialized(projectConfig, target) ?? {
+        agent: target.agent,
+        provider: target.provider,
+      },
+    plugin,
+    server: capability,
+  });
+}
+
+function configuredMcpAgentTargetForMaterialized(
+  projectConfig: NexusProjectConfig,
+  target: MaterializedNexusAgentMcpTarget,
+): NexusProjectAgentMcpTarget | null {
+  return (
+    activeNexusProjectMcpAgentTargets(projectConfig).find((candidate) => {
+      const candidateProvider = candidate.provider ?? candidate.agent;
+      return (
+        sameMcpAgentName(candidate.agent, target.agent) &&
+        sameMcpAgentName(candidateProvider, target.provider) &&
+        (candidate.serverName === undefined || candidate.serverName === target.serverName)
+      );
+    }) ?? null
+  );
+}
+
+function sameMcpAgentName(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+function mcpExposureDetails(exposure: NexusMcpExposureResolution): Record<string, unknown> {
+  return {
+    exposure: {
+      mode: exposure.mode,
+      source: exposure.source,
+      declaredMode: exposure.declaredMode,
+      path: exposure.path,
+      reason: exposure.reason,
+    },
+  };
+}
+
+function mcpExposureSummary(exposure: NexusMcpExposureResolution): string {
+  return `exposure=${exposure.mode} source=${exposure.source}`;
 }
 
 function pluginProjectedSkillCapabilities(

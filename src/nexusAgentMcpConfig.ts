@@ -7,6 +7,11 @@ import type {
   NexusProjectAgentMcpConfigFormat,
   NexusProjectMcpConfig,
 } from "./nexusProjectConfig.js";
+import {
+  resolveNexusMcpExposure,
+  type NexusMcpExposureSource,
+  type NexusResolvedMcpExposureMode,
+} from "./nexusMcpExposurePolicy.js";
 import type { NexusSkillSourceControl } from "./nexusSkills.js";
 
 export const defaultNexusMcpServerName = "dev_nexus";
@@ -26,6 +31,8 @@ export type NexusAgentMcpConfigSchema = string;
 
 export type NexusAgentMcpConfigStatus =
   | "materialized"
+  | "gateway_pending"
+  | "hidden"
   | "manual"
   | "unsupported";
 
@@ -73,6 +80,10 @@ export interface MaterializedNexusAgentMcpTarget {
   manualInstructions: string[];
   capabilityGaps: NexusAgentMcpCapabilityGap[];
   commandResolution: NexusAgentMcpCommandResolution;
+  effectiveExposure: NexusResolvedMcpExposureMode;
+  exposureSource: NexusMcpExposureSource;
+  exposurePath: string | null;
+  exposureReason: string;
 }
 
 export interface MaterializeNexusProjectAgentMcpConfigResult {
@@ -97,6 +108,7 @@ interface NexusAgentMcpProviderAdapter {
     target: NexusProjectAgentMcpTarget,
   ) => NexusAgentMcpTrustSemantics;
   writer: ((target: ResolvedNexusAgentMcpTarget) => void) | null;
+  remover: ((target: ResolvedNexusAgentMcpTarget) => void) | null;
 }
 
 export class NexusAgentMcpConfigError extends Error {
@@ -137,6 +149,11 @@ export function materializeNexusProjectAgentMcpConfig(
   for (const target of targets) {
     if (target.configStatus === "materialized") {
       writeNexusAgentMcpConfig(target);
+    } else if (
+      target.configStatus === "gateway_pending" ||
+      target.configStatus === "hidden"
+    ) {
+      removeNexusAgentMcpConfig(target);
     }
   }
 
@@ -180,6 +197,10 @@ function resolveAgentMcpTargets(
   return configuredTargets
     .filter((target) => target.enabled !== false)
     .map((target) => {
+      const exposure = resolveNexusMcpExposure({
+        workspaceExposure: options.mcpConfig?.exposure,
+        agentTarget: target,
+      });
       const provider = normalizeAgentProvider(target);
       const adapter = providerAdapterForTarget(target, provider);
       const serverName =
@@ -225,26 +246,38 @@ function resolveAgentMcpTargets(
         command,
         platform: options.platform ?? process.platform,
       });
+      const configStatus = mcpConfigStatusForExposure(
+        exposure.mode,
+        configCapability.configStatus,
+      );
       const capabilityGaps = [
-        ...configCapability.capabilityGaps,
-        ...commandResolution.capabilityGaps,
+        ...(exposure.mode === "direct" ? configCapability.capabilityGaps : []),
+        ...(exposure.mode === "direct" ? commandResolution.capabilityGaps : []),
+        ...mcpExposureCapabilityGaps(exposure),
       ];
       const activationNotes = [
         ...adapter.activationNotes,
         ...(target.activationNotes ?? []),
       ];
-      const manualInstructions = [
-        ...manualInstructionsForTarget({
-          target,
-          provider,
-          serverName,
-          command: commandResolution.command,
-          args,
-          configPath: configPathRelative,
-          configStatus: configCapability.configStatus,
-        }),
-        ...(target.manualInstructions ?? []),
-      ];
+      const manualInstructions = exposure.mode === "direct"
+        ? [
+            ...manualInstructionsForTarget({
+              target,
+              provider,
+              serverName,
+              command: commandResolution.command,
+              args,
+              configPath: configPathRelative,
+              configStatus,
+            }),
+            ...(target.manualInstructions ?? []),
+          ]
+        : exposure.mode === "gateway"
+          ? [
+              `Register MCP server ${serverName} through the DevNexus MCP gateway projection once gateway projection is available.`,
+              ...(target.manualInstructions ?? []),
+            ]
+          : [...(target.manualInstructions ?? [])];
 
       return {
         agent: target.agent,
@@ -260,7 +293,7 @@ function resolveAgentMcpTargets(
         configPathRelative,
         configFormat,
         configSchema,
-        configStatus: configCapability.configStatus,
+        configStatus,
         activationNotes,
         trustSemantics:
           target.trustSemantics !== undefined
@@ -283,6 +316,10 @@ function resolveAgentMcpTargets(
           strategy: commandResolution.strategy,
           summary: commandResolution.summary,
         },
+        effectiveExposure: exposure.mode,
+        exposureSource: exposure.source,
+        exposurePath: exposure.path,
+        exposureReason: exposure.reason,
       };
     });
 }
@@ -333,6 +370,7 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
       settingPath: "mcp_servers.<server>.default_tools_approval_mode",
     }),
     writer: writeCodexMcpConfig,
+    remover: removeCodexMcpConfig,
   },
   claude: {
     provider: "claude",
@@ -349,6 +387,7 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
       settingPath: null,
     }),
     writer: writeClaudeMcpConfig,
+    remover: removeClaudeMcpConfig,
   },
   opencode: {
     provider: "opencode",
@@ -365,6 +404,7 @@ const providerAdapters: Record<string, NexusAgentMcpProviderAdapter> = {
       settingPath: "permission",
     }),
     writer: writeOpenCodeMcpConfig,
+    remover: removeOpenCodeMcpConfig,
   },
 };
 
@@ -397,6 +437,7 @@ function providerAdapterForTarget(
       settingPath: null,
     }),
     writer: null,
+    remover: null,
   };
 }
 
@@ -571,6 +612,43 @@ function writeNexusAgentMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   adapter.writer(target);
 }
 
+function removeNexusAgentMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  const adapter = providerAdapters[target.provider];
+  adapter?.remover?.(target);
+}
+
+function mcpConfigStatusForExposure(
+  exposure: NexusResolvedMcpExposureMode,
+  configStatus: NexusAgentMcpConfigStatus,
+): NexusAgentMcpConfigStatus {
+  if (exposure === "hidden") {
+    return "hidden";
+  }
+  if (exposure === "gateway") {
+    return "gateway_pending";
+  }
+  return configStatus;
+}
+
+function mcpExposureCapabilityGaps(
+  exposure: ReturnType<typeof resolveNexusMcpExposure>,
+): NexusAgentMcpCapabilityGap[] {
+  if (exposure.mode !== "gateway") {
+    return [];
+  }
+
+  return [
+    {
+      id: "mcp-gateway-projection-pending",
+      severity: "warning",
+      summary:
+        "MCP exposure resolves to gateway, but DevNexus gateway projection is not available yet.",
+      nextAction:
+        "Keep this server out of direct projection until the DevNexus MCP gateway server can be materialized.",
+    },
+  ];
+}
+
 function assertProjectRelativeFilePath(filePath: string, pathName: string): string {
   if (
     !filePath ||
@@ -630,6 +708,22 @@ function writeCodexMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
 
   fs.mkdirSync(path.dirname(target.configPath), { recursive: true });
   fs.writeFileSync(target.configPath, nextContent, "utf8");
+}
+
+function removeCodexMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  if (!fs.existsSync(target.configPath)) {
+    return;
+  }
+
+  const existing = fs.readFileSync(target.configPath, "utf8");
+  const retained = trimTrailingBlankLines(
+    removeTomlServerTable(existing, target.serverName),
+  ).join("\n");
+  fs.writeFileSync(
+    target.configPath,
+    retained.length > 0 ? `${retained}\n` : "",
+    "utf8",
+  );
 }
 
 function upsertCodexMcpServerBlock(
@@ -779,6 +873,36 @@ function writeClaudeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   );
 }
 
+function removeClaudeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  if (!fs.existsSync(target.configPath)) {
+    return;
+  }
+
+  const existing = readJsonObject(target.configPath);
+  const existingServers = existing.mcpServers;
+  if (
+    existingServers !== undefined &&
+    (!existingServers ||
+      typeof existingServers !== "object" ||
+      Array.isArray(existingServers))
+  ) {
+    throw new NexusAgentMcpConfigError(
+      `Claude MCP config mcpServers must be an object: ${target.configPath}`,
+    );
+  }
+
+  const mcpServers = {
+    ...((existingServers as Record<string, unknown> | undefined) ?? {}),
+  };
+  delete mcpServers[target.serverName];
+
+  fs.writeFileSync(
+    target.configPath,
+    `${JSON.stringify({ ...existing, mcpServers }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 function writeOpenCodeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   const existing = readJsonObject(target.configPath);
   const existingMcp = existing.mcp;
@@ -806,6 +930,39 @@ function writeOpenCodeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
   };
 
   fs.mkdirSync(path.dirname(target.configPath), { recursive: true });
+  fs.writeFileSync(
+    target.configPath,
+    `${JSON.stringify(next, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function removeOpenCodeMcpConfig(target: ResolvedNexusAgentMcpTarget): void {
+  if (!fs.existsSync(target.configPath)) {
+    return;
+  }
+
+  const existing = readJsonObject(target.configPath);
+  const existingMcp = existing.mcp;
+  if (
+    existingMcp !== undefined &&
+    (!existingMcp || typeof existingMcp !== "object" || Array.isArray(existingMcp))
+  ) {
+    throw new NexusAgentMcpConfigError(
+      `OpenCode MCP config mcp must be an object: ${target.configPath}`,
+    );
+  }
+
+  const mcp = {
+    ...((existingMcp as Record<string, unknown> | undefined) ?? {}),
+  };
+  delete mcp[target.serverName];
+  const next = {
+    $schema: "https://opencode.ai/config.json",
+    ...existing,
+    mcp,
+  };
+
   fs.writeFileSync(
     target.configPath,
     `${JSON.stringify(next, null, 2)}\n`,
