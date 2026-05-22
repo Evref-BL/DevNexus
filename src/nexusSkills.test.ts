@@ -356,6 +356,9 @@ describe("nexus skills", () => {
       "Route through the relevant skill chain",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
+      "routing map for substantial led work",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
       "recommended next action",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(

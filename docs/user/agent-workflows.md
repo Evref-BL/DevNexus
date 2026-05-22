@@ -17,10 +17,12 @@ page as supporting context when the workspace docs are available.
 
 When `take-the-lead` is active, the agent should treat the chains as routing
 rules: choose the current chain, invoke the next skill, and evaluate
-`parallel-work-dispatch` when independent domains appear. A user request to lead
-the work is enough authorization to recommend subagents, subject to workspace
-policy, tool availability, cost, provider-mutation, credential, and runtime
-approval gates.
+`parallel-work-dispatch` when independent domains appear. For substantial led
+work in a DevNexus workspace, use this page's companion
+[Skill Chains](skill-chains.md) reference as the routing map when it is
+available. A user request to lead the work is enough authorization to recommend
+subagents, subject to workspace policy, tool availability, cost,
+provider-mutation, credential, and runtime approval gates.
 
 ## MCP Server
 

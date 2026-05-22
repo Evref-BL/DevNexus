@@ -171,6 +171,7 @@ describe("README onboarding guardrails", () => {
     const guide = repoFile("docs/user/agent-workflows.md");
     expect(guide).toContain("keep the default workflow provider-neutral");
     expect(guide).toContain("A user request to lead");
+    expect(guide).toContain("as the routing map");
     expect(guide).toContain("choose the delivery topology before preparing");
     expect(guide).toContain("initiative integration branch only after");
     expect(guide).toContain("provider-specific until DevNexus has a neutral collector adapter");

@@ -1349,8 +1349,10 @@ constraints, approvals, and final direction.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
 4. Route through the relevant skill chain and invoke the next skill in that
-   chain. For work large enough to plan or slice, check whether
-   \`parallel-work-dispatch\` would accelerate safe independent progress.
+   chain. In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the
+   routing map for substantial led work when it is available. For work large
+   enough to plan or slice, check whether \`parallel-work-dispatch\` would
+   accelerate safe independent progress.
 5. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
 6. Track commitments, blockers, verification, and the next action so the user
@@ -1421,9 +1423,10 @@ path, and any human-in-the-loop gate for cost, provider mutation, credentials,
 or live runtime actions. If subagent tooling is unavailable, continue inline
 and say what would have been delegated.
 
-In a DevNexus workspace, consult \`docs/user/skill-chains.md\` for the full
-workflow-composition diagrams when the route is unclear or the work spans a
-feature, bugfix, documentation, architecture, or version flow.
+In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the routing
+reference for substantial led work when it is available. The diagrams are
+supporting maps, but the chain order and delegation overlay should affect the
+next skill chosen.
 
 ## Pairing
 
