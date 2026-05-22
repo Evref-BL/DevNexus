@@ -580,8 +580,10 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 3. Map the changed surfaces before writing tasks. Name the owning component,
    files or artifacts, tracker anchor, expected worktree, command working
    directory, and selected delivery topology where those are knowable.
-4. Split the work into bounded slices. Each slice needs one owner, one scope,
-   dependencies, acceptance criteria, verification commands, and handoff notes.
+4. Split the work into bounded vertical slices where possible. Each slice needs
+   one owner, one scope, dependencies, acceptance criteria, verification
+   commands, and handoff notes. Do not make slices smaller than the next real
+   review, risk, ownership, or human-in-the-loop gate requires.
 5. For Git-backed plans, choose the delivery topology before the first branch:
    direct slice, stacked slice, initiative integration branch, throw-away
    integration rehearsal, or release/version policy. Record the base branch,
@@ -608,8 +610,8 @@ Use this shape when writing a saved implementation plan:
 1. Goal and done criteria.
 2. Integration surface, delivery topology, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
-4. Task slices with files, acceptance criteria, steps, verification, and
-   handoff.
+4. Work-item or vertical slices with files, acceptance criteria, steps,
+   verification, and handoff.
 5. Human approval gates and publication path.
 6. Open questions and blockers.
 
@@ -1267,9 +1269,10 @@ delivery topology says how slice branches reach it.
 3. Inventory current state: prior decisions, active branches or artifacts,
    verification already run, blockers, and unrelated work that must be
    preserved.
-4. Slice by independently reviewable progress. Each slice needs one owner, one
-   scope, one verification path, and a clear contribution to the initiative
-   surface.
+4. Slice by independently reviewable vertical progress where possible. Each
+   slice needs one owner, one scope, one verification path, and a clear
+   contribution to the initiative surface. Do not make slices smaller than the
+   next real review, risk, ownership, or human-in-the-loop gate requires.
 5. Route every slice back to the initiative surface. If a slice wants a new
    surface or objective, decide whether it belongs here or should become a
    separate initiative.
@@ -1688,7 +1691,10 @@ Use this skill when a plan, specification, or Product Requirements Document (PRD
 
 1. Gather the source plan, existing issue context, tracker conventions, and relevant domain glossary or Architecture Decision Records.
 2. Explore enough code to understand the current implementation state before proposing issue boundaries.
-3. Split the work into tracer-bullet vertical slices: each issue should deliver a narrow end-to-end behavior that can be demonstrated or verified on its own.
+3. Split the work into vertical slices: each issue should deliver an end-to-end
+   behavior or result that can be demonstrated or verified on its own. Use a
+   technical task only when the work cannot honestly be framed as user-visible
+   or end-to-end progress.
 4. Mark each proposed slice as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
 5. Present the proposed issue list for review with title, type, blockers, user stories covered, and acceptance criteria.
 6. After approval, create or update tracker issues in dependency order. Do not close or rewrite the parent issue unless explicitly asked.
