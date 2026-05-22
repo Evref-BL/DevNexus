@@ -183,6 +183,12 @@ Normalize saved provider evidence:
 dev-nexus publication evidence normalize evidence.json
 ```
 
+Collect pull-request evidence through the configured publication credential:
+
+```bash
+dev-nexus publication pull-request evidence <workspace-root> --component api --number 123 --json
+```
+
 Review merge queue readiness:
 
 ```bash

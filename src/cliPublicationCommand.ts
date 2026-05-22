@@ -26,10 +26,12 @@ import {
   type NexusInitiativeDeliveryReportItem,
 } from "./nexusInitiativeDeliveryReport.js";
 import {
+  inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
   type NexusPublicationBranchPushResult,
+  type NexusPublicationPullRequestEvidenceResult,
   type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
@@ -109,6 +111,14 @@ interface ParsedPublicationPullRequestMergeCommand {
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+  json?: boolean;
+}
+
+interface ParsedPublicationPullRequestEvidenceCommand {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  number: number;
   json?: boolean;
 }
 
@@ -234,6 +244,25 @@ export async function handlePublicationCommand(
       dependencies.stdout ?? process.stdout,
     );
     return result.merge.merged ? 0 : 1;
+  }
+
+  if (argv[1] === "pull-request" && argv[2] === "evidence") {
+    const parsed = parsePublicationPullRequestEvidenceCommand(argv);
+    const result = await inspectNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
+      number: parsed.number,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestEvidenceResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
   }
 
   if (argv[1] === "green-main" && argv[2] === "plan") {
@@ -640,6 +669,55 @@ function parsePublicationPullRequestMergeCommand(
   assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
 
   return parsed as ParsedPublicationPullRequestMergeCommand;
+}
+
+function parsePublicationPullRequestEvidenceCommand(
+  argv: string[],
+): ParsedPublicationPullRequestEvidenceCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "evidence") {
+    throw new Error("publication requires pull-request evidence");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request evidence requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestEvidenceCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request evidence option: ${arg}`);
+    }
+  }
+  if (!parsed.number) {
+    throw new Error("publication pull-request evidence requires --number");
+  }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
+
+  return parsed as ParsedPublicationPullRequestEvidenceCommand;
 }
 
 function assertSinglePublicationTarget(
@@ -1228,6 +1306,42 @@ function printPublicationPullRequestMergeResult(
   }
   writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
   writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
+}
+
+function printPublicationPullRequestEvidenceResult(
+  result: NexusPublicationPullRequestEvidenceResult,
+  parsed: ParsedPublicationPullRequestEvidenceCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    target: result.target,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+    evidence: result.evidence,
+    providerEvidence: [result.evidence],
+    metadata: result.metadata,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request evidence.");
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  writeLine(stdout, `  Head: ${result.evidence.headBranch ?? "unknown"}`);
+  writeLine(stdout, `  Base: ${result.evidence.targetBranch ?? "unknown"}`);
+  writeLine(stdout, `  Checks: ${result.evidence.checks?.length ?? 0}`);
+  writeLine(stdout, `  Review: ${result.evidence.reviewState ?? "unknown"}`);
+  writeLine(stdout, `  Base status: ${result.evidence.baseStatus ?? "unknown"}`);
+  writeLine(stdout, `  Mergeability: ${result.evidence.mergeability ?? "unknown"}`);
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.metadata.backend}`);
 }
 
 function formatPublicationTarget(

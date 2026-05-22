@@ -2,6 +2,7 @@ import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
   createNexusForgePublicationAdapter,
+  type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
   type NexusForgePullRequestResult,
 } from "./nexusForgePublication.js";
@@ -117,6 +118,19 @@ export interface NexusPublicationPullRequestMergeResult {
   merge: NexusForgePullRequestMergeResult;
 }
 
+export interface NexusPublicationPullRequestEvidenceResult {
+  projectRoot: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
+  repository: NexusGitHubRepositorySelection;
+  credential: NexusPublicationCredentialSummary;
+  pullRequest: {
+    number: number;
+  };
+  evidence: NexusForgePullRequestChecksResult["evidence"];
+  metadata: NexusForgePullRequestChecksResult["metadata"];
+}
+
 export interface NexusPublicationOperationRuntimeOptions {
   baseEnv?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
@@ -156,6 +170,14 @@ export interface MergeNexusPublicationPullRequestForComponentOptions
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+}
+
+export interface InspectNexusPublicationPullRequestForComponentOptions
+  extends NexusPublicationOperationRuntimeOptions {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  number: number;
 }
 
 export function resolveNexusPublicationComponentContext(options: {
@@ -348,6 +370,41 @@ export async function mergeNexusPublicationPullRequestForComponent(
       method,
     },
     merge,
+  };
+}
+
+export async function inspectNexusPublicationPullRequestForComponent(
+  options: InspectNexusPublicationPullRequestForComponentOptions,
+): Promise<NexusPublicationPullRequestEvidenceResult> {
+  const context = resolveNexusPublicationTargetContext(options);
+  const credential = await resolvePublicationCredential({
+    context,
+    purpose: "api",
+    requiredPermissions: { pull_requests: "read" },
+    runtime: options,
+  });
+  const adapter = createNexusForgePublicationAdapter({
+    repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
+    credential,
+    preferredBackend: "github_rest",
+    fetch: options.fetch,
+    baseEnv: options.baseEnv,
+  });
+  const result = await adapter.inspectPullRequestChecks({
+    number: options.number,
+  });
+
+  return {
+    projectRoot: context.projectRoot,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
+    repository: context.repository,
+    credential: summarizePublicationCredential(credential),
+    pullRequest: {
+      number: options.number,
+    },
+    evidence: result.evidence,
+    metadata: result.metadata,
   };
 }
 

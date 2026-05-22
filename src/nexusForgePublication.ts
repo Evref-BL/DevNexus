@@ -161,13 +161,23 @@ interface GitHubPullRequestResponse {
   html_url?: string | null;
   state?: string | null;
   title?: string | null;
+  draft?: boolean | null;
   mergeable?: boolean | null;
+  mergeable_state?: string | null;
   head?: {
     ref?: string | null;
     sha?: string | null;
   } | null;
   base?: {
     ref?: string | null;
+  } | null;
+}
+
+interface GitHubPullRequestReviewResponse {
+  state?: string | null;
+  submitted_at?: string | null;
+  user?: {
+    login?: string | null;
   } | null;
 }
 
@@ -585,6 +595,10 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       `${this.repositoryApiPath()}/commits/${headSha}/check-runs?per_page=100`,
       { method: "GET", capability: "pull_request.checks" },
     );
+    const reviews = await this.githubRestRequest<GitHubPullRequestReviewResponse[]>(
+      `${this.repositoryApiPath()}/pulls/${String(options.number)}/reviews?per_page=100`,
+      { method: "GET", capability: "pull_request.checks" },
+    );
 
     return {
       evidence: {
@@ -600,6 +614,7 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
         headSha,
         targetBranch: clean(pullRequest.base?.ref),
         sourceUrl: clean(pullRequest.html_url),
+        reviewState: reviewStateFromGitHubReviews(reviews),
         checks: (checks.check_runs ?? []).map((check) => ({
           name: clean(check.name) ?? "unnamed check",
           status: clean(check.status),
@@ -610,10 +625,13 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
           startedAt: clean(check.started_at),
           completedAt: clean(check.completed_at),
         })),
-        mergeability: pullRequest.mergeable,
-        branchPolicy: null,
+        mergeability: mergeabilityFromGitHubPullRequest(pullRequest),
+        branchPolicy: branchPolicyFromGitHubPullRequest(pullRequest),
+        baseStatus: baseStatusFromGitHubPullRequest(pullRequest),
         metadata: {
           backend: this.backend,
+          mergeableState: clean(pullRequest.mergeable_state),
+          draft: pullRequest.draft === true,
         },
       },
       metadata: this.metadata("pull_request.checks"),
@@ -625,11 +643,11 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
   }): NexusForgePullRequestChecksResult {
     const result = this.runGh(
       [
-        "pr",
-        "checks",
-        String(options.number),
-        "--repo",
-        this.repositorySlug(),
+      "pr",
+      "checks",
+      String(options.number),
+      "--repo",
+      this.repositorySlug(),
         "--json",
         "name,state,bucket,link,workflow",
       ],
@@ -639,6 +657,22 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
       result.stdout,
       "GitHub CLI pull request checks",
     );
+    const view = this.runGh(
+      [
+        "pr",
+        "view",
+        String(options.number),
+        "--repo",
+        this.repositorySlug(),
+        "--json",
+        "number,url,title,headRefName,headRefOid,baseRefName,reviewDecision,mergeStateStatus,isDraft",
+      ],
+      "pull_request.checks",
+    );
+    const pullRequest = parseJsonObject(
+      view.stdout,
+      "GitHub CLI pull request view",
+    );
     return {
       evidence: {
         provider: "github",
@@ -646,7 +680,14 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
         reviewTarget: {
           kind: "pull_request",
           number: options.number,
+          url: stringField(pullRequest, "url"),
+          title: stringField(pullRequest, "title"),
         },
+        headBranch: stringField(pullRequest, "headRefName"),
+        headSha: stringField(pullRequest, "headRefOid"),
+        targetBranch: stringField(pullRequest, "baseRefName"),
+        sourceUrl: stringField(pullRequest, "url"),
+        reviewState: stringField(pullRequest, "reviewDecision"),
         checks: checks.map((check) => ({
           name: stringField(check, "name") ?? "unnamed check",
           state: stringField(check, "state"),
@@ -654,8 +695,20 @@ class GitHubForgePublicationAdapter implements NexusForgePublicationAdapter {
           workflowName: stringField(check, "workflow"),
           url: stringField(check, "link"),
         })),
+        mergeability: mergeabilityFromGitHubMergeState(
+          stringField(pullRequest, "mergeStateStatus"),
+        ),
+        branchPolicy: branchPolicyFromGitHubMergeState(
+          stringField(pullRequest, "mergeStateStatus"),
+          booleanField(pullRequest, "isDraft"),
+        ),
+        baseStatus: baseStatusFromGitHubMergeState(
+          stringField(pullRequest, "mergeStateStatus"),
+        ),
         metadata: {
           backend: this.backend,
+          mergeableState: stringField(pullRequest, "mergeStateStatus"),
+          draft: booleanField(pullRequest, "isDraft") === true,
         },
       },
       metadata: this.metadata("pull_request.checks"),
@@ -968,6 +1021,21 @@ function parseJsonArray<T>(value: string, label: string): T[] {
   );
 }
 
+function parseJsonObject(value: string, label: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Fall through to the typed error below.
+  }
+  throw new NexusForgePublicationError(
+    "invalid_provider_response",
+    `${label} response was not a JSON object.`,
+  );
+}
+
 function forgePublicationCommand(args: string[]): string {
   return args.map(shellQuoteArgument).join(" ");
 }
@@ -975,6 +1043,122 @@ function forgePublicationCommand(args: string[]): string {
 function stringField(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function booleanField(record: Record<string, unknown>, key: string): boolean | null {
+  const value = record[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function reviewStateFromGitHubReviews(
+  reviews: GitHubPullRequestReviewResponse[],
+): string | null {
+  const latestByReviewer = new Map<string, string>();
+  for (const [index, review] of reviews.entries()) {
+    const reviewer = clean(review.user?.login) ?? `review-${index}`;
+    const state = normalizedToken(review.state);
+    if (state) {
+      latestByReviewer.set(reviewer, state);
+    }
+  }
+  const states = [...latestByReviewer.values()];
+  if (
+    states.some((state) =>
+      state === "changes_requested" ||
+      state === "rejected" ||
+      state === "timed_out"
+    )
+  ) {
+    return "changes_requested";
+  }
+  if (states.some((state) => state === "approved")) {
+    return "approved";
+  }
+  return states.length > 0 ? "waiting_for_approval" : null;
+}
+
+function mergeabilityFromGitHubPullRequest(
+  pullRequest: GitHubPullRequestResponse,
+): string | boolean | null {
+  return mergeabilityFromGitHubMergeState(clean(pullRequest.mergeable_state)) ??
+    pullRequest.mergeable ??
+    null;
+}
+
+function mergeabilityFromGitHubMergeState(value: string | null): string | null {
+  const state = normalizedToken(value);
+  if (!state) {
+    return null;
+  }
+  if (state === "dirty") {
+    return "conflicting";
+  }
+  if (state === "blocked" || state === "behind" || state === "draft") {
+    return "blocked";
+  }
+  if (state === "clean" || state === "has_hooks" || state === "unstable") {
+    return "mergeable";
+  }
+  return "unknown";
+}
+
+function branchPolicyFromGitHubPullRequest(
+  pullRequest: GitHubPullRequestResponse,
+): string | boolean | null {
+  return branchPolicyFromGitHubMergeState(
+    clean(pullRequest.mergeable_state),
+    pullRequest.draft === true,
+  );
+}
+
+function branchPolicyFromGitHubMergeState(
+  value: string | null,
+  draft: boolean | null,
+): string | boolean | null {
+  if (draft === true) {
+    return "blocked";
+  }
+  const state = normalizedToken(value);
+  if (!state) {
+    return null;
+  }
+  if (state === "clean" || state === "has_hooks") {
+    return "clear";
+  }
+  if (state === "unstable" || state === "behind") {
+    return "pending";
+  }
+  if (state === "blocked" || state === "dirty" || state === "draft") {
+    return "blocked";
+  }
+  return "unknown";
+}
+
+function baseStatusFromGitHubPullRequest(
+  pullRequest: GitHubPullRequestResponse,
+): string | null {
+  return baseStatusFromGitHubMergeState(clean(pullRequest.mergeable_state));
+}
+
+function baseStatusFromGitHubMergeState(value: string | null): string | null {
+  const state = normalizedToken(value);
+  if (!state) {
+    return null;
+  }
+  if (state === "behind") {
+    return "behind";
+  }
+  if (state === "dirty") {
+    return "diverged";
+  }
+  if (state === "clean" || state === "has_hooks" || state === "unstable") {
+    return "current";
+  }
+  return "unknown";
+}
+
+function normalizedToken(value: string | null | undefined): string | null {
+  return value?.trim().toLowerCase().replace(/[\s-]+/gu, "_") || null;
 }
 
 function pullRequestNumberFromUrl(value: string | null): number | null {
