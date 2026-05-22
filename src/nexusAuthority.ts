@@ -242,7 +242,7 @@ export interface NexusCurrentActorProfileResolution {
 }
 
 export interface NexusCurrentActorResolution {
-  componentId: string;
+  componentId: string | null;
   status: NexusCurrentActorResolutionStatus;
   expectedActorId: string | null;
   expectedActorKind: NexusAuthorityActorKind | null;
@@ -257,7 +257,7 @@ export interface NexusCurrentActorResolution {
 
 export interface ResolveNexusCurrentAutomationActorOptions {
   authority?: NexusAuthorityConfig;
-  componentId: string;
+  componentId: string | null;
   publication: NexusAutomationPublicationConfig;
   authProfiles?: NexusHostingAuthProfileConfig[];
   repository?: string | null;
@@ -878,14 +878,28 @@ export function resolveNexusCurrentAutomationActor(
     });
   }
 
-  const repositoryMatchedProfiles = filterProfilesForPublicationRepository(
+  const repositoryProfileFilter = filterProfilesForPublicationRepository(
     validKindProfiles,
     options.repository,
   );
   const candidateProfiles =
-    repositoryMatchedProfiles.length > 0
-      ? repositoryMatchedProfiles
-      : validKindProfiles;
+    repositoryProfileFilter.matchedProfiles.length > 0
+      ? repositoryProfileFilter.matchedProfiles
+      : repositoryProfileFilter.unscopedProfiles;
+  if (candidateProfiles.length === 0) {
+    return currentActorResolution({
+      componentId: options.componentId,
+      status: "missing",
+      expectedActor: expected,
+      profileId: null,
+      profiles: [],
+      roles: authority.roles,
+      actions: authority.actions,
+      warnings: [
+        `No host-local auth profile for automation actor ${expected.id} matches publication repository ${options.repository ?? "unknown"}.`,
+      ],
+    });
+  }
   const mechanismMatchedProfiles = candidateProfiles
     .map((profile) => authProfileResolution(profile, expected, options.publication))
     .filter((profile) =>
@@ -2218,7 +2232,7 @@ function uniqueValues<T>(values: readonly T[]): T[] {
 }
 
 function currentActorResolution(options: {
-  componentId: string;
+  componentId: string | null;
   status: NexusCurrentActorResolutionStatus;
   expectedActor: NexusAuthorityActorConfig | null;
   profileId: string | null;
@@ -2413,14 +2427,99 @@ function authProfileMechanisms(
 function filterProfilesForPublicationRepository(
   profiles: NexusHostingAuthProfileConfig[],
   repository: string | null | undefined,
-): NexusHostingAuthProfileConfig[] {
+): {
+  matchedProfiles: NexusHostingAuthProfileConfig[];
+  unscopedProfiles: NexusHostingAuthProfileConfig[];
+  scopedProfileCount: number;
+} {
   const repositoryRef = parseGitHubRepositoryRef(repository);
   if (!repositoryRef) {
-    return [];
+    return {
+      matchedProfiles: [],
+      unscopedProfiles: profiles,
+      scopedProfileCount: 0,
+    };
   }
-  return profiles.filter((profile) =>
-    githubAppProfileIncludesRepository(profile, repositoryRef)
+  const scopedProfiles = profiles.filter((profile) =>
+    authProfileHasRepositoryScope(profile)
   );
+  const unscopedProfiles = profiles.filter((profile) =>
+    !authProfileHasRepositoryScope(profile)
+  );
+  return {
+    matchedProfiles: scopedProfiles.filter((profile) =>
+      authProfileIncludesRepository(profile, repositoryRef)
+    ),
+    unscopedProfiles,
+    scopedProfileCount: scopedProfiles.length,
+  };
+}
+
+function authProfileHasRepositoryScope(
+  profile: NexusHostingAuthProfileConfig,
+): boolean {
+  return (
+    (profile.repositoryScopes?.length ?? 0) > 0 ||
+    Boolean(profile.githubApp)
+  );
+}
+
+function authProfileIncludesRepository(
+  profile: NexusHostingAuthProfileConfig,
+  repository: { host: string; owner: string; name: string },
+): boolean {
+  if ((profile.repositoryScopes?.length ?? 0) > 0) {
+    return profile.repositoryScopes!.some((scope) =>
+      repositoryScopeMatches(scope, repository)
+    );
+  }
+
+  return githubAppProfileIncludesRepository(profile, repository);
+}
+
+function repositoryScopeMatches(
+  scope: string,
+  repository: { host: string; owner: string; name: string },
+): boolean {
+  const normalized = scope.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const wildcard = parseGitHubRepositoryWildcardScope(normalized);
+  if (wildcard) {
+    return (
+      handlesEqual(wildcard.host, repository.host) &&
+      handlesEqual(wildcard.owner, repository.owner)
+    );
+  }
+
+  const exact = parseGitHubRepositoryRef(normalized);
+  return Boolean(
+    exact &&
+      handlesEqual(exact.host, repository.host) &&
+      handlesEqual(exact.owner, repository.owner) &&
+      handlesEqual(exact.name, repository.name),
+  );
+}
+
+function parseGitHubRepositoryWildcardScope(
+  scope: string,
+): { host: string; owner: string } | null {
+  const parts = scope.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 2 && parts[1] === "*") {
+    return {
+      host: "github.com",
+      owner: parts[0]!,
+    };
+  }
+  if (parts.length === 3 && parts[2] === "*") {
+    return {
+      host: parts[0]!,
+      owner: parts[1]!,
+    };
+  }
+  return null;
 }
 
 function githubAppProfileIncludesRepository(

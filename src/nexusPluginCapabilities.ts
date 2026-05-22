@@ -1,3 +1,5 @@
+import type { NexusMcpExposureMode } from "./nexusMcpExposurePolicy.js";
+
 export type NexusPluginCapabilityKind =
   | "projected_skill"
   | "mcp_server"
@@ -51,6 +53,7 @@ export interface NexusPluginMcpServerCapability
   command?: string;
   args?: string[];
   targetAgents?: string[];
+  exposure?: NexusMcpExposureMode;
   tools?: NexusPluginMcpToolCapability[];
 }
 
@@ -121,6 +124,7 @@ export interface NexusProjectPluginConfig {
   enabled: boolean;
   name?: string;
   version?: string;
+  mcpExposure?: NexusMcpExposureMode;
   capabilities: NexusPluginCapabilityRecord[];
 }
 
@@ -139,6 +143,7 @@ export type NexusPluginCapabilityProjectionRecord =
       id: string;
       description: string | null;
       serverName: string;
+      exposure: NexusMcpExposureMode | null;
       targetAgents: string[];
       tools: Array<{
         name: string;
@@ -339,6 +344,7 @@ function projectCapabilityRecord(
       id: capability.id,
       description: capability.description ?? null,
       serverName: capability.serverName,
+      exposure: capability.exposure ?? null,
       targetAgents: capability.targetAgents ?? [],
       tools: (capability.tools ?? []).map((tool) => ({
         name: tool.name,

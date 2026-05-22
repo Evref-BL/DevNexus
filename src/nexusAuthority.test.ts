@@ -292,6 +292,89 @@ describe("nexus current automation actor resolution", () => {
     expect(result.profiles.map((profile) => profile.id)).toEqual(["evref-app"]);
   });
 
+  it("uses explicit repository scopes to disambiguate non-App actor profiles", () => {
+    const result = resolveNexusCurrentAutomationActor({
+      authority,
+      componentId: "dev-nexus",
+      publication,
+      repository: "git@github.com:Evref-BL/DevNexus.git",
+      authProfiles: [
+        automationProfile({
+          id: "dogfood-bot",
+          actorId: "example-bot-actor",
+          account: "Example-Bot",
+          repositoryScopes: ["Gabot-Darbot/*"],
+        }),
+        automationProfile({
+          id: "evref-bot",
+          actorId: "example-bot-actor",
+          account: "Example-Bot",
+          repositoryScopes: ["Evref-BL/DevNexus"],
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      status: "matched",
+      expectedActorId: "example-bot-actor",
+      profileId: "evref-bot",
+      warnings: [],
+    });
+    expect(result.profiles.map((profile) => profile.id)).toEqual(["evref-bot"]);
+  });
+
+  it("does not fall back to repository-scoped profiles from another repository", () => {
+    const result = resolveNexusCurrentAutomationActor({
+      authority,
+      componentId: null,
+      publication,
+      repository: "git@github.com:Evref-BL/DevNexus.git",
+      authProfiles: [
+        automationProfile({
+          id: "dogfood-bot",
+          actorId: "example-bot-actor",
+          repositoryScopes: ["Gabot-Darbot/*"],
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      componentId: null,
+      status: "missing",
+      expectedActorId: "example-bot-actor",
+      profileId: null,
+      profiles: [],
+    });
+    expect(result.warnings[0]).toContain("publication repository");
+  });
+
+  it("keeps unscoped actor profiles available when no scoped profile matches", () => {
+    const result = resolveNexusCurrentAutomationActor({
+      authority,
+      componentId: "dev-nexus",
+      publication,
+      repository: "git@github.com:Evref-BL/DevNexus.git",
+      authProfiles: [
+        automationProfile({
+          id: "dogfood-bot",
+          actorId: "example-bot-actor",
+          repositoryScopes: ["Gabot-Darbot/*"],
+        }),
+        automationProfile({
+          id: "generic-bot",
+          actorId: "example-bot-actor",
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      status: "matched",
+      expectedActorId: "example-bot-actor",
+      profileId: "generic-bot",
+      warnings: [],
+    });
+  });
+
   it("does not let a human profile satisfy an automation actor", () => {
     const result = resolveNexusCurrentAutomationActor({
       authority,

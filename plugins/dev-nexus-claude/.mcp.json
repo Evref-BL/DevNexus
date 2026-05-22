@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dev_nexus": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/scripts/dev-nexus-claude-wrapper.mjs",
+        "mcp-stdio"
+      ],
+      "env": {
+        "DEV_NEXUS_AGENT_CLIENT": "claude"
+      }
+    }
+  }
+}

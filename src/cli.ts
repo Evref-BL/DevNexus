@@ -26,6 +26,7 @@ export {
   usage,
 } from "./cliUsage.js";
 import { handleDiagnosticsCommand } from "./cliDiagnosticsCommand.js";
+import { handleAuthCommand } from "./cliAuthCommand.js";
 import { handleHostCommand } from "./cliHostCommand.js";
 import { handlePublicationCommand } from "./cliPublicationCommand.js";
 import { isCliEntrypoint } from "./cliRuntime.js";
@@ -185,8 +186,19 @@ import {
 } from "./nexusSetupAssistant.js";
 import {
   materializeNexusProjectAgentMcpConfig,
+  resolveNexusProjectAgentMcpTargets,
   type MaterializeNexusProjectAgentMcpConfigResult,
+  type MaterializedNexusAgentMcpTarget,
 } from "./nexusAgentMcpConfig.js";
+import {
+  buildNexusMcpContextBudgetReport,
+  type NexusMcpContextBudgetReport,
+} from "./nexusMcpContextBudget.js";
+import {
+  resolveNexusMcpExposure,
+  resolveNexusPluginMcpServerExposures,
+  type NexusPluginMcpServerExposureResolution,
+} from "./nexusMcpExposurePolicy.js";
 import {
   refreshNexusProjectPlugin,
   type RefreshNexusProjectPluginResult,
@@ -198,6 +210,10 @@ import {
   type NexusAgentProjectionCleanupPlan,
 } from "./nexusAgentProjectionCleanup.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
+import { runDevNexusMcpGatewayStdioServer } from "./nexusMcpGateway.js";
+import {
+  nexusMcpGatewayAgentTargets,
+} from "./nexusMcpGatewayProjection.js";
 import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
@@ -227,6 +243,7 @@ import {
 import {
   loadProjectConfig,
   selectNexusProjectMcpAgentTargets,
+  type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -428,6 +445,35 @@ interface ParsedProjectHostingCommand {
 interface ParsedProjectMcpRefreshCommand {
   projectRoot: string;
   agents: string[];
+  dryRun?: boolean;
+  json?: boolean;
+}
+
+interface ProjectMcpRefreshExposurePlan {
+  directTargets: Array<{
+    agent: string;
+    provider: string;
+    serverName: string;
+    mode: string;
+    source: string;
+    path: string | null;
+    reason: string;
+  }>;
+  pluginServers: NexusPluginMcpServerExposureResolution[];
+}
+
+interface ProjectMcpRefreshDryRunResult {
+  agentTargets: MaterializedNexusAgentMcpTarget[];
+  capabilityGaps: MaterializeNexusProjectAgentMcpConfigResult["capabilityGaps"];
+  gitExcludePath: null;
+  gitExcludeEntries: [];
+  exposurePlan: ProjectMcpRefreshExposurePlan;
+}
+
+interface ParsedProjectMcpBudgetCommand {
+  projectRoot: string;
+  agents: string[];
+  topLimit?: number;
   json?: boolean;
 }
 
@@ -915,7 +961,10 @@ async function mainUnchecked(
   if (argv[0] === "home") {
     return handleHomeCommand(argv, dependencies);
   }
-  if (argv[0] === "workspace" || argv[0] === "project") {
+  if (argv[0] === "auth") {
+    return handleAuthCommand(argv, dependencies);
+  }
+  if (argv[0] === "workspace") {
     return handleProjectCommand(argv, dependencies);
   }
   if (argv[0] === "setup") {
@@ -964,9 +1013,13 @@ async function mainUnchecked(
     await runDevNexusMcpStdioServer();
     return 0;
   }
+  if (argv[0] === "mcp-gateway-stdio") {
+    await runDevNexusMcpGatewayStdioServer();
+    return 0;
+  }
 
   throw new Error(
-    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, dashboard, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1111,7 +1164,7 @@ async function handleProjectCommand(
     return 0;
   }
 
-  if (command === "init" || command === "setup") {
+  if (command === "init") {
     if (argvRequestsHelp(argv)) {
       writeLine(dependencies.stdout ?? process.stdout, projectSetupUsage());
       return 0;
@@ -1136,7 +1189,7 @@ async function handleProjectCommand(
 
     assertCliMutationAllowed(dependencies, {
       projectRoot: proposal.answers.project.root,
-      command: command === "init" ? "workspace init" : "workspace setup",
+      command: "workspace init",
       mutationClass: "worktree_bootstrap",
       targetPath: proposal.answers.project.root,
     });
@@ -1208,7 +1261,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("workspace requires create, init, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
+  throw new Error("workspace requires create, init, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -1323,25 +1376,69 @@ async function handleProjectMcpCommand(
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
   const command = argv[2];
+  if (command === "budget") {
+    const parsed = parseProjectMcpBudgetCommand(argv);
+    const report = buildNexusMcpContextBudgetReport({
+      projectRoot: parsed.projectRoot,
+      agents: parsed.agents,
+      topLimit: parsed.topLimit,
+    });
+    printProjectMcpBudgetResult(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
   if (command !== "refresh") {
-    throw new Error("workspace mcp requires refresh");
+    throw new Error("workspace mcp requires refresh or budget");
   }
 
   const parsed = parseProjectMcpRefreshCommand(argv);
   const projectRoot = path.resolve(parsed.projectRoot);
+  const projectConfig = loadProjectConfig(projectRoot);
+  const selectedTargets = selectNexusProjectMcpAgentTargets(
+    projectConfig,
+    parsed.agents,
+  );
+  const gatewayTargets = nexusMcpGatewayAgentTargets({
+    projectConfig,
+    selectedTargets,
+  });
+  if (parsed.dryRun) {
+    const agentTargets = resolveNexusProjectAgentMcpTargets({
+      projectRoot,
+      mcpConfig: projectConfig.mcp,
+      agentTargets: [...selectedTargets, ...gatewayTargets],
+    });
+    const result: ProjectMcpRefreshDryRunResult = {
+      agentTargets,
+      capabilityGaps: [],
+      gitExcludePath: null,
+      gitExcludeEntries: [],
+      exposurePlan: buildProjectMcpRefreshExposurePlan({
+        projectConfig,
+        selectedTargets,
+        materializedTargets: agentTargets,
+      }),
+    };
+    printProjectMcpRefreshResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   assertCliMutationAllowed(dependencies, {
     projectRoot,
     command: "workspace mcp refresh",
     mutationClass: "skill_mcp_projection",
   });
-  const projectConfig = loadProjectConfig(projectRoot);
   const result = materializeNexusProjectAgentMcpConfig({
     projectRoot,
     mcpConfig: projectConfig.mcp,
-    agentTargets: selectNexusProjectMcpAgentTargets(
-      projectConfig,
-      parsed.agents,
-    ),
+    agentTargets: [...selectedTargets, ...gatewayTargets],
   });
   printProjectMcpRefreshResult(result, parsed, dependencies.stdout ?? process.stdout);
   return 0;
@@ -3245,7 +3342,7 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown workspace setup option: ${arg}`);
+        throw new Error(`Unknown workspace init option: ${arg}`);
     }
   }
 
@@ -3479,11 +3576,55 @@ function parseProjectMcpRefreshCommand(
       case "--agent":
         parsed.agents.push(next());
         break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
       case "--json":
         parsed.json = true;
         break;
       default:
         throw new Error(`Unknown workspace mcp refresh option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectMcpBudgetCommand(
+  argv: string[],
+): ParsedProjectMcpBudgetCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("workspace mcp budget requires a workspace root");
+  }
+
+  const parsed: ParsedProjectMcpBudgetCommand = {
+    projectRoot,
+    agents: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--agent":
+        parsed.agents.push(next());
+        break;
+      case "--top":
+        parsed.topLimit = parsePositiveInteger(next(), "--top");
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown workspace mcp budget option: ${arg}`);
     }
   }
 
@@ -6417,17 +6558,26 @@ function printHostingIssues(
 }
 
 function printProjectMcpRefreshResult(
-  result: MaterializeNexusProjectAgentMcpConfigResult,
+  result: MaterializeNexusProjectAgentMcpConfigResult | ProjectMcpRefreshDryRunResult,
   parsed: ParsedProjectMcpRefreshCommand,
   stdout: TextWriter,
 ): void {
-  const payload = { ok: true, ...result };
+  const payload = {
+    ok: true,
+    applied: parsed.dryRun !== true,
+    ...result,
+  };
   if (parsed.json) {
     writeJson(stdout, payload);
     return;
   }
 
-  writeLine(stdout, "DevNexus MCP agent config refreshed.");
+  writeLine(
+    stdout,
+    parsed.dryRun
+      ? "DevNexus MCP agent config refresh dry-run."
+      : "DevNexus MCP agent config refreshed.",
+  );
   writeLine(stdout, `  Agent targets: ${result.agentTargets.length}`);
   for (const target of result.agentTargets) {
     writeLine(
@@ -6450,6 +6600,113 @@ function printProjectMcpRefreshResult(
   }
   if (result.gitExcludeEntries.length > 0) {
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
+  }
+  if ("exposurePlan" in result) {
+    writeLine(stdout, "  Exposure plan:");
+    for (const target of result.exposurePlan.directTargets) {
+      writeLine(
+        stdout,
+        `    direct ${target.agent}/${target.serverName}: ${target.mode} (${target.source})`,
+      );
+    }
+    for (const server of result.exposurePlan.pluginServers) {
+      writeLine(
+        stdout,
+        `    plugin ${server.pluginId}/${server.serverName}: ${server.mode} (${server.source})`,
+      );
+    }
+  }
+}
+
+function buildProjectMcpRefreshExposurePlan(options: {
+  projectConfig: NexusProjectConfig;
+  selectedTargets: NexusProjectAgentMcpTarget[];
+  materializedTargets: MaterializedNexusAgentMcpTarget[];
+}): ProjectMcpRefreshExposurePlan {
+  return {
+    directTargets: options.materializedTargets.map((target) => {
+      const configuredTarget =
+        options.selectedTargets.find((candidate) =>
+          candidate.agent.trim().toLowerCase() === target.agent.trim().toLowerCase()
+        ) ?? {
+          agent: target.agent,
+          provider: target.provider,
+        };
+      const exposure = resolveNexusMcpExposure({
+        workspaceExposure: options.projectConfig.mcp?.exposure,
+        agentTarget: configuredTarget,
+      });
+      return {
+        agent: target.agent,
+        provider: target.provider,
+        serverName: target.serverName,
+        mode: exposure.mode,
+        source: exposure.source,
+        path: exposure.path,
+        reason: exposure.reason,
+      };
+    }),
+    pluginServers: options.selectedTargets.flatMap((target) =>
+      resolveNexusPluginMcpServerExposures(options.projectConfig, {
+        agent: target.agent,
+      }),
+    ),
+  };
+}
+
+function printProjectMcpBudgetResult(
+  report: NexusMcpContextBudgetReport,
+  parsed: ParsedProjectMcpBudgetCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, report);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus MCP context budget.");
+  writeLine(stdout, `  Project: ${report.projectRoot}`);
+  writeLine(stdout, `  Direct MCP targets: ${report.totals.directTargetCount}`);
+  writeLine(
+    stdout,
+    `  Plugin-declared MCP servers: ${report.totals.pluginDeclaredServerCount}`,
+  );
+  writeLine(
+    stdout,
+    `  Known tools: ${report.totals.knownToolCount}; estimated metadata: ${report.totals.estimatedBytes} bytes (~${report.totals.estimatedTokens} tokens)`,
+  );
+  writeLine(
+    stdout,
+    `  Visible MCP context: ${report.contextImpact.visibleEstimatedBytes} bytes (~${report.contextImpact.visibleEstimatedTokens} tokens)`,
+  );
+  if (report.contextImpact.gatewayRoutedToolCount > 0) {
+    writeLine(
+      stdout,
+      `  Gateway routing: ${report.contextImpact.gatewaySurfaceToolCount} visible gateway tool(s) route ${report.contextImpact.gatewayRoutedToolCount} upstream tool(s); saved ${report.contextImpact.savedBytes} bytes (~${report.contextImpact.savedTokens} tokens)`,
+    );
+  }
+  writeLine(stdout, "  Top MCP servers:");
+  for (const server of report.topServers) {
+    writeLine(
+      stdout,
+      `    ${server.source}:${server.serverName} ${server.toolCount} tool(s), ${server.estimatedBytes} bytes (${server.metadataStatus})`,
+    );
+  }
+  if (report.topServers.length === 0) {
+    writeLine(stdout, "    none");
+  }
+  writeLine(stdout, "  Top MCP tools:");
+  for (const tool of report.topTools) {
+    writeLine(
+      stdout,
+      `    ${tool.serverName}.${tool.toolName} ${tool.estimatedBytes} bytes`,
+    );
+  }
+  if (report.topTools.length === 0) {
+    writeLine(stdout, "    none");
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
   }
 }
 

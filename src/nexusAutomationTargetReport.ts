@@ -234,6 +234,7 @@ export interface NexusAutomationTargetReport {
   workItemSummary: NexusAutomationTargetReportWorkItemSummary | null;
   executionSummary: NexusAutomationTargetReportExecutionSummary | null;
   externalIssueVisibility: NexusExternalIssueVisibilitySummary;
+  workspacePublication: NexusAutomationPublicationPolicySummary;
   authority: NexusAuthorityProjectSummary | null;
   componentProgress: NexusAutomationTargetReportComponentProgressSummary[];
   versionPlanning?: NexusVersionPlanningSurface;
@@ -262,6 +263,9 @@ export function buildNexusAutomationTargetReport(
     components,
     discoveryStatus: getNexusWorkItemDiscoveryStatus({ projectRoot }),
   });
+  const workspacePublication = summarizeNexusAutomationPublicationPolicy(
+    resolveNexusPublicationPolicy(projectConfig),
+  );
   const authority = summarizeNexusAuthorityForProject({
     projectId: projectConfig.id,
     authority: projectConfig.authority,
@@ -290,6 +294,7 @@ export function buildNexusAutomationTargetReport(
       workItemSummary: null,
       executionSummary: null,
       externalIssueVisibility,
+      workspacePublication,
       authority,
       componentProgress: [],
       relaunchDecision: {
@@ -359,6 +364,7 @@ export function buildNexusAutomationTargetReport(
     workItemSummary,
     executionSummary,
     externalIssueVisibility,
+    workspacePublication,
     authority,
     componentProgress: summarizeComponentProgress({
       projectConfig,

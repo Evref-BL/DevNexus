@@ -1,0 +1,20 @@
+{
+  "name": "dev-nexus-local",
+  "interface": {
+    "displayName": "DevNexus Local"
+  },
+  "plugins": [
+    {
+      "name": "dev-nexus-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dev-nexus-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

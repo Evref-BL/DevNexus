@@ -388,6 +388,15 @@ function ok(args: string[], stdout: string, exitCode = 0): GitCommandResult {
   };
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -406,10 +415,10 @@ describe("dev-nexus cli", () => {
     await expect(main(["--help"], { stdout: output.writer })).resolves.toBe(0);
 
     expect(output.output()).toContain("dev-nexus home init");
+    expect(output.output()).toContain("dev-nexus auth github-app user login");
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus workspace status");
     expect(output.output()).toContain("dev-nexus workspace init");
-    expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("dev-nexus workspace component add");
     expect(output.output()).toContain("dev-nexus workspace hosting status");
     expect(output.output()).toContain("dev-nexus workspace hosting plan");
@@ -436,6 +445,147 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus automation coordinator-loop");
   });
 
+  it("logs in, reports status, and logs out of GitHub App user auth", async () => {
+    const homePath = makeTempDir("dev-nexus-home-");
+    saveHomeConfig(homePath, [
+      {
+        id: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        provider: "github",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "Gabriel-Darbord",
+        host: "github.com",
+        purposes: ["api", "git"],
+        githubApp: {
+          clientId: "Iv23client",
+          slug: "devnexus-automation",
+          installationAccount: "Evref-BL",
+          repositories: ["DevNexus"],
+        },
+      },
+    ]);
+    const requests: Array<{ url: string; method: string; authorization: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init = {}) => {
+      const url = String(input);
+      requests.push({
+        url,
+        method: init.method ?? "GET",
+        authorization: new Headers(init.headers).get("authorization"),
+      });
+      if (url === "https://github.com/login/device/code") {
+        return jsonResponse({
+          device_code: "device-code",
+          user_code: "WDJB-MJHT",
+          verification_uri: "https://github.com/login/device",
+          expires_in: 900,
+          interval: 5,
+        });
+      }
+      if (url === "https://github.com/login/oauth/access_token") {
+        return jsonResponse({
+          access_token: "ghu_access",
+          expires_in: 28800,
+          refresh_token: "ghr_refresh",
+          refresh_token_expires_in: 15897600,
+          token_type: "bearer",
+        });
+      }
+      if (url === "https://api.github.com/user") {
+        return jsonResponse({
+          login: "Gabriel-Darbord",
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    const loginOutput = captureOutput();
+
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "login",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        {
+          stdout: loginOutput.writer,
+          fetch: fetchImpl,
+          now: fixedClock("2026-05-22T10:00:00.000Z"),
+          sleep: async () => undefined,
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(loginOutput.output())).toMatchObject({
+      ok: true,
+      result: {
+        profileId: "gabriel-devnexus-app-user",
+        login: "Gabriel-Darbord",
+        userCode: "WDJB-MJHT",
+        status: {
+          state: "authorized",
+        },
+      },
+    });
+    expect(requests).toHaveLength(3);
+
+    const statusOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "status",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        {
+          stdout: statusOutput.writer,
+          now: fixedClock("2026-05-22T11:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(statusOutput.output())).toMatchObject({
+      ok: true,
+      status: {
+        state: "authorized",
+        login: "Gabriel-Darbord",
+      },
+    });
+
+    const logoutOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "auth",
+          "github-app",
+          "user",
+          "logout",
+          "--home",
+          homePath,
+          "--profile",
+          "gabriel-devnexus-app-user",
+          "--json",
+        ],
+        { stdout: logoutOutput.writer },
+      ),
+    ).resolves.toBe(0);
+    expect(JSON.parse(logoutOutput.output())).toMatchObject({
+      ok: true,
+      removed: true,
+    });
+  });
+
   it("prints focused workspace init help", async () => {
     const output = captureOutput();
 
@@ -453,19 +603,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--dry-run");
     expect(output.output()).toContain("--json");
     expect(output.output()).not.toContain("--yes");
-    expect(output.output()).toContain("Provider mutations are not part of workspace setup.");
-  });
-
-  it("keeps workspace setup as an alias for workspace init", async () => {
-    const output = captureOutput();
-
-    await expect(
-      main(["workspace", "setup", "--help"], { stdout: output.writer }),
-    ).resolves.toBe(0);
-
-    expect(output.output()).toContain("dev-nexus workspace init");
-    expect(output.output()).toContain("Alias:");
-    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("Provider mutations are not part of workspace init.");
   });
 
   it("prints focused workspace component add help", async () => {
@@ -490,7 +628,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["workspace", "setup", "--bad-option", "--json"], {
+      main(["workspace", "init", "--bad-option", "--json"], {
         stdout: output.writer,
       }),
     ).resolves.toBe(1);
@@ -499,7 +637,7 @@ describe("dev-nexus cli", () => {
       ok: false,
       error: {
         code: "cli_error",
-        message: "Unknown workspace setup option: --bad-option",
+        message: "Unknown workspace init option: --bad-option",
       },
     });
   });
@@ -632,16 +770,6 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("keeps project as a compatibility alias for workspace commands", async () => {
-    const output = captureOutput();
-
-    await expect(
-      main(["project", "setup", "--help"], { stdout: output.writer }),
-    ).resolves.toBe(0);
-
-    expect(output.output()).toContain("dev-nexus workspace init");
-  });
-
   it("refreshes a local project plugin and materializes skills and MCP config", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-plugin-project-");
     const pluginRoot = makeTempDir("dev-nexus-cli-plugin-package-");
@@ -725,7 +853,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "plugin",
           "refresh",
           projectRoot,
@@ -775,6 +903,95 @@ describe("dev-nexus cli", () => {
     expect(codexConfig).toContain("[mcp_servers.demo_ts]");
     expect(codexConfig).toContain('command = "node"');
     expect(codexConfig).toContain('args = ["demo-server.js"]');
+  });
+
+  it("does not directly materialize hidden or gateway-routed plugin MCP servers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-plugin-exposure-");
+    const pluginRoot = makeTempDir("dev-nexus-cli-plugin-exposure-package-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        agentTargets: {
+          active: [
+            {
+              provider: "codex",
+              mcp: {},
+              skills: {},
+            },
+          ],
+        },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "demo-mcp-exposure-plugin",
+          type: "module",
+          main: "./index.js",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "index.js"),
+      [
+        "export function demoDevNexusPluginConfig() {",
+        "  return {",
+        "    id: 'demo-mcp-exposure',",
+        "    enabled: true,",
+        "    capabilities: [",
+        "      { kind: 'mcp_server', id: 'direct-mcp', serverName: 'direct_mcp', command: 'node', args: ['direct.js'], targetAgents: ['codex'], exposure: 'direct' },",
+        "      { kind: 'mcp_server', id: 'gateway-mcp', serverName: 'gateway_mcp', command: 'node', args: ['gateway.js'], targetAgents: ['codex'], exposure: 'gateway' },",
+        "      { kind: 'mcp_server', id: 'hidden-mcp', serverName: 'hidden_mcp', command: 'node', args: ['hidden.js'], targetAgents: ['codex'], exposure: 'hidden' }",
+        "    ]",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await main(
+      [
+        "workspace",
+        "plugin",
+        "refresh",
+        projectRoot,
+        "--from",
+        pluginRoot,
+        "--json",
+      ],
+      { stdout: output.writer },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload.mcpProjection).toMatchObject({
+      materializedServerCount: 1,
+      materializedTargetCount: 1,
+      skippedServers: [
+        {
+          serverName: "gateway_mcp",
+          reason: "gateway_pending",
+          exposureMode: "gateway",
+        },
+        {
+          serverName: "hidden_mcp",
+          reason: "hidden_exposure",
+          exposureMode: "hidden",
+        },
+      ],
+    });
+    const codexConfig = fs.readFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "utf8",
+    );
+    expect(codexConfig).toContain("[mcp_servers.direct_mcp]");
+    expect(codexConfig).not.toContain("gateway_mcp");
+    expect(codexConfig).not.toContain("hidden_mcp");
   });
 
   it("prints a quick-fix plan for one provider-native GitHub issue", async () => {
@@ -1823,7 +2040,7 @@ describe("dev-nexus cli", () => {
           "--expected-command",
           "dev-nexus workspace status <workspace-id-or-root>",
           "--expected-command",
-          "dev-nexus workspace setup <workspace-root> --answers <answers.json>",
+          "dev-nexus workspace init <workspace-root> --answers <answers.json>",
           "--package-version",
           "0.1.0-alpha.10",
           "--json",
@@ -1838,7 +2055,7 @@ describe("dev-nexus cli", () => {
       diagnostic: {
         status: "skew_detected",
         installedPackageVersion: "0.1.0-alpha.10",
-        missingDocumentedCommands: ["dev-nexus workspace setup"],
+        missingDocumentedCommands: ["dev-nexus workspace init"],
         remediation: {
           action: "upgrade_npm_package",
         },
@@ -1864,7 +2081,7 @@ describe("dev-nexus cli", () => {
           "--installed-help-file",
           olderHelpPath,
           "--expected-command",
-          "dev-nexus workspace setup <workspace-root>",
+          "dev-nexus workspace init <workspace-root>",
         ],
         { stdout: output.writer },
       ),
@@ -1872,7 +2089,7 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("DevNexus CLI version skew: skew_detected.");
     expect(output.output()).toContain("Missing documented commands:");
-    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("dev-nexus workspace init");
     expect(output.output()).toContain("Remediation:");
   });
 
@@ -1974,7 +2191,7 @@ describe("dev-nexus cli", () => {
 
     const statusOutput = captureOutput();
     await expect(
-      main(["project", "hosting", "status", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "status", projectRoot, "--home", homePath, "--json"], {
         stdout: statusOutput.writer,
         gitRunner,
       }),
@@ -2004,7 +2221,7 @@ describe("dev-nexus cli", () => {
 
     const planOutput = captureOutput();
     await expect(
-      main(["project", "hosting", "plan", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "plan", projectRoot, "--home", homePath, "--json"], {
         stdout: planOutput.writer,
         gitRunner,
       }),
@@ -2092,7 +2309,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "hosting", "apply", projectRoot, "--json"], {
+      main(["workspace", "hosting", "apply", projectRoot, "--json"], {
         stdout: output.writer,
         gitRunner,
       }),
@@ -2208,7 +2425,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "hosting", "apply", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "apply", projectRoot, "--home", homePath, "--json"], {
         stdout: output.writer,
         hostingProvider,
       }),
@@ -2617,11 +2834,11 @@ describe("dev-nexus cli", () => {
     );
   });
 
-  it("reports required workspace setup answers in non-interactive JSON mode", async () => {
+  it("reports required workspace init answers in non-interactive JSON mode", async () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "setup", "--json"], { stdout: output.writer }),
+      main(["workspace", "init", "--json"], { stdout: output.writer }),
     ).resolves.toBe(2);
 
     expect(JSON.parse(output.output())).toMatchObject({
@@ -2635,7 +2852,7 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(output.output()).requiredAnswers).not.toContain("home.path");
   });
 
-  it("defaults workspace setup home when answers omit home path", async () => {
+  it("defaults workspace init home when answers omit home path", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-default-home-");
     const defaultHomePath = path.join(makeTempDir("dev-nexus-default-home-"), "home");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -2667,8 +2884,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2694,8 +2911,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2715,7 +2932,7 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
-  it("previews and applies workspace setup from an answer file without provider mutations", async () => {
+  it("previews and applies workspace init from an answer file without provider mutations", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-");
     const homePath = makeTempDir("dev-nexus-project-setup-home-");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -2812,8 +3029,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2870,8 +3087,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2985,6 +3202,82 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("previews and applies an embedded workspace whose primary component is the workspace root", async () => {
+    const projectRoot = makeTempDir("dev-nexus-embedded-project-setup-");
+    const homePath = makeTempDir("dev-nexus-embedded-project-setup-home-");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    const answersPath = path.join(projectRoot, "answers.json");
+    fs.writeFileSync(
+      answersPath,
+      `${JSON.stringify({
+        home: {
+          path: homePath,
+        },
+        project: {
+          id: "embedded-demo",
+          name: "Embedded Demo",
+          root: projectRoot,
+          initializeGit: false,
+          defaultBranch: "main",
+        },
+        components: [
+          {
+            id: "embedded-demo",
+            name: "Embedded Demo",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: ".",
+              defaultBranch: "main",
+            },
+          },
+        ],
+        agentTargets: [
+          {
+            provider: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+        },
+      }, null, 2)}\n`,
+    );
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "workspace",
+          "init",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(applyOutput.output())).toMatchObject({
+      ok: true,
+      applied: true,
+      projectRoot,
+    });
+    expect(loadProjectConfig(projectRoot)).toMatchObject({
+      id: "embedded-demo",
+      components: [
+        expect.objectContaining({
+          id: "embedded-demo",
+          sourceRoot: ".",
+          defaultWorkTrackerId: "local",
+        }),
+      ],
+    });
+  });
+
   it("previews and applies component add from an answer file", async () => {
     const projectRoot = makeTempDir("dev-nexus-component-add-");
     const homePath = makeTempDir("dev-nexus-component-add-home-");
@@ -3050,8 +3343,8 @@ describe("dev-nexus cli", () => {
     const setupOutput = captureOutput();
     await expect(
       main([
-        "project",
-        "setup",
+        "workspace",
+        "init",
         projectRoot,
         "--answers",
         setupAnswersPath,
@@ -3063,7 +3356,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "component",
           "add",
           projectRoot,
@@ -3089,7 +3382,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "component",
           "add",
           projectRoot,
@@ -3139,22 +3432,22 @@ describe("dev-nexus cli", () => {
         stdout: initOutput.writer,
       },
     );
-    await main(["project", "create", "HomeTool", "--home", homePath, "--json"], {
+    await main(["workspace", "create", "HomeTool", "--home", homePath, "--json"], {
       stdout: createOutput.writer,
       projectGitRunner: fakeProjectGitRunner(gitCalls),
     });
-    await main(["project", "list", "--home", homePath, "--json"], {
+    await main(["workspace", "list", "--home", homePath, "--json"], {
       stdout: listOutput.writer,
     });
 
     const created = JSON.parse(createOutput.output());
     await main(
-      ["project", "status", "home-tool", "--home", homePath, "--json"],
+      ["workspace", "status", "home-tool", "--home", homePath, "--json"],
       {
         stdout: registryStatusOutput.writer,
       },
     );
-    await main(["project", "status", created.projectRoot, "--json"], {
+    await main(["workspace", "status", created.projectRoot, "--json"], {
       stdout: pathStatusOutput.writer,
     });
 
@@ -3209,7 +3502,7 @@ describe("dev-nexus cli", () => {
     });
     await main(
       [
-        "project",
+        "workspace",
         "import",
         sourceRoot,
         "--home",
@@ -3228,7 +3521,7 @@ describe("dev-nexus cli", () => {
     );
     await main(
       [
-        "project",
+        "workspace",
         "tracker",
         "configure",
         "imported",
@@ -3246,7 +3539,7 @@ describe("dev-nexus cli", () => {
     );
     await main(
       [
-        "project",
+        "workspace",
         "tracker",
         "link",
         "imported",
@@ -5778,7 +6071,7 @@ describe("dev-nexus cli", () => {
 
     await main(
       [
-        "project",
+        "workspace",
         "mcp",
         "refresh",
         projectRoot,
@@ -5852,7 +6145,7 @@ describe("dev-nexus cli", () => {
       },
     }));
 
-    await main(["project", "mcp", "refresh", projectRoot], {
+    await main(["workspace", "mcp", "refresh", projectRoot], {
       stdout: output.writer,
     });
 
@@ -5878,7 +6171,7 @@ describe("dev-nexus cli", () => {
       },
     }));
 
-    await main(["project", "mcp", "refresh", projectRoot, "--agent", "claude"], {
+    await main(["workspace", "mcp", "refresh", projectRoot, "--agent", "claude"], {
       stdout: output.writer,
     });
 
@@ -5886,6 +6179,333 @@ describe("dev-nexus cli", () => {
     expect(
       fs.existsSync(path.join(projectRoot, ".codex", "config.toml")),
     ).toBe(false);
+  });
+
+  it("dry-runs project MCP refresh with effective exposure planning", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-dry-run-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        exposure: "gateway",
+        agentTargets: [
+          {
+            agent: "codex",
+            exposure: "direct",
+          },
+        ],
+      },
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "hidden-mcp",
+              serverName: "hidden_mcp",
+              command: "node",
+              args: ["hidden-server.js"],
+              exposure: "hidden",
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(
+      ["workspace", "mcp", "refresh", projectRoot, "--dry-run", "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      applied: false,
+      exposurePlan: {
+        directTargets: [
+          {
+            agent: "codex",
+            serverName: "dev_nexus",
+            mode: "direct",
+            source: "agent_target",
+          },
+          {
+            agent: "codex",
+            serverName: "dev_nexus_gateway",
+            mode: "direct",
+            source: "agent_target",
+          },
+        ],
+        pluginServers: [
+          {
+            pluginId: "workflow-plugin",
+            capabilityId: "workflow-mcp",
+            serverName: "workflow_mcp",
+            mode: "gateway",
+            source: "plugin",
+          },
+          {
+            pluginId: "workflow-plugin",
+            capabilityId: "hidden-mcp",
+            serverName: "hidden_mcp",
+            mode: "hidden",
+            source: "server",
+          },
+        ],
+      },
+    });
+    expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(false);
+  });
+
+  it("projects the gateway MCP server alongside direct targets when needed", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-gateway-refresh-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [
+          {
+            agent: "codex",
+            exposure: "direct",
+          },
+        ],
+      },
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              targetAgents: ["codex"],
+              tools: [{ name: "workflow_search" }],
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "refresh", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload.agentTargets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          agent: "codex",
+          serverName: "dev_nexus",
+          effectiveExposure: "direct",
+        }),
+        expect.objectContaining({
+          agent: "codex",
+          serverName: "dev_nexus_gateway",
+          effectiveExposure: "direct",
+        }),
+      ]),
+    );
+    const codexConfig = fs.readFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "utf8",
+    );
+    expect(codexConfig).toContain("[mcp_servers.dev_nexus]");
+    expect(codexConfig).toContain("[mcp_servers.dev_nexus_gateway]");
+    expect(codexConfig).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-gateway-stdio"]`);
+    expect(codexConfig).not.toContain("workflow_mcp");
+  });
+
+  it("reports project MCP context budget without writing agent config", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      totals: {
+        directTargetCount: 1,
+        directServerCount: 1,
+        pluginDeclaredServerCount: 0,
+      },
+      directServers: [
+        {
+          source: "direct",
+          serverName: "dev_nexus",
+          agent: "codex",
+          metadataStatus: "known",
+        },
+      ],
+    });
+    expect(payload.totals.knownToolCount).toBeGreaterThan(20);
+    expect(payload.totals.estimatedBytes).toBeGreaterThan(1000);
+    expect(payload.topTools[0].estimatedBytes).toBeGreaterThan(0);
+    expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(false);
+  });
+
+  it("reports an empty MCP context budget when MCP projection is disabled", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-empty-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        enabled: false,
+      },
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      totals: {
+        directTargetCount: 0,
+        directServerCount: 0,
+        pluginDeclaredServerCount: 0,
+        knownToolCount: 0,
+        estimatedBytes: 0,
+        estimatedTokens: 0,
+      },
+      directServers: [],
+      pluginDeclaredServers: [],
+      topServers: [],
+      topTools: [],
+    });
+  });
+
+  it("includes plugin-declared MCP servers in the context budget report", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-plugin-budget-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              exposure: "gateway",
+              targetAgents: ["codex"],
+              tools: [
+                {
+                  name: "workflow.status",
+                  description: "Read workflow status.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload.pluginDeclaredServers).toEqual([
+      expect.objectContaining({
+        source: "plugin",
+        pluginId: "workflow-plugin",
+        capabilityId: "workflow-mcp",
+        serverName: "workflow_mcp",
+        declaredToolCount: 1,
+        materializationStatus: "declared",
+        effectiveExposure: "gateway",
+        exposureSource: "server",
+        declaredTools: [
+          expect.objectContaining({
+            source: "plugin",
+            serverName: "workflow_mcp",
+            toolName: "workflow.status",
+          }),
+        ],
+      }),
+    ]);
+  });
+
+  it("prints a concise text MCP context budget report", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-text-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot], {
+      stdout: output.writer,
+    });
+
+    expect(output.output()).toContain("DevNexus MCP context budget");
+    expect(output.output()).toContain("Direct MCP targets: 1");
+    expect(output.output()).toContain("Plugin-declared MCP servers: 0");
+    expect(output.output()).toContain("Visible MCP context:");
+    expect(output.output()).toContain("Top MCP servers:");
+  });
+
+  it("reports malformed MCP budget project config as a JSON error", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-invalid-");
+    fs.writeFileSync(
+      path.join(projectRoot, "dev-nexus.project.json"),
+      "{",
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const exitCode = await main(
+      ["workspace", "mcp", "budget", projectRoot, "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("reports missing MCP budget project config as a JSON error", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-missing-");
+    const output = captureOutput();
+
+    const exitCode = await main(
+      ["workspace", "mcp", "budget", projectRoot, "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+    });
   });
 
   it("cleans up stale generated agent workspaceions through the CLI", async () => {
@@ -5920,7 +6540,7 @@ describe("dev-nexus cli", () => {
     const dryRunOutput = captureOutput();
     const applyOutput = captureOutput();
 
-    await main(["project", "agent-projection", "cleanup", projectRoot, "--json"], {
+    await main(["workspace", "agent-projection", "cleanup", projectRoot, "--json"], {
       stdout: dryRunOutput.writer,
     });
 
@@ -5938,7 +6558,7 @@ describe("dev-nexus cli", () => {
     ).toBe(true);
 
     await main(
-      ["project", "agent-projection", "cleanup", projectRoot, "--apply", "--json"],
+      ["workspace", "agent-projection", "cleanup", projectRoot, "--apply", "--json"],
       {
         stdout: applyOutput.writer,
       },

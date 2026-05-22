@@ -10,6 +10,7 @@ import {
   currentNexusCliScriptPath,
   listNexusSetupFlows,
   recordNexusSetupStep,
+  type NexusAgentClientRuntimeCommandRunner,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -21,6 +22,11 @@ function projectedDevNexusMcpToml(): string {
 
 function expectedProjectedDevNexusMcpCommandLine(): string {
   return `"node" "${currentNexusCliScriptPath()}" "mcp-stdio"`;
+}
+
+function writeJson(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 function makeTempDir(prefix: string): string {
@@ -90,6 +96,23 @@ function initGitRepository(cwd: string) {
   );
 }
 
+function commitAll(cwd: string, message = "initial commit") {
+  childProcess.execFileSync("git", ["add", "."], { cwd });
+  childProcess.execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=DevNexus Test",
+      "-c",
+      "user.email=dev-nexus-test@example.invalid",
+      "commit",
+      "-m",
+      message,
+    ],
+    { cwd },
+  );
+}
+
 function createComponentGitCheckout(projectRoot: string) {
   const componentRoot = path.join(projectRoot, "components", "DevNexus");
   fs.mkdirSync(componentRoot, { recursive: true });
@@ -99,6 +122,51 @@ function createComponentGitCheckout(projectRoot: string) {
     ["remote", "add", "origin", "git@github.com:Evref-BL/DevNexus.git"],
     { cwd: componentRoot },
   );
+}
+
+function writeAgentClientSourceRuntime(sourceRoot: string): string {
+  const sourceCliPath = path.join(sourceRoot, "dist", "cli.js");
+  writeJson(path.join(sourceRoot, "package.json"), {
+    name: "@evref-bl/dev-nexus",
+    version: "0.1.0-test.0",
+    engines: { node: ">=22" },
+  });
+  fs.mkdirSync(path.dirname(sourceCliPath), { recursive: true });
+  fs.writeFileSync(sourceCliPath, "#!/usr/bin/env node\n", "utf8");
+  return sourceCliPath;
+}
+
+function readyAgentClientCommandRunner(): NexusAgentClientRuntimeCommandRunner {
+  return (command, args, options) => {
+    if (command === "node" && args[0] === "--version") {
+      return {
+        command,
+        args,
+        cwd: options.cwd,
+        stdout: "v22.11.0\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+    if (command === "npm" && args[0] === "--version") {
+      return {
+        command,
+        args,
+        cwd: options.cwd,
+        stdout: "10.9.0\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    }
+    return {
+      command,
+      args,
+      cwd: options.cwd,
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    };
+  };
 }
 
 afterEach(() => {
@@ -1012,6 +1080,104 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("treats embedded workspace setup files as a readiness warning instead of blocking", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+      mcp: {
+        command: "dev-nexus",
+        args: ["mcp-stdio"],
+        agentTargets: [
+          {
+            agent: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+      },
+    });
+    fs.writeFileSync(path.join(projectRoot, "AGENTS.md"), "# Agent Guide\n", "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), projectedDevNexusMcpToml(), "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-source-root",
+        status: "passed",
+        details: expect.objectContaining({
+          sourceRootTopology: expect.objectContaining({
+            layout: "embedded",
+            state: "present",
+          }),
+        }),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "warning",
+        summary: expect.stringContaining("only DevNexus setup files"),
+      }),
+    );
+  });
+
+  it("still blocks embedded workspace readiness when product files are dirty", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-dirty-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+    });
+    fs.writeFileSync(path.join(projectRoot, "src", "local-change.txt"), "dirty\n", "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "blocked",
+        summary: expect.stringContaining("dirty local changes"),
+      }),
+    );
+  });
+
   it("uses workspace-local componentsRoot source roots in setup commands", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-components-root-");
     writeProject(projectRoot, {
@@ -1653,6 +1819,137 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("shows effective exposure for agent and plugin MCP setup checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-mcp-exposure-");
+    writeProject(projectRoot, {
+      mcp: {
+        exposure: "hidden",
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "example-runtime-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "mcp-direct-runtime",
+              serverName: "direct_runtime",
+              command: "node",
+              args: ["direct-server.js"],
+              exposure: "direct",
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-gateway-runtime",
+              serverName: "gateway_runtime",
+              command: "node",
+              args: ["gateway-server.js"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-hidden-runtime",
+              serverName: "hidden_runtime",
+              command: "node",
+              args: ["hidden-server.js"],
+              exposure: "hidden",
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const checks = refreshStep.checks.join("\n");
+    expect(refreshStep.checks).toContain("test -f .codex/config.toml");
+    expect(checks).toContain("direct_runtime");
+    expect(checks).not.toContain("gateway_runtime");
+    expect(checks).not.toContain("hidden_runtime");
+
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    createComponentGitCheckout(projectRoot);
+
+    const setupCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-codex",
+        status: "warning",
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=workspace"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "workspace",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus_gateway",
+        status: "warning",
+        summary: expect.stringContaining("cannot confirm dev_nexus_gateway is configured"),
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-direct_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("exposure=direct source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "direct",
+            source: "server",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-gateway_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("planned for DevNexus gateway registration"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "gateway",
+            source: "plugin",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-hidden_runtime-codex",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "server",
+          }),
+        },
+      }),
+    );
+  });
+
   it("warns when a plugin MCP server uses a stale command line", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-plugin-mcp-stale-");
     writeProject(projectRoot, {
@@ -1711,6 +2008,214 @@ describe("nexus setup assistant", () => {
         item.id === "plugin-example-runtime-plugin-mcp-example_runtime-codex"
       )?.summary,
     ).toContain('Expected: "example-runtime" "mcp" "project"');
+  });
+
+  it("reports Codex and Claude agent-client adapter readiness in setup checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-client-ready-");
+    const sourceRoot = makeTempDir("dev-nexus-setup-agent-client-source-");
+    const sourceCliPath = writeAgentClientSourceRuntime(sourceRoot);
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [
+          { provider: "codex" },
+          { provider: "claude" },
+        ],
+      },
+      plugins: [
+        {
+          id: "example-agent-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "projected_skill",
+              id: "codex-skill",
+              skillId: "codex-diagnostic",
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "claude-mcp",
+              serverName: "claude_diagnostic",
+              targetAgents: ["claude"],
+            },
+          ],
+        },
+      ],
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      projectedDevNexusMcpToml(),
+    );
+    writeJson(path.join(projectRoot, ".mcp.json"), {
+      mcpServers: {
+        dev_nexus: {
+          command: "node",
+          args: [currentNexusCliScriptPath(), "mcp-stdio"],
+        },
+      },
+    });
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+      agentClientAdapter: {
+        sourceRoot,
+        sourceCliPath,
+        commandRunner: readyAgentClientCommandRunner(),
+        commandLocator: () => null,
+      },
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-client-adapter-codex",
+        status: "passed",
+        summary: expect.stringContaining("runtime=source_current"),
+      }),
+    );
+    const codexCheck = check.checks.find(
+      (entry) => entry.id === "agent-client-adapter-codex",
+    );
+    expect(codexCheck?.summary).toContain("version=0.1.0-test.0");
+    expect(codexCheck?.summary).toContain("mcp=ready");
+    expect(codexCheck?.summary).toContain("pluginProjection=skills:1,mcp:0");
+    expect(codexCheck?.summary).toContain("workspace");
+
+    const claudeCheck = check.checks.find(
+      (entry) => entry.id === "agent-client-adapter-claude",
+    );
+    expect(claudeCheck).toMatchObject({
+      status: "passed",
+    });
+    expect(claudeCheck?.summary).toContain("pluginProjection=skills:0,mcp:1");
+  });
+
+  it("blocks adapter readiness on a missing runtime without installing it", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-client-missing-");
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      projectedDevNexusMcpToml(),
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+      agentClientAdapter: {
+        sourceRoot: null,
+        sourceCliPath: null,
+        commandRunner: (command, args, options) => ({
+          command,
+          args,
+          cwd: options.cwd,
+          stdout: "",
+          stderr: `${command} not found`,
+          exitCode: 127,
+        }),
+        commandLocator: () => null,
+      },
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-client-adapter-codex",
+        status: "blocked",
+        summary: expect.stringContaining("runtime=none"),
+        nextAction: expect.stringContaining(
+          "npm install -g @evref-bl/dev-nexus",
+        ),
+      }),
+    );
+  });
+
+  it("warns when adapter readiness sees stale MCP config", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-agent-client-stale-");
+    const sourceRoot = makeTempDir(
+      "dev-nexus-setup-agent-client-stale-source-",
+    );
+    const sourceCliPath = writeAgentClientSourceRuntime(sourceRoot);
+    writeProject(projectRoot, {
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      [
+        "[mcp_servers.dev_nexus]",
+        'command = "old-dev-nexus"',
+        'args = ["mcp-stdio"]',
+        "",
+      ].join("\n"),
+    );
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+      agentClientAdapter: {
+        sourceRoot,
+        sourceCliPath,
+        commandRunner: readyAgentClientCommandRunner(),
+        commandLocator: () => null,
+      },
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-client-adapter-codex",
+        status: "warning",
+        summary: expect.stringContaining("mcp=stale"),
+        nextAction: expect.stringContaining("dev-nexus workspace mcp refresh"),
+      }),
+    );
+  });
+
+  it("reports unsupported agent-client adapter targets", () => {
+    const projectRoot = makeTempDir(
+      "dev-nexus-setup-agent-client-unsupported-",
+    );
+    writeProject(projectRoot, {
+      agentTargets: {
+        active: [{ provider: "custom" }],
+      },
+    });
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    createComponentGitCheckout(projectRoot);
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+      agentClientAdapter: {
+        commandRunner: readyAgentClientCommandRunner(),
+        commandLocator: () => null,
+      },
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-client-adapter-custom",
+        status: "warning",
+        summary: expect.stringContaining("not supported"),
+        nextAction: expect.stringContaining("add adapter readiness support"),
+      }),
+    );
   });
 
   it("blocks setup diagnostics when plugin MCP tools duplicate core DevNexus tools", () => {

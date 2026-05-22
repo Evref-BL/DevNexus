@@ -146,6 +146,8 @@ export interface NexusPublicationPolicyCheck {
   message: string;
 }
 
+export type NexusPublicationScope = "workspace" | "component";
+
 export type NexusGreenMainCandidateStatus =
   | "not_on_candidate_branch"
   | "candidate_branch_local"
@@ -196,7 +198,8 @@ export interface NexusGreenMainPublicationStatus {
 }
 
 export interface NexusPublicationStatus {
-  componentId: string;
+  scope: NexusPublicationScope;
+  componentId: string | null;
   sourceRoot: string;
   action: NexusPublicationGuardAction;
   policy: NexusAutomationPublicationConfig;
@@ -209,6 +212,17 @@ export interface NexusPublicationStatus {
   checks: NexusPublicationPolicyCheck[];
   blocking: boolean;
   warnings: string[];
+}
+
+interface NexusPublicationTarget {
+  scope: NexusPublicationScope;
+  componentId: string | null;
+  label: string;
+  sourceRoot: string;
+  remoteUrl: string | null;
+  defaultBranch: string | null;
+  trackerId: string | null;
+  workTracking: { provider?: string; host?: string | null } | null;
 }
 
 export class NexusPublicationPolicyError extends Error {
@@ -272,6 +286,37 @@ export function resolveNexusPublicationPolicy(
   );
 }
 
+function publicationTargetForComponent(
+  component: ResolvedNexusProjectComponent,
+): NexusPublicationTarget {
+  return {
+    scope: "component",
+    componentId: component.id,
+    label: component.id,
+    sourceRoot: component.sourceRoot,
+    remoteUrl: component.remoteUrl,
+    defaultBranch: component.defaultBranch,
+    trackerId: component.defaultTrackerId,
+    workTracking: component.workTracking ?? null,
+  };
+}
+
+function publicationTargetForWorkspace(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+): NexusPublicationTarget {
+  return {
+    scope: "workspace",
+    componentId: null,
+    label: "workspace",
+    sourceRoot: path.resolve(projectRoot),
+    remoteUrl: projectConfig.repo.remoteUrl,
+    defaultBranch: projectConfig.repo.defaultBranch,
+    trackerId: null,
+    workTracking: projectConfig.workTracking ?? null,
+  };
+}
+
 export function getNexusPublicationStatus(options: {
   projectRoot: string;
   projectConfig: NexusProjectConfig;
@@ -284,15 +329,55 @@ export function getNexusPublicationStatus(options: {
   actorRunner?: NexusPublicationActorRunner;
   env?: NodeJS.ProcessEnv;
 }): NexusPublicationStatus {
+  return getNexusPublicationStatusForTarget({
+    ...options,
+    target: publicationTargetForComponent(options.component),
+    policy: resolveNexusPublicationPolicy(
+      options.projectConfig,
+      options.component,
+    ),
+  });
+}
+
+export function getNexusWorkspacePublicationStatus(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  action?: NexusPublicationGuardAction;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  homePath?: string;
+  providerState?: NexusAuthorityProviderState | null;
+  gitRunner?: GitRunner;
+  actorRunner?: NexusPublicationActorRunner;
+  env?: NodeJS.ProcessEnv;
+}): NexusPublicationStatus {
+  return getNexusPublicationStatusForTarget({
+    ...options,
+    target: publicationTargetForWorkspace(
+      options.projectRoot,
+      options.projectConfig,
+    ),
+    policy: resolveNexusPublicationPolicy(options.projectConfig),
+  });
+}
+
+function getNexusPublicationStatusForTarget(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  target: NexusPublicationTarget;
+  policy: NexusAutomationPublicationConfig;
+  action?: NexusPublicationGuardAction;
+  authProfiles?: NexusHostingAuthProfileConfig[];
+  homePath?: string;
+  providerState?: NexusAuthorityProviderState | null;
+  gitRunner?: GitRunner;
+  actorRunner?: NexusPublicationActorRunner;
+  env?: NodeJS.ProcessEnv;
+}): NexusPublicationStatus {
   const action = options.action ?? "status";
-  const policy = resolveNexusPublicationPolicy(
-    options.projectConfig,
-    options.component,
-  );
   const git = readPublicationGitStatus({
-    component: options.component,
+    target: options.target,
     projectConfig: options.projectConfig,
-    policy,
+    policy: options.policy,
     gitRunner: options.gitRunner ?? defaultGitRunner,
   });
   const authProfiles =
@@ -303,24 +388,24 @@ export function getNexusPublicationStatus(options: {
       homePath: options.homePath,
     });
   const gitIdentity = readPublicationGitIdentityStatus({
-    policy,
-    repositoryPath: git.repositoryPath ?? options.component.sourceRoot,
+    policy: options.policy,
+    repositoryPath: git.repositoryPath ?? options.target.sourceRoot,
     gitRunner: options.gitRunner ?? defaultGitRunner,
     authProfiles,
   });
   const actor = readPublicationActorStatus({
     projectRoot: options.projectRoot,
-    component: options.component,
-    policy,
-    cwd: git.repositoryPath ?? options.component.sourceRoot,
+    target: options.target,
+    policy: options.policy,
+    cwd: git.repositoryPath ?? options.target.sourceRoot,
     actorRunner: options.actorRunner ?? defaultPublicationActorRunner,
     baseEnv: options.env ?? process.env,
     authProfiles,
   });
   const authority = resolvePublicationAuthority({
     projectConfig: options.projectConfig,
-    component: options.component,
-    policy,
+    target: options.target,
+    policy: options.policy,
     git,
     action,
     authProfiles,
@@ -328,16 +413,16 @@ export function getNexusPublicationStatus(options: {
   });
   const greenMain = greenMainPublicationStatus({
     projectConfig: options.projectConfig,
-    component: options.component,
-    policy,
+    target: options.target,
+    policy: options.policy,
     git,
     authProfiles,
     providerState: options.providerState ?? null,
   });
-  const strict = publicationPolicyRequiresGuard(policy, action);
+  const strict = publicationPolicyRequiresGuard(options.policy, action);
   const checks = publicationPolicyChecks({
-    component: options.component,
-    policy,
+    target: options.target,
+    policy: options.policy,
     git,
     gitIdentity,
     actor,
@@ -360,11 +445,12 @@ export function getNexusPublicationStatus(options: {
   ];
 
   return {
-    componentId: options.component.id,
-    sourceRoot: options.component.sourceRoot,
+    scope: options.target.scope,
+    componentId: options.target.componentId,
+    sourceRoot: options.target.sourceRoot,
     action,
-    policy,
-    policySummary: summarizeNexusAutomationPublicationPolicy(policy),
+    policy: options.policy,
+    policySummary: summarizeNexusAutomationPublicationPolicy(options.policy),
     greenMain,
     git,
     gitIdentity,
@@ -668,14 +754,7 @@ export function loadNexusPublicationAuthProfiles(options: {
   projectConfig: NexusProjectConfig;
   homePath?: string;
 }): NexusHostingAuthProfileConfig[] {
-  const homePath = options.homePath
-    ? path.resolve(options.homePath)
-    : options.projectConfig.home
-      ? resolveNexusProjectPath({
-          projectRoot: options.projectRoot,
-          value: options.projectConfig.home,
-        })
-      : defaultNexusHomePath();
+  const homePath = resolveNexusPublicationHomePath(options);
   try {
     return loadNexusHomeConfigFile(
       homePath,
@@ -686,9 +765,24 @@ export function loadNexusPublicationAuthProfiles(options: {
   }
 }
 
+export function resolveNexusPublicationHomePath(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): string {
+  return options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+}
+
 function greenMainPublicationStatus(options: {
   projectConfig: NexusProjectConfig;
-  component: ResolvedNexusProjectComponent;
+  target: NexusPublicationTarget;
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
   authProfiles: NexusHostingAuthProfileConfig[];
@@ -709,7 +803,7 @@ function greenMainPublicationStatus(options: {
   const mergeability = greenMainMergeabilityStatus(options.providerState);
   const mergeAuthority = resolvePublicationAuthority({
     projectConfig: options.projectConfig,
-    component: options.component,
+    target: options.target,
     policy: options.policy,
     git: options.git,
     action: "provider_pull_request_merge",
@@ -913,7 +1007,7 @@ function greenMainHandoffStatus(options: {
 }
 
 function readPublicationGitStatus(options: {
-  component: ResolvedNexusProjectComponent;
+  target: NexusPublicationTarget;
   projectConfig: NexusProjectConfig;
   policy: NexusAutomationPublicationConfig;
   gitRunner: GitRunner;
@@ -922,7 +1016,7 @@ function readPublicationGitStatus(options: {
     runOptionalGit(
       options.gitRunner,
       ["rev-parse", "--show-toplevel"],
-      options.component.sourceRoot,
+      options.target.sourceRoot,
     ),
   );
   const warnings: string[] = [];
@@ -938,10 +1032,10 @@ function readPublicationGitStatus(options: {
       pushUrl: null,
       targetBranch:
         options.policy.targetBranch ??
-        options.component.defaultBranch ??
+        options.target.defaultBranch ??
         options.projectConfig.repo.defaultBranch,
       warnings: [
-        `No Git repository could be resolved for component ${options.component.id}.`,
+        `No Git repository could be resolved for ${options.target.scope} ${options.target.label}.`,
       ],
     };
   }
@@ -1004,7 +1098,7 @@ function readPublicationGitStatus(options: {
     targetBranch:
       options.policy.targetBranch ??
       upstreamParts.branch ??
-      options.component.defaultBranch ??
+      options.target.defaultBranch ??
       options.projectConfig.repo.defaultBranch,
     warnings,
   };
@@ -1012,7 +1106,7 @@ function readPublicationGitStatus(options: {
 
 function readPublicationActorStatus(options: {
   projectRoot: string;
-  component: ResolvedNexusProjectComponent;
+  target: NexusPublicationTarget;
   policy: NexusAutomationPublicationConfig;
   cwd: string;
   actorRunner: NexusPublicationActorRunner;
@@ -1053,7 +1147,7 @@ function readPublicationActorStatus(options: {
     return appProfileStatus;
   }
 
-  const host = githubActorHost(options.component);
+  const host = githubActorHost(options.target);
   const args =
     expected.kind === "app"
       ? ["api", "app", "--jq", ".slug", "--hostname", host]
@@ -1251,7 +1345,7 @@ export function publicationPolicyRequiresGuard(
 }
 
 function publicationPolicyChecks(options: {
-  component: ResolvedNexusProjectComponent;
+  target: NexusPublicationTarget;
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
   gitIdentity: NexusGitIdentityStatus;
@@ -1260,7 +1354,7 @@ function publicationPolicyChecks(options: {
   strict: boolean;
 }): NexusPublicationPolicyCheck[] {
   const checks: NexusPublicationPolicyCheck[] = [];
-  const prefix = `publication:${options.component.id}`;
+  const prefix = `publication:${options.target.label}`;
   const remoteName = options.policy.remote;
   if (remoteName && options.strict) {
     checks.push(
@@ -1268,7 +1362,7 @@ function publicationPolicyChecks(options: {
         `${prefix}:remote`,
         options.git.remoteName === remoteName && Boolean(options.git.remoteUrl),
         `Publication remote ${remoteName} is configured`,
-        `Publication remote ${remoteName} is not available in ${options.component.sourceRoot}`,
+        `Publication remote ${remoteName} is not available in ${options.target.sourceRoot}`,
       ),
     );
   }
@@ -1282,7 +1376,7 @@ function publicationPolicyChecks(options: {
           options.git.pushUrl,
         ]),
         `Publication remote URL matches ${options.policy.remoteUrl}`,
-        `Publication remote URL mismatch for ${options.component.id}: expected ${options.policy.remoteUrl}, observed ${options.git.remoteUrl ?? "unknown"}`,
+        `Publication remote URL mismatch for ${options.target.label}: expected ${options.policy.remoteUrl}, observed ${options.git.remoteUrl ?? "unknown"}`,
       ),
     );
   }
@@ -1294,7 +1388,7 @@ function publicationPolicyChecks(options: {
         normalizeUrl(options.git.pushUrl) ===
           normalizeUrl(options.policy.pushUrl),
         `Publication push URL matches ${options.policy.pushUrl}`,
-        `Publication push URL mismatch for ${options.component.id}: expected ${options.policy.pushUrl}, observed ${options.git.pushUrl ?? "unknown"}`,
+        `Publication push URL mismatch for ${options.target.label}: expected ${options.policy.pushUrl}, observed ${options.git.pushUrl ?? "unknown"}`,
       ),
     );
   }
@@ -1307,7 +1401,7 @@ function publicationPolicyChecks(options: {
           (url) => sshHostAlias(url) === options.policy.sshHostAlias,
         ),
         `Publication SSH host alias matches ${options.policy.sshHostAlias}`,
-        `Publication SSH host alias mismatch for ${options.component.id}: expected ${options.policy.sshHostAlias}, observed ${sshHostAlias(options.git.pushUrl ?? options.git.remoteUrl) ?? "unknown"}`,
+        `Publication SSH host alias mismatch for ${options.target.label}: expected ${options.policy.sshHostAlias}, observed ${sshHostAlias(options.git.pushUrl ?? options.git.remoteUrl) ?? "unknown"}`,
       ),
     );
   }
@@ -1361,7 +1455,7 @@ function publicationPolicyChecks(options: {
 
 function resolvePublicationAuthority(options: {
   projectConfig: NexusProjectConfig;
-  component: ResolvedNexusProjectComponent;
+  target: NexusPublicationTarget;
   policy: NexusAutomationPublicationConfig;
   git: NexusPublicationGitStatus;
   action: NexusPublicationGuardAction;
@@ -1378,11 +1472,11 @@ function resolvePublicationAuthority(options: {
 
   const currentActor = resolveNexusCurrentAutomationActor({
     authority: options.projectConfig.authority,
-    componentId: options.component.id,
+    componentId: options.target.componentId,
     publication: options.policy,
     authProfiles: options.authProfiles,
     repository:
-      options.component.remoteUrl ??
+      options.target.remoteUrl ??
       options.git.pushUrl ??
       options.git.remoteUrl ??
       null,
@@ -1410,17 +1504,17 @@ function resolvePublicationAuthority(options: {
         }
       : null,
     project: options.projectConfig.id,
-    component: options.component.id,
+    component: options.target.componentId,
     provider:
       options.policy.actor?.provider ??
       options.policy.manualActor?.provider ??
       currentActor.expectedProvider ??
-      options.component.workTracking?.provider ??
+      options.target.workTracking?.provider ??
       null,
-    tracker: options.component.defaultTrackerId,
+    tracker: options.target.trackerId,
     remote: options.git.remoteName ?? options.policy.remote,
     repository:
-      options.component.remoteUrl ??
+      options.target.remoteUrl ??
       options.git.pushUrl ??
       options.git.remoteUrl ??
       null,
@@ -1701,8 +1795,8 @@ function sshHostAlias(value: string | null): string | null {
   }
 }
 
-function githubActorHost(component: ResolvedNexusProjectComponent): string {
-  const host = component.workTracking?.host?.trim();
+function githubActorHost(target: NexusPublicationTarget): string {
+  const host = target.workTracking?.host?.trim();
   if (!host || host === "https://github.com" || host === "api.github.com") {
     return "github.com";
   }

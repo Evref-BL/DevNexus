@@ -250,7 +250,7 @@ interface NexusDashboardProviderUrls {
 }
 
 export interface NexusDashboardPublicationSummary {
-  componentId: string;
+  componentId: string | null;
   strategy: string;
   targetBranch: string | null;
   remote: string | null;

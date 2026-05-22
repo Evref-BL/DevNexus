@@ -440,6 +440,9 @@ export function pathForProjectConfig(
   targetPath: string,
 ): string {
   const relative = path.relative(projectRoot, targetPath);
+  if (relative === "") {
+    return ".";
+  }
   if (
     relative &&
     !relative.startsWith("..") &&

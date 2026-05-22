@@ -84,7 +84,7 @@ export function buildNexusProjectSetupReadinessReport(options: {
       status: "blocked",
       summary: error instanceof Error ? error.message : String(error),
       nextAction:
-        "Run workspace setup from a DevNexus workspace root or restore dev-nexus.project.json.",
+        "Run workspace init from a DevNexus workspace root or restore dev-nexus.project.json.",
     });
   }
 
@@ -376,7 +376,7 @@ function authInventoryCheck(
           `Referenced auth profile(s) are present in DevNexus home: ${referencedProfiles.join(", ")}. ` +
           `GitHub App user-to-server profile(s) require host-local authorization checks: ${githubAppUserProfiles.join(", ")}.`,
         nextAction:
-          "Run the configured GitHub App user-token helper status/auth command and verify the authorizing user, refresh token, App installation, selected repository, and requested permissions before provider operations.",
+          "Run dev-nexus auth github-app user status --profile <id> or dev-nexus auth github-app user login --profile <id>, then verify the authorizing user, refresh token, App installation, selected repository, and requested permissions before provider operations.",
       };
     }
     return {

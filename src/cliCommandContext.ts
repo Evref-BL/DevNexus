@@ -37,6 +37,7 @@ export interface DevNexusCliDependencies {
   ) => Promise<NexusDashboardServerHandle>;
   dashboardServerWaiter?: (handle: NexusDashboardServerHandle) => Promise<void>;
   now?: () => Date | string;
+  sleep?: (milliseconds: number) => Promise<void>;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;

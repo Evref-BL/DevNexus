@@ -1,0 +1,39 @@
+{
+  "name": "dev-nexus-codex",
+  "version": "0.1.0-alpha.0",
+  "description": "Local Codex plugin prototype for DevNexus workspaces.",
+  "author": {
+    "name": "Evref BL",
+    "url": "https://github.com/Evref-BL"
+  },
+  "homepage": "https://github.com/Evref-BL/DevNexus",
+  "repository": "https://github.com/Evref-BL/DevNexus",
+  "license": "Apache-2.0",
+  "keywords": [
+    "codex",
+    "dev-nexus",
+    "mcp",
+    "worktree"
+  ],
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "DevNexus",
+    "shortDescription": "Use DevNexus workspaces from Codex.",
+    "longDescription": "Expose DevNexus setup, status, handoff, worktree, and MCP workflows.",
+    "developerName": "Evref BL",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Skills",
+      "Workspace"
+    ],
+    "websiteURL": "https://github.com/Evref-BL/DevNexus",
+    "brandColor": "#2563EB",
+    "defaultPrompt": [
+      "Check this DevNexus workspace status.",
+      "Prepare a DevNexus worktree for this issue.",
+      "Record a DevNexus handoff for this work."
+    ]
+  }
+}
