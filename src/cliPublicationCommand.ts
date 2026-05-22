@@ -1160,12 +1160,22 @@ function publicationPullRequestBody(
   parsed: ParsedPublicationPullRequestUpsertCommand,
 ): string | null | undefined {
   if (parsed.body !== undefined) {
-    return parsed.body;
+    if (parsed.body === null) {
+      return null;
+    }
+    return normalizeInlinePullRequestBody(parsed.body);
   }
   if (parsed.bodyFile) {
     return fs.readFileSync(path.resolve(parsed.bodyFile), "utf8");
   }
   return undefined;
+}
+
+function normalizeInlinePullRequestBody(body: string): string {
+  const escapedLineBreak = `${String.fromCharCode(92)}n`;
+  return body.includes(escapedLineBreak)
+    ? body.replaceAll(escapedLineBreak, String.fromCharCode(10))
+    : body;
 }
 
 function readPublicationTrainEvidenceInput(

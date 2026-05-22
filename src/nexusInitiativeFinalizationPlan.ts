@@ -562,7 +562,16 @@ function finalPullRequestCliCommand(
     action.base,
     "--title",
     action.title,
+    "--body",
+    singleLinePullRequestBody(action.body),
   ].map(shellQuoteArgument).join(" ");
+}
+
+function singleLinePullRequestBody(body: string): string {
+  return body.split(/\r?\u000a/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join(" ");
 }
 
 function mergeQueueSummary(options: {
