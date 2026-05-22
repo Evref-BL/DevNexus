@@ -617,6 +617,95 @@ describe("dev-nexus cli", () => {
     expect(codexConfig).toContain('args = ["demo-server.js"]');
   });
 
+  it("does not directly materialize hidden or gateway-routed plugin MCP servers", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-plugin-exposure-");
+    const pluginRoot = makeTempDir("dev-nexus-cli-plugin-exposure-package-");
+    saveProjectConfig(
+      projectRoot,
+      projectConfig({
+        agentTargets: {
+          active: [
+            {
+              provider: "codex",
+              mcp: {},
+              skills: {},
+            },
+          ],
+        },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "demo-mcp-exposure-plugin",
+          type: "module",
+          main: "./index.js",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(pluginRoot, "index.js"),
+      [
+        "export function demoDevNexusPluginConfig() {",
+        "  return {",
+        "    id: 'demo-mcp-exposure',",
+        "    enabled: true,",
+        "    capabilities: [",
+        "      { kind: 'mcp_server', id: 'direct-mcp', serverName: 'direct_mcp', command: 'node', args: ['direct.js'], targetAgents: ['codex'], exposure: 'direct' },",
+        "      { kind: 'mcp_server', id: 'gateway-mcp', serverName: 'gateway_mcp', command: 'node', args: ['gateway.js'], targetAgents: ['codex'], exposure: 'gateway' },",
+        "      { kind: 'mcp_server', id: 'hidden-mcp', serverName: 'hidden_mcp', command: 'node', args: ['hidden.js'], targetAgents: ['codex'], exposure: 'hidden' }",
+        "    ]",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const output = captureOutput();
+
+    await main(
+      [
+        "project",
+        "plugin",
+        "refresh",
+        projectRoot,
+        "--from",
+        pluginRoot,
+        "--json",
+      ],
+      { stdout: output.writer },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload.mcpProjection).toMatchObject({
+      materializedServerCount: 1,
+      materializedTargetCount: 1,
+      skippedServers: [
+        {
+          serverName: "gateway_mcp",
+          reason: "gateway_pending",
+          exposureMode: "gateway",
+        },
+        {
+          serverName: "hidden_mcp",
+          reason: "hidden_exposure",
+          exposureMode: "hidden",
+        },
+      ],
+    });
+    const codexConfig = fs.readFileSync(
+      path.join(projectRoot, ".codex", "config.toml"),
+      "utf8",
+    );
+    expect(codexConfig).toContain("[mcp_servers.direct_mcp]");
+    expect(codexConfig).not.toContain("gateway_mcp");
+    expect(codexConfig).not.toContain("hidden_mcp");
+  });
+
   it("prints a quick-fix plan for one provider-native GitHub issue", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     saveProjectConfig(
