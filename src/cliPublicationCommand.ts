@@ -202,6 +202,7 @@ export async function handlePublicationCommand(
       gitRunner: parsed.dryRun
         ? dryRunPublicationGitPushRunner
         : dependencies.publicationGitPushRunner,
+      remoteProbeRunner: dependencies.publicationGitPushRunner,
     });
     printPublicationBranchPushResult(
       result,
@@ -1314,6 +1315,10 @@ function printPublicationBranchPushResult(
       stdout,
       `  Initiative remote policy: ${result.initiativeDelivery.branchPublication.strategy} -> ${result.initiativeDelivery.branchPublication.selectedRemote}`,
     );
+    writeLine(
+      stdout,
+      `  Initiative remote selection: ${result.initiativeDelivery.remoteSelection.status}`,
+    );
   }
   if (result.targetBranch) {
     writeLine(stdout, `  Target branch: ${result.targetBranch}`);
@@ -1711,6 +1716,12 @@ function printPublicationInitiativeReport(
         `    reviewTarget=${formatReviewTarget(evidence.reviewTarget)}`,
       );
     }
+    if (item.branchUpdateDecision.status !== "not_required") {
+      writeLine(
+        stdout,
+        `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
+      );
+    }
     if (item.reasons.length > 0) {
       writeLine(stdout, `    reasons: ${item.reasons.join("; ")}`);
     }
@@ -1751,6 +1762,29 @@ function printPublicationInitiativeFinalizationPlan(
       stdout,
       `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
     );
+    writeLine(
+      stdout,
+      `    finalPRAction=${item.finalPullRequestAction.status} humanInTheLoop=${item.finalPullRequestAction.humanInTheLoop}`,
+    );
+    if (item.finalPullRequestAction.providerAction) {
+      const action = item.finalPullRequestAction.providerAction;
+      writeLine(
+        stdout,
+        `    finalPR=${action.head} -> ${action.base} title=${action.title}`,
+      );
+    }
+    if (item.finalPullRequestAction.cliCommand) {
+      writeLine(
+        stdout,
+        `    command: ${item.finalPullRequestAction.cliCommand}`,
+      );
+    }
+    if (item.branchUpdateDecision.status !== "not_required") {
+      writeLine(
+        stdout,
+        `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
+      );
+    }
     if (item.reviewReadiness.reasons.length > 0) {
       writeLine(
         stdout,

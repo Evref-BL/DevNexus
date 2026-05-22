@@ -177,7 +177,7 @@ describe("initiative delivery policy", () => {
       publicationRemote: "app",
     });
 
-    expect(summary.branchPublication).toEqual({
+    expect(summary.branchPublication).toMatchObject({
       strategy: "publication_remote_then_fallback",
       publicationRemote: "app",
       fallbackRemote: "fork",
@@ -185,5 +185,120 @@ describe("initiative delivery policy", () => {
       requiresFallbackApproval: true,
     });
     expect(summary.warnings).toEqual([]);
+  });
+
+  it("renders upstream final pull request heads as branch names", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "Codex Goals",
+        defaultTopology: "hybrid",
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "origin",
+      remoteUrls: {
+        origin: "https://github.com/Evref-BL/DevNexus.git",
+      },
+    });
+
+    expect(summary.branchPublication.finalPullRequestHead).toMatchObject({
+      status: "upstream_branch",
+      branch: "feat/codex-goals",
+      remote: "origin",
+      provider: "github",
+      owner: "Evref-BL",
+      repository: "DevNexus",
+      displayRef: "feat/codex-goals",
+      setupAction: null,
+    });
+  });
+
+  it("renders GitHub fork final pull request heads from SSH fallback remotes", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "Codex Goals",
+        defaultTopology: "hybrid",
+        branchPublication: {
+          strategy: "fallback_remote",
+          fallbackRemote: "fork",
+        },
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "origin",
+      remoteUrls: {
+        fork: "git@github.com:Gabriel-Darbord/DevNexus.git",
+      },
+    });
+
+    expect(summary.branchPublication.finalPullRequestHead).toMatchObject({
+      status: "fork_branch",
+      branch: "feat/codex-goals",
+      remote: "fork",
+      provider: "github",
+      owner: "Gabriel-Darbord",
+      repository: "DevNexus",
+      displayRef: "Gabriel-Darbord:feat/codex-goals",
+      setupAction: null,
+    });
+  });
+
+  it("renders GitHub fork final pull request heads from HTTPS fallback remotes", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "Codex Goals",
+        defaultTopology: "hybrid",
+        branchPublication: {
+          strategy: "fallback_remote",
+          fallbackRemote: "fork",
+        },
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "origin",
+      remoteUrls: {
+        fork: "https://github.com/Gabriel-Darbord/DevNexus.git",
+      },
+    });
+
+    expect(summary.branchPublication.finalPullRequestHead).toMatchObject({
+      status: "fork_branch",
+      owner: "Gabriel-Darbord",
+      repository: "DevNexus",
+      displayRef: "Gabriel-Darbord:feat/codex-goals",
+    });
+  });
+
+
+  it("blocks fork pull request heads when fallback remotes have no GitHub URL", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "Codex Goals",
+        defaultTopology: "hybrid",
+        branchPublication: {
+          strategy: "fallback_remote",
+          fallbackRemote: "fork",
+        },
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "origin",
+    });
+
+    expect(summary.branchPublication.finalPullRequestHead).toMatchObject({
+      status: "blocked",
+      remote: "fork",
+      displayRef: null,
+      setupAction:
+        "configure remote fork with a GitHub URL before creating a fork pull request",
+    });
   });
 });

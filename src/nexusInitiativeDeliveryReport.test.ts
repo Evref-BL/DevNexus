@@ -117,6 +117,31 @@ describe("initiative delivery report", () => {
             branchPolicy: "clear",
             baseStatus: "behind",
           },
+          branchUpdateDecision: {
+            status: "behind",
+            recommendation: "merge_update",
+            conflictRisk: "unknown",
+            ciFreshnessRisk: "stale",
+            forceWithLeaseRequired: false,
+            humanInTheLoop: false,
+            choices: [
+              {
+                id: "merge_update",
+                recommended: true,
+                forceWithLeaseRequired: false,
+              },
+              {
+                id: "rebase",
+                recommended: false,
+                humanInTheLoop: true,
+                forceWithLeaseRequired: true,
+              },
+              {
+                id: "no_update",
+                recommended: false,
+              },
+            ],
+          },
           reasons: ["review branch base status is behind"],
         },
       ],

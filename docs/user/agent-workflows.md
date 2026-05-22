@@ -163,6 +163,19 @@ is created unless policy explicitly says `at_initiative_start`. When upstream
 branch pushes are unavailable, use the configured `branchPublication` fallback
 remote instead of inventing a fork or pushing with a human account.
 
+Use `publication branch-push --initiative` to let DevNexus probe the configured
+remote path. For `publication_remote_then_fallback`, the command checks the
+publication remote with a dry-run push before it selects the fallback remote.
+Use `initiative-finalization` to get the final PR action; for GitHub forks it
+renders the `owner:branch` head ref when the fallback remote URL identifies the
+fork.
+
+If `initiative-report` or `initiative-finalization` says the review branch is
+behind or diverged, prefer the reported merge-update command unless a human
+explicitly chooses rebase. Rebase rewrites the branch and needs a
+force-with-lease push, so it is a human-in-the-loop gate for public initiative
+branches.
+
 Prepare a component-scoped worktree when implementation should be isolated:
 
 ```bash

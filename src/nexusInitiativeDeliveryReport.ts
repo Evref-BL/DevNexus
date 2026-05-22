@@ -7,9 +7,17 @@ import {
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
 import {
+  buildNexusInitiativeBranchUpdateDecision,
+  type NexusInitiativeBranchUpdateDecision,
+} from "./nexusInitiativeBranchUpdateDecision.js";
+import {
   buildNexusInitiativeDeliveryPlan,
   type NexusInitiativeDeliveryPlanItem,
 } from "./nexusInitiativeDeliveryPlan.js";
+import type {
+  NexusInitiativeDeliveryBranchPublicationSummary,
+  NexusInitiativeDeliveryPullRequestHeadSummary,
+} from "./nexusInitiativeDeliveryPolicy.js";
 import {
   classifyNexusPublicationProviderEvidenceChecks,
   findNexusPublicationProviderEvidence,
@@ -97,6 +105,9 @@ export interface NexusInitiativeDeliveryReportItem {
   finalPublicationTarget: string;
   finalPullRequest: boolean;
   finalPullRequestCreation: string;
+  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
+  finalPullRequestHead: NexusInitiativeDeliveryPullRequestHeadSummary;
+  branchUpdateDecision: NexusInitiativeBranchUpdateDecision;
   ciTier: NexusCiTierDecision;
   providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
   status: NexusInitiativeDeliveryReportItemStatus;
@@ -240,6 +251,13 @@ function reportItem(options: {
     finalPublicationTarget: branchPlan.finalPublicationTarget,
     finalPullRequest: initiative.finalPullRequest,
     finalPullRequestCreation: initiative.finalPullRequestCreation,
+    branchPublication: initiative.branchPublication,
+    finalPullRequestHead: initiative.branchPublication.finalPullRequestHead,
+    branchUpdateDecision: buildNexusInitiativeBranchUpdateDecision({
+      baseStatus: providerEvidence.baseStatus,
+      headBranch: providerEvidence.headBranch ?? branchName,
+      baseBranch: branchPlan.finalPublicationTarget,
+    }),
     ciTier,
     providerEvidence,
     status: classificationResult.status,

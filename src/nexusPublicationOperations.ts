@@ -106,6 +106,30 @@ export interface NexusPublicationBranchPushResult {
 export interface NexusPublicationBranchPushInitiativeSummary {
   initiativeId: string;
   branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
+  remoteSelection: NexusPublicationBranchPushRemoteSelection;
+}
+
+export type NexusPublicationBranchPushRemoteSelectionStatus =
+  | "not_required"
+  | "publication_remote_writable"
+  | "fallback_selected"
+  | "blocked";
+
+export interface NexusPublicationBranchPushRemoteSelection {
+  status: NexusPublicationBranchPushRemoteSelectionStatus;
+  selectedRemote: string | null;
+  publicationRemote: string | null;
+  fallbackRemote: string | null;
+  reasons: string[];
+  setupActions: string[];
+  probes: NexusPublicationBranchPushRemoteProbe[];
+}
+
+export interface NexusPublicationBranchPushRemoteProbe {
+  remote: string;
+  exitCode: number | null;
+  stderr: string;
+  writable: boolean;
 }
 
 export interface NexusPublicationPullRequestUpsertResult {
@@ -161,6 +185,7 @@ export interface PushNexusPublicationBranchForComponentOptions
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   gitRunner?: NexusPublicationGitPushRunner;
+  remoteProbeRunner?: NexusPublicationGitPushRunner;
 }
 
 export interface UpsertNexusPublicationPullRequestForComponentOptions
@@ -270,14 +295,10 @@ export async function pushNexusPublicationBranchForComponent(
   options: PushNexusPublicationBranchForComponentOptions,
 ): Promise<NexusPublicationBranchPushResult> {
   const context = resolveNexusPublicationTargetContext(options);
-  const initiativeDelivery = resolveInitiativeBranchPushPolicy({
+  const initiativeDeliveryPlan = resolveInitiativeBranchPushPolicy({
     context,
     initiativeId: options.initiativeId ?? null,
   });
-  const remoteOverride = initiativeDelivery?.branchPublication.selectedRemote ?? null;
-  const preferConfiguredRemote = Boolean(
-    remoteOverride && remoteOverride !== context.publication.remote,
-  );
   assertSafePublicationBranchTarget({
     publication: context.publication,
     branch: options.branch,
@@ -289,6 +310,22 @@ export async function pushNexusPublicationBranchForComponent(
     requiredPermissions: { contents: "write" },
     runtime: options,
   });
+  const initiativeDelivery = initiativeDeliveryPlan
+    ? resolveInitiativeBranchPushRemoteSelection({
+        initiativeDelivery: initiativeDeliveryPlan,
+        repositoryPath: options.repositoryPath,
+        branch: options.branch,
+        baseEnv: options.baseEnv,
+        gitRunner: options.remoteProbeRunner ?? options.gitRunner,
+      })
+    : null;
+  const remoteOverride =
+    initiativeDelivery?.remoteSelection.selectedRemote ??
+    initiativeDelivery?.branchPublication.selectedRemote ??
+    null;
+  const preferConfiguredRemote = Boolean(
+    remoteOverride && remoteOverride !== context.publication.remote,
+  );
   const push = pushNexusPublicationBranch({
     policy: context.publication,
     repositoryPath: options.repositoryPath,
@@ -347,6 +384,176 @@ function resolveInitiativeBranchPushPolicy(options: {
   return {
     initiativeId: item.initiative.activeScopeId,
     branchPublication: item.initiative.branchPublication,
+    remoteSelection: {
+      status: "not_required",
+      selectedRemote: item.initiative.branchPublication.selectedRemote,
+      publicationRemote: item.initiative.branchPublication.publicationRemote,
+      fallbackRemote: item.initiative.branchPublication.fallbackRemote,
+      reasons: [],
+      setupActions: [],
+      probes: [],
+    },
+  };
+}
+
+function resolveInitiativeBranchPushRemoteSelection(options: {
+  initiativeDelivery: NexusPublicationBranchPushInitiativeSummary;
+  repositoryPath: string;
+  branch: string;
+  baseEnv?: NodeJS.ProcessEnv;
+  gitRunner?: NexusPublicationGitPushRunner;
+}): NexusPublicationBranchPushInitiativeSummary {
+  const branchPublication = options.initiativeDelivery.branchPublication;
+  if (branchPublication.strategy !== "publication_remote_then_fallback") {
+    return options.initiativeDelivery;
+  }
+
+  const publicationRemote = branchPublication.publicationRemote;
+  const fallbackRemote = branchPublication.fallbackRemote;
+  if (!publicationRemote) {
+    if (!fallbackRemote) {
+      return blockedInitiativeRemoteSelection(
+        options.initiativeDelivery,
+        "publication remote is not configured",
+        "configure automation.publication.remote or initiativeDelivery.branchPublication.fallbackRemote",
+      );
+    }
+    return initiativeRemoteSelection(options.initiativeDelivery, {
+      status: "fallback_selected",
+      selectedRemote: fallbackRemote,
+      publicationRemote,
+      fallbackRemote,
+      reasons: ["publication remote is not configured"],
+      setupActions: [],
+      probes: [],
+    });
+  }
+
+  const publicationProbe = probeInitiativeBranchRemote({
+    remote: publicationRemote,
+    repositoryPath: options.repositoryPath,
+    branch: options.branch,
+    baseEnv: options.baseEnv,
+    gitRunner: options.gitRunner,
+  });
+  if (publicationProbe.writable) {
+    return initiativeRemoteSelection(options.initiativeDelivery, {
+      status: "publication_remote_writable",
+      selectedRemote: publicationRemote,
+      publicationRemote,
+      fallbackRemote,
+      reasons: ["publication remote accepted a dry-run branch push"],
+      setupActions: [],
+      probes: [publicationProbe],
+    });
+  }
+  if (!fallbackRemote) {
+    return blockedInitiativeRemoteSelection(
+      options.initiativeDelivery,
+      `publication remote ${publicationRemote} rejected a dry-run branch push`,
+      "configure initiativeDelivery.branchPublication.fallbackRemote",
+      [publicationProbe],
+    );
+  }
+
+  const fallbackProbe = probeInitiativeBranchRemote({
+    remote: fallbackRemote,
+    repositoryPath: options.repositoryPath,
+    branch: options.branch,
+    baseEnv: options.baseEnv,
+    gitRunner: options.gitRunner,
+  });
+  if (!fallbackProbe.writable) {
+    return blockedInitiativeRemoteSelection(
+      options.initiativeDelivery,
+      `fallback remote ${fallbackRemote} rejected a dry-run branch push`,
+      `fix remote ${fallbackRemote} before publishing the initiative branch`,
+      [publicationProbe, fallbackProbe],
+    );
+  }
+
+  return initiativeRemoteSelection(options.initiativeDelivery, {
+    status: "fallback_selected",
+    selectedRemote: fallbackRemote,
+    publicationRemote,
+    fallbackRemote,
+    reasons: [
+      `publication remote ${publicationRemote} rejected a dry-run branch push`,
+      `fallback remote ${fallbackRemote} accepted a dry-run branch push`,
+    ],
+    setupActions: [],
+    probes: [publicationProbe, fallbackProbe],
+  });
+}
+
+function probeInitiativeBranchRemote(options: {
+  remote: string;
+  repositoryPath: string;
+  branch: string;
+  baseEnv?: NodeJS.ProcessEnv;
+  gitRunner?: NexusPublicationGitPushRunner;
+}): NexusPublicationBranchPushRemoteProbe {
+  if (!options.gitRunner) {
+    return {
+      remote: options.remote,
+      exitCode: null,
+      stderr: "remote writability probe was not run",
+      writable: true,
+    };
+  }
+  const result = options.gitRunner(
+    ["push", "--dry-run", options.remote, options.branch],
+    {
+      cwd: options.repositoryPath,
+      env: {
+        ...(options.baseEnv ?? process.env),
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    },
+  );
+  return {
+    remote: options.remote,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    writable: result.exitCode === 0,
+  };
+}
+
+function blockedInitiativeRemoteSelection(
+  initiativeDelivery: NexusPublicationBranchPushInitiativeSummary,
+  reason: string,
+  setupAction: string,
+  probes: NexusPublicationBranchPushRemoteProbe[] = [],
+): never {
+  const selection = initiativeRemoteSelection(initiativeDelivery, {
+    status: "blocked",
+    selectedRemote: null,
+    publicationRemote: initiativeDelivery.branchPublication.publicationRemote,
+    fallbackRemote: initiativeDelivery.branchPublication.fallbackRemote,
+    reasons: [reason],
+    setupActions: [setupAction],
+    probes,
+  }).remoteSelection;
+  throw new Error(
+    [
+      "Initiative branch publication is blocked.",
+      ...selection.reasons,
+      ...selection.setupActions,
+    ].join(" "),
+  );
+}
+
+function initiativeRemoteSelection(
+  initiativeDelivery: NexusPublicationBranchPushInitiativeSummary,
+  remoteSelection: NexusPublicationBranchPushRemoteSelection,
+): NexusPublicationBranchPushInitiativeSummary {
+  return {
+    ...initiativeDelivery,
+    branchPublication: {
+      ...initiativeDelivery.branchPublication,
+      selectedRemote: remoteSelection.selectedRemote,
+    },
+    remoteSelection,
   };
 }
 

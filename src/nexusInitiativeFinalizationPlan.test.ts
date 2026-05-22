@@ -45,6 +45,23 @@ describe("initiative finalization plan", () => {
     });
     expect(plan.items[0]).toMatchObject({
       finalPullRequestCreation: "at_review_gate",
+      finalPullRequestAction: {
+        status: "create_at_review_gate",
+        humanInTheLoop: false,
+        providerAction: {
+          kind: "pull_request_upsert",
+          componentId: "primary",
+          head: "feat/codex-goals",
+          base: "main",
+          title: "Finalize initiative codex-goals",
+          draft: false,
+        },
+        reasons: ["final pull request is created at the review gate"],
+        cliCommand:
+          "dev-nexus publication pull-request upsert " +
+          `${projectRoot} --component primary --head feat/codex-goals --base main ` +
+          '--title "Finalize initiative codex-goals"',
+      },
       reviewReadiness: {
         status: "needs_final_pull_request",
         nextAction: "create_pull_request",
@@ -55,6 +72,151 @@ describe("initiative finalization plan", () => {
         status: "needs_final_pull_request",
         nextAction: "create_pull_request",
         authorizedToMerge: false,
+      },
+    });
+  });
+
+  it("reports a missing initiative-start final pull request as a create action", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      finalPullRequestCreation: "at_initiative_start",
+    }));
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.nextAction).toBe("create_pull_request");
+    expect(plan.items[0]).toMatchObject({
+      finalPullRequestAction: {
+        status: "create_at_initiative_start",
+        humanInTheLoop: false,
+        providerAction: {
+          kind: "pull_request_upsert",
+          head: "feat/codex-goals",
+          base: "main",
+          title: "Finalize initiative codex-goals",
+          draft: false,
+        },
+        reasons: ["final pull request should have been created at initiative start"],
+      },
+      reviewReadiness: {
+        status: "needs_final_pull_request",
+        nextAction: "create_pull_request",
+      },
+    });
+  });
+
+  it("renders fallback fork pull request heads in final PR actions", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
+    fs.writeFileSync(
+      path.join(sourceRoot, ".git", "config"),
+      `[remote "origin"]
+	url = git@github.com:Evref-BL/DevNexus.git
+[remote "fork"]
+	url = git@github.com:Gabriel-Darbord/DevNexus.git
+`,
+      "utf8",
+    );
+    saveProjectConfig(projectRoot, projectConfig({
+      branchPublication: {
+        strategy: "fallback_remote",
+        fallbackRemote: "fork",
+      },
+    }));
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.items[0]).toMatchObject({
+      finalPullRequestHead: {
+        status: "fork_branch",
+        branch: "feat/codex-goals",
+        owner: "Gabriel-Darbord",
+        repository: "DevNexus",
+        displayRef: "Gabriel-Darbord:feat/codex-goals",
+      },
+      finalPullRequestAction: {
+        status: "create_at_review_gate",
+        providerAction: {
+          head: "Gabriel-Darbord:feat/codex-goals",
+        },
+      },
+    });
+    expect(plan.items[0]!.finalPullRequestAction.cliCommand).toContain(
+      "--head Gabriel-Darbord:feat/codex-goals",
+    );
+  });
+
+  it("blocks fork final PR creation when fallback remote metadata is missing", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      branchPublication: {
+        strategy: "fallback_remote",
+        fallbackRemote: "fork",
+      },
+    }));
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.nextAction).toBe("resolve_branch_policy");
+    expect(plan.items[0]).toMatchObject({
+      finalPullRequestHead: {
+        status: "blocked",
+        remote: "fork",
+        setupAction:
+          "configure remote fork with a GitHub URL before creating a fork pull request",
+      },
+      finalPullRequestAction: {
+        status: "blocked",
+        humanInTheLoop: true,
+        providerAction: null,
+      },
+      reviewReadiness: {
+        status: "blocked",
+        nextAction: "resolve_branch_policy",
+      },
+    });
+  });
+
+  it("reports manual-only final pull request creation as a HITL action", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      finalPullRequestCreation: "manual_only",
+    }));
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.nextAction).toBe("manual_pull_request");
+    expect(plan.items[0]).toMatchObject({
+      finalPullRequestAction: {
+        status: "manual_only",
+        humanInTheLoop: true,
+        providerAction: null,
+        cliCommand: null,
+        reasons: ["final pull request creation is manual-only"],
+      },
+      reviewReadiness: {
+        status: "needs_final_pull_request",
+        nextAction: "manual_pull_request",
       },
     });
   });
@@ -125,6 +287,69 @@ describe("initiative finalization plan", () => {
     });
   });
 
+  it("includes conservative update choices for diverged review branches", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      providerEvidence: [
+        {
+          provider: "github",
+          sourceKind: "pull_request",
+          reviewTarget: 243,
+          headBranch: "feat/codex-goals",
+          targetBranch: "main",
+          intendedCiTier: "remote_smoke",
+          reviewState: "approved",
+          mergeability: "mergeable",
+          branchPolicy: "clear",
+          baseStatus: "diverged",
+          checks: [
+            { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+          ],
+        },
+      ],
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.nextAction).toBe("update_branch");
+    expect(plan.items[0]).toMatchObject({
+      branchUpdateDecision: {
+        status: "diverged",
+        recommendation: "merge_update",
+        conflictRisk: "elevated",
+        ciFreshnessRisk: "stale",
+        forceWithLeaseRequired: false,
+        humanInTheLoop: false,
+        choices: [
+          {
+            id: "merge_update",
+            recommended: true,
+            humanInTheLoop: false,
+            forceWithLeaseRequired: false,
+          },
+          {
+            id: "rebase",
+            recommended: false,
+            humanInTheLoop: true,
+            forceWithLeaseRequired: true,
+          },
+          {
+            id: "no_update",
+            recommended: false,
+          },
+        ],
+      },
+      reviewReadiness: {
+        status: "needs_update",
+        nextAction: "update_branch",
+      },
+    });
+  });
+
   it("stops at human approval when final publication evidence is otherwise ready", () => {
     const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -175,7 +400,13 @@ describe("initiative finalization plan", () => {
   });
 });
 
-function projectConfig(): NexusProjectConfig {
+function projectConfig(options: {
+  finalPullRequestCreation?: "at_initiative_start" | "at_review_gate" | "manual_only";
+  branchPublication?: {
+    strategy: "publication_remote" | "fallback_remote" | "publication_remote_then_fallback" | "manual_only";
+    fallbackRemote: string | null;
+  };
+} = {}): NexusProjectConfig {
   return {
     version: 1,
     id: "initiative-finalization-demo",
@@ -207,6 +438,16 @@ function projectConfig(): NexusProjectConfig {
             enabled: true,
             activeInitiativeId: "codex-goals",
             defaultTopology: "hybrid",
+            review: {
+              ...defaultNexusInitiativeDeliveryConfig.review,
+              finalPullRequestCreation:
+                options.finalPullRequestCreation ??
+                defaultNexusInitiativeDeliveryConfig.review
+                  .finalPullRequestCreation,
+            },
+            branchPublication: options.branchPublication ?? {
+              ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+            },
           },
           selector: {
             statuses: ["ready"],

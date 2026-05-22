@@ -123,6 +123,109 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("selects fallback remotes after publication remote dry-run permission denial", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        if (args.join(" ") === "push --dry-run app feat/codex-goals") {
+          return {
+            args: [...args],
+            stdout: "",
+            stderr: "ERROR: permission denied",
+            exitCode: 1,
+          };
+        }
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        selectedRemote: "fork",
+      },
+      remoteSelection: {
+        status: "fallback_selected",
+        selectedRemote: "fork",
+        probes: [
+          {
+            remote: "app",
+            writable: false,
+          },
+          {
+            remote: "fork",
+            writable: true,
+          },
+        ],
+      },
+    });
+    expect(result.push.plan).toMatchObject({
+      transport: "configured_remote",
+      remote: "fork",
+      refspec: "feat/codex-goals",
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["push", "--dry-run", "app", "feat/codex-goals"],
+      ["push", "--dry-run", "fork", "feat/codex-goals"],
+      ["push", "fork", "feat/codex-goals"],
+    ]);
+  });
+
+  it("blocks initiative fallback selection before live push when fallback setup fails", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "feat/codex-goals",
+        initiativeId: "codex-goals",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        }),
+      }),
+    ).rejects.toThrow(/fix remote fork before publishing the initiative branch/u);
+  });
+
+
   it("pushes review branches through GitHub App user-to-server credentials for human actors", async () => {
     const { projectRoot, sourceRoot } = createHumanUserTokenPublicationProject();
     const calls: Array<{ cwd: string; token: string | undefined }> = [];
@@ -1148,6 +1251,8 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
 
 function initiativeFallbackPublicationProjectConfig(
   homePath: string,
+  strategy: "fallback_remote" | "publication_remote_then_fallback" = "fallback_remote",
+  fallbackRemote: string | null = "fork",
 ): NexusProjectConfig {
   return {
     ...publicationProjectConfig(homePath),
@@ -1179,8 +1284,8 @@ function initiativeFallbackPublicationProjectConfig(
             activeInitiativeId: "codex-goals",
             defaultTopology: "hybrid",
             branchPublication: {
-              strategy: "fallback_remote",
-              fallbackRemote: "fork",
+              strategy,
+              fallbackRemote,
             },
           },
           selector: {

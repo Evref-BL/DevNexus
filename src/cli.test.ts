@@ -7091,6 +7091,7 @@ describe("dev-nexus cli", () => {
     const jsonOutput = captureOutput();
     const finalizationTextOutput = captureOutput();
     const finalizationJsonOutput = captureOutput();
+    const finalizationCreateTextOutput = captureOutput();
 
     await main(
       [
@@ -7154,6 +7155,19 @@ describe("dev-nexus cli", () => {
         now: () => "2026-05-22T10:00:00.000Z",
       },
     );
+    await main(
+      [
+        "publication",
+        "initiative-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+      ],
+      {
+        stdout: finalizationCreateTextOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
 
     expect(textOutput.output()).toContain("DevNexus initiative delivery report.");
     expect(textOutput.output()).toContain("Next action: request_review");
@@ -7194,6 +7208,13 @@ describe("dev-nexus cli", () => {
     expect(finalizationTextOutput.output()).toContain(
       "primary: active=codex-goals review=ready_for_review publication=needs_review",
     );
+    expect(finalizationCreateTextOutput.output()).toContain(
+      "finalPRAction=create_at_review_gate",
+    );
+    expect(finalizationCreateTextOutput.output()).toContain(
+      "dev-nexus publication pull-request upsert",
+    );
+    expect(finalizationCreateTextOutput.output()).toContain("--head feat/codex-goals");
     expect(JSON.parse(finalizationJsonOutput.output())).toMatchObject({
       ok: true,
       nextAction: "request_review",
