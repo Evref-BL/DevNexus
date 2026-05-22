@@ -356,7 +356,9 @@ export function buildNexusSetupCheck(options: {
         component,
         topology: sourceRootPlan.topology,
       }));
-      checks.push(...componentGitSafetyChecks(component, sourceRootPlan.path));
+      checks.push(...componentGitSafetyChecks(component, sourceRootPlan.path, {
+        topology: sourceRootPlan.topology,
+      }));
     }
   }
 
@@ -2555,7 +2557,8 @@ function componentSourceRootTopologyCheck(options: {
   const status: NexusSetupCheckStatus =
     topology.state === "missing" || topology.state === "incompatible-platform"
       ? "blocked"
-      : topology.layout === "workspace-local" && topology.state === "present"
+      : (topology.layout === "embedded" || topology.layout === "workspace-local") &&
+          topology.state === "present"
         ? "passed"
         : "warning";
   return {
@@ -2580,6 +2583,9 @@ function componentSourceRootTopologyCheck(options: {
 function componentGitSafetyChecks(
   component: NexusProjectConfig["components"][number],
   sourceRoot: string,
+  options: {
+    topology?: NexusComponentSourceRootTopology;
+  } = {},
 ): NexusSetupCheckResult[] {
   if (!fs.existsSync(sourceRoot)) {
     return [];
@@ -2655,6 +2661,26 @@ function componentGitSafetyChecks(
   }
 
   if (dirtyStatus.trim().length > 0) {
+    const dirtyPaths = dirtyStatusPaths(dirtyStatus);
+    const devNexusSetupDirtyPaths = options.topology?.layout === "embedded"
+      ? dirtyPaths.filter(isDevNexusSetupDirtyPath)
+      : [];
+    if (
+      options.topology?.layout === "embedded" &&
+      dirtyPaths.length > 0 &&
+      devNexusSetupDirtyPaths.length === dirtyPaths.length
+    ) {
+      return [...checks, {
+        id: `component-${component.id}-dirty-state`,
+        title: `${component.name} dirty state`,
+        status: "warning",
+        summary:
+          `Embedded component source root has only DevNexus setup files with Git changes (${devNexusSetupDirtyPaths.length}): ${summarizeDirtyPaths(devNexusSetupDirtyPaths)}`,
+        nextAction:
+          "Review and commit the DevNexus setup files when the embedded workspace configuration is correct.",
+      }];
+    }
+
     return [...checks, {
       id: `component-${component.id}-dirty-state`,
       title: `${component.name} dirty state`,
@@ -2673,6 +2699,49 @@ function componentGitSafetyChecks(
     summary: `Component source root has no Git working tree changes: ${sourceRoot}`,
     nextAction: null,
   }];
+}
+
+function dirtyStatusPaths(status: string): string[] {
+  return status
+    .split(/\r?\n/u)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const rawPath = line.length > 3 ? line.slice(3).trim() : line.trim();
+      const renameSeparator = " -> ";
+      const pathValue = rawPath.includes(renameSeparator)
+        ? rawPath.slice(rawPath.lastIndexOf(renameSeparator) + renameSeparator.length)
+        : rawPath;
+      return unquoteGitStatusPath(pathValue).replace(/\\/gu, "/");
+    });
+}
+
+function unquoteGitStatusPath(value: string): string {
+  if (value.startsWith("\"") && value.endsWith("\"")) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function isDevNexusSetupDirtyPath(filePath: string): boolean {
+  return filePath === "dev-nexus.project.json" ||
+    filePath === "AGENTS.md" ||
+    filePath === ".mcp.json" ||
+    filePath === "opencode.json" ||
+    filePath.startsWith(".dev-nexus/") ||
+    filePath.startsWith(".codex/") ||
+    filePath.startsWith(".agents/") ||
+    filePath.startsWith(".claude/") ||
+    filePath.startsWith(".opencode/");
+}
+
+function summarizeDirtyPaths(filePaths: string[]): string {
+  const limit = 6;
+  if (filePaths.length <= limit) {
+    return filePaths.join(", ");
+  }
+  const remainingCount = filePaths.length - limit;
+  return `${filePaths.slice(0, limit).join(", ")} and ${remainingCount} more`;
 }
 
 function githubMetaProjectChecks(

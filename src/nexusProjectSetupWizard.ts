@@ -152,7 +152,7 @@ export async function applyNexusProjectSetup(
   const proposal = previewNexusProjectSetup(options.answers);
   if (proposal.status !== "ready") {
     throw new Error(
-      `workspace setup proposal is blocked: ${proposal.diagnostics
+      `workspace init proposal is blocked: ${proposal.diagnostics
         .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`)
         .join("; ")}`,
     );
@@ -161,7 +161,7 @@ export async function applyNexusProjectSetup(
     (operation) => operation.mutationClass === "provider_mutation",
   );
   if (providerMutation?.allowedDuringLocalSetup) {
-    throw new Error("workspace setup refuses provider mutations during local setup");
+    throw new Error("workspace init refuses provider mutations during local setup");
   }
 
   const projectRoot = path.resolve(proposal.answers.project.root);
@@ -346,7 +346,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
 
 export function renderNexusProjectSetupRequiredAnswers(): string {
   return [
-    "workspace init/setup requires --answers <json-file> in non-interactive mode.",
+    "workspace init requires --answers <json-file> in non-interactive mode.",
     "Required answer paths:",
     ...nexusProjectSetupRequiredAnswerPaths.map((answer) => `- ${answer}`),
   ].join("\n");
@@ -395,7 +395,8 @@ async function promptForNexusProjectSetupAnswers(options: {
       [
         "DevNexus user quickstart",
         "Answer the workspace and component prompts.",
-        "Press Enter on a component source path to create it under components/<id>, or type an existing path to reference it.",
+        "Choose what you are setting up. Use project for one repository; use workspace for a separate root that coordinates components.",
+        "The primary component source path defaults to . for project and components/<id> for workspace.",
         "DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
@@ -407,13 +408,18 @@ async function promptForNexusProjectSetupAnswers(options: {
     );
     const defaultName = path.basename(projectRoot);
     const projectName = await askWithDefault(rl, "Workspace name", defaultName);
-    const projectId = await askWithDefault(rl, "Project id", slug(projectName));
+    const projectId = await askWithDefault(rl, "Workspace id", slug(projectName));
     const homePath = options.homePath ?? defaultNexusHomePath();
+    const layout = await askWorkspaceLayout(
+      rl,
+      options.stdout,
+      defaultWorkspaceLayout(projectRoot),
+    );
     const componentId = await askWithDefault(rl, "Primary component id", "primary");
     const componentPath = await askWithDefault(
       rl,
       "Primary component source path",
-      path.join("components", componentId),
+      defaultPrimaryComponentSourcePath(layout, componentId),
     );
     const components: NexusProjectSetupAnswers["components"] = [
       {
@@ -446,7 +452,10 @@ async function promptForNexusProjectSetupAnswers(options: {
 
     const agent = await askWithDefault(rl, "Agent target", "codex");
     const localTracker = await askWithDefault(rl, "Enable local tracker? (yes/no)", "yes");
-    const initializeGit = await askWithDefault(rl, "Initialize meta Git repo? (yes/no)", "yes");
+    const projectHasGit = gitCheckoutExists(projectRoot);
+    const initializeGit = projectHasGit
+      ? true
+      : yesNo(await askWithDefault(rl, "Initialize Git repo? (yes/no)", "yes"));
     const agentProvider = normalizeAgentProvider(agent);
 
     return {
@@ -457,7 +466,7 @@ async function promptForNexusProjectSetupAnswers(options: {
         id: projectId,
         name: projectName,
         root: projectRoot,
-        initializeGit: yesNo(initializeGit),
+        initializeGit,
       },
       components,
       agentTargets: [
@@ -495,6 +504,66 @@ function wizardComponentSource(
     path: sourcePath,
     initializeGit: true,
   };
+}
+
+function defaultPrimaryComponentSourcePath(
+  layout: NexusProjectSetupWorkspaceLayout,
+  componentId: string,
+): string {
+  return layout === "project"
+    ? "."
+    : path.join("components", componentId);
+}
+
+type NexusProjectSetupWorkspaceLayout = "project" | "workspace";
+
+function defaultWorkspaceLayout(projectRoot: string): NexusProjectSetupWorkspaceLayout {
+  return gitCheckoutExists(projectRoot)
+    ? "project"
+    : "workspace";
+}
+
+function gitCheckoutExists(projectRoot: string): boolean {
+  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"));
+}
+
+async function askWorkspaceLayout(
+  rl: readline.Interface,
+  stdout: NodeJS.WriteStream,
+  defaultLayout: NexusProjectSetupWorkspaceLayout,
+): Promise<NexusProjectSetupWorkspaceLayout> {
+  for (;;) {
+    const answer = await askWithDefault(
+      rl,
+      "What are you setting up? (project/workspace)",
+      defaultLayout,
+    );
+    const layout = normalizeWorkspaceLayout(answer);
+    if (layout) {
+      return layout;
+    }
+    stdout.write(
+      "Choose project for one repository, or workspace for a separate root that coordinates components.\n",
+    );
+  }
+}
+
+function normalizeWorkspaceLayout(
+  value: string,
+): NexusProjectSetupWorkspaceLayout | null {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "project":
+    case "embedded":
+    case "embedded-project":
+      return "project";
+    case "workspace":
+    case "coordination":
+    case "coordination-workspace":
+      return "workspace";
+    default:
+      return null;
+  }
 }
 
 function isSameOrInsidePath(parentPath: string, childPath: string): boolean {

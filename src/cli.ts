@@ -943,7 +943,7 @@ async function mainUnchecked(
   if (argv[0] === "home") {
     return handleHomeCommand(argv, dependencies);
   }
-  if (argv[0] === "workspace" || argv[0] === "project") {
+  if (argv[0] === "workspace") {
     return handleProjectCommand(argv, dependencies);
   }
   if (argv[0] === "setup") {
@@ -995,7 +995,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, workspace, project, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 
@@ -1054,7 +1054,7 @@ async function handleProjectCommand(
     return 0;
   }
 
-  if (command === "init" || command === "setup") {
+  if (command === "init") {
     if (argvRequestsHelp(argv)) {
       writeLine(dependencies.stdout ?? process.stdout, projectSetupUsage());
       return 0;
@@ -1079,7 +1079,7 @@ async function handleProjectCommand(
 
     assertCliMutationAllowed(dependencies, {
       projectRoot: proposal.answers.project.root,
-      command: command === "init" ? "workspace init" : "workspace setup",
+      command: "workspace init",
       mutationClass: "worktree_bootstrap",
       targetPath: proposal.answers.project.root,
     });
@@ -1151,7 +1151,7 @@ async function handleProjectCommand(
     return handleProjectTrackerCommand(argv, dependencies);
   }
 
-  throw new Error("workspace requires create, init, setup, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
+  throw new Error("workspace requires create, init, component, import, list, status, hosting, mcp, plugin, agent-projection, or tracker");
 }
 
 async function handleProjectComponentCommand(
@@ -3232,7 +3232,7 @@ function parseProjectSetupCommand(argv: string[]): ParsedProjectSetupCommand {
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown workspace setup option: ${arg}`);
+        throw new Error(`Unknown workspace init option: ${arg}`);
     }
   }
 

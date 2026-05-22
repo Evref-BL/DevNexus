@@ -45,8 +45,18 @@ dev-nexus workspace init
 For a user in a terminal, init asks the minimum first-workspace questions. The
 DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
 one.
-Press Enter for a component source path to create it under `components/<id>`, or
-type an existing path to reference it.
+
+Choose what you are setting up:
+
+The wizard asks this early because it controls whether the primary component
+starts at `.` or under `components/<id>`.
+
+- **Embedded project layout:** run init inside an existing Git repository and
+  accept `.` as the primary component source path. DevNexus files live next to
+  the project files, like Maven, Gradle, Cargo, or editor configuration.
+- **Coordination workspace layout:** run init from a new workspace directory and
+  accept `components/<id>` for new workspace-local components, or type existing
+  paths for repositories and folders you want the workspace to coordinate.
 
 Setup creates or updates:
 
@@ -69,9 +79,9 @@ Open the DevNexus workspace root in the agent:
 the directory where you ran dev-nexus workspace init
 ```
 
-Do not open a component repository when you expect DevNexus tools and generated
-agent context. Components are the things the workspace coordinates. The DevNexus
-workspace root is the agent workspace.
+Use the DevNexus workspace root as the agent workspace when you expect DevNexus
+tools and generated agent context. Components are the things the workspace
+coordinates.
 
 After opening the workspace, ask the agent to:
 
@@ -99,14 +109,19 @@ The workspace is ready when `workspace status` succeeds, setup check is not
 blocked, `AGENTS.md` exists, and your agent config was generated, such as
 `.codex/config.toml` for Codex or `.mcp.json` for Claude.
 
+In embedded project layout, setup check may warn that DevNexus setup files are
+uncommitted. Review and commit those files when the embedded workspace
+configuration is correct. Unrelated dirty product files still block readiness.
+
 ## Add Existing Components
 
 A DevNexus workspace can coordinate several existing folders. For example, one
 workspace might point to an API repository, a frontend repository, a shared
 library, and a load-test harness.
 
-Use one DevNexus workspace with several components. Do not run `workspace import`
-once per repository if the goal is one shared agent workspace.
+Use one DevNexus workspace with several components for a shared agent workspace.
+`workspace import` fits the narrower case where one existing source checkout
+becomes the primary component of a new workspace.
 
 See [First workspace from existing components](first-workspace-existing-components.md)
 for a full example.
@@ -181,8 +196,7 @@ profile, GitLab CLI profile, environment-variable name, or token store id. See
 
 ## Low-Level Commands
 
-`workspace init` is the first-workspace command. `workspace setup` is an alias
-for the same local setup flow.
+`workspace init` is the first-workspace command.
 
 Use `workspace create` only when you want a low-level local scaffold. Use
 `workspace import <source-root>` only when one existing source checkout should
