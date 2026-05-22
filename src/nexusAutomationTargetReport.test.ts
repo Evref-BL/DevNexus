@@ -457,6 +457,90 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("summarizes Codex Goal lifecycle facts from run metadata", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-goals-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "run-goal",
+        projectId: "report-demo",
+        componentId: "primary",
+        status: "completed",
+        workItemId: "local-1",
+        workItemTitle: "Use Codex Goals",
+        summary: "Run completed with Goal lifecycle evidence.",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-goal",
+          profileId: "codex-app-server",
+          threadId: "thread-goal-report",
+          turnId: "turn-goal-report",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: projectRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus/result.json"),
+          failureSummary: null,
+          goal: {
+            requested: true,
+            setMethodAvailable: true,
+            getMethodAvailable: true,
+            setStatus: "set",
+            readStatus: "read",
+            goalId: "goal-1",
+            threadId: "thread-goal-report",
+            status: "budgetLimited",
+            tokenBudget: 100,
+            tokensUsed: 100,
+            timeUsedSeconds: 11,
+            failureSummary: null,
+          },
+        },
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:05:00.000Z",
+    });
+
+    expect(report.executionSummary.codexGoals).toMatchObject([
+      {
+        runId: "run-goal",
+        componentId: "primary",
+        workItemId: "local-1",
+        workItemTitle: "Use Codex Goals",
+        goalId: "goal-1",
+        threadId: "thread-goal-report",
+        status: "budgetLimited",
+        tokenBudget: 100,
+        tokensUsed: 100,
+        timeUsedSeconds: 11,
+        setStatus: "set",
+        readStatus: "read",
+        summary:
+          "Codex Goal budgetLimited for thread thread-goal-report; tokens 100/100; time 11s.",
+      },
+    ]);
+    expect(report.componentProgress[0]?.codexGoals).toMatchObject([
+      {
+        runId: "run-goal",
+        status: "budgetLimited",
+      },
+    ]);
+  });
+
   it("omits version planning from target reports when no version config exists", () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
