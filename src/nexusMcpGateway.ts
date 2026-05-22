@@ -1,3 +1,6 @@
+import childProcess from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import {
   jsonRpcError,
@@ -99,6 +102,32 @@ export interface NexusMcpGatewayIndexOptions {
   agent?: string | null;
 }
 
+export interface NexusMcpGatewayResultRecord {
+  version: 1;
+  id: string;
+  createdAt: string;
+  projectRoot: string;
+  toolId: string;
+  serverId: string;
+  serverName: string;
+  toolName: string;
+  command: string;
+  args: string[];
+  argumentBytes: number;
+  resultBytes: number;
+  stored: true;
+  truncated: boolean;
+  policy: {
+    decision: "allowed";
+    reason: string;
+  };
+  response: unknown;
+}
+
+const defaultGatewayCallInlineBytes = 8000;
+const maxGatewayCallInlineBytes = 50000;
+const gatewayCallTimeoutMs = 15_000;
+
 const gatewayTools: McpTool[] = [
   {
     name: "mcp_gateway_status",
@@ -142,6 +171,42 @@ const gatewayTools: McpTool[] = [
         toolId: { type: "string" },
       },
       required: ["projectRoot", "toolId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "mcp_gateway_call",
+    description:
+      "Invoke one gateway-routed command-based MCP tool by toolId and return a bounded result with an audit id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        agent: { type: "string" },
+        toolId: { type: "string" },
+        arguments: { type: "object" },
+        maxInlineBytes: {
+          type: "number",
+          minimum: 1000,
+          maximum: maxGatewayCallInlineBytes,
+          default: defaultGatewayCallInlineBytes,
+        },
+      },
+      required: ["projectRoot", "toolId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "mcp_gateway_result_fetch",
+    description:
+      "Fetch a stored MCP gateway call result and audit record by result id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        resultId: { type: "string" },
+      },
+      required: ["projectRoot", "resultId"],
       additionalProperties: false,
     },
   },
@@ -279,6 +344,59 @@ export async function callDevNexusMcpGatewayTool(
           ok: true,
           projectRoot: index.projectRoot,
           tool,
+        });
+      }
+      case "mcp_gateway_call": {
+        const projectRoot = requiredString(args, "projectRoot", "arguments");
+        const index = buildNexusMcpGatewayIndex({
+          projectRoot,
+          agent: optionalString(args, "agent", "arguments"),
+        });
+        const toolId = requiredString(args, "toolId", "arguments");
+        const tool = index.tools.find((candidate) => candidate.toolId === toolId);
+        if (!tool) {
+          return toolResult({
+            ok: false,
+            error: `Gateway tool not found: ${toolId}`,
+          }, true);
+        }
+        const server = index.servers.find(
+          (candidate) => candidate.serverId === tool.serverId,
+        );
+        if (!server?.command) {
+          return toolResult({
+            ok: false,
+            error: `Gateway server ${tool.serverName} does not declare a command.`,
+            toolId,
+          }, true);
+        }
+        const toolArguments = optionalRecord(args, "arguments", "arguments") ?? {};
+        const response = await callCommandMcpTool({
+          projectRoot: index.projectRoot,
+          command: server.command,
+          args: server.args,
+          toolName: tool.toolName,
+          toolArguments,
+        });
+        const record = writeGatewayResultRecord({
+          projectRoot: index.projectRoot,
+          tool,
+          server,
+          toolArguments,
+          response,
+        });
+        return toolResult(summarizeGatewayResultRecord(
+          record,
+          optionalNumber(args, "maxInlineBytes", "arguments") ??
+            defaultGatewayCallInlineBytes,
+        ));
+      }
+      case "mcp_gateway_result_fetch": {
+        const projectRoot = requiredString(args, "projectRoot", "arguments");
+        const resultId = requiredString(args, "resultId", "arguments");
+        return toolResult({
+          ok: true,
+          result: readGatewayResultRecord(projectRoot, resultId),
         });
       }
       default:
@@ -515,6 +633,320 @@ function pluginToolRecord(options: {
   };
 }
 
+async function callCommandMcpTool(options: {
+  projectRoot: string;
+  command: string;
+  args: readonly string[];
+  toolName: string;
+  toolArguments: Record<string, unknown>;
+}): Promise<unknown> {
+  const client = new StdioMcpClient({
+    projectRoot: options.projectRoot,
+    command: options.command,
+    args: options.args,
+    timeoutMs: gatewayCallTimeoutMs,
+  });
+  try {
+    await client.start();
+    await client.request("initialize", {
+      protocolVersion: devNexusMcpProtocolVersion,
+      capabilities: {},
+      clientInfo: {
+        name: "dev-nexus-mcp-gateway",
+        version: "0.1.0",
+      },
+    });
+    client.notify("notifications/initialized", {});
+    return await client.request("tools/call", {
+      name: options.toolName,
+      arguments: options.toolArguments,
+    });
+  } finally {
+    await client.stop();
+  }
+}
+
+class StdioMcpClient {
+  private child: childProcess.ChildProcessWithoutNullStreams | null = null;
+  private nextId = 1;
+  private stdoutBuffer: Buffer = Buffer.alloc(0);
+  private stderr = "";
+  private readonly pending = new Map<number, {
+    resolve: (value: unknown) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+  }>();
+
+  constructor(
+    private readonly options: {
+      projectRoot: string;
+      command: string;
+      args: readonly string[];
+      timeoutMs: number;
+    },
+  ) {}
+
+  async start(): Promise<void> {
+    this.child = childProcess.spawn(this.options.command, [...this.options.args], {
+      cwd: this.options.projectRoot,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    this.child.stdout.on("data", (chunk: Buffer | string) => {
+      const bufferChunk = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk, "utf8");
+      this.stdoutBuffer = Buffer.concat([this.stdoutBuffer, bufferChunk]);
+      this.processStdout();
+    });
+    this.child.stderr.on("data", (chunk: Buffer | string) => {
+      this.stderr += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+    });
+    this.child.once("error", (error) => {
+      this.rejectPending(error);
+    });
+    this.child.once("exit", (code, signal) => {
+      if (this.pending.size > 0) {
+        this.rejectPending(new Error(
+          `MCP upstream exited before responding: code=${code ?? "null"} signal=${signal ?? "null"} stderr=${this.stderr.trim()}`,
+        ));
+      }
+    });
+  }
+
+  request(method: string, params: unknown): Promise<unknown> {
+    const child = this.assertChild();
+    const id = this.nextId++;
+    child.stdin.write(jsonRpcFrame({
+      jsonrpc: "2.0",
+      id,
+      method,
+      params,
+    }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`MCP upstream request timed out: ${method}`));
+      }, this.options.timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+    });
+  }
+
+  notify(method: string, params: unknown): void {
+    this.assertChild().stdin.write(jsonRpcFrame({
+      jsonrpc: "2.0",
+      method,
+      params,
+    }));
+  }
+
+  async stop(): Promise<void> {
+    const child = this.child;
+    if (!child) {
+      return;
+    }
+    child.stdin.end();
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve();
+      }, 100);
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    this.child = null;
+  }
+
+  private processStdout(): void {
+    while (true) {
+      const extracted = extractJsonRpcMessage(this.stdoutBuffer);
+      if (!extracted) {
+        return;
+      }
+      this.stdoutBuffer = extracted.remaining;
+      this.handleMessage(extracted.message);
+    }
+  }
+
+  private handleMessage(message: unknown): void {
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      return;
+    }
+    const record = message as Record<string, unknown>;
+    const id = typeof record.id === "number" ? record.id : null;
+    if (id === null) {
+      return;
+    }
+    const pending = this.pending.get(id);
+    if (!pending) {
+      return;
+    }
+    this.pending.delete(id);
+    clearTimeout(pending.timer);
+    if (record.error) {
+      pending.reject(new Error(JSON.stringify(record.error)));
+      return;
+    }
+    pending.resolve(record.result);
+  }
+
+  private rejectPending(error: Error): void {
+    for (const [id, pending] of this.pending) {
+      this.pending.delete(id);
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+  }
+
+  private assertChild(): childProcess.ChildProcessWithoutNullStreams {
+    if (!this.child) {
+      throw new Error("MCP upstream process is not running");
+    }
+    return this.child;
+  }
+}
+
+function writeGatewayResultRecord(options: {
+  projectRoot: string;
+  tool: NexusMcpGatewayToolRecord;
+  server: NexusMcpGatewayServerRecord;
+  toolArguments: Record<string, unknown>;
+  response: unknown;
+}): NexusMcpGatewayResultRecord {
+  const id = `mcp-result-${new Date().toISOString().replace(/[^0-9TZ]/gu, "")}-${crypto.randomUUID()}`;
+  const responseText = JSON.stringify(options.response);
+  const record: NexusMcpGatewayResultRecord = {
+    version: 1,
+    id,
+    createdAt: new Date().toISOString(),
+    projectRoot: options.projectRoot,
+    toolId: options.tool.toolId,
+    serverId: options.server.serverId,
+    serverName: options.server.serverName,
+    toolName: options.tool.toolName,
+    command: options.server.command ?? "",
+    args: options.server.args,
+    argumentBytes: Buffer.byteLength(JSON.stringify(options.toolArguments), "utf8"),
+    resultBytes: Buffer.byteLength(responseText, "utf8"),
+    stored: true,
+    truncated: false,
+    policy: {
+      decision: "allowed",
+      reason: "Gateway MVP allows configured command-based upstream MCP tools.",
+    },
+    response: options.response,
+  };
+  const recordPath = gatewayResultRecordPath(options.projectRoot, id);
+  fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+  fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  return record;
+}
+
+function summarizeGatewayResultRecord(
+  record: NexusMcpGatewayResultRecord,
+  maxInlineBytes: number,
+): Record<string, unknown> {
+  const inlineLimit = Math.max(
+    1000,
+    Math.min(maxGatewayCallInlineBytes, Math.trunc(maxInlineBytes)),
+  );
+  const responseText = JSON.stringify(record.response, null, 2);
+  const responseBytes = Buffer.byteLength(responseText, "utf8");
+  const truncated = responseBytes > inlineLimit;
+  return {
+    ok: true,
+    resultId: record.id,
+    toolId: record.toolId,
+    serverId: record.serverId,
+    serverName: record.serverName,
+    toolName: record.toolName,
+    stored: true,
+    truncated,
+    argumentBytes: record.argumentBytes,
+    resultBytes: record.resultBytes,
+    policy: record.policy,
+    response: truncated
+      ? {
+          excerpt: responseText.slice(0, inlineLimit),
+          omittedBytes: responseBytes - inlineLimit,
+        }
+      : record.response,
+  };
+}
+
+function readGatewayResultRecord(
+  projectRoot: string,
+  resultId: string,
+): NexusMcpGatewayResultRecord {
+  if (!/^mcp-result-[A-Za-z0-9TZ-]+$/u.test(resultId)) {
+    throw new Error("arguments.resultId must be a gateway result id");
+  }
+  const recordPath = gatewayResultRecordPath(projectRoot, resultId);
+  if (!fs.existsSync(recordPath)) {
+    throw new Error(`Gateway result record not found: ${resultId}`);
+  }
+  return JSON.parse(fs.readFileSync(recordPath, "utf8")) as NexusMcpGatewayResultRecord;
+}
+
+function gatewayResultRecordPath(projectRoot: string, resultId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "results",
+    `${resultId}.json`,
+  );
+}
+
+function jsonRpcFrame(message: unknown): string {
+  const body = JSON.stringify(message);
+  return `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`;
+}
+
+function extractJsonRpcMessage(buffer: Buffer): {
+  message: unknown;
+  remaining: Buffer;
+} | null {
+  if (buffer.length === 0) {
+    return null;
+  }
+  if (
+    buffer.subarray(0, Math.min(buffer.length, "Content-Length:".length))
+      .toString("utf8")
+      .toLowerCase() === "content-length:"
+  ) {
+    const headerEnd = buffer.indexOf("\r\n\r\n");
+    if (headerEnd < 0) {
+      return null;
+    }
+    const header = buffer.slice(0, headerEnd).toString("utf8");
+    const lengthMatch = /^Content-Length:\s*(\d+)\s*$/imu.exec(header);
+    if (!lengthMatch) {
+      throw new Error("Missing Content-Length header from MCP upstream");
+    }
+    const bodyStart = headerEnd + 4;
+    const bodyEnd = bodyStart + Number(lengthMatch[1]);
+    if (buffer.length < bodyEnd) {
+      return null;
+    }
+    return {
+      message: JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8")),
+      remaining: buffer.slice(bodyEnd),
+    };
+  }
+
+  const newlineIndex = buffer.indexOf("\n");
+  if (newlineIndex < 0) {
+    return null;
+  }
+  const line = buffer.slice(0, newlineIndex).toString("utf8").trim();
+  return {
+    message: JSON.parse(line),
+    remaining: buffer.slice(newlineIndex + 1),
+  };
+}
+
 function scoreGatewayTool(tool: NexusMcpGatewayToolRecord, query: string): number {
   const terms = query
     .trim()
@@ -630,6 +1062,21 @@ function optionalString(
     throw new Error(`${pathName}.${key} must be a non-empty string`);
   }
   return value.trim();
+}
+
+function optionalRecord(
+  record: Record<string, unknown>,
+  key: string,
+  pathName: string,
+): Record<string, unknown> | undefined {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${pathName}.${key} must be an object`);
+  }
+  return value as Record<string, unknown>;
 }
 
 function optionalNumber(

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import process from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildNexusMcpGatewayIndex,
@@ -59,6 +60,55 @@ function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
 }
 
+function writeEchoMcpServer(projectRoot: string): string {
+  const serverPath = path.join(projectRoot, "echo-mcp-server.cjs");
+  fs.writeFileSync(
+    serverPath,
+    `
+let buffer = Buffer.alloc(0);
+process.stdin.on("data", (chunk) => {
+  buffer = Buffer.concat([buffer, chunk]);
+  processBuffer();
+});
+function processBuffer() {
+  while (true) {
+    const headerEnd = buffer.indexOf("\\r\\n\\r\\n");
+    if (headerEnd < 0) return;
+    const header = buffer.slice(0, headerEnd).toString("utf8");
+    const match = /Content-Length:\\s*(\\d+)/i.exec(header);
+    if (!match) throw new Error("missing content length");
+    const bodyStart = headerEnd + 4;
+    const bodyEnd = bodyStart + Number(match[1]);
+    if (buffer.length < bodyEnd) return;
+    const message = JSON.parse(buffer.slice(bodyStart, bodyEnd).toString("utf8"));
+    buffer = buffer.slice(bodyEnd);
+    handle(message);
+  }
+}
+function send(message) {
+  const body = JSON.stringify(message);
+  process.stdout.write("Content-Length: " + Buffer.byteLength(body, "utf8") + "\\r\\n\\r\\n" + body);
+}
+function handle(message) {
+  if (message.method === "initialize") {
+    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "echo" } } });
+    return;
+  }
+  if (message.method === "notifications/initialized") {
+    return;
+  }
+  if (message.method === "tools/call") {
+    const args = message.params.arguments || {};
+    const text = typeof args.repeat === "number" ? "x".repeat(args.repeat) : String(args.text || "ok");
+    send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }] } });
+  }
+}
+`,
+    "utf8",
+  );
+  return serverPath;
+}
+
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -71,6 +121,8 @@ describe("DevNexus MCP gateway", () => {
       "mcp_gateway_status",
       "mcp_gateway_search",
       "mcp_gateway_describe",
+      "mcp_gateway_call",
+      "mcp_gateway_result_fetch",
     ]);
   });
 
@@ -266,6 +318,127 @@ describe("DevNexus MCP gateway", () => {
     });
   });
 
+  it("calls command-based upstream tools and fetches stored results", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-call-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+              tools: [
+                {
+                  name: "echo",
+                  description: "Echo text from arguments.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "echo" },
+    ));
+
+    const called = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_call",
+      {
+        projectRoot,
+        toolId: search.matches[0].toolId,
+        arguments: { text: "hello gateway" },
+      },
+    ));
+
+    expect(called).toMatchObject({
+      ok: true,
+      stored: true,
+      truncated: false,
+      response: {
+        content: [{ type: "text", text: "hello gateway" }],
+      },
+      policy: {
+        decision: "allowed",
+      },
+    });
+    const fetched = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_result_fetch",
+      { projectRoot, resultId: called.resultId },
+    ));
+    expect(fetched.result).toMatchObject({
+      id: called.resultId,
+      serverName: "echo_runtime",
+      toolName: "echo",
+      resultBytes: expect.any(Number),
+      response: {
+        content: [{ type: "text", text: "hello gateway" }],
+      },
+    });
+  });
+
+  it("returns bounded inline content for large gateway call results", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-large-call-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+              tools: [{ name: "echo", description: "Echo text from arguments." }],
+            },
+          ],
+        },
+      ],
+    }));
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "echo" },
+    ));
+
+    const called = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_call",
+      {
+        projectRoot,
+        toolId: search.matches[0].toolId,
+        arguments: { repeat: 3000 },
+        maxInlineBytes: 1000,
+      },
+    ));
+
+    expect(called.truncated).toBe(true);
+    expect(called.response.excerpt.length).toBe(1000);
+    const fetched = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_result_fetch",
+      { projectRoot, resultId: called.resultId },
+    ));
+    expect(fetched.result.response.content[0].text).toHaveLength(3000);
+  });
+
   it("handles gateway MCP JSON-RPC initialize, tools/list, and tools/call", async () => {
     const initialized = await handleDevNexusMcpGatewayJsonRpcMessage({
       jsonrpc: "2.0",
@@ -295,6 +468,8 @@ describe("DevNexus MCP gateway", () => {
           expect.objectContaining({ name: "mcp_gateway_status" }),
           expect.objectContaining({ name: "mcp_gateway_search" }),
           expect.objectContaining({ name: "mcp_gateway_describe" }),
+          expect.objectContaining({ name: "mcp_gateway_call" }),
+          expect.objectContaining({ name: "mcp_gateway_result_fetch" }),
         ],
       },
     });
