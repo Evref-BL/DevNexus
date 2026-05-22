@@ -104,6 +104,15 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  buildNexusInitiativeDeliveryPlan,
+} from "./nexusInitiativeDeliveryPlan.js";
+import {
+  buildNexusInitiativeDeliveryReport,
+} from "./nexusInitiativeDeliveryReport.js";
+import type {
+  NexusPublicationProviderEvidenceInput,
+} from "./nexusPublicationProviderEvidence.js";
+import {
   adoptNexusAutomationCurrentAgent,
   adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
   recordNexusAutomationCurrentAgentAdoptionResult,
@@ -535,6 +544,39 @@ const tools: McpTool[] = [
         project: { type: "string" },
         projectRoot: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "publication_initiative_plan",
+    description: "Build a read-only initiative delivery branch plan from configured publication policy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        initiativeId: { type: "string" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "publication_initiative_report",
+    description: "Build a read-only initiative delivery readiness report from configured policy and optional provider evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        initiativeId: { type: "string" },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+        fullMatrixBudgetAvailable: { type: "boolean" },
+      },
+      required: ["projectRoot"],
       additionalProperties: false,
     },
   },
@@ -1528,6 +1570,31 @@ export async function callDevNexusMcpTool(
           report: detail === "full" ? report : summarizeTargetReport(report),
         });
       }
+      case "publication_initiative_plan":
+        return toolResult({
+          ok: true,
+          plan: buildNexusInitiativeDeliveryPlan({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            initiativeId: optionalNullableString(args, "initiativeId", "arguments"),
+          }),
+        });
+      case "publication_initiative_report":
+        return toolResult({
+          ok: true,
+          report: buildNexusInitiativeDeliveryReport({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            initiativeId: optionalNullableString(args, "initiativeId", "arguments"),
+            providerEvidence: providerEvidenceFromArgs(args),
+            fullMatrixBudgetAvailable: optionalBoolean(
+              args,
+              "fullMatrixBudgetAvailable",
+              "arguments",
+            ),
+            now: context.now,
+          }),
+        });
       case "current_agent_adopt": {
         const coordinatorLoop =
           optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
@@ -3354,6 +3421,25 @@ function remoteExecutionAttachmentRefsFromArgs(
       throw new Error(`arguments.attachmentRefs[${index}] must be an object`);
     }
     return value as NexusRemoteExecutionAttachmentRef;
+  });
+}
+
+function providerEvidenceFromArgs(
+  args: Record<string, unknown>,
+): NexusPublicationProviderEvidenceInput[] {
+  const values = args.providerEvidence;
+  if (values === undefined || values === null) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    throw new Error("arguments.providerEvidence must be an array");
+  }
+
+  return values.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`arguments.providerEvidence[${index}] must be an object`);
+    }
+    return value as NexusPublicationProviderEvidenceInput;
   });
 }
 
