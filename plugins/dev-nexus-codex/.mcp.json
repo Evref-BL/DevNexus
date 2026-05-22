@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "dev_nexus": {
+      "command": "node",
+      "args": [
+        "./scripts/dev-nexus-codex-wrapper.mjs",
+        "mcp-stdio"
+      ],
+      "env": {
+        "DEV_NEXUS_AGENT_CLIENT": "codex"
+      }
+    }
+  }
+}
