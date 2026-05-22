@@ -29,20 +29,26 @@ and ready for coordinator-driven work across its components.
   `/Users/gabriel.darbord/dev-nexus/sources/dev-nexus`, while generated MCP
   config should pin the active CLI script path from `workspace mcp refresh`
   instead of inheriting stale global `dev-nexus mcp-stdio` behavior.
+- The DevNexus Automation GitHub App installation token is available for
+  Evref-BL component repositories such as `Evref-BL/DevNexus`.
 
 ## Current Decisions
 
-- Agent-created GitHub activity for Evref-BL repositories should use the
-  DevNexus Automation GitHub App (`devnexus-automation[bot]`) through the
-  host-local App profile and installation-token helper. The former
-  `Gabot-Darbot` machine-user identity is not the active automation actor.
-- App-backed Git transport and publication are not complete yet. Component
-  source publication remains green-main guarded and must not rely on the old
-  bot SSH profile; use handoff/manual integration until credential brokering,
-  the forge facade, and App HTTPS push support land.
+- Agent-created GitHub activity for Evref-BL repositories must use the
+  DevNexus Automation GitHub App installation identity
+  (`devnexus-automation[bot]`) through the host-local App profile and
+  installation-token helper. Do not silently fall back to `Gabriel-Darbord`
+  user tokens or the former `Gabot-Darbot` machine-user identity for autonomous
+  push/PR publication.
+- App-backed branch push and PR creation are the dogfood default for
+  agent-created review handoffs. If App installation auth is unavailable, block
+  and record the auth problem instead of publishing through a personal account.
 - Component source publication uses green-main policy: branch/PR validation,
   required Node 24 checks on Ubuntu, Windows, and macOS, and authorized merge
   only after checks are green.
+- Human maintainers, normally `Gabriel-Darbord`, retain manual merge authority
+  after PR validation. Agents should stop at PR/handoff unless explicitly
+  instructed to perform a merge action.
 - Provider-native GitHub issues are the work items of record. Do not copy new
   provider-native issues into local tracker state unless a policy-gated import
   explicitly requires it.
@@ -72,9 +78,14 @@ and ready for coordinator-driven work across its components.
 - Provider-native coordination remains incomplete enough that GitHub comments
   and GitHub issues should be treated as the durable human-visible record when
   coordination handoff readback is unavailable.
-- App-backed publication is incomplete. Published branches need human PR
-  handoff or an explicitly configured non-bot fallback until the credential
-  broker, forge facade, and App HTTPS push support land.
+- DevNexus MCP authority or credential brokering may still misreport App actor
+  readiness. Treat that as an auth/tooling blocker; use the App
+  installation-token path when explicitly available, but do not substitute a
+  personal GitHub App user token for agent-created publication.
+- The DevNexus Automation GitHub App is not currently installed on
+  `Gabot-Darbot/dev-nexus-dogfood`; dogfood metadata branch/PR publication by
+  the App is blocked until that installation exists. Do not use a personal
+  account as a silent fallback for dogfood metadata publication.
 
 ## Next Direction
 

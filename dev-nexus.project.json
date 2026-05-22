@@ -271,10 +271,10 @@
           }
         },
         "actor": {
-          "kind": "human",
+          "kind": "app",
           "provider": "github",
-          "handle": "Gabriel-Darbord",
-          "id": "dogfood-human-maintainer"
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
         },
         "gitIdentity": {
           "name": "devnexus-automation[bot]",
@@ -359,10 +359,10 @@
           "staleChecks": "block"
         },
         "actor": {
-          "kind": "human",
+          "kind": "app",
           "provider": "github",
-          "handle": "Gabriel-Darbord",
-          "id": "dogfood-human-maintainer"
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
         },
         "gitIdentity": {
           "name": "devnexus-automation[bot]",
@@ -461,10 +461,10 @@
           "staleChecks": "block"
         },
         "actor": {
-          "kind": "human",
+          "kind": "app",
           "provider": "github",
-          "handle": "Gabriel-Darbord",
-          "id": "dogfood-human-maintainer"
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
         },
         "gitIdentity": {
           "name": "devnexus-automation[bot]",
@@ -548,10 +548,10 @@
           "staleChecks": "block"
         },
         "actor": {
-          "kind": "human",
+          "kind": "app",
           "provider": "github",
-          "handle": "Gabriel-Darbord",
-          "id": "dogfood-human-maintainer"
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
         },
         "gitIdentity": {
           "name": "devnexus-automation[bot]",
@@ -635,10 +635,10 @@
           "staleChecks": "block"
         },
         "actor": {
-          "kind": "human",
+          "kind": "app",
           "provider": "github",
-          "handle": "Gabriel-Darbord",
-          "id": "dogfood-human-maintainer"
+          "handle": "devnexus-automation",
+          "id": "dev-nexus-automation-app"
         },
         "gitIdentity": {
           "name": "devnexus-automation[bot]",
@@ -1213,10 +1213,10 @@
       "targetBranch": "main",
       "push": false,
       "actor": {
-        "kind": "human",
+        "kind": "app",
         "provider": "github",
-        "handle": "Gabriel-Darbord",
-        "id": "dogfood-human-maintainer"
+        "handle": "devnexus-automation",
+        "id": "dev-nexus-automation-app"
       },
       "manualRemote": "origin",
       "manualActor": {
