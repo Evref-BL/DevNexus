@@ -744,6 +744,14 @@ describe("nexus dashboard", () => {
     expect(module).toContain("Approval");
     expect(module).not.toContain("Human approval");
     expect(module).toContain("selectedDetail");
+    expect(module).toContain("renderSelectedItem");
+    expect(module).toContain("dn-selected-panel");
+    expect(module).toContain("Selected item");
+    expect(module).toContain("Summary");
+    expect(module).toContain("Actions");
+    expect(module).toContain("Evidence");
+    expect(module).toContain("Diagnostics");
+    expect(module).not.toContain("dn-inspector");
     expect(module).toContain("timelineLanes");
     expect(module).toContain("renderBranchGraph");
     expect(module).toContain("dn-branch-svg");
