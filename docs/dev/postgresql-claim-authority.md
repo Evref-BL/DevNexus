@@ -308,6 +308,12 @@ Verification:
 - `npm run check`
 - Optional PostgreSQL smoke under explicit approval.
 
+Progress:
+
+- 2026-05-23: Slice 5A added user-facing PostgreSQL claim authority setup
+  documentation, linked it from the docs index, and documented the `claim-next
+  --home` option in CLI usage. Live PostgreSQL smoke remains gated.
+
 ## Human Gates
 
 - Provider write gate: create or update GitHub implementation issues/comments.

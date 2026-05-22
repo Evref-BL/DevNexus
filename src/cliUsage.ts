@@ -399,6 +399,7 @@ export function usage(): string {
     "  --json",
     "",
     "Options for work-item claim-next:",
+    "  --home <path>             host-local home config for PostgreSQL profiles",
     "  --component <id>          defaults to the primary component",
     "  --tracker <id>            defaults to the component default tracker",
     "  --mode <default|discovery>",
