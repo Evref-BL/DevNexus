@@ -6515,6 +6515,16 @@ function printProjectMcpBudgetResult(
     stdout,
     `  Known tools: ${report.totals.knownToolCount}; estimated metadata: ${report.totals.estimatedBytes} bytes (~${report.totals.estimatedTokens} tokens)`,
   );
+  writeLine(
+    stdout,
+    `  Visible MCP context: ${report.contextImpact.visibleEstimatedBytes} bytes (~${report.contextImpact.visibleEstimatedTokens} tokens)`,
+  );
+  if (report.contextImpact.gatewayRoutedToolCount > 0) {
+    writeLine(
+      stdout,
+      `  Gateway routing: ${report.contextImpact.gatewaySurfaceToolCount} visible gateway tool(s) route ${report.contextImpact.gatewayRoutedToolCount} upstream tool(s); saved ${report.contextImpact.savedBytes} bytes (~${report.contextImpact.savedTokens} tokens)`,
+    );
+  }
   writeLine(stdout, "  Top MCP servers:");
   for (const server of report.topServers) {
     writeLine(

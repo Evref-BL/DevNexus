@@ -6305,6 +6305,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("DevNexus MCP context budget");
     expect(output.output()).toContain("Direct MCP targets: 1");
     expect(output.output()).toContain("Plugin-declared MCP servers: 0");
+    expect(output.output()).toContain("Visible MCP context:");
     expect(output.output()).toContain("Top MCP servers:");
   });
 

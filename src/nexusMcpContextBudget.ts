@@ -9,7 +9,19 @@ import {
   type NexusMcpExposureSource,
   type NexusResolvedMcpExposureMode,
 } from "./nexusMcpExposurePolicy.js";
-import type { NexusPluginMcpServerCapability } from "./nexusPluginCapabilities.js";
+import {
+  effectiveNexusMcpGatewayPolicy,
+  listDevNexusMcpGatewayTools,
+  nexusMcpGatewayServerId,
+  nexusMcpGatewayToolAllowed,
+  readNexusMcpGatewayDiscoveryRecord,
+  type NexusMcpGatewayDiscoveryTool,
+  type NexusMcpGatewayEffectivePolicy,
+} from "./nexusMcpGateway.js";
+import type {
+  NexusPluginMcpServerCapability,
+  NexusProjectPluginConfig,
+} from "./nexusPluginCapabilities.js";
 import {
   loadProjectConfig,
   selectNexusProjectMcpAgentTargets,
@@ -24,7 +36,11 @@ export interface NexusMcpContextBudgetReportOptions {
 }
 
 export type NexusMcpContextBudgetSource = "direct" | "plugin";
-export type NexusMcpContextBudgetMetadataStatus = "known" | "declared" | "unknown";
+export type NexusMcpContextBudgetMetadataStatus =
+  | "known"
+  | "declared"
+  | "discovered"
+  | "unknown";
 
 export interface NexusMcpContextBudgetToolContribution {
   source: NexusMcpContextBudgetSource;
@@ -96,11 +112,33 @@ export interface NexusMcpContextBudgetReport {
     estimatedBytes: number;
     estimatedTokens: number;
   };
+  contextImpact: NexusMcpContextBudgetImpact;
   directServers: NexusMcpContextBudgetDirectServer[];
   pluginDeclaredServers: NexusMcpContextBudgetPluginServer[];
   topServers: NexusMcpContextBudgetServerContribution[];
   topTools: NexusMcpContextBudgetToolContribution[];
   warnings: string[];
+}
+
+export interface NexusMcpContextBudgetImpact {
+  directToolCount: number;
+  directEstimatedBytes: number;
+  directEstimatedTokens: number;
+  gatewaySurfaceToolCount: number;
+  gatewaySurfaceEstimatedBytes: number;
+  gatewaySurfaceEstimatedTokens: number;
+  gatewayRoutedToolCount: number;
+  gatewayRoutedEstimatedBytes: number;
+  gatewayRoutedEstimatedTokens: number;
+  hiddenToolCount: number;
+  hiddenEstimatedBytes: number;
+  hiddenEstimatedTokens: number;
+  withoutGatewayEstimatedBytes: number;
+  withoutGatewayEstimatedTokens: number;
+  visibleEstimatedBytes: number;
+  visibleEstimatedTokens: number;
+  savedBytes: number;
+  savedTokens: number;
 }
 
 interface ServerToolMetadata {
@@ -128,8 +166,8 @@ export function buildNexusMcpContextBudgetReport(
     agentTargets: selectedTargets,
   });
   const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
-  const directServers = directTargets.map((target) => {
-    const metadata = directServerToolMetadata(target.serverName, target.args);
+  const directServerEntries = directTargets.map((target) => {
+    const unfilteredMetadata = directServerToolMetadata(target.serverName, target.args);
     const configuredTarget = findConfiguredTarget(selectedTargets, target.agent);
     const exposure = resolveNexusMcpExposure({
       workspaceExposure: projectConfig.mcp?.exposure,
@@ -138,26 +176,42 @@ export function buildNexusMcpContextBudgetReport(
         provider: target.provider,
       },
     });
+    const metadata = exposure.mode === "gateway"
+      ? filterServerToolMetadataByGatewayPolicy({
+          metadata: unfilteredMetadata,
+          projectConfig,
+          agentTarget: configuredTarget,
+          serverName: target.serverName,
+        })
+      : unfilteredMetadata;
     return {
-      source: "direct" as const,
-      agent: target.agent,
-      provider: target.provider,
-      serverName: target.serverName,
-      command: target.command,
-      args: target.args,
-      configPathRelative: target.configPathRelative,
-      toolCount: metadata.tools.length,
-      estimatedBytes: metadata.estimatedBytes,
-      estimatedTokens: metadata.estimatedTokens,
-      metadataStatus: metadata.metadataStatus,
-      effectiveExposure: exposure.mode,
-      exposureSource: exposure.source,
-      exposureReason: exposure.reason,
+      server: {
+        source: "direct" as const,
+        agent: target.agent,
+        provider: target.provider,
+        serverName: target.serverName,
+        command: target.command,
+        args: target.args,
+        configPathRelative: target.configPathRelative,
+        toolCount: metadata.tools.length,
+        estimatedBytes: metadata.estimatedBytes,
+        estimatedTokens: metadata.estimatedTokens,
+        metadataStatus: metadata.metadataStatus,
+        effectiveExposure: exposure.mode,
+        exposureSource: exposure.source,
+        exposureReason: exposure.reason,
+      },
+      tools: metadata.tools,
     };
   });
-  const pluginDeclaredServers = pluginMcpServers(projectConfig, selectedTargets);
-  const directToolContributions = directTargets.flatMap((target) =>
-    directServerToolMetadata(target.serverName, target.args).tools,
+  const directServers = directServerEntries.map((entry) => entry.server);
+  const pluginDeclaredServers = pluginMcpServers(
+    projectRoot,
+    projectConfig,
+    selectedTargets,
+  );
+  const directToolContributions = directServerEntries.flatMap(
+    (entry) => entry.tools,
   );
   const pluginToolContributions = pluginDeclaredServers.flatMap(
     (server) => server.declaredTools,
@@ -179,6 +233,10 @@ export function buildNexusMcpContextBudgetReport(
     (total, server) => total + server.toolCount,
     0,
   );
+  const contextImpact = buildContextImpact({
+    directServers,
+    pluginServers: pluginDeclaredServers,
+  });
 
   return {
     ok: true,
@@ -191,6 +249,7 @@ export function buildNexusMcpContextBudgetReport(
       estimatedBytes,
       estimatedTokens: estimateTokens(estimatedBytes),
     },
+    contextImpact,
     directServers,
     pluginDeclaredServers,
     topServers,
@@ -239,6 +298,7 @@ function directServerToolMetadata(
 }
 
 function pluginMcpServers(
+  projectRoot: string,
   projectConfig: NexusProjectConfig,
   selectedTargets: readonly NexusProjectAgentMcpTarget[],
 ): NexusMcpContextBudgetPluginServer[] {
@@ -251,12 +311,20 @@ function pluginMcpServers(
         )
         .map((capability) => {
           const targetAgents = capability.targetAgents ?? [];
-          const metadata = pluginServerMetadata(capability);
+          const agentTarget = selectedTargets[0] ?? null;
           const exposure = resolveNexusMcpExposure({
             workspaceExposure: projectConfig.mcp?.exposure,
-            agentTarget: selectedTargets[0] ?? null,
+            agentTarget,
             plugin,
             server: capability,
+          });
+          const metadata = pluginServerMetadata({
+            projectRoot,
+            projectConfig,
+            agentTarget,
+            plugin,
+            capability,
+            exposureMode: exposure.mode,
           });
           return {
             source: "plugin" as const,
@@ -297,19 +365,164 @@ function findConfiguredTarget(
   );
 }
 
-function pluginServerMetadata(
-  capability: NexusPluginMcpServerCapability,
-): ServerToolMetadata {
-  const tools = (capability.tools ?? []).map((tool) => {
+function pluginServerMetadata(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  agentTarget: NexusProjectAgentMcpTarget | null;
+  plugin: NexusProjectPluginConfig;
+  capability: NexusPluginMcpServerCapability;
+  exposureMode: NexusResolvedMcpExposureMode;
+}): ServerToolMetadata {
+  const declaredTools = options.capability.tools ?? [];
+  const discoveredTools = declaredTools.length === 0
+    ? readDiscoveredPluginTools(options)
+    : [];
+  const tools = [
+    ...declaredTools.map((tool) => {
+      const estimatedBytes = estimateMetadataBytes({
+        name: tool.name,
+        description: tool.description ?? null,
+      });
+      return {
+        source: "plugin" as const,
+        serverName: options.capability.serverName,
+        toolName: tool.name,
+        description: tool.description ?? null,
+        estimatedBytes,
+        estimatedTokens: estimateTokens(estimatedBytes),
+      };
+    }),
+    ...discoveredTools.map((tool) => {
+      const estimatedBytes = estimateMetadataBytes({
+        name: tool.name,
+        description: tool.description ?? null,
+        inputSchema: tool.inputSchema ?? null,
+      });
+      return {
+        source: "plugin" as const,
+        serverName: options.capability.serverName,
+        toolName: tool.name,
+        description: tool.description ?? null,
+        estimatedBytes,
+        estimatedTokens: estimateTokens(estimatedBytes),
+      };
+    }),
+  ];
+  const filteredTools = options.exposureMode === "gateway"
+    ? filterToolContributionsByGatewayPolicy({
+        tools,
+        policy: effectiveNexusMcpGatewayPolicy(
+          options.projectConfig,
+          options.agentTarget,
+        ),
+        serverName: options.capability.serverName,
+      })
+    : tools;
+  const estimatedBytes = filteredTools.reduce(
+    (total, tool) => total + tool.estimatedBytes,
+    0,
+  );
+  return {
+    tools: filteredTools,
+    estimatedBytes,
+    estimatedTokens: estimateTokens(estimatedBytes),
+    metadataStatus: pluginMetadataStatus(declaredTools.length, discoveredTools.length),
+  };
+}
+
+function readDiscoveredPluginTools(options: {
+  projectRoot: string;
+  agentTarget: NexusProjectAgentMcpTarget | null;
+  plugin: NexusProjectPluginConfig;
+  capability: NexusPluginMcpServerCapability;
+}): NexusMcpGatewayDiscoveryTool[] {
+  if (!options.agentTarget || !options.capability.command) {
+    return [];
+  }
+  const record = readNexusMcpGatewayDiscoveryRecord(
+    options.projectRoot,
+    nexusMcpGatewayServerId({
+      agent: options.agentTarget.agent,
+      source: "plugin",
+      pluginId: options.plugin.id,
+      capabilityId: options.capability.id,
+      serverName: options.capability.serverName,
+    }),
+  );
+  if (!record) {
+    return [];
+  }
+  if (
+    record.command !== options.capability.command ||
+    !sameStringArray(record.args, options.capability.args ?? [])
+  ) {
+    return [];
+  }
+  return record.tools;
+}
+
+function pluginMetadataStatus(
+  declaredToolCount: number,
+  discoveredToolCount: number,
+): NexusMcpContextBudgetMetadataStatus {
+  if (declaredToolCount > 0) {
+    return "declared";
+  }
+  if (discoveredToolCount > 0) {
+    return "discovered";
+  }
+  return "unknown";
+}
+
+function filterServerToolMetadataByGatewayPolicy(options: {
+  metadata: ServerToolMetadata;
+  projectConfig: NexusProjectConfig;
+  agentTarget: NexusProjectAgentMcpTarget | null;
+  serverName: string;
+}): ServerToolMetadata {
+  const tools = filterToolContributionsByGatewayPolicy({
+    tools: options.metadata.tools,
+    policy: effectiveNexusMcpGatewayPolicy(
+      options.projectConfig,
+      options.agentTarget,
+    ),
+    serverName: options.serverName,
+  });
+  const estimatedBytes = tools.reduce((total, tool) => total + tool.estimatedBytes, 0);
+  return {
+    tools,
+    estimatedBytes,
+    estimatedTokens: estimateTokens(estimatedBytes),
+    metadataStatus: options.metadata.metadataStatus,
+  };
+}
+
+function filterToolContributionsByGatewayPolicy(options: {
+  tools: readonly NexusMcpContextBudgetToolContribution[];
+  policy: NexusMcpGatewayEffectivePolicy;
+  serverName: string;
+}): NexusMcpContextBudgetToolContribution[] {
+  return options.tools.filter((tool) =>
+    nexusMcpGatewayToolAllowed({
+      policy: options.policy,
+      serverName: options.serverName,
+      toolName: tool.toolName,
+    })
+  );
+}
+
+function gatewaySurfaceMetadata(): Pick<ServerToolMetadata, "tools" | "estimatedBytes" | "estimatedTokens"> {
+  const tools = listDevNexusMcpGatewayTools().map((tool) => {
     const estimatedBytes = estimateMetadataBytes({
       name: tool.name,
-      description: tool.description ?? null,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
     });
     return {
-      source: "plugin" as const,
-      serverName: capability.serverName,
+      source: "direct" as const,
+      serverName: defaultNexusMcpServerName,
       toolName: tool.name,
-      description: tool.description ?? null,
+      description: tool.description,
       estimatedBytes,
       estimatedTokens: estimateTokens(estimatedBytes),
     };
@@ -319,7 +532,6 @@ function pluginServerMetadata(
     tools,
     estimatedBytes,
     estimatedTokens: estimateTokens(estimatedBytes),
-    metadataStatus: tools.length > 0 ? "declared" : "unknown",
   };
 }
 
@@ -364,11 +576,67 @@ function serverContributionFromPluginServer(
     serverName: server.serverName,
     agent: null,
     pluginId: server.pluginId,
-    toolCount: server.declaredToolCount,
+    toolCount: server.toolCount,
     estimatedBytes: server.estimatedBytes,
     estimatedTokens: server.estimatedTokens,
     metadataStatus: server.metadataStatus,
   };
+}
+
+function buildContextImpact(options: {
+  directServers: readonly NexusMcpContextBudgetDirectServer[];
+  pluginServers: readonly NexusMcpContextBudgetPluginServer[];
+}): NexusMcpContextBudgetImpact {
+  const servers = [...options.directServers, ...options.pluginServers];
+  const direct = sumServersByExposure(servers, "direct");
+  const gatewayRouted = sumServersByExposure(servers, "gateway");
+  const hidden = sumServersByExposure(servers, "hidden");
+  const gatewaySurface = gatewayRouted.toolCount > 0
+    ? gatewaySurfaceMetadata()
+    : { tools: [], estimatedBytes: 0, estimatedTokens: 0 };
+  const withoutGatewayEstimatedBytes =
+    direct.estimatedBytes + gatewayRouted.estimatedBytes;
+  const visibleEstimatedBytes =
+    direct.estimatedBytes + gatewaySurface.estimatedBytes;
+  const savedBytes = withoutGatewayEstimatedBytes - visibleEstimatedBytes;
+
+  return {
+    directToolCount: direct.toolCount,
+    directEstimatedBytes: direct.estimatedBytes,
+    directEstimatedTokens: estimateTokens(direct.estimatedBytes),
+    gatewaySurfaceToolCount: gatewaySurface.tools.length,
+    gatewaySurfaceEstimatedBytes: gatewaySurface.estimatedBytes,
+    gatewaySurfaceEstimatedTokens: estimateTokens(gatewaySurface.estimatedBytes),
+    gatewayRoutedToolCount: gatewayRouted.toolCount,
+    gatewayRoutedEstimatedBytes: gatewayRouted.estimatedBytes,
+    gatewayRoutedEstimatedTokens: estimateTokens(gatewayRouted.estimatedBytes),
+    hiddenToolCount: hidden.toolCount,
+    hiddenEstimatedBytes: hidden.estimatedBytes,
+    hiddenEstimatedTokens: estimateTokens(hidden.estimatedBytes),
+    withoutGatewayEstimatedBytes,
+    withoutGatewayEstimatedTokens: estimateTokens(withoutGatewayEstimatedBytes),
+    visibleEstimatedBytes,
+    visibleEstimatedTokens: estimateTokens(visibleEstimatedBytes),
+    savedBytes,
+    savedTokens: estimateSignedTokens(savedBytes),
+  };
+}
+
+function sumServersByExposure(
+  servers: ReadonlyArray<
+    NexusMcpContextBudgetDirectServer | NexusMcpContextBudgetPluginServer
+  >,
+  exposure: NexusResolvedMcpExposureMode,
+): { toolCount: number; estimatedBytes: number } {
+  return servers
+    .filter((server) => server.effectiveExposure === exposure)
+    .reduce(
+      (total, server) => ({
+        toolCount: total.toolCount + server.toolCount,
+        estimatedBytes: total.estimatedBytes + server.estimatedBytes,
+      }),
+      { toolCount: 0, estimatedBytes: 0 },
+    );
 }
 
 function budgetWarnings(
@@ -389,12 +657,23 @@ function budgetWarnings(
   ];
 }
 
+function sameStringArray(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
 function estimateMetadataBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), "utf8");
 }
 
 function estimateTokens(bytes: number): number {
   return Math.ceil(bytes / APPROXIMATE_TOKEN_BYTES);
+}
+
+function estimateSignedTokens(bytes: number): number {
+  return bytes >= 0 ? estimateTokens(bytes) : -estimateTokens(Math.abs(bytes));
 }
 
 function compareToolContributions(

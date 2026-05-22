@@ -256,9 +256,16 @@ export interface NexusProjectAgentMcpTarget {
   args?: string[];
   defaultToolsApprovalMode?: string;
   exposure?: NexusMcpExposureMode;
+  gateway?: NexusMcpGatewayPolicyConfig;
   activationNotes?: string[];
   trustSemantics?: string;
   manualInstructions?: string[];
+}
+
+export interface NexusMcpGatewayPolicyConfig {
+  includedServers?: string[];
+  includedTools?: string[];
+  excludedTools?: string[];
 }
 
 export interface NexusProjectMcpConfig {
@@ -270,6 +277,7 @@ export interface NexusProjectMcpConfig {
   args?: string[];
   defaultToolsApprovalMode?: string;
   agentTargets?: NexusProjectAgentMcpTarget[];
+  gateway?: NexusMcpGatewayPolicyConfig;
 }
 
 export type NexusProjectActiveAgentProvider =
@@ -1785,6 +1793,25 @@ function validateMcpExposureMode(
   );
 }
 
+function validateMcpGatewayPolicyConfig(
+  value: unknown,
+  pathName: string,
+): NexusMcpGatewayPolicyConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const includedServers = optionalStringArray(record, "includedServers", pathName);
+  const includedTools = optionalStringArray(record, "includedTools", pathName);
+  const excludedTools = optionalStringArray(record, "excludedTools", pathName);
+  return {
+    ...(includedServers !== undefined ? { includedServers } : {}),
+    ...(includedTools !== undefined ? { includedTools } : {}),
+    ...(excludedTools !== undefined ? { excludedTools } : {}),
+  };
+}
+
 function validatePluginCapabilityRecord(
   value: unknown,
   index: number,
@@ -2190,6 +2217,10 @@ function validateProjectMcpAgentTarget(
     pathName,
   );
   const exposure = validateMcpExposureMode(record.exposure, `${pathName}.exposure`);
+  const gateway = validateMcpGatewayPolicyConfig(
+    record.gateway,
+    `${pathName}.gateway`,
+  );
   const configFormat = validateAgentMcpConfigFormat(
     record.configFormat,
     `${pathName}.configFormat`,
@@ -2220,6 +2251,7 @@ function validateProjectMcpAgentTarget(
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
     ...(exposure !== undefined ? { exposure } : {}),
+    ...(gateway !== undefined ? { gateway } : {}),
     ...(activationNotes !== undefined ? { activationNotes } : {}),
     ...(trustSemantics !== undefined ? { trustSemantics } : {}),
     ...(manualInstructions !== undefined ? { manualInstructions } : {}),
@@ -2266,6 +2298,10 @@ function validateProjectMcpConfig(
     record.exposure,
     "workspace config.mcp.exposure",
   );
+  const gateway = validateMcpGatewayPolicyConfig(
+    record.gateway,
+    "workspace config.mcp.gateway",
+  );
   const agentTargets = record.agentTargets;
   if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
     throw new NexusConfigError(
@@ -2281,6 +2317,7 @@ function validateProjectMcpConfig(
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
     ...(exposure !== undefined ? { exposure } : {}),
+    ...(gateway !== undefined ? { gateway } : {}),
     ...(agentTargets
       ? {
           agentTargets: agentTargets.map((target, index) =>

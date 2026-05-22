@@ -97,6 +97,32 @@ function handle(message) {
   if (message.method === "notifications/initialized") {
     return;
   }
+  if (message.method === "tools/list") {
+    send({ jsonrpc: "2.0", id: message.id, result: { tools: [
+      {
+        name: "echo",
+        description: "Echo text from arguments.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string" },
+            repeat: { type: "number" }
+          }
+        }
+      },
+      {
+        name: "secret_echo",
+        description: "Echo text that should be excluded by gateway policy.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string" }
+          }
+        }
+      }
+    ] } });
+    return;
+  }
   if (message.method === "tools/call") {
     const args = message.params.arguments || {};
     const text = typeof args.repeat === "number" ? "x".repeat(args.repeat) : String(args.text || "ok");
@@ -386,6 +412,118 @@ describe("DevNexus MCP gateway", () => {
       response: {
         content: [{ type: "text", text: "hello gateway" }],
       },
+    });
+  });
+
+  it("discovers command-based upstream tools dynamically when metadata is not declared", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-discovery-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "echo" },
+    ));
+
+    expect(search.matches[0]).toMatchObject({
+      serverName: "echo_runtime",
+      toolName: "echo",
+      schemaStatus: "discovered",
+    });
+
+    const described = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_describe",
+      { projectRoot, toolId: search.matches[0].toolId },
+    ));
+    expect(described.tool.inputSchema).toMatchObject({
+      type: "object",
+      properties: {
+        text: { type: "string" },
+      },
+    });
+
+    const called = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_call",
+      {
+        projectRoot,
+        toolId: search.matches[0].toolId,
+        arguments: { text: "dynamic" },
+      },
+    ));
+    expect(called.response).toMatchObject({
+      content: [{ type: "text", text: "dynamic" }],
+    });
+  });
+
+  it("applies gateway grouping policy to discovered tools before search and call", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-gateway-groups-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const serverPath = writeEchoMcpServer(projectRoot);
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        gateway: {
+          includedServers: ["echo_runtime"],
+          excludedTools: ["echo_runtime.secret_echo"],
+        },
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "echo-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "echo-mcp",
+              serverName: "echo_runtime",
+              command: process.execPath,
+              args: [serverPath],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const search = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_search",
+      { projectRoot, query: "echo" },
+    ));
+
+    expect(search.matches.map((match: any) => match.toolName)).toEqual(["echo"]);
+
+    const blocked = toolJson(await callDevNexusMcpGatewayTool(
+      "mcp_gateway_call",
+      {
+        projectRoot,
+        toolId: "codex/plugin/echo-plugin/echo-mcp/echo_runtime/secret_echo",
+        arguments: { text: "blocked" },
+      },
+    ));
+    expect(blocked).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("Gateway tool not found"),
     });
   });
 

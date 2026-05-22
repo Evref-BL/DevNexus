@@ -105,13 +105,18 @@ that location but does not install packages into it.
 ## Context budget
 
 The default profile should stay small. Prefer grouped status and setup checks
-over exposing many specialized tools in the first install shape.
+over exposing many specialized tools in the first install shape. When a plugin
+has a broad MCP surface, prefer routing it through the DevNexus MCP gateway and
+using gateway groups to expose only the server or tools that belong in the
+default profile.
 
 Diagnostics should flag:
 
 - plugin MCP tools that duplicate core `dev_nexus` tools
 - stale or unexpected MCP command lines
 - missing MCP config
+- stale MCP gateway discovery metadata
+- gateway groups that hide every routed tool
 - missing projected skills
 - unsupported client targets
 - excessive or write-heavy plugin surfaces in a default profile

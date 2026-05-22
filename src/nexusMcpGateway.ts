@@ -32,6 +32,7 @@ import {
   selectNexusProjectMcpAgentTargets,
   type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
+  type NexusMcpGatewayPolicyConfig,
 } from "./nexusProjectConfig.js";
 import { providerCompatibleMcpTools } from "./nexusMcpSchemaCompatibility.js";
 export {
@@ -40,7 +41,10 @@ export {
 } from "./nexusMcpGatewayProjection.js";
 
 export type NexusMcpGatewayServerSource = "core" | "plugin";
-export type NexusMcpGatewayToolSchemaStatus = "known" | "declared_name_only";
+export type NexusMcpGatewayToolSchemaStatus =
+  | "known"
+  | "declared_name_only"
+  | "discovered";
 
 export interface NexusMcpGatewayServerRecord {
   serverId: string;
@@ -100,6 +104,28 @@ export interface NexusMcpGatewaySearchMatch {
 export interface NexusMcpGatewayIndexOptions {
   projectRoot: string;
   agent?: string | null;
+}
+
+export interface NexusMcpGatewayDiscoveryTool {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+export interface NexusMcpGatewayDiscoveryRecord {
+  version: 1;
+  createdAt: string;
+  serverId: string;
+  serverName: string;
+  command: string;
+  args: string[];
+  tools: NexusMcpGatewayDiscoveryTool[];
+}
+
+export interface NexusMcpGatewayEffectivePolicy {
+  includedServers: string[];
+  includedTools: string[];
+  excludedTools: string[];
 }
 
 export interface NexusMcpGatewayResultRecord {
@@ -219,15 +245,38 @@ export function listDevNexusMcpGatewayTools(): McpTool[] {
 export function buildNexusMcpGatewayIndex(
   options: NexusMcpGatewayIndexOptions,
 ): NexusMcpGatewayIndex {
+  const base = buildNexusMcpGatewayBaseIndex(options);
+  return applyGatewayPolicy(base.index, base.projectConfig, base.selectedTargets);
+}
+
+export async function buildNexusMcpGatewayIndexWithDiscovery(
+  options: NexusMcpGatewayIndexOptions,
+): Promise<NexusMcpGatewayIndex> {
+  const base = buildNexusMcpGatewayBaseIndex(options);
+  await discoverMissingGatewayMetadata(base.index);
+  return applyGatewayPolicy(base.index, base.projectConfig, base.selectedTargets);
+}
+
+function buildNexusMcpGatewayBaseIndex(
+  options: NexusMcpGatewayIndexOptions,
+): {
+  index: NexusMcpGatewayIndex;
+  projectConfig: NexusProjectConfig;
+  selectedTargets: NexusProjectAgentMcpTarget[];
+} {
   const projectRoot = path.resolve(options.projectRoot);
   const projectConfig = loadProjectConfig(projectRoot);
   if (projectConfig.mcp?.enabled === false) {
     return {
-      projectRoot,
-      agentFilter: options.agent ?? null,
-      servers: [],
-      tools: [],
-      warnings: ["Workspace MCP projection is disabled."],
+      projectConfig,
+      selectedTargets: [],
+      index: {
+        projectRoot,
+        agentFilter: options.agent ?? null,
+        servers: [],
+        tools: [],
+        warnings: ["Workspace MCP projection is disabled."],
+      },
     };
   }
 
@@ -236,19 +285,23 @@ export function buildNexusMcpGatewayIndex(
     options.agent ? [options.agent] : [],
   );
   const core = coreGatewayRecords(projectRoot, projectConfig, selectedTargets);
-  const plugins = pluginGatewayRecords(projectConfig, selectedTargets);
+  const plugins = pluginGatewayRecords(projectRoot, projectConfig, selectedTargets);
   const servers = [...core.servers, ...plugins.servers];
   const tools = [...core.tools, ...plugins.tools];
 
   return {
-    projectRoot,
-    agentFilter: options.agent ?? null,
-    servers,
-    tools,
-    warnings: [
-      ...core.warnings,
-      ...plugins.warnings,
-    ],
+    projectConfig,
+    selectedTargets,
+    index: {
+      projectRoot,
+      agentFilter: options.agent ?? null,
+      servers,
+      tools,
+      warnings: [
+        ...core.warnings,
+        ...plugins.warnings,
+      ],
+    },
   };
 }
 
@@ -284,6 +337,125 @@ export function searchNexusMcpGatewayTools(
     }));
 }
 
+export function effectiveNexusMcpGatewayPolicy(
+  projectConfig: NexusProjectConfig,
+  agentTarget: NexusProjectAgentMcpTarget | null | undefined,
+): NexusMcpGatewayEffectivePolicy {
+  return mergeGatewayPolicy(
+    projectConfig.mcp?.gateway,
+    agentTarget?.gateway,
+  );
+}
+
+export function nexusMcpGatewayToolAllowed(options: {
+  policy: NexusMcpGatewayEffectivePolicy;
+  serverName: string;
+  toolName: string;
+}): boolean {
+  const includedServers = normalizedPolicySet(options.policy.includedServers);
+  const includedTools = normalizedPolicySet(options.policy.includedTools);
+  const excludedTools = normalizedPolicySet(options.policy.excludedTools);
+  const serverKey = normalizePolicyKey(options.serverName);
+  const toolKeys = gatewayToolPolicyKeys(options.serverName, options.toolName);
+  const hasIncludes = includedServers.size > 0 || includedTools.size > 0;
+  const included = !hasIncludes ||
+    includedServers.has(serverKey) ||
+    toolKeys.some((key) => includedTools.has(key));
+  if (!included) {
+    return false;
+  }
+
+  return !toolKeys.some((key) => excludedTools.has(key));
+}
+
+function applyGatewayPolicy(
+  index: NexusMcpGatewayIndex,
+  projectConfig: NexusProjectConfig,
+  selectedTargets: readonly NexusProjectAgentMcpTarget[],
+): NexusMcpGatewayIndex {
+  const rawToolCount = index.tools.length;
+  const filteredTools = index.tools.filter((tool) => {
+    const target = selectedTargets.find((candidate) =>
+      sameAgent(candidate.agent, tool.agent)
+    );
+    return nexusMcpGatewayToolAllowed({
+      policy: effectiveNexusMcpGatewayPolicy(projectConfig, target),
+      serverName: tool.serverName,
+      toolName: tool.toolName,
+    });
+  });
+  const toolCounts = new Map<string, number>();
+  for (const tool of filteredTools) {
+    toolCounts.set(tool.serverId, (toolCounts.get(tool.serverId) ?? 0) + 1);
+  }
+  const filteredServers = index.servers.map((server) => ({
+    ...server,
+    toolCount: toolCounts.get(server.serverId) ?? 0,
+  }));
+  const warnings = [...index.warnings];
+  if (rawToolCount > 0 && filteredTools.length === 0) {
+    warnings.push("Gateway grouping policy excludes all gateway-routed tools.");
+  }
+
+  return {
+    ...index,
+    servers: filteredServers,
+    tools: filteredTools,
+    warnings,
+  };
+}
+
+function mergeGatewayPolicy(
+  workspace: NexusMcpGatewayPolicyConfig | undefined,
+  agent: NexusMcpGatewayPolicyConfig | undefined,
+): NexusMcpGatewayEffectivePolicy {
+  return {
+    includedServers: uniquePolicyValues([
+      ...(workspace?.includedServers ?? []),
+      ...(agent?.includedServers ?? []),
+    ]),
+    includedTools: uniquePolicyValues([
+      ...(workspace?.includedTools ?? []),
+      ...(agent?.includedTools ?? []),
+    ]),
+    excludedTools: uniquePolicyValues([
+      ...(workspace?.excludedTools ?? []),
+      ...(agent?.excludedTools ?? []),
+    ]),
+  };
+}
+
+function uniquePolicyValues(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function normalizedPolicySet(values: readonly string[]): Set<string> {
+  return new Set(values.map(normalizePolicyKey));
+}
+
+function gatewayToolPolicyKeys(serverName: string, toolName: string): string[] {
+  return [
+    normalizePolicyKey(toolName),
+    normalizePolicyKey(`${serverName}.${toolName}`),
+    normalizePolicyKey(`${serverName}__${toolName}`),
+  ];
+}
+
+function normalizePolicyKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function sameAgent(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+function sameStringArray(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
 export async function callDevNexusMcpGatewayTool(
   name: string,
   argsValue: unknown,
@@ -292,7 +464,7 @@ export async function callDevNexusMcpGatewayTool(
     const args = argsValue === undefined ? {} : asRecord(argsValue, "arguments");
     switch (name) {
       case "mcp_gateway_status": {
-        const index = buildNexusMcpGatewayIndex({
+        const index = await buildNexusMcpGatewayIndexWithDiscovery({
           projectRoot: requiredString(args, "projectRoot", "arguments"),
           agent: optionalString(args, "agent", "arguments"),
         });
@@ -310,7 +482,7 @@ export async function callDevNexusMcpGatewayTool(
         });
       }
       case "mcp_gateway_search": {
-        const index = buildNexusMcpGatewayIndex({
+        const index = await buildNexusMcpGatewayIndexWithDiscovery({
           projectRoot: requiredString(args, "projectRoot", "arguments"),
           agent: optionalString(args, "agent", "arguments"),
         });
@@ -328,7 +500,7 @@ export async function callDevNexusMcpGatewayTool(
         });
       }
       case "mcp_gateway_describe": {
-        const index = buildNexusMcpGatewayIndex({
+        const index = await buildNexusMcpGatewayIndexWithDiscovery({
           projectRoot: requiredString(args, "projectRoot", "arguments"),
           agent: optionalString(args, "agent", "arguments"),
         });
@@ -348,7 +520,7 @@ export async function callDevNexusMcpGatewayTool(
       }
       case "mcp_gateway_call": {
         const projectRoot = requiredString(args, "projectRoot", "arguments");
-        const index = buildNexusMcpGatewayIndex({
+        const index = await buildNexusMcpGatewayIndexWithDiscovery({
           projectRoot,
           agent: optionalString(args, "agent", "arguments"),
         });
@@ -528,6 +700,7 @@ function coreGatewayRecords(
 }
 
 function pluginGatewayRecords(
+  projectRoot: string,
   projectConfig: NexusProjectConfig,
   selectedTargets: readonly NexusProjectAgentMcpTarget[],
 ): Pick<NexusMcpGatewayIndex, "servers" | "tools" | "warnings"> {
@@ -560,6 +733,16 @@ function pluginGatewayRecords(
           serverName: capability.serverName,
         });
         const declaredTools = capability.tools ?? [];
+        const discovered = declaredTools.length === 0
+          ? readNexusMcpGatewayDiscoveryRecord(projectRoot, serverId)
+          : null;
+        const discoveredCacheIsCurrent = discovered
+          ? discovered.command === capability.command &&
+            sameStringArray(discovered.args, capability.args ?? [])
+          : false;
+        const discoveredTools = discovered && discoveredCacheIsCurrent
+          ? discovered.tools
+          : [];
         servers.push({
           serverId,
           source: "plugin",
@@ -570,7 +753,7 @@ function pluginGatewayRecords(
           capabilityId: capability.id,
           command: capability.command ?? null,
           args: [...(capability.args ?? [])],
-          toolCount: declaredTools.length,
+          toolCount: declaredTools.length + discoveredTools.length,
           effectiveExposure: exposure.mode,
           exposureSource: exposure.source,
           exposureReason: exposure.reason,
@@ -580,7 +763,16 @@ function pluginGatewayRecords(
             `Gateway-routed plugin MCP server ${plugin.id}/${capability.serverName} has no command declaration.`,
           );
         }
-        if (declaredTools.length === 0) {
+        if (discovered && !discoveredCacheIsCurrent) {
+          warnings.push(
+            `Gateway discovery cache for plugin MCP server ${plugin.id}/${capability.serverName} is stale because its command or args changed.`,
+          );
+        }
+        if (
+          declaredTools.length === 0 &&
+          discoveredTools.length === 0 &&
+          !capability.command
+        ) {
           warnings.push(
             `Gateway-routed plugin MCP server ${plugin.id}/${capability.serverName} declares no tool metadata.`,
           );
@@ -595,6 +787,20 @@ function pluginGatewayRecords(
             provider,
             exposureSource: exposure.source,
             exposureReason: exposure.reason,
+            schemaStatus: "declared_name_only",
+          }));
+        }
+        for (const tool of discoveredTools) {
+          tools.push(pluginToolRecord({
+            tool,
+            serverId,
+            plugin,
+            capability,
+            agentTarget,
+            provider,
+            exposureSource: exposure.source,
+            exposureReason: exposure.reason,
+            schemaStatus: "discovered",
           }));
         }
       }
@@ -605,7 +811,8 @@ function pluginGatewayRecords(
 }
 
 function pluginToolRecord(options: {
-  tool: NonNullable<NexusPluginMcpServerCapability["tools"]>[number];
+  tool: NonNullable<NexusPluginMcpServerCapability["tools"]>[number] |
+    NexusMcpGatewayDiscoveryTool;
   serverId: string;
   plugin: NexusProjectPluginConfig;
   capability: NexusPluginMcpServerCapability;
@@ -613,6 +820,7 @@ function pluginToolRecord(options: {
   provider: string;
   exposureSource: NexusMcpExposureSource;
   exposureReason: string;
+  schemaStatus: NexusMcpGatewayToolSchemaStatus;
 }): NexusMcpGatewayToolRecord {
   return {
     toolId: gatewayToolId(options.serverId, options.tool.name),
@@ -625,12 +833,141 @@ function pluginToolRecord(options: {
     capabilityId: options.capability.id,
     toolName: options.tool.name,
     description: options.tool.description ?? null,
-    inputSchema: null,
-    schemaStatus: "declared_name_only",
+    inputSchema: "inputSchema" in options.tool
+      ? options.tool.inputSchema ?? null
+      : null,
+    schemaStatus: options.schemaStatus,
     effectiveExposure: "gateway",
     exposureSource: options.exposureSource,
     exposureReason: options.exposureReason,
   };
+}
+
+async function discoverMissingGatewayMetadata(
+  index: NexusMcpGatewayIndex,
+): Promise<void> {
+  const toolsByServer = new Map<string, number>();
+  for (const tool of index.tools) {
+    toolsByServer.set(tool.serverId, (toolsByServer.get(tool.serverId) ?? 0) + 1);
+  }
+
+  for (const server of index.servers) {
+    if (
+      server.source !== "plugin" ||
+      !server.command ||
+      (toolsByServer.get(server.serverId) ?? 0) > 0
+    ) {
+      continue;
+    }
+
+    try {
+      const discoveredTools = await discoverCommandMcpTools({
+        projectRoot: index.projectRoot,
+        command: server.command,
+        args: server.args,
+      });
+      writeNexusMcpGatewayDiscoveryRecord(index.projectRoot, {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        serverId: server.serverId,
+        serverName: server.serverName,
+        command: server.command,
+        args: server.args,
+        tools: discoveredTools,
+      });
+      server.toolCount = discoveredTools.length;
+      if (discoveredTools.length === 0) {
+        index.warnings.push(
+          `Gateway-routed plugin MCP server ${server.serverName} discovery returned no tools.`,
+        );
+      }
+      for (const tool of discoveredTools) {
+        index.tools.push({
+          toolId: gatewayToolId(server.serverId, tool.name),
+          serverId: server.serverId,
+          source: server.source,
+          agent: server.agent,
+          provider: server.provider,
+          serverName: server.serverName,
+          pluginId: server.pluginId,
+          capabilityId: server.capabilityId,
+          toolName: tool.name,
+          description: tool.description ?? null,
+          inputSchema: tool.inputSchema ?? null,
+          schemaStatus: "discovered",
+          effectiveExposure: server.effectiveExposure,
+          exposureSource: server.exposureSource,
+          exposureReason: server.exposureReason,
+        });
+      }
+    } catch (error) {
+      index.warnings.push(
+        `Gateway-routed plugin MCP server ${server.serverName} discovery failed: ${error instanceof Error ? error.message : String(error)}.`,
+      );
+    }
+  }
+}
+
+async function discoverCommandMcpTools(options: {
+  projectRoot: string;
+  command: string;
+  args: readonly string[];
+}): Promise<NexusMcpGatewayDiscoveryTool[]> {
+  const client = new StdioMcpClient({
+    projectRoot: options.projectRoot,
+    command: options.command,
+    args: options.args,
+    timeoutMs: gatewayCallTimeoutMs,
+  });
+  try {
+    await client.start();
+    await client.request("initialize", {
+      protocolVersion: devNexusMcpProtocolVersion,
+      capabilities: {},
+      clientInfo: {
+        name: "dev-nexus-mcp-gateway",
+        version: "0.1.0",
+      },
+    });
+    client.notify("notifications/initialized", {});
+
+    const tools: NexusMcpGatewayDiscoveryTool[] = [];
+    let cursor: string | undefined;
+    do {
+      const result = asRecord(
+        await client.request("tools/list", cursor ? { cursor } : {}),
+        "tools/list result",
+      );
+      const resultTools = result.tools;
+      if (!Array.isArray(resultTools)) {
+        throw new Error("tools/list result.tools must be an array");
+      }
+      for (const toolValue of resultTools) {
+        const tool = asRecord(toolValue, "tools/list result.tools[]");
+        const name = requiredString(tool, "name", "tools/list result.tools[]");
+        const description = optionalString(
+          tool,
+          "description",
+          "tools/list result.tools[]",
+        );
+        const inputSchema = optionalRecord(
+          tool,
+          "inputSchema",
+          "tools/list result.tools[]",
+        );
+        tools.push({
+          name,
+          ...(description !== undefined ? { description } : {}),
+          ...(inputSchema !== undefined ? { inputSchema } : {}),
+        });
+      }
+      cursor = optionalString(result, "nextCursor", "tools/list result");
+    } while (cursor);
+
+    return tools;
+  } finally {
+    await client.stop();
+  }
 }
 
 async function callCommandMcpTool(options: {
@@ -889,6 +1226,33 @@ function readGatewayResultRecord(
   return JSON.parse(fs.readFileSync(recordPath, "utf8")) as NexusMcpGatewayResultRecord;
 }
 
+export function readNexusMcpGatewayDiscoveryRecord(
+  projectRoot: string,
+  serverId: string,
+): NexusMcpGatewayDiscoveryRecord | null {
+  const recordPath = gatewayDiscoveryRecordPath(projectRoot, serverId);
+  if (!fs.existsSync(recordPath)) {
+    return null;
+  }
+
+  const record = JSON.parse(
+    fs.readFileSync(recordPath, "utf8"),
+  ) as NexusMcpGatewayDiscoveryRecord;
+  if (record.version !== 1 || record.serverId !== serverId) {
+    return null;
+  }
+  return record;
+}
+
+function writeNexusMcpGatewayDiscoveryRecord(
+  projectRoot: string,
+  record: NexusMcpGatewayDiscoveryRecord,
+): void {
+  const recordPath = gatewayDiscoveryRecordPath(projectRoot, record.serverId);
+  fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+  fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+}
+
 function gatewayResultRecordPath(projectRoot: string, resultId: string): string {
   return path.join(
     path.resolve(projectRoot),
@@ -896,6 +1260,16 @@ function gatewayResultRecordPath(projectRoot: string, resultId: string): string 
     "mcp-gateway",
     "results",
     `${resultId}.json`,
+  );
+}
+
+function gatewayDiscoveryRecordPath(projectRoot: string, serverId: string): string {
+  return path.join(
+    path.resolve(projectRoot),
+    ".dev-nexus",
+    "mcp-gateway",
+    "discovery",
+    `${safeIdPart(serverId)}.json`,
   );
 }
 
@@ -982,7 +1356,7 @@ function scoreGatewayTool(tool: NexusMcpGatewayToolRecord, query: string): numbe
   return score;
 }
 
-function gatewayServerId(options: {
+export function nexusMcpGatewayServerId(options: {
   agent: string;
   source: NexusMcpGatewayServerSource;
   pluginId: string | null;
@@ -1001,6 +1375,8 @@ function gatewayServerId(options: {
 function gatewayToolId(serverId: string, toolName: string): string {
   return `${serverId}/${safeIdPart(toolName)}`;
 }
+
+const gatewayServerId = nexusMcpGatewayServerId;
 
 function safeIdPart(value: string): string {
   return value.trim().replace(/[^A-Za-z0-9_.-]/gu, "_");

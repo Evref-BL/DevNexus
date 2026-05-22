@@ -721,10 +721,18 @@ describe("workspace config", () => {
       },
       mcp: {
         exposure: "direct",
+        gateway: {
+          includedServers: ["workflow_mcp"],
+          includedTools: ["workflow_mcp.workflow_status"],
+          excludedTools: ["workflow_mcp.workflow_delete"],
+        },
         agentTargets: [
           {
             agent: "claude",
             exposure: "hidden",
+            gateway: {
+              excludedTools: ["workflow_mcp.workflow_archive"],
+            },
           },
         ],
       },
@@ -745,8 +753,16 @@ describe("workspace config", () => {
     });
 
     expect(config.mcp?.exposure).toBe("direct");
+    expect(config.mcp?.gateway).toMatchObject({
+      includedServers: ["workflow_mcp"],
+      includedTools: ["workflow_mcp.workflow_status"],
+      excludedTools: ["workflow_mcp.workflow_delete"],
+    });
     expect(config.agentTargets?.active[0]?.mcp?.exposure).toBe("gateway");
     expect(config.mcp?.agentTargets?.[0]?.exposure).toBe("hidden");
+    expect(config.mcp?.agentTargets?.[0]?.gateway?.excludedTools).toEqual([
+      "workflow_mcp.workflow_archive",
+    ]);
     expect(config.plugins?.[0]?.mcpExposure).toBe("inherit");
     expect(config.plugins?.[0]?.capabilities[0]).toMatchObject({
       kind: "mcp_server",
@@ -786,6 +802,19 @@ describe("workspace config", () => {
         ],
       }),
     ).toThrow(/workspace config\.plugins\[0\]\.capabilities\[0\]\.exposure must be direct, gateway, hidden, or inherit/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-gateway-policy",
+        name: "Bad Gateway Policy",
+        mcp: {
+          gateway: {
+            includedTools: ["workflow.status", 1],
+          },
+        },
+      }),
+    ).toThrow(/workspace config\.mcp\.gateway\.includedTools\[1\] must be a non-empty string/);
   });
 
   it("normalizes legacy MCP and skill targets into compatibility policy", () => {
