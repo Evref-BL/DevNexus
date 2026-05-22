@@ -4,6 +4,12 @@ import {
   type GitRunner,
 } from "./gitWorktreeService.js";
 import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+  type NexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
+import {
   readNexusAutomationRunLedger,
 } from "./nexusAutomation.js";
 import type { NexusAutomationRunRecord } from "./nexusAutomation.js";
@@ -39,8 +45,10 @@ import {
 } from "./nexusPluginCapabilities.js";
 import {
   resolveProjectComponents,
+  samePath,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
+import type { NexusProjectReference } from "./nexusProjectRegistry.js";
 import {
   listNexusWorktreeLeases,
   type NexusWorktreeLeaseCollection,
@@ -349,6 +357,53 @@ export interface NexusDashboardSnapshot {
   weave: NexusDashboardWeave;
 }
 
+export interface BuildNexusDashboardHostSnapshotOptions
+  extends Pick<
+    BuildNexusDashboardSnapshotOptions,
+    | "homePath"
+    | "env"
+    | "credentialResolver"
+    | "provider"
+    | "providerFactory"
+    | "providerOptions"
+    | "eligibleWorkMode"
+    | "gitRunner"
+    | "now"
+  > {
+  projectRoot?: string;
+}
+
+export interface NexusDashboardHostWorkspaceRecord {
+  id: string;
+  name: string;
+  root: string;
+  registered: boolean;
+  current: boolean;
+  generatedAt: string | null;
+  summary: string;
+  tone: NexusDashboardSignalTone;
+  componentCount: number;
+  dirtyComponentCount: number;
+  threadCount: number;
+  needsDecisionCount: number;
+  blockerCount: number;
+  pluginCount: number;
+  automationStatus: string | null;
+  eligibleWorkCount: number | null;
+  error: NexusDashboardDataError | null;
+}
+
+export interface NexusDashboardHostSnapshot {
+  version: 1;
+  generatedAt: string;
+  homePath: string;
+  homeError: NexusDashboardDataError | null;
+  currentProjectRoot: string | null;
+  workspaceCount: number;
+  needsAttentionCount: number;
+  workspaces: NexusDashboardHostWorkspaceRecord[];
+}
+
 export async function buildNexusDashboardSnapshot(
   options: BuildNexusDashboardSnapshotOptions,
 ): Promise<NexusDashboardSnapshot> {
@@ -458,6 +513,233 @@ export async function buildNexusDashboardSnapshot(
     events,
     weave,
   };
+}
+
+export async function buildNexusDashboardHostSnapshot(
+  options: BuildNexusDashboardHostSnapshotOptions = {},
+): Promise<NexusDashboardHostSnapshot> {
+  const generatedAt = isoString(options.now?.() ?? new Date());
+  const homePath = path.resolve(options.homePath ?? defaultNexusHomePath());
+  const home = capture(() =>
+    loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
+  );
+  const currentProjectRoot = options.projectRoot
+    ? path.resolve(nonEmptyString(options.projectRoot, "projectRoot"))
+    : null;
+  const workspaceReferences = dashboardHostWorkspaceReferences(
+    home.value,
+    currentProjectRoot,
+  );
+  const workspaces = await Promise.all(
+    workspaceReferences.map((workspace) =>
+      dashboardHostWorkspaceRecord({
+        ...options,
+        homePath,
+        reference: workspace.reference,
+        registered: workspace.registered,
+        current: workspace.current,
+      }),
+    ),
+  );
+
+  return {
+    version: 1,
+    generatedAt,
+    homePath,
+    homeError: home.error,
+    currentProjectRoot,
+    workspaceCount: workspaces.length,
+    needsAttentionCount: workspaces.filter((workspace) =>
+      dashboardHostWorkspaceNeedsAttention(workspace),
+    ).length,
+    workspaces,
+  };
+}
+
+function dashboardHostWorkspaceReferences(
+  homeConfig: NexusHomeConfigBase | null,
+  currentProjectRoot: string | null,
+): Array<{
+  reference: NexusProjectReference;
+  registered: boolean;
+  current: boolean;
+}> {
+  const references = (homeConfig?.projects ?? []).map((reference) => ({
+    reference: {
+      ...reference,
+      projectRoot: path.resolve(reference.projectRoot),
+    },
+    registered: true,
+    current: Boolean(currentProjectRoot && samePath(reference.projectRoot, currentProjectRoot)),
+  }));
+  if (
+    currentProjectRoot &&
+    !references.some((workspace) =>
+      samePath(workspace.reference.projectRoot, currentProjectRoot),
+    )
+  ) {
+    const currentConfig = capture(() => loadProjectConfig(currentProjectRoot));
+    references.unshift({
+      reference: {
+        id: currentConfig.value?.id ?? path.basename(currentProjectRoot),
+        name: currentConfig.value?.name ?? path.basename(currentProjectRoot),
+        projectRoot: currentProjectRoot,
+      },
+      registered: false,
+      current: true,
+    });
+  }
+
+  return references;
+}
+
+async function dashboardHostWorkspaceRecord(options: {
+  reference: NexusProjectReference;
+  registered: boolean;
+  current: boolean;
+} & BuildNexusDashboardHostSnapshotOptions): Promise<NexusDashboardHostWorkspaceRecord> {
+  const root = path.resolve(options.reference.projectRoot);
+  const localFacts = capture(() => {
+    const projectConfig = loadProjectConfig(root);
+    const components = resolveProjectComponents(root, projectConfig);
+    const componentSummaries = components.map((component) =>
+      summarizeComponent(component, options.gitRunner ?? defaultGitRunner),
+    );
+    const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
+    const worktreeCollection = capture(() =>
+      listNexusWorktreeLeases({
+        projectRoot: root,
+        includeProjectMeta: true,
+        now: options.now,
+      }),
+    );
+    const runs = readRuns(root, projectConfig);
+    const worktrees = summarizeWorktrees(worktreeCollection.value);
+    const threads = summarizeThreads(
+      worktrees,
+      providerUrls,
+      [],
+      runs,
+    );
+    const plugins = summarizePlugins(projectConfig);
+    const dirtyComponentCount = componentSummaries.filter((component) =>
+      Boolean(component.git?.dirty),
+    ).length;
+    return {
+      projectConfig,
+      componentSummaries,
+      threads,
+      plugins,
+      blockerCount: 0,
+      warningCount: worktrees.warnings.length,
+      dirtyComponentCount,
+    };
+  });
+
+  if (!localFacts.value) {
+    return {
+      id: options.reference.id,
+      name: options.reference.name,
+      root,
+      registered: options.registered,
+      current: options.current,
+      generatedAt: null,
+      summary: localFacts.error?.message ?? "Workspace snapshot is unavailable.",
+      tone: "danger",
+      componentCount: 0,
+      dirtyComponentCount: 0,
+      threadCount: 0,
+      needsDecisionCount: 0,
+      blockerCount: 0,
+      pluginCount: 0,
+      automationStatus: null,
+      eligibleWorkCount: null,
+      error: localFacts.error,
+    };
+  }
+
+  const value = localFacts.value;
+  const project = projectSummary(
+    root,
+    value.projectConfig,
+    value.componentSummaries,
+  );
+  return {
+    id: project.id,
+    name: project.name,
+    root: project.root,
+    registered: options.registered,
+    current: options.current,
+    generatedAt: isoString(options.now?.() ?? new Date()),
+    summary: dashboardHostWorkspaceSummary(value),
+    tone: dashboardHostWorkspaceTone({
+      automationStatus: null,
+      blockerCount: value.blockerCount,
+      dirtyComponentCount: value.dirtyComponentCount,
+      needsDecisionCount: value.threads.needsDecisionCount,
+      threadCount: value.threads.totalCount,
+      hasError: false,
+    }),
+    componentCount: value.componentSummaries.length,
+    dirtyComponentCount: value.dirtyComponentCount,
+    threadCount: value.threads.totalCount,
+    needsDecisionCount: value.threads.needsDecisionCount,
+    blockerCount: value.blockerCount,
+    pluginCount: value.plugins.enabledCount,
+    automationStatus: null,
+    eligibleWorkCount: null,
+    error: null,
+  };
+}
+
+function dashboardHostWorkspaceSummary(value: {
+  componentSummaries: NexusDashboardComponentSummary[];
+  threads: NexusDashboardThreadSummary;
+  plugins: NexusDashboardPluginSummary;
+  blockerCount: number;
+  warningCount: number;
+  dirtyComponentCount: number;
+}): string {
+  const review = value.threads.needsDecisionCount > 0
+    ? `${value.threads.needsDecisionCount} need review`
+    : "no review needed";
+  const dirty = value.dirtyComponentCount > 0
+    ? `${value.dirtyComponentCount} dirty`
+    : "clean";
+  const warnings = value.warningCount > 0
+    ? `${value.warningCount} warnings`
+    : "no warnings";
+  return `${value.componentSummaries.length} components, ${value.threads.totalCount} active threads, ${review}, ${dirty}, ${warnings}, ${value.plugins.enabledCount} plugins`;
+}
+
+function dashboardHostWorkspaceTone(options: {
+  automationStatus: string | null;
+  blockerCount: number;
+  dirtyComponentCount: number;
+  needsDecisionCount: number;
+  threadCount: number;
+  hasError: boolean;
+}): NexusDashboardSignalTone {
+  if (
+    options.blockerCount > 0 ||
+    options.automationStatus === "blocked" ||
+    options.hasError
+  ) {
+    return "danger";
+  }
+  if (options.needsDecisionCount > 0 || options.dirtyComponentCount > 0) {
+    return "warn";
+  }
+  if (options.threadCount > 0 || options.automationStatus === "ready") {
+    return "active";
+  }
+  return "good";
+}
+
+function dashboardHostWorkspaceNeedsAttention(
+  workspace: NexusDashboardHostWorkspaceRecord,
+): boolean {
+  return workspace.tone === "danger" || workspace.tone === "warn";
 }
 
 export function buildNexusDashboardWeave(options: {

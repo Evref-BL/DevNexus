@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appendNexusAutomationRunRecord,
   appendNexusAutomationTargetCycleRecord,
+  buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   CodexAppServerJsonRpcClient,
   createLocalWorkTrackerProvider,
@@ -13,7 +14,9 @@ import {
   nexusWorktreeLeaseKind,
   renderNexusDashboardClientModule,
   saveProjectConfig,
+  saveNexusHomeConfigFile,
   startNexusDashboardServer,
+  validateNexusHomeConfigBase,
   writeNexusWorktreeLeaseStore,
   type CodexAppServerJsonRpcRequest,
   type CodexAppServerJsonRpcResponse,
@@ -481,6 +484,80 @@ describe("nexus dashboard", () => {
     });
   });
 
+  it("builds a host snapshot from registered workspaces plus the current project", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-registered-");
+    const currentRoot = makeTempDir("dev-nexus-dashboard-current-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "registered-project",
+      name: "Registered Project",
+    });
+    const currentConfig = projectConfig({
+      id: "current-project",
+      name: "Current Project",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveProjectConfig(currentRoot, currentConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+
+    const host = await buildNexusDashboardHostSnapshot({
+      projectRoot: currentRoot,
+      homePath,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:10:00.000Z"),
+    });
+
+    expect(host).toMatchObject({
+      version: 1,
+      generatedAt: "2026-05-21T10:10:00.000Z",
+      homePath,
+      currentProjectRoot: currentRoot,
+      workspaceCount: 2,
+      homeError: null,
+    });
+    expect(host.workspaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "current-project",
+          name: "Current Project",
+          root: currentRoot,
+          current: true,
+          registered: false,
+          componentCount: 1,
+          pluginCount: 1,
+        }),
+        expect.objectContaining({
+          id: "registered-project",
+          name: "Registered Project",
+          root: registeredRoot,
+          current: false,
+          registered: true,
+          componentCount: 1,
+          pluginCount: 1,
+        }),
+      ]),
+    );
+  });
+
   it("renders a client module with explicit light and dark mode controls", () => {
     const module = renderNexusDashboardClientModule();
 
@@ -495,10 +572,16 @@ describe("nexus dashboard", () => {
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
     expect(module).toContain("Workspace Activity");
+    expect(module).toContain("Host cockpit");
+    expect(module).toContain("Workspaces");
     expect(module).toContain("Action Needed");
     expect(module).toContain("HITL queue");
     expect(module).toContain("Plugins");
     expect(module).toContain("renderThreadInbox");
+    expect(module).toContain("renderHostOverview");
+    expect(module).toContain("renderWorkspaceCard");
+    expect(module).toContain("hostRefreshMs");
+    expect(module).toContain("hostInFlight");
     expect(module).toContain("renderThreadActions");
     expect(module).toContain("renderPlugins");
     expect(module).toContain("bindLocalActions");
@@ -509,6 +592,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-start-chat-prompt");
     expect(module).toContain("data-chat-target-id");
     expect(module).toContain("/api/codex/thread");
+    expect(module).toContain("/api/host");
     expect(module).toContain("x-dev-nexus-action-token");
     expect(module).toContain("renderChatActionStrip");
     expect(module).toContain("detailPrompt");
@@ -520,6 +604,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("Parallel work map");
     expect(module).toContain("dn-work-stack");
     expect(module).toContain("dn-plugin-row");
+    expect(module).toContain("dn-workspace-card");
     expect(module).toContain("Installed extensions");
     expect(module).not.toContain("Capability layer");
     expect(module).not.toContain("dn-side-stack");
@@ -610,6 +695,74 @@ describe("nexus dashboard", () => {
     }
 
     expect(codexChatStarter.closed).toBe(true);
+  });
+
+  it("serves a host workspace overview endpoint", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-server-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-server-registered-");
+    const currentRoot = makeTempDir("dev-nexus-dashboard-server-current-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "server-registered",
+      name: "Server Registered",
+    });
+    const currentConfig = projectConfig({
+      id: "server-current",
+      name: "Server Current",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveProjectConfig(currentRoot, currentConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      projectRoot: currentRoot,
+      homePath,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:20:00.000Z"),
+    });
+
+    try {
+      const host = await fetch(`${server.url}api/host`).then((response) =>
+        response.json(),
+      );
+      const projects = await fetch(`${server.url}api/projects`).then((response) =>
+        response.json(),
+      );
+
+      expect(host).toMatchObject({
+        version: 1,
+        homePath,
+        currentProjectRoot: currentRoot,
+        workspaceCount: 2,
+      });
+      expect(host.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual([
+        "server-current",
+        "server-registered",
+      ]);
+      expect(projects.projects.map((workspace: { id: string }) => workspace.id)).toEqual([
+        "server-current",
+        "server-registered",
+      ]);
+    } finally {
+      await server.close();
+    }
   });
 
   it("resumes a recorded assistant thread for cockpit targets", async () => {

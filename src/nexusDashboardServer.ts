@@ -6,6 +6,7 @@ import http, {
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import {
+  buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   type BuildNexusDashboardSnapshotOptions,
   type NexusDashboardSnapshot,
@@ -159,6 +160,14 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-signal:hover, .dn-component-card:hover, .dn-event:hover, .dn-blocker:hover { transform: translateY(-1px); }",
     ".dn-signal.selected, .dn-component-card.selected, .dn-event.selected, .dn-blocker.selected, .dn-history-item.selected { border-color: var(--dn-active); box-shadow: 0 0 0 2px color-mix(in srgb, var(--dn-active) 18%, transparent) inset; }",
     ".dn-signal-top, .dn-card-title, .dn-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }",
+    ".dn-host-panel { margin: 16px 0; background: linear-gradient(135deg, color-mix(in srgb, var(--dn-surface) 92%, var(--dn-branch-5) 8%), var(--dn-surface)); }",
+    ".dn-workspace-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }",
+    ".dn-workspace-card { --dn-workspace-accent: var(--dn-neutral); display: grid; gap: 7px; min-width: 0; padding: 11px; border: 1px solid color-mix(in srgb, var(--dn-workspace-accent) 34%, var(--dn-border)); border-left: 5px solid var(--dn-workspace-accent); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-muted) 82%, var(--dn-workspace-accent) 18%); }",
+    ".dn-workspace-card.tone-good { --dn-workspace-accent: var(--dn-good); } .dn-workspace-card.tone-active { --dn-workspace-accent: var(--dn-active); } .dn-workspace-card.tone-warn { --dn-workspace-accent: var(--dn-warn); } .dn-workspace-card.tone-danger { --dn-workspace-accent: var(--dn-danger); }",
+    ".dn-workspace-card strong { min-width: 0; overflow: hidden; color: var(--dn-strong); text-overflow: ellipsis; white-space: nowrap; }",
+    ".dn-workspace-card p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.8rem; }",
+    ".dn-workspace-meta { display: flex; flex-wrap: wrap; gap: 6px; }",
+    ".dn-workspace-meta span { padding: 3px 6px; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface-muted); font-size: 0.7rem; font-weight: 800; }",
     ".dn-signal-icon { display: inline-grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--dn-signal-accent) 36%, var(--dn-border)); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-raised) 72%, var(--dn-signal-accent) 28%); color: var(--dn-signal-accent); }",
     ".dn-signal-icon svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }",
     ".dn-dot { display: inline-block; flex: 0 0 auto; width: 10px; height: 10px; border-radius: 999px; background: currentColor; }",
@@ -242,17 +251,27 @@ export function renderNexusDashboardClientModule(): string {
     "  return response.json();",
     "}",
     "",
+    "export async function fetchDevNexusDashboardHost(baseUrl = '') {",
+    "  const response = await fetch(`${baseUrl}/api/host`, { cache: 'no-store' });",
+    "  if (!response.ok) throw new Error(`Host API returned ${response.status}`);",
+    "  return response.json();",
+    "}",
+    "",
     "export function mountDevNexusDashboard(root, options = {}) {",
     "  if (!root) throw new Error('mountDevNexusDashboard requires a root element');",
     "  const baseUrl = options.baseUrl ?? '';",
     "  const actionToken = options.actionToken ?? (typeof globalThis !== 'undefined' ? (globalThis.__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ ?? '') : '');",
     "  const refreshMs = options.refreshMs ?? defaultRefreshMs;",
+    "  const hostRefreshMs = options.hostRefreshMs ?? Math.max(refreshMs * 4, 60000);",
     "  let themeMode = normalizeThemeMode(options.theme ?? readStoredThemeMode());",
     "  let selectedId = null;",
     "  let latestSnapshot = null;",
+    "  let latestHost = null;",
     "  let latestError = null;",
+    "  let lastHostRefreshAt = 0;",
     "  let disposed = false;",
     "  let inFlight = false;",
+    "  let hostInFlight = false;",
     "  applyThemePreference(themeMode);",
     "  injectStyles();",
     "  const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;",
@@ -284,7 +303,7 @@ export function renderNexusDashboardClientModule(): string {
     "  function renderCurrent() {",
     "    if (disposed) return;",
     "    if (latestSnapshot) {",
-    "      renderRoot(renderDashboard(latestSnapshot, themeMode, selectedId));",
+    "      renderRoot(renderDashboard(latestSnapshot, themeMode, selectedId, latestHost));",
     "    } else if (latestError) {",
     "      renderRoot(renderError(latestError, themeMode));",
     "    }",
@@ -293,17 +312,32 @@ export function renderNexusDashboardClientModule(): string {
     "    if (inFlight) return;",
     "    inFlight = true;",
     "    try {",
+    "      const shouldRefreshHost = !latestHost || Date.now() - lastHostRefreshAt >= hostRefreshMs;",
     "      const snapshot = await fetchDevNexusDashboard(baseUrl);",
     "      latestSnapshot = snapshot;",
     "      latestError = null;",
     "      if (!findSelectableById(snapshot, selectedId)) selectedId = defaultSelectedId(snapshot);",
     "      renderCurrent();",
+    "      if (shouldRefreshHost) void refreshHost();",
     "    } catch (error) {",
     "      latestSnapshot = null;",
     "      latestError = error;",
     "      renderCurrent();",
     "    } finally {",
     "      inFlight = false;",
+    "    }",
+    "  }",
+    "  async function refreshHost() {",
+    "    if (hostInFlight) return;",
+    "    hostInFlight = true;",
+    "    try {",
+    "      latestHost = await fetchDevNexusDashboardHost(baseUrl);",
+    "      lastHostRefreshAt = Date.now();",
+    "      renderCurrent();",
+    "    } catch {",
+    "      latestHost = null;",
+    "    } finally {",
+    "      hostInFlight = false;",
     "    }",
     "  }",
     "  void refresh();",
@@ -319,13 +353,14 @@ export function renderNexusDashboardClientModule(): string {
     "  document.head.appendChild(style);",
     "}",
     "",
-    "function renderDashboard(snapshot, themeMode, selectedId) {",
+    "function renderDashboard(snapshot, themeMode, selectedId, host) {",
     "  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);",
     "  return `<div class=\"dn-shell\">",
     "    <header class=\"dn-header\">",
     "      <div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>",
     "      <div class=\"dn-header-actions\"><div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot.generatedAt))}</strong><span>Root</span><strong title=\"${escapeHtml(snapshot.project.root)}\">${escapeHtml(compactPath(snapshot.project.root))}</strong></div>${renderThemeToggle(themeMode)}</div>",
     "    </header>",
+    "    ${renderHostOverview(host, snapshot)}",
     "    ${renderSignals(snapshot.signals, activeSelection)}",
     "    <section class=\"dn-main-grid\">",
     "      <div class=\"dn-work-stack\">${renderWorkHistory(snapshot, activeSelection)}${renderThreadInbox(snapshot)}</div>",
@@ -338,6 +373,30 @@ export function renderNexusDashboardClientModule(): string {
     "    </section>",
     "    <section class=\"dn-plugin-row\">${renderPlugins(snapshot.plugins)}</section>",
     "  </div>`;",
+    "}",
+    "",
+    "function renderHostOverview(host, snapshot) {",
+    "  const workspaces = host?.workspaces ?? [];",
+    "  if (!workspaces.length) return '';",
+    "  const count = `${host.needsAttentionCount ?? 0} need attention · ${host.workspaceCount ?? workspaces.length} workspaces`;",
+    "  return `<section class=\"dn-panel dn-host-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>Workspaces</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot)).join('')}</div></section>`;",
+    "}",
+    "",
+    "function renderWorkspaceCard(workspace, snapshot) {",
+    "  const current = workspace.current ? 'current' : (workspace.registered ? 'registered' : 'local');",
+    "  const status = workspace.error ? 'unavailable' : workspaceToneLabel(workspace);",
+    "  const detail = formatDisplayText(workspace.summary);",
+    "  const title = workspace.current ? snapshot.project.name : workspace.name;",
+    "  const meta = [`${workspace.componentCount} components`, `${workspace.needsDecisionCount} active HITL`, `${workspace.threadCount} active`, `${workspace.pluginCount} plugins`];",
+    "  return `<article class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></article>`;",
+    "}",
+    "",
+    "function workspaceToneLabel(workspace) {",
+    "  if (workspace.blockerCount > 0 || workspace.automationStatus === 'blocked') return 'blocked';",
+    "  if (workspace.needsDecisionCount > 0) return 'needs review';",
+    "  if (workspace.dirtyComponentCount > 0) return 'dirty';",
+    "  if (workspace.eligibleWorkCount > 0) return 'ready work';",
+    "  return 'clear';",
     "}",
     "",
     "function renderThemeToggle(themeMode) {",
@@ -972,6 +1031,10 @@ async function routeDashboardRequest(
       sendJson(response, await buildNexusDashboardSnapshot(snapshotOptions));
       return;
     }
+    if (url.pathname === "/api/host") {
+      sendJson(response, await buildNexusDashboardHostSnapshot(snapshotOptions));
+      return;
+    }
     if (url.pathname === "/api/weave") {
       const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
       sendJson(response, snapshot.weave);
@@ -983,8 +1046,8 @@ async function routeDashboardRequest(
       return;
     }
     if (url.pathname === "/api/projects") {
-      const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
-      sendJson(response, { projects: [snapshot.project] });
+      const host = await buildNexusDashboardHostSnapshot(snapshotOptions);
+      sendJson(response, { projects: host.workspaces });
       return;
     }
     response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
