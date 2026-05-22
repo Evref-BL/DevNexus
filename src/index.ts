@@ -31,6 +31,7 @@ export * from "./nexusCleanupPlan.js";
 export * from "./nexusCliVersionSkewDiagnostic.js";
 export * from "./nexusCiFailureIntake.js";
 export * from "./nexusDashboard.js";
+export * from "./nexusDashboardCodexChat.js";
 export * from "./nexusDashboardServer.js";
 export * from "./nexusCiTierPolicy.js";
 export * from "./nexusCoreMcpTools.js";

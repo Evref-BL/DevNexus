@@ -5,14 +5,23 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appendNexusAutomationTargetCycleRecord,
   buildNexusDashboardSnapshot,
+  CodexAppServerJsonRpcClient,
   createLocalWorkTrackerProvider,
+  createNexusDashboardCodexChatStarter,
   defaultNexusAutomationConfig,
   nexusWorktreeLeaseKind,
   renderNexusDashboardClientModule,
   saveProjectConfig,
+  startNexusDashboardServer,
   writeNexusWorktreeLeaseStore,
+  type CodexAppServerJsonRpcRequest,
+  type CodexAppServerJsonRpcResponse,
+  type CodexAppServerJsonRpcTransport,
   type GitCommandResult,
   type GitRunner,
+  type NexusDashboardCodexChatStartOptions,
+  type NexusDashboardCodexChatStartResult,
+  type NexusDashboardCodexChatStarter,
   type NexusProjectConfig,
   type NexusWorktreeLeaseRecord,
 } from "./index.js";
@@ -88,6 +97,53 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
       },
     ],
     ...overrides,
+  };
+}
+
+function appServerAutomationConfig(): NonNullable<NexusProjectConfig["automation"]> {
+  return {
+    ...defaultNexusAutomationConfig,
+    agent: {
+      ...defaultNexusAutomationConfig.agent,
+      coordinatorProfileId: "codex-app-server",
+      profiles: [
+        {
+          id: "codex-app-server",
+          executor: "codex",
+          executorMode: "app_server",
+          model: "gpt-5.5",
+          version: null,
+          variant: null,
+          reasoning: "high",
+          intelligence: null,
+          intendedUse: "coordinator",
+          safety: {
+            profile: "isolated",
+            allowHostMutation: false,
+            allowDependencyInstall: false,
+            allowLiveServices: false,
+          },
+          command: null,
+          args: [
+            "-c",
+            "approval_policy=never",
+            "--sandbox",
+            "workspace-write",
+          ],
+          appServer: {
+            mode: "spawn",
+            command: "codex",
+            args: ["app-server"],
+            endpoint: "http://127.0.0.1:18080",
+            ephemeralThreadDefault: false,
+            localPolicy: {
+              allowNonLoopbackEndpoint: false,
+              hostLocalSafetyHints: ["spawns_local_process"],
+            },
+          },
+        },
+      ],
+    },
   };
 }
 
@@ -196,6 +252,62 @@ function worktreeLease(
       ...overrides.git,
     },
   };
+}
+
+class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
+  readonly requests: CodexAppServerJsonRpcRequest[] = [];
+  closed = false;
+
+  async send(
+    request: CodexAppServerJsonRpcRequest,
+  ): Promise<CodexAppServerJsonRpcResponse> {
+    this.requests.push(request);
+    if (request.method === "initialize") {
+      return { id: request.id, result: { protocolVersion: "0.1.0" } };
+    }
+    if (request.method === "thread/start") {
+      return { id: request.id, result: { thread: { id: "thread-1" } } };
+    }
+    if (request.method === "turn/start") {
+      return { id: request.id, result: { turn: { id: "turn-1" } } };
+    }
+    return {
+      id: request.id,
+      error: {
+        code: -32601,
+        message: `Unsupported method ${request.method}`,
+      },
+    };
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+}
+
+class RecordingCodexChatStarter implements NexusDashboardCodexChatStarter {
+  readonly starts: NexusDashboardCodexChatStartOptions[] = [];
+  closed = false;
+
+  async start(
+    options: NexusDashboardCodexChatStartOptions,
+  ): Promise<NexusDashboardCodexChatStartResult> {
+    this.starts.push(options);
+    return {
+      status: "started",
+      profileId: "codex-app-server",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      cwd: options.cwd ?? options.projectRoot,
+      model: "gpt-5.5",
+      reasoning: "high",
+      threadPersistence: "durable",
+    };
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
 }
 
 afterEach(() => {
@@ -388,6 +500,10 @@ describe("nexus dashboard", () => {
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
     expect(module).toContain("Copy Codex brief");
+    expect(module).toContain("Start Codex chat");
+    expect(module).toContain("data-start-codex-prompt");
+    expect(module).toContain("/api/codex/thread");
+    expect(module).toContain("x-dev-nexus-action-token");
     expect(module).toContain("Parallel work map");
     expect(module).toContain("dn-work-stack");
     expect(module).toContain("dn-plugin-row");
@@ -416,5 +532,191 @@ describe("nexus dashboard", () => {
     expect(module).toContain("target=\"_blank\"");
     expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
+  });
+
+  it("serves a Codex thread action endpoint for dashboard prompts", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const codexChatStarter = new RecordingCodexChatStarter();
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      codexChatStarter,
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      expect(actionToken).toBeTruthy();
+      const unauthenticatedResponse = await fetch(`${server.url}api/codex/thread`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: "Review blocked approval.",
+        }),
+      });
+      expect(unauthenticatedResponse.status).toBe(403);
+
+      const response = await fetch(`${server.url}api/codex/thread`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-dev-nexus-action-token": actionToken!,
+        },
+        body: JSON.stringify({
+          prompt: "Review blocked approval.",
+          title: "Approval needed",
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body).toMatchObject({
+        ok: true,
+        result: {
+          status: "started",
+          profileId: "codex-app-server",
+          threadId: "thread-1",
+          turnId: "turn-1",
+          threadPersistence: "durable",
+        },
+      });
+      expect(codexChatStarter.starts).toEqual([
+        {
+          projectRoot,
+          prompt: "Review blocked approval.",
+          title: "Approval needed",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+
+    expect(codexChatStarter.closed).toBe(true);
+  });
+
+  it("rejects browser-controlled profile and cwd values for Codex thread actions", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-guard-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const codexChatStarter = new RecordingCodexChatStarter();
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      codexChatStarter,
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      const response = await fetch(`${server.url}api/codex/thread`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-dev-nexus-action-token": actionToken!,
+        },
+        body: JSON.stringify({
+          prompt: "Review blocked approval.",
+          profileId: "other-profile",
+          cwd: "/tmp",
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error.message).toContain("profileId is server-controlled");
+      expect(codexChatStarter.starts).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("starts a durable Codex app-server chat from a dashboard prompt", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-codex-chat-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: appServerAutomationConfig(),
+    }));
+    const transport = new MockCodexAppServerTransport();
+    const starter = createNexusDashboardCodexChatStarter({
+      clientFactory: () =>
+        new CodexAppServerJsonRpcClient({
+          transport,
+        }),
+    });
+
+    try {
+      const result = await starter.start({
+        projectRoot,
+        prompt: "Review this thread.",
+        title: "Review",
+      });
+
+      expect(result).toMatchObject({
+        status: "started",
+        profileId: "codex-app-server",
+        threadId: "thread-1",
+        turnId: "turn-1",
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        reasoning: "high",
+        threadPersistence: "durable",
+      });
+      expect(transport.requests.map((request) => request.method)).toEqual([
+        "initialize",
+        "thread/start",
+        "turn/start",
+      ]);
+      expect(transport.requests[1]?.params).toMatchObject({
+        ephemeral: false,
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+        threadSource: "user",
+      });
+      expect(transport.requests[2]?.params).toMatchObject({
+        threadId: "thread-1",
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        effort: "high",
+        approvalPolicy: "never",
+        input: [
+          {
+            type: "text",
+            text: "Review this thread.",
+            text_elements: [],
+          },
+        ],
+      });
+    } finally {
+      await starter.close();
+    }
+
+    expect(transport.closed).toBe(true);
+  });
+
+  it("reports a setup blocker when no Codex app-server profile is configured", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-codex-blocker-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const starter = createNexusDashboardCodexChatStarter({
+      clientFactory: () => {
+        throw new Error("client factory should not run");
+      },
+    });
+
+    await expect(starter.start({
+      projectRoot,
+      prompt: "Review this thread.",
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining("No Codex app-server profile"),
+    });
   });
 });

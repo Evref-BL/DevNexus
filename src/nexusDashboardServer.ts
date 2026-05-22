@@ -3,12 +3,18 @@ import http, {
   type Server,
   type ServerResponse,
 } from "node:http";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import {
   buildNexusDashboardSnapshot,
   type BuildNexusDashboardSnapshotOptions,
   type NexusDashboardSnapshot,
 } from "./nexusDashboard.js";
+import {
+  createNexusDashboardCodexChatStarter,
+  NexusDashboardCodexChatError,
+  type NexusDashboardCodexChatStarter,
+} from "./nexusDashboardCodexChat.js";
 import type { GitRunner } from "./gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "./nexusEligibleWorkSummary.js";
 
@@ -20,6 +26,7 @@ export interface StartNexusDashboardServerOptions {
   eligibleWorkMode?: NexusEligibleWorkMode;
   gitRunner?: GitRunner;
   now?: () => Date | string;
+  codexChatStarter?: NexusDashboardCodexChatStarter;
 }
 
 export interface NexusDashboardServerHandle {
@@ -44,8 +51,17 @@ export async function startNexusDashboardServer(
     gitRunner: options.gitRunner,
     now: options.now,
   };
+  const codexChatStarter =
+    options.codexChatStarter ?? createNexusDashboardCodexChatStarter();
+  const actionToken = randomBytes(24).toString("base64url");
   const server = http.createServer((request, response) => {
-    void routeDashboardRequest(request, response, snapshotOptions);
+    void routeDashboardRequest(
+      request,
+      response,
+      snapshotOptions,
+      codexChatStarter,
+      actionToken,
+    );
   });
 
   await listen(server, port, host);
@@ -61,16 +77,23 @@ export async function startNexusDashboardServer(
     port: address.port,
     url,
     server,
-    close: () => close(server),
+    close: async () => {
+      await close(server);
+      await codexChatStarter.close();
+    },
   };
 }
 
 export function renderNexusDashboardHtml(options: {
   title?: string;
   modulePath?: string;
+  actionToken?: string;
 } = {}): string {
   const title = escapeHtml(options.title ?? "DevNexus Cockpit");
   const modulePath = escapeHtml(options.modulePath ?? "/assets/dev-nexus-dashboard.js");
+  const actionTokenScript = options.actionToken
+    ? `<script>globalThis.__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = ${safeJsonString(options.actionToken)};</script>`
+    : "";
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -81,6 +104,7 @@ export function renderNexusDashboardHtml(options: {
     "</head>",
     "<body>",
     '<main id="dev-nexus-dashboard-root"></main>',
+    actionTokenScript,
     `<script type="module">import { mountDevNexusDashboard } from "${modulePath}"; mountDevNexusDashboard(document.getElementById("dev-nexus-dashboard-root"));</script>`,
     "</body>",
     "</html>",
@@ -114,7 +138,10 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--dn-active) 42%, var(--dn-border)); border-radius: 8px; color: var(--dn-strong); background: color-mix(in srgb, var(--dn-surface-raised) 78%, var(--dn-active) 22%); font-size: 0.78rem; font-weight: 850; text-decoration: none; transition: transform 120ms ease, border-color 120ms ease, background 120ms ease; cursor: pointer; }",
     ".dn-action:hover { transform: translateY(-1px); border-color: var(--dn-active); background: color-mix(in srgb, var(--dn-surface-raised) 64%, var(--dn-active) 36%); }",
     ".dn-local-action { color: var(--dn-strong); border-color: color-mix(in srgb, var(--dn-warn) 44%, var(--dn-border)); background: color-mix(in srgb, var(--dn-surface-raised) 78%, var(--dn-warn) 22%); }",
+    ".dn-start-action { color: var(--dn-strong); border-color: color-mix(in srgb, var(--dn-active) 52%, var(--dn-border)); background: color-mix(in srgb, var(--dn-surface-raised) 70%, var(--dn-active) 30%); }",
     ".dn-local-action[data-copied='true'] { border-color: var(--dn-good); background: color-mix(in srgb, var(--dn-surface-raised) 70%, var(--dn-good) 30%); }",
+    ".dn-action:disabled { opacity: 0.72; cursor: wait; transform: none; }",
+    ".dn-action:disabled:hover { transform: none; }",
     ".dn-action svg { flex: 0 0 auto; width: 14px; height: 14px; fill: currentColor; stroke: currentColor; }",
     ".dn-action-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
     ".dn-action-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }",
@@ -218,6 +245,7 @@ export function renderNexusDashboardClientModule(): string {
     "export function mountDevNexusDashboard(root, options = {}) {",
     "  if (!root) throw new Error('mountDevNexusDashboard requires a root element');",
     "  const baseUrl = options.baseUrl ?? '';",
+    "  const actionToken = options.actionToken ?? (typeof globalThis !== 'undefined' ? (globalThis.__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ ?? '') : '');",
     "  const refreshMs = options.refreshMs ?? defaultRefreshMs;",
     "  let themeMode = normalizeThemeMode(options.theme ?? readStoredThemeMode());",
     "  let selectedId = null;",
@@ -251,7 +279,7 @@ export function renderNexusDashboardClientModule(): string {
     "    root.innerHTML = markup;",
     "    bindThemeControls(root, setThemeMode);",
     "    bindSelectionControls(root, setSelectedId);",
-    "    bindLocalActions(root);",
+    "    bindLocalActions(root, baseUrl, actionToken);",
     "  }",
     "  function renderCurrent() {",
     "    if (disposed) return;",
@@ -328,7 +356,7 @@ export function renderNexusDashboardClientModule(): string {
     "  });",
     "}",
     "",
-    "function bindLocalActions(container) {",
+    "function bindLocalActions(container, baseUrl = '', actionToken = '') {",
     "  container.querySelectorAll('[data-copy-prompt]').forEach((button) => {",
     "    button.addEventListener('click', async () => {",
     "      const prompt = button.getAttribute('data-copy-prompt') ?? '';",
@@ -342,6 +370,33 @@ export function renderNexusDashboardClientModule(): string {
     "        if (label) label.textContent = 'Copy failed';",
     "      }",
     "      setTimeout(() => { delete button.dataset.copied; if (label) label.textContent = 'Copy Codex brief'; }, 1600);",
+    "    });",
+    "  });",
+    "  container.querySelectorAll('[data-start-codex-prompt]').forEach((button) => {",
+    "    button.addEventListener('click', async () => {",
+    "      const prompt = button.getAttribute('data-start-codex-prompt') ?? '';",
+    "      const title = button.getAttribute('data-start-codex-title') ?? '';",
+    "      const label = button.querySelector('.dn-action-label');",
+    "      button.disabled = true;",
+    "      if (label) label.textContent = 'Starting...';",
+    "      try {",
+    "        const headers = { 'content-type': 'application/json' };",
+    "        if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;",
+    "        const response = await fetch(`${baseUrl}/api/codex/thread`, {",
+    "          method: 'POST',",
+    "          headers,",
+    "          body: JSON.stringify({ prompt, title }),",
+    "        });",
+    "        const payload = await response.json();",
+    "        if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);",
+    "        if (label) label.textContent = 'Chat started';",
+    "        button.title = `Thread ${payload.result?.threadId ?? 'started'}`;",
+    "      } catch (error) {",
+    "        if (label) label.textContent = 'Setup needed';",
+    "        button.title = error instanceof Error ? error.message : String(error);",
+    "      } finally {",
+    "        button.disabled = false;",
+    "      }",
     "    });",
     "  });",
     "}",
@@ -404,7 +459,9 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderThreadActions(thread) {",
     "  const links = uniqueActions(thread.actions ?? []).slice(0, 2).map((action) => `<a class=\"dn-action\" href=\"${escapeHtml(action.href)}\" target=\"_blank\" rel=\"noreferrer\" aria-label=\"${escapeHtml(externalActionLabel(action))}\">${providerIcon(action.provider)}<span class=\"dn-action-label\">${escapeHtml(action.label ?? 'Open provider')}</span>${externalLinkIcon()}</a>`).join('');",
-    "  return `<div class=\"dn-action-strip compact\">${links}<button class=\"dn-action dn-local-action\" type=\"button\" data-copy-prompt=\"${escapeHtml(codexThreadPrompt(thread))}\">${clipboardIcon()}<span class=\"dn-action-label\">Copy Codex brief</span></button></div>`;",
+    "  const prompt = codexThreadPrompt(thread);",
+    "  const title = `Continue ${thread.title}`;",
+    "  return `<div class=\"dn-action-strip compact\">${links}<button class=\"dn-action dn-start-action\" type=\"button\" data-start-codex-prompt=\"${escapeHtml(prompt)}\" data-start-codex-title=\"${escapeHtml(title)}\">${codexIcon()}<span class=\"dn-action-label\">Start Codex chat</span></button><button class=\"dn-action dn-local-action\" type=\"button\" data-copy-prompt=\"${escapeHtml(prompt)}\">${clipboardIcon()}<span class=\"dn-action-label\">Copy Codex brief</span></button></div>`;",
     "}",
     "",
     "function codexThreadPrompt(thread) {",
@@ -462,6 +519,10 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function clipboardIcon() {",
     "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 2.5h4M6.5 1.5h3A1.5 1.5 0 0111 3v.5H5V3a1.5 1.5 0 011.5-1.5zM4 3.5H3A1.5 1.5 0 001.5 5v8A1.5 1.5 0 003 14.5h10A1.5 1.5 0 0014.5 13V5A1.5 1.5 0 0013 3.5h-1\"/></svg>';",
+    "}",
+    "",
+    "function codexIcon() {",
+    "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3.5h10A1.5 1.5 0 0114.5 5v4A1.5 1.5 0 0113 10.5H8l-3.5 3v-3H3A1.5 1.5 0 011.5 9V5A1.5 1.5 0 013 3.5z\"/><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" d=\"M5 6.5h6M5 8.5h3\"/></svg>';",
     "}",
     "",
     "function signalIcon(id) {",
@@ -816,21 +877,37 @@ async function routeDashboardRequest(
   request: IncomingMessage,
   response: ServerResponse,
   snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  codexChatStarter: NexusDashboardCodexChatStarter,
+  actionToken: string,
 ): Promise<void> {
   const method = request.method ?? "GET";
+  const url = new URL(request.url ?? "/", "http://localhost");
+  if (method === "POST" && url.pathname === "/api/codex/thread") {
+    await routeCodexThreadStart(
+      request,
+      response,
+      snapshotOptions,
+      codexChatStarter,
+      actionToken,
+    );
+    return;
+  }
   if (method !== "GET" && method !== "HEAD") {
     response.writeHead(405, {
       "content-type": "application/json; charset=utf-8",
-      allow: "GET, HEAD",
+      allow: "GET, HEAD, POST",
     });
     response.end(JSON.stringify({ ok: false, error: "method_not_allowed" }));
     return;
   }
 
-  const url = new URL(request.url ?? "/", "http://localhost");
   try {
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      sendText(response, "text/html; charset=utf-8", renderNexusDashboardHtml());
+      sendText(
+        response,
+        "text/html; charset=utf-8",
+        renderNexusDashboardHtml({ actionToken }),
+      );
       return;
     }
     if (url.pathname === "/assets/dev-nexus-dashboard.js") {
@@ -876,11 +953,92 @@ async function routeDashboardRequest(
   }
 }
 
-function sendJson(response: ServerResponse, value: unknown): void {
+async function routeCodexThreadStart(
+  request: IncomingMessage,
+  response: ServerResponse,
+  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  codexChatStarter: NexusDashboardCodexChatStarter,
+  actionToken: string,
+): Promise<void> {
+  try {
+    requireDashboardMutationRequest(request, actionToken);
+    const body = await readJsonBody(request);
+    const prompt = requiredStringField(body, "prompt");
+    const title = optionalStringField(body, "title");
+    rejectClientControlledField(body, "profileId");
+    rejectClientControlledField(body, "cwd");
+    const result = await codexChatStarter.start({
+      projectRoot: snapshotOptions.projectRoot,
+      prompt,
+      ...(title ? { title } : {}),
+    });
+    sendJson(response, { ok: true, result }, 201);
+  } catch (error) {
+    const statusCode = error instanceof NexusDashboardCodexChatError
+      ? error.statusCode
+      : 500;
+    sendJson(
+      response,
+      {
+        ok: false,
+        error: {
+          name: error instanceof Error ? error.name : "Error",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      },
+      statusCode,
+    );
+  }
+}
+
+function requireDashboardMutationRequest(
+  request: IncomingMessage,
+  actionToken: string,
+): void {
+  const contentType = request.headers["content-type"];
+  if (
+    typeof contentType !== "string" ||
+    !contentType.toLowerCase().split(";").some((part) =>
+      part.trim() === "application/json"
+    )
+  ) {
+    throw new NexusDashboardCodexChatError(
+      "Content-Type must be application/json",
+      415,
+    );
+  }
+
+  const suppliedToken = request.headers["x-dev-nexus-action-token"];
+  if (suppliedToken !== actionToken) {
+    throw new NexusDashboardCodexChatError(
+      "Dashboard action token is missing or invalid",
+      403,
+    );
+  }
+
+  const origin = request.headers.origin;
+  if (typeof origin === "string") {
+    const requestHost = request.headers.host;
+    const originHost = safeOriginHost(origin);
+    if (!requestHost || originHost !== requestHost) {
+      throw new NexusDashboardCodexChatError(
+        "Dashboard action origin is not allowed",
+        403,
+      );
+    }
+  }
+}
+
+function sendJson(
+  response: ServerResponse,
+  value: unknown,
+  statusCode = 200,
+): void {
   sendText(
     response,
     "application/json; charset=utf-8",
     JSON.stringify(value, null, 2),
+    statusCode,
   );
 }
 
@@ -888,12 +1046,107 @@ function sendText(
   response: ServerResponse,
   contentType: string,
   body: string,
+  statusCode = 200,
 ): void {
-  response.writeHead(200, {
+  response.writeHead(statusCode, {
     "content-type": contentType,
     "cache-control": "no-store",
   });
   response.end(body);
+}
+
+async function readJsonBody(
+  request: IncomingMessage,
+  maxBytes = 64 * 1024,
+): Promise<unknown> {
+  let body = "";
+  for await (const chunk of request) {
+    body += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    if (Buffer.byteLength(body, "utf8") > maxBytes) {
+      throw new NexusDashboardCodexChatError(
+        "Request body is too large",
+        413,
+      );
+    }
+  }
+  if (!body.trim()) {
+    throw new NexusDashboardCodexChatError(
+      "Request body must be JSON",
+      400,
+    );
+  }
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    throw new NexusDashboardCodexChatError(
+      "Request body must be valid JSON",
+      400,
+    );
+  }
+}
+
+function requiredStringField(value: unknown, fieldName: string): string {
+  const record = plainRecord(value);
+  const field = record[fieldName];
+  if (typeof field !== "string" || field.trim().length === 0) {
+    throw new NexusDashboardCodexChatError(
+      `${fieldName} must be a non-empty string`,
+      400,
+    );
+  }
+
+  return field.trim();
+}
+
+function optionalStringField(
+  value: unknown,
+  fieldName: string,
+): string | undefined {
+  const record = plainRecord(value);
+  const field = record[fieldName];
+  if (field === undefined || field === null || field === "") {
+    return undefined;
+  }
+  if (typeof field !== "string") {
+    throw new NexusDashboardCodexChatError(
+      `${fieldName} must be a string`,
+      400,
+    );
+  }
+
+  return field.trim() || undefined;
+}
+
+function rejectClientControlledField(
+  value: unknown,
+  fieldName: string,
+): void {
+  const record = plainRecord(value);
+  if (record[fieldName] !== undefined && record[fieldName] !== null) {
+    throw new NexusDashboardCodexChatError(
+      `${fieldName} is server-controlled for dashboard chat actions`,
+      400,
+    );
+  }
+}
+
+function plainRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusDashboardCodexChatError(
+      "Request body must be a JSON object",
+      400,
+    );
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function safeOriginHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
 }
 
 function listen(server: Server, port: number, host: string): Promise<void> {
@@ -939,4 +1192,8 @@ function escapeHtml(value: string): string {
         return "&#39;";
     }
   });
+}
+
+function safeJsonString(value: string): string {
+  return JSON.stringify(value).replace(/<\/script/giu, "<\\/script");
 }
