@@ -16,6 +16,9 @@ import type {
   NexusAutomationAgentLauncher,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunch.js";
+import type {
+  NexusAutomationCodexAppServerGoalMetadata,
+} from "./nexusAutomationAgentLaunchMetadata.js";
 import {
   readNexusAutomationAgentResultFile,
 } from "./nexusAutomationAgentLaunch.js";
@@ -105,6 +108,7 @@ export function createNexusAutomationCodexAppServerLauncher(
     let ephemeral = true;
     let threadId: string | null = null;
     let turnId: string | null = null;
+    let goal: NexusAutomationCodexAppServerGoalMetadata | null = null;
     const fork = options.fork ?? null;
     const action = fork ? "thread_fork" : "thread_start";
 
@@ -154,7 +158,7 @@ export function createNexusAutomationCodexAppServerLauncher(
           "id",
           "thread.id",
         ], "thread id");
-        await maybeSetCodexThreadGoal({
+        goal = await maybeSetCodexThreadGoal({
           adapter,
           input,
           threadId,
@@ -187,6 +191,11 @@ export function createNexusAutomationCodexAppServerLauncher(
             options.turnCompletionNotificationTimeoutMs ??
             defaultTurnCompletionNotificationTimeoutMs,
         });
+        goal = await maybeReadCodexThreadGoal({
+          adapter,
+          threadId,
+          goal,
+        });
 
         const reported = readNexusAutomationAgentResultFile(input.resultFile);
         if (reported.status !== "loaded") {
@@ -205,6 +214,7 @@ export function createNexusAutomationCodexAppServerLauncher(
               ephemeral,
               cwd,
               failureSummary: reported.error,
+              goal,
             }),
           };
         }
@@ -233,6 +243,7 @@ export function createNexusAutomationCodexAppServerLauncher(
             ephemeral,
             cwd,
             failureSummary: resultFailureSummary,
+            goal,
           }),
         };
       } finally {
@@ -259,6 +270,7 @@ export function createNexusAutomationCodexAppServerLauncher(
                 ephemeral,
                 cwd: cwd || input.projectRoot,
                 failureSummary,
+                goal,
               }),
             }
           : {}),
@@ -564,10 +576,19 @@ async function maybeSetCodexThreadGoal(options: {
   input: NexusAutomationAgentLaunchInput;
   threadId: string;
   goalOptions: CreateNexusAutomationCodexAppServerLauncherOptions["goal"];
-}): Promise<void> {
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
   const projection = resolveCodexThreadGoalProjection(options.goalOptions);
-  if (!projection.enabled || !options.adapter.capabilities.threadGoalSet.available) {
-    return;
+  if (!projection.enabled) {
+    return null;
+  }
+
+  const metadata = initialCodexThreadGoalMetadata({
+    adapter: options.adapter,
+    threadId: options.threadId,
+    tokenBudget: projection.tokenBudget,
+  });
+  if (!options.adapter.capabilities.threadGoalSet.available) {
+    return metadata;
   }
 
   try {
@@ -579,12 +600,107 @@ async function maybeSetCodexThreadGoal(options: {
         tokenBudget: projection.tokenBudget,
       }),
     );
+    return {
+      ...metadata,
+      setStatus: "set",
+    };
   } catch (error) {
     if (isCodexThreadGoalUnavailableError(error)) {
-      return;
+      return {
+        ...metadata,
+        setStatus: "unavailable",
+        readStatus: "unavailable",
+        failureSummary: summarizeCodexAppServerJsonRpcFailure(error),
+      };
     }
     throw error;
   }
+}
+
+async function maybeReadCodexThreadGoal(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  threadId: string;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
+  if (!options.goal || options.goal.setStatus !== "set") {
+    return options.goal;
+  }
+  if (!options.adapter.capabilities.threadGoalGet.available) {
+    return {
+      ...options.goal,
+      readStatus: "unsupported",
+    };
+  }
+
+  try {
+    const result = await options.adapter.client.request(
+      options.adapter.capabilities.threadGoalGet.method,
+      { threadId: options.threadId },
+    );
+    return codexThreadGoalReadMetadata(options.goal, result);
+  } catch (error) {
+    return {
+      ...options.goal,
+      readStatus: isCodexThreadGoalUnavailableError(error)
+        ? "unavailable"
+        : "failed",
+      failureSummary: summarizeCodexAppServerJsonRpcFailure(error),
+    };
+  }
+}
+
+function initialCodexThreadGoalMetadata(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  threadId: string;
+  tokenBudget?: number | null;
+}): NexusAutomationCodexAppServerGoalMetadata {
+  const getMethodAvailable = options.adapter.capabilities.threadGoalGet.available;
+  return {
+    requested: true,
+    setMethodAvailable: options.adapter.capabilities.threadGoalSet.available,
+    getMethodAvailable,
+    setStatus: options.adapter.capabilities.threadGoalSet.available
+      ? "not_requested"
+      : "unsupported",
+    readStatus: getMethodAvailable ? "not_requested" : "unsupported",
+    goalId: null,
+    threadId: options.threadId,
+    status: null,
+    tokenBudget: options.tokenBudget ?? null,
+    tokensUsed: null,
+    timeUsedSeconds: null,
+    failureSummary: null,
+  };
+}
+
+function codexThreadGoalReadMetadata(
+  existing: NexusAutomationCodexAppServerGoalMetadata,
+  value: unknown,
+): NexusAutomationCodexAppServerGoalMetadata {
+  const goal = codexThreadGoalRecord(value);
+  return {
+    ...existing,
+    readStatus: "read",
+    goalId: firstStringAtPath(goal, ["goalId", "goal_id", "id"]) ?? null,
+    threadId: firstStringAtPath(goal, ["threadId", "thread_id"]) ??
+      existing.threadId,
+    status: firstStringAtPath(goal, ["status", "state"]) ?? existing.status,
+    tokenBudget: optionalNumberAtPath(goal, ["tokenBudget", "token_budget"]),
+    tokensUsed: optionalNumberAtPath(goal, ["tokensUsed", "tokens_used"]),
+    timeUsedSeconds: optionalNumberAtPath(goal, [
+      "timeUsedSeconds",
+      "time_used_seconds",
+    ]),
+    failureSummary: null,
+  };
+}
+
+function codexThreadGoalRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const nestedGoal = value.goal;
+  return isRecord(nestedGoal) ? nestedGoal : value;
 }
 
 function codexThreadGoalSetParams(options: {
@@ -678,7 +794,7 @@ function isCodexThreadGoalUnavailableError(error: unknown): boolean {
   if (!(error instanceof CodexAppServerJsonRpcError)) {
     return false;
   }
-  if (error.method !== "thread/goal/set") {
+  if (!error.method.startsWith("thread/goal/")) {
     return false;
   }
   if (error.code === -32601) {
@@ -849,6 +965,7 @@ function codexAppServerMetadata(options: {
   ephemeral: boolean;
   cwd: string;
   failureSummary: string | null;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
 }): NexusAutomationCodexAppServerLaunchMetadata {
   return {
     provider: "codex-app-server",
@@ -867,6 +984,7 @@ function codexAppServerMetadata(options: {
     reasoning: options.profile.reasoning,
     resultFile: options.input.resultFile,
     failureSummary: options.failureSummary,
+    goal: options.goal,
   };
 }
 
@@ -918,6 +1036,23 @@ function firstStringAtPath(
     const candidate = valueAtPath(value, path);
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function optionalNumberAtPath(
+  value: Record<string, unknown>,
+  paths: readonly string[],
+): number | null {
+  for (const path of paths) {
+    const candidate = valueAtPath(value, path);
+    if (candidate === null) {
+      return null;
+    }
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
     }
   }
 
