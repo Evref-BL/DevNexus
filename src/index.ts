@@ -67,6 +67,7 @@ export * from "./nexusProjectHostingIntegrationFixture.js";
 export * from "./nexusProjectPluginRefresh.js";
 export * from "./nexusGreenMainPublication.js";
 export * from "./nexusInitiativeDeliveryPlan.js";
+export * from "./nexusInitiativeFinalizationPlan.js";
 export * from "./nexusInitiativeDeliveryPolicy.js";
 export * from "./nexusInitiativeDeliveryReport.js";
 export * from "./nexusMergeQueueReadiness.js";

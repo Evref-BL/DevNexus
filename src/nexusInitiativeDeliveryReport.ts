@@ -93,6 +93,7 @@ export interface NexusInitiativeDeliveryReportItem {
   sliceBranchPattern: string;
   finalReviewTarget: string;
   finalPublicationTarget: string;
+  finalPullRequest: boolean;
   ciTier: NexusCiTierDecision;
   providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
   status: NexusInitiativeDeliveryReportItemStatus;
@@ -232,6 +233,7 @@ function reportItem(options: {
     sliceBranchPattern: branchPlan.sliceBranchPattern,
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
+    finalPullRequest: initiative.finalPullRequest,
     ciTier,
     providerEvidence,
     status: classificationResult.status,

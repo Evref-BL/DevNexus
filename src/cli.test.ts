@@ -7089,6 +7089,8 @@ describe("dev-nexus cli", () => {
     );
     const textOutput = captureOutput();
     const jsonOutput = captureOutput();
+    const finalizationTextOutput = captureOutput();
+    const finalizationJsonOutput = captureOutput();
 
     await main(
       [
@@ -7121,6 +7123,37 @@ describe("dev-nexus cli", () => {
         now: () => "2026-05-22T10:00:00.000Z",
       },
     );
+    await main(
+      [
+        "publication",
+        "initiative-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      {
+        stdout: finalizationTextOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "initiative-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      {
+        stdout: finalizationJsonOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
 
     expect(textOutput.output()).toContain("DevNexus initiative delivery report.");
     expect(textOutput.output()).toContain("Next action: request_review");
@@ -7150,6 +7183,37 @@ describe("dev-nexus cli", () => {
               checksStatus: "success",
               reviewState: "waiting_for_approval",
               baseStatus: "current",
+            },
+          },
+        ],
+      },
+    });
+    expect(finalizationTextOutput.output()).toContain(
+      "DevNexus initiative finalization plan.",
+    );
+    expect(finalizationTextOutput.output()).toContain(
+      "primary: active=codex-goals review=ready_for_review publication=needs_review",
+    );
+    expect(JSON.parse(finalizationJsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "request_review",
+      summary: {
+        itemCount: 1,
+        safeToReviewCount: 1,
+        needsReviewCount: 1,
+      },
+      plan: {
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            reviewReadiness: {
+              status: "ready_for_review",
+              safeToReview: true,
+            },
+            publicationReadiness: {
+              status: "needs_review",
+              authorizedToMerge: false,
             },
           },
         ],

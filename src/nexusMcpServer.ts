@@ -109,6 +109,9 @@ import {
 import {
   buildNexusInitiativeDeliveryReport,
 } from "./nexusInitiativeDeliveryReport.js";
+import {
+  buildNexusInitiativeFinalizationPlan,
+} from "./nexusInitiativeFinalizationPlan.js";
 import type {
   NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
@@ -564,6 +567,25 @@ const tools: McpTool[] = [
   {
     name: "publication_initiative_report",
     description: "Build a read-only initiative delivery readiness report from configured policy and optional provider evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        initiativeId: { type: "string" },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+        fullMatrixBudgetAvailable: { type: "boolean" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "publication_initiative_finalization",
+    description: "Build a read-only initiative finalization plan that separates review readiness from publication authority.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1583,6 +1605,22 @@ export async function callDevNexusMcpTool(
         return toolResult({
           ok: true,
           report: buildNexusInitiativeDeliveryReport({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            initiativeId: optionalNullableString(args, "initiativeId", "arguments"),
+            providerEvidence: providerEvidenceFromArgs(args),
+            fullMatrixBudgetAvailable: optionalBoolean(
+              args,
+              "fullMatrixBudgetAvailable",
+              "arguments",
+            ),
+            now: context.now,
+          }),
+        });
+      case "publication_initiative_finalization":
+        return toolResult({
+          ok: true,
+          plan: buildNexusInitiativeFinalizationPlan({
             projectRoot: projectRootFromArgs(args),
             componentId: optionalString(args, "componentId", "arguments"),
             initiativeId: optionalNullableString(args, "initiativeId", "arguments"),

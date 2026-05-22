@@ -286,6 +286,7 @@ describe("DevNexus MCP server", () => {
       "target_report",
       "publication_initiative_plan",
       "publication_initiative_report",
+      "publication_initiative_finalization",
       "current_agent_adopt",
       "current_agent_record",
       "worktree_prepare",
@@ -479,6 +480,36 @@ describe("DevNexus MCP server", () => {
         { now: fixedClock("2026-05-22T21:10:00.000Z") },
       ),
     );
+    const finalization = toolJson(
+      await callDevNexusMcpTool(
+        "publication_initiative_finalization",
+        {
+          projectRoot,
+          componentId: "primary",
+          providerEvidence: [
+            {
+              provider: "github",
+              sourceKind: "pull_request",
+              reviewTarget: 243,
+              headBranch: "feat/codex-goals",
+              targetBranch: "main",
+              intendedCiTier: "remote_smoke",
+              reviewState: "waiting_for_approval",
+              mergeability: "mergeable",
+              branchPolicy: "blocked",
+              baseStatus: "current",
+              metadata: {
+                draft: true,
+              },
+              checks: [
+                { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              ],
+            },
+          ],
+        },
+        { now: fixedClock("2026-05-22T21:10:00.000Z") },
+      ),
+    );
 
     expect(plan).toMatchObject({
       ok: true,
@@ -518,6 +549,29 @@ describe("DevNexus MCP server", () => {
             providerEvidence: {
               branchPolicy: "blocked",
               draft: true,
+            },
+          },
+        ],
+      },
+    });
+    expect(finalization).toMatchObject({
+      ok: true,
+      plan: {
+        nextAction: "request_review",
+        summary: {
+          safeToReviewCount: 1,
+          needsReviewCount: 1,
+        },
+        items: [
+          {
+            componentId: "primary",
+            reviewReadiness: {
+              status: "ready_for_review",
+              safeToReview: true,
+            },
+            publicationReadiness: {
+              status: "needs_review",
+              authorizedToMerge: false,
             },
           },
         ],
