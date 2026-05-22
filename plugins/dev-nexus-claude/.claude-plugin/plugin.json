@@ -1,0 +1,21 @@
+{
+  "name": "dev-nexus-claude",
+  "displayName": "DevNexus",
+  "version": "0.1.0-alpha.0",
+  "description": "Local Claude Code plugin prototype for DevNexus workspaces.",
+  "author": {
+    "name": "Evref BL",
+    "url": "https://github.com/Evref-BL"
+  },
+  "homepage": "https://github.com/Evref-BL/DevNexus",
+  "repository": "https://github.com/Evref-BL/DevNexus",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude-code",
+    "dev-nexus",
+    "mcp",
+    "worktree"
+  ],
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json"
+}
