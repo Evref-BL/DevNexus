@@ -21,6 +21,9 @@ The active plugin directories are:
 Each plugin has its own manifest, MCP config, wrapper script, README, and
 agent-native skills. They share DevNexus source code and adapter behavior.
 
+Smoke-test scope and live-client gates are recorded in
+[`agent-client-plugin-smoke.md`](agent-client-plugin-smoke.md).
+
 ## Default MCP profile
 
 The default profile is read-mostly and setup-safe. It should help a user or
@@ -180,3 +183,7 @@ Before running a live smoke, record:
 
 No live client smoke, package install, workspace sharing, or marketplace
 publication is approved by this policy note.
+
+Use [`agent-client-plugin-smoke.md`](agent-client-plugin-smoke.md) for the
+current no-network smoke command, live-client checklist, and failure
+classification rules.

@@ -5,6 +5,8 @@ initiative. It is not a public marketplace package.
 
 Default exposure, runtime, distribution, and uninstall rules are documented in
 [`docs/dev/agent-client-plugins.md`](../../docs/dev/agent-client-plugins.md).
+No-network smoke and live-client gates are documented in
+[`docs/dev/agent-client-plugin-smoke.md`](../../docs/dev/agent-client-plugin-smoke.md).
 
 ## What It Contains
 
@@ -22,6 +24,7 @@ From the DevNexus source checkout:
 
 ```bash
 npm run build
+npm test -- src/nexusAgentClientPluginNoNetworkSmoke.test.ts
 python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/dev-nexus-codex
 node --check plugins/dev-nexus-codex/scripts/dev-nexus-codex-wrapper.mjs
 ```

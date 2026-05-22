@@ -5,6 +5,8 @@ initiative. It is not a marketplace package.
 
 Default exposure, runtime, distribution, and uninstall rules are documented in
 [`docs/dev/agent-client-plugins.md`](../../docs/dev/agent-client-plugins.md).
+No-network smoke and live-client gates are documented in
+[`docs/dev/agent-client-plugin-smoke.md`](../../docs/dev/agent-client-plugin-smoke.md).
 
 ## What It Contains
 
@@ -21,6 +23,7 @@ From the DevNexus source checkout:
 
 ```bash
 npm run build
+npm test -- src/nexusAgentClientPluginNoNetworkSmoke.test.ts
 node --check plugins/dev-nexus-claude/scripts/dev-nexus-claude-wrapper.mjs
 CLAUDE_PLUGIN_ROOT="$PWD/plugins/dev-nexus-claude" \
   CLAUDE_PLUGIN_DATA="$PWD/.tmp/claude-plugin-data" \

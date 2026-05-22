@@ -37,3 +37,5 @@ publication rules agents need before they edit code.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the
   current Codex and Claude plugin exposure, runtime, distribution, and uninstall
   decisions.
+- [Agent-client plugin smoke tests](dev/agent-client-plugin-smoke.md) records
+  the no-network smoke boundary and the gated live-client checklist.
