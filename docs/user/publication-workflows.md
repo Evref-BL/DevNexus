@@ -202,7 +202,7 @@ trains instead of replacing them.
           "enabled": true,
           "activeInitiativeId": "codex-goals",
           "defaultTopology": "hybrid",
-          "allowedTopologies": ["direct", "stacked", "integration", "hybrid"],
+          "allowedTopologies": ["direct", "stacked", "integration_branch", "hybrid"],
           "branchNaming": {
             "defaultIntentPrefix": "feat",
             "allowedIntentPrefixes": [
@@ -218,11 +218,16 @@ trains instead of replacing them.
             "sliceBranchPattern": "{intent}/{initiative}/{slice}"
           },
           "review": {
-            "mode": "slice_pull_request",
-            "finalPullRequest": true
+            "mode": "slice_pr",
+            "finalPullRequest": true,
+            "finalPullRequestCreation": "at_review_gate"
           },
           "provider": {
-            "noise": "quiet"
+            "noise": "status_only"
+          },
+          "branchPublication": {
+            "strategy": "publication_remote_then_fallback",
+            "fallbackRemote": "fork"
           }
         },
         "selector": {
@@ -244,6 +249,19 @@ Initiative delivery uses three read-only surfaces:
   authority. A draft pull request can be safe to review while still blocked for
   final publication. A green, approved pull request still stops at the human
   publication gate unless policy explicitly grants more authority.
+
+`finalPullRequestCreation` controls when the final initiative pull request is
+opened. The default, `at_review_gate`, avoids creating a long-lived PR while the
+initiative branch is still accumulating commits. Use `at_initiative_start` only
+when the team accepts repeated PR CI on every branch update, and `manual_only`
+when DevNexus should report readiness without recommending provider mutation.
+
+`branchPublication` controls where initiative and slice branches are expected to
+be pushed. `publication_remote` uses the component publication remote.
+`publication_remote_then_fallback` records a configured fallback remote, such as
+a fork, for machines or actors that cannot push to the upstream repository.
+`fallback_remote` always targets the fallback. `manual_only` reports the branch
+shape without selecting a push remote.
 
 For GitHub, keep routine provider output quiet. Prefer PR bodies, checks,
 labels, and DevNexus reports for ordinary state. Comments should be reserved
@@ -305,10 +323,11 @@ dev-nexus publication initiative-report <workspace-root> --component api --evide
 ```
 
 The report is read-only. It classifies the initiative review surface as needing
-provider evidence, branch update, conflict resolution, branch-policy resolution,
-check follow-up, review, or final publication readiness. Saved provider evidence
-can include pull-request review state and base freshness, so an out-of-date but
-otherwise mergeable GitHub pull request is flagged before publication.
+final pull-request creation, provider evidence, branch update, conflict
+resolution, branch-policy resolution, check follow-up, review, or final
+publication readiness. Saved provider evidence can include pull-request review
+state and base freshness, so an out-of-date but otherwise mergeable GitHub pull
+request is flagged before publication.
 
 Review finalization readiness before undrafting, requesting review, or merging:
 

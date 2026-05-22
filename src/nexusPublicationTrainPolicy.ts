@@ -131,6 +131,7 @@ export function summarizeNexusPublicationTrainPolicy(options: {
           fallbackScopeId: activeVersionId,
           unscopedName: train.branchNaming.unscopedName,
           targetBranch,
+          publicationRemote: publication.remote ?? null,
         })
       : null,
     selector: {

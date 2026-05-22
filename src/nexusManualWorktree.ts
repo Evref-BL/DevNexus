@@ -661,7 +661,9 @@ function resolveManualWorktreeInitiativeDelivery(options: {
       parentBranch: null,
       finalPublicationTarget: initiative.branchPlan.finalPublicationTarget,
       reviewMode: initiative.reviewMode,
+      finalPullRequestCreation: initiative.finalPullRequestCreation,
       providerNoise: initiative.providerNoise,
+      branchPublication: initiative.branchPublication,
       hitlGates,
     },
   };

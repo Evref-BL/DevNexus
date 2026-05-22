@@ -27,6 +27,10 @@ function initiativeConfig(
       ...defaultNexusInitiativeDeliveryConfig.provider,
       ...patch.provider,
     },
+    branchPublication: {
+      ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+      ...patch.branchPublication,
+    },
   };
 }
 
@@ -41,6 +45,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: "v-next",
       unscopedName: "manual",
       targetBranch: "main",
+      publicationRemote: "app",
     });
 
     expect(summary).toMatchObject({
@@ -52,7 +57,15 @@ describe("initiative delivery policy", () => {
       defaultTopology: "hybrid",
       reviewMode: "slice_pr",
       finalPullRequest: true,
+      finalPullRequestCreation: "at_review_gate",
       providerNoise: "status_only",
+      branchPublication: {
+        strategy: "publication_remote",
+        publicationRemote: "app",
+        fallbackRemote: null,
+        selectedRemote: "app",
+        requiresFallbackApproval: false,
+      },
       branchPlan: {
         topology: "hybrid",
         targetBranch: "main",
@@ -84,6 +97,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
+      publicationRemote: "app",
     });
 
     expect(summary.branchPlan).toMatchObject({
@@ -107,6 +121,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: "0.2.0",
       unscopedName: "manual",
       targetBranch: "main",
+      publicationRemote: "app",
     });
 
     expect(summary.activeScopeId).toBe("0.2.0");
@@ -124,6 +139,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
+      publicationRemote: "app",
     });
 
     expect(summary.activeScopeId).toBe("manual");
@@ -142,5 +158,32 @@ describe("initiative delivery policy", () => {
         slice: "target-projection",
       }),
     ).toBe("feat/codex-goals/target-projection");
+  });
+
+  it("plans configured fallback remotes for fork or temp branch publication", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "fork-review",
+        defaultTopology: "hybrid",
+        branchPublication: {
+          strategy: "publication_remote_then_fallback",
+          fallbackRemote: "fork",
+        },
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "app",
+    });
+
+    expect(summary.branchPublication).toEqual({
+      strategy: "publication_remote_then_fallback",
+      publicationRemote: "app",
+      fallbackRemote: "fork",
+      selectedRemote: "app",
+      requiresFallbackApproval: true,
+    });
+    expect(summary.warnings).toEqual([]);
   });
 });

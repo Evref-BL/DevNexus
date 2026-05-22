@@ -89,6 +89,7 @@ interface ParsedPublicationBranchPushCommand {
   repositoryPath?: string;
   branch: string;
   targetBranch?: string | null;
+  initiativeId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   dryRun?: boolean;
@@ -192,6 +193,7 @@ export async function handlePublicationCommand(
       repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
       branch: parsed.branch,
       targetBranch: parsed.targetBranch,
+      initiativeId: parsed.initiativeId,
       forceWithLease: parsed.forceWithLease,
       forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
       baseEnv: dependencies.env ?? process.env,
@@ -547,6 +549,9 @@ function parsePublicationBranchPushCommand(
         break;
       case "--target-branch":
         parsed.targetBranch = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
         break;
       case "--force-with-lease":
         parsed.forceWithLease = true;
@@ -1277,6 +1282,7 @@ function printPublicationBranchPushResult(
     repository: result.repository,
     branch: result.branch,
     targetBranch: result.targetBranch,
+    initiativeDelivery: result.initiativeDelivery,
     forceWithLease: result.forceWithLease,
     forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
     credential: result.credential,
@@ -1302,6 +1308,13 @@ function printPublicationBranchPushResult(
   writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branch}`);
+  if (result.initiativeDelivery) {
+    writeLine(stdout, `  Initiative: ${result.initiativeDelivery.initiativeId}`);
+    writeLine(
+      stdout,
+      `  Initiative remote policy: ${result.initiativeDelivery.branchPublication.strategy} -> ${result.initiativeDelivery.branchPublication.selectedRemote}`,
+    );
+  }
   if (result.targetBranch) {
     writeLine(stdout, `  Target branch: ${result.targetBranch}`);
   }
@@ -1641,7 +1654,11 @@ function printPublicationInitiativePlan(
     );
     writeLine(
       stdout,
-      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} providerNoise=${initiative.providerNoise}`,
+      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} finalPRCreation=${initiative.finalPullRequestCreation} providerNoise=${initiative.providerNoise}`,
+    );
+    writeLine(
+      stdout,
+      `    branchPublication=${initiative.branchPublication.strategy} remote=${initiative.branchPublication.selectedRemote ?? "manual"} fallback=${initiative.branchPublication.fallbackRemote ?? "none"}`,
     );
     if (branchPlan.requiresIntegrationBranchApproval) {
       writeLine(stdout, "    HITL: integration branch approval required");

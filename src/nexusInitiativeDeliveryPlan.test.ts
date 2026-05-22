@@ -61,6 +61,14 @@ describe("initiative delivery plan", () => {
               sliceBranchPattern: "feat/codex-goals/{slice}",
               finalPublicationTarget: "main",
             },
+            finalPullRequestCreation: "at_review_gate",
+            branchPublication: {
+              strategy: "publication_remote_then_fallback",
+              publicationRemote: "origin",
+              fallbackRemote: "fork",
+              selectedRemote: "origin",
+              requiresFallbackApproval: true,
+            },
           },
         },
       ],
@@ -118,6 +126,10 @@ function projectConfig(): NexusProjectConfig {
             enabled: true,
             activeInitiativeId: "codex-goals",
             defaultTopology: "hybrid",
+            branchPublication: {
+              strategy: "publication_remote_then_fallback",
+              fallbackRemote: "fork",
+            },
             branchNaming: {
               ...defaultNexusInitiativeDeliveryConfig.branchNaming,
               defaultIntentPrefix: "feat",
