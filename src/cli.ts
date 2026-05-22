@@ -1071,8 +1071,11 @@ async function handleDashboardCommand(
       requireProjectRoot: false,
     });
     const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
+    const currentProjectRoot =
+      parsed.projectRoot ?? discoverDashboardCurrentProjectRoot(process.cwd());
     const handle = await starter({
       ...(parsed.projectRoot ? { projectRoot: parsed.projectRoot } : {}),
+      ...(currentProjectRoot ? { currentProjectRoot } : {}),
       homePath: parsed.homePath,
       eligibleWorkMode: parsed.mode,
       host: parsed.host,
@@ -5688,6 +5691,20 @@ function parseDashboardCommand(
   }
 
   return parsed;
+}
+
+function discoverDashboardCurrentProjectRoot(startPath: string): string | null {
+  let current = path.resolve(startPath);
+  while (true) {
+    if (fs.existsSync(path.join(current, "dev-nexus.project.json"))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
 }
 
 function parseAutomationAgentProfilesCommand(

@@ -31,6 +31,7 @@ import type { NexusEligibleWorkMode } from "./nexusEligibleWorkSummary.js";
 
 export interface StartNexusDashboardServerOptions {
   projectRoot?: string;
+  currentProjectRoot?: string | null;
   host?: string;
   port?: number;
   homePath?: string;
@@ -120,6 +121,9 @@ export async function startNexusDashboardServer(
   const port = options.port ?? 0;
   const snapshotOptions: BuildNexusDashboardHostSnapshotOptions = {
     ...(projectRoot ? { projectRoot } : {}),
+    ...(options.currentProjectRoot !== undefined
+      ? { currentProjectRoot: options.currentProjectRoot }
+      : {}),
     homePath: options.homePath,
     eligibleWorkMode: options.eligibleWorkMode,
     gitRunner: options.gitRunner,

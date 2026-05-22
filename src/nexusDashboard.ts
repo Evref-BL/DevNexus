@@ -644,6 +644,7 @@ export interface BuildNexusDashboardHostSnapshotOptions
     | "now"
   > {
   projectRoot?: string;
+  currentProjectRoot?: string | null;
 }
 
 export interface NexusDashboardHostWorkspaceRecord {
@@ -849,9 +850,16 @@ export async function buildNexusDashboardHostSnapshot(
   const home = capture(() =>
     loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
   );
-  const currentProjectRoot = options.projectRoot
-    ? path.resolve(nonEmptyString(options.projectRoot, "projectRoot"))
-    : null;
+  const currentProjectRoot =
+    options.currentProjectRoot !== undefined
+      ? options.currentProjectRoot
+        ? path.resolve(
+            nonEmptyString(options.currentProjectRoot, "currentProjectRoot"),
+          )
+        : null
+      : options.projectRoot
+        ? path.resolve(nonEmptyString(options.projectRoot, "projectRoot"))
+        : null;
   const workspaceReferences = dashboardHostWorkspaceReferences(
     home.value,
     currentProjectRoot,

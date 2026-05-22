@@ -37,6 +37,7 @@ import {
 
 const tempDirs: string[] = [];
 const originalDevNexusHome = process.env.DEV_NEXUS_HOME;
+const originalCwd = process.cwd();
 
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -398,6 +399,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 afterEach(() => {
+  process.chdir(originalCwd);
   for (const tempDir of tempDirs.splice(0)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -722,8 +724,10 @@ describe("dev-nexus cli", () => {
   });
 
   it("starts the dashboard server in host scope without a workspace root", async () => {
+    process.chdir(makeTempDir("dev-nexus-cli-dashboard-cwd-"));
     const output = captureOutput();
     let receivedProjectRoot: string | null = "unexpected";
+    let receivedCurrentProjectRoot: string | null = "unexpected";
     let waited = false;
 
     await expect(
@@ -741,6 +745,7 @@ describe("dev-nexus cli", () => {
           stdout: output.writer,
           dashboardServerStarter: async (options) => {
             receivedProjectRoot = options.projectRoot ?? null;
+            receivedCurrentProjectRoot = options.currentProjectRoot ?? null;
             return {
               projectRoot: null,
               host: options.host ?? "127.0.0.1",
@@ -758,6 +763,7 @@ describe("dev-nexus cli", () => {
     ).resolves.toBe(0);
 
     expect(receivedProjectRoot).toBeNull();
+    expect(receivedCurrentProjectRoot).toBeNull();
     expect(waited).toBe(true);
     expect(JSON.parse(output.output())).toMatchObject({
       ok: true,
@@ -766,6 +772,65 @@ describe("dev-nexus cli", () => {
         scope: "host",
         port: 4242,
         url: "http://127.0.0.1:4242/",
+      },
+    });
+  });
+
+  it("discovers the current workspace from cwd while serving the host cockpit", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-dashboard-current-");
+    const nestedWorktreePath = path.join(
+      projectRoot,
+      "worktrees",
+      "dev-nexus",
+      "feature-worktree",
+    );
+    fs.mkdirSync(nestedWorktreePath, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      id: "current-host-project",
+      name: "Current Host Project",
+    }));
+    process.chdir(nestedWorktreePath);
+    const output = captureOutput();
+    let receivedProjectRoot: string | null = "unexpected";
+    let receivedCurrentProjectRoot: string | null = "unexpected";
+
+    await expect(
+      main(
+        [
+          "dashboard",
+          "serve",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "0",
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          dashboardServerStarter: async (options) => {
+            receivedProjectRoot = options.projectRoot ?? null;
+            receivedCurrentProjectRoot = options.currentProjectRoot ?? null;
+            return {
+              projectRoot: null,
+              host: options.host ?? "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              server: {} as NexusDashboardServerHandle["server"],
+              close: async () => {},
+            };
+          },
+          dashboardServerWaiter: async () => {},
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(receivedProjectRoot).toBeNull();
+    expect(receivedCurrentProjectRoot).toBe(fs.realpathSync(projectRoot));
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      dashboard: {
+        projectRoot: null,
+        scope: "host",
       },
     });
   });
