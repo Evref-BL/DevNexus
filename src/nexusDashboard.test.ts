@@ -1549,6 +1549,61 @@ describe("nexus dashboard", () => {
     expect(pluginHtml).not.toContain("1 capabilities");
   });
 
+  it("does not badge registered workspace cards and highlights the current workspace", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const hostHtml = hooks.renderHostOverview({
+      partial: false,
+      workspaceCount: 2,
+      needsAttentionCount: 0,
+      workspaces: [
+        {
+          id: "registered-workspace",
+          name: "Registered Workspace",
+          root: "/tmp/registered-workspace",
+          registered: true,
+          current: false,
+          loading: false,
+          tone: "good",
+          summary: "Registered workspace is clear.",
+          componentCount: 2,
+          needsDecisionCount: 0,
+          threadCount: 0,
+          pluginCount: 1,
+          blockerCount: 0,
+          automationStatus: "idle",
+          dirtyComponentCount: 0,
+          eligibleWorkCount: 0,
+        },
+        {
+          id: "current-workspace",
+          name: "Current Workspace",
+          root: "/tmp/current-workspace",
+          registered: true,
+          current: true,
+          loading: false,
+          tone: "active",
+          summary: "Current workspace is selected.",
+          componentCount: 1,
+          needsDecisionCount: 1,
+          threadCount: 1,
+          pluginCount: 1,
+          blockerCount: 0,
+          automationStatus: "idle",
+          dirtyComponentCount: 0,
+          eligibleWorkCount: 0,
+        },
+      ],
+    }, null, "current-workspace", { hostMode: false });
+
+    expect(hostHtml).not.toContain(">registered<");
+    expect(hostHtml).toContain("dn-workspace-card current-workspace");
+    expect(hostHtml).toContain("dn-workspace-current-badge");
+    expect(hostHtml).toContain(">current<");
+    expect(hostHtml).not.toContain("decision-rescue\">registered");
+    expect(hostHtml).not.toContain("decision-continue\">registered");
+  });
+
   it("makes HITL threads selectable with the same chat actions as the queue", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
