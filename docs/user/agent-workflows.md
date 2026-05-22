@@ -15,6 +15,15 @@ Agents should not rely on the diagrams being loaded automatically. Skills such
 as `take-the-lead` include compact routing rules and can use the skill-chain
 page as supporting context when the workspace docs are available.
 
+When `take-the-lead` is active, the agent should treat the chains as routing
+rules: choose the current chain, invoke the next skill, and evaluate
+`parallel-work-dispatch` when independent domains appear. For substantial led
+work in a DevNexus workspace, use this page's companion
+[Skill Chains](skill-chains.md) reference as the routing map when it is
+available. A user request to lead the work is enough authorization to recommend
+subagents, subject to workspace policy, tool availability, cost,
+provider-mutation, credential, and runtime approval gates.
+
 ## MCP Server
 
 Start the generic stdio Model Context Protocol (MCP) server with:
@@ -124,6 +133,21 @@ Before editing a Git checkout, run a freshness preflight:
 - Fast-forward clean branches with an upstream.
 - Record a blocker when freshness cannot be checked.
 
+For Git-backed initiatives, choose the delivery topology before preparing the
+first worktree. The words "feature", "initiative", "bugfix campaign", and
+"release train" do not by themselves choose a branch shape.
+
+- Use direct slice topology by default when slices can land independently on
+  the final integration branch.
+- Use stacked slice topology when later slices depend on earlier unmerged
+  slices.
+- Use an initiative integration branch only after human-in-the-loop approval
+  when partial publication would leave the target branch incoherent or unsafe.
+- Use a throw-away integration branch only for compatibility rehearsal; do not
+  base new work on it.
+- Use the workspace release policy for version, train, candidate, and merge
+  queue decisions.
+
 Prepare a component-scoped worktree when implementation should be isolated:
 
 ```bash
@@ -220,8 +244,12 @@ The workflow uses a small checkout vocabulary:
 - Worker worktree: an isolated branch and filesystem path for one bounded work
   item, component, or workspace-meta surface. Run edits, verification, and Git
   commands for that work from this path.
-- Integration branch: a temporary branch used to serialize or batch ready
-  worker branches before publishing to a target branch.
+- Initiative integration branch: an approved long-lived branch where slices
+  accumulate before final publication because partial publication would be
+  incoherent or unsafe.
+- Throw-away integration branch: a temporary branch used to rehearse conflicts,
+  compatibility, or release readiness. It is not a base for new work unless a
+  human explicitly promotes it.
 - Rescue branch: a preservation branch for useful, ambiguous, or abandoned work
   discovered during status checks or cleanup. Creating one preserves evidence;
   it does not by itself prove that cleanup is safe.

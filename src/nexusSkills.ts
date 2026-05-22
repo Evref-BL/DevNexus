@@ -578,22 +578,26 @@ agent leads the plan; the user decides scope, risk, and approval gates.
    request covers independent objectives, propose separate plans before
    execution.
 3. Map the changed surfaces before writing tasks. Name the owning component,
-   files or artifacts, tracker anchor, expected worktree, and command working
-   directory where those are knowable.
+   files or artifacts, tracker anchor, expected worktree, command working
+   directory, and selected delivery topology where those are knowable.
 4. Split the work into bounded slices. Each slice needs one owner, one scope,
    dependencies, acceptance criteria, verification commands, and handoff notes.
-5. Prefer Test-Driven Development (TDD) for behavior changes that can be tested
+5. For Git-backed plans, choose the delivery topology before the first branch:
+   direct slice, stacked slice, initiative integration branch, throw-away
+   integration rehearsal, or release/version policy. Record the base branch,
+   review target, and publication target for each slice.
+6. Prefer Test-Driven Development (TDD) for behavior changes that can be tested
    cleanly. Include the focused failing test target, minimal implementation
    target, and nearest broader check.
-6. Be concrete enough for another agent to execute without guessing: exact
+7. Be concrete enough for another agent to execute without guessing: exact
    paths, exact commands, expected outcomes, and explicit blockers. Do not use
    placeholders such as TBD, TODO, "similar to above", or "add tests".
-7. Mark human-in-the-loop gates for publication, destructive cleanup, external
+8. Mark human-in-the-loop gates for publication, destructive cleanup, external
    provider writes, product decisions, cost, security, or live runtime actions.
-8. Save a durable plan only when it needs to survive the chat. In a DevNexus
+9. Save a durable plan only when it needs to survive the chat. In a DevNexus
    workspace, prefer the configured tracker, issue comment, PRD, initiative
    notes, or target-cycle facts over an ad hoc file.
-9. End with the recommended execution mode: subagents for independent disjoint
+10. End with the recommended execution mode: subagents for independent disjoint
    slices, inline execution for tightly coupled work, or blocked with the
    smallest decision needed.
 
@@ -602,7 +606,7 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 Use this shape when writing a saved implementation plan:
 
 1. Goal and done criteria.
-2. Integration surface and tracker anchor.
+2. Integration surface, delivery topology, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
 4. Task slices with files, acceptance criteria, steps, verification, and
    handoff.
@@ -656,9 +660,13 @@ skills, planning documents, or another durable project surface.
    worktree for source changes and a workspace/meta worktree for files such as
    \`dev-nexus.project.json\`, \`.dev-nexus/**\`, projected skills,
    \`PLAN.md\`, \`CONTEXT.md\`, target state, or workspace docs.
-5. Choose a branch name that matches the initiative or tracker item and the
-   workspace branch policy. Keep one long-lived initiative branch when slices
-   should accumulate before final publication.
+5. Use the selected delivery topology to choose the branch name, base ref, and
+   review target. Direct slices target the final integration branch;
+   stacked slices target the branch below them; initiative slices target the
+   approved initiative integration branch; throw-away integration branches are
+   only for compatibility rehearsal and must not become the base for new work.
+   If Git-backed initiative work has no selected topology, recommend one and
+   get the needed human-in-the-loop decision before creating branches.
 6. Let configured setup do its job. Prefer projected dependencies, generated
    context bundles, and skill projection over ad hoc package installation.
 7. Run the smallest useful baseline verification for the planned work. If the
@@ -712,8 +720,11 @@ handoff, publication, or cleanup.
 4. Read the component publication policy and current authority. Do not silently
    fall back to a human account when policy expects an automation actor.
 5. If publication is allowed, use the configured remote, credential profile,
-   target branch, and review path. For green-main policy, prefer branch or pull
-   request validation and required checks before merge.
+   topology-selected target branch, and review path. For green-main policy,
+   prefer branch or pull request validation and required checks before merge.
+   A slice branch in an initiative integration branch topology targets the
+   initiative branch; final publication happens from the initiative branch only
+   after the accumulated work is coherent, reviewed, verified, and approved.
 6. If publication authority is blocked, leave a human handoff with branch name,
    commit ids, verification commands and outcomes, target branch, and the exact
    PR or review action needed.
@@ -731,6 +742,7 @@ handoff, publication, or cleanup.
 
 - Branch and worktree path.
 - Tracker anchor and initiative surface.
+- Delivery topology, target branch, and review path.
 - Commit ids and changed areas.
 - Verification commands with pass, fail, or not-run status.
 - Publication decision: direct integration, review handoff, local only,
@@ -743,6 +755,8 @@ handoff, publication, or cleanup.
 - Do not merge, push, open a pull request, delete a branch, or remove a
   worktree without the required policy and approval state.
 - Do not hide provider-auth problems by using the wrong account.
+- Do not retarget a slice branch around the selected delivery topology without
+  approval and a durable record of the reason.
 - Do not clean up worktrees that another chat or host may still own.
 
 ## Attribution
@@ -771,13 +785,14 @@ accumulate on one initiative or delivery surface.
 ## Workflow
 
 1. Load the plan and its durable context: tracker anchor, initiative notes,
-   Product Requirements Document (PRD), design record, current branch, and
-   relevant workspace state.
+   Product Requirements Document (PRD), design record, selected delivery
+   topology, current branch, and relevant workspace state.
 2. Review the plan before acting. Stop and raise concerns when tasks are
    ambiguous, unsafe, out of date, missing verification, or split across the
    wrong component, artifact, or publication surface.
-3. Confirm the current checkout is the intended owned surface. If not, use the
-   worktree preparation workflow before editing.
+3. Confirm the current checkout, branch base, and review target match the
+   intended owned surface and delivery topology. If not, use the worktree
+   preparation workflow before editing.
 4. Execute one slice at a time. Keep status current, follow referenced companion
    skills, and preserve unrelated dirty changes.
 5. Run the verification named by the slice before marking it complete. If the
@@ -796,6 +811,8 @@ accumulate on one initiative or delivery surface.
 - Do not treat a plan as approval for destructive cleanup, live runtime actions,
   provider writes, cost changes, or publication unless it says so explicitly.
 - Do not split one initiative into many unrelated final publications.
+- Do not execute a Git-backed initiative plan that lacks a delivery topology;
+  recommend one and get the needed decision first.
 - Do not continue after verification fails unless the next step is diagnosis.
 
 ## Attribution
@@ -812,7 +829,7 @@ component ownership, worktree policy, tracker records, and publication gates.
 const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   "parallel-work-dispatch",
   "parallel-work-dispatch",
-  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use only when independent slices can be delegated safely and the user has asked for subagents or parallel agent work.",
+  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use when independent slices can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
   [
     "skills/dispatching-parallel-agents/SKILL.md",
     "skills/subagent-driven-development/SKILL.md",
@@ -820,39 +837,49 @@ const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   `
 # Parallel Work Dispatch
 
-Use this skill when the user has explicitly asked for subagents or parallel
-agent work, and the work can be split into independent domains.
+Use this skill when independent work can be delegated safely and the user has
+asked for subagents, parallel agent work, or agent-led coordination through
+\`take-the-lead\`. Under \`take-the-lead\`, the coordinator should decide when
+parallel work is useful instead of waiting for the user to name subagents.
 
 ## Workflow
 
 1. Identify the independent domains. Good boundaries are separate components,
    disjoint files, separate tracker items, unrelated failures, or independent
    artifacts with no shared mutable state.
-2. Keep the coordinator local to the initiative surface. The coordinator owns
-   the plan, branch or artifact set, tracker anchor, integration order, and
-   final verification.
-3. Assign each worker one bounded task with an explicit write scope, expected
+2. Check delegation fit: enough context to brief a worker, no likely shared-file
+   collisions, useful sidecar work while the coordinator continues, available
+   agent or subagent tooling, and a clear review and integration path.
+3. Keep the coordinator local to the initiative surface. The coordinator owns
+   the plan, delivery topology, branch or artifact set, tracker anchor,
+   integration order, and final verification.
+4. Assign each worker one bounded task with an explicit write scope, expected
    output, verification command, and handoff format. Tell workers they are not
    alone in the codebase and must not revert edits made by others.
-4. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
+5. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
    paths for mutating work. Avoid parallel edits to the same file unless one
    agent is explicitly the integrator.
-5. Dispatch only sidecar work that can progress while the coordinator continues
+6. Dispatch only sidecar work that can progress while the coordinator continues
    useful non-overlapping work. Keep immediate blockers local when waiting would
    stall the critical path.
-6. Review returned work before integration: spec fit first, then implementation
+7. Review returned work before integration: spec fit first, then implementation
    quality, then conflict risk. Ask the worker to fix its own slice when review
    finds issues.
-7. Integrate deliberately. Use DevNexus coordination status or integration
+8. Integrate deliberately. Use DevNexus coordination status or integration
    planning when multiple branches or handoffs exist, then run focused and
    broader verification from the integration surface.
-8. Record the result in the tracker, target-cycle facts, coordination handoff,
+9. Record the result in the tracker, target-cycle facts, coordination handoff,
    or pull request so the parallel work does not vanish into chat history.
 
 ## Guardrails
 
 - Do not dispatch subagents unless the user explicitly requested subagents,
-  delegation, or parallel agent work.
+  delegation, parallel agent work, or agent-led coordination through
+  \`take-the-lead\`.
+- Do not dispatch subagents for small direct tasks where coordination overhead
+  exceeds useful parallel progress.
+- Do not launch external workers when tool availability, workspace policy, cost,
+  credentials, or provider writes require human-in-the-loop approval.
 - Do not delegate urgent blocking work when the coordinator's next action
   depends on the result.
 - Do not give a worker the whole chat transcript when a focused prompt with
@@ -1225,15 +1252,18 @@ one integration surface, and explicit done criteria. It is the outer frame for
 coherent long-running work, not a separate "take the lead" persona or a
 project-management ceremony. The surface may be a Git branch, pull request,
 artifact directory, document set, tracker epic, release train, coordination
-record, or another project-owned place where slices accumulate.
+record, or another project-owned place where slices accumulate. For Git-backed
+work, the integration surface is the final destination and review path; the
+delivery topology says how slice branches reach it.
 
 ## Workflow
 
 1. Establish the frame: objective, reason, owner or coordinator, tracker
    anchor, expected outputs, constraints, non-goals, and done criteria.
-2. Choose the integration surface before the first slice. For Git-backed work,
-   use one branch or review surface; for non-code work, choose the document set,
-   artifact directory, tracker, release train, or coordination record.
+2. Choose the integration surface and delivery topology before the first slice.
+   For Git-backed work, choose how branches and reviews flow; for non-code work,
+   choose the document set, artifact directory, tracker, release train, or
+   coordination record.
 3. Inventory current state: prior decisions, active branches or artifacts,
    verification already run, blockers, and unrelated work that must be
    preserved.
@@ -1257,6 +1287,27 @@ record, or another project-owned place where slices accumulate.
 10. Close with a compact handoff: what shipped, what was verified, what remains,
     and where the durable record lives.
 
+## Git Delivery Topology
+
+Use the smallest topology that lets slices stay reviewable without publishing
+an incoherent partial state.
+
+- Direct slice topology is the default for independent slices: short-lived
+  slice branches or pull requests target the final integration branch, while the
+  initiative record groups the work.
+- Stacked slice topology fits dependent slices: each branch or review targets
+  the branch below it, then lands bottom-up or retargets as dependencies land.
+- Initiative integration branch topology is for broad work that must accumulate
+  before final publication. It requires explicit human-in-the-loop approval;
+  slice branches target the initiative branch, and final publication happens
+  from that branch only after coherent review and verification.
+- Throw-away integration branch topology is only for compatibility rehearsal.
+  Do not base new work on it or treat it as a publication source unless the
+  user explicitly promotes it.
+- Release or version topology belongs to the workspace release policy. Do not
+  use "release train" language as a shortcut for batching unrelated work into
+  one branch.
+
 ## Companion Skills
 
 Use this as the outer frame. Use design, planning, worktree, execution, review,
@@ -1267,6 +1318,9 @@ verification, diagnosis, and handoff skills for the slices themselves.
 - Keep the initiative generic; do not force all work into a programming model.
 - Prefer one final publication path over many unrelated final publications,
   unless the initiative explicitly owns multiple coordinated surfaces.
+- Do not assume a feature, bugfix campaign, or initiative requires one
+  long-lived Git branch; recommend the delivery topology and get approval when
+  selecting the initiative integration branch topology.
 - Do not let the initiative hide unrelated work, unresolved blockers, or
   unreviewed risky changes.
 - Do not turn a small direct fix into ceremony.
@@ -1294,15 +1348,32 @@ constraints, approvals, and final direction.
    make, and include your recommendation when you have one.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
-4. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+4. Route through the relevant skill chain and invoke the next skill in that
+   chain. In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the
+   routing map for substantial led work when it is available. For work large
+   enough to plan or slice, check whether \`parallel-work-dispatch\` would
+   accelerate safe independent progress.
+5. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
-5. Track commitments, blockers, verification, and the next action so the user
+6. Track commitments, blockers, verification, and the next action so the user
    can decide from state, not from memory.
-6. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+7. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
    credentials, external provider writes, publication, destructive cleanup, or
    live runtime gates.
-7. Close loops. When a decision is made, record what changed and continue from
+8. Close loops. When a decision is made, record what changed and continue from
    that decision instead of relitigating it.
+9. End every substantive response with a push toward the next step: the
+   recommended next action, the human-in-the-loop unblock needed, a short set
+   of direction choices with your default, or a ready-to-run prompt the user
+   can approve.
+
+## Response Closeout
+
+Lead by making the next move obvious. If you are ready to act, say the action
+you will take next. If approval is needed, ask for the smallest explicit
+approval that unblocks progress. If there are real options, recommend one and
+state the tradeoff. If the user can continue you with a prompt, provide the
+prompt instead of ending on a passive status summary.
 
 ## Workflow Routing
 
@@ -1310,26 +1381,52 @@ When leading multi-step work, choose the current skill chain before taking the
 next action. Say the chain when it matters, then invoke the next skill in that
 chain.
 
+For Git-backed initiative work, choose the Git delivery topology before
+preparing a worktree. Direct slice topology is the default when slices can land
+independently; stacked topology fits dependent slices; initiative integration
+branch topology needs explicit approval; throw-away integration branches are
+for rehearsal only.
+
+Treat \`parallel-work-dispatch\` as an optional branch in every substantial
+chain, not only in version work. Evaluate it after triage, design, planning,
+or issue slicing exposes independent domains. Use it when work can be split
+by component, disjoint files, separate tracker items, independent failures, or
+separate artifacts; skip it when the task is small, tightly coupled, blocked by
+one decision, or would force workers into the same mutable files.
+
 - Unclear goal or scope: \`triage\` or \`design-with-user\`.
 - Existing plan that needs pressure: \`grill-me\`; use \`grill-with-docs\` when
   code, glossary terms, docs, or Architecture Decision Records should decide.
-- Feature work: \`write-implementation-plan\` -> \`prepare-dev-nexus-worktree\`
-  -> \`tdd\` -> \`verify-before-completion\` -> \`request-work-review\` ->
+- Feature work: delivery topology decision -> \`write-implementation-plan\`
+  -> \`prepare-dev-nexus-worktree\` -> \`tdd\` ->
+  \`verify-before-completion\` -> \`request-work-review\` ->
   \`finish-dev-nexus-branch\`.
 - Bugfix work: \`prepare-dev-nexus-worktree\` -> \`diagnose\` -> \`tdd\` ->
   \`verify-before-completion\` -> review and finish.
 - Documentation work: \`documentation\` -> \`humanizer\` ->
   \`verify-before-completion\` -> review and finish.
 - Architecture work: \`zoom-out\` -> \`architecture-review\` ->
-  \`architecture-deepening\` -> planning, implementation, verification, and
-  review.
+  \`architecture-deepening\` -> delivery topology decision -> planning,
+  implementation, verification, and review.
 - Version or release work: \`initiative-workflow\` -> \`to-prd\` ->
-  \`to-issues\` -> \`write-implementation-plan\`, then execute and verify each
-  slice before final approval.
+  \`to-issues\` -> delivery topology decision ->
+  \`write-implementation-plan\`, then execute and verify each slice before
+  final approval.
 
-In a DevNexus workspace, consult \`docs/user/skill-chains.md\` for the full
-workflow-composition diagrams when the route is unclear or the work spans a
-feature, bugfix, documentation, architecture, or version flow.
+## Delegation Decision
+
+Under \`take-the-lead\`, the user's request to lead authorizes the agent to
+recommend and use subagents when the workspace supports them and the work is
+actually parallelizable. Do not wait for the user to say "use subagents" again.
+Before dispatching, confirm the split, write scopes, verification, integration
+path, and any human-in-the-loop gate for cost, provider mutation, credentials,
+or live runtime actions. If subagent tooling is unavailable, continue inline
+and say what would have been delegated.
+
+In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the routing
+reference for substantial led work when it is available. The diagrams are
+supporting maps, but the chain order and delegation overlay should affect the
+next skill chosen.
 
 ## Pairing
 
