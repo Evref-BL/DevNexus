@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -905,6 +906,12 @@ function materializePluginDependencyProjection(options: {
     targetPath,
     worktreePath: options.worktreePath,
   });
+  const setupReadiness = pluginDependencyProjectionSetupReadiness({
+    projection,
+    sourceRoot: projectionSourceRoot,
+    sourcePath,
+    worktreePath: options.worktreePath,
+  });
   if (fs.existsSync(targetPath)) {
     if (
       projection.sourceControl === "support" &&
@@ -925,6 +932,8 @@ function materializePluginDependencyProjection(options: {
       status: "present",
       message: `Plugin dependency projection target already exists: ${targetPath}`,
       warnings,
+      setupNotes: setupReadiness.setupNotes,
+      setupBlockers: setupReadiness.setupBlockers,
     });
   }
 
@@ -953,6 +962,8 @@ function materializePluginDependencyProjection(options: {
     status: "linked",
     message: `Linked plugin dependency projection ${sourcePath} -> ${targetPath}`,
     warnings,
+    setupNotes: setupReadiness.setupNotes,
+    setupBlockers: setupReadiness.setupBlockers,
   });
 }
 
@@ -1052,8 +1063,12 @@ function dependencyProjectionResult(options: {
   status: NexusWorkerContextDependencyProjectionStatus;
   message: string;
   warnings?: string[];
+  setupNotes?: string[];
+  setupBlockers?: string[];
 }): NexusAutomationWorktreeDependencyProjectionResult {
   const warnings = options.warnings ?? [];
+  const setupNotes = options.setupNotes ?? [];
+  const setupBlockers = options.setupBlockers ?? [];
 
   return {
     id: options.projection.id,
@@ -1067,6 +1082,8 @@ function dependencyProjectionResult(options: {
     status: options.status,
     message: options.message,
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(setupNotes.length > 0 ? { setupNotes } : {}),
+    ...(setupBlockers.length > 0 ? { setupBlockers } : {}),
     sourceMetadata: options.projection.sourceMetadata,
     ...(options.projection.sourceComponent
       ? { sourceComponent: options.projection.sourceComponent }
@@ -1111,6 +1128,214 @@ function pluginDependencyProjectionWarnings(options: {
       `Workspace package imports can resolve to the source checkout ${sourceRoot} instead of this worktree ${worktreePath}; ` +
       "use a worktree-local install/link mode before source-changing verification, or treat package-importing commands as advisory.",
   ];
+}
+
+function pluginDependencyProjectionSetupReadiness(options: {
+  projection: NexusAutomationPluginDependencyProjection;
+  sourceRoot: string;
+  sourcePath: string;
+  worktreePath: string;
+}): {
+  setupNotes: string[];
+  setupBlockers: string[];
+} {
+  if (!isProjectedNodeModules(options.projection)) {
+    return {
+      setupNotes: [],
+      setupBlockers: [],
+    };
+  }
+
+  const nodeModulesPath = path.resolve(options.sourcePath);
+  const detectedPackages = detectedPlaywrightBrowserPackages(nodeModulesPath);
+  if (detectedPackages.length === 0) {
+    return {
+      setupNotes: [],
+      setupBlockers: [],
+    };
+  }
+
+  const cacheRoot = playwrightBrowserCacheRoot({
+    commandRoot: options.worktreePath,
+    nodeModulesPath,
+  });
+  const expectedBrowsers = expectedPlaywrightBrowserDirectories(nodeModulesPath);
+  const installCommand = configuredPlaywrightInstallCommand(options.sourceRoot);
+  if (expectedBrowsers.length === 0) {
+    return {
+      setupNotes: [],
+      setupBlockers: [
+        [
+          `Playwright browser tooling detected (${detectedPackages.join(", ")}),`,
+          "but DevNexus could not read the Playwright browser manifest from projected node_modules.",
+          `Run ${installCommand} before browser tests if this worktree needs a renderer.`,
+          "DevNexus did not run this action automatically.",
+        ].join(" "),
+      ],
+    };
+  }
+
+  const foundBrowsers = expectedBrowsers.filter((browserDirectory) =>
+    fs.existsSync(path.join(cacheRoot, browserDirectory)),
+  );
+  if (foundBrowsers.length > 0) {
+    return {
+      setupNotes: [
+        `Playwright browser tooling detected (${detectedPackages.join(", ")}); browser binaries were found in ${cacheRoot}: ${foundBrowsers.join(", ")}.`,
+      ],
+      setupBlockers: [],
+    };
+  }
+
+  return {
+    setupNotes: [],
+    setupBlockers: [
+      [
+        `Playwright browser tooling detected (${detectedPackages.join(", ")}),`,
+        `but expected browser binaries are missing from ${cacheRoot}: ${expectedBrowsers.join(", ")}.`,
+        `Run ${installCommand} before browser tests.`,
+        "DevNexus did not run this action automatically.",
+      ].join(" "),
+    ],
+  };
+}
+
+function detectedPlaywrightBrowserPackages(nodeModulesPath: string): string[] {
+  return [
+    {
+      name: "playwright",
+      manifestPath: path.join(nodeModulesPath, "playwright", "package.json"),
+    },
+    {
+      name: "playwright-core",
+      manifestPath: path.join(nodeModulesPath, "playwright-core", "package.json"),
+    },
+    {
+      name: "@playwright/test",
+      manifestPath: path.join(
+        nodeModulesPath,
+        "@playwright",
+        "test",
+        "package.json",
+      ),
+    },
+    {
+      name: "@vitest/browser-playwright",
+      manifestPath: path.join(
+        nodeModulesPath,
+        "@vitest",
+        "browser-playwright",
+        "package.json",
+      ),
+    },
+  ]
+    .filter((candidate) => fs.existsSync(candidate.manifestPath))
+    .map((candidate) => candidate.name);
+}
+
+function expectedPlaywrightBrowserDirectories(nodeModulesPath: string): string[] {
+  const manifest = readJsonObject(
+    path.join(nodeModulesPath, "playwright-core", "browsers.json"),
+  );
+  const browsers = Array.isArray(manifest?.browsers) ? manifest.browsers : [];
+  return browsers
+    .map((browser): string | null => {
+      if (!browser || typeof browser !== "object" || Array.isArray(browser)) {
+        return null;
+      }
+
+      const record = browser as Record<string, unknown>;
+      if (
+        typeof record.name !== "string" ||
+        typeof record.revision !== "string" ||
+        record.installByDefault === false
+      ) {
+        return null;
+      }
+
+      return `${record.name}-${record.revision}`;
+    })
+    .filter((browserDirectory): browserDirectory is string => Boolean(browserDirectory));
+}
+
+function playwrightBrowserCacheRoot(options: {
+  commandRoot: string;
+  nodeModulesPath: string;
+}): string {
+  const configuredPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (configuredPath === "0") {
+    return path.join(options.nodeModulesPath, "playwright-core", ".local-browsers");
+  }
+  if (configuredPath) {
+    return path.resolve(options.commandRoot, configuredPath);
+  }
+
+  if (process.platform === "darwin") {
+    return path.join(os.homedir(), "Library", "Caches", "ms-playwright");
+  }
+  if (process.platform === "win32") {
+    return path.join(
+      process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local"),
+      "ms-playwright",
+    );
+  }
+
+  return path.join(os.homedir(), ".cache", "ms-playwright");
+}
+
+function configuredPlaywrightInstallCommand(sourceRoot: string): string {
+  const scripts = packageJsonScripts(sourceRoot);
+  const preferredScriptNames = [
+    "test:browser:install",
+    "browser:install",
+    "browsers:install",
+    "install:browsers",
+    "install:playwright",
+    "playwright:install",
+    "setup:playwright",
+  ];
+  const preferred = preferredScriptNames.find((scriptName) =>
+    Object.hasOwn(scripts, scriptName),
+  );
+  if (preferred) {
+    return `npm run ${preferred}`;
+  }
+
+  const detected = Object.entries(scripts).find(([, script]) =>
+    /\bplaywright\s+install\b/u.test(script),
+  );
+  if (detected) {
+    return `npm run ${detected[0]}`;
+  }
+
+  return "npm exec playwright install";
+}
+
+function packageJsonScripts(sourceRoot: string): Record<string, string> {
+  const packageJson = readJsonObject(path.join(sourceRoot, "package.json"));
+  const scripts = packageJson?.scripts;
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(scripts).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+function readJsonObject(filePath: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function isProjectedNodeModules(

@@ -22,6 +22,11 @@ function makeTempDir(prefix: string): string {
   return tempDir;
 }
 
+function writeJson(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
 function automationConfig(
   overrides: Partial<NexusAutomationConfig> = {},
 ): NexusAutomationConfig {
@@ -131,6 +136,61 @@ function resolveLocalBinFromWorktree(
   }
 
   return null;
+}
+
+function writePlaywrightBrowserToolingFixture(options: {
+  sourceRoot: string;
+  scripts?: Record<string, string>;
+}): void {
+  writeJson(path.join(options.sourceRoot, "package.json"), {
+    scripts: options.scripts ?? {},
+  });
+  writeJson(
+    path.join(options.sourceRoot, "node_modules", "playwright-core", "package.json"),
+    {
+      name: "playwright-core",
+      version: "1.2.3",
+    },
+  );
+  writeJson(
+    path.join(options.sourceRoot, "node_modules", "playwright-core", "browsers.json"),
+    {
+      browsers: [
+        {
+          name: "chromium",
+          revision: "1234",
+          installByDefault: true,
+        },
+      ],
+    },
+  );
+  writeJson(
+    path.join(
+      options.sourceRoot,
+      "node_modules",
+      "@vitest",
+      "browser-playwright",
+      "package.json",
+    ),
+    {
+      name: "@vitest/browser-playwright",
+      version: "1.2.3",
+    },
+  );
+}
+
+function withPlaywrightBrowserPath<T>(browserPath: string, fn: () => T): T {
+  const previous = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  process.env.PLAYWRIGHT_BROWSERS_PATH = browserPath;
+  try {
+    return fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    } else {
+      process.env.PLAYWRIGHT_BROWSERS_PATH = previous;
+    }
+  }
 }
 
 afterEach(() => {
@@ -603,6 +663,120 @@ describe("nexus automation worktree setup", () => {
     expect(result.dependencyProjections[0]?.warnings?.[0]).toContain(worktreePath);
     expect(resolvedVitest).toBe(path.join(worktreePath, "node_modules", ".bin", vitestBinName));
     expect(fs.realpathSync(resolvedVitest!)).toBe(fs.realpathSync(sourceVitest));
+  });
+
+  it("does not report browser readiness when projected node_modules has no Playwright tooling", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreePath = makeTempDir("dev-nexus-setup-worktree-");
+    fs.mkdirSync(path.join(sourceRoot, "node_modules"), { recursive: true });
+
+    const result = materializeNexusAutomationWorktreeSetup({
+      sourceRoot,
+      worktreePath,
+      automationConfig: automationConfig({
+        setup: {
+          dependencyLinks: [],
+        },
+      }),
+      pluginDependencyProjections: [jsToolchainProjection()],
+      gitRunner: fakeGitRunner([]),
+    });
+
+    expect(result.dependencyProjections[0]).not.toHaveProperty("setupBlockers");
+    expect(result.dependencyProjections[0]).not.toHaveProperty("setupNotes");
+  });
+
+  it("reports missing Playwright browser binaries as setup blockers in worker context", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreesRoot = path.join(projectRoot, "worktrees", "primary");
+    const worktreePath = path.join(worktreesRoot, "codex-demo-project-github-218");
+    const browserCachePath = makeTempDir("dev-nexus-empty-browser-cache-");
+    fs.mkdirSync(worktreePath, { recursive: true });
+    writePlaywrightBrowserToolingFixture({ sourceRoot });
+
+    const result = withPlaywrightBrowserPath(browserCachePath, () =>
+      materializeNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreesRoot,
+        worktreePath,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [jsToolchainProjection()],
+        gitRunner: fakeGitRunner([]),
+        context: {
+          project: {
+            id: "demo-project",
+            name: "Demo Project",
+            root: projectRoot,
+          },
+          ownership: {
+            componentId: "primary",
+            sourceRoot,
+            worktreesRoot,
+            worktreePath,
+            branchName: "codex/demo-project/github-218",
+            baseRef: "main",
+            workItem: {
+              id: "github-218",
+              title: "Make prepared JS worktrees explicit about Playwright browser readiness",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.dependencyProjections[0]?.setupBlockers).toEqual([
+      expect.stringContaining("Playwright browser tooling detected"),
+    ]);
+    expect(result.dependencyProjections[0]?.setupBlockers?.[0]).toContain(
+      "@vitest/browser-playwright",
+    );
+    expect(result.dependencyProjections[0]?.setupBlockers?.[0]).toContain(
+      "chromium-1234",
+    );
+    expect(result.dependencyProjections[0]?.setupBlockers?.[0]).toContain(
+      "npm exec playwright install",
+    );
+    expect(result.context!.briefingMarkdown).toContain("Setup blocker:");
+    expect(result.context!.briefingMarkdown).toContain("chromium-1234");
+  });
+
+  it("reports configured Playwright browser install scripts as the setup action", () => {
+    const sourceRoot = makeTempDir("dev-nexus-setup-source-");
+    const worktreePath = makeTempDir("dev-nexus-setup-worktree-");
+    const browserCachePath = makeTempDir("dev-nexus-empty-browser-cache-");
+    fs.mkdirSync(worktreePath, { recursive: true });
+    writePlaywrightBrowserToolingFixture({
+      sourceRoot,
+      scripts: {
+        "test:browser:install": "playwright install chromium",
+      },
+    });
+
+    const result = withPlaywrightBrowserPath(browserCachePath, () =>
+      materializeNexusAutomationWorktreeSetup({
+        sourceRoot,
+        worktreePath,
+        automationConfig: automationConfig({
+          setup: {
+            dependencyLinks: [],
+          },
+        }),
+        pluginDependencyProjections: [jsToolchainProjection()],
+        gitRunner: fakeGitRunner([]),
+      }),
+    );
+
+    expect(result.dependencyProjections[0]?.setupBlockers?.[0]).toContain(
+      "npm run test:browser:install",
+    );
+    expect(result.dependencyProjections[0]?.setupBlockers?.[0]).toContain(
+      "DevNexus did not run this action automatically",
+    );
   });
 
   it("materializes a generated worker context bundle and excludes it", () => {
