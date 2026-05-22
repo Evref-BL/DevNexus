@@ -1180,6 +1180,12 @@ describe("nexus dashboard", () => {
     expect(module).toContain("target=\"_blank\"");
     expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
+    expect(module.indexOf("await sectionRefresh;")).toBeGreaterThan(
+      module.indexOf("sectionRefresh = refreshWorkspaceSections"),
+    );
+    expect(module.indexOf("const snapshot = await fetchDevNexusDashboard")).toBeGreaterThan(
+      module.indexOf("await sectionRefresh;"),
+    );
   });
 
   it("audits static visual guardrails for light and dark cockpit modes", () => {
