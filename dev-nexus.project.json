@@ -16,12 +16,19 @@
       "visibility": "private",
       "defaultBranch": "main"
     },
-    "authProfile": "human-github",
+    "authProfile": "dogfood-bot-github",
     "remotes": [
       {
         "name": "origin",
         "role": "human",
-        "protocol": "ssh"
+        "protocol": "ssh",
+        "authProfile": "human-github"
+      },
+      {
+        "name": "bot",
+        "role": "automation",
+        "protocol": "ssh",
+        "authProfile": "dogfood-bot-github"
       }
     ],
     "provisioning": {
@@ -42,6 +49,16 @@
         }
       },
       {
+        "id": "dogfood-gabot-automation-bot",
+        "kind": "machine_user",
+        "provider": "github",
+        "providerIdentity": "Gabot-Darbot",
+        "displayName": "Gabot-Darbot",
+        "handles": {
+          "github": "Gabot-Darbot"
+        }
+      },
+      {
         "id": "dogfood-human-maintainer",
         "kind": "human",
         "provider": "github",
@@ -55,6 +72,15 @@
     "roleBindings": [
       {
         "actorId": "dev-nexus-automation-app",
+        "roles": [
+          "maintainer"
+        ],
+        "scope": {
+          "project": "dev-nexus-dogfood"
+        }
+      },
+      {
+        "actorId": "dogfood-gabot-automation-bot",
         "roles": [
           "maintainer"
         ],
@@ -1209,14 +1235,15 @@
     },
     "publication": {
       "strategy": "green_main",
-      "remote": "app",
+      "remote": "bot",
       "targetBranch": "main",
       "push": false,
+      "sshHostAlias": "github.com-bot",
       "actor": {
-        "kind": "app",
+        "kind": "machine_user",
         "provider": "github",
-        "handle": "devnexus-automation",
-        "id": "dev-nexus-automation-app"
+        "handle": "Gabot-Darbot",
+        "id": "dogfood-gabot-automation-bot"
       },
       "manualRemote": "origin",
       "manualActor": {
@@ -1233,8 +1260,8 @@
         "staleChecks": "block"
       },
       "gitIdentity": {
-        "name": "devnexus-automation[bot]",
-        "email": "286661136+devnexus-automation[bot]@users.noreply.github.com"
+        "name": "Gabot-Darbot",
+        "email": "285409735+Gabot-Darbot@users.noreply.github.com"
       }
     }
   }

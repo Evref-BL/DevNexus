@@ -31,6 +31,10 @@ and ready for coordinator-driven work across its components.
   instead of inheriting stale global `dev-nexus mcp-stdio` behavior.
 - The DevNexus Automation GitHub App installation token is available for
   Evref-BL component repositories such as `Evref-BL/DevNexus`.
+- The workspace metadata repository lives under `Gabot-Darbot/*`, where App
+  installation is unavailable. Dogfood workspace-level publication uses the
+  `dogfood-gabot-automation-bot` machine-user actor through the `bot` remote
+  and host-local `dogfood-bot-github` auth profile.
 
 ## Current Decisions
 
@@ -38,8 +42,11 @@ and ready for coordinator-driven work across its components.
   DevNexus Automation GitHub App installation identity
   (`devnexus-automation[bot]`) through the host-local App profile and
   installation-token helper. Do not silently fall back to `Gabriel-Darbord`
-  user tokens or the former `Gabot-Darbot` machine-user identity for autonomous
-  push/PR publication.
+  user tokens or the `Gabot-Darbot` machine-user identity for autonomous
+  Evref-BL push/PR publication.
+- Agent-created GitHub activity for `github.com/Gabot-Darbot/*` repositories may
+  use Gabot auth. This is the sanctioned exception for the dogfood workspace
+  repository because the App cannot be installed there.
 - App-backed branch push and PR creation are the dogfood default for
   agent-created review handoffs. If App installation auth is unavailable, block
   and record the auth problem instead of publishing through a personal account.
@@ -83,9 +90,8 @@ and ready for coordinator-driven work across its components.
   installation-token path when explicitly available, but do not substitute a
   personal GitHub App user token for agent-created publication.
 - The DevNexus Automation GitHub App is not currently installed on
-  `Gabot-Darbot/dev-nexus-dogfood`; dogfood metadata branch/PR publication by
-  the App is blocked until that installation exists. Do not use a personal
-  account as a silent fallback for dogfood metadata publication.
+  `Gabot-Darbot/dev-nexus-dogfood`; dogfood metadata branch/PR publication must
+  use the configured Gabot machine-user path, not a personal account.
 
 ## Next Direction
 
