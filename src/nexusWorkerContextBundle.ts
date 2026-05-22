@@ -124,6 +124,8 @@ export interface NexusWorkerContextDependencyProjection {
   status: NexusWorkerContextDependencyProjectionStatus;
   message: string;
   warnings?: string[];
+  setupNotes?: string[];
+  setupBlockers?: string[];
   sourceMetadata: NexusWorkerContextDependencyProjectionSourceMetadata;
   sourceComponent?: NexusWorkerContextDependencyProjectionSourceComponent;
 }
@@ -708,6 +710,14 @@ function normalizeWorkerDependencyProjection(
     projection.warnings ?? [],
     "dependencyProjections.warnings",
   );
+  const setupNotes = normalizeStringArray(
+    projection.setupNotes ?? [],
+    "dependencyProjections.setupNotes",
+  );
+  const setupBlockers = normalizeStringArray(
+    projection.setupBlockers ?? [],
+    "dependencyProjections.setupBlockers",
+  );
 
   return {
     id: requiredNonEmptyString(projection.id, "dependencyProjections.id"),
@@ -744,6 +754,8 @@ function normalizeWorkerDependencyProjection(
       "dependencyProjections.message",
     ),
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(setupNotes.length > 0 ? { setupNotes } : {}),
+    ...(setupBlockers.length > 0 ? { setupBlockers } : {}),
     sourceMetadata: normalizeDependencyProjectionSourceMetadata(
       projection.sourceMetadata,
     ),
@@ -838,6 +850,10 @@ function renderDependencyProjectionLines(
       : []),
     ...(projection.reason ? [`  Reason: ${projection.reason}`] : []),
     ...(projection.warnings ?? []).map((warning) => `  Warning: ${warning}`),
+    ...(projection.setupNotes ?? []).map((note) => `  Setup note: ${note}`),
+    ...(projection.setupBlockers ?? []).map(
+      (blocker) => `  Setup blocker: ${blocker}`,
+    ),
   ]);
 }
 
