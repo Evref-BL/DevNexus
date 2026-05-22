@@ -51,6 +51,9 @@ setup_record
 target_cycle_list
 target_cycle_record
 target_report
+publication_initiative_plan
+publication_initiative_report
+publication_initiative_finalization
 current_agent_adopt
 current_agent_record
 coordination_status

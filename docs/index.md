@@ -26,6 +26,9 @@ publication rules agents need before they edit code.
 
 - [Agent workflows](user/agent-workflows.md) covers worktrees, automation loops,
   result files, and coordination handoffs.
+- [Publication workflows](user/publication-workflows.md) covers review handoff,
+  green-main checks, publication trains, initiative delivery, and finalization
+  gates.
 - [Providers, auth, and hosting](user/providers-auth-hosting.md) covers GitHub
   Apps, GitHub CLI profiles, GitLab, Jira, user accounts, machine-user accounts,
   and workspace repository hosting.
