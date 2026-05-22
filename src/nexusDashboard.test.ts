@@ -987,10 +987,13 @@ describe("nexus dashboard", () => {
     expect(module).toContain("readWorkspaceIdFromLocation");
     expect(module).toContain("writeWorkspaceIdToLocation");
     expect(module).toContain("bindWorkspaceControls");
-    expect(module).toContain("bindScrollControls");
-    expect(module).toContain("data-scroll-target");
+    expect(module).toContain("bindHostSignalControls");
+    expect(module).toContain("data-host-focus");
+    expect(module).toContain("filteredHostActions");
+    expect(module).toContain("filteredHostWorkspaces");
     expect(module).toContain("host-action-queue");
     expect(module).toContain("host-workspaces");
+    expect(module).toContain("dn-host-sticky-panel");
     expect(module).toContain("data-workspace-id");
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
@@ -1048,6 +1051,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-row-height");
     expect(module).toContain("--dn-project-accent");
     expect(module).toContain("projectAccentStyle");
+    expect(module).toContain("projectAccentCount = 7");
+    expect(module).toContain("workspaceAccentMap");
+    expect(module).toContain("--dn-branch-6");
     expect(module).toContain("stableAccentIndex");
     expect(module).not.toContain("--dn-warn: #9a641c");
     expect(module).toContain("providerIcon");
@@ -1079,6 +1085,7 @@ describe("nexus dashboard", () => {
         expect.objectContaining({ id: "theme-modes", status: "passed" }),
         expect.objectContaining({ id: "signal-accents", status: "passed" }),
         expect.objectContaining({ id: "branch-accents", status: "passed" }),
+        expect.objectContaining({ id: "host-smart-cards", status: "passed" }),
         expect.objectContaining({ id: "text-fitting", status: "passed" }),
         expect.objectContaining({ id: "lane-labels", status: "passed" }),
         expect.objectContaining({ id: "selected-details", status: "passed" }),
