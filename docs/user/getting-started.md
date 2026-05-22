@@ -48,6 +48,9 @@ one.
 
 Choose the layout that matches the way you want to work:
 
+The setup wizard asks you to choose between a project layout and a coordination
+workspace. This is the main first-workspace decision.
+
 - **Embedded project layout:** run init inside an existing Git repository and
   accept `.` as the primary component source path. DevNexus files live next to
   the project files, like Maven, Gradle, Cargo, or editor configuration.

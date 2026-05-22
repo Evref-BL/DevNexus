@@ -395,8 +395,8 @@ async function promptForNexusProjectSetupAnswers(options: {
       [
         "DevNexus user quickstart",
         "Answer the workspace and component prompts.",
-        "Primary component source path defaults to . inside an existing Git checkout and components/<id> in a new workspace.",
-        "Press Enter to accept the default, or type another path.",
+        "Workspace layout is an explicit choice. Use project to embed DevNexus in this project; use workspace to coordinate components from a separate root.",
+        "Primary component source path defaults to . for project layout and components/<id> for workspace layout.",
         "DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
@@ -408,13 +408,18 @@ async function promptForNexusProjectSetupAnswers(options: {
     );
     const defaultName = path.basename(projectRoot);
     const projectName = await askWithDefault(rl, "Workspace name", defaultName);
-    const projectId = await askWithDefault(rl, "Project id", slug(projectName));
+    const projectId = await askWithDefault(rl, "Workspace id", slug(projectName));
     const homePath = options.homePath ?? defaultNexusHomePath();
+    const layout = await askWorkspaceLayout(
+      rl,
+      options.stdout,
+      defaultWorkspaceLayout(projectRoot),
+    );
     const componentId = await askWithDefault(rl, "Primary component id", "primary");
     const componentPath = await askWithDefault(
       rl,
       "Primary component source path",
-      defaultPrimaryComponentSourcePath(projectRoot, componentId),
+      defaultPrimaryComponentSourcePath(layout, componentId),
     );
     const components: NexusProjectSetupAnswers["components"] = [
       {
@@ -499,12 +504,59 @@ function wizardComponentSource(
 }
 
 function defaultPrimaryComponentSourcePath(
-  projectRoot: string,
+  layout: NexusProjectSetupWorkspaceLayout,
   componentId: string,
 ): string {
-  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"))
+  return layout === "project"
     ? "."
     : path.join("components", componentId);
+}
+
+type NexusProjectSetupWorkspaceLayout = "project" | "workspace";
+
+function defaultWorkspaceLayout(projectRoot: string): NexusProjectSetupWorkspaceLayout {
+  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"))
+    ? "project"
+    : "workspace";
+}
+
+async function askWorkspaceLayout(
+  rl: readline.Interface,
+  stdout: NodeJS.WriteStream,
+  defaultLayout: NexusProjectSetupWorkspaceLayout,
+): Promise<NexusProjectSetupWorkspaceLayout> {
+  for (;;) {
+    const answer = await askWithDefault(
+      rl,
+      "Workspace layout (project/workspace)",
+      defaultLayout,
+    );
+    const layout = normalizeWorkspaceLayout(answer);
+    if (layout) {
+      return layout;
+    }
+    stdout.write(
+      "Choose project for one repository with DevNexus files in that repo, or workspace for a separate root that coordinates components.\n",
+    );
+  }
+}
+
+function normalizeWorkspaceLayout(
+  value: string,
+): NexusProjectSetupWorkspaceLayout | null {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case "project":
+    case "embedded":
+    case "embedded-project":
+      return "project";
+    case "workspace":
+    case "coordination":
+    case "coordination-workspace":
+      return "workspace";
+    default:
+      return null;
+  }
 }
 
 function isSameOrInsidePath(parentPath: string, childPath: string): boolean {

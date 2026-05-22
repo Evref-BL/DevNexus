@@ -70,6 +70,7 @@ describe("nexus workspace setup wizard", () => {
       "",
       "",
       "",
+      "",
     ];
     const stdout = captureOutput({
       onWrite(chunk) {
@@ -119,11 +120,14 @@ describe("nexus workspace setup wizard", () => {
       ],
     });
     expect(stdout.output()).toContain("DevNexus user quickstart");
+    expect(stdout.output()).toContain("Workspace layout");
+    expect(stdout.output()).toContain("project");
+    expect(stdout.output()).toContain("workspace");
     expect(stdout.output()).toContain("~/.dev-nexus unless --home is supplied");
     expect(stdout.output()).not.toContain("DevNexus home [");
   });
 
-  it("defaults the primary component to the workspace root in an existing Git checkout", async () => {
+  it("defaults the layout to project and the primary component to the workspace root in an existing Git checkout", async () => {
     const defaultHome = path.join(os.tmpdir(), "dev-nexus-existing-repo-home");
     const projectRoot = makeTempDir("dev-nexus-existing-repo-");
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -132,6 +136,7 @@ describe("nexus workspace setup wizard", () => {
     const promptAnswers = [
       "",
       "Existing Repo",
+      "",
       "",
       "repo",
       "",
@@ -178,12 +183,63 @@ describe("nexus workspace setup wizard", () => {
     });
   });
 
+  it("can choose a coordination workspace layout inside an existing Git checkout", async () => {
+    const projectRoot = makeTempDir("dev-nexus-existing-repo-workspace-layout-");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const stdin = ttyInput();
+    const promptAnswers = [
+      "",
+      "Existing Repo Workspace",
+      "",
+      "workspace",
+      "core",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ];
+    const stdout = captureOutput({
+      onWrite(chunk) {
+        if (!chunk.includes(": ") || promptAnswers.length === 0) {
+          return;
+        }
+        const answer = promptAnswers.shift()!;
+        queueMicrotask(() => {
+          stdin.write(`${answer}\n`);
+        });
+      },
+    });
+
+    const answers = await loadNexusProjectSetupAnswers({
+      projectRoot,
+      stdin,
+      stdout: stdout.stream,
+    });
+    stdin.destroy();
+
+    expect(answers).toMatchObject({
+      components: [
+        {
+          id: "core",
+          role: "primary",
+          source: {
+            kind: "create_local",
+            path: "components/core",
+            initializeGit: true,
+          },
+        },
+      ],
+    });
+  });
+
   it("collects additional components through an explicit repeat prompt", async () => {
     const projectRoot = makeTempDir("dev-nexus-multi-component-project-");
     const stdin = ttyInput();
     const promptAnswers = [
       "",
       "Multi Component Demo",
+      "",
       "",
       "core",
       "",
@@ -267,6 +323,7 @@ describe("nexus workspace setup wizard", () => {
     const promptAnswers = [
       "",
       "Outside Path Demo",
+      "",
       "",
       "external",
       missingOutsidePath,

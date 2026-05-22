@@ -143,6 +143,8 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toContain("Copy-paste prompt");
     expect(quickStart).toContain("Codex or Claude");
     expect(quickStart).toContain("DevNexus workspace root");
+    expect(quickStart).toContain("project layout");
+    expect(quickStart).toContain("coordination workspace");
     expect(quickStart).toContain("existing Git repository");
     expect(quickStart).toContain("primary component");
     expect(quickStart).toContain("components/<id>");
@@ -163,6 +165,7 @@ describe("README onboarding guardrails", () => {
 
     expect(combined).toContain("Embedded project layout");
     expect(combined).toContain("Coordination workspace layout");
+    expect(combined).toContain("The setup wizard asks you to choose");
     expect(combined).toContain("accept `.` as the primary component source path");
     expect(combined).toContain("Unrelated dirty product files still block readiness");
   });
@@ -250,6 +253,7 @@ describe("first-workspace quickstart smoke", () => {
     const stdout = promptAnsweringOutput([
       "",
       "Quickstart Smoke",
+      "",
       "",
       "core",
       "",
