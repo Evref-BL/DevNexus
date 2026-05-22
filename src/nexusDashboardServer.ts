@@ -783,7 +783,7 @@ export function renderNexusDashboardClientModule(): string {
     "  const provider = action.provider ?? 'web';",
     "  const kind = action.kind ?? 'provider-link';",
     "  const label = actionChipLabel(action);",
-    "  return `<a class=\"dn-action provider-${escapeAttribute(provider)} kind-${escapeAttribute(kind)}\" href=\"${escapeHtml(action.href)}\" target=\"_blank\" rel=\"noreferrer\" title=\"${escapeHtml(externalActionLabel(action))}\" aria-label=\"${escapeHtml(externalActionLabel(action))}\">${providerIcon(provider)}<span class=\"dn-action-label\">${escapeHtml(label)}</span>${externalLinkIcon()}</a>`;",
+    "  return `<a class=\"dn-action provider-${escapeAttribute(provider)} kind-${escapeAttribute(kind)}\" href=\"${escapeHtml(action.href)}\" target=\"_blank\" rel=\"noopener noreferrer\" title=\"${escapeHtml(externalActionLabel(action))}\" aria-label=\"${escapeHtml(externalActionLabel(action))}\">${providerIcon(provider)}<span class=\"dn-action-label\">${escapeHtml(label)}</span>${externalLinkIcon()}</a>`;",
     "}",
     "",
     "function actionChipLabel(action) {",
@@ -1217,6 +1217,176 @@ export function renderNexusDashboardClientModule(): string {
     "}",
     "",
   ].join("\n");
+}
+
+export type NexusDashboardVisualAuditStatus = "passed" | "failed";
+
+export interface NexusDashboardVisualAuditCheck {
+  id: string;
+  label: string;
+  status: NexusDashboardVisualAuditStatus;
+  detail: string;
+}
+
+export interface NexusDashboardVisualAuditResult {
+  ok: boolean;
+  checks: NexusDashboardVisualAuditCheck[];
+  evidence: string[];
+  limitations: string[];
+}
+
+export function auditNexusDashboardClientVisuals(
+  moduleSource = renderNexusDashboardClientModule(),
+): NexusDashboardVisualAuditResult {
+  const signalAccents = uniqueMatches(
+    moduleSource,
+    /\.dn-signal\.signal-[^{]+\{ --dn-signal-accent: (#[0-9a-f]{6})/giu,
+  );
+  const branchAccents = uniqueMatches(
+    moduleSource,
+    /--dn-branch-\d: (#[0-9a-f]{6})/giu,
+  );
+  const checks = [
+    visualAuditCheck(
+      "theme-modes",
+      "Light and dark themes",
+      includesAll(moduleSource, [
+        "data-theme-mode=\"system\"",
+        "data-theme-mode=\"light\"",
+        "data-theme-mode=\"dark\"",
+        ":root[data-dev-nexus-theme='light']",
+        ":root[data-dev-nexus-theme='dark']",
+        "prefers-color-scheme",
+      ]),
+      "System, light, and dark modes are present.",
+    ),
+    visualAuditCheck(
+      "signal-accents",
+      "Distinct signal accents",
+      signalAccents.length >= 6,
+      `${signalAccents.length} signal accent colors found.`,
+    ),
+    visualAuditCheck(
+      "branch-accents",
+      "Distinct branch accents",
+      branchAccents.length >= 6,
+      `${branchAccents.length} branch accent colors found.`,
+    ),
+    visualAuditCheck(
+      "text-fitting",
+      "Text fitting guardrails",
+      includesAll(moduleSource, [
+        ".dn-action-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
+        ".dn-selected-section p { display: -webkit-box; -webkit-line-clamp: 3;",
+        ".dn-plugin-pills span { max-width: 100%;",
+        ".dn-thread-main strong, .dn-plugin-card strong { overflow: hidden;",
+        ".dn-workspace-card strong { min-width: 0; overflow: hidden;",
+        "overflow-wrap: anywhere;",
+      ]),
+      "Long labels use truncation, line clamp, or overflow wrapping.",
+    ),
+    visualAuditCheck(
+      "lane-labels",
+      "Lane labels and row alignment",
+      includesAll(moduleSource, [
+        ".dn-lane-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));",
+        "Source checkout",
+        "Worktree branch",
+        "Other worktrees",
+        "Approvals and blockers",
+        "const rowHeight = 34",
+        "data-row-height",
+        "top: calc(50% - 5px)",
+      ]),
+      "Work-map lanes have compact labels and centered row dots.",
+    ),
+    visualAuditCheck(
+      "selected-details",
+      "Selected details panel",
+      includesAll(moduleSource, [
+        "dn-selected-panel",
+        "Selected item",
+        "Summary",
+        "Actions",
+        "Evidence",
+        "Diagnostics",
+      ]),
+      "Selected detail sections are available above the work map.",
+    ),
+    visualAuditCheck(
+      "action-buttons",
+      "Provider and chat actions",
+      includesAll(moduleSource, [
+        "providerIcon",
+        "externalLinkIcon",
+        "target=\"_blank\"",
+        "rel=\"noopener noreferrer\"",
+        "Start chat",
+        "Resume chat",
+      ]),
+      "Provider links and chat actions expose their behavior.",
+    ),
+    visualAuditCheck(
+      "plugin-cards",
+      "Plugin cards",
+      includesAll(moduleSource, [
+        "renderPlugins",
+        "dn-plugin-card",
+        "dn-plugin-pills",
+        "Installed extensions",
+        "Install actions appear only",
+      ]),
+      "Installed plugins have their own compact cockpit section.",
+    ),
+    visualAuditCheck(
+      "responsive-layout",
+      "Responsive layout",
+      includesAll(moduleSource, [
+        "@media (max-width: 1120px)",
+        "@media (max-width: 680px)",
+        ".dn-signals { grid-template-columns: 1fr; }",
+        ".dn-history-detail { display: none; }",
+      ]),
+      "Desktop and narrow viewport breakpoints are defined.",
+    ),
+  ];
+  return {
+    ok: checks.every((check) => check.status === "passed"),
+    checks,
+    evidence: [
+      `${signalAccents.length} signal accent colors`,
+      `${branchAccents.length} branch accent colors`,
+      `${checks.length} static visual checks`,
+    ],
+    limitations: [
+      "Pixel screenshots still require a browser renderer and human review.",
+    ],
+  };
+}
+
+function visualAuditCheck(
+  id: string,
+  label: string,
+  passed: boolean,
+  detail: string,
+): NexusDashboardVisualAuditCheck {
+  return {
+    id,
+    label,
+    status: passed ? "passed" : "failed",
+    detail,
+  };
+}
+
+function includesAll(source: string, snippets: string[]): boolean {
+  return snippets.every((snippet) => source.includes(snippet));
+}
+
+function uniqueMatches(source: string, pattern: RegExp): string[] {
+  const matches = [...source.matchAll(pattern)]
+    .map((match) => match[1]?.toLowerCase())
+    .filter((match): match is string => Boolean(match));
+  return [...new Set(matches)];
 }
 
 async function routeDashboardRequest(

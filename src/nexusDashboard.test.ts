@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appendNexusAutomationRunRecord,
   appendNexusAutomationTargetCycleRecord,
+  auditNexusDashboardClientVisuals,
   buildNexusDashboardHostActionQueue,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
@@ -1047,6 +1048,30 @@ describe("nexus dashboard", () => {
     expect(module).toContain("target=\"_blank\"");
     expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
+  });
+
+  it("audits static visual guardrails for light and dark cockpit modes", () => {
+    const audit = auditNexusDashboardClientVisuals();
+
+    expect(audit.ok).toBe(true);
+    expect(audit.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "theme-modes", status: "passed" }),
+        expect.objectContaining({ id: "signal-accents", status: "passed" }),
+        expect.objectContaining({ id: "branch-accents", status: "passed" }),
+        expect.objectContaining({ id: "text-fitting", status: "passed" }),
+        expect.objectContaining({ id: "lane-labels", status: "passed" }),
+        expect.objectContaining({ id: "selected-details", status: "passed" }),
+        expect.objectContaining({ id: "action-buttons", status: "passed" }),
+        expect.objectContaining({ id: "plugin-cards", status: "passed" }),
+        expect.objectContaining({ id: "responsive-layout", status: "passed" }),
+      ]),
+    );
+    expect(audit.limitations).toEqual(
+      expect.arrayContaining([
+        "Pixel screenshots still require a browser renderer and human review.",
+      ]),
+    );
   });
 
   it("labels parallel work-map lanes without repeating branch names as row titles", async () => {

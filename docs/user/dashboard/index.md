@@ -34,6 +34,8 @@ diagnostics mode.
 - [Cockpit actions](actions.md) describes approvals, provider links, and chat
   actions.
 - [Data contracts](data-contracts.md) describes routes and embeddable payloads.
+- [Visual QA](visual-qa.md) describes repeatable visual guardrails and the
+  remaining human review step.
 
 ## Commands
 
