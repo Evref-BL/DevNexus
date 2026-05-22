@@ -655,7 +655,7 @@ skills, planning documents, or another durable project surface.
    \`worktree_prepare\` or \`dev-nexus worktree prepare\`. Use a component
    worktree for source changes and a workspace/meta worktree for files such as
    \`dev-nexus.project.json\`, \`.dev-nexus/**\`, projected skills,
-   \`PLAN.md\`, \`CONTEXT.md\`, target state, or dogfood docs.
+   \`PLAN.md\`, \`CONTEXT.md\`, target state, or workspace docs.
 5. Choose a branch name that matches the initiative or tracker item and the
    workspace branch policy. Keep one long-lived initiative branch when slices
    should accumulate before final publication.
@@ -1198,7 +1198,7 @@ Use this skill when working inside a DevNexus-managed workspace.
 4. Work through configured component work-item services. Prefer component-qualified work-item ids when a workspace has multiple components, and do not assume a tracker provider; use the provider configured for the owning component.
 5. Run a Git freshness preflight before editing a checkout: inspect status, remotes, upstream, and ahead/behind state. Fetch configured remotes when policy allows, fast-forward clean branches with an upstream, and record blockers.
 6. Preserve unrelated changes. Treat a shared checkout as read-mostly context unless the task is clearly read-only or already owns that checkout.
-7. For mutating parallel work, prepare an isolated Git worktree before editing. Use component-scoped worktrees for component source changes, and use a workspace/meta worktree for DevNexus workspace files such as \`AGENTS.md\`, \`PLAN.md\`, \`CONTEXT.md\`, \`.dev-nexus/**\`, projected skills, target state, or dogfood docs. Prefer DevNexus worktree tools such as \`worktree_prepare\` or \`dev-nexus worktree prepare\` over hand-rolled \`git worktree\` commands.
+7. For mutating parallel work, prepare an isolated Git worktree before editing. Use component-scoped worktrees for component source changes, and use a workspace/meta worktree for DevNexus workspace files such as \`AGENTS.md\`, \`PLAN.md\`, \`CONTEXT.md\`, \`.dev-nexus/**\`, projected skills, target state, or workspace docs. Prefer DevNexus worktree tools such as \`worktree_prepare\` or \`dev-nexus worktree prepare\` over hand-rolled \`git worktree\` commands.
 8. Let configured setup make prepared worktrees usable. For example, JavaScript/TypeScript projects should expose reusable dependencies through a plugin \`dependency_projection\` such as \`node_modules\` -> \`node_modules\`, instead of teaching every agent to repair missing dependencies manually.
 9. Choose a bounded batch with clear ownership, acceptance criteria, verification, and publication expectations. Parallelize independent work when safe: split by work item, component, worktree, or disjoint write scope; respect the configured subagent cap; keep each worker's ownership explicit.
 10. Run source and Git commands from the assigned worktree. Stage only files owned by that worktree and avoid committing unrelated workspace-state or tracker files from another chat.
@@ -1489,7 +1489,7 @@ Use this skill when creating, auditing, or updating README files, getting-starte
 3. Put the fastest credible path early. Installation and the first runnable command usually belong before long terminology, architecture, or provider detail.
 4. Define terms before relying on them. Use one canonical term consistently and avoid overloaded words when a simpler noun works.
 5. Keep README content short and skimmable. Move reference detail, provider-specific setup, edge cases, and long rationale into linked docs.
-6. Prefer general examples over dogfood, internal, or unusually specialized examples. Use specific names only when they help the target reader recognize the shape.
+6. Prefer general examples over internal, private, or unusually specialized examples. Use specific names only when they help the target reader recognize the shape.
 7. Keep examples copyable and truthful. Use placeholders only when the user must substitute a value. If a wizard asks for a value, do not also require it in the quick-start command unless scripting needs it.
 8. Update docs with code and tests when behavior changes. Delete stale docs rather than preserving half-correct history in the active path.
 9. Validate links, command examples, and generated output where feasible. Add focused documentation tests when the project already has docs guardrails.

@@ -378,7 +378,7 @@ export function buildNexusQuickFixPlan(
       },
     ],
     skippedBookkeeping: [
-      "Do not create a dogfood metadata PR unless workspace config, target state, policy, or durable coordination changed.",
+      "Do not create a workspace metadata PR unless workspace config, target state, policy, or durable coordination changed.",
       "Do not require coordination handoff when provider-backed handoffs are incomplete or unnecessary for a one-issue fix.",
       "Do not run DevNexus work-item sync-execute for live provider writes until provider identity is proven to use the automation profile.",
     ],

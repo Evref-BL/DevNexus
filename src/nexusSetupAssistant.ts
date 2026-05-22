@@ -805,20 +805,20 @@ function joinExistingProjectSteps(options: {
       commands: platformCommands(options.platform, {
         macos: [
           "brew install git gh node",
-          "npm install -g @evref-bl/dev-nexus@dogfood",
+          "npm install -g @evref-bl/dev-nexus@alpha",
         ],
         windows: [
           "winget install --id Git.Git -e",
           "winget install --id GitHub.cli -e",
-          "npm install -g @evref-bl/dev-nexus@dogfood",
+          "npm install -g @evref-bl/dev-nexus@alpha",
         ],
         linux: [
-          "npm install -g @evref-bl/dev-nexus@dogfood",
+          "npm install -g @evref-bl/dev-nexus@alpha",
         ],
       }),
       manualInstructions: [
         "Use the package manager you trust on this host; the commands are examples.",
-        "For freshly published dogfood packages, setup should wait for npm packument and dist-tag visibility with bounded retry/backoff before installing.",
+        "For freshly published prerelease packages, setup should wait for npm packument and dist-tag visibility with bounded retry/backoff before installing.",
         "Classify npm fetch failures before assigning worker tasks: E404 immediately after publish is registry propagation delay, network and timeout errors are network failures, absent versions are missing-version blockers, and damaged node_modules belongs to setup repair.",
         "Do not continue to auth or remotes until git, gh, node, npm, and dev-nexus are available.",
       ],

@@ -105,7 +105,7 @@ describe("quick-fix planning", () => {
       "cleanup-worktree",
     );
     expect(plan.skippedBookkeeping.join("\n")).toContain(
-      "dogfood metadata PR",
+      "workspace metadata PR",
     );
     expect(plan.warnings).toEqual([]);
   });

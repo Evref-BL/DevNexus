@@ -6,10 +6,10 @@ on:
       dist_tag:
         description: npm dist-tag to publish under
         required: true
-        default: dogfood
+        default: alpha
         type: choice
         options:
-          - dogfood
+          - alpha
           - latest
 
 permissions:
