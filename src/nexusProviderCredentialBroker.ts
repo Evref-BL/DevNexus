@@ -109,6 +109,8 @@ interface CommandTokenResult {
   authorizationHeader?: string;
   env?: Record<string, string>;
   expiresAt?: string | null;
+  actorId?: string;
+  providerIdentity?: string;
   scopes?: string[];
   permissions?: Record<string, string>;
 }
@@ -465,6 +467,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
 
     const commandToken = parseCommandTokenResult(result.stdout, profile);
     assertNotExpired(commandToken.expiresAt, this.now(), profile.id);
+    assertCommandTokenActorMatches(profile, request, commandToken);
     assertCredentialPermissionMetadata(
       profile,
       request.requiredPermissions,
@@ -1151,10 +1154,18 @@ function parseCommandTokenJson(
   const authorizationHeader = optionalString(record.authorizationHeader);
   const expiresAt =
     optionalString(record.expiresAt) ?? optionalString(record.expires_at);
+  const actorId = optionalString(record.actorId);
+  const providerIdentity =
+    optionalString(record.providerIdentity) ??
+    optionalString(record.account) ??
+    optionalString(record.login) ??
+    optionalString(record.user);
   return {
     ...(token ? { token } : {}),
     ...(authorizationHeader ? { authorizationHeader } : {}),
     ...(expiresAt !== undefined ? { expiresAt } : {}),
+    ...(actorId ? { actorId } : {}),
+    ...(providerIdentity ? { providerIdentity } : {}),
     ...parseScopes(record.scopes),
     ...parsePermissions(record.permissions),
   };
@@ -1237,6 +1248,43 @@ function assertNotExpired(
       { profileId },
     );
   }
+}
+
+function assertCommandTokenActorMatches(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+  commandToken: CommandTokenResult,
+): void {
+  const expectedActorId = request.actorId?.trim() || profile.actorId?.trim();
+  if (
+    commandToken.actorId &&
+    expectedActorId &&
+    commandToken.actorId !== expectedActorId
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "wrong_actor",
+      `Credential command for profile ${profile.id} returned actor ${commandToken.actorId}, not expected actor ${expectedActorId}.`,
+      { profileId: profile.id },
+    );
+  }
+
+  const expectedIdentity =
+    request.providerIdentity?.trim() || profile.account?.trim();
+  if (
+    commandToken.providerIdentity &&
+    expectedIdentity &&
+    !providerIdentitiesEqual(commandToken.providerIdentity, expectedIdentity)
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "wrong_actor",
+      `Credential command for profile ${profile.id} returned identity ${commandToken.providerIdentity}, not expected identity ${expectedIdentity}.`,
+      { profileId: profile.id },
+    );
+  }
+}
+
+function providerIdentitiesEqual(left: string, right: string): boolean {
+  return left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
 }
 
 function expandCommandArg(

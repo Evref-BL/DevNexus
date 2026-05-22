@@ -125,6 +125,46 @@ describe("nexus forge publication facade", () => {
       .toEqual(["GET /user"]);
   });
 
+  it("reports wrong-user GitHub App user-to-server credentials as mismatched", async () => {
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential({
+        profileId: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        account: "Gabriel-Darbord",
+        kind: "github_app_user_token",
+        authorizationHeader: "Bearer other-user-access-token",
+      }),
+      fetch: queuedFetch([], [
+        {
+          body: {
+            login: "Other-User",
+          },
+        },
+      ]),
+    });
+
+    await expect(
+      adapter.verifyActor({
+        expected: {
+          kind: "human",
+          provider: "github",
+          handle: "Gabriel-Darbord",
+          id: "gabriel",
+        },
+      }),
+    ).resolves.toMatchObject({
+      matched: false,
+      observed: {
+        provider: "github",
+        handle: "Other-User",
+        source: "github_rest_user",
+        backend: "github_rest",
+      },
+    });
+  });
+
   it("creates, updates, merges, and closes GitHub resources through REST", async () => {
     const calls: CapturedFetchCall[] = [];
     const adapter = createNexusForgePublicationAdapter({
