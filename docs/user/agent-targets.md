@@ -55,6 +55,59 @@ provider surface:
 dev-nexus workspace mcp refresh <workspace-root> --agent codex
 ```
 
+## MCP Exposure And Gateway Groups
+
+MCP servers can be projected directly, hidden, or routed through the DevNexus
+MCP gateway. Direct exposure gives the agent every configured upstream tool as a
+visible tool. Gateway exposure gives the agent the small `dev_nexus_gateway`
+surface and lets it search, describe, and call configured upstream tools on
+demand.
+
+Use gateway exposure when a workspace or plugin has many MCP tools but most
+turns only need a few of them:
+
+```json
+{
+  "mcp": {
+    "exposure": "gateway",
+    "gateway": {
+      "includedServers": ["workflow_runtime"],
+      "excludedTools": ["workflow_runtime.workflow_delete"]
+    },
+    "agentTargets": [
+      {
+        "agent": "codex",
+        "gateway": {
+          "includedTools": ["workflow_runtime.workflow_search"]
+        }
+      }
+    ]
+  }
+}
+```
+
+Gateway grouping is an allow/filter policy. `includedServers` allows every tool
+from a server, `includedTools` allows individual tools, and `excludedTools`
+removes tools even when a broader include matched. Tool names may be written as
+`tool_name`, `server_name.tool_name`, or `server_name__tool_name`.
+
+Plugin MCP servers connect to the gateway through their `mcp_server`
+capability. Declare `serverName`, `command`, and `args`; declare `tools` when the
+tool names are known at plugin install time. If no tools are declared, the
+gateway starts the command-based MCP server, runs MCP initialization and
+`tools/list`, caches the discovered metadata under `.dev-nexus/mcp-gateway/`,
+and uses that cache in future budget reports.
+
+Check the context effect before changing exposure:
+
+```bash
+dev-nexus workspace mcp budget <workspace-root>
+dev-nexus workspace mcp budget <workspace-root> --json
+```
+
+The budget report shows visible MCP context, gateway-routed upstream tools, and
+the estimated byte/token delta versus exposing those upstream tools directly.
+
 ## Common Policies
 
 Codex-only:
