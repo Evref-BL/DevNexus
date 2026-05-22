@@ -26,6 +26,7 @@ export {
   usage,
 } from "./cliUsage.js";
 import { handleDiagnosticsCommand } from "./cliDiagnosticsCommand.js";
+import { handleAuthCommand } from "./cliAuthCommand.js";
 import { handleHostCommand } from "./cliHostCommand.js";
 import { handlePublicationCommand } from "./cliPublicationCommand.js";
 import { isCliEntrypoint } from "./cliRuntime.js";
@@ -898,6 +899,9 @@ async function mainUnchecked(
   if (argv[0] === "home") {
     return handleHomeCommand(argv, dependencies);
   }
+  if (argv[0] === "auth") {
+    return handleAuthCommand(argv, dependencies);
+  }
   if (argv[0] === "workspace") {
     return handleProjectCommand(argv, dependencies);
   }
@@ -946,7 +950,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, or --help",
   );
 }
 

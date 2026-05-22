@@ -158,15 +158,50 @@ For human-attributed automation, the App also needs a user authorization flow.
 Use either a callback URL for a web OAuth flow or enable device flow for a
 headless/CLI flow. Store user access tokens, refresh tokens, client secrets,
 and any helper state in host-local secret storage. In shared DevNexus config,
-reference only the auth profile id and a host-local command or environment key.
+reference only the auth profile id and non-secret App metadata such as
+`clientId`, App slug, installation account, and selected repositories.
 GitHub limits user-to-server tokens to the intersection of the user's access,
 the App installation's repository access, and the App's granted permissions.
 
-A `github_app_user_token` profile should normally use a host-local helper
-command. The helper owns the OAuth/device-flow state and prints a short-lived
-token response for the requested repository. DevNexus passes placeholders such
-as `{repository.owner}` and `{repository.name}` to the command and accepts
-either plain token output or JSON:
+A `github_app_user_token` profile can use DevNexus' built-in host-local device
+flow. Configure the profile in DevNexus home, not the shared workspace:
+
+```json
+{
+  "id": "alice-devnexus-app-user",
+  "actorId": "alice",
+  "provider": "github",
+  "kind": "human",
+  "credentialKind": "github_app_user_token",
+  "account": "alice",
+  "host": "github.com",
+  "purposes": ["api", "git"],
+  "githubApp": {
+    "clientId": "Iv23example",
+    "slug": "devnexus-automation",
+    "installationAccount": "ExampleOrg",
+    "repositories": ["example-suite"]
+  }
+}
+```
+
+Then authorize and inspect it locally:
+
+```sh
+dev-nexus auth github-app user login --profile alice-devnexus-app-user
+dev-nexus auth github-app user status --profile alice-devnexus-app-user
+dev-nexus auth github-app user logout --profile alice-devnexus-app-user
+```
+
+The login command opens a GitHub device-flow authorization, stores the user
+access token and refresh token under the host-local DevNexus home, refreshes
+expiring tokens through the credential broker, and keeps token values out of
+shared project files.
+
+A `github_app_user_token` profile may still use a custom host-local helper
+command when a team wants to delegate OAuth state to another secret manager.
+DevNexus passes placeholders such as `{repository.owner}` and
+`{repository.name}` to the command and accepts either plain token output or JSON:
 
 ```json
 {

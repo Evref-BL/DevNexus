@@ -53,6 +53,7 @@ export * from "./nexusNpmRuntime.js";
 export * from "./nexusPathResolver.js";
 export * from "./nexusPluginCapabilities.js";
 export * from "./nexusProviderCredentialBroker.js";
+export * from "./nexusGitHubAppUserAuth.js";
 export * from "./nexusProjectComponentAdd.js";
 export * from "./nexusProjectComponentTopology.js";
 export * from "./nexusProjectHosting.js";

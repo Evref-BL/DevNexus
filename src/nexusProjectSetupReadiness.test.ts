@@ -268,7 +268,7 @@ describe("nexus workspace setup readiness", () => {
           id: "auth-inventory",
           status: "warning",
           summary: expect.stringContaining("gabriel-devnexus-app-user"),
-          nextAction: expect.stringContaining("user-token helper"),
+          nextAction: expect.stringContaining("dev-nexus auth github-app user login"),
         }),
       ]),
     );
