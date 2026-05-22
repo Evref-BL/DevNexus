@@ -62,8 +62,12 @@ import {
 import {
   claimNexusEligibleWorkItem,
   type NexusEligibleWorkClaimProviderFactory,
+  type NexusWorkItemClaimAuthority,
   type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
+import {
+  verifyNexusAgentClaimForMutation,
+} from "./nexusAgentClaimGuard.js";
 import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
@@ -227,6 +231,7 @@ export interface DevNexusMcpToolContext {
   workItemProviderOptions?: CreateWorkTrackerProviderOptions;
   workItemCredentialCommandRunner?: NexusProviderCredentialCommandRunner;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
 }
 
@@ -1585,6 +1590,14 @@ export async function callDevNexusMcpTool(
           workItemId,
           workItemTitle,
           topic,
+          now: context.now,
+        });
+        await verifyNexusAgentClaimForMutation({
+          projectRoot,
+          componentId: resolvedWorkItem.componentId ?? componentId ?? null,
+          workItemId: resolvedWorkItem.itemId ?? workItemId ?? null,
+          env: process.env,
+          claimAuthority: context.workItemClaimAuthority,
           now: context.now,
         });
         const prepared = prepareNexusManualWorktree({

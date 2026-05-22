@@ -45,6 +45,7 @@ export * from "./nexusWorkItemClaim.js";
 export * from "./nexusWorkItemRouting.js";
 export * from "./nexusAgentMcpConfig.js";
 export * from "./nexusAgentClientAdapterWrapper.js";
+export * from "./nexusAgentClaimGuard.js";
 export * from "./nexusAgentProjectionCleanup.js";
 export * from "./nexusAgentProjectionStatus.js";
 export * from "./nexusAgentClientRuntimeResolver.js";

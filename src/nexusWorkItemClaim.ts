@@ -59,6 +59,7 @@ import type {
 import type {
   NexusWorkItemClaimAuthority,
   NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityVerifyResult,
   NexusWorkItemClaimObservation,
   NexusWorkItemClaimOwner,
   NexusWorkItemClaimOwnerInput,
@@ -433,6 +434,40 @@ export async function claimNexusEligibleWorkItem(
   return noClaimResult("candidates_not_claimable", skippedCandidates, {
     activeClaims: combinedActiveClaims,
     staleClaims: inspectedClaims.staleClaims.map((item) => item.observation),
+  });
+}
+
+export async function verifyNexusWorkItemAuthorityClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  authorityClaim: NexusWorkItemClaimAuthorityRecord;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
+  now?: () => Date | string;
+}): Promise<NexusWorkItemClaimAuthorityVerifyResult> {
+  const projectRoot = path.resolve(
+    requiredNonEmptyString(options.projectRoot, "projectRoot"),
+  );
+  const env = nexusWorkItemDiscoveryCredentialEnvironment({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    env: options.env ?? process.env,
+  });
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
+  if (!claimAuthority.verifyClaim) {
+    throw new Error(
+      `Claim authority backend ${claimAuthority.kind} does not support claim verification`,
+    );
+  }
+
+  return claimAuthority.verifyClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.authorityClaim.owner.leaseToken,
+    now: currentDate(options.now),
   });
 }
 

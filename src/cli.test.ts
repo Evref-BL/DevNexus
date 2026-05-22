@@ -22,6 +22,8 @@ import {
   type GitRunner,
   type NexusProjectHostingProviderAdapter,
   type NexusAutomationCommandRunner,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectConfig,
   type ProjectGitCommandResult,
   type ProjectGitRunner,
@@ -2389,6 +2391,58 @@ describe("dev-nexus cli", () => {
 
     const payload = JSON.parse(output.output());
     expect(payload.worktree.branchName).toBe("codex/primary/guard-bootstrap");
+  });
+
+  it("blocks worktree preparation when an agent-launch authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "expired",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "worktree",
+        "prepare",
+        projectRoot,
+        "--work-item",
+        "local-1",
+        "--work-item-title",
+        "Claimed issue",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        gitRunner: fakeGitRunner(gitCalls),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "DevNexus claim verification failed before mutation: expired",
+      },
+    });
+    expect(gitCalls).toEqual([]);
   });
 
   it("prepares manual component and workspace-meta worktrees through the CLI", async () => {
@@ -8315,6 +8369,65 @@ function cloneClaimItem(item: WorkItem): WorkItem {
     labels: item.labels ? [...item.labels] : undefined,
     assignees: item.assignees ? [...item.assignees] : undefined,
     externalRef: item.externalRef ? { ...item.externalRef } : undefined,
+  };
+}
+
+function writeCliAgentContext(
+  projectRoot: string,
+  authorityClaim: NexusWorkItemClaimAuthorityRecord,
+): string {
+  const contextFile = path.join(projectRoot, ".dev-nexus", "context.json");
+  fs.mkdirSync(path.dirname(contextFile), { recursive: true });
+  fs.writeFileSync(
+    contextFile,
+    `${JSON.stringify({
+      workItemClaim: {
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        logicalWorkItemId: "local-1",
+        authorityClaim,
+      },
+    })}\n`,
+    "utf8",
+  );
+
+  return contextFile;
+}
+
+function cliAgentEnv(contextFile: string): NodeJS.ProcessEnv {
+  return {
+    DEV_NEXUS_AUTOMATION_MODE: "agent_launch",
+    DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: "claimed",
+    DEV_NEXUS_AGENT_CONTEXT_FILE: contextFile,
+  };
+}
+
+function cliAuthorityClaim(): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: "demo-project",
+      componentId: "primary",
+      trackerId: "default",
+      provider: "local",
+      workItemId: "local-1",
+    },
+    owner: {
+      version: 1,
+      hostId: "host-a",
+      agentId: "agent-a",
+      ownerId: null,
+      leaseToken: "lease-1",
+      claimedAt: "2026-05-23T09:00:00.000Z",
+      expiresAt: "2026-05-23T10:30:00.000Z",
+    },
+    fencingToken: 12,
+    state: "active",
+    claimedAt: "2026-05-23T09:00:00.000Z",
+    expiresAt: "2026-05-23T10:30:00.000Z",
+    lastHeartbeatAt: "2026-05-23T09:00:00.000Z",
   };
 }
 

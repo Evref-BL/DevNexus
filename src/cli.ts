@@ -213,6 +213,9 @@ import {
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
+import {
+  verifyNexusAgentClaimForMutation,
+} from "./nexusAgentClaimGuard.js";
 import { buildNexusQuickFixPlan } from "./nexusQuickFix.js";
 import {
   nexusAuthorityMutationBlock,
@@ -1704,6 +1707,14 @@ async function handleWorktreeCommand(
       parsed,
       dependencies,
     );
+    await verifyNexusAgentClaimForMutation({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: resolvedWorkItem.componentId ?? parsed.componentId ?? null,
+      workItemId: resolvedWorkItem.itemId ?? parsed.workItemId ?? null,
+      env: dependencies.env ?? process.env,
+      claimAuthority: dependencies.workItemClaimAuthority,
+      now: dependencies.now,
+    });
     const result = prepareNexusManualWorktree({
       projectRoot: parsed.projectRoot,
       componentId: resolvedWorkItem.componentId ?? parsed.componentId,

@@ -279,6 +279,10 @@ Progress:
   coordinator launch and carries verified authority/fencing facts into the agent
   context and launch environment. Projects without authority-backed claims keep
   the existing optimistic tracker behavior.
+- 2026-05-23: Slice 4B added an agent-launch claim guard for DevNexus-controlled
+  worktree preparation. CLI and MCP worktree preparation now verify the current
+  authority-backed claim from the launch context before creating a Git worktree,
+  while optimistic tracker claims remain unchanged.
 
 ### Slice 5: Documentation And Optional Live Smoke
 

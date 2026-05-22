@@ -20,6 +20,8 @@ import {
   type GitCommandResult,
   type GitRunner,
   type NexusEligibleWorkClaimProviderFactory,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectHostingProviderAdapter,
   type NexusProjectConfig,
   type WorkComment,
@@ -1434,6 +1436,64 @@ describe("DevNexus MCP server", () => {
       ],
       cwd: addonSourceRoot,
     });
+  });
+
+  it("blocks MCP worktree preparation when an agent-launch authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-worktree-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = mcpAuthorityClaim();
+    const contextFile = writeMcpAgentContext(projectRoot, authorityClaim);
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const gitRunner: GitRunner = (args, cwd) => {
+      const argsArray = [...args];
+      gitCalls.push({ args: argsArray, cwd });
+      return ok(argsArray, "");
+    };
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "released",
+          claim: authorityClaim,
+        };
+      },
+    };
+    const previousAutomationMode = process.env.DEV_NEXUS_AUTOMATION_MODE;
+    const previousClaimStatus = process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS;
+    const previousContextFile = process.env.DEV_NEXUS_AGENT_CONTEXT_FILE;
+    try {
+      process.env.DEV_NEXUS_AUTOMATION_MODE = "agent_launch";
+      process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS = "claimed";
+      process.env.DEV_NEXUS_AGENT_CONTEXT_FILE = contextFile;
+      const result = await callDevNexusMcpTool(
+        "worktree_prepare",
+        {
+          projectRoot,
+          workItemId: "local-1",
+          workItemTitle: "Claimed issue",
+        },
+        {
+          gitRunner,
+          workItemClaimAuthority: claimAuthority,
+          now: fixedClock("2026-05-23T10:00:00.000Z"),
+        },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(toolJson(result)).toMatchObject({
+        ok: false,
+        error: "DevNexus claim verification failed before mutation: released",
+      });
+      expect(gitCalls).toEqual([]);
+    } finally {
+      restoreOptionalEnv("DEV_NEXUS_AUTOMATION_MODE", previousAutomationMode);
+      restoreOptionalEnv("DEV_NEXUS_WORK_ITEM_CLAIM_STATUS", previousClaimStatus);
+      restoreOptionalEnv("DEV_NEXUS_AGENT_CONTEXT_FILE", previousContextFile);
+    }
   });
 
   it("builds guided setup plans through MCP tools", async () => {
@@ -3981,6 +4041,65 @@ function mcpClaimProviderFactory(
   provider: McpClaimMemoryProvider,
 ): NexusEligibleWorkClaimProviderFactory {
   return () => provider;
+}
+
+function writeMcpAgentContext(
+  projectRoot: string,
+  authorityClaim: NexusWorkItemClaimAuthorityRecord,
+): string {
+  const contextFile = path.join(projectRoot, ".dev-nexus", "context.json");
+  fs.mkdirSync(path.dirname(contextFile), { recursive: true });
+  fs.writeFileSync(
+    contextFile,
+    `${JSON.stringify({
+      workItemClaim: {
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        logicalWorkItemId: "local-1",
+        authorityClaim,
+      },
+    })}\n`,
+    "utf8",
+  );
+
+  return contextFile;
+}
+
+function restoreOptionalEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}
+
+function mcpAuthorityClaim(): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: "mcp-demo",
+      componentId: "primary",
+      trackerId: "default",
+      provider: "local",
+      workItemId: "local-1",
+    },
+    owner: {
+      version: 1,
+      hostId: "host-a",
+      agentId: "agent-a",
+      ownerId: null,
+      leaseToken: "lease-1",
+      claimedAt: "2026-05-23T09:00:00.000Z",
+      expiresAt: "2026-05-23T10:30:00.000Z",
+    },
+    fencingToken: 12,
+    state: "active",
+    claimedAt: "2026-05-23T09:00:00.000Z",
+    expiresAt: "2026-05-23T10:30:00.000Z",
+    lastHeartbeatAt: "2026-05-23T09:00:00.000Z",
+  };
 }
 
 class McpClaimMemoryProvider implements WorkTrackerProvider {
