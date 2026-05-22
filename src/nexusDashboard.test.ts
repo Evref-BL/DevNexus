@@ -2118,6 +2118,80 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves workspace sections independently for card hydration", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-section-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-section-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "workspace-section",
+      name: "Workspace Section",
+      plugins: [
+        {
+          id: "configured-plugin",
+          enabled: true,
+          capabilities: [],
+        },
+      ],
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      gitRunner: () => {
+        throw new Error("plugin section must not run Git");
+      },
+      now: fixedClock("2026-05-21T10:24:50.000Z"),
+    });
+
+    try {
+      const response = await fetch(
+        `${server.url}api/dashboard/section?workspace=workspace-section&section=plugins`,
+      );
+      const payload = await response.json();
+      const invalidResponse = await fetch(
+        `${server.url}api/dashboard/section?workspace=workspace-section&section=unknown`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        version: 1,
+        section: "plugins",
+        patch: {
+          loadedSections: ["plugins"],
+          plugins: {
+            enabledCount: 1,
+            records: [
+              expect.objectContaining({
+                id: "configured-plugin",
+                state: "enabled",
+              }),
+            ],
+          },
+        },
+      });
+      expect(invalidResponse.status).toBe(400);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves host cockpit data without a current workspace root", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");

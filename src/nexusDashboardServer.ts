@@ -12,6 +12,7 @@ import {
   buildNexusDashboardHostProjectIndex,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
+  buildNexusDashboardWorkspaceSection,
   buildNexusDashboardWorkspaceShell,
   nexusDashboardEmbeddingContract,
   nexusDashboardHostWorkspaceReferenceMatches,
@@ -22,6 +23,7 @@ import {
   type NexusDashboardHostSnapshot,
   type NexusDashboardHostWorkspaceRecord,
   type NexusDashboardSnapshot,
+  type NexusDashboardWorkspaceSectionId,
   type NexusDashboardThreadResolutionAction,
 } from "./nexusDashboard.js";
 import {
@@ -393,6 +395,13 @@ export function renderNexusDashboardClientModule(): string {
     "  return response.json();",
     "}",
     "",
+    "export async function fetchDevNexusDashboardSection(baseUrl = '', workspaceId = '', section = '') {",
+    "  const query = `${workspaceQuery(workspaceId)}${workspaceQuery(workspaceId) ? '&' : '?'}section=${encodeURIComponent(section)}`;",
+    "  const response = await fetch(`${baseUrl}/api/dashboard/section${query}`, { cache: 'no-store' });",
+    "  if (!response.ok) throw new Error(`Dashboard section API returned ${response.status}`);",
+    "  return response.json();",
+    "}",
+    "",
     "export async function fetchDevNexusDashboardHost(baseUrl = '', workspaceId = '') {",
     "  const response = await fetch(`${baseUrl}/api/host${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
     "  if (!response.ok) throw new Error(`Host API returned ${response.status}`);",
@@ -428,6 +437,7 @@ export function renderNexusDashboardClientModule(): string {
     "  let disposed = false;",
     "  let inFlight = false;",
     "  let hostInFlight = false;",
+    "  let workspaceSectionToken = 0;",
     "  applyThemePreference(themeMode);",
     "  injectStyles();",
     "  const systemThemeQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;",
@@ -465,6 +475,7 @@ export function renderNexusDashboardClientModule(): string {
     "    latestSnapshot = null;",
     "    latestError = null;",
     "    lastHostRefreshAt = 0;",
+    "    workspaceSectionToken += 1;",
     "    writeWorkspaceIdToLocation(selectedWorkspaceId);",
     "    renderCurrent();",
     "    void refresh(true);",
@@ -523,12 +534,14 @@ export function renderNexusDashboardClientModule(): string {
     "        latestError = null;",
     "        if (!findSelectableById(shell, selectedId)) selectedId = defaultSelectedId(shell);",
     "        renderCurrent();",
+    "        void refreshWorkspaceSections(workspaceId, ++workspaceSectionToken);",
     "      }",
     "      if (needsHostShell) void refreshHostShell();",
     "      const snapshot = await fetchDevNexusDashboard(baseUrl, workspaceId);",
     "      if (workspaceId !== selectedWorkspaceId) return;",
     "      latestSnapshot = snapshot;",
     "      latestError = null;",
+    "      workspaceSectionToken += 1;",
     "      if (!findSelectableById(snapshot, selectedId)) selectedId = defaultSelectedId(snapshot);",
     "      renderCurrent();",
     "      if (shouldRefreshHost) void refreshHost();",
@@ -539,6 +552,20 @@ export function renderNexusDashboardClientModule(): string {
     "    } finally {",
     "      inFlight = false;",
     "    }",
+    "  }",
+    "  async function refreshWorkspaceSections(workspaceId, token) {",
+    "    const sections = ['components', 'plugins', 'threads', 'tracked-work'];",
+    "    await Promise.all(sections.map(async (section) => {",
+    "      try {",
+    "        const payload = await fetchDevNexusDashboardSection(baseUrl, workspaceId, section);",
+    "        if (disposed || workspaceId !== selectedWorkspaceId || token !== workspaceSectionToken) return;",
+    "        latestSnapshot = mergeDashboardSnapshot(latestSnapshot, payload.patch);",
+    "        if (latestSnapshot && !findSelectableById(latestSnapshot, selectedId)) selectedId = defaultSelectedId(latestSnapshot);",
+    "        renderCurrent();",
+    "      } catch {",
+    "        // Keep the shell visible; the full snapshot is still the final reconciliation path.",
+    "      }",
+    "    }));",
     "  }",
     "  async function refreshHost() {",
     "    if (hostInFlight) return;",
@@ -588,12 +615,15 @@ export function renderNexusDashboardClientModule(): string {
     "function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '') {",
     "  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);",
     "  const loading = snapshot.partial === true;",
-    "  const workHistory = loading ? renderProgressivePanel('Parallel work map', 'Workspace Activity', 'Loading checkout lanes, worktrees, cycles, and approvals.') : renderWorkHistory(snapshot, activeSelection);",
-    "  const threadInbox = loading ? renderProgressivePanel('HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot);",
-    "  const trackedWork = loading ? renderProgressivePanel('Tracked work', 'Issues and Work Items', 'Loading provider and local work items.') : renderTrackedWork(snapshot, activeSelection);",
-    "  const plugins = loading ? renderProgressivePanel('Extensions', 'Plugins', 'Loading local plugin candidates and capability details.') : renderPlugins(snapshot.plugins);",
-    "  const activity = loading ? renderProgressivePanel('Activity', 'Recent Signals', 'Loading workspace events.') : `<div class=\"dn-panel\"><h2>Activity</h2><div class=\"dn-events\">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>`;",
-    "  const blockers = loading ? renderProgressivePanel('Blockers', 'Blockers', 'Loading approvals and blockers.') : `<div class=\"dn-panel\"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>`;",
+    "  const threadsLoaded = sectionLoaded(snapshot, 'threads');",
+    "  const trackedLoaded = sectionLoaded(snapshot, 'tracked-work');",
+    "  const pluginsLoaded = sectionLoaded(snapshot, 'plugins');",
+    "  const workHistory = loading && !threadsLoaded ? renderProgressivePanel('Parallel work map', 'Workspace Activity', 'Loading checkout lanes, worktrees, cycles, and approvals.') : renderWorkHistory(snapshot, activeSelection);",
+    "  const threadInbox = loading && !threadsLoaded ? renderProgressivePanel('HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot);",
+    "  const trackedWork = loading && !trackedLoaded ? renderProgressivePanel('Tracked work', 'Issues and Work Items', 'Loading provider and local work items.') : renderTrackedWork(snapshot, activeSelection);",
+    "  const plugins = loading && !pluginsLoaded ? renderProgressivePanel('Extensions', 'Plugins', 'Loading local plugin candidates and capability details.') : renderPlugins(snapshot.plugins);",
+    "  const activity = loading && !threadsLoaded ? renderProgressivePanel('Activity', 'Recent Signals', 'Loading workspace events.') : `<div class=\"dn-panel\"><h2>Activity</h2><div class=\"dn-events\">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>`;",
+    "  const blockers = loading && !trackedLoaded ? renderProgressivePanel('Blockers', 'Blockers', 'Loading approvals and blockers.') : `<div class=\"dn-panel\"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>`;",
     "  return `<div class=\"dn-shell\">",
     "    <header class=\"dn-header\">",
     "      <div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>",
@@ -695,6 +725,17 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function sumBy(values, selector) {",
     "  return values.reduce((total, value) => total + Number(selector(value) ?? 0), 0);",
+    "}",
+    "",
+    "function mergeDashboardSnapshot(snapshot, patch) {",
+    "  if (!snapshot) return patch ?? null;",
+    "  if (!patch) return snapshot;",
+    "  const loaded = new Set([...(snapshot.loadedSections ?? []), ...(patch.loadedSections ?? [])]);",
+    "  return { ...snapshot, ...patch, loadedSections: [...loaded], partial: snapshot.partial === true && patch.partial !== false ? true : patch.partial };",
+    "}",
+    "",
+    "function sectionLoaded(snapshot, section) {",
+    "  return snapshot?.partial !== true || (snapshot.loadedSections ?? []).includes(section);",
     "}",
     "",
     "function renderLoading(themeMode, host, selectedWorkspaceId = '') {",
@@ -1917,6 +1958,20 @@ async function routeDashboardRequest(
       sendJson(response, dashboardWorkspacePayload(snapshot, selection));
       return;
     }
+    if (url.pathname === "/api/dashboard/section") {
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      sendJson(
+        response,
+        await buildNexusDashboardWorkspaceSection(
+          selection.snapshotOptions,
+          dashboardSectionFromUrl(url),
+        ),
+      );
+      return;
+    }
     if (url.pathname === "/api/dashboard" || url.pathname === "/api/snapshot") {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
@@ -2122,6 +2177,23 @@ function workspaceIdFromUrl(url: URL): string | null {
     );
   }
   return workspaceId;
+}
+
+function dashboardSectionFromUrl(url: URL): NexusDashboardWorkspaceSectionId {
+  const section = url.searchParams.get("section")?.trim();
+  if (
+    section === "components" ||
+    section === "plugins" ||
+    section === "threads" ||
+    section === "tracked-work"
+  ) {
+    return section;
+  }
+  throw new NexusDashboardRouteError(
+    "invalid_dashboard_section",
+    "Dashboard section must be components, plugins, threads, or tracked-work",
+    400,
+  );
 }
 
 async function resolveDashboardWorkspaceSelection(

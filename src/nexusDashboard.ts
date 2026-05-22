@@ -611,6 +611,7 @@ export interface NexusDashboardSnapshot {
   version: 1;
   contract: NexusDashboardEmbeddingContract;
   partial?: boolean;
+  loadedSections?: string[];
   generatedAt: string;
   projectRoot: string;
   project: NexusDashboardProjectSummary;
@@ -629,6 +630,20 @@ export interface NexusDashboardSnapshot {
   blockers: string[];
   events: NexusDashboardEvent[];
   weave: NexusDashboardWeave;
+}
+
+export type NexusDashboardWorkspaceSectionId =
+  | "components"
+  | "plugins"
+  | "threads"
+  | "tracked-work";
+
+export interface NexusDashboardWorkspaceSectionPayload {
+  version: 1;
+  generatedAt: string;
+  projectRoot: string;
+  section: NexusDashboardWorkspaceSectionId;
+  patch: Partial<NexusDashboardSnapshot>;
 }
 
 export interface BuildNexusDashboardHostSnapshotOptions
@@ -865,6 +880,7 @@ export async function buildNexusDashboardWorkspaceShell(
       hostMode: false,
     }),
     partial: true,
+    loadedSections: ["shell"],
     generatedAt,
     projectRoot,
     project,
@@ -883,6 +899,145 @@ export async function buildNexusDashboardWorkspaceShell(
     blockers: [],
     events: [],
     weave: workspaceShellWeave(generatedAt, project, componentSummaries),
+  };
+}
+
+export async function buildNexusDashboardWorkspaceSection(
+  options: BuildNexusDashboardSnapshotOptions,
+  section: NexusDashboardWorkspaceSectionId,
+): Promise<NexusDashboardWorkspaceSectionPayload> {
+  const projectRoot = path.resolve(nonEmptyString(options.projectRoot, "projectRoot"));
+  const generatedAt = isoString(options.now?.() ?? new Date());
+  const projectConfig = loadProjectConfig(projectRoot);
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const gitRunner = options.gitRunner ?? defaultGitRunner;
+  const componentShellSummaries = components.map(summarizeComponentShell);
+  const providerUrls = dashboardProviderUrls(projectConfig, componentShellSummaries);
+  const basePatch = {
+    generatedAt,
+    projectRoot,
+    project: projectSummary(projectRoot, projectConfig, componentShellSummaries),
+    loadedSections: [section],
+  };
+
+  if (section === "components") {
+    const componentSummaries = components.map((component) =>
+      summarizeComponent(component, gitRunner),
+    );
+    return {
+      version: 1,
+      generatedAt,
+      projectRoot,
+      section,
+      patch: {
+        ...basePatch,
+        components: componentSummaries,
+      },
+    };
+  }
+
+  if (section === "plugins") {
+    return {
+      version: 1,
+      generatedAt,
+      projectRoot,
+      section,
+      patch: {
+        ...basePatch,
+        plugins: summarizePlugins(projectRoot, projectConfig, components),
+      },
+    };
+  }
+
+  if (section === "threads") {
+    const componentSummaries = components.map((component) =>
+      summarizeComponent(component, gitRunner),
+    );
+    const threadProviderUrls = dashboardProviderUrls(projectConfig, componentSummaries);
+    const worktreeCollection = capture(() =>
+      listNexusWorktreeLeases({
+        projectRoot,
+        includeProjectMeta: true,
+        now: options.now,
+      }),
+    );
+    const worktrees = summarizeWorktrees(
+      projectRoot,
+      projectConfig,
+      componentSummaries,
+      worktreeCollection.value,
+    );
+    const runs = readRuns(projectRoot, projectConfig);
+    const cleanupPlan = capture(() =>
+      buildNexusCleanupPlan({
+        projectRoot,
+        includeProjectMeta: true,
+        gitRunner,
+        now: options.now,
+      }),
+    );
+    const threads = summarizeThreads(
+      worktrees,
+      threadProviderUrls,
+      cleanupPlan.value?.candidates ?? [],
+      runs,
+      readNexusDashboardThreadResolutionStore(projectRoot),
+    );
+    return {
+      version: 1,
+      generatedAt,
+      projectRoot,
+      section,
+      patch: {
+        ...basePatch,
+        components: componentSummaries,
+        worktrees,
+        threads,
+        events: buildDashboardEvents({
+          generatedAt,
+          automation: null,
+          eligibleWork: null,
+          targetReport: null,
+          worktrees,
+          cycles: [],
+          runs,
+          blockers: [],
+          providerUrls: threadProviderUrls,
+        }),
+        weave: buildNexusDashboardWeave({
+          generatedAt,
+          projectRoot,
+          projectConfig,
+          components: componentSummaries,
+          eligibleWork: null,
+          worktrees,
+          cycles: [],
+          runs,
+          authority: null,
+          blockers: [],
+          providerUrls: threadProviderUrls,
+        }),
+      },
+    };
+  }
+
+  const eligibleWork = await captureAsync(() =>
+    getNexusEligibleWorkSummary({
+      ...statusOptions(options, projectRoot, gitRunner),
+    }),
+  );
+  return {
+    version: 1,
+    generatedAt,
+    projectRoot,
+    section,
+    patch: {
+      ...basePatch,
+      trackedWork: summarizeTrackedWork(eligibleWork.value, providerUrls),
+      blockers: eligibleWork.ok
+        ? eligibleWork.value?.blockers ?? []
+        : [`Eligible work unavailable: ${eligibleWork.error?.message ?? "unknown error"}`],
+    },
   };
 }
 
