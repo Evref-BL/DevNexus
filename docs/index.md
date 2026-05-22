@@ -16,6 +16,7 @@ publication rules agents need before they edit code.
 
 ## Start Here
 
+- [Feature overview](dev-nexus-features.md) summarizes what DevNexus provides.
 - [Getting started](user/getting-started.md) walks through the first workspace.
 - [Concepts](user/concepts.md) defines the workspace model and vocabulary.
 - [First workspace from existing components](user/first-workspace-existing-components.md)
