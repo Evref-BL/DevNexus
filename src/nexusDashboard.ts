@@ -344,6 +344,9 @@ export interface NexusDashboardThreadSummary {
   needsDecisionCount: number;
   archiveCandidateCount: number;
   forgetCandidateCount: number;
+  source?: "cleanup" | "local";
+  incomplete?: boolean;
+  detail?: string | null;
   records: NexusDashboardThreadRecord[];
 }
 
@@ -808,6 +811,11 @@ export async function buildNexusDashboardSnapshot(
     cleanupPlan.value?.candidates ?? [],
     runs,
     threadResolutions,
+    {
+      source: "cleanup",
+      incomplete: !cleanupPlan.ok,
+      detail: cleanupPlan.ok ? null : "Cleanup proof is unavailable.",
+    },
   );
   const trackedWork = summarizeTrackedWork(eligibleWork.value, providerUrls);
   const publication = summarizePublication(automation.value);
@@ -981,20 +989,17 @@ export async function buildNexusDashboardWorkspaceSection(
       worktreeCollection.value,
     );
     const runs = readRuns(projectRoot, projectConfig);
-    const cleanupPlan = capture(() =>
-      buildNexusCleanupPlan({
-        projectRoot,
-        includeProjectMeta: true,
-        gitRunner,
-        now: options.now,
-      }),
-    );
     const threads = summarizeThreads(
       worktrees,
       threadProviderUrls,
-      cleanupPlan.value?.candidates ?? [],
+      [],
       runs,
       readNexusDashboardThreadResolutionStore(projectRoot),
+      {
+        source: "local",
+        incomplete: true,
+        detail: "Showing active lease and chat records while cleanup proof loads.",
+      },
     );
     return {
       version: 1,
@@ -2563,6 +2568,9 @@ function emptyThreadSummary(): NexusDashboardThreadSummary {
     needsDecisionCount: 0,
     archiveCandidateCount: 0,
     forgetCandidateCount: 0,
+    source: "local",
+    incomplete: true,
+    detail: null,
     records: [],
   };
 }
@@ -2844,6 +2852,7 @@ function summarizeThreads(
   cleanupCandidates: NexusCleanupCandidate[],
   runs: NexusAutomationRunRecord[],
   threadResolutions: NexusDashboardThreadResolutionStore = emptyNexusDashboardThreadResolutionStore(),
+  metadata: Pick<NexusDashboardThreadSummary, "source" | "incomplete" | "detail"> = {},
 ): NexusDashboardThreadSummary {
   const matchedCleanupIds = new Set<string>();
   const assistantThreads = assistantThreadIndex(runs);
@@ -2909,6 +2918,9 @@ function summarizeThreads(
     needsDecisionCount: needsDecision.length,
     archiveCandidateCount: records.filter((record) => record.decision === "archive").length,
     forgetCandidateCount: records.filter((record) => record.decision === "forget").length,
+    source: metadata.source ?? (cleanupCandidates.length > 0 ? "cleanup" : "local"),
+    incomplete: metadata.incomplete ?? cleanupCandidates.length === 0,
+    detail: metadata.detail ?? null,
     records,
   };
 }

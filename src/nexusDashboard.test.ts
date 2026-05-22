@@ -2273,6 +2273,86 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves local thread state without cleanup planning", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-thread-local-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-thread-local-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "thread-local",
+      name: "Thread Local",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    writeNexusWorktreeLeaseStore(registeredRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(registeredConfig.id, {
+          id: "lease-thread-local",
+          status: "working",
+          branchName: "codex/dev-nexus/thread-local",
+        }),
+      ],
+    });
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      gitRunner: (args, cwd) => {
+        const command = args.join(" ");
+        if (command.includes("worktree") || command.startsWith("branch ")) {
+          throw new Error(`thread section must not run cleanup planner: ${command} in ${cwd}`);
+        }
+        return fakeGitRunner()(args, cwd);
+      },
+      now: fixedClock("2026-05-21T10:25:00.000Z"),
+    });
+
+    try {
+      const response = await fetch(
+        `${server.url}api/dashboard/section?workspace=thread-local&section=threads`,
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        section: "threads",
+        patch: {
+          loadedSections: ["threads"],
+          threads: {
+            source: "local",
+            incomplete: true,
+            totalCount: 1,
+            records: [
+              expect.objectContaining({
+                id: "lease-thread-local",
+                branchName: "codex/dev-nexus/thread-local",
+                decision: "continue",
+              }),
+            ],
+          },
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves host cockpit data without a current workspace root", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");
