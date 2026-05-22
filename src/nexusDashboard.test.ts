@@ -45,6 +45,15 @@ function fixedClock(timestamp: string): () => string {
 }
 
 async function loadDashboardClientTestHooks(): Promise<{
+  cockpitThreadPrompt: (thread: {
+    branchName?: string | null;
+    componentId?: string | null;
+    decisionDetail: string;
+    decisionLabel: string;
+    hostId?: string | null;
+    title: string;
+    workItemId?: string | null;
+  }) => string;
   historyRows: (snapshot: unknown) => {
     rows: Array<{ detail: string; lane: number; node: { id: string }; title: string }>;
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>;
@@ -85,7 +94,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -506,7 +515,7 @@ describe("nexus dashboard", () => {
     expect(snapshot.signals.find((signal) => signal.id === "worktrees")).toMatchObject({
       label: "Threads",
       value: "2",
-      detail: "1 needs review",
+      detail: "1 needs action",
     });
     expect(snapshot.signals.find((signal) => signal.id === "plugins")).toMatchObject({
       label: "Plugins",
@@ -557,6 +566,104 @@ describe("nexus dashboard", () => {
     expect(snapshot.events.find((event) => event.id === "target-cycle-cycle-1")).toMatchObject({
       href: "https://github.com/Evref-BL/DevNexus/pull/66",
     });
+  });
+
+  it("classifies thread lifecycle states and resumable assistant chats", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-thread-lifecycle-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(config.id, {
+          id: "lease-resume",
+          workItemId: "local-1",
+          branchName: "codex/dev-nexus/github-114-dashboard",
+          status: "working",
+          updatedAt: "2026-05-21T10:00:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-blocked",
+          workItemId: "github-120",
+          branchName: "codex/dev-nexus/github-120-blocked",
+          status: "blocked",
+          updatedAt: "2026-05-21T09:00:00.000Z",
+        }),
+        worktreeLease(config.id, {
+          id: "lease-merged",
+          workItemId: "github-121",
+          branchName: "codex/dev-nexus/github-121-merged",
+          status: "merged",
+          updatedAt: "2026-05-21T08:00:00.000Z",
+        }),
+      ],
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-21T10:02:00.000Z",
+      record: {
+        id: "run-chat-1",
+        projectId: config.id,
+        componentId: "primary",
+        status: "completed",
+        startedAt: "2026-05-21T10:01:00.000Z",
+        finishedAt: "2026-05-21T10:02:00.000Z",
+        workItemId: "local-1",
+        branchName: "codex/dev-nexus/github-114-dashboard",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-chat-1",
+          profileId: "codex-app-server",
+          threadId: "existing-thread",
+          turnId: "turn-old",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: false,
+          threadPersistence: "durable",
+          cwd: projectRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus", "automation", "result.json"),
+          failureSummary: null,
+        },
+      },
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:05:00.000Z"),
+    });
+
+    expect(snapshot.threads).toMatchObject({
+      activeCount: 1,
+      needsDecisionCount: 2,
+    });
+    expect(snapshot.threads.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "lease-resume",
+          decision: "resume",
+          decisionLabel: "Resume",
+          assistantThreadId: "existing-thread",
+        }),
+        expect.objectContaining({
+          id: "lease-blocked",
+          decision: "blocked",
+          decisionLabel: "Blocked",
+        }),
+        expect.objectContaining({
+          id: "lease-merged",
+          decision: "merged",
+          decisionLabel: "Merged",
+        }),
+      ]),
+    );
   });
 
   it("builds a host snapshot from registered workspaces plus the current project", async () => {
@@ -703,7 +810,7 @@ describe("nexus dashboard", () => {
         }),
         expect.objectContaining({
           id: "host-action:thread:thread",
-          reason: "2 threads need review",
+          reason: "2 threads need action",
           state: "stale threads",
         }),
         expect.objectContaining({
@@ -763,7 +870,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderPlugins");
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
-    expect(module).toContain("Copy brief");
+    expect(module).toContain("Copy prompt");
+    expect(module).not.toContain("Copy brief");
     expect(module).toContain("Start chat");
     expect(module).toContain("Resume chat");
     expect(module).toContain("data-start-chat-prompt");
@@ -973,6 +1081,27 @@ describe("nexus dashboard", () => {
     expect(html).toContain('target="_blank"');
     expect(html).toContain("opens in a new tab");
     expect(html).toContain("M9 2h5v5");
+  });
+
+  it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const prompt = hooks.cockpitThreadPrompt({
+      title: "main.",
+      decisionLabel: "Rescue",
+      decisionDetail: "Local changes need inspection before this can be archived or forgotten.",
+      branchName: "main",
+      componentId: "dev-nexus",
+      hostId: "local",
+      workItemId: null,
+    });
+
+    expect(prompt).toContain("Continue cockpit thread: main.");
+    expect(prompt).toContain(
+      "Reason: Local changes need inspection before this can be archived or forgotten.",
+    );
+    expect(prompt).not.toContain("..");
+    expect(prompt).not.toContain("Codex");
   });
 
   it("extracts GitHub provider actions from bare issue references", async () => {

@@ -234,10 +234,13 @@ export interface NexusDashboardWorktreeSummary {
 
 export type NexusDashboardThreadDecision =
   | "continue"
+  | "resume"
   | "review"
   | "archive"
   | "forget"
-  | "rescue";
+  | "rescue"
+  | "merged"
+  | "blocked";
 
 export interface NexusDashboardThreadRecord {
   id: string;
@@ -780,7 +783,7 @@ function dashboardHostWorkspaceSummary(value: {
   eligibleWorkCount: number | null;
 }): string {
   const review = value.threads.needsDecisionCount > 0
-    ? `${value.threads.needsDecisionCount} need review`
+    ? `${value.threads.needsDecisionCount} need action`
     : "no review needed";
   const dirty = value.dirtyComponentCount > 0
     ? `${value.dirtyComponentCount} dirty`
@@ -904,7 +907,7 @@ function dashboardHostActionItems(
   if (workspace.needsDecisionCount > 0) {
     add(
       "thread",
-      `${workspace.needsDecisionCount} ${plural(workspace.needsDecisionCount, "thread", "threads")} need review`,
+      `${workspace.needsDecisionCount} ${plural(workspace.needsDecisionCount, "thread", "threads")} need action`,
       "Unfinished work needs continue, archive, forget, or rescue.",
       workspace.staleThreadCount > 0 ? "stale threads" : "review needed",
       "warn",
@@ -1763,18 +1766,18 @@ function summarizeThreads(
       if (cleanup) {
         matchedCleanupIds.add(cleanup.id);
       }
-      const decision = threadDecision(worktree, cleanup);
-      const actions = providerActionsFromText(
-        `${worktree.workItemId ?? ""} ${worktree.branchName ?? ""} ${worktree.id}`,
-        providerUrls,
-        worktree.componentId,
-      );
       const assistantThread = assistantThreadForWork({
         index: assistantThreads,
         componentId: worktree.componentId,
         workItemId: worktree.workItemId,
         branchName: worktree.branchName,
       });
+      const decision = threadDecision(worktree, cleanup, assistantThread);
+      const actions = providerActionsFromText(
+        `${worktree.workItemId ?? ""} ${worktree.branchName ?? ""} ${worktree.id}`,
+        providerUrls,
+        worktree.componentId,
+      );
       return {
         id: worktree.id,
         title: threadTitle(worktree),
@@ -1807,11 +1810,13 @@ function summarizeThreads(
   });
 
   const needsDecision = records.filter((record) =>
-    ["review", "archive", "rescue"].includes(record.decision),
+    !["continue", "resume"].includes(record.decision),
   );
   return {
     totalCount: records.length,
-    activeCount: records.filter((record) => record.decision === "continue").length,
+    activeCount: records.filter((record) =>
+      ["continue", "resume"].includes(record.decision)
+    ).length,
     needsDecisionCount: needsDecision.length,
     archiveCandidateCount: records.filter((record) => record.decision === "archive").length,
     forgetCandidateCount: records.filter((record) => record.decision === "forget").length,
@@ -1859,7 +1864,6 @@ function cleanupThreadRecord(
   providerUrls: NexusDashboardProviderUrls,
   assistantThreads: Map<string, AssistantThreadReference>,
 ): NexusDashboardThreadRecord {
-  const decision = cleanupThreadDecision(candidate);
   const actionText = `${candidate.branch ?? ""} ${candidate.id}`;
   const assistantThread = assistantThreadForWork({
     index: assistantThreads,
@@ -1867,6 +1871,7 @@ function cleanupThreadRecord(
     workItemId: candidate.lease?.workItemId ?? null,
     branchName: candidate.branch,
   });
+  const decision = cleanupThreadDecision(candidate);
   return {
     id: candidate.id,
     title: cleanupThreadTitle(candidate),
@@ -1963,11 +1968,17 @@ function assistantThreadReferenceTime(reference: AssistantThreadReference): numb
 function cleanupThreadDecision(
   candidate: NexusCleanupCandidate,
 ): NexusDashboardThreadDecision {
+  if (candidate.rescue.needed) {
+    return "rescue";
+  }
+  if (candidate.classifications.includes("merged")) {
+    return "merged";
+  }
   if (candidate.safeToDelete) {
     return "forget";
   }
-  if (candidate.rescue.needed) {
-    return "rescue";
+  if (candidate.classifications.includes("blocked")) {
+    return "blocked";
   }
   return "review";
 }
@@ -1975,10 +1986,17 @@ function cleanupThreadDecision(
 function threadDecision(
   worktree: NexusDashboardWorktreeSummary["records"][number],
   cleanup: NexusCleanupCandidate | null,
+  assistantThread: AssistantThreadReference | null,
 ): NexusDashboardThreadDecision {
   const status = worktree.effectiveStatus || worktree.status;
   if (worktree.dirty) {
     return "rescue";
+  }
+  if (status === "blocked") {
+    return "blocked";
+  }
+  if (status === "merged") {
+    return "merged";
   }
   if (cleanup?.safeToDelete) {
     return "forget";
@@ -1986,12 +2004,13 @@ function threadDecision(
   if (status === "abandoned") {
     return "archive";
   }
+  if (assistantThread) {
+    return "resume";
+  }
   if (
     worktree.stale ||
     status === "stale" ||
-    status === "blocked" ||
-    status === "ready" ||
-    status === "merged"
+    status === "ready"
   ) {
     return "review";
   }
@@ -2012,10 +2031,16 @@ function threadDecisionLabel(decision: NexusDashboardThreadDecision): string {
   switch (decision) {
     case "archive":
       return "Archive";
+    case "blocked":
+      return "Blocked";
     case "forget":
       return "Forget";
+    case "merged":
+      return "Merged";
     case "rescue":
       return "Rescue";
+    case "resume":
+      return "Resume";
     case "review":
       return "Review";
     case "continue":
@@ -2030,10 +2055,19 @@ function threadDecisionDetail(
   switch (decision) {
     case "archive":
       return "Park the thread outside the active flow, keeping its notes and branch context.";
+    case "blocked":
+      if (cleanup && !cleanup.safeToDelete && cleanup.blockers.length > 0) {
+        return cleanup.blockers[0];
+      }
+      return "A blocker needs a human decision before this thread can continue or be cleaned up.";
     case "forget":
       return "Clean merged work can leave the active cockpit after cleanup proof.";
+    case "merged":
+      return "Merged work can leave the active cockpit after cleanup proof.";
     case "rescue":
       return "Local changes need inspection before this can be archived or forgotten.";
+    case "resume":
+      return "A previous assistant chat is available for this thread.";
     case "review":
       if (cleanup && !cleanup.safeToDelete && cleanup.blockers.length > 0) {
         return cleanup.blockers[0];
@@ -2048,14 +2082,20 @@ function threadDecisionPriority(decision: NexusDashboardThreadDecision): number 
   switch (decision) {
     case "rescue":
       return 0;
-    case "review":
+    case "blocked":
       return 1;
-    case "continue":
+    case "review":
       return 2;
-    case "archive":
+    case "merged":
       return 3;
-    case "forget":
+    case "resume":
       return 4;
+    case "continue":
+      return 5;
+    case "archive":
+      return 6;
+    case "forget":
+      return 7;
   }
 }
 
@@ -2383,7 +2423,7 @@ function dashboardSignals(
 
 function threadSignalDetail(threads: NexusDashboardThreadSummary): string {
   if (threads.needsDecisionCount > 0) {
-    return `${threads.needsDecisionCount} needs review`;
+    return `${threads.needsDecisionCount} needs action`;
   }
   if (threads.forgetCandidateCount > 0) {
     return `${threads.forgetCandidateCount} ready to forget`;
@@ -2426,7 +2466,7 @@ function dashboardSummary(
     readyCount > 0 ? `${readyCount} ready ${plural(readyCount, "item", "items")}` : "no ready items",
     `${threads.totalCount} ${plural(threads.totalCount, "thread", "threads")}`,
     threads.needsDecisionCount > 0
-      ? `${threads.needsDecisionCount} need review`
+      ? `${threads.needsDecisionCount} need action`
       : "threads current",
     blockers.length > 0 ? `${blockers.length} ${plural(blockers.length, "blocker", "blockers")}` : "no blockers",
     automation ? `automation ${automation.status}` : "automation unknown",
