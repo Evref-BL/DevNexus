@@ -66,6 +66,58 @@ describe("provider credential broker", () => {
     });
   });
 
+  it("selects matching GitHub App profiles by installation account and repository", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        appProfile({
+          id: "dev-nexus-app-evref",
+          githubApp: {
+            appId: "12345",
+            privateKeyPath: "/secrets/app.private-key.pem",
+            installationAccount: "Evref-BL",
+            repositories: ["DevNexus"],
+          },
+        }),
+        appProfile({
+          id: "dev-nexus-app-dogfood",
+          githubApp: {
+            appId: "12345",
+            privateKeyPath: "/secrets/app.private-key.pem",
+            installationAccount: "Gabot-Darbot",
+            repositories: ["dev-nexus-dogfood"],
+          },
+        }),
+      ],
+      env: {
+        GH_TOKEN: "installation-token",
+      },
+    });
+
+    expect(
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "git",
+        actorId: "dev-nexus-automation-app",
+        providerIdentity: "devnexus-automation",
+        repository: {
+          owner: "Gabot-Darbot",
+          name: "dev-nexus-dogfood",
+        },
+      }),
+    ).toMatchObject({
+      profileId: "dev-nexus-app-dogfood",
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Gabot-Darbot/dev-nexus-dogfood.git",
+      },
+      secret: {
+        kind: "token",
+        value: "installation-token",
+      },
+    });
+  });
+
   it("resolves command-backed credentials with metadata and conservative expiry checks", () => {
     const calls: Array<{ command: string; args: string[] }> = [];
     const commandRunner: NexusProviderCredentialCommandRunner = (

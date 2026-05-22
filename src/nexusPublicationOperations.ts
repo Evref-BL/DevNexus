@@ -7,6 +7,7 @@ import {
 } from "./nexusForgePublication.js";
 import {
   nexusForgeRepositoryFromGitHubRepository,
+  resolveNexusGitHubRepositoryFromRemoteUrl,
   resolveNexusGitHubRepository,
   selectNexusGitHubPrimaryTracker,
   type NexusGitHubRepositorySelection,
@@ -43,6 +44,26 @@ export interface NexusPublicationComponentContext {
   repository: NexusGitHubRepositorySelection;
 }
 
+export interface NexusPublicationProjectContext {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  component: null;
+  publication: NexusAutomationPublicationConfig;
+  authProfiles: NexusHostingAuthProfileConfig[];
+  repository: NexusGitHubRepositorySelection;
+}
+
+export interface NexusPublicationTargetSummary {
+  kind: "component" | "project";
+  id: string;
+  componentId: string | null;
+  projectId: string | null;
+}
+
+export type NexusPublicationTargetContext =
+  | NexusPublicationComponentContext
+  | NexusPublicationProjectContext;
+
 export interface NexusPublicationCredentialSummary {
   provider: string;
   profileId: string;
@@ -60,7 +81,8 @@ export interface NexusPublicationCredentialSummary {
 
 export interface NexusPublicationBranchPushResult {
   projectRoot: string;
-  componentId: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
   repository: NexusGitHubRepositorySelection;
   branch: string;
   targetBranch: string | null;
@@ -72,7 +94,8 @@ export interface NexusPublicationBranchPushResult {
 
 export interface NexusPublicationPullRequestUpsertResult {
   projectRoot: string;
-  componentId: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
   repository: NexusGitHubRepositorySelection;
   credential: NexusPublicationCredentialSummary;
   pullRequest: NexusForgePullRequestResult;
@@ -80,7 +103,8 @@ export interface NexusPublicationPullRequestUpsertResult {
 
 export interface NexusPublicationPullRequestMergeResult {
   projectRoot: string;
-  componentId: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
   repository: NexusGitHubRepositorySelection;
   credential: NexusPublicationCredentialSummary;
   pullRequest: {
@@ -100,6 +124,7 @@ export interface PushNexusPublicationBranchForComponentOptions
   extends NexusPublicationOperationRuntimeOptions {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
@@ -112,6 +137,7 @@ export interface UpsertNexusPublicationPullRequestForComponentOptions
   extends NexusPublicationOperationRuntimeOptions {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   number?: number | null;
   head: string;
   base?: string | null;
@@ -123,6 +149,7 @@ export interface MergeNexusPublicationPullRequestForComponentOptions
   extends NexusPublicationOperationRuntimeOptions {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
 }
@@ -156,10 +183,44 @@ export function resolveNexusPublicationComponentContext(options: {
   };
 }
 
+export function resolveNexusPublicationTargetContext(options: {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+}): NexusPublicationTargetContext {
+  if (options.projectRepository && options.componentId) {
+    throw new Error("Publication target accepts --component or --project-repository, not both.");
+  }
+  if (!options.projectRepository) {
+    return resolveNexusPublicationComponentContext(options);
+  }
+
+  const projectRoot = path.resolve(required(options.projectRoot, "projectRoot"));
+  const projectConfig = loadProjectConfig(projectRoot);
+  const publication = resolveNexusPublicationPolicy(projectConfig);
+  const authProfiles = loadNexusPublicationAuthProfiles({
+    projectRoot,
+    projectConfig,
+  });
+  const repository = resolveNexusGitHubRepositoryFromRemoteUrl(
+    projectConfig.repo.remoteUrl,
+    "project repository publication",
+  );
+
+  return {
+    projectRoot,
+    projectConfig,
+    component: null,
+    publication,
+    authProfiles,
+    repository,
+  };
+}
+
 export async function pushNexusPublicationBranchForComponent(
   options: PushNexusPublicationBranchForComponentOptions,
 ): Promise<NexusPublicationBranchPushResult> {
-  const context = resolveNexusPublicationComponentContext(options);
+  const context = resolveNexusPublicationTargetContext(options);
   assertSafePublicationBranchTarget({
     publication: context.publication,
     branch: options.branch,
@@ -187,7 +248,8 @@ export async function pushNexusPublicationBranchForComponent(
 
   return {
     projectRoot: context.projectRoot,
-    componentId: context.component.id,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
     repository: context.repository,
     branch: options.branch,
     targetBranch: options.targetBranch ?? null,
@@ -201,7 +263,7 @@ export async function pushNexusPublicationBranchForComponent(
 export async function upsertNexusPublicationPullRequestForComponent(
   options: UpsertNexusPublicationPullRequestForComponentOptions,
 ): Promise<NexusPublicationPullRequestUpsertResult> {
-  const context = resolveNexusPublicationComponentContext(options);
+  const context = resolveNexusPublicationTargetContext(options);
   const credential = await resolvePublicationCredential({
     context,
     purpose: "api",
@@ -221,7 +283,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
     base:
       options.base ??
       context.publication.targetBranch ??
-      context.component.defaultBranch ??
+      publicationTargetDefaultBranch(context) ??
       "main",
     title: options.title,
     ...(options.body !== undefined ? { body: options.body } : {}),
@@ -229,7 +291,8 @@ export async function upsertNexusPublicationPullRequestForComponent(
 
   return {
     projectRoot: context.projectRoot,
-    componentId: context.component.id,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
     pullRequest,
@@ -239,7 +302,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
 export async function mergeNexusPublicationPullRequestForComponent(
   options: MergeNexusPublicationPullRequestForComponentOptions,
 ): Promise<NexusPublicationPullRequestMergeResult> {
-  const context = resolveNexusPublicationComponentContext(options);
+  const context = resolveNexusPublicationTargetContext(options);
   const credential = await resolvePublicationCredential({
     context,
     purpose: "api",
@@ -261,7 +324,8 @@ export async function mergeNexusPublicationPullRequestForComponent(
 
   return {
     projectRoot: context.projectRoot,
-    componentId: context.component.id,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
     pullRequest: {
@@ -294,7 +358,7 @@ export function summarizePublicationCredential(
 }
 
 async function resolvePublicationCredential(options: {
-  context: NexusPublicationComponentContext;
+  context: NexusPublicationTargetContext;
   purpose: "api" | "git";
   requiredPermissions: Record<string, string>;
   runtime: NexusPublicationOperationRuntimeOptions;
@@ -321,6 +385,38 @@ async function resolvePublicationCredential(options: {
     },
     requiredPermissions: options.requiredPermissions,
   });
+}
+
+function componentIdForPublicationTarget(
+  context: NexusPublicationTargetContext,
+): string | null {
+  return context.component?.id ?? null;
+}
+
+function publicationTargetSummary(
+  context: NexusPublicationTargetContext,
+): NexusPublicationTargetSummary {
+  if (context.component) {
+    return {
+      kind: "component",
+      id: context.component.id,
+      componentId: context.component.id,
+      projectId: context.projectConfig.id ?? null,
+    };
+  }
+
+  return {
+    kind: "project",
+    id: context.projectConfig.id,
+    componentId: null,
+    projectId: context.projectConfig.id,
+  };
+}
+
+function publicationTargetDefaultBranch(
+  context: NexusPublicationTargetContext,
+): string | null {
+  return context.component?.defaultBranch ?? context.projectConfig.repo.defaultBranch ?? null;
 }
 
 function assertSafePublicationBranchTarget(options: {
