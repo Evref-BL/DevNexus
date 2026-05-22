@@ -679,6 +679,14 @@ export interface BuildNexusDashboardHostSnapshotOptions
   currentProjectRoot?: string | null;
 }
 
+export type NexusDashboardHostActionKind =
+  | "workspace-error"
+  | "approval"
+  | "blocker"
+  | "thread"
+  | "dirty"
+  | "ready-work";
+
 export interface NexusDashboardHostWorkspaceRecord {
   id: string;
   name: string;
@@ -701,17 +709,10 @@ export interface NexusDashboardHostWorkspaceRecord {
   eligibleWorkCount: number | null;
   firstReadyWorkSelectionId: string | null;
   firstReadyWorkProviderAction: NexusDashboardProviderAction | null;
+  actionUpdatedAt: Partial<Record<NexusDashboardHostActionKind, string | null>>;
   updatedAt: string | null;
   error: NexusDashboardDataError | null;
 }
-
-export type NexusDashboardHostActionKind =
-  | "workspace-error"
-  | "approval"
-  | "blocker"
-  | "thread"
-  | "dirty"
-  | "ready-work";
 
 export interface NexusDashboardHostPrimaryAction {
   label: string;
@@ -1446,6 +1447,9 @@ async function dashboardHostWorkspaceRecord(options: {
       eligibleWorkCount: null,
       firstReadyWorkSelectionId: null,
       firstReadyWorkProviderAction: null,
+      actionUpdatedAt: {
+        "workspace-error": generatedAt,
+      },
       updatedAt: null,
       error: localFacts.error,
     };
@@ -1478,10 +1482,16 @@ async function dashboardHostWorkspaceRecord(options: {
     eligibleBlockerCount > 0 || automation.value?.status === "blocked"
       ? Math.max(eligibleBlockerCount, 1)
       : 0;
-  const updatedAt = latestIsoString([
-    ...value.threads.records.map((thread) => thread.updatedAt),
-    generatedAt,
-  ]);
+  const eligibleWorkCount = eligibleWork.value?.eligibleWorkItemCount ?? null;
+  const actionUpdatedAt = dashboardHostWorkspaceActionUpdatedAt({
+    threads: value.threads,
+    automation: automation.value,
+    eligibleWork: eligibleWork.value,
+    approvalCount,
+    blockerCount,
+    eligibleWorkCount,
+  });
+  const updatedAt = latestIsoString(Object.values(actionUpdatedAt));
   const project = projectSummary(
     root,
     value.projectConfig,
@@ -1498,7 +1508,7 @@ async function dashboardHostWorkspaceRecord(options: {
       ...value,
       approvalCount,
       blockerCount,
-      eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+      eligibleWorkCount,
     }),
     tone: dashboardHostWorkspaceTone({
       automationStatus: automation.value?.status ?? null,
@@ -1506,7 +1516,7 @@ async function dashboardHostWorkspaceRecord(options: {
       dirtyComponentCount: value.dirtyComponentCount,
       needsDecisionCount: value.threads.needsDecisionCount,
       threadCount: value.threads.totalCount,
-      eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+      eligibleWorkCount,
       hasError: false,
     }),
     componentCount: value.componentSummaries.length,
@@ -1518,9 +1528,10 @@ async function dashboardHostWorkspaceRecord(options: {
     blockerCount,
     pluginCount: value.plugins.enabledCount,
     automationStatus: automation.value?.status ?? null,
-    eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+    eligibleWorkCount,
     firstReadyWorkSelectionId: firstReadyWorkSelectionId(eligibleWork.value),
     firstReadyWorkProviderAction: firstReadyWorkProviderAction(eligibleWork.value, dashboardProviderUrls(value.projectConfig, value.componentSummaries)),
+    actionUpdatedAt,
     updatedAt,
     error: null,
   };
@@ -1565,6 +1576,9 @@ function dashboardHostWorkspaceShellRecord(options: {
       eligibleWorkCount: null,
       firstReadyWorkSelectionId: null,
       firstReadyWorkProviderAction: null,
+      actionUpdatedAt: {
+        "workspace-error": options.generatedAt,
+      },
       updatedAt: null,
       error: localFacts.error,
     };
@@ -1594,9 +1608,61 @@ function dashboardHostWorkspaceShellRecord(options: {
     eligibleWorkCount: null,
     firstReadyWorkSelectionId: null,
     firstReadyWorkProviderAction: null,
+    actionUpdatedAt: {},
     updatedAt: null,
     error: null,
   };
+}
+
+function dashboardHostWorkspaceActionUpdatedAt(options: {
+  threads: NexusDashboardThreadSummary;
+  automation: NexusAutomationStatus | null;
+  eligibleWork: NexusEligibleWorkSummary | null;
+  approvalCount: number;
+  blockerCount: number;
+  eligibleWorkCount: number | null;
+}): Partial<Record<NexusDashboardHostActionKind, string | null>> {
+  const automationAt = latestAutomationEventAt(options.automation);
+  return {
+    approval: options.approvalCount > 0 ? automationAt : null,
+    blocker: options.blockerCount > 0 || options.automation?.status === "blocked"
+      ? automationAt
+      : null,
+    thread: options.threads.needsDecisionCount > 0
+      ? latestIsoString(options.threads.records.map((thread) => thread.updatedAt))
+      : null,
+    "ready-work": options.eligibleWorkCount && options.eligibleWorkCount > 0
+      ? latestEligibleWorkEventAt(options.eligibleWork)
+      : null,
+    dirty: null,
+    "workspace-error": null,
+  };
+}
+
+function latestAutomationEventAt(status: NexusAutomationStatus | null): string | null {
+  if (!status) {
+    return null;
+  }
+  const lastCycle = status.targetCycles?.lastCycle ?? null;
+  return latestIsoString([
+    status.ledger?.updatedAt,
+    lastCycle?.finishedAt,
+    lastCycle?.startedAt,
+  ]);
+}
+
+function latestEligibleWorkEventAt(summary: NexusEligibleWorkSummary | null): string | null {
+  if (!summary) {
+    return null;
+  }
+  return latestIsoString(
+    summary.components.flatMap((component) => [
+      ...component.workItems.map((item) => item.updatedAt),
+      ...component.importCandidateWorkItems.map((item) => item.updatedAt),
+      ...component.staleInProgressWorkItems.map((item) => item.updatedAt),
+      ...component.excludedWorkItems.map((item) => item.updatedAt),
+    ]),
+  );
 }
 
 function firstReadyWorkSelectionId(
@@ -1727,7 +1793,7 @@ function dashboardHostActionItems(
       detail,
       state,
       tone,
-      updatedAt: workspace.updatedAt ?? workspace.generatedAt,
+      updatedAt: hostActionUpdatedAt(workspace, kind),
       primaryAction: {
         label,
         kind: kind === "dirty"
@@ -1809,6 +1875,13 @@ function dashboardHostActionItems(
   }
 
   return items;
+}
+
+function hostActionUpdatedAt(
+  workspace: NexusDashboardHostWorkspaceRecord,
+  kind: NexusDashboardHostActionKind,
+): string | null {
+  return workspace.actionUpdatedAt[kind] ?? null;
 }
 
 function compareDashboardHostActions(

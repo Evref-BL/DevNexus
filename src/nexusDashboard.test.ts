@@ -359,6 +359,7 @@ function hostWorkspace(
     eligibleWorkCount: 0,
     firstReadyWorkSelectionId: null,
     firstReadyWorkProviderAction: null,
+    actionUpdatedAt: {},
     updatedAt: "2026-05-21T10:00:00.000Z",
     error: null,
     ...overrides,
@@ -934,6 +935,9 @@ describe("nexus dashboard", () => {
         id: "approval",
         name: "Approval Workspace",
         approvalCount: 3,
+        actionUpdatedAt: {
+          approval: "2026-05-21T09:30:00.000Z",
+        },
         tone: "warn",
       }),
       hostWorkspace({
@@ -942,12 +946,18 @@ describe("nexus dashboard", () => {
         threadCount: 4,
         needsDecisionCount: 2,
         staleThreadCount: 1,
+        actionUpdatedAt: {
+          thread: "2026-05-21T08:15:00.000Z",
+        },
         tone: "warn",
       }),
       hostWorkspace({
         id: "ready",
         name: "Ready Workspace",
         eligibleWorkCount: 2,
+        actionUpdatedAt: {
+          "ready-work": "2026-05-21T09:45:00.000Z",
+        },
         firstReadyWorkSelectionId: "tracked-work:primary:github-42",
         firstReadyWorkProviderAction: {
           label: "#42: ready work",
@@ -963,12 +973,18 @@ describe("nexus dashboard", () => {
         name: "Blocked Workspace",
         blockerCount: 1,
         automationStatus: "blocked",
+        actionUpdatedAt: {
+          blocker: "2026-05-21T09:50:00.000Z",
+        },
         tone: "danger",
       }),
       hostWorkspace({
         id: "broken",
         name: "Broken Workspace",
         summary: "Workspace snapshot is unavailable.",
+        actionUpdatedAt: {
+          "workspace-error": "2026-05-21T09:55:00.000Z",
+        },
         tone: "danger",
         error: {
           name: "Error",
@@ -992,6 +1008,7 @@ describe("nexus dashboard", () => {
           workspaceId: "broken",
           reason: "Workspace unavailable",
           state: "unavailable",
+          updatedAt: "2026-05-21T09:55:00.000Z",
           primaryAction: {
             label: "Review workspace",
             kind: "review",
@@ -1002,6 +1019,7 @@ describe("nexus dashboard", () => {
         expect.objectContaining({
           id: "host-action:approval:approval",
           reason: "3 approvals needed",
+          updatedAt: "2026-05-21T09:30:00.000Z",
           primaryAction: expect.objectContaining({
             label: "Review approval",
           }),
@@ -1010,10 +1028,12 @@ describe("nexus dashboard", () => {
           id: "host-action:thread:thread",
           reason: "2 threads need action",
           state: "stale threads",
+          updatedAt: "2026-05-21T08:15:00.000Z",
         }),
         expect.objectContaining({
           id: "host-action:ready:ready-work",
           reason: "2 ready items",
+          updatedAt: "2026-05-21T09:45:00.000Z",
           primaryAction: {
             label: "Review work",
             kind: "start-work",
@@ -1027,6 +1047,7 @@ describe("nexus dashboard", () => {
         expect.objectContaining({
           id: "host-action:dirty:dirty",
           reason: "2 dirty components",
+          updatedAt: null,
           primaryAction: {
             label: "Rescue changes",
             kind: "rescue",
