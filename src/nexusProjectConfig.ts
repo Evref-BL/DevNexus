@@ -35,6 +35,7 @@ import {
   devNexusCoreMcpServerName,
   devNexusCoreMcpToolNames,
 } from "./nexusCoreMcpTools.js";
+import type { NexusMcpExposureMode } from "./nexusMcpExposurePolicy.js";
 import {
   validatePartialNexusAutomationPublicationConfig,
   validateNexusAutomationConfig,
@@ -254,6 +255,7 @@ export interface NexusProjectAgentMcpTarget {
   command?: string;
   args?: string[];
   defaultToolsApprovalMode?: string;
+  exposure?: NexusMcpExposureMode;
   activationNotes?: string[];
   trustSemantics?: string;
   manualInstructions?: string[];
@@ -262,6 +264,7 @@ export interface NexusProjectAgentMcpTarget {
 export interface NexusProjectMcpConfig {
   enabled?: boolean;
   sourceControl?: NexusSkillSourceControl;
+  exposure?: NexusMcpExposureMode;
   serverName?: string;
   command?: string;
   args?: string[];
@@ -292,6 +295,7 @@ export interface NexusProjectActiveAgentMcpSettings {
   command?: string;
   args?: string[];
   defaultToolsApprovalMode?: string;
+  exposure?: NexusMcpExposureMode;
   activationNotes?: string[];
   trustSemantics?: string;
   manualInstructions?: string[];
@@ -750,6 +754,7 @@ function activeMcpSettingsToLegacyTarget(
     ...(settings?.defaultToolsApprovalMode !== undefined
       ? { defaultToolsApprovalMode: settings.defaultToolsApprovalMode }
       : {}),
+    ...(settings?.exposure !== undefined ? { exposure: settings.exposure } : {}),
     ...(settings?.activationNotes !== undefined
       ? { activationNotes: settings.activationNotes }
       : {}),
@@ -1758,6 +1763,28 @@ function validatePluginMcpTools(
   });
 }
 
+function validateMcpExposureMode(
+  value: unknown,
+  pathName: string,
+): NexusMcpExposureMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    value === "direct" ||
+    value === "gateway" ||
+    value === "hidden" ||
+    value === "inherit"
+  ) {
+    return value;
+  }
+
+  throw new NexusConfigError(
+    `${pathName} must be direct, gateway, hidden, or inherit`,
+  );
+}
+
 function validatePluginCapabilityRecord(
   value: unknown,
   index: number,
@@ -1785,6 +1812,7 @@ function validatePluginCapabilityRecord(
     const tools = validatePluginMcpTools(record.tools, `${pathName}.tools`);
     const command = optionalString(record, "command", pathName);
     const args = optionalStringArray(record, "args", pathName);
+    const exposure = validateMcpExposureMode(record.exposure, `${pathName}.exposure`);
     return {
       kind,
       id,
@@ -1793,6 +1821,7 @@ function validatePluginCapabilityRecord(
       ...(command !== undefined ? { command } : {}),
       ...(args !== undefined ? { args } : {}),
       ...(targetAgents !== undefined ? { targetAgents } : {}),
+      ...(exposure !== undefined ? { exposure } : {}),
       ...(tools !== undefined ? { tools } : {}),
     };
   }
@@ -1919,6 +1948,10 @@ function validateProjectPluginConfig(
   const enabled = optionalBoolean(record, "enabled", pathName) ?? true;
   const name = optionalString(record, "name", pathName);
   const version = optionalString(record, "version", pathName);
+  const mcpExposure = validateMcpExposureMode(
+    record.mcpExposure,
+    `${pathName}.mcpExposure`,
+  );
   const capabilitiesValue = record.capabilities;
   if (capabilitiesValue !== undefined && !Array.isArray(capabilitiesValue)) {
     throw new NexusConfigError(`${pathName}.capabilities must be an array`);
@@ -1941,6 +1974,7 @@ function validateProjectPluginConfig(
     enabled,
     ...(name !== undefined ? { name } : {}),
     ...(version !== undefined ? { version } : {}),
+    ...(mcpExposure !== undefined ? { mcpExposure } : {}),
     capabilities,
   };
 }
@@ -2063,6 +2097,7 @@ function validateProjectActiveAgentMcpSettings(
     "defaultToolsApprovalMode",
     pathName,
   );
+  const exposure = validateMcpExposureMode(record.exposure, `${pathName}.exposure`);
   const activationNotes = optionalStringArray(record, "activationNotes", pathName);
   const trustSemantics = optionalString(record, "trustSemantics", pathName);
   const manualInstructions = optionalStringArray(
@@ -2081,6 +2116,7 @@ function validateProjectActiveAgentMcpSettings(
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
+    ...(exposure !== undefined ? { exposure } : {}),
     ...(activationNotes !== undefined ? { activationNotes } : {}),
     ...(trustSemantics !== undefined ? { trustSemantics } : {}),
     ...(manualInstructions !== undefined ? { manualInstructions } : {}),
@@ -2153,6 +2189,7 @@ function validateProjectMcpAgentTarget(
     "defaultToolsApprovalMode",
     pathName,
   );
+  const exposure = validateMcpExposureMode(record.exposure, `${pathName}.exposure`);
   const configFormat = validateAgentMcpConfigFormat(
     record.configFormat,
     `${pathName}.configFormat`,
@@ -2182,6 +2219,7 @@ function validateProjectMcpAgentTarget(
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
+    ...(exposure !== undefined ? { exposure } : {}),
     ...(activationNotes !== undefined ? { activationNotes } : {}),
     ...(trustSemantics !== undefined ? { trustSemantics } : {}),
     ...(manualInstructions !== undefined ? { manualInstructions } : {}),
@@ -2224,6 +2262,10 @@ function validateProjectMcpConfig(
     "defaultToolsApprovalMode",
     "workspace config.mcp",
   );
+  const exposure = validateMcpExposureMode(
+    record.exposure,
+    "workspace config.mcp.exposure",
+  );
   const agentTargets = record.agentTargets;
   if (agentTargets !== undefined && !Array.isArray(agentTargets)) {
     throw new NexusConfigError(
@@ -2238,6 +2280,7 @@ function validateProjectMcpConfig(
     ...(command !== undefined ? { command } : {}),
     ...(args !== undefined ? { args } : {}),
     ...(defaultToolsApprovalMode !== undefined ? { defaultToolsApprovalMode } : {}),
+    ...(exposure !== undefined ? { exposure } : {}),
     ...(agentTargets
       ? {
           agentTargets: agentTargets.map((target, index) =>
