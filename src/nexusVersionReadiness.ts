@@ -879,7 +879,7 @@ function collectGreenMainEvidence(
   return [
     ...(facts.greenMainValidation ?? []),
     ...(facts.publicationStatuses ?? []).flatMap((status) => {
-      if (!status.greenMain) {
+      if (!status.greenMain || status.componentId === null) {
         return [];
       }
 
