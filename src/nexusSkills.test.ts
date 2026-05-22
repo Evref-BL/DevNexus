@@ -308,6 +308,21 @@ describe("nexus skills", () => {
       "one integration surface",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
+      "Git Delivery Topology",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "Direct slice topology",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "Stacked slice topology",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "initiative integration branch topology",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
+      "Throw-away integration branch topology",
+    );
+    expect(skillMarkdown["initiative-workflow"]).toContain(
       "outer frame",
     );
     expect(skillMarkdown["initiative-workflow"]).toContain(
@@ -333,6 +348,15 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "choose the current skill chain",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "End every substantive response",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "recommended next action",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "choose the Git delivery topology before",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "docs/user/skill-chains.md",
@@ -365,6 +389,9 @@ describe("nexus skills", () => {
       "one initiative or delivery surface",
     );
     expect(skillMarkdown["write-implementation-plan"]).toContain(
+      "selected delivery topology",
+    );
+    expect(skillMarkdown["write-implementation-plan"]).toContain(
       "human-in-the-loop gates",
     );
     expect(skillMarkdown["execute-initiative-plan"]).toContain(
@@ -372,6 +399,9 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["execute-initiative-plan"]).toContain(
       "initiative or delivery surface",
+    );
+    expect(skillMarkdown["execute-initiative-plan"]).toContain(
+      "lacks a delivery topology",
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
       "skills/using-git-worktrees/SKILL.md",
@@ -381,6 +411,12 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
       "workspace/meta worktree",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "selected delivery topology",
+    );
+    expect(skillMarkdown["prepare-dev-nexus-worktree"]).toContain(
+      "approved initiative integration branch",
     );
     expect(skillMarkdown["parallel-work-dispatch"]).toContain(
       "skills/dispatching-parallel-agents/SKILL.md",
@@ -411,6 +447,12 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "green-main policy",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "topology-selected target branch",
+    );
+    expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
+      "initiative integration branch topology",
     );
     expect(skillMarkdown["finish-dev-nexus-branch"]).toContain(
       "Do not silently",
