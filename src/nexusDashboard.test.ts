@@ -1004,12 +1004,16 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-copy-prompt");
     expect(module).toContain("Copy prompt");
     expect(module).toContain("renderOpenMenu");
+    expect(module).toContain("chevronDownIcon");
+    expect(module).toContain("dn-open-chevron");
+    expect(module).toContain(".dn-open-menu[open] .dn-open-chevron");
     expect(module).toContain("/api/local/open");
     expect(module).toContain("data-open-target");
     expect(module).toContain("data-open-app");
     expect(module).toContain("Finder");
     expect(module).toContain("VS Code");
     expect(module).toContain("Terminal");
+    expect(module).not.toContain("<span aria-hidden=\"true\">v</span>");
     expect(module).not.toContain("Copy brief");
     expect(module).toContain("Start chat");
     expect(module).toContain("Resume chat");
