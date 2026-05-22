@@ -2192,6 +2192,87 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves local tracked work without provider hydration", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-tracked-local-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-tracked-local-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "tracked-local",
+      name: "Tracked Local",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot: registeredRoot,
+      now: fixedClock("2026-05-21T10:24:55.000Z"),
+    });
+    await tracker.createWorkItem({
+      projectRoot: registeredRoot,
+      title: "Keep local work visible",
+      status: "ready",
+    });
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      providerFactory: () => {
+        throw new Error("tracked-work section must not hydrate provider work");
+      },
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:25:00.000Z"),
+    });
+
+    try {
+      const response = await fetch(
+        `${server.url}api/dashboard/section?workspace=tracked-local&section=tracked-work`,
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        section: "tracked-work",
+        patch: {
+          loadedSections: ["tracked-work"],
+          trackedWork: {
+            source: "local",
+            incomplete: true,
+            readyCount: 1,
+            records: [
+              expect.objectContaining({
+                title: "Keep local work visible",
+                provider: "local",
+              }),
+            ],
+          },
+          eligibleWork: {
+            ok: false,
+            error: {
+              name: "Pending",
+            },
+          },
+          blockers: [],
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves host cockpit data without a current workspace root", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");

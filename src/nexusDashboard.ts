@@ -57,6 +57,14 @@ import {
   type NexusWorktreeLeaseCollection,
   type NexusWorktreeLeaseSummary,
 } from "./nexusWorktreeLease.js";
+import {
+  loadLocalWorkTrackingStore,
+  resolveLocalWorkTrackingStorePath,
+} from "./workTrackingLocalProvider.js";
+import type {
+  WorkItem,
+  WorkTrackerRef,
+} from "./workTrackingTypes.js";
 
 export type NexusDashboardSignalTone =
   | "good"
@@ -530,6 +538,7 @@ export interface NexusDashboardPluginSummary {
 }
 
 export type NexusDashboardTrackedWorkKind =
+  | "blocked"
   | "ready"
   | "import-candidate"
   | "stale"
@@ -554,10 +563,14 @@ export interface NexusDashboardTrackedWorkItem {
 
 export interface NexusDashboardTrackedWorkSummary {
   totalCount: number;
+  blockedCount?: number;
   readyCount: number;
   importCandidateCount: number;
   staleCount: number;
   excludedCount: number;
+  source?: "provider" | "local";
+  incomplete?: boolean;
+  detail?: string | null;
   records: NexusDashboardTrackedWorkItem[];
 }
 
@@ -1021,11 +1034,13 @@ export async function buildNexusDashboardWorkspaceSection(
     };
   }
 
-  const eligibleWork = await captureAsync(() =>
-    getNexusEligibleWorkSummary({
-      ...statusOptions(options, projectRoot, gitRunner),
-    }),
-  );
+  const localTrackedWork = summarizeLocalTrackedWork({
+    generatedAt,
+    projectRoot,
+  projectConfig,
+  components,
+  providerUrls,
+});
   return {
     version: 1,
     generatedAt,
@@ -1033,10 +1048,14 @@ export async function buildNexusDashboardWorkspaceSection(
     section,
     patch: {
       ...basePatch,
-      trackedWork: summarizeTrackedWork(eligibleWork.value, providerUrls),
-      blockers: eligibleWork.ok
-        ? eligibleWork.value?.blockers ?? []
-        : [`Eligible work unavailable: ${eligibleWork.error?.message ?? "unknown error"}`],
+      trackedWork: localTrackedWork,
+      targetReport: pendingDashboardResult(
+        "Target report is loading in the full workspace snapshot.",
+      ),
+      eligibleWork: pendingDashboardResult(
+        "Provider work items are loading in the full workspace snapshot.",
+      ),
+      blockers: [],
     },
   };
 }
@@ -2551,6 +2570,7 @@ function emptyThreadSummary(): NexusDashboardThreadSummary {
 function emptyTrackedWorkSummary(): NexusDashboardTrackedWorkSummary {
   return {
     totalCount: 0,
+    blockedCount: 0,
     readyCount: 0,
     importCandidateCount: 0,
     staleCount: 0,
@@ -3616,11 +3636,129 @@ function summarizeTrackedWork(
       (summary?.importCandidateWorkItemCount ?? 0) +
       (summary?.staleInProgressWorkItemCount ?? 0) +
       (summary?.excludedWorkItemCount ?? 0),
-    readyCount: summary?.eligibleWorkItemCount ?? 0,
+    blockedCount: trackedWorkBlockedCount(records),
+    readyCount: trackedWorkReadyCount(records),
     importCandidateCount: summary?.importCandidateWorkItemCount ?? 0,
     staleCount: summary?.staleInProgressWorkItemCount ?? 0,
     excludedCount: summary?.excludedWorkItemCount ?? 0,
+    source: "provider",
+    incomplete: false,
+    detail: null,
     records: records.slice(0, 30),
+  };
+}
+
+function summarizeLocalTrackedWork(options: {
+  generatedAt: string;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  components: ResolvedNexusProjectComponent[];
+  providerUrls: NexusDashboardProviderUrls;
+}): NexusDashboardTrackedWorkSummary {
+  const records: NexusDashboardTrackedWorkItem[] = [];
+  const seen = new Set<string>();
+  const add = (item: NexusDashboardTrackedWorkItem): void => {
+    const key = `${item.componentId}:${item.id}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    records.push(item);
+  };
+
+  for (const component of options.components) {
+    for (const tracker of component.workTrackers) {
+      const localWorkTracking = tracker.workTracking;
+      if (!tracker.enabled || localWorkTracking.provider !== "local") {
+        continue;
+      }
+      const store = capture(() =>
+        loadLocalWorkTrackingStore(
+          resolveLocalWorkTrackingStorePath(options.projectRoot, localWorkTracking),
+          options.generatedAt,
+          "dashboardTrackedWorkLocalFallback",
+        ),
+      );
+      if (!store.ok) {
+        continue;
+      }
+      for (const item of store.value?.items ?? []) {
+        if (item.status === "done" || item.status === "wont_do") {
+          continue;
+        }
+        add(trackedWorkLocalItem({
+          item,
+          component,
+          trackerRef: {
+            componentId: component.id,
+            componentName: component.name,
+            trackerId: tracker.id,
+            trackerName: tracker.name,
+            provider: tracker.provider,
+            roles: tracker.roles,
+            default: tracker.default,
+          },
+          providerUrls: options.providerUrls,
+        }));
+      }
+    }
+  }
+
+  records.sort(compareTrackedWorkItems);
+  return {
+    totalCount: records.length,
+    blockedCount: trackedWorkBlockedCount(records),
+    readyCount: trackedWorkReadyCount(records),
+    importCandidateCount: 0,
+    staleCount: records.filter((item) => item.kind === "stale").length,
+    excludedCount: 0,
+    source: "local",
+    incomplete: true,
+    detail: "Showing local tracker records while provider work items finish loading.",
+    records: records.slice(0, 30),
+  };
+}
+
+function trackedWorkLocalItem(options: {
+  item: WorkItem;
+  component: ResolvedNexusProjectComponent;
+  trackerRef: WorkTrackerRef;
+  providerUrls: NexusDashboardProviderUrls;
+}): NexusDashboardTrackedWorkItem {
+  const status = options.item.status;
+  const kind: NexusDashboardTrackedWorkKind =
+    status === "blocked" ? "blocked" : status === "in_progress" ? "stale" : "ready";
+  const kindLabel =
+    status === "blocked" ? "blocked" : status === "in_progress" ? "active" : "local";
+  const detail =
+    status === "blocked"
+      ? "Blocked local work item. Review before automation can continue."
+      : status === "in_progress"
+        ? "Local item is in progress; provider scan is still loading."
+        : "Local work item is visible while provider scan finishes.";
+  const actions = uniqueProviderActions([
+    ...providerActionsForHref(options.item.webUrl),
+    ...providerActionsFromText(
+      `${options.item.id} ${options.item.title}`,
+      options.providerUrls,
+      options.component.id,
+    ),
+  ]);
+  return {
+    id: options.item.id,
+    logicalItemId: options.item.externalRef?.itemId ?? options.item.id,
+    componentId: options.component.id,
+    componentName: options.component.name,
+    title: options.item.title,
+    status,
+    kind,
+    kindLabel,
+    detail,
+    provider: options.trackerRef.provider,
+    trackerId: options.trackerRef.trackerId,
+    updatedAt: options.item.updatedAt ?? null,
+    webUrl: options.item.webUrl ?? null,
+    actions,
   };
 }
 
@@ -3684,6 +3822,8 @@ function trackedWorkScore(item: NexusDashboardTrackedWorkItem): number {
     return 95;
   }
   switch (item.kind) {
+    case "blocked":
+      return 95;
     case "ready":
       return 90;
     case "import-candidate":
@@ -3693,6 +3833,16 @@ function trackedWorkScore(item: NexusDashboardTrackedWorkItem): number {
     case "excluded":
       return 20;
   }
+}
+
+function trackedWorkBlockedCount(records: NexusDashboardTrackedWorkItem[]): number {
+  return records.filter((item) => item.kind === "blocked" || item.status === "blocked").length;
+}
+
+function trackedWorkReadyCount(records: NexusDashboardTrackedWorkItem[]): number {
+  return records.filter((item) =>
+    item.kind === "ready" && item.status !== "blocked"
+  ).length;
 }
 
 function buildDashboardEvents(options: {

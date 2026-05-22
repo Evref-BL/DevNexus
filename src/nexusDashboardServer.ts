@@ -40,6 +40,11 @@ export interface StartNexusDashboardServerOptions {
   host?: string;
   port?: number;
   homePath?: string;
+  env?: BuildNexusDashboardSnapshotOptions["env"];
+  credentialResolver?: BuildNexusDashboardSnapshotOptions["credentialResolver"];
+  provider?: BuildNexusDashboardSnapshotOptions["provider"];
+  providerFactory?: BuildNexusDashboardSnapshotOptions["providerFactory"];
+  providerOptions?: BuildNexusDashboardSnapshotOptions["providerOptions"];
   eligibleWorkMode?: NexusEligibleWorkMode;
   gitRunner?: GitRunner;
   now?: () => Date | string;
@@ -130,6 +135,11 @@ export async function startNexusDashboardServer(
       ? { currentProjectRoot: options.currentProjectRoot }
       : {}),
     homePath: options.homePath,
+    env: options.env,
+    credentialResolver: options.credentialResolver,
+    provider: options.provider,
+    providerFactory: options.providerFactory,
+    providerOptions: options.providerOptions,
     eligibleWorkMode: options.eligibleWorkMode,
     gitRunner: options.gitRunner,
     now: options.now,
@@ -356,7 +366,7 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-component-card, .dn-event, .dn-blocker { display: grid; gap: 6px; min-width: 0; padding: 11px; border: 1px solid var(--dn-border-muted); border-radius: 8px; color: inherit; background: var(--dn-surface-muted); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }",
     ".dn-thread-card, .dn-plugin-card, .dn-tracked-card { display: grid; gap: 7px; min-width: 0; padding: 11px; border: 1px solid var(--dn-border-muted); border-radius: 8px; color: inherit; background: var(--dn-surface-muted); }",
     ".dn-tracked-card { --dn-tracked-accent: var(--dn-active); border-left: 5px solid var(--dn-tracked-accent); }",
-    ".dn-tracked-card.kind-ready { --dn-tracked-accent: var(--dn-active); } .dn-tracked-card.kind-import-candidate { --dn-tracked-accent: var(--dn-branch-4); } .dn-tracked-card.kind-stale { --dn-tracked-accent: var(--dn-warn); } .dn-tracked-card.kind-excluded { --dn-tracked-accent: var(--dn-neutral); }",
+    ".dn-tracked-card.kind-ready { --dn-tracked-accent: var(--dn-active); } .dn-tracked-card.kind-blocked { --dn-tracked-accent: var(--dn-danger); } .dn-tracked-card.kind-import-candidate { --dn-tracked-accent: var(--dn-branch-4); } .dn-tracked-card.kind-stale { --dn-tracked-accent: var(--dn-warn); } .dn-tracked-card.kind-excluded { --dn-tracked-accent: var(--dn-neutral); }",
     ".dn-tracked-card.selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--dn-tracked-accent) 24%, transparent) inset; }",
     ".dn-tracked-button { display: grid; gap: 7px; min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }",
     ".dn-thread-card-header, .dn-plugin-card-header, .dn-tracked-card-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }",
@@ -367,7 +377,8 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-thread-decision.decision-continue, .dn-thread-decision.decision-resume { color: var(--dn-active); } .dn-thread-decision.decision-review, .dn-thread-decision.decision-archive, .dn-thread-decision.decision-merged { color: var(--dn-warn); } .dn-thread-decision.decision-rescue, .dn-thread-decision.decision-blocked { color: var(--dn-danger); } .dn-thread-decision.decision-forget { color: var(--dn-good); }",
     ".dn-plugin-pills { display: flex; flex-wrap: wrap; gap: 5px; }",
     ".dn-plugin-pills span { max-width: 100%; padding: 3px 6px; overflow: hidden; border: 1px solid var(--dn-border-muted); border-radius: 6px; color: var(--dn-muted); background: var(--dn-surface); font-size: 0.7rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }",
-    ".dn-plugin-note { margin-top: 10px; font-size: 0.78rem; }",
+    ".dn-plugin-note, .dn-panel-note { margin-top: 10px; font-size: 0.78rem; }",
+    ".dn-panel-note { color: var(--dn-muted); }",
     ".dn-event strong { color: var(--dn-strong); }",
     ".dn-event p, .dn-blocker strong { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }",
     ".tone-good { color: var(--dn-good); } .tone-active { color: var(--dn-active); } .tone-warn { color: var(--dn-warn); } .tone-danger { color: var(--dn-danger); } .tone-neutral { color: var(--dn-neutral); }",
@@ -1116,9 +1127,10 @@ export function renderNexusDashboardClientModule(): string {
     "function renderTrackedWork(snapshot, selectedId) {",
     "  const tracked = snapshot.trackedWork;",
     "  const records = tracked?.records ?? [];",
-    "  const count = tracked ? `${tracked.readyCount} ready · ${tracked.importCandidateCount} import · ${tracked.staleCount} stale` : '0 ready';",
+    "  const count = tracked ? [tracked.blockedCount ? `${tracked.blockedCount} blocked` : null, `${tracked.readyCount} ready`, `${tracked.importCandidateCount} import`, `${tracked.staleCount} stale`, tracked.incomplete ? 'local first' : null].filter(Boolean).join(' · ') : '0 ready';",
+    "  const note = tracked?.incomplete && tracked.detail ? `<p class=\"dn-panel-note\">${escapeHtml(tracked.detail)}</p>` : '';",
     "  const body = records.length ? records.slice(0, 8).map((item) => renderTrackedWorkCard(item, selectedId)).join('') : '<p>No tracked work is waiting.</p>';",
-    "  return `<div class=\"dn-panel dn-tracked-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Tracked work</span><h2>Issues and Work Items</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-tracked-list\">${body}</div></div>`;",
+    "  return `<div class=\"dn-panel dn-tracked-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Tracked work</span><h2>Issues and Work Items</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div>${note}<div class=\"dn-tracked-list\">${body}</div></div>`;",
     "}",
     "",
     "function renderTrackedWorkCard(item, selectedId) {",
@@ -1138,7 +1150,7 @@ export function renderNexusDashboardClientModule(): string {
     "}",
     "",
     "function trackedWorkDecisionClass(item) {",
-    "  if (item.status === 'blocked') return 'blocked';",
+    "  if (item.status === 'blocked' || item.kind === 'blocked') return 'blocked';",
     "  if (item.kind === 'ready') return 'continue';",
     "  if (item.kind === 'stale') return 'rescue';",
     "  if (item.kind === 'import-candidate') return 'review';",
