@@ -17,6 +17,8 @@ is available.
 | Archive | Keep the record but remove it from active attention. |
 | Forget | Drop an unneeded local thread or cockpit reminder after explicit user choice. |
 | Rescue | Inspect uncertain local changes before archive or forget. |
+| Enable plugin | Enable or install a known DevNexus plugin when policy allows it. |
+| Run setup | Run plugin setup actions when policy allows it. |
 
 ## Provider Actions
 
@@ -35,6 +37,10 @@ Example labels:
 
 Provider actions are read-only navigation unless a separate provider mutation
 policy explicitly allows posting, approving, merging, or cleanup.
+
+Archive, forget, plugin enable, and plugin setup controls should be visible but
+disabled until a trusted mutation policy exists. The disabled label should name
+the action, and the tooltip should name the missing policy.
 
 ## Assistant Actions
 

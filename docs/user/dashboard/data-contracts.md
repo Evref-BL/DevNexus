@@ -61,7 +61,9 @@ include a `trackedWork` summary with compact records for ready, importable,
 stale, and hidden work items.
 
 The queue is read-only guidance. Provider writes, cleanup, archive, forget, and
-assistant actions still need their own explicit action contract.
+assistant actions still need their own explicit action contract. When the UI can
+name the desired action but no contract exists yet, it should render a disabled
+control instead of hiding the action or guessing the mutation.
 
 ## Workspace Drill-Down
 

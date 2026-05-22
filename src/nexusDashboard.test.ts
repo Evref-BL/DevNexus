@@ -77,6 +77,15 @@ async function loadDashboardClientTestHooks(): Promise<{
   ) => string;
   renderPlugins: (plugins: unknown) => string;
   renderTrackedWork: (snapshot: unknown, selectedId?: string | null) => string;
+  renderThreadActions: (thread: {
+    actions?: unknown[];
+    assistantThreadId?: string | null;
+    decision: string;
+    decisionDetail: string;
+    decisionLabel: string;
+    id: string;
+    title: string;
+  }) => string;
   selectedDetail: (snapshot: unknown, selectedId?: string | null) => {
     actions: Array<{ href: string; label: string }>;
     chat: { prompt: string; targetId?: string; title: string } | null;
@@ -103,7 +112,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderTrackedWork, selectedDetail, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderThreadActions, renderTrackedWork, selectedDetail, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1039,8 +1048,14 @@ describe("nexus dashboard", () => {
     expect(module).toContain("targetSelectionId");
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
+    expect(module).toContain("renderThreadPolicyAction");
     expect(module).toContain("renderPlugins");
     expect(module).toContain("pluginPills");
+    expect(module).toContain("renderPluginPolicyAction");
+    expect(module).toContain("renderDisabledAction");
+    expect(module).toContain("dn-policy-action");
+    expect(module).toContain("Needs archive policy");
+    expect(module).toContain("Needs plugin enable policy");
     expect(module).toContain("Install actions appear only");
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
@@ -1392,7 +1407,30 @@ describe("nexus dashboard", () => {
     expect(prompt).not.toContain("Codex");
   });
 
-  it("renders plugin cards without unsafe install buttons", async () => {
+  it("renders policy-gated thread cleanup actions without mutation hooks", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderThreadActions({
+      id: "thread-archive",
+      title: "Archive old branch",
+      decision: "archive",
+      decisionLabel: "Archive",
+      decisionDetail: "Done enough to archive.",
+      assistantThreadId: null,
+      actions: [],
+    });
+
+    expect(html).toContain("Archive");
+    expect(html).toContain("Needs archive policy");
+    expect(html).toContain("dn-policy-action");
+    expect(html).toContain("disabled");
+    expect(html).toContain("Start chat");
+    expect(html).toContain("Copy prompt");
+    expect(html).not.toContain("data-archive-thread");
+    expect(html).not.toContain("data-forget-thread");
+  });
+
+  it("renders plugin cards with policy-gated setup actions", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
     const html = hooks.renderPlugins({
@@ -1439,7 +1477,12 @@ describe("nexus dashboard", () => {
     expect(html).toContain("Setup: Prepare research corpus");
     expect(html).toContain("Deps: node_modules -&gt; node_modules");
     expect(html).toContain("Install actions appear only after a trusted plugin source");
-    expect(html).not.toContain("<button");
+    expect(html).toContain("Enable unavailable");
+    expect(html).toContain("Needs plugin enable policy");
+    expect(html).toContain("dn-policy-action");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain("data-install-plugin");
+    expect(html).not.toContain("data-enable-plugin");
   });
 
   it("extracts GitHub provider actions from bare issue references", async () => {
