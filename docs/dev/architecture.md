@@ -111,6 +111,9 @@ metadata, and DevNexus rejects any declared tool name that overlaps a core
 `dev_nexus` MCP tool. Plugin-specific packages own the provider-specific
 commands that materialize or start specialized runtime surfaces.
 
+For the Codex and Claude adapter split, see
+[Agent-client plugin compatibility](agent-client-plugin-compatibility.md).
+
 Example:
 
 ```json
