@@ -21,6 +21,11 @@ import {
   type NexusInitiativeDeliveryPlan,
 } from "./nexusInitiativeDeliveryPlan.js";
 import {
+  buildNexusInitiativeDeliveryReport,
+  type NexusInitiativeDeliveryReport,
+  type NexusInitiativeDeliveryReportItem,
+} from "./nexusInitiativeDeliveryReport.js";
+import {
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
@@ -129,6 +134,15 @@ interface ParsedPublicationInitiativePlanCommand {
   projectRoot: string;
   componentId?: string;
   initiativeId?: string | null;
+  json?: boolean;
+}
+
+interface ParsedPublicationInitiativeReportCommand {
+  projectRoot: string;
+  componentId?: string;
+  initiativeId?: string | null;
+  evidenceFile?: string;
+  fullMatrixBudgetAvailable?: boolean;
   json?: boolean;
 }
 
@@ -345,8 +359,28 @@ export async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "initiative-report") {
+    const parsed = parsePublicationInitiativeReportCommand(argv);
+    const report = buildNexusInitiativeDeliveryReport({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      initiativeId: parsed.initiativeId,
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      now: dependencies.now,
+    });
+    printPublicationInitiativeReport(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, candidate-plan, or initiative-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, candidate-plan, initiative-plan, or initiative-report",
   );
 }
 
@@ -863,6 +897,57 @@ function parsePublicationInitiativePlanCommand(
   return parsed;
 }
 
+function parsePublicationInitiativeReportCommand(
+  argv: string[],
+): ParsedPublicationInitiativeReportCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "initiative-report") {
+    throw new Error("publication requires initiative-report");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication initiative-report requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationInitiativeReportCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication initiative-report option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function readGreenMainChecksInput(
   inputPath: string,
 ): NexusGreenMainCheckRunInput[] {
@@ -1373,6 +1458,64 @@ function printPublicationInitiativePlan(
   for (const warning of plan.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
   }
+}
+
+function printPublicationInitiativeReport(
+  report: NexusInitiativeDeliveryReport,
+  parsed: ParsedPublicationInitiativeReportCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: report.nextAction,
+      summary: report.summary,
+      report,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus initiative delivery report.");
+  writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
+  writeLine(stdout, `  Next action: ${report.nextAction}`);
+  writeLine(
+    stdout,
+    `  Initiatives: ${report.summary.itemCount}; ready=${report.summary.readyCount}; needsUpdate=${report.summary.needsUpdateCount}; blocked=${report.summary.blockedCount}; reviewNeeded=${report.summary.reviewNeededCount}`,
+  );
+  for (const item of report.items) {
+    const evidence = item.providerEvidence;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${item.initiativeId} topology=${item.topology} -> ${item.status}`,
+    );
+    writeLine(
+      stdout,
+      `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} ci=${item.ciTier.tier.id}`,
+    );
+    writeLine(
+      stdout,
+      `    evidence=${evidence.provider ?? "none"} ${evidence.sourceKind ?? "no-source"} checks=${evidence.checksStatus} review=${evidence.reviewState ?? "unknown"} merge=${evidence.mergeability ?? "unknown"} base=${evidence.baseStatus ?? "unknown"} policy=${evidence.branchPolicy ?? "unknown"}`,
+    );
+    if (evidence.reviewTarget) {
+      writeLine(
+        stdout,
+        `    reviewTarget=${formatReviewTarget(evidence.reviewTarget)}`,
+      );
+    }
+    if (item.reasons.length > 0) {
+      writeLine(stdout, `    reasons: ${item.reasons.join("; ")}`);
+    }
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function formatReviewTarget(
+  target: NonNullable<NexusInitiativeDeliveryReportItem["providerEvidence"]["reviewTarget"]>,
+): string {
+  const label = target.number ? `#${target.number}` : target.id ?? target.kind;
+  return target.url ? `${label} ${target.url}` : label;
 }
 
 function writeCandidatePlanItems(

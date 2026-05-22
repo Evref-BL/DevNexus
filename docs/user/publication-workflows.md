@@ -207,6 +207,18 @@ Review initiative delivery branch routing:
 dev-nexus publication initiative-plan <workspace-root> --component api
 ```
 
+Review initiative delivery provider state from saved evidence:
+
+```bash
+dev-nexus publication initiative-report <workspace-root> --component api --evidence-file evidence.json
+```
+
+The report is read-only. It classifies the initiative review surface as needing
+provider evidence, branch update, conflict resolution, branch-policy resolution,
+check follow-up, review, or final publication readiness. Saved provider evidence
+can include pull-request review state and base freshness, so an out-of-date but
+otherwise mergeable GitHub pull request is flagged before publication.
+
 ## Choosing A Path
 
 Start with `review_handoff` unless the workspace already has a reason to do

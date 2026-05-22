@@ -7026,6 +7026,137 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints read-only initiative delivery reports", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const evidenceFile = path.join(projectRoot, "initiative-evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 243,
+              url: "https://github.com/Evref-BL/DevNexus/pull/243",
+            },
+            headBranch: "feat/codex-goals",
+            targetBranch: "main",
+            intendedCiTier: "remote_smoke",
+            reviewState: "waiting_for_approval",
+            mergeability: "mergeable",
+            branchPolicy: "clear",
+            baseStatus: "current",
+            checks: [
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      [
+        "publication",
+        "initiative-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      {
+        stdout: textOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "initiative-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus initiative delivery report.");
+    expect(textOutput.output()).toContain("Next action: request_review");
+    expect(textOutput.output()).toContain(
+      "primary: active=codex-goals topology=hybrid -> review_needed",
+    );
+    expect(textOutput.output()).toContain(
+      "checks=success review=waiting_for_approval merge=mergeable base=current policy=clear",
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "request_review",
+      summary: {
+        itemCount: 1,
+        reviewNeededCount: 1,
+      },
+      report: {
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            status: "review_needed",
+            providerEvidence: {
+              reviewTarget: {
+                number: 243,
+              },
+              checksStatus: "success",
+              reviewState: "waiting_for_approval",
+              baseStatus: "current",
+            },
+          },
+        ],
+      },
+    });
+  });
+
   it("enqueues work items that match the automation selector", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
