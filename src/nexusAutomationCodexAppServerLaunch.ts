@@ -3,6 +3,7 @@ import {
   type CodexAppServerCapabilityAdapter,
 } from "./codexAppServerCapabilityAdapter.js";
 import {
+  CodexAppServerJsonRpcError,
   CodexAppServerJsonRpcClient,
   createCodexAppServerStdioJsonRpcTransport,
   summarizeCodexAppServerJsonRpcFailure,
@@ -34,6 +35,11 @@ export interface NexusAutomationCodexAppServerForkOptions {
   turnId?: string | null;
 }
 
+export interface NexusAutomationCodexAppServerGoalOptions {
+  enabled?: boolean;
+  tokenBudget?: number | null;
+}
+
 export interface NexusAutomationCodexAppServerClientFactoryInput {
   input: NexusAutomationAgentLaunchInput;
   profile: NexusAutomationAgentProfilePolicy;
@@ -51,6 +57,7 @@ export interface CreateNexusAutomationCodexAppServerLauncherOptions {
   turnInput?: string | ((input: NexusAutomationAgentLaunchInput) => string);
   threadPersistence?: NexusAutomationCodexAppServerThreadPersistence;
   fork?: NexusAutomationCodexAppServerForkOptions;
+  goal?: NexusAutomationCodexAppServerGoalOptions | false;
   env?: NodeJS.ProcessEnv;
   adapter?: CodexAppServerCapabilityAdapter;
   client?: CodexAppServerJsonRpcClient;
@@ -147,6 +154,12 @@ export function createNexusAutomationCodexAppServerLauncher(
           "id",
           "thread.id",
         ], "thread id");
+        await maybeSetCodexThreadGoal({
+          adapter,
+          input,
+          threadId,
+          goalOptions: options.goal,
+        });
         const turnResult = await adapter.client.request(
           "turn/start",
           codexTurnParams({
@@ -544,6 +557,137 @@ function codexTurnParams(options: {
     input: options.turnInput,
     ...codexExecutionParams(options),
   });
+}
+
+async function maybeSetCodexThreadGoal(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  input: NexusAutomationAgentLaunchInput;
+  threadId: string;
+  goalOptions: CreateNexusAutomationCodexAppServerLauncherOptions["goal"];
+}): Promise<void> {
+  const projection = resolveCodexThreadGoalProjection(options.goalOptions);
+  if (!projection.enabled || !options.adapter.capabilities.threadGoalSet.available) {
+    return;
+  }
+
+  try {
+    await options.adapter.client.request(
+      options.adapter.capabilities.threadGoalSet.method,
+      codexThreadGoalSetParams({
+        input: options.input,
+        threadId: options.threadId,
+        tokenBudget: projection.tokenBudget,
+      }),
+    );
+  } catch (error) {
+    if (isCodexThreadGoalUnavailableError(error)) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function codexThreadGoalSetParams(options: {
+  input: NexusAutomationAgentLaunchInput;
+  threadId: string;
+  tokenBudget?: number | null;
+}): Record<string, unknown> {
+  return compactRecord({
+    threadId: options.threadId,
+    objective: codexThreadGoalObjective(options.input),
+    tokenBudget: options.tokenBudget,
+  });
+}
+
+function codexThreadGoalObjective(
+  input: NexusAutomationAgentLaunchInput,
+): string {
+  const targetId = input.automationConfig.target.id;
+  const targetObjective =
+    input.automationConfig.target.objective?.trim() ||
+    `Advance eligible DevNexus work for ${input.projectConfig.name}.`;
+  const workScope = codexThreadGoalWorkScope(input);
+
+  return [
+    targetId
+      ? `Target ${targetId}: ${targetObjective}`
+      : `Target: ${targetObjective}`,
+    workScope,
+    `Run ${input.runId} starts from context ${input.contextFile}.`,
+    `Write result JSON to ${input.resultFile}. The result must include status and summary; include verification, commitIds, workItems, publicationDecision, and error when relevant.`,
+    "Completion requires concrete evidence from the repository, commands, tests, logs, or generated artifacts.",
+    "Stop and report blocked if human approval, credentials, provider review, unsafe mutation, missing access, or a publication decision is required.",
+    "Preserve DevNexus work-item, worktree, authority, verification, and publication gates.",
+  ].join("\n");
+}
+
+function codexThreadGoalWorkScope(
+  input: NexusAutomationAgentLaunchInput,
+): string {
+  const claim = input.workItemClaim;
+  if (claim?.workItemId) {
+    const title = claim.workItemTitle ? `: ${claim.workItemTitle}` : "";
+    return `Selected work item ${claim.workItemId}${title}.`;
+  }
+
+  const items = input.eligibleWorkItems.slice(0, 5).map((item) =>
+    `${item.id}: ${item.title}`
+  );
+  if (items.length === 0) {
+    return "No specific work item is claimed yet; use the DevNexus context to select the bounded eligible work.";
+  }
+
+  const suffix =
+    input.eligibleWorkItems.length > items.length
+      ? ` plus ${input.eligibleWorkItems.length - items.length} more`
+      : "";
+  return `Eligible work: ${items.join("; ")}${suffix}.`;
+}
+
+function resolveCodexThreadGoalProjection(
+  options: CreateNexusAutomationCodexAppServerLauncherOptions["goal"],
+): { enabled: boolean; tokenBudget?: number | null } {
+  if (options === false || options?.enabled === false) {
+    return { enabled: false };
+  }
+
+  const tokenBudget = normalizeCodexThreadGoalTokenBudget(
+    options?.tokenBudget,
+  );
+  return tokenBudget === undefined
+    ? { enabled: true }
+    : { enabled: true, tokenBudget };
+}
+
+function normalizeCodexThreadGoalTokenBudget(
+  value: number | null | undefined,
+): number | null | undefined {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new NexusAutomationCodexAppServerLaunchError(
+      "goal.tokenBudget must be a positive safe integer when provided",
+    );
+  }
+
+  return value;
+}
+
+function isCodexThreadGoalUnavailableError(error: unknown): boolean {
+  if (!(error instanceof CodexAppServerJsonRpcError)) {
+    return false;
+  }
+  if (error.method !== "thread/goal/set") {
+    return false;
+  }
+  if (error.code === -32601) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return /goals? feature is disabled/.test(message) ||
+    /goals? (are|is) (disabled|unavailable|unsupported)/.test(message);
 }
 
 function codexExecutionParams(options: {
