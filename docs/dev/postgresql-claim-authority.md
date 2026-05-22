@@ -313,6 +313,11 @@ Progress:
 - 2026-05-23: Slice 5A added user-facing PostgreSQL claim authority setup
   documentation, linked it from the docs index, and documented the `claim-next
   --home` option in CLI usage. Live PostgreSQL smoke remains gated.
+- 2026-05-23: Slice 5B added a gated Vitest live smoke for PostgreSQL claim
+  authority. It is skipped unless
+  `DEV_NEXUS_POSTGRES_CLAIM_AUTHORITY_SMOKE=1` is set, creates/uses the
+  configured schema, applies the exported schema SQL, verifies one-winner
+  claiming and fencing-token verification, then releases the synthetic claim.
 
 ## Human Gates
 

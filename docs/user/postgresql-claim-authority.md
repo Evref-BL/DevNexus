@@ -87,7 +87,7 @@ The profile stores the environment variable name, not the secret.
 Schema creation is explicit. DevNexus does not create tables from normal
 automation commands.
 
-The package exports `nexusPostgresWorkItemClaimAuthoritySchemaSql` for tooling
+The package exports `nexusPostgresClaimAuthoritySchemaSql` for tooling
 that applies schema under an approved operator workflow. Apply it with the
 database account and migration process your team uses for shared infrastructure.
 
@@ -143,3 +143,18 @@ Live PostgreSQL smoke tests are intentionally gated. They require an explicit
 runner policy, a real database connection, and operator approval to create or
 use schema. The normal test suite uses fake SQL clients and does not require a
 database.
+
+To run the live smoke, install the optional `pg` peer dependency in the runtime
+environment and set:
+
+```bash
+DEV_NEXUS_POSTGRES_CLAIM_AUTHORITY_SMOKE=1 \
+DEV_NEXUS_CLAIMS_DATABASE_URL='postgres://user:password@host:5432/dev_nexus' \
+npm test -- src/nexusPostgresWorkItemClaimAuthority.live.test.ts
+```
+
+The smoke creates the target schema if it does not exist, applies
+`nexusPostgresClaimAuthoritySchemaSql`, writes one synthetic claim row, verifies
+that a second owner loses the race, then releases the claim. It uses
+`DEV_NEXUS_CLAIMS_SCHEMA` when set and otherwise defaults to
+`dev_nexus_smoke`.
