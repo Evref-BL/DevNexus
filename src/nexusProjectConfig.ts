@@ -138,6 +138,18 @@ export type NexusProjectTrackerDiscoveryMissingCredentialBehavior =
   | "block"
   | "skip";
 
+export type NexusProjectTrackerCoordinationHandoffPolicy =
+  | "comment"
+  | "silent";
+
+export interface NexusProjectTrackerCommunicationPolicyConfig {
+  coordinationHandoffs?: NexusProjectTrackerCoordinationHandoffPolicy;
+}
+
+export interface NormalizedNexusProjectTrackerCommunicationPolicy {
+  coordinationHandoffs: NexusProjectTrackerCoordinationHandoffPolicy;
+}
+
 export interface NexusProjectTrackerDiscoveryFingerprintConfig {
   id: string;
   trackerId?: string;
@@ -200,6 +212,7 @@ export interface NexusProjectWorkTrackerBindingConfig {
   name: string;
   enabled: boolean;
   roles: NexusProjectWorkTrackerRole[];
+  communication?: NexusProjectTrackerCommunicationPolicyConfig;
   workTracking: WorkTrackingConfig;
 }
 
@@ -360,6 +373,7 @@ export interface NexusProjectConfig {
   worktreesRoot: string;
   kanban?: NexusProjectKanbanConfig;
   workTracking?: WorkTrackingConfig;
+  workTrackerCommunication?: NexusProjectTrackerCommunicationPolicyConfig;
   extensions?: NexusProjectExtensionsConfig;
   agent?: NexusAgentConfig;
   agentTargets?: NexusProjectAgentTargetsConfig;
@@ -405,6 +419,29 @@ export const defaultNexusProjectTrackerDiscoveryPolicy: NexusProjectTrackerDisco
   conflictWinner: "default_tracker",
   missingCredentialBehavior: "block",
 };
+
+export function defaultNexusProjectTrackerCommunicationPolicy(
+  provider: WorkTrackingProviderName | string,
+): NormalizedNexusProjectTrackerCommunicationPolicy {
+  return {
+    coordinationHandoffs: provider === "local" ? "comment" : "silent",
+  };
+}
+
+export function normalizeNexusProjectTrackerCommunicationPolicy(options: {
+  provider: WorkTrackingProviderName | string;
+  project?: NexusProjectTrackerCommunicationPolicyConfig;
+  tracker?: NexusProjectTrackerCommunicationPolicyConfig;
+}): NormalizedNexusProjectTrackerCommunicationPolicy {
+  const fallback = defaultNexusProjectTrackerCommunicationPolicy(options.provider);
+
+  return {
+    coordinationHandoffs:
+      options.tracker?.coordinationHandoffs ??
+      options.project?.coordinationHandoffs ??
+      fallback.coordinationHandoffs,
+  };
+}
 
 export function projectConfigPath(projectRootPath: string): string {
   return path.join(path.resolve(projectRootPath), devNexusProjectConfigFileName);
@@ -3119,6 +3156,39 @@ function optionalWorkTrackerRoles(
   return validateWorkTrackerRoles(value, pathName);
 }
 
+function validateTrackerCoordinationHandoffPolicy(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerCoordinationHandoffPolicy {
+  if (value === "comment" || value === "silent") {
+    return value;
+  }
+
+  throw new NexusConfigError(`${pathName} must be comment or silent`);
+}
+
+function validateTrackerCommunicationPolicy(
+  value: unknown,
+  pathName: string,
+): NexusProjectTrackerCommunicationPolicyConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = assertRecord(value, pathName);
+  const coordinationHandoffs =
+    record.coordinationHandoffs === undefined
+      ? undefined
+      : validateTrackerCoordinationHandoffPolicy(
+          record.coordinationHandoffs,
+          `${pathName}.coordinationHandoffs`,
+        );
+
+  return {
+    ...(coordinationHandoffs !== undefined ? { coordinationHandoffs } : {}),
+  };
+}
+
 function validateTrackerDiscoveryDirectExternalSelection(
   value: unknown,
   pathName: string,
@@ -3535,11 +3605,16 @@ function validateComponentWorkTrackerBinding(
   }
 
   const id = requiredString(record, "id", pathName);
+  const communication = validateTrackerCommunicationPolicy(
+    record.communication,
+    `${pathName}.communication`,
+  );
   return {
     id,
     name: optionalString(record, "name", pathName) ?? id,
     enabled: optionalBoolean(record, "enabled", pathName) ?? true,
     roles: validateWorkTrackerRoles(record.roles, `${pathName}.roles`),
+    ...(communication ? { communication } : {}),
     workTracking,
   };
 }
@@ -3971,6 +4046,10 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
   }
   const agent = validateNexusAgentConfig(record.agent, "workspace config.agent");
   const workTracking = validateWorkTrackingConfig(record.workTracking);
+  const workTrackerCommunication = validateTrackerCommunicationPolicy(
+    record.workTrackerCommunication,
+    "workspace config.workTrackerCommunication",
+  );
   const extensions = validateProjectExtensionsConfig(record.extensions);
   const skills = validateProjectSkillsConfig(record.skills);
   const plugins = validateProjectPluginsConfig(record.plugins);
@@ -3995,6 +4074,7 @@ export function validateProjectConfig(value: unknown): NexusProjectConfig {
     worktreesRoot,
     ...(kanban ? { kanban } : {}),
     ...(workTracking ? { workTracking } : {}),
+    ...(workTrackerCommunication ? { workTrackerCommunication } : {}),
   };
   const components = validateProjectComponentsConfig(record.components, common);
   const versionPlanning = validateNexusVersionPlanningConfig(
