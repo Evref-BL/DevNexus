@@ -120,7 +120,7 @@ describe("nexus workspace setup wizard", () => {
       ],
     });
     expect(stdout.output()).toContain("DevNexus user quickstart");
-    expect(stdout.output()).toContain("Workspace layout");
+    expect(stdout.output()).toContain("What are you setting up?");
     expect(stdout.output()).toContain("project");
     expect(stdout.output()).toContain("workspace");
     expect(stdout.output()).toContain("Initialize Git repo? (yes/no)");

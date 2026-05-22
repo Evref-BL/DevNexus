@@ -46,10 +46,10 @@ For a user in a terminal, init asks the minimum first-workspace questions. The
 DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
 one.
 
-Choose the layout that matches the way you want to work:
+Choose what you are setting up:
 
-The setup wizard asks you to choose between a project layout and a coordination
-workspace. This is the main first-workspace decision.
+The wizard asks this early because it controls whether the primary component
+starts at `.` or under `components/<id>`.
 
 - **Embedded project layout:** run init inside an existing Git repository and
   accept `.` as the primary component source path. DevNexus files live next to
