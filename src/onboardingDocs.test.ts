@@ -143,6 +143,9 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toContain("Copy-paste prompt");
     expect(quickStart).toContain("Codex or Claude");
     expect(quickStart).toContain("DevNexus workspace root");
+    expect(quickStart).toContain("existing Git repository");
+    expect(quickStart).toContain("primary component");
+    expect(quickStart).toContain("components/<id>");
     expect(quickStart).toContain("AGENTS.md");
     expect(quickStart).toContain("dev-nexus workspace status");
     expect(quickStart).toContain("dev-nexus setup check");
@@ -151,6 +154,17 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toContain(".codex/config.toml");
     expect(quickStart).toContain(".mcp.json");
     expect(quickStart).not.toContain("gh pr checks");
+  });
+
+  it("documents embedded and coordination workspace layouts in the user guide", () => {
+    const concepts = repoFile("docs/user/concepts.md");
+    const gettingStarted = repoFile("docs/user/getting-started.md");
+    const combined = `${concepts}\n${gettingStarted}`;
+
+    expect(combined).toContain("Embedded project layout");
+    expect(combined).toContain("Coordination workspace layout");
+    expect(combined).toContain("accept `.` as the primary component source path");
+    expect(combined).toContain("Unrelated dirty product files still block readiness");
   });
 
   it("uses a general industry example instead of dogfood or research-specific names", () => {

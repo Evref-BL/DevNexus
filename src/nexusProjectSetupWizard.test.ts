@@ -123,6 +123,61 @@ describe("nexus workspace setup wizard", () => {
     expect(stdout.output()).not.toContain("DevNexus home [");
   });
 
+  it("defaults the primary component to the workspace root in an existing Git checkout", async () => {
+    const defaultHome = path.join(os.tmpdir(), "dev-nexus-existing-repo-home");
+    const projectRoot = makeTempDir("dev-nexus-existing-repo-");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    process.env.DEV_NEXUS_HOME = defaultHome;
+    const stdin = ttyInput();
+    const promptAnswers = [
+      "",
+      "Existing Repo",
+      "",
+      "repo",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ];
+    const stdout = captureOutput({
+      onWrite(chunk) {
+        if (!chunk.includes(": ") || promptAnswers.length === 0) {
+          return;
+        }
+        const answer = promptAnswers.shift()!;
+        queueMicrotask(() => {
+          stdin.write(`${answer}\n`);
+        });
+      },
+    });
+
+    const answers = await loadNexusProjectSetupAnswers({
+      projectRoot,
+      stdin,
+      stdout: stdout.stream,
+    });
+    stdin.destroy();
+
+    expect(answers).toMatchObject({
+      project: {
+        id: "existing-repo",
+        name: "Existing Repo",
+        root: projectRoot,
+      },
+      components: [
+        {
+          id: "repo",
+          role: "primary",
+          source: {
+            kind: "reference_existing",
+            path: ".",
+          },
+        },
+      ],
+    });
+  });
+
   it("collects additional components through an explicit repeat prompt", async () => {
     const projectRoot = makeTempDir("dev-nexus-multi-component-project-");
     const stdin = ttyInput();

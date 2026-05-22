@@ -21,6 +21,15 @@ The workspace root contains:
 
 One DevNexus workspace can coordinate one component or many components.
 
+Two workspace layouts are first-class:
+
+- **Embedded project layout:** the DevNexus workspace root is also the primary
+  component source root. Use this for a single repository where DevNexus context
+  belongs with the project, like build-tool or editor configuration.
+- **Coordination workspace layout:** the DevNexus workspace root is separate
+  from its components. Use this when one agent workspace should coordinate
+  several repositories, documents, datasets, or support folders.
+
 ## Component
 
 A component is something the workspace works on. Common components are Git

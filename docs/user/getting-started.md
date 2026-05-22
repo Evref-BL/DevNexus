@@ -45,8 +45,15 @@ dev-nexus workspace init
 For a user in a terminal, init asks the minimum first-workspace questions. The
 DevNexus home defaults to `~/.dev-nexus`, so most users do not need to choose
 one.
-Press Enter for a component source path to create it under `components/<id>`, or
-type an existing path to reference it.
+
+Choose the layout that matches the way you want to work:
+
+- **Embedded project layout:** run init inside an existing Git repository and
+  accept `.` as the primary component source path. DevNexus files live next to
+  the project files, like Maven, Gradle, Cargo, or editor configuration.
+- **Coordination workspace layout:** run init from a new workspace directory and
+  accept `components/<id>` for new workspace-local components, or type existing
+  paths for repositories and folders you want the workspace to coordinate.
 
 Setup creates or updates:
 
@@ -98,6 +105,10 @@ dev-nexus setup check . join-existing-project
 The workspace is ready when `workspace status` succeeds, setup check is not
 blocked, `AGENTS.md` exists, and your agent config was generated, such as
 `.codex/config.toml` for Codex or `.mcp.json` for Claude.
+
+In embedded project layout, setup check may warn that DevNexus setup files are
+uncommitted. Review and commit those files when the embedded workspace
+configuration is correct. Unrelated dirty product files still block readiness.
 
 ## Add Existing Components
 

@@ -8,6 +8,7 @@ import {
 import type { NexusProjectComponentConfig } from "./nexusProjectConfig.js";
 
 export type NexusComponentSourceRootTopologyLayout =
+  | "embedded"
   | "workspace-local"
   | "explicit-external"
   | "legacy-external"
@@ -152,6 +153,9 @@ function sourceRootLayout(
   configuredAnalysis: NexusProjectPathAnalysis,
   effectiveAnalysis: NexusProjectPathAnalysis,
 ): NexusComponentSourceRootTopologyLayout {
+  if (samePath(projectRoot, effectiveAnalysis.path)) {
+    return "embedded";
+  }
   if (
     (configuredAnalysis.base === "componentsRoot" ||
       configuredAnalysis.base === "projectRoot") &&
@@ -167,6 +171,10 @@ function sourceRootLayout(
     return "explicit-external";
   }
   return "legacy-external";
+}
+
+function samePath(left: string, right: string): boolean {
+  return path.relative(path.resolve(left), path.resolve(right)) === "";
 }
 
 function sourceRootState(options: {
@@ -202,9 +210,13 @@ function sourceRootNextAction(
   state: NexusComponentSourceRootTopologyState,
 ): string | null {
   if (state === "missing") {
-    return layout === "workspace-local"
-      ? "Clone the component into the workspace-local components root before assigning work."
-      : "Confirm this external layout is intentional, or migrate the checkout into componentsRoot:<component-id>.";
+    if (layout === "embedded") {
+      return "Create or clone the project repository at the DevNexus workspace root, or choose another primary component source path.";
+    }
+    if (layout === "workspace-local") {
+      return "Clone the component into the workspace-local components root before assigning work.";
+    }
+    return "Confirm this external layout is intentional, or migrate the checkout into componentsRoot:<component-id>.";
   }
   if (state === "workspace-local-escape") {
     return "Replace the symlink or junction with a real workspace-local clone, or configure an explicit external sourceRoot.";
@@ -222,6 +234,9 @@ function sourceRootNextAction(
 }
 
 function layoutLabel(layout: NexusComponentSourceRootTopologyLayout): string {
+  if (layout === "embedded") {
+    return "embedded project-root";
+  }
   if (layout === "workspace-local") {
     return "workspace-local";
   }

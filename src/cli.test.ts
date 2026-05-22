@@ -2825,6 +2825,82 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("previews and applies an embedded workspace whose primary component is the workspace root", async () => {
+    const projectRoot = makeTempDir("dev-nexus-embedded-project-setup-");
+    const homePath = makeTempDir("dev-nexus-embedded-project-setup-home-");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    const answersPath = path.join(projectRoot, "answers.json");
+    fs.writeFileSync(
+      answersPath,
+      `${JSON.stringify({
+        home: {
+          path: homePath,
+        },
+        project: {
+          id: "embedded-demo",
+          name: "Embedded Demo",
+          root: projectRoot,
+          initializeGit: false,
+          defaultBranch: "main",
+        },
+        components: [
+          {
+            id: "embedded-demo",
+            name: "Embedded Demo",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: ".",
+              defaultBranch: "main",
+            },
+          },
+        ],
+        agentTargets: [
+          {
+            provider: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+        },
+      }, null, 2)}\n`,
+    );
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "project",
+          "setup",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(applyOutput.output())).toMatchObject({
+      ok: true,
+      applied: true,
+      projectRoot,
+    });
+    expect(loadProjectConfig(projectRoot)).toMatchObject({
+      id: "embedded-demo",
+      components: [
+        expect.objectContaining({
+          id: "embedded-demo",
+          sourceRoot: ".",
+          defaultWorkTrackerId: "local",
+        }),
+      ],
+    });
+  });
+
   it("previews and applies component add from an answer file", async () => {
     const projectRoot = makeTempDir("dev-nexus-component-add-");
     const homePath = makeTempDir("dev-nexus-component-add-home-");

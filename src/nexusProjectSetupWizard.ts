@@ -395,7 +395,8 @@ async function promptForNexusProjectSetupAnswers(options: {
       [
         "DevNexus user quickstart",
         "Answer the workspace and component prompts.",
-        "Press Enter on a component source path to create it under components/<id>, or type an existing path to reference it.",
+        "Primary component source path defaults to . inside an existing Git checkout and components/<id> in a new workspace.",
+        "Press Enter to accept the default, or type another path.",
         "DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
       ].join("\n"),
@@ -413,7 +414,7 @@ async function promptForNexusProjectSetupAnswers(options: {
     const componentPath = await askWithDefault(
       rl,
       "Primary component source path",
-      path.join("components", componentId),
+      defaultPrimaryComponentSourcePath(projectRoot, componentId),
     );
     const components: NexusProjectSetupAnswers["components"] = [
       {
@@ -495,6 +496,15 @@ function wizardComponentSource(
     path: sourcePath,
     initializeGit: true,
   };
+}
+
+function defaultPrimaryComponentSourcePath(
+  projectRoot: string,
+  componentId: string,
+): string {
+  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"))
+    ? "."
+    : path.join("components", componentId);
 }
 
 function isSameOrInsidePath(parentPath: string, childPath: string): boolean {
