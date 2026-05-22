@@ -147,8 +147,11 @@ Progress:
 - 2026-05-22: Slice 1A added `NexusWorkItemClaimAuthority` and delegated
   ready-candidate acquisition through the default optimistic tracker authority.
   No database dependency was introduced.
-- Remaining Slice 1 work: add the in-memory authority contract and lifecycle
-  operations for verify, heartbeat, release, reclaim, and inspection before
+- 2026-05-22: Slice 1B added the in-memory authority contract for active
+  claims, duplicate rejection, verify, heartbeat, release, stale inspection,
+  reclaim, and fencing-token increments.
+- Remaining Slice 1 work: decide whether stale reclaim in
+  `claimNexusEligibleWorkItem` should route through authority backends before
   introducing PostgreSQL.
 
 ### Slice 2: PostgreSQL Backend Contract

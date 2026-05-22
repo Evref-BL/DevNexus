@@ -50,10 +50,23 @@ import type {
   NexusWorkItemClaimSkippedCandidate,
   NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaimAuthority.js";
+export {
+  NexusMemoryWorkItemClaimAuthority,
+  nexusWorkItemClaimAuthorityKey,
+} from "./nexusWorkItemClaimAuthority.js";
 export type {
   NexusWorkItemClaimAuthority,
   NexusWorkItemClaimAuthorityClaimCandidateOptions,
   NexusWorkItemClaimAuthorityClaimCandidateResult,
+  NexusWorkItemClaimAuthorityHeartbeatResult,
+  NexusWorkItemClaimAuthorityInspectOptions,
+  NexusWorkItemClaimAuthorityInspectResult,
+  NexusWorkItemClaimAuthorityKey,
+  NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityReclaimResult,
+  NexusWorkItemClaimAuthorityReleaseResult,
+  NexusWorkItemClaimAuthorityState,
+  NexusWorkItemClaimAuthorityVerifyResult,
   NexusWorkItemClaimObservation,
   NexusWorkItemClaimOwner,
   NexusWorkItemClaimOwnerInput,
@@ -269,6 +282,7 @@ export async function claimNexusEligibleWorkItem(
       leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
     });
     const claimAttempt = await claimAuthority.claimCandidate({
+      projectId: options.projectConfig.id,
       candidate,
       tracker,
       provider,
@@ -286,6 +300,9 @@ export async function claimNexusEligibleWorkItem(
         componentId: candidate.componentId,
         trackerId: tracker.id,
         owner,
+        ...(claimAttempt.authorityClaim
+          ? { authorityClaim: claimAttempt.authorityClaim }
+          : {}),
         skippedCandidates,
         ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
       };
@@ -297,6 +314,9 @@ export async function claimNexusEligibleWorkItem(
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,
+      ...(claimAttempt.authorityClaim
+        ? { authorityClaim: claimAttempt.authorityClaim }
+        : {}),
       skippedCandidates,
       ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
     };
