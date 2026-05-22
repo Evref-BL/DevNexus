@@ -5728,6 +5728,88 @@ describe("dev-nexus cli", () => {
     ).toBe(false);
   });
 
+  it("dry-runs project MCP refresh with effective exposure planning", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-dry-run-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        exposure: "gateway",
+        agentTargets: [
+          {
+            agent: "codex",
+            exposure: "direct",
+          },
+        ],
+      },
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              targetAgents: ["codex"],
+            },
+            {
+              kind: "mcp_server",
+              id: "hidden-mcp",
+              serverName: "hidden_mcp",
+              command: "node",
+              args: ["hidden-server.js"],
+              exposure: "hidden",
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(
+      ["workspace", "mcp", "refresh", projectRoot, "--dry-run", "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      applied: false,
+      exposurePlan: {
+        directTargets: [
+          {
+            agent: "codex",
+            serverName: "dev_nexus",
+            mode: "direct",
+            source: "agent_target",
+          },
+        ],
+        pluginServers: [
+          {
+            pluginId: "workflow-plugin",
+            capabilityId: "workflow-mcp",
+            serverName: "workflow_mcp",
+            mode: "gateway",
+            source: "plugin",
+          },
+          {
+            pluginId: "workflow-plugin",
+            capabilityId: "hidden-mcp",
+            serverName: "hidden_mcp",
+            mode: "hidden",
+            source: "server",
+          },
+        ],
+      },
+    });
+    expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(false);
+  });
+
   it("reports project MCP context budget without writing agent config", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -5808,6 +5890,7 @@ describe("dev-nexus cli", () => {
               serverName: "workflow_mcp",
               command: "node",
               args: ["workflow-server.js"],
+              exposure: "gateway",
               targetAgents: ["codex"],
               tools: [
                 {
@@ -5835,6 +5918,8 @@ describe("dev-nexus cli", () => {
         serverName: "workflow_mcp",
         declaredToolCount: 1,
         materializationStatus: "declared",
+        effectiveExposure: "gateway",
+        exposureSource: "server",
         declaredTools: [
           expect.objectContaining({
             source: "plugin",

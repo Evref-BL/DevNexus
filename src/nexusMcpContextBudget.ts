@@ -4,10 +4,16 @@ import {
   resolveNexusProjectAgentMcpTargets,
 } from "./nexusAgentMcpConfig.js";
 import { listDevNexusMcpTools } from "./nexusMcpServer.js";
+import {
+  resolveNexusMcpExposure,
+  type NexusMcpExposureSource,
+  type NexusResolvedMcpExposureMode,
+} from "./nexusMcpExposurePolicy.js";
 import type { NexusPluginMcpServerCapability } from "./nexusPluginCapabilities.js";
 import {
   loadProjectConfig,
   selectNexusProjectMcpAgentTargets,
+  type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 
@@ -41,6 +47,9 @@ export interface NexusMcpContextBudgetDirectServer {
   estimatedBytes: number;
   estimatedTokens: number;
   metadataStatus: NexusMcpContextBudgetMetadataStatus;
+  effectiveExposure: NexusResolvedMcpExposureMode;
+  exposureSource: NexusMcpExposureSource;
+  exposureReason: string;
 }
 
 export interface NexusMcpContextBudgetPluginServer {
@@ -60,6 +69,9 @@ export interface NexusMcpContextBudgetPluginServer {
   estimatedTokens: number;
   metadataStatus: NexusMcpContextBudgetMetadataStatus;
   materializationStatus: "declared" | "missing_command" | "no_matching_target";
+  effectiveExposure: NexusResolvedMcpExposureMode;
+  exposureSource: NexusMcpExposureSource;
+  exposureReason: string;
 }
 
 export interface NexusMcpContextBudgetServerContribution {
@@ -118,6 +130,14 @@ export function buildNexusMcpContextBudgetReport(
   const topLimit = options.topLimit ?? DEFAULT_TOP_LIMIT;
   const directServers = directTargets.map((target) => {
     const metadata = directServerToolMetadata(target.serverName, target.args);
+    const configuredTarget = findConfiguredTarget(selectedTargets, target.agent);
+    const exposure = resolveNexusMcpExposure({
+      workspaceExposure: projectConfig.mcp?.exposure,
+      agentTarget: configuredTarget ?? {
+        agent: target.agent,
+        provider: target.provider,
+      },
+    });
     return {
       source: "direct" as const,
       agent: target.agent,
@@ -130,11 +150,12 @@ export function buildNexusMcpContextBudgetReport(
       estimatedBytes: metadata.estimatedBytes,
       estimatedTokens: metadata.estimatedTokens,
       metadataStatus: metadata.metadataStatus,
+      effectiveExposure: exposure.mode,
+      exposureSource: exposure.source,
+      exposureReason: exposure.reason,
     };
   });
-  const pluginDeclaredServers = pluginMcpServers(projectConfig, selectedTargets.map(
-    (target) => target.agent,
-  ));
+  const pluginDeclaredServers = pluginMcpServers(projectConfig, selectedTargets);
   const directToolContributions = directTargets.flatMap((target) =>
     directServerToolMetadata(target.serverName, target.args).tools,
   );
@@ -219,7 +240,7 @@ function directServerToolMetadata(
 
 function pluginMcpServers(
   projectConfig: NexusProjectConfig,
-  selectedAgents: readonly string[],
+  selectedTargets: readonly NexusProjectAgentMcpTarget[],
 ): NexusMcpContextBudgetPluginServer[] {
   return (projectConfig.plugins ?? [])
     .filter((plugin) => plugin.enabled !== false)
@@ -231,6 +252,12 @@ function pluginMcpServers(
         .map((capability) => {
           const targetAgents = capability.targetAgents ?? [];
           const metadata = pluginServerMetadata(capability);
+          const exposure = resolveNexusMcpExposure({
+            workspaceExposure: projectConfig.mcp?.exposure,
+            agentTarget: selectedTargets[0] ?? null,
+            plugin,
+            server: capability,
+          });
           return {
             source: "plugin" as const,
             pluginId: plugin.id,
@@ -249,11 +276,25 @@ function pluginMcpServers(
             metadataStatus: metadata.metadataStatus,
             materializationStatus: pluginMaterializationStatus(
               capability,
-              selectedAgents,
+              selectedTargets.map((target) => target.agent),
             ),
+            effectiveExposure: exposure.mode,
+            exposureSource: exposure.source,
+            exposureReason: exposure.reason,
           };
         }),
     );
+}
+
+function findConfiguredTarget(
+  targets: readonly NexusProjectAgentMcpTarget[],
+  agent: string,
+): NexusProjectAgentMcpTarget | null {
+  const normalized = agent.trim().toLowerCase();
+  return (
+    targets.find((target) => target.agent.trim().toLowerCase() === normalized) ??
+    null
+  );
 }
 
 function pluginServerMetadata(

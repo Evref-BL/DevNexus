@@ -121,6 +121,7 @@ export function usage(): string {
     "",
     "Options for workspace mcp refresh:",
     "  --agent <agent>           repeatable; defaults to workspace mcp.agentTargets or codex",
+    "  --dry-run                 resolve targets and exposure policy without writing config",
     "  --json",
     "",
     "Options for workspace mcp budget:",
