@@ -580,7 +580,13 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderThreadInbox");
     expect(module).toContain("renderHostOverview");
     expect(module).toContain("renderWorkspaceCard");
+    expect(module).toContain("renderHostDashboard");
+    expect(module).toContain("renderHostActionQueue");
+    expect(module).toContain("Host Cockpit");
+    expect(module).toContain("Host HITL");
+    expect(module).toContain("Action Queue");
     expect(module).toContain("renderLoading");
+    expect(module).toContain("Loading host cockpit");
     expect(module).toContain("Switching workspace");
     expect(module).toContain("hostRefreshMs");
     expect(module).toContain("hostInFlight");
