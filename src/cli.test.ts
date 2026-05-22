@@ -5728,6 +5728,179 @@ describe("dev-nexus cli", () => {
     ).toBe(false);
   });
 
+  it("reports project MCP context budget without writing agent config", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      totals: {
+        directTargetCount: 1,
+        directServerCount: 1,
+        pluginDeclaredServerCount: 0,
+      },
+      directServers: [
+        {
+          source: "direct",
+          serverName: "dev_nexus",
+          agent: "codex",
+          metadataStatus: "known",
+        },
+      ],
+    });
+    expect(payload.totals.knownToolCount).toBeGreaterThan(20);
+    expect(payload.totals.estimatedBytes).toBeGreaterThan(1000);
+    expect(payload.topTools[0].estimatedBytes).toBeGreaterThan(0);
+    expect(fs.existsSync(path.join(projectRoot, ".codex", "config.toml"))).toBe(false);
+  });
+
+  it("reports an empty MCP context budget when MCP projection is disabled", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-empty-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      mcp: {
+        enabled: false,
+      },
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      totals: {
+        directTargetCount: 0,
+        directServerCount: 0,
+        pluginDeclaredServerCount: 0,
+        knownToolCount: 0,
+        estimatedBytes: 0,
+        estimatedTokens: 0,
+      },
+      directServers: [],
+      pluginDeclaredServers: [],
+      topServers: [],
+      topTools: [],
+    });
+  });
+
+  it("includes plugin-declared MCP servers in the context budget report", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-plugin-budget-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      plugins: [
+        {
+          id: "workflow-plugin",
+          enabled: true,
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              command: "node",
+              args: ["workflow-server.js"],
+              targetAgents: ["codex"],
+              tools: [
+                {
+                  name: "workflow.status",
+                  description: "Read workflow status.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot, "--json"], {
+      stdout: output.writer,
+    });
+
+    const payload = JSON.parse(output.output());
+    expect(payload.pluginDeclaredServers).toEqual([
+      expect.objectContaining({
+        source: "plugin",
+        pluginId: "workflow-plugin",
+        capabilityId: "workflow-mcp",
+        serverName: "workflow_mcp",
+        declaredToolCount: 1,
+        materializationStatus: "declared",
+        declaredTools: [
+          expect.objectContaining({
+            source: "plugin",
+            serverName: "workflow_mcp",
+            toolName: "workflow.status",
+          }),
+        ],
+      }),
+    ]);
+  });
+
+  it("prints a concise text MCP context budget report", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-text-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const output = captureOutput();
+
+    await main(["workspace", "mcp", "budget", projectRoot], {
+      stdout: output.writer,
+    });
+
+    expect(output.output()).toContain("DevNexus MCP context budget");
+    expect(output.output()).toContain("Direct MCP targets: 1");
+    expect(output.output()).toContain("Plugin-declared MCP servers: 0");
+    expect(output.output()).toContain("Top MCP servers:");
+  });
+
+  it("reports malformed MCP budget project config as a JSON error", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-invalid-");
+    fs.writeFileSync(
+      path.join(projectRoot, "dev-nexus.project.json"),
+      "{",
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const exitCode = await main(
+      ["workspace", "mcp", "budget", projectRoot, "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("reports missing MCP budget project config as a JSON error", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-mcp-budget-missing-");
+    const output = captureOutput();
+
+    const exitCode = await main(
+      ["workspace", "mcp", "budget", projectRoot, "--json"],
+      {
+        stdout: output.writer,
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+    });
+  });
+
   it("cleans up stale generated agent workspaceions through the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-agent-projection-cleanup-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

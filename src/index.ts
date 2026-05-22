@@ -46,6 +46,7 @@ export * from "./nexusAgentProjectionCleanup.js";
 export * from "./nexusAgentProjectionStatus.js";
 export * from "./nexusAutomationWorktreeSetup.js";
 export * from "./nexusMcpServer.js";
+export * from "./nexusMcpContextBudget.js";
 export * from "./nexusMcpJsonRpcTransport.js";
 export * from "./nexusMcpSchemaCompatibility.js";
 export * from "./nexusManualWorktree.js";

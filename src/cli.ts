@@ -180,6 +180,10 @@ import {
   type MaterializeNexusProjectAgentMcpConfigResult,
 } from "./nexusAgentMcpConfig.js";
 import {
+  buildNexusMcpContextBudgetReport,
+  type NexusMcpContextBudgetReport,
+} from "./nexusMcpContextBudget.js";
+import {
   refreshNexusProjectPlugin,
   type RefreshNexusProjectPluginResult,
 } from "./nexusProjectPluginRefresh.js";
@@ -420,6 +424,13 @@ interface ParsedProjectHostingCommand {
 interface ParsedProjectMcpRefreshCommand {
   projectRoot: string;
   agents: string[];
+  json?: boolean;
+}
+
+interface ParsedProjectMcpBudgetCommand {
+  projectRoot: string;
+  agents: string[];
+  topLimit?: number;
   json?: boolean;
 }
 
@@ -1217,8 +1228,22 @@ async function handleProjectMcpCommand(
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
   const command = argv[2];
+  if (command === "budget") {
+    const parsed = parseProjectMcpBudgetCommand(argv);
+    const report = buildNexusMcpContextBudgetReport({
+      projectRoot: parsed.projectRoot,
+      agents: parsed.agents,
+      topLimit: parsed.topLimit,
+    });
+    printProjectMcpBudgetResult(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
   if (command !== "refresh") {
-    throw new Error("workspace mcp requires refresh");
+    throw new Error("workspace mcp requires refresh or budget");
   }
 
   const parsed = parseProjectMcpRefreshCommand(argv);
@@ -3378,6 +3403,47 @@ function parseProjectMcpRefreshCommand(
         break;
       default:
         throw new Error(`Unknown workspace mcp refresh option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parseProjectMcpBudgetCommand(
+  argv: string[],
+): ParsedProjectMcpBudgetCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("workspace mcp budget requires a workspace root");
+  }
+
+  const parsed: ParsedProjectMcpBudgetCommand = {
+    projectRoot,
+    agents: [],
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--agent":
+        parsed.agents.push(next());
+        break;
+      case "--top":
+        parsed.topLimit = parsePositiveInteger(next(), "--top");
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown workspace mcp budget option: ${arg}`);
     }
   }
 
@@ -6290,6 +6356,52 @@ function printProjectMcpRefreshResult(
   }
   if (result.gitExcludeEntries.length > 0) {
     writeLine(stdout, `  Git exclude entries: ${result.gitExcludeEntries.length}`);
+  }
+}
+
+function printProjectMcpBudgetResult(
+  report: NexusMcpContextBudgetReport,
+  parsed: ParsedProjectMcpBudgetCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, report);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus MCP context budget.");
+  writeLine(stdout, `  Project: ${report.projectRoot}`);
+  writeLine(stdout, `  Direct MCP targets: ${report.totals.directTargetCount}`);
+  writeLine(
+    stdout,
+    `  Plugin-declared MCP servers: ${report.totals.pluginDeclaredServerCount}`,
+  );
+  writeLine(
+    stdout,
+    `  Known tools: ${report.totals.knownToolCount}; estimated metadata: ${report.totals.estimatedBytes} bytes (~${report.totals.estimatedTokens} tokens)`,
+  );
+  writeLine(stdout, "  Top MCP servers:");
+  for (const server of report.topServers) {
+    writeLine(
+      stdout,
+      `    ${server.source}:${server.serverName} ${server.toolCount} tool(s), ${server.estimatedBytes} bytes (${server.metadataStatus})`,
+    );
+  }
+  if (report.topServers.length === 0) {
+    writeLine(stdout, "    none");
+  }
+  writeLine(stdout, "  Top MCP tools:");
+  for (const tool of report.topTools) {
+    writeLine(
+      stdout,
+      `    ${tool.serverName}.${tool.toolName} ${tool.estimatedBytes} bytes`,
+    );
+  }
+  if (report.topTools.length === 0) {
+    writeLine(stdout, "    none");
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
   }
 }
 
