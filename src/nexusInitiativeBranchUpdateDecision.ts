@@ -26,6 +26,9 @@ export interface NexusInitiativeBranchUpdateDecision {
   recommendation: NexusInitiativeBranchUpdateChoiceId | "none";
   headBranch: string | null;
   baseBranch: string;
+  pushRemote: string | null;
+  publicBranch: boolean;
+  stackedBranch: boolean;
   conflictRisk: "none" | "unknown" | "elevated";
   ciFreshnessRisk: "none" | "stale" | "unknown";
   protectedBranchConstraint: "none" | "avoid_direct_base_push";
@@ -39,14 +42,25 @@ export function buildNexusInitiativeBranchUpdateDecision(options: {
   baseStatus: NexusPublicationProviderBaseStatus | null;
   headBranch: string | null;
   baseBranch: string;
+  pushRemote?: string | null;
+  publicBranch?: boolean;
+  stackedBranch?: boolean;
 }): NexusInitiativeBranchUpdateDecision {
   const baseStatus = options.baseStatus;
+  const pushRemote = clean(options.pushRemote) ?? null;
+  const publicBranch = options.publicBranch ?? (
+    baseStatus === "behind" || baseStatus === "diverged"
+  );
+  const stackedBranch = options.stackedBranch ?? false;
   if (baseStatus !== "behind" && baseStatus !== "diverged") {
     return {
       status: baseStatus === "unknown" ? "unknown" : "not_required",
       recommendation: "none",
       headBranch: options.headBranch,
       baseBranch: options.baseBranch,
+      pushRemote,
+      publicBranch: false,
+      stackedBranch,
       conflictRisk: baseStatus === "unknown" ? "unknown" : "none",
       ciFreshnessRisk: baseStatus === "unknown" ? "unknown" : "none",
       protectedBranchConstraint: "none",
@@ -63,12 +77,20 @@ export function buildNexusInitiativeBranchUpdateDecision(options: {
     "CI may be stale until the review branch includes the current base branch",
     "avoid direct pushes to the protected base branch",
   ];
+  if (stackedBranch) {
+    reasons.push(
+      "review branch belongs to a stack; update parent branches before children",
+    );
+  }
 
   return {
     status: baseStatus,
     recommendation: "merge_update",
     headBranch: options.headBranch,
     baseBranch: options.baseBranch,
+    pushRemote,
+    publicBranch,
+    stackedBranch,
     conflictRisk,
     ciFreshnessRisk: "stale",
     protectedBranchConstraint: "avoid_direct_base_push",
@@ -93,7 +115,9 @@ export function buildNexusInitiativeBranchUpdateDecision(options: {
         forceWithLeaseRequired: true,
         command: branchUpdateCommand("rebase", options),
         reasons: [
-          "rewrites the review branch and requires force-with-lease approval",
+          publicBranch
+            ? "rewrites the public review branch and requires force-with-lease approval"
+            : "rewrites the review branch and requires force-with-lease approval",
         ],
       },
       {
@@ -115,23 +139,30 @@ function branchUpdateCommand(
   options: {
     headBranch: string | null;
     baseBranch: string;
+    pushRemote?: string | null;
   },
 ): string | null {
   if (!options.headBranch) {
     return null;
   }
+  const pushRemote = clean(options.pushRemote) ?? "origin";
   const checkout = `git checkout ${shellQuoteArgument(options.headBranch)}`;
   if (mode === "merge") {
     return [
       checkout,
       `git merge --no-ff ${shellQuoteArgument(options.baseBranch)}`,
-      `git push origin ${shellQuoteArgument(options.headBranch)}`,
+      `git push ${shellQuoteArgument(pushRemote)} ${shellQuoteArgument(options.headBranch)}`,
     ].join(" && ");
   }
 
   return [
     checkout,
     `git rebase ${shellQuoteArgument(options.baseBranch)}`,
-    `git push --force-with-lease origin ${shellQuoteArgument(options.headBranch)}`,
+    `git push --force-with-lease ${shellQuoteArgument(pushRemote)} ${shellQuoteArgument(options.headBranch)}`,
   ].join(" && ");
+}
+
+function clean(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }

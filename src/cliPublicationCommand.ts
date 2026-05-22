@@ -32,6 +32,7 @@ import {
 import {
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
+  NexusPublicationBranchPushBlockedError,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
   type NexusPublicationBranchPushResult,
@@ -186,24 +187,37 @@ export async function handlePublicationCommand(
 ): Promise<number> {
   if (argv[1] === "branch-push") {
     const parsed = parsePublicationBranchPushCommand(argv);
-    const result = await pushNexusPublicationBranchForComponent({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
-      branch: parsed.branch,
-      targetBranch: parsed.targetBranch,
-      initiativeId: parsed.initiativeId,
-      forceWithLease: parsed.forceWithLease,
-      forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
-      baseEnv: dependencies.env ?? process.env,
-      fetch: dependencies.fetch,
-      credentialCommandRunner: dependencies.credentialCommandRunner,
-      gitRunner: parsed.dryRun
-        ? dryRunPublicationGitPushRunner
-        : dependencies.publicationGitPushRunner,
-      remoteProbeRunner: dependencies.publicationGitPushRunner,
-    });
+    let result: NexusPublicationBranchPushResult;
+    try {
+      result = await pushNexusPublicationBranchForComponent({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        projectRepository: parsed.projectRepository,
+        repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+        branch: parsed.branch,
+        targetBranch: parsed.targetBranch,
+        initiativeId: parsed.initiativeId,
+        forceWithLease: parsed.forceWithLease,
+        forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+        baseEnv: dependencies.env ?? process.env,
+        fetch: dependencies.fetch,
+        credentialCommandRunner: dependencies.credentialCommandRunner,
+        gitRunner: parsed.dryRun
+          ? dryRunPublicationGitPushRunner
+          : dependencies.publicationGitPushRunner,
+        remoteProbeRunner: dependencies.publicationGitPushRunner,
+      });
+    } catch (error) {
+      if (parsed.json && error instanceof NexusPublicationBranchPushBlockedError) {
+        printPublicationBranchPushBlockedError(
+          error,
+          parsed,
+          dependencies.stdout ?? process.stdout,
+        );
+        return 1;
+      }
+      throw error;
+    }
     printPublicationBranchPushResult(
       result,
       parsed,
@@ -1338,6 +1352,22 @@ function printPublicationBranchPushResult(
   }
 }
 
+function printPublicationBranchPushBlockedError(
+  error: NexusPublicationBranchPushBlockedError,
+  parsed: ParsedPublicationBranchPushCommand,
+  stdout: TextWriter,
+): void {
+  writeJson(stdout, {
+    ok: false,
+    dryRun: Boolean(parsed.dryRun),
+    error: {
+      code: "initiative_branch_publication_blocked",
+      message: error.message,
+    },
+    initiativeDelivery: error.initiativeDelivery,
+  });
+}
+
 function printPublicationPullRequestUpsertResult(
   result: NexusPublicationPullRequestUpsertResult,
   parsed: ParsedPublicationPullRequestUpsertCommand,
@@ -1721,6 +1751,16 @@ function printPublicationInitiativeReport(
         stdout,
         `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
       );
+      if (item.branchUpdateDecision.reasons.length > 0) {
+        writeLine(
+          stdout,
+          `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
+        );
+      }
+      const command = recommendedBranchUpdateCommand(item);
+      if (command) {
+        writeLine(stdout, `    branchUpdate command: ${command}`);
+      }
     }
     if (item.reasons.length > 0) {
       writeLine(stdout, `    reasons: ${item.reasons.join("; ")}`);
@@ -1784,6 +1824,16 @@ function printPublicationInitiativeFinalizationPlan(
         stdout,
         `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
       );
+      if (item.branchUpdateDecision.reasons.length > 0) {
+        writeLine(
+          stdout,
+          `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
+        );
+      }
+      const command = recommendedBranchUpdateCommand(item);
+      if (command) {
+        writeLine(stdout, `    branchUpdate command: ${command}`);
+      }
     }
     if (item.reviewReadiness.reasons.length > 0) {
       writeLine(
@@ -1805,6 +1855,16 @@ function formatReviewTarget(
 ): string {
   const label = target.number ? `#${target.number}` : target.id ?? target.kind;
   return target.url ? `${label} ${target.url}` : label;
+}
+
+function recommendedBranchUpdateCommand(
+  item: Pick<NexusInitiativeDeliveryReportItem, "branchUpdateDecision">,
+): string | null {
+  const recommendation = item.branchUpdateDecision.recommendation;
+  const choice = item.branchUpdateDecision.choices.find((candidate) =>
+    candidate.id === recommendation
+  );
+  return choice?.command ?? null;
 }
 
 function writeCandidatePlanItems(

@@ -260,6 +260,13 @@ function reportItem(options: {
       baseStatus: providerEvidence.baseStatus,
       headBranch: providerEvidence.headBranch ?? branchName,
       baseBranch: branchPlan.finalPublicationTarget,
+      pushRemote: initiative.branchPublication.selectedRemote,
+      publicBranch: providerEvidence.sourceKind === "pull_request" ||
+        providerEvidence.sourceKind === "branch" ||
+        providerEvidence.reviewTarget !== null,
+      stackedBranch: branchPlan.stack.status === "active" &&
+        (branchPlan.stack.topology === "stacked" ||
+          branchPlan.stack.topology === "hybrid"),
     }),
     ciTier,
     providerEvidence,

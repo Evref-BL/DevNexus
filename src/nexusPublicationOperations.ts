@@ -132,6 +132,21 @@ export interface NexusPublicationBranchPushRemoteProbe {
   writable: boolean;
 }
 
+export class NexusPublicationBranchPushBlockedError extends Error {
+  readonly initiativeDelivery: NexusPublicationBranchPushInitiativeSummary;
+  readonly remoteSelection: NexusPublicationBranchPushRemoteSelection;
+
+  constructor(options: {
+    message: string;
+    initiativeDelivery: NexusPublicationBranchPushInitiativeSummary;
+  }) {
+    super(options.message);
+    this.name = "NexusPublicationBranchPushBlockedError";
+    this.initiativeDelivery = options.initiativeDelivery;
+    this.remoteSelection = options.initiativeDelivery.remoteSelection;
+  }
+}
+
 export interface NexusPublicationPullRequestUpsertResult {
   projectRoot: string;
   componentId: string | null;
@@ -376,16 +391,11 @@ function resolveInitiativeBranchPushPolicy(options: {
   if (!item) {
     throw new Error(`Initiative delivery policy was not found: ${options.initiativeId}`);
   }
-  if (!item.initiative.branchPublication.selectedRemote) {
-    throw new Error(
-      `Initiative ${options.initiativeId} branch publication is manual-only; no push remote was selected.`,
-    );
-  }
-  return {
+  const summary = {
     initiativeId: item.initiative.activeScopeId,
     branchPublication: item.initiative.branchPublication,
     remoteSelection: {
-      status: "not_required",
+      status: "not_required" as const,
       selectedRemote: item.initiative.branchPublication.selectedRemote,
       publicationRemote: item.initiative.branchPublication.publicationRemote,
       fallbackRemote: item.initiative.branchPublication.fallbackRemote,
@@ -394,6 +404,34 @@ function resolveInitiativeBranchPushPolicy(options: {
       probes: [],
     },
   };
+  if (!item.initiative.branchPublication.selectedRemote) {
+    const manualOnly =
+      item.initiative.branchPublication.strategy === "manual_only";
+    throw new NexusPublicationBranchPushBlockedError({
+      message:
+        manualOnly
+          ? `Initiative ${options.initiativeId} branch publication is manual-only; no push remote was selected.`
+          : `Initiative ${options.initiativeId} branch publication has no selected push remote.`,
+      initiativeDelivery: initiativeRemoteSelection(summary, {
+        status: "blocked",
+        selectedRemote: null,
+        publicationRemote: item.initiative.branchPublication.publicationRemote,
+        fallbackRemote: item.initiative.branchPublication.fallbackRemote,
+        reasons: [
+          manualOnly
+            ? "initiative branch publication is manual-only"
+            : "initiative branch publication has no selected remote",
+        ],
+        setupActions: [
+          manualOnly
+            ? "publish manually or configure initiativeDelivery.branchPublication"
+            : "configure automation.publication.remote or initiativeDelivery.branchPublication.fallbackRemote",
+        ],
+        probes: [],
+      }),
+    });
+  }
+  return summary;
 }
 
 function resolveInitiativeBranchPushRemoteSelection(options: {
@@ -525,7 +563,7 @@ function blockedInitiativeRemoteSelection(
   setupAction: string,
   probes: NexusPublicationBranchPushRemoteProbe[] = [],
 ): never {
-  const selection = initiativeRemoteSelection(initiativeDelivery, {
+  const blocked = initiativeRemoteSelection(initiativeDelivery, {
     status: "blocked",
     selectedRemote: null,
     publicationRemote: initiativeDelivery.branchPublication.publicationRemote,
@@ -533,14 +571,15 @@ function blockedInitiativeRemoteSelection(
     reasons: [reason],
     setupActions: [setupAction],
     probes,
-  }).remoteSelection;
-  throw new Error(
-    [
+  });
+  throw new NexusPublicationBranchPushBlockedError({
+    message: [
       "Initiative branch publication is blocked.",
-      ...selection.reasons,
-      ...selection.setupActions,
+      ...blocked.remoteSelection.reasons,
+      ...blocked.remoteSelection.setupActions,
     ].join(" "),
-  );
+    initiativeDelivery: blocked,
+  });
 }
 
 function initiativeRemoteSelection(

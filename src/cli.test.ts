@@ -7242,6 +7242,136 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("prints initiative branch update decision reasons in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const evidenceFile = path.join(projectRoot, "initiative-evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 243,
+              url: "https://github.com/Evref-BL/DevNexus/pull/243",
+            },
+            headBranch: "feat/codex-goals",
+            targetBranch: "main",
+            intendedCiTier: "remote_smoke",
+            reviewState: "approved",
+            mergeability: "mergeable",
+            branchPolicy: "clear",
+            baseStatus: "behind",
+            checks: [
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      [
+        "publication",
+        "initiative-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      { stdout: textOutput.writer },
+    );
+    await main(
+      [
+        "publication",
+        "initiative-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      { stdout: jsonOutput.writer },
+    );
+
+    expect(textOutput.output()).toContain(
+      "branchUpdate=behind recommendation=merge_update forceWithLease=false",
+    );
+    expect(textOutput.output()).toContain(
+      "branchUpdate reasons: review branch base status is behind; CI may be stale until the review branch includes the current base branch",
+    );
+    expect(textOutput.output()).toContain(
+      "branchUpdate command: git checkout feat/codex-goals && git merge --no-ff main && git push origin feat/codex-goals",
+    );
+    const payload = JSON.parse(jsonOutput.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      nextAction: "update_branch",
+      report: {
+        items: [
+          {
+            branchUpdateDecision: {
+              status: "behind",
+              recommendation: "merge_update",
+              pushRemote: "origin",
+              publicBranch: true,
+            },
+          },
+        ],
+      },
+    });
+    const decision = payload.report.items[0].branchUpdateDecision;
+    expect(decision.reasons).toEqual(expect.arrayContaining([
+      "review branch base status is behind",
+      "CI may be stale until the review branch includes the current base branch",
+      "avoid direct pushes to the protected base branch",
+    ]));
+    expect(decision.choices.find((choice: { id: string }) =>
+      choice.id === "merge_update"
+    )).toMatchObject({
+      command:
+        "git checkout feat/codex-goals && git merge --no-ff main && git push origin feat/codex-goals",
+    });
+  });
+
   it("enqueues work items that match the automation selector", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
