@@ -8,6 +8,7 @@ import path from "node:path";
 import {
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
+  type BuildNexusDashboardHostSnapshotOptions,
   type BuildNexusDashboardSnapshotOptions,
   type NexusDashboardHostSnapshot,
   type NexusDashboardHostWorkspaceRecord,
@@ -22,7 +23,7 @@ import type { GitRunner } from "./gitWorktreeService.js";
 import type { NexusEligibleWorkMode } from "./nexusEligibleWorkSummary.js";
 
 export interface StartNexusDashboardServerOptions {
-  projectRoot: string;
+  projectRoot?: string;
   host?: string;
   port?: number;
   homePath?: string;
@@ -33,7 +34,7 @@ export interface StartNexusDashboardServerOptions {
 }
 
 export interface NexusDashboardServerHandle {
-  projectRoot: string;
+  projectRoot: string | null;
   host: string;
   port: number;
   url: string;
@@ -60,11 +61,11 @@ class NexusDashboardRouteError extends Error {
 export async function startNexusDashboardServer(
   options: StartNexusDashboardServerOptions,
 ): Promise<NexusDashboardServerHandle> {
-  const projectRoot = path.resolve(options.projectRoot);
+  const projectRoot = options.projectRoot ? path.resolve(options.projectRoot) : null;
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 0;
-  const snapshotOptions: BuildNexusDashboardSnapshotOptions = {
-    projectRoot,
+  const snapshotOptions: BuildNexusDashboardHostSnapshotOptions = {
+    ...(projectRoot ? { projectRoot } : {}),
     homePath: options.homePath,
     eligibleWorkMode: options.eligibleWorkMode,
     gitRunner: options.gitRunner,
@@ -1153,7 +1154,7 @@ export function renderNexusDashboardClientModule(): string {
 async function routeDashboardRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   codexChatStarter: NexusDashboardCodexChatStarter,
   actionToken: string,
 ): Promise<void> {
@@ -1247,7 +1248,7 @@ async function routeDashboardRequest(
 async function routeCodexThreadStart(
   request: IncomingMessage,
   response: ServerResponse,
-  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   codexChatStarter: NexusDashboardCodexChatStarter,
   actionToken: string,
   url: URL,
@@ -1300,11 +1301,23 @@ function workspaceIdFromUrl(url: URL): string | null {
 }
 
 async function resolveDashboardWorkspaceSelection(
-  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   workspaceId: string | null,
 ): Promise<DashboardWorkspaceSelection> {
   if (!workspaceId) {
-    return { snapshotOptions };
+    if (!snapshotOptions.projectRoot) {
+      throw new NexusDashboardRouteError(
+        "workspace_required",
+        "A workspace id is required for workspace dashboard data when the server was started in host mode",
+        400,
+      );
+    }
+    return {
+      snapshotOptions: {
+        ...snapshotOptions,
+        projectRoot: path.resolve(snapshotOptions.projectRoot),
+      },
+    };
   }
 
   const baseHost = await buildNexusDashboardHostSnapshot(snapshotOptions);
@@ -1336,9 +1349,12 @@ async function resolveDashboardWorkspaceSelection(
 }
 
 async function buildDashboardHostForRequest(
-  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   workspaceId: string | null,
 ): Promise<NexusDashboardHostSnapshot> {
+  if (!workspaceId) {
+    return buildNexusDashboardHostSnapshot(snapshotOptions);
+  }
   const selection = await resolveDashboardWorkspaceSelection(
     snapshotOptions,
     workspaceId,

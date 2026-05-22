@@ -1127,7 +1127,7 @@ interface ParsedHostCheckCommand {
 }
 
 interface ParsedDashboardCommand {
-  projectRoot: string;
+  projectRoot?: string;
   host?: string;
   port?: number;
   homePath?: string;
@@ -1202,7 +1202,7 @@ export function usage(): string {
     "  dev-nexus ci-failure-intake plan <workspace-root> --input <json-file> [options]",
     "  dev-nexus dashboard snapshot <workspace-root> [options]",
     "  dev-nexus dashboard weave <workspace-root> [options]",
-    "  dev-nexus dashboard serve <workspace-root> [options]",
+    "  dev-nexus dashboard serve [workspace-root] [options]",
     "  dev-nexus automation status <workspace-root> [options]",
     "  dev-nexus automation eligible-work <workspace-root> [options]",
     "  dev-nexus automation agent-profiles <workspace-root> [options]",
@@ -1657,6 +1657,7 @@ export function usage(): string {
     "  --host <host>               serve only; defaults to 127.0.0.1",
     "  --port <port>               serve only; defaults to a random free port",
     "  --home <path>               host-local home config for auth profiles",
+    "                             serve is host-scoped when workspace-root is omitted",
     "  --mode <default|discovery>  eligible-work mode used in the snapshot",
     "  --discovery                 shortcut for --mode discovery",
     "  --json",
@@ -1898,9 +1899,11 @@ async function handleDashboardCommand(
 ): Promise<number> {
   const command = argv[1];
   if (command === "snapshot") {
-    const parsed = parseDashboardCommand(argv, "dashboard snapshot");
+    const parsed = parseDashboardCommand(argv, "dashboard snapshot", {
+      requireProjectRoot: true,
+    });
     const snapshot = await buildNexusDashboardSnapshot({
-      projectRoot: parsed.projectRoot,
+      projectRoot: parsed.projectRoot!,
       homePath: parsed.homePath,
       eligibleWorkMode: parsed.mode,
       gitRunner: dependencies.gitRunner,
@@ -1915,9 +1918,11 @@ async function handleDashboardCommand(
   }
 
   if (command === "weave") {
-    const parsed = parseDashboardCommand(argv, "dashboard weave");
+    const parsed = parseDashboardCommand(argv, "dashboard weave", {
+      requireProjectRoot: true,
+    });
     const snapshot = await buildNexusDashboardSnapshot({
-      projectRoot: parsed.projectRoot,
+      projectRoot: parsed.projectRoot!,
       homePath: parsed.homePath,
       eligibleWorkMode: parsed.mode,
       gitRunner: dependencies.gitRunner,
@@ -1932,10 +1937,12 @@ async function handleDashboardCommand(
   }
 
   if (command === "serve") {
-    const parsed = parseDashboardCommand(argv, "dashboard serve");
+    const parsed = parseDashboardCommand(argv, "dashboard serve", {
+      requireProjectRoot: false,
+    });
     const starter = dependencies.dashboardServerStarter ?? startNexusDashboardServer;
     const handle = await starter({
-      projectRoot: parsed.projectRoot,
+      ...(parsed.projectRoot ? { projectRoot: parsed.projectRoot } : {}),
       homePath: parsed.homePath,
       eligibleWorkMode: parsed.mode,
       host: parsed.host,
@@ -7931,13 +7938,19 @@ function parseEligibleWorkMode(
 function parseDashboardCommand(
   argv: string[],
   commandName: string,
+  options: { requireProjectRoot?: boolean } = {},
 ): ParsedDashboardCommand {
-  const [, , projectRoot, ...rest] = argv;
-  if (!projectRoot || projectRoot.startsWith("--")) {
+  const requireProjectRoot = options.requireProjectRoot ?? true;
+  const [, , maybeProjectRoot, ...tail] = argv;
+  const projectRoot = maybeProjectRoot && !maybeProjectRoot.startsWith("--")
+    ? maybeProjectRoot
+    : undefined;
+  const rest = projectRoot ? tail : argv.slice(2);
+  if (!projectRoot && requireProjectRoot) {
     throw new Error(`${commandName} requires a workspace root`);
   }
 
-  const parsed: ParsedDashboardCommand = { projectRoot };
+  const parsed: ParsedDashboardCommand = projectRoot ? { projectRoot } : {};
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index]!;
     const next = (): string => {
@@ -10117,6 +10130,7 @@ function printDashboardServeResult(
     ok: true,
     dashboard: {
       projectRoot: handle.projectRoot,
+      scope: handle.projectRoot ? "workspace" : "host",
       host: handle.host,
       port: handle.port,
       url: handle.url,
@@ -10128,7 +10142,11 @@ function printDashboardServeResult(
   }
 
   writeLine(stdout, "DevNexus dashboard server started.");
-  writeLine(stdout, `  Project root: ${handle.projectRoot}`);
+  if (handle.projectRoot) {
+    writeLine(stdout, `  Project root: ${handle.projectRoot}`);
+  } else {
+    writeLine(stdout, "  Scope: host");
+  }
   writeLine(stdout, `  URL: ${handle.url}`);
   writeLine(stdout, "  Press Ctrl+C to stop.");
 }

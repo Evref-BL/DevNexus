@@ -555,9 +555,9 @@ describe("dev-nexus cli", () => {
         {
           stdout: output.writer,
           dashboardServerStarter: async (options) => {
-            receivedProjectRoot = options.projectRoot;
+            receivedProjectRoot = options.projectRoot ?? null;
             return {
-              projectRoot: path.resolve(options.projectRoot),
+              projectRoot: path.resolve(options.projectRoot!),
               host: options.host ?? "127.0.0.1",
               port: 4242,
               url: "http://127.0.0.1:4242/",
@@ -577,6 +577,55 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(output.output())).toMatchObject({
       ok: true,
       dashboard: {
+        port: 4242,
+        url: "http://127.0.0.1:4242/",
+      },
+    });
+  });
+
+  it("starts the dashboard server in host scope without a workspace root", async () => {
+    const output = captureOutput();
+    let receivedProjectRoot: string | null = "unexpected";
+    let waited = false;
+
+    await expect(
+      main(
+        [
+          "dashboard",
+          "serve",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "0",
+          "--json",
+        ],
+        {
+          stdout: output.writer,
+          dashboardServerStarter: async (options) => {
+            receivedProjectRoot = options.projectRoot ?? null;
+            return {
+              projectRoot: null,
+              host: options.host ?? "127.0.0.1",
+              port: 4242,
+              url: "http://127.0.0.1:4242/",
+              server: {} as NexusDashboardServerHandle["server"],
+              close: async () => {},
+            };
+          },
+          dashboardServerWaiter: async () => {
+            waited = true;
+          },
+        },
+      ),
+    ).resolves.toBe(0);
+
+    expect(receivedProjectRoot).toBeNull();
+    expect(waited).toBe(true);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: true,
+      dashboard: {
+        projectRoot: null,
+        scope: "host",
         port: 4242,
         url: "http://127.0.0.1:4242/",
       },

@@ -831,6 +831,62 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves host cockpit data without a current workspace root", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "host-only-registered",
+      name: "Host Only Registered",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:25:00.000Z"),
+    });
+
+    try {
+      const host = await fetch(`${server.url}api/host`).then((response) =>
+        response.json(),
+      );
+      const workspaceResponse = await fetch(`${server.url}api/dashboard`);
+
+      expect(server.projectRoot).toBeNull();
+      expect(host).toMatchObject({
+        version: 1,
+        currentProjectRoot: null,
+        workspaceCount: 1,
+      });
+      expect(host.workspaces[0]).toMatchObject({
+        id: "host-only-registered",
+        current: false,
+        registered: true,
+      });
+      expect(workspaceResponse.status).toBe(400);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("starts dashboard chats in the selected host workspace", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-chat-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-chat-registered-");
