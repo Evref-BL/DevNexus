@@ -2,6 +2,7 @@ import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
   createNexusForgePublicationAdapter,
+  type NexusForgePullRequestMergeResult,
   type NexusForgePullRequestResult,
 } from "./nexusForgePublication.js";
 import {
@@ -77,6 +78,18 @@ export interface NexusPublicationPullRequestUpsertResult {
   pullRequest: NexusForgePullRequestResult;
 }
 
+export interface NexusPublicationPullRequestMergeResult {
+  projectRoot: string;
+  componentId: string;
+  repository: NexusGitHubRepositorySelection;
+  credential: NexusPublicationCredentialSummary;
+  pullRequest: {
+    number: number;
+    method: "merge" | "squash" | "rebase";
+  };
+  merge: NexusForgePullRequestMergeResult;
+}
+
 export interface NexusPublicationOperationRuntimeOptions {
   baseEnv?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
@@ -104,6 +117,14 @@ export interface UpsertNexusPublicationPullRequestForComponentOptions
   base?: string | null;
   title: string;
   body?: string | null;
+}
+
+export interface MergeNexusPublicationPullRequestForComponentOptions
+  extends NexusPublicationOperationRuntimeOptions {
+  projectRoot: string;
+  componentId?: string;
+  number: number;
+  method?: "merge" | "squash" | "rebase";
 }
 
 export function resolveNexusPublicationComponentContext(options: {
@@ -212,6 +233,42 @@ export async function upsertNexusPublicationPullRequestForComponent(
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
     pullRequest,
+  };
+}
+
+export async function mergeNexusPublicationPullRequestForComponent(
+  options: MergeNexusPublicationPullRequestForComponentOptions,
+): Promise<NexusPublicationPullRequestMergeResult> {
+  const context = resolveNexusPublicationComponentContext(options);
+  const credential = await resolvePublicationCredential({
+    context,
+    purpose: "api",
+    requiredPermissions: { contents: "write", pull_requests: "write" },
+    runtime: options,
+  });
+  const adapter = createNexusForgePublicationAdapter({
+    repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
+    credential,
+    preferredBackend: "github_rest",
+    fetch: options.fetch,
+    baseEnv: options.baseEnv,
+  });
+  const method = options.method ?? "merge";
+  const merge = await adapter.mergePullRequest({
+    number: options.number,
+    method,
+  });
+
+  return {
+    projectRoot: context.projectRoot,
+    componentId: context.component.id,
+    repository: context.repository,
+    credential: summarizePublicationCredential(credential),
+    pullRequest: {
+      number: options.number,
+      method,
+    },
+    merge,
   };
 }
 

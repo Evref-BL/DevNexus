@@ -219,9 +219,11 @@ import {
   type NexusPublicationTrainReadinessReport,
 } from "./nexusPublicationTrainReadiness.js";
 import {
+  mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
   type NexusPublicationBranchPushResult,
+  type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
 import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCredentialBroker.js";
@@ -1018,6 +1020,14 @@ interface ParsedPublicationPullRequestUpsertCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationPullRequestMergeCommand {
+  projectRoot: string;
+  componentId?: string;
+  number: number;
+  method?: "merge" | "squash" | "rebase";
+  json?: boolean;
+}
+
 interface ParsedPublicationTrainReadinessCommand {
   projectRoot: string;
   versionId?: string | null;
@@ -1142,6 +1152,7 @@ export function usage(): string {
     "  dev-nexus worktree prepare <workspace-root> [options]",
     "  dev-nexus publication branch-push <workspace-root> --branch <branch> [options]",
     "  dev-nexus publication pull-request upsert <workspace-root> --head <branch> --title <title> [options]",
+    "  dev-nexus publication pull-request merge <workspace-root> --number <number> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus publication evidence normalize <json-file> [options]",
     "  dev-nexus publication merge-queue-readiness <workspace-root> [options]",
@@ -1410,6 +1421,12 @@ export function usage(): string {
     "  --title <text>",
     "  --body <text>",
     "  --body-file <path>",
+    "  --json",
+    "",
+    "Options for publication pull-request merge:",
+    "  --component <id>          defaults to the primary component",
+    "  --number <number>",
+    "  --method <merge|squash|rebase>  defaults to merge",
     "  --json",
     "",
     "Options for publication green-main plan:",
@@ -2717,6 +2734,25 @@ async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "pull-request" && argv[2] === "merge") {
+    const parsed = parsePublicationPullRequestMergeCommand(argv);
+    const result = await mergeNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      number: parsed.number,
+      method: parsed.method,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestMergeResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.merge.merged ? 0 : 1;
+  }
+
   if (argv[1] === "green-main" && argv[2] === "plan") {
     const parsed = parsePublicationGreenMainPlanCommand(argv);
     const checks = readGreenMainChecksInput(parsed.checksFile);
@@ -2826,7 +2862,7 @@ async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires branch-push, pull-request upsert, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
   );
 }
 
@@ -5941,6 +5977,65 @@ function parsePublicationPullRequestUpsertCommand(
   }
 
   return parsed as ParsedPublicationPullRequestUpsertCommand;
+}
+
+function parsePublicationPullRequestMergeCommand(
+  argv: string[],
+): ParsedPublicationPullRequestMergeCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "merge") {
+    throw new Error("publication requires pull-request merge");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request merge requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestMergeCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--method":
+        parsed.method = parsePublicationPullRequestMergeMethod(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request merge option: ${arg}`);
+    }
+  }
+  if (!parsed.number) {
+    throw new Error("publication pull-request merge requires --number");
+  }
+
+  return parsed as ParsedPublicationPullRequestMergeCommand;
+}
+
+function parsePublicationPullRequestMergeMethod(
+  value: string,
+  optionName: string,
+): "merge" | "squash" | "rebase" {
+  if (value === "merge" || value === "squash" || value === "rebase") {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be merge, squash, or rebase`);
 }
 
 function parsePublicationTrainReadinessCommand(
@@ -9391,6 +9486,41 @@ function printPublicationPullRequestUpsertResult(
   }
   writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
   writeLine(stdout, `  Backend: ${result.pullRequest.metadata.backend}`);
+}
+
+function printPublicationPullRequestMergeResult(
+  result: NexusPublicationPullRequestMergeResult,
+  parsed: ParsedPublicationPullRequestMergeCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: result.merge.merged,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+    merge: result.merge,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request merged.");
+  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  writeLine(stdout, `  Method: ${result.pullRequest.method}`);
+  writeLine(stdout, `  Merged: ${result.merge.merged ? "yes" : "no"}`);
+  if (result.merge.sha) {
+    writeLine(stdout, `  SHA: ${result.merge.sha}`);
+  }
+  if (result.merge.message) {
+    writeLine(stdout, `  Message: ${result.merge.message}`);
+  }
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
 }
 
 function printPublicationTrainReadinessReport(

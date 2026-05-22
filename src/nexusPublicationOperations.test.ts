@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main } from "./cli.js";
 import {
   defaultNexusAutomationConfig,
+  mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   saveProjectConfig,
   saveNexusHomeConfigFile,
@@ -146,6 +147,57 @@ describe("publication operations", () => {
           base: "main",
           title: "Add App publication commands",
           body: "Use DevNexus App credentials for publication.",
+        },
+      },
+    ]);
+  });
+
+  it("merges pull requests through the forge adapter with App API credentials", async () => {
+    const { projectRoot } = createPublicationProject();
+    const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        authorization: new Headers(init?.headers).get("authorization"),
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return new Response(
+        JSON.stringify({
+          merged: true,
+          sha: "merge-commit",
+          message: "Pull Request successfully merged",
+        }),
+        { status: 200 },
+      );
+    };
+
+    const result = await mergeNexusPublicationPullRequestForComponent({
+      projectRoot,
+      number: 191,
+      method: "squash",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.merge).toMatchObject({
+      merged: true,
+      sha: "merge-commit",
+      message: "Pull Request successfully merged",
+    });
+    expect(result.pullRequest).toEqual({
+      number: 191,
+      method: "squash",
+    });
+    expect(requests).toEqual([
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/pulls/191/merge",
+        method: "PUT",
+        authorization: "Bearer installation-token",
+        body: {
+          merge_method: "squash",
         },
       },
     ]);
@@ -295,6 +347,73 @@ describe("publication CLI operations", () => {
           base: "main",
           title: "Add App publication commands",
           body: "Use DevNexus App credentials for publication.",
+        },
+      },
+    ]);
+  });
+
+  it("merges pull requests through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const requests: Array<{ authorization: string | null; body: unknown }> = [];
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      requests.push({
+        authorization: new Headers(init?.headers).get("authorization"),
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return new Response(
+        JSON.stringify({
+          merged: true,
+          sha: "merge-commit",
+          message: "Pull Request successfully merged",
+        }),
+        { status: 200 },
+      );
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "merge",
+        projectRoot,
+        "--number",
+        "191",
+        "--method",
+        "rebase",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      pullRequest: {
+        number: 191,
+        method: "rebase",
+      },
+      merge: {
+        merged: true,
+        sha: "merge-commit",
+      },
+      credential: {
+        profileId: "dev-nexus-app-github",
+        kind: "github_app",
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+    expect(requests).toEqual([
+      {
+        authorization: "Bearer installation-token",
+        body: {
+          merge_method: "rebase",
         },
       },
     ]);
