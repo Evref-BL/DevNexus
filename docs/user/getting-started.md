@@ -69,9 +69,9 @@ Open the DevNexus workspace root in the agent:
 the directory where you ran dev-nexus workspace init
 ```
 
-Do not open a component repository when you expect DevNexus tools and generated
-agent context. Components are the things the workspace coordinates. The DevNexus
-workspace root is the agent workspace.
+Use the DevNexus workspace root as the agent workspace when you expect DevNexus
+tools and generated agent context. Components are the things the workspace
+coordinates.
 
 After opening the workspace, ask the agent to:
 
@@ -105,8 +105,9 @@ A DevNexus workspace can coordinate several existing folders. For example, one
 workspace might point to an API repository, a frontend repository, a shared
 library, and a load-test harness.
 
-Use one DevNexus workspace with several components. Do not run `workspace import`
-once per repository if the goal is one shared agent workspace.
+Use one DevNexus workspace with several components for a shared agent workspace.
+`workspace import` fits the narrower case where one existing source checkout
+becomes the primary component of a new workspace.
 
 See [First workspace from existing components](first-workspace-existing-components.md)
 for a full example.

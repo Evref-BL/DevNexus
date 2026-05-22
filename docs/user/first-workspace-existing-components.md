@@ -27,8 +27,8 @@ Components:
   load-test-lab
 ```
 
-Do not create one DevNexus workspace per folder unless you want separate agent
-workspaces and separate workspace state.
+Create one DevNexus workspace for folders that should share an agent context.
+Separate workspaces fit separate agent workspaces and separate workspace state.
 
 ## Interactive Setup
 
