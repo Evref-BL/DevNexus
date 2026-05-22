@@ -283,6 +283,10 @@ Progress:
   worktree preparation. CLI and MCP worktree preparation now verify the current
   authority-backed claim from the launch context before creating a Git worktree,
   while optimistic tracker claims remain unchanged.
+- 2026-05-23: Slice 4C extended the same launch-context claim guard to
+  current-agent completion recording. Stale workers can still report blocked or
+  failed outcomes, but cannot record successful completion under an expired,
+  released, or mismatched authority claim.
 
 ### Slice 5: Documentation And Optional Live Smoke
 

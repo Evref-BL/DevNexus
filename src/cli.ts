@@ -2643,6 +2643,14 @@ async function handleAutomationCurrentAgentCommand(
       command: "automation current-agent record",
       mutationClass: "target_state",
     });
+    if (currentAgentResultRequiresVerifiedClaim(parsed.result)) {
+      await verifyNexusAgentClaimForMutation({
+        projectRoot: path.resolve(parsed.projectRoot),
+        env: dependencies.env ?? process.env,
+        claimAuthority: dependencies.workItemClaimAuthority,
+        now: dependencies.now,
+      });
+    }
     const result = recordNexusAutomationCurrentAgentAdoptionResult({
       projectRoot: parsed.projectRoot,
       runId: parsed.runId,
@@ -2654,6 +2662,12 @@ async function handleAutomationCurrentAgentCommand(
   }
 
   throw new Error("automation current-agent requires adopt or record");
+}
+
+function currentAgentResultRequiresVerifiedClaim(
+  result: NexusAutomationCurrentAgentAdoptionResultInput,
+): boolean {
+  return result.status === "completed";
 }
 
 function resolveAutomationCommandCliOptions(

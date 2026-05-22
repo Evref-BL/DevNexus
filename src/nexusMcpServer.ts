@@ -1554,15 +1554,26 @@ export async function callDevNexusMcpTool(
           command: "current_agent_record",
           mutationClass: "target_state",
         });
-        return toolResult({
-          ok: true,
-          ...recordNexusAutomationCurrentAgentAdoptionResult({
-            projectRoot: projectRootFromArgs(args),
-            runId: requiredString(args, "runId", "arguments"),
-            result: currentAgentResultFromArgs(args),
-            now: context.now,
-          }),
-        });
+        {
+          const result = currentAgentResultFromArgs(args);
+          if (result.status === "completed") {
+            await verifyNexusAgentClaimForMutation({
+              projectRoot: projectRootFromArgs(args),
+              env: process.env,
+              claimAuthority: context.workItemClaimAuthority,
+              now: context.now,
+            });
+          }
+          return toolResult({
+            ok: true,
+            ...recordNexusAutomationCurrentAgentAdoptionResult({
+              projectRoot: projectRootFromArgs(args),
+              runId: requiredString(args, "runId", "arguments"),
+              result,
+              now: context.now,
+            }),
+          });
+        }
       case "worktree_prepare": {
         const projectRoot = projectRootFromArgs(args);
         const componentId = optionalString(args, "componentId", "arguments");

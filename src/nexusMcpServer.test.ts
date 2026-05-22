@@ -1630,6 +1630,59 @@ describe("DevNexus MCP server", () => {
     });
   });
 
+  it("blocks completed MCP current-agent records when an authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = mcpAuthorityClaim();
+    const contextFile = writeMcpAgentContext(projectRoot, authorityClaim);
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "expired",
+          claim: authorityClaim,
+        };
+      },
+    };
+    const previousAutomationMode = process.env.DEV_NEXUS_AUTOMATION_MODE;
+    const previousClaimStatus = process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS;
+    const previousContextFile = process.env.DEV_NEXUS_AGENT_CONTEXT_FILE;
+    try {
+      process.env.DEV_NEXUS_AUTOMATION_MODE = "agent_launch";
+      process.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS = "claimed";
+      process.env.DEV_NEXUS_AGENT_CONTEXT_FILE = contextFile;
+      const result = await callDevNexusMcpTool(
+        "current_agent_record",
+        {
+          projectRoot,
+          runId: "mcp-current-stale",
+          result: {
+            status: "completed",
+            summary: "Stale worker should not complete",
+          },
+        },
+        {
+          workItemClaimAuthority: claimAuthority,
+          now: fixedClock("2026-05-23T10:00:00.000Z"),
+        },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(toolJson(result)).toMatchObject({
+        ok: false,
+        error: "DevNexus claim verification failed before mutation: expired",
+      });
+    } finally {
+      restoreOptionalEnv("DEV_NEXUS_AUTOMATION_MODE", previousAutomationMode);
+      restoreOptionalEnv("DEV_NEXUS_WORK_ITEM_CLAIM_STATUS", previousClaimStatus);
+      restoreOptionalEnv("DEV_NEXUS_AGENT_CONTEXT_FILE", previousContextFile);
+    }
+  });
+
   it("reports generic plugin capabilities through the agent profile surface", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

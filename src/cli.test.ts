@@ -7552,6 +7552,58 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("blocks completed current-agent records when an authority claim is stale", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const authorityClaim = cliAuthorityClaim();
+    const contextFile = writeCliAgentContext(projectRoot, authorityClaim);
+    const output = captureOutput();
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not run");
+      },
+      async verifyClaim() {
+        return {
+          status: "released",
+          claim: authorityClaim,
+        };
+      },
+    };
+
+    const exitCode = await main(
+      [
+        "automation",
+        "current-agent",
+        "record",
+        projectRoot,
+        "--run-id",
+        "current-cli-stale",
+        "--status",
+        "completed",
+        "--summary",
+        "Stale worker should not complete",
+        "--json",
+      ],
+      {
+        stdout: output.writer,
+        env: cliAgentEnv(contextFile),
+        workItemClaimAuthority: claimAuthority,
+        now: fixedClock("2026-05-23T10:00:00.000Z"),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(output.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "DevNexus claim verification failed before mutation: released",
+      },
+    });
+  });
+
   it("schedules bounded automation through the command executor", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
