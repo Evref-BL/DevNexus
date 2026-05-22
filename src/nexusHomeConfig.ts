@@ -20,7 +20,7 @@ import type {
   NexusHomeHostTransportKind,
   NexusHomeHostWorkspaceRootsConfig,
 } from "./nexusHostRegistry.js";
-import type { NexusProjectReference } from "./nexusProjectRegistry.js";
+import type { NexusProjectReference } from "./nexusProjectReference.js";
 
 export const devNexusHomeConfigFileName = "dev-nexus.home.json";
 export const nexusLogsDirectoryName = "logs";

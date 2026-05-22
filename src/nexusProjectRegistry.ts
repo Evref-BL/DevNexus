@@ -36,6 +36,10 @@ import {
   buildNexusProjectAgentProjectionStatus,
   type NexusProjectAgentProjectionStatus,
 } from "./nexusAgentProjectionStatus.js";
+import type {
+  NexusProjectReference,
+  NexusProjectRegistry,
+} from "./nexusProjectReference.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import type {
   TrackerCapabilities,
@@ -43,17 +47,10 @@ import type {
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
 
-export interface NexusProjectReference {
-  id: string;
-  name: string;
-  projectRoot: string;
-  vibeKanbanProjectId?: string;
-  vibeKanbanRepoId?: string;
-}
-
-export interface NexusProjectRegistry {
-  projects: NexusProjectReference[];
-}
+export type {
+  NexusProjectReference,
+  NexusProjectRegistry,
+} from "./nexusProjectReference.js";
 
 export interface NexusProjectStatusBase {
   id: string;

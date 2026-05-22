@@ -28,8 +28,10 @@ import {
   preflightNexusAutomationAgentLaunch,
   type NexusAutomationAgentLaunchComponentContext,
   type NexusAutomationAgentLaunchComponentProvider,
-  type NexusAutomationComponentEligibleWorkItems,
 } from "./nexusAutomationAgentLaunch.js";
+import type {
+  NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationEligibleWorkItems.js";
 import type {
   NexusAutomationPreflightCheck,
   NexusAutomationProviderContext,

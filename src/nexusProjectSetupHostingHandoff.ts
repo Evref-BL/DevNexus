@@ -1,37 +1,15 @@
-import type { NexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
 import type {
   NexusProjectSetupAnswers,
+  NexusProjectSetupAuthInventory,
+  NexusProjectSetupHostingHandoff,
   NexusProjectSetupMetaHostingIntent,
 } from "./nexusProjectSetupModel.js";
 
-export type NexusProjectSetupHostingHandoffStatus =
-  | "not_configured"
-  | "planned"
-  | "blocked_on_auth";
-
-export interface NexusProjectSetupHostingHandoffCommand {
-  id: "hosting-status" | "hosting-plan" | "hosting-apply";
-  title: string;
-  command: string;
-  providerMutation: boolean;
-  allowedDuringProjectSetup: boolean;
-  authProfileId: string | null;
-}
-
-export interface NexusProjectSetupHostingHandoff {
-  status: NexusProjectSetupHostingHandoffStatus;
-  provider: NexusProjectSetupMetaHostingIntent["provider"] | null;
-  host: string | null;
-  namespace: string | null;
-  repositoryName: string | null;
-  defaultBranch: string | null;
-  metaProjectOnly: true;
-  componentRepositoryHosting: "not_configured_by_project_setup";
-  summary: string;
-  commands: NexusProjectSetupHostingHandoffCommand[];
-  missingAuthProfileIds: string[];
-  providerMutationsDeferred: true;
-}
+export type {
+  NexusProjectSetupHostingHandoff,
+  NexusProjectSetupHostingHandoffCommand,
+  NexusProjectSetupHostingHandoffStatus,
+} from "./nexusProjectSetupModel.js";
 
 export function buildNexusProjectSetupHostingHandoff(
   answers: NexusProjectSetupAnswers,
