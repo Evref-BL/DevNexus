@@ -24,6 +24,11 @@ available. A user request to lead the work is enough authorization to recommend
 subagents, subject to workspace policy, tool availability, cost,
 provider-mutation, credential, and runtime approval gates.
 
+Use [Concepts](concepts.md#work-sizing-terms) for sizing terms. DevNexus uses
+`work item` as the neutral tracker record, `slice` as an independently
+reviewable vertical increment, and `delivery topology` as the Git and review
+route for slice branches.
+
 ## MCP Server
 
 Start the generic stdio Model Context Protocol (MCP) server with:
