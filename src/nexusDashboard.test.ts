@@ -467,6 +467,33 @@ describe("nexus dashboard", () => {
     expect(snapshot).toMatchObject({
       version: 1,
       generatedAt: "2026-05-21T10:05:00.000Z",
+      contract: {
+        scope: "workspace",
+        diagnostics: {
+          defaultPayload: false,
+          endpoint: "/api/diagnostics",
+        },
+        surfaces: {
+          workspaceSummary: {
+            field: "summary",
+          },
+          selectedWorkspaceSnapshot: {
+            field: "project",
+          },
+          actionQueue: {
+            defaultPayload: false,
+          },
+          providerActions: {
+            field: "actions",
+          },
+          plugins: {
+            field: "plugins",
+          },
+          threadActions: {
+            field: "threads.records",
+          },
+        },
+      },
       project: {
         id: "dashboard-demo",
         componentCount: 1,
@@ -772,8 +799,39 @@ describe("nexus dashboard", () => {
       generatedAt: "2026-05-21T10:10:00.000Z",
       homePath,
       currentProjectRoot: currentRoot,
+      selectedWorkspaceId: "current-project",
       workspaceCount: 2,
       homeError: null,
+      contract: {
+        scope: "host",
+        selection: {
+          selectedWorkspaceId: "current-project",
+          workspaceQueryParam: "workspace",
+        },
+        surfaces: {
+          hostSummary: {
+            field: "workspaces",
+          },
+          workspaceSummary: {
+            field: "workspaces[]",
+          },
+          selectedWorkspaceSnapshot: {
+            endpoint: "/api/dashboard?workspace=:workspaceId",
+          },
+          actionQueue: {
+            field: "actionQueue",
+          },
+          providerActions: {
+            field: "actionQueue[].providerAction",
+          },
+          plugins: {
+            field: "workspaces[].pluginCount",
+          },
+          threadActions: {
+            field: "workspaces[].needsDecisionCount",
+          },
+        },
+      },
     });
     expect(host.workspaces).toEqual(
       expect.arrayContaining([
@@ -1370,6 +1428,9 @@ describe("nexus dashboard", () => {
       const selectedDashboard = await fetch(
         `${server.url}api/dashboard?workspace=server-registered`,
       ).then((response) => response.json());
+      const selectedDiagnostics = await fetch(
+        `${server.url}api/diagnostics?workspace=server-registered`,
+      ).then((response) => response.json());
       const selectedWeave = await fetch(
         `${server.url}api/weave?workspace=server-registered`,
       ).then((response) => response.json());
@@ -1384,7 +1445,14 @@ describe("nexus dashboard", () => {
         version: 1,
         homePath,
         currentProjectRoot: currentRoot,
+        selectedWorkspaceId: "server-current",
         workspaceCount: 2,
+        contract: {
+          scope: "host",
+          selection: {
+            selectedWorkspaceId: "server-current",
+          },
+        },
       });
       expect(host.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual([
         "server-current",
@@ -1398,6 +1466,7 @@ describe("nexus dashboard", () => {
         version: 1,
         homePath,
         currentProjectRoot: registeredRoot,
+        selectedWorkspaceId: "server-registered",
         workspaceCount: 2,
       });
       expect(
@@ -1421,6 +1490,34 @@ describe("nexus dashboard", () => {
         name: "Server Registered",
         root: registeredRoot,
       });
+      expect(selectedDashboard.contract).toMatchObject({
+        scope: "workspace",
+        selection: {
+          hostMode: true,
+          selectedWorkspaceId: "server-registered",
+          selectedWorkspaceRoot: registeredRoot,
+        },
+        diagnostics: {
+          defaultPayload: false,
+          endpoint: "/api/diagnostics",
+        },
+      });
+      expect(selectedDashboard).not.toHaveProperty("automation");
+      expect(selectedDashboard).not.toHaveProperty("eligibleWork");
+      expect(selectedDashboard).not.toHaveProperty("targetReport");
+      expect(selectedDiagnostics).toMatchObject({
+        version: 1,
+        projectRoot: registeredRoot,
+        contract: {
+          scope: "diagnostics",
+          diagnostics: {
+            defaultPayload: true,
+          },
+        },
+      });
+      expect(selectedDiagnostics).toHaveProperty("automation");
+      expect(selectedDiagnostics).toHaveProperty("eligibleWork");
+      expect(selectedDiagnostics).toHaveProperty("targetReport");
       expect(selectedWeave.nodes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: "project", label: "Server Registered" }),
@@ -1476,7 +1573,15 @@ describe("nexus dashboard", () => {
       expect(host).toMatchObject({
         version: 1,
         currentProjectRoot: null,
+        selectedWorkspaceId: null,
         workspaceCount: 1,
+        contract: {
+          scope: "host",
+          selection: {
+            hostMode: true,
+            selectedWorkspaceId: null,
+          },
+        },
       });
       expect(host.workspaces[0]).toMatchObject({
         id: "host-only-registered",

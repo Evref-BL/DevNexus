@@ -111,6 +111,65 @@ export interface NexusDashboardProviderAction {
   title: string | null;
 }
 
+export type NexusDashboardContractScope = "host" | "workspace" | "diagnostics";
+
+export type NexusDashboardContractOwner =
+  | "dev-nexus"
+  | "host-app"
+  | "provider"
+  | "assistant-provider";
+
+export type NexusDashboardContractSurfaceId =
+  | "hostSummary"
+  | "workspaceSummary"
+  | "selectedWorkspaceSnapshot"
+  | "actionQueue"
+  | "providerActions"
+  | "plugins"
+  | "threadActions";
+
+export interface NexusDashboardContractSurface {
+  field: string;
+  endpoint: string;
+  owner: NexusDashboardContractOwner;
+  defaultPayload: boolean;
+  action: "read" | "open-provider" | "start-chat";
+}
+
+export interface NexusDashboardContractSelection {
+  hostMode: boolean;
+  workspaceQueryParam: "workspace";
+  selectedWorkspaceId: string | null;
+  selectedWorkspaceRoot: string | null;
+}
+
+export interface NexusDashboardEmbeddingContract {
+  version: 1;
+  scope: NexusDashboardContractScope;
+  ownership: {
+    devNexus: string[];
+    hostApp: string[];
+  };
+  selection: NexusDashboardContractSelection;
+  surfaces: Record<
+    NexusDashboardContractSurfaceId,
+    NexusDashboardContractSurface
+  >;
+  diagnostics: {
+    defaultPayload: boolean;
+    endpoint: string;
+  };
+  routes: {
+    host: string;
+    dashboard: string;
+    diagnostics: string;
+    projects: string;
+    weave: string;
+    events: string;
+    threadAction: string;
+  };
+}
+
 export interface BuildNexusDashboardSnapshotOptions
   extends Pick<
     GetNexusAutomationStatusOptions,
@@ -345,6 +404,7 @@ export interface NexusDashboardWeave {
 
 export interface NexusDashboardSnapshot {
   version: 1;
+  contract: NexusDashboardEmbeddingContract;
   generatedAt: string;
   projectRoot: string;
   project: NexusDashboardProjectSummary;
@@ -433,10 +493,12 @@ export interface NexusDashboardHostActionItem {
 
 export interface NexusDashboardHostSnapshot {
   version: 1;
+  contract: NexusDashboardEmbeddingContract;
   generatedAt: string;
   homePath: string;
   homeError: NexusDashboardDataError | null;
   currentProjectRoot: string | null;
+  selectedWorkspaceId: string | null;
   workspaceCount: number;
   needsAttentionCount: number;
   actionQueue: NexusDashboardHostActionItem[];
@@ -534,6 +596,12 @@ export async function buildNexusDashboardSnapshot(
 
   return {
     version: 1,
+    contract: nexusDashboardEmbeddingContract({
+      scope: "workspace",
+      selectedWorkspaceId: projectConfig.id,
+      selectedWorkspaceRoot: projectRoot,
+      hostMode: false,
+    }),
     generatedAt,
     projectRoot,
     project: projectSummary(projectRoot, projectConfig, componentSummaries),
@@ -581,13 +649,21 @@ export async function buildNexusDashboardHostSnapshot(
     ),
   );
   const actionQueue = buildNexusDashboardHostActionQueue(workspaces);
+  const selectedWorkspace = selectedDashboardHostWorkspace(workspaces);
 
   return {
     version: 1,
+    contract: nexusDashboardEmbeddingContract({
+      scope: "host",
+      selectedWorkspaceId: selectedWorkspace?.id ?? null,
+      selectedWorkspaceRoot: selectedWorkspace?.root ?? null,
+      hostMode: true,
+    }),
     generatedAt,
     homePath,
     homeError: home.error,
     currentProjectRoot,
+    selectedWorkspaceId: selectedWorkspace?.id ?? null,
     workspaceCount: workspaces.length,
     needsAttentionCount: workspaces.filter((workspace) =>
       dashboardHostWorkspaceNeedsAttention(workspace),
@@ -595,6 +671,125 @@ export async function buildNexusDashboardHostSnapshot(
     actionQueue,
     workspaces,
   };
+}
+
+export function nexusDashboardEmbeddingContract(options: {
+  scope: NexusDashboardContractScope;
+  selectedWorkspaceId?: string | null;
+  selectedWorkspaceRoot?: string | null;
+  hostMode?: boolean;
+  diagnosticsDefaultPayload?: boolean;
+}): NexusDashboardEmbeddingContract {
+  const hostMode = options.hostMode ?? options.scope === "host";
+  const diagnosticsDefaultPayload =
+    options.diagnosticsDefaultPayload ?? options.scope === "diagnostics";
+  const dashboardEndpoint = hostMode
+    ? "/api/dashboard?workspace=:workspaceId"
+    : "/api/dashboard";
+  return {
+    version: 1,
+    scope: options.scope,
+    ownership: {
+      devNexus: [
+        "workspace facts",
+        "provider action links",
+        "plugin projections",
+        "thread action hints",
+      ],
+      hostApp: [
+        "tenant selection",
+        "auth shell",
+        "global navigation",
+        "persistence policy",
+      ],
+    },
+    selection: {
+      hostMode,
+      workspaceQueryParam: "workspace",
+      selectedWorkspaceId: options.selectedWorkspaceId ?? null,
+      selectedWorkspaceRoot: options.selectedWorkspaceRoot ?? null,
+    },
+    surfaces: {
+      hostSummary: {
+        field: "workspaces",
+        endpoint: "/api/host",
+        owner: "dev-nexus",
+        defaultPayload: options.scope === "host",
+        action: "read",
+      },
+      workspaceSummary: {
+        field: options.scope === "host" ? "workspaces[]" : "summary",
+        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        owner: "dev-nexus",
+        defaultPayload: true,
+        action: "read",
+      },
+      selectedWorkspaceSnapshot: {
+        field: "project",
+        endpoint: dashboardEndpoint,
+        owner: "dev-nexus",
+        defaultPayload: options.scope !== "host",
+        action: "read",
+      },
+      actionQueue: {
+        field: "actionQueue",
+        endpoint: "/api/host",
+        owner: "dev-nexus",
+        defaultPayload: options.scope === "host",
+        action: "read",
+      },
+      providerActions: {
+        field: options.scope === "host"
+          ? "actionQueue[].providerAction"
+          : "actions",
+        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        owner: "provider",
+        defaultPayload: true,
+        action: "open-provider",
+      },
+      plugins: {
+        field: options.scope === "host" ? "workspaces[].pluginCount" : "plugins",
+        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        owner: "dev-nexus",
+        defaultPayload: true,
+        action: "read",
+      },
+      threadActions: {
+        field: options.scope === "host"
+          ? "workspaces[].needsDecisionCount"
+          : "threads.records",
+        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        owner: "assistant-provider",
+        defaultPayload: true,
+        action: "start-chat",
+      },
+    },
+    diagnostics: {
+      defaultPayload: diagnosticsDefaultPayload,
+      endpoint: "/api/diagnostics",
+    },
+    routes: {
+      host: "/api/host",
+      dashboard: dashboardEndpoint,
+      diagnostics: "/api/diagnostics",
+      projects: "/api/projects",
+      weave: hostMode
+        ? "/api/weave?workspace=:workspaceId"
+        : "/api/weave",
+      events: hostMode
+        ? "/api/events?workspace=:workspaceId"
+        : "/api/events",
+      threadAction: hostMode
+        ? "/api/codex/thread?workspace=:workspaceId"
+        : "/api/codex/thread",
+    },
+  };
+}
+
+function selectedDashboardHostWorkspace(
+  workspaces: NexusDashboardHostWorkspaceRecord[],
+): NexusDashboardHostWorkspaceRecord | null {
+  return workspaces.find((workspace) => workspace.current) ?? null;
 }
 
 function dashboardHostWorkspaceReferences(

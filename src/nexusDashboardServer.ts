@@ -9,8 +9,10 @@ import {
   buildNexusDashboardHostActionQueue,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
+  nexusDashboardEmbeddingContract,
   type BuildNexusDashboardHostSnapshotOptions,
   type BuildNexusDashboardSnapshotOptions,
+  type NexusDashboardEmbeddingContract,
   type NexusDashboardHostSnapshot,
   type NexusDashboardHostWorkspaceRecord,
   type NexusDashboardSnapshot,
@@ -46,6 +48,25 @@ export interface NexusDashboardServerHandle {
 interface DashboardWorkspaceSelection {
   readonly snapshotOptions: BuildNexusDashboardSnapshotOptions;
   readonly baseHost?: NexusDashboardHostSnapshot;
+  readonly workspaceId: string | null;
+}
+
+type NexusDashboardWorkspacePayload = Omit<
+  NexusDashboardSnapshot,
+  "automation" | "eligibleWork" | "targetReport"
+>;
+
+interface NexusDashboardDiagnosticsPayload {
+  version: 1;
+  contract: NexusDashboardEmbeddingContract;
+  generatedAt: string;
+  projectRoot: string;
+  automation: NexusDashboardSnapshot["automation"];
+  eligibleWork: NexusDashboardSnapshot["eligibleWork"];
+  targetReport: NexusDashboardSnapshot["targetReport"];
+  authority: NexusDashboardSnapshot["authority"];
+  blockers: NexusDashboardSnapshot["blockers"];
+  publication: NexusDashboardSnapshot["publication"];
 }
 
 class NexusDashboardRouteError extends Error {
@@ -1249,7 +1270,17 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      sendJson(response, await buildNexusDashboardSnapshot(selection.snapshotOptions));
+      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      sendJson(response, dashboardWorkspacePayload(snapshot, selection));
+      return;
+    }
+    if (url.pathname === "/api/diagnostics") {
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      sendJson(response, dashboardDiagnosticsPayload(snapshot, selection));
       return;
     }
     if (url.pathname === "/api/host") {
@@ -1364,6 +1395,7 @@ async function resolveDashboardWorkspaceSelection(
         ...snapshotOptions,
         projectRoot: path.resolve(snapshotOptions.projectRoot),
       },
+      workspaceId: null,
     };
   }
 
@@ -1392,6 +1424,7 @@ async function resolveDashboardWorkspaceSelection(
       projectRoot: path.resolve(matches[0]!.root),
     },
     baseHost,
+    workspaceId,
   };
 }
 
@@ -1438,8 +1471,16 @@ function mergeDashboardHostSnapshots(
     }
     return left.name.localeCompare(right.name);
   });
+  const selectedWorkspace = workspaces.find((workspace) => workspace.current) ?? null;
   return {
     ...selectedHost,
+    contract: nexusDashboardEmbeddingContract({
+      scope: "host",
+      selectedWorkspaceId: selectedWorkspace?.id ?? null,
+      selectedWorkspaceRoot: selectedWorkspace?.root ?? null,
+      hostMode: true,
+    }),
+    selectedWorkspaceId: selectedWorkspace?.id ?? null,
     workspaceCount: workspaces.length,
     needsAttentionCount: workspaces.filter((workspace) =>
       workspace.tone === "danger" || workspace.tone === "warn"
@@ -1447,6 +1488,59 @@ function mergeDashboardHostSnapshots(
     actionQueue: buildNexusDashboardHostActionQueue(workspaces),
     workspaces,
   };
+}
+
+function dashboardWorkspacePayload(
+  snapshot: NexusDashboardSnapshot,
+  selection: DashboardWorkspaceSelection,
+): NexusDashboardWorkspacePayload {
+  const {
+    automation: _automation,
+    eligibleWork: _eligibleWork,
+    targetReport: _targetReport,
+    ...payload
+  } = snapshot;
+  return {
+    ...payload,
+    contract: workspaceContract(snapshot, selection, false),
+  };
+}
+
+function dashboardDiagnosticsPayload(
+  snapshot: NexusDashboardSnapshot,
+  selection: DashboardWorkspaceSelection,
+): NexusDashboardDiagnosticsPayload {
+  return {
+    version: 1,
+    contract: workspaceContract(snapshot, selection, true),
+    generatedAt: snapshot.generatedAt,
+    projectRoot: snapshot.projectRoot,
+    automation: snapshot.automation,
+    eligibleWork: snapshot.eligibleWork,
+    targetReport: snapshot.targetReport,
+    authority: snapshot.authority,
+    blockers: snapshot.blockers,
+    publication: snapshot.publication,
+  };
+}
+
+function workspaceContract(
+  snapshot: NexusDashboardSnapshot,
+  selection: DashboardWorkspaceSelection,
+  diagnosticsDefaultPayload: boolean,
+): NexusDashboardEmbeddingContract {
+  const selectedWorkspace = selection.workspaceId
+    ? selection.baseHost?.workspaces.find((workspace) =>
+      workspace.id === selection.workspaceId
+    ) ?? null
+    : null;
+  return nexusDashboardEmbeddingContract({
+    scope: diagnosticsDefaultPayload ? "diagnostics" : "workspace",
+    selectedWorkspaceId: selection.workspaceId ?? snapshot.project.id,
+    selectedWorkspaceRoot: selectedWorkspace?.root ?? snapshot.projectRoot,
+    hostMode: Boolean(selection.baseHost),
+    diagnosticsDefaultPayload,
+  });
 }
 
 function dashboardErrorStatusCode(error: unknown): number {
