@@ -113,8 +113,11 @@ function fail(args: string[], stderr: string): GitCommandResult {
   };
 }
 
-function worktreeLease(projectId: string): NexusWorktreeLeaseRecord {
-  return {
+function worktreeLease(
+  projectId: string,
+  overrides: Partial<NexusWorktreeLeaseRecord> = {},
+): NexusWorktreeLeaseRecord {
+  const lease: NexusWorktreeLeaseRecord = {
     kind: nexusWorktreeLeaseKind,
     version: 1,
     id: "lease-dashboard",
@@ -159,6 +162,14 @@ function worktreeLease(projectId: string): NexusWorktreeLeaseRecord {
       warnings: [],
     },
     notes: [],
+  };
+  return {
+    ...lease,
+    ...overrides,
+    git: {
+      ...lease.git,
+      ...overrides.git,
+    },
   };
 }
 
@@ -206,7 +217,16 @@ describe("nexus dashboard", () => {
     writeNexusWorktreeLeaseStore(projectRoot, {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
-      leases: [worktreeLease(config.id)],
+      leases: [
+        worktreeLease(config.id),
+        worktreeLease(config.id, {
+          id: "lease-stale-notes",
+          branchName: "codex/dev-nexus/github-115-stale-notes",
+          lastSeenAt: "2026-05-19T10:00:00.000Z",
+          updatedAt: "2026-05-19T10:00:00.000Z",
+          notes: ["Interesting research notes; park this before cleanup."],
+        }),
+      ],
     });
 
     const snapshot = await buildNexusDashboardSnapshot({
@@ -230,9 +250,40 @@ describe("nexus dashboard", () => {
       },
       worktrees: {
         activeCount: 1,
+        staleCount: 1,
+      },
+      threads: {
+        totalCount: 2,
+        activeCount: 1,
+        needsDecisionCount: 1,
       },
     });
+    expect(snapshot.threads.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "lease-dashboard",
+          decision: "continue",
+          decisionLabel: "Continue",
+        }),
+        expect.objectContaining({
+          id: "lease-stale-notes",
+          decision: "review",
+          decisionLabel: "Review",
+          actions: [
+            expect.objectContaining({
+              label: "#115: stale notes",
+              href: "https://github.com/Evref-BL/DevNexus/issues/115",
+            }),
+          ],
+        }),
+      ]),
+    );
     expect(snapshot.signals.map((signal) => signal.id)).toContain("eligible-work");
+    expect(snapshot.signals.find((signal) => signal.id === "worktrees")).toMatchObject({
+      label: "Threads",
+      value: "2",
+      detail: "1 needs review",
+    });
     expect(snapshot.weave.nodes.map((node) => node.id)).toEqual(
       expect.arrayContaining([
         "project",
@@ -284,6 +335,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("prefers-color-scheme");
     expect(module).toContain("data-select-id");
     expect(module).toContain("Workspace Activity");
+    expect(module).toContain("Thread Inbox");
+    expect(module).toContain("renderThreadInbox");
     expect(module).toContain("Parallel work map");
     expect(module).toContain("Human approval");
     expect(module).toContain("selectedDetail");

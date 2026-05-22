@@ -21,6 +21,10 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  buildNexusCleanupPlan,
+  type NexusCleanupCandidate,
+} from "./nexusCleanupPlan.js";
+import {
   getNexusEligibleWorkSummary,
   type NexusEligibleWorkSummary,
   type NexusEligibleWorkMode,
@@ -216,6 +220,43 @@ export interface NexusDashboardWorktreeSummary {
   }>;
 }
 
+export type NexusDashboardThreadDecision =
+  | "continue"
+  | "review"
+  | "archive"
+  | "forget"
+  | "rescue";
+
+export interface NexusDashboardThreadRecord {
+  id: string;
+  title: string;
+  componentId: string | null;
+  workItemId: string | null;
+  branchName: string | null;
+  hostId: string;
+  agentId: string | null;
+  state: string;
+  decision: NexusDashboardThreadDecision;
+  decisionLabel: string;
+  decisionDetail: string;
+  stale: boolean;
+  dirty: boolean | null;
+  pushed: boolean | null;
+  cleanupSafe: boolean | null;
+  cleanupBlockers: string[];
+  updatedAt: string;
+  actions: NexusDashboardProviderAction[];
+}
+
+export interface NexusDashboardThreadSummary {
+  totalCount: number;
+  activeCount: number;
+  needsDecisionCount: number;
+  archiveCandidateCount: number;
+  forgetCandidateCount: number;
+  records: NexusDashboardThreadRecord[];
+}
+
 export interface NexusDashboardEvent {
   id: string;
   time: string;
@@ -274,6 +315,7 @@ export interface NexusDashboardSnapshot {
   eligibleWork: NexusDashboardDataResult<NexusEligibleWorkSummary>;
   targetReport: NexusDashboardDataResult<NexusAutomationTargetReport>;
   worktrees: NexusDashboardWorktreeSummary;
+  threads: NexusDashboardThreadSummary;
   publication: NexusDashboardPublicationSummary[];
   authority: NexusDashboardAuthoritySummary | null;
   blockers: string[];
@@ -321,6 +363,19 @@ export async function buildNexusDashboardSnapshot(
   const cycles = readTargetCycles(projectRoot, projectConfig);
   const runs = readRuns(projectRoot, projectConfig);
   const worktrees = summarizeWorktrees(worktreeCollection.value);
+  const cleanupPlan = capture(() =>
+    buildNexusCleanupPlan({
+      projectRoot,
+      includeProjectMeta: true,
+      gitRunner,
+      now: options.now,
+    }),
+  );
+  const threads = summarizeThreads(
+    worktrees,
+    providerUrls,
+    cleanupPlan.value?.candidates ?? [],
+  );
   const publication = summarizePublication(automation.value);
   const authority = summarizeAuthority(
     automation.value?.authority ?? targetReport.value?.authority ?? null,
@@ -361,13 +416,14 @@ export async function buildNexusDashboardSnapshot(
     generatedAt,
     projectRoot,
     project: projectSummary(projectRoot, projectConfig, componentSummaries),
-    summary: dashboardSummary(componentSummaries, automation.value, eligibleWork.value, worktrees, blockers),
-    signals: dashboardSignals(componentSummaries, automation.value, eligibleWork.value, worktrees, blockers),
+    summary: dashboardSummary(componentSummaries, automation.value, eligibleWork.value, threads, blockers),
+    signals: dashboardSignals(componentSummaries, automation.value, eligibleWork.value, threads, blockers),
     components: componentSummaries,
     automation,
     eligibleWork,
     targetReport,
     worktrees,
+    threads,
     publication,
     authority,
     blockers,
@@ -1159,6 +1215,245 @@ function summarizeWorktrees(
   };
 }
 
+function summarizeThreads(
+  worktrees: NexusDashboardWorktreeSummary,
+  providerUrls: NexusDashboardProviderUrls,
+  cleanupCandidates: NexusCleanupCandidate[],
+): NexusDashboardThreadSummary {
+  const matchedCleanupIds = new Set<string>();
+  const leaseRecords = worktrees.records
+    .map((worktree): NexusDashboardThreadRecord => {
+      const cleanup = cleanupCandidateForThread(cleanupCandidates, worktree);
+      if (cleanup) {
+        matchedCleanupIds.add(cleanup.id);
+      }
+      const decision = threadDecision(worktree, cleanup);
+      const actions = providerActionsFromText(
+        `${worktree.workItemId ?? ""} ${worktree.branchName ?? ""} ${worktree.id}`,
+        providerUrls,
+        worktree.componentId,
+      );
+      return {
+        id: worktree.id,
+        title: threadTitle(worktree),
+        componentId: worktree.componentId,
+        workItemId: worktree.workItemId,
+        branchName: worktree.branchName,
+        hostId: worktree.hostId,
+        agentId: worktree.agentId,
+        state: worktree.effectiveStatus,
+        decision,
+        decisionLabel: threadDecisionLabel(decision),
+        decisionDetail: threadDecisionDetail(decision, cleanup),
+        stale: worktree.stale,
+        dirty: worktree.dirty,
+        pushed: worktree.pushed,
+        cleanupSafe: cleanup?.safeToDelete ?? null,
+        cleanupBlockers: cleanup?.blockers ?? [],
+        updatedAt: worktree.updatedAt,
+        actions,
+      };
+    });
+  const cleanupRecords = cleanupCandidates
+    .filter((candidate) => !matchedCleanupIds.has(candidate.id))
+    .map((candidate) => cleanupThreadRecord(candidate, providerUrls));
+  const records = uniqueThreadRecords([...leaseRecords, ...cleanupRecords]).sort((left, right) => {
+    const priority = threadDecisionPriority(left.decision) - threadDecisionPriority(right.decision);
+    return priority !== 0 ? priority : right.updatedAt.localeCompare(left.updatedAt);
+  });
+
+  const needsDecision = records.filter((record) =>
+    ["review", "archive", "rescue"].includes(record.decision),
+  );
+  return {
+    totalCount: records.length,
+    activeCount: records.filter((record) => record.decision === "continue").length,
+    needsDecisionCount: needsDecision.length,
+    archiveCandidateCount: records.filter((record) => record.decision === "archive").length,
+    forgetCandidateCount: records.filter((record) => record.decision === "forget").length,
+    records,
+  };
+}
+
+function uniqueThreadRecords(
+  records: NexusDashboardThreadRecord[],
+): NexusDashboardThreadRecord[] {
+  const byKey = new Map<string, NexusDashboardThreadRecord>();
+  for (const record of records) {
+    const key = threadRecordKey(record);
+    const previous = byKey.get(key);
+    if (!previous || preferThreadRecord(record, previous) === record) {
+      byKey.set(key, record);
+    }
+  }
+  return [...byKey.values()];
+}
+
+function threadRecordKey(record: NexusDashboardThreadRecord): string {
+  return [
+    record.componentId ?? "workspace",
+    record.branchName ?? record.workItemId ?? record.title ?? record.id,
+  ].join(":");
+}
+
+function preferThreadRecord(
+  left: NexusDashboardThreadRecord,
+  right: NexusDashboardThreadRecord,
+): NexusDashboardThreadRecord {
+  const priority = threadDecisionPriority(left.decision) - threadDecisionPriority(right.decision);
+  if (priority !== 0) {
+    return priority < 0 ? left : right;
+  }
+  if (left.updatedAt !== right.updatedAt) {
+    return left.updatedAt > right.updatedAt ? left : right;
+  }
+  return left.cleanupBlockers.length >= right.cleanupBlockers.length ? left : right;
+}
+
+function cleanupThreadRecord(
+  candidate: NexusCleanupCandidate,
+  providerUrls: NexusDashboardProviderUrls,
+): NexusDashboardThreadRecord {
+  const decision = cleanupThreadDecision(candidate);
+  const actionText = `${candidate.branch ?? ""} ${candidate.id}`;
+  return {
+    id: candidate.id,
+    title: cleanupThreadTitle(candidate),
+    componentId: candidate.componentId,
+    workItemId: candidate.lease?.workItemId ?? null,
+    branchName: candidate.branch,
+    hostId: "local",
+    agentId: null,
+    state: candidate.classifications.join(", "),
+    decision,
+    decisionLabel: threadDecisionLabel(decision),
+    decisionDetail: threadDecisionDetail(decision, candidate),
+    stale: candidate.classifications.includes("stale"),
+    dirty: candidate.classifications.includes("dirty"),
+    pushed: candidate.git.ahead === 0 ? true : candidate.git.ahead ? false : null,
+    cleanupSafe: candidate.safeToDelete,
+    cleanupBlockers: candidate.blockers,
+    updatedAt: "",
+    actions: providerActionsFromText(actionText, providerUrls, candidate.componentId),
+  };
+}
+
+function cleanupThreadDecision(
+  candidate: NexusCleanupCandidate,
+): NexusDashboardThreadDecision {
+  if (candidate.safeToDelete) {
+    return "forget";
+  }
+  if (candidate.rescue.needed) {
+    return "rescue";
+  }
+  return "review";
+}
+
+function threadDecision(
+  worktree: NexusDashboardWorktreeSummary["records"][number],
+  cleanup: NexusCleanupCandidate | null,
+): NexusDashboardThreadDecision {
+  const status = worktree.effectiveStatus || worktree.status;
+  if (worktree.dirty) {
+    return "rescue";
+  }
+  if (cleanup?.safeToDelete) {
+    return "forget";
+  }
+  if (status === "abandoned") {
+    return "archive";
+  }
+  if (
+    worktree.stale ||
+    status === "stale" ||
+    status === "blocked" ||
+    status === "ready" ||
+    status === "merged"
+  ) {
+    return "review";
+  }
+  return "continue";
+}
+
+function cleanupCandidateForThread(
+  candidates: NexusCleanupCandidate[],
+  worktree: NexusDashboardWorktreeSummary["records"][number],
+): NexusCleanupCandidate | null {
+  return candidates.find((candidate) =>
+    candidate.lease?.id === worktree.id ||
+    (Boolean(worktree.branchName) && candidate.branch === worktree.branchName)
+  ) ?? null;
+}
+
+function threadDecisionLabel(decision: NexusDashboardThreadDecision): string {
+  switch (decision) {
+    case "archive":
+      return "Archive";
+    case "forget":
+      return "Forget";
+    case "rescue":
+      return "Rescue";
+    case "review":
+      return "Review";
+    case "continue":
+      return "Continue";
+  }
+}
+
+function threadDecisionDetail(
+  decision: NexusDashboardThreadDecision,
+  cleanup: NexusCleanupCandidate | null,
+): string {
+  switch (decision) {
+    case "archive":
+      return "Park the thread outside the active flow, keeping its notes and branch context.";
+    case "forget":
+      return "Clean merged work can leave the active cockpit after cleanup proof.";
+    case "rescue":
+      return "Local changes need inspection before this can be archived or forgotten.";
+    case "review":
+      if (cleanup && !cleanup.safeToDelete && cleanup.blockers.length > 0) {
+        return cleanup.blockers[0];
+      }
+      return "Decide whether to continue, archive the useful parts, or forget the thread.";
+    case "continue":
+      return "Active work; keep it visible in the cockpit.";
+  }
+}
+
+function threadDecisionPriority(decision: NexusDashboardThreadDecision): number {
+  switch (decision) {
+    case "rescue":
+      return 0;
+    case "review":
+      return 1;
+    case "continue":
+      return 2;
+    case "archive":
+      return 3;
+    case "forget":
+      return 4;
+  }
+}
+
+function threadTitle(worktree: NexusDashboardWorktreeSummary["records"][number]): string {
+  const branch = worktree.branchName ?? worktree.workItemId ?? worktree.id;
+  return compactThreadBranch(branch);
+}
+
+function cleanupThreadTitle(candidate: NexusCleanupCandidate): string {
+  return compactThreadBranch(
+    candidate.branch ??
+    (candidate.worktreePath ? path.basename(candidate.worktreePath) : candidate.id),
+  );
+}
+
+function compactThreadBranch(value: string): string {
+  const parts = value.split("/").filter(Boolean);
+  return parts.length > 2 ? parts.slice(-2).join("/") : value;
+}
+
 function summarizePublication(
   automationStatus: NexusAutomationStatus | null,
 ): NexusDashboardPublicationSummary[] {
@@ -1375,7 +1670,7 @@ function dashboardSignals(
   components: NexusDashboardComponentSummary[],
   automation: NexusAutomationStatus | null,
   eligibleWork: NexusEligibleWorkSummary | null,
-  worktrees: NexusDashboardWorktreeSummary,
+  threads: NexusDashboardThreadSummary,
   blockers: string[],
 ): NexusDashboardSignal[] {
   const dirtyComponents = components.filter((component) => component.git?.dirty).length;
@@ -1405,12 +1700,14 @@ function dashboardSignals(
     },
     {
       id: "worktrees",
-      label: "Worktrees",
-      value: String(worktrees.activeCount),
-      tone: worktrees.activeCount > 0 ? "active" : "neutral",
-      detail: worktrees.staleCount > 0
-        ? `${worktrees.staleCount} stale ${plural(worktrees.staleCount, "lease", "leases")}`
-        : "Current",
+      label: "Threads",
+      value: String(threads.totalCount),
+      tone: threads.needsDecisionCount > 0
+        ? "warn"
+        : threads.activeCount > 0
+          ? "active"
+          : "neutral",
+      detail: threadSignalDetail(threads),
     },
     {
       id: "blockers",
@@ -1427,6 +1724,19 @@ function dashboardSignals(
       detail: dirtyComponents > 0 ? `${dirtyComponents} dirty` : "Clean",
     },
   ];
+}
+
+function threadSignalDetail(threads: NexusDashboardThreadSummary): string {
+  if (threads.needsDecisionCount > 0) {
+    return `${threads.needsDecisionCount} needs review`;
+  }
+  if (threads.forgetCandidateCount > 0) {
+    return `${threads.forgetCandidateCount} ready to forget`;
+  }
+  if (threads.activeCount > 0) {
+    return `${threads.activeCount} active`;
+  }
+  return "No open threads";
 }
 
 function automationDetail(automation: NexusAutomationStatus | null): string {
@@ -1452,14 +1762,17 @@ function dashboardSummary(
   components: NexusDashboardComponentSummary[],
   automation: NexusAutomationStatus | null,
   eligibleWork: NexusEligibleWorkSummary | null,
-  worktrees: NexusDashboardWorktreeSummary,
+  threads: NexusDashboardThreadSummary,
   blockers: string[],
 ): string {
   const readyCount = eligibleWork?.eligibleWorkItemCount ?? 0;
   return [
     `${components.length} ${plural(components.length, "component", "components")}`,
     readyCount > 0 ? `${readyCount} ready ${plural(readyCount, "item", "items")}` : "no ready items",
-    `${worktrees.activeCount} ${plural(worktrees.activeCount, "worktree", "worktrees")}`,
+    `${threads.totalCount} ${plural(threads.totalCount, "thread", "threads")}`,
+    threads.needsDecisionCount > 0
+      ? `${threads.needsDecisionCount} need review`
+      : "threads current",
     blockers.length > 0 ? `${blockers.length} ${plural(blockers.length, "blocker", "blockers")}` : "no blockers",
     automation ? `automation ${automation.status}` : "automation unknown",
   ].join(", ");
