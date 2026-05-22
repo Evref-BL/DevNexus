@@ -395,7 +395,7 @@ async function promptForNexusProjectSetupAnswers(options: {
       [
         "DevNexus user quickstart",
         "Answer the workspace and component prompts.",
-        "Choose what you are setting up. Use project for one repository; use workspace for a separate root that coordinates components.",
+        "Choose what you are setting up. Use project when this root is the primary component; use workspace for a separate root that coordinates components.",
         "The primary component source path defaults to . for project and components/<id> for workspace.",
         "DevNexus home defaults to the host-local ~/.dev-nexus unless --home is supplied.",
         "",
@@ -543,7 +543,7 @@ async function askWorkspaceLayout(
       return layout;
     }
     stdout.write(
-      "Choose project for one repository, or workspace for a separate root that coordinates components.\n",
+      "Choose project when this root is the primary component, or workspace for a separate root that coordinates components.\n",
     );
   }
 }

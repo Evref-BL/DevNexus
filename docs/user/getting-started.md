@@ -51,9 +51,10 @@ Choose what you are setting up:
 The wizard asks this early because it controls whether the primary component
 starts at `.` or under `components/<id>`.
 
-- **Embedded project layout:** run init inside an existing Git repository and
-  accept `.` as the primary component source path. DevNexus files live next to
-  the project files, like Maven, Gradle, Cargo, or editor configuration.
+- **Embedded project layout:** run init where the workspace root should also be
+  the primary component source root and accept `.` as the primary component
+  source path. DevNexus files live next to the project files, like Maven,
+  Gradle, Cargo, or editor configuration. You can still add related components.
 - **Coordination workspace layout:** run init from a new workspace directory and
   accept `components/<id>` for new workspace-local components, or type existing
   paths for repositories and folders you want the workspace to coordinate.

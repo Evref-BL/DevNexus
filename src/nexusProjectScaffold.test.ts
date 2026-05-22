@@ -390,6 +390,10 @@ describe("nexus project scaffold", () => {
     expect(result.template.gitExcludeEntries).toEqual(
       expect.arrayContaining([
         ".dev-nexus/README.md",
+        ".dev-nexus/runtime/",
+        ".dev-nexus/host-setup/",
+        ".dev-nexus/worktree-leases.json",
+        ".dev-nexus/work-item-sync-runs.json",
         ".dev-nexus/automation/runs.json",
         ".dev-nexus/automation/run.lock",
         ".dev-nexus/automation/target-cycles.json",
@@ -397,6 +401,32 @@ describe("nexus project scaffold", () => {
         "worktrees/",
       ]),
     );
+  });
+
+  it("writes local runtime excludes through Git worktree metadata", () => {
+    const projectRoot = makeTempDir("dev-nexus-project-");
+    const gitDir = makeTempDir("dev-nexus-gitdir-");
+    fs.writeFileSync(path.join(projectRoot, ".git"), `gitdir: ${gitDir}\n`, "utf8");
+    const worktreesRoot = path.join(projectRoot, "worktrees");
+
+    const result = scaffoldNexusProject({
+      homePath: makeTempDir("dev-nexus-home-"),
+      projectRoot,
+      worktreesRoot,
+      projectConfig: minimalProjectConfig({
+        automation: defaultNexusAutomationConfig,
+      }),
+      skills: false,
+      mcp: false,
+    });
+
+    const excludePath = path.join(gitDir, "info", "exclude");
+    const exclude = fs.readFileSync(excludePath, "utf8");
+    expect(result.template.gitExcludePath).toBe(excludePath);
+    expect(exclude).toContain(".dev-nexus/runtime/");
+    expect(exclude).toContain(".dev-nexus/host-setup/");
+    expect(exclude).toContain(".dev-nexus/worktree-leases.json");
+    expect(exclude).toContain(".dev-nexus/work-item-sync-runs.json");
   });
 
   it("preserves existing target state when refreshing the template", () => {

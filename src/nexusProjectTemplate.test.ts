@@ -72,6 +72,16 @@ describe("nexus project template", () => {
           owner: "local_runtime",
           path: ".nexus/worktrees/docs/",
         }),
+        expect.objectContaining({
+          area: "workspace_state",
+          owner: "local_runtime",
+          path: ".dev-nexus/runtime/",
+        }),
+        expect.objectContaining({
+          area: "workspace_state",
+          owner: "local_runtime",
+          path: ".dev-nexus/host-setup/",
+        }),
       ]),
     );
     expect(layout.entries).not.toEqual(

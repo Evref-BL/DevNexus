@@ -84,6 +84,37 @@ export function buildNexusProjectTemplateLayout(
       description:
         "Generated map of workspace support state, runtime state, and migration boundaries.",
     },
+    {
+      area: "workspace_state",
+      owner: "local_runtime",
+      path: ".dev-nexus/runtime/",
+      sourceControl: "local",
+      description:
+        "Host-local runtime installs, caches, and temporary state used by setup and launched workers.",
+    },
+    {
+      area: "workspace_state",
+      owner: "local_runtime",
+      path: ".dev-nexus/host-setup/",
+      sourceControl: "local",
+      description:
+        "Host-local setup reports and machine-specific setup handoff state.",
+    },
+    {
+      area: "workspace_state",
+      owner: "local_runtime",
+      path: ".dev-nexus/worktree-leases.json",
+      sourceControl: "local",
+      description:
+        "Legacy local worktree lease store kept readable for migration.",
+    },
+    {
+      area: "workspace_state",
+      owner: "local_runtime",
+      path: ".dev-nexus/work-item-sync-runs.json",
+      sourceControl: "local",
+      description: "Local work-item sync execution history.",
+    },
   ];
 
   for (const component of components) {
@@ -355,7 +386,13 @@ function templateGitExcludeEntries(
   projectRoot: string,
   config: NexusProjectConfig,
 ): string[] {
-  const entries = new Set<string>([".dev-nexus/README.md"]);
+  const entries = new Set<string>([
+    ".dev-nexus/README.md",
+    ".dev-nexus/runtime/",
+    ".dev-nexus/host-setup/",
+    ".dev-nexus/worktree-leases.json",
+    ".dev-nexus/work-item-sync-runs.json",
+  ]);
   const worktreesEntry = gitExcludeEntryForPath(
     projectRoot,
     projectWorktreesRootPath(projectRoot, config),
@@ -440,8 +477,8 @@ function addGitExcludeEntries(
   projectRoot: string,
   entries: readonly string[],
 ): { gitExcludePath: string | null; gitExcludeEntries: string[] } {
-  const gitInfoDir = path.join(projectRoot, ".git", "info");
-  if (!fs.existsSync(gitInfoDir) || !fs.statSync(gitInfoDir).isDirectory()) {
+  const gitInfoDir = projectGitInfoDirectory(projectRoot);
+  if (!gitInfoDir) {
     return {
       gitExcludePath: null,
       gitExcludeEntries: [],
@@ -476,6 +513,33 @@ function addGitExcludeEntries(
     gitExcludePath: excludePath,
     gitExcludeEntries: appended,
   };
+}
+
+function projectGitInfoDirectory(projectRoot: string): string | null {
+  const dotGit = path.join(projectRoot, ".git");
+  if (!fs.existsSync(dotGit)) {
+    return null;
+  }
+
+  const dotGitStat = fs.statSync(dotGit);
+  if (dotGitStat.isDirectory()) {
+    return path.join(dotGit, "info");
+  }
+  if (!dotGitStat.isFile()) {
+    return null;
+  }
+
+  const gitFile = fs.readFileSync(dotGit, "utf8");
+  const gitDirMatch = gitFile.match(/^gitdir:\s*(.+?)\s*$/imu);
+  if (!gitDirMatch) {
+    return null;
+  }
+
+  const gitDirValue = gitDirMatch[1]!;
+  const gitDir = path.isAbsolute(gitDirValue)
+    ? path.resolve(gitDirValue)
+    : path.resolve(projectRoot, gitDirValue);
+  return path.join(gitDir, "info");
 }
 
 function displayPath(
