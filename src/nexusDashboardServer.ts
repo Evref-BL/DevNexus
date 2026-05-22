@@ -12,12 +12,14 @@ import {
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   nexusDashboardEmbeddingContract,
+  recordNexusDashboardThreadResolution,
   type BuildNexusDashboardHostSnapshotOptions,
   type BuildNexusDashboardSnapshotOptions,
   type NexusDashboardEmbeddingContract,
   type NexusDashboardHostSnapshot,
   type NexusDashboardHostWorkspaceRecord,
   type NexusDashboardSnapshot,
+  type NexusDashboardThreadResolutionAction,
 } from "./nexusDashboard.js";
 import {
   createNexusDashboardCodexChatStarter,
@@ -451,7 +453,7 @@ export function renderNexusDashboardClientModule(): string {
     "    bindSelectionControls(root, setSelectedId);",
     "    bindHostSignalControls(root, setHostFocus);",
     "    bindWorkspaceControls(root, setWorkspaceId);",
-    "    bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId);",
+    "    bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId, () => refresh(true));",
     "  }",
     "  function renderCurrent() {",
     "    if (disposed) return;",
@@ -766,7 +768,7 @@ export function renderNexusDashboardClientModule(): string {
     "  });",
     "}",
     "",
-    "function bindLocalActions(container, baseUrl = '', actionToken = '', workspaceId = '') {",
+    "function bindLocalActions(container, baseUrl = '', actionToken = '', workspaceId = '', onMutation = null) {",
     "  container.querySelectorAll('[data-open-target][data-open-app]').forEach((button) => {",
     "    button.addEventListener('click', async () => {",
     "      const target = button.getAttribute('data-open-target') ?? '';",
@@ -792,6 +794,35 @@ export function renderNexusDashboardClientModule(): string {
     "        button.title = error instanceof Error ? error.message : String(error);",
     "      } finally {",
     "        setTimeout(() => { if (label) label.textContent = originalLabel; button.disabled = false; }, 1200);",
+    "      }",
+    "    });",
+    "  });",
+    "  container.querySelectorAll('[data-thread-action][data-thread-id]').forEach((button) => {",
+    "    button.addEventListener('click', async () => {",
+    "      const action = button.getAttribute('data-thread-action') ?? '';",
+    "      const threadId = button.getAttribute('data-thread-id') ?? '';",
+    "      const label = button.querySelector('.dn-action-label');",
+    "      const originalLabel = label?.textContent ?? '';",
+    "      const busyLabel = action === 'forget' ? 'Forgetting...' : 'Archiving...';",
+    "      const doneLabel = action === 'forget' ? 'Forgotten' : 'Archived';",
+    "      button.disabled = true;",
+    "      if (label) label.textContent = busyLabel;",
+    "      try {",
+    "        const headers = { 'content-type': 'application/json' };",
+    "        if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;",
+    "        const response = await fetch(`${baseUrl}/api/dashboard/thread-action${workspaceQuery(workspaceId)}`, {",
+    "          method: 'POST',",
+    "          headers,",
+    "          body: JSON.stringify({ action, threadId }),",
+    "        });",
+    "        const payload = await response.json();",
+    "        if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);",
+    "        if (label) label.textContent = doneLabel;",
+    "        if (typeof onMutation === 'function') await onMutation();",
+    "      } catch (error) {",
+    "        if (label) label.textContent = 'Action failed';",
+    "        button.title = error instanceof Error ? error.message : String(error);",
+    "        setTimeout(() => { if (label) label.textContent = originalLabel; button.disabled = false; }, 1600);",
     "      }",
     "    });",
     "  });",
@@ -908,9 +939,13 @@ export function renderNexusDashboardClientModule(): string {
     "}",
     "",
     "function renderThreadPolicyAction(thread) {",
-    "  if (thread.decision === 'archive') return renderDisabledAction('Archive', 'Needs archive policy');",
-    "  if (thread.decision === 'forget') return renderDisabledAction('Forget', 'Needs forget policy');",
+    "  if (thread.decision === 'archive') return renderThreadLocalAction(thread, 'archive', 'Archive');",
+    "  if (thread.decision === 'forget') return renderThreadLocalAction(thread, 'forget', 'Forget');",
     "  return '';",
+    "}",
+    "",
+    "function renderThreadLocalAction(thread, action, label) {",
+    "  return `<button class=\"dn-action dn-local-action\" type=\"button\" data-thread-action=\"${escapeHtml(action)}\" data-thread-id=\"${escapeHtml(thread.id)}\" title=\"${escapeHtml(`${label} locally; no files are deleted`)}\">${signalIcon('worktrees')}<span class=\"dn-action-label\">${escapeHtml(label)}</span></button>`;",
     "}",
     "",
     "function renderChatActionStrip(chat, mode = '') {",
@@ -1753,6 +1788,16 @@ async function routeDashboardRequest(
     );
     return;
   }
+  if (method === "POST" && url.pathname === "/api/dashboard/thread-action") {
+    await routeDashboardThreadAction(
+      request,
+      response,
+      snapshotOptions,
+      actionToken,
+      url,
+    );
+    return;
+  }
   if (method !== "GET" && method !== "HEAD") {
     response.writeHead(405, {
       "content-type": "application/json; charset=utf-8",
@@ -1907,6 +1952,65 @@ async function routeLocalOpen(
       path: targetPath,
     });
     sendJson(response, { ok: result.ok, result }, result.ok ? 200 : 502);
+  } catch (error) {
+    sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
+  }
+}
+
+async function routeDashboardThreadAction(
+  request: IncomingMessage,
+  response: ServerResponse,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  actionToken: string,
+  url: URL,
+): Promise<void> {
+  try {
+    requireDashboardMutationRequest(request, actionToken);
+    const workspaceId = workspaceIdFromUrl(url);
+    const body = await readJsonBody(request);
+    const threadId = requiredStringField(body, "threadId");
+    const action = requiredDashboardThreadResolutionAction(body, "action");
+    rejectClientControlledField(body, "projectRoot");
+    rejectClientControlledField(body, "workspaceRoot");
+    rejectClientControlledField(body, "path");
+    rejectClientControlledField(body, "cwd");
+    const selection = await resolveDashboardWorkspaceSelection(
+      snapshotOptions,
+      workspaceId,
+    );
+    const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+    const thread = snapshot.threads.records.find((record) =>
+      record.id === threadId
+    );
+    if (!thread) {
+      throw new NexusDashboardRouteError(
+        "thread_not_found",
+        `Dashboard thread ${threadId} is not active in this workspace`,
+        404,
+      );
+    }
+    if (thread.decision !== action) {
+      throw new NexusDashboardRouteError(
+        "thread_action_not_allowed",
+        `Dashboard thread ${threadId} is marked ${thread.decision}, not ${action}`,
+        409,
+      );
+    }
+    const record = recordNexusDashboardThreadResolution({
+      projectRoot: selection.snapshotOptions.projectRoot,
+      action,
+      thread,
+      now: snapshotOptions.now,
+    });
+    sendJson(response, {
+      ok: true,
+      result: {
+        action: record.action,
+        threadId: record.threadId,
+        decidedAt: record.decidedAt,
+        scope: "local",
+      },
+    });
   } catch (error) {
     sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
   }
@@ -2380,6 +2484,20 @@ function requiredLocalOpenApp(
   }
   throw new NexusDashboardCodexChatError(
     `${fieldName} must be file, code, or terminal`,
+    400,
+  );
+}
+
+function requiredDashboardThreadResolutionAction(
+  value: unknown,
+  fieldName: string,
+): NexusDashboardThreadResolutionAction {
+  const action = requiredStringField(value, fieldName);
+  if (action === "archive" || action === "forget") {
+    return action;
+  }
+  throw new NexusDashboardCodexChatError(
+    `${fieldName} must be archive or forget`,
     400,
   );
 }

@@ -38,9 +38,13 @@ Example labels:
 Provider actions are read-only navigation unless a separate provider mutation
 policy explicitly allows posting, approving, merging, or cleanup.
 
-Archive, forget, plugin enable, and plugin setup controls should be visible but
-disabled until a trusted mutation policy exists. The disabled label should name
-the action, and the tooltip should name the missing policy.
+Archive and forget are local cockpit decisions. They hide a thread from active
+attention by writing local dashboard state; they must not delete worktrees,
+branches, notes, or provider records.
+
+Plugin enable and plugin setup controls should be visible but disabled until a
+trusted plugin source and setup policy exist. The disabled label should name the
+action, and the tooltip should name the missing policy.
 
 ## Assistant Actions
 

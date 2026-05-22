@@ -1054,7 +1054,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderPluginPolicyAction");
     expect(module).toContain("renderDisabledAction");
     expect(module).toContain("dn-policy-action");
-    expect(module).toContain("Needs archive policy");
+    expect(module).toContain("data-thread-action");
+    expect(module).toContain("/api/dashboard/thread-action");
     expect(module).toContain("Needs plugin enable policy");
     expect(module).toContain("Install actions appear only");
     expect(module).toContain("bindLocalActions");
@@ -1407,7 +1408,7 @@ describe("nexus dashboard", () => {
     expect(prompt).not.toContain("Codex");
   });
 
-  it("renders policy-gated thread cleanup actions without mutation hooks", async () => {
+  it("renders approved local thread cleanup actions", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
     const html = hooks.renderThreadActions({
@@ -1421,13 +1422,11 @@ describe("nexus dashboard", () => {
     });
 
     expect(html).toContain("Archive");
-    expect(html).toContain("Needs archive policy");
-    expect(html).toContain("dn-policy-action");
-    expect(html).toContain("disabled");
+    expect(html).toContain('data-thread-action="archive"');
+    expect(html).toContain('data-thread-id="thread-archive"');
     expect(html).toContain("Start chat");
     expect(html).toContain("Copy prompt");
-    expect(html).not.toContain("data-archive-thread");
-    expect(html).not.toContain("data-forget-thread");
+    expect(html).not.toContain("Needs archive policy");
   });
 
   it("renders plugin cards with policy-gated setup actions", async () => {
@@ -1601,6 +1600,92 @@ describe("nexus dashboard", () => {
     }
 
     expect(codexChatStarter.closed).toBe(true);
+  });
+
+  it("archives dashboard threads locally without deleting worktrees", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-thread-action-");
+    const worktreesRoot = makeTempDir("dev-nexus-dashboard-thread-action-worktrees-");
+    const worktreePath = path.join(worktreesRoot, "primary", "dashboard");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    const config = projectConfig({
+      id: "thread-action-project",
+      worktreesRoot,
+    });
+    saveProjectConfig(projectRoot, config);
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(config.id, {
+          id: "lease-archive",
+          status: "abandoned",
+          branchName: "codex/dev-nexus/old-dashboard",
+          updatedAt: "2026-05-21T09:00:00.000Z",
+        }),
+      ],
+    });
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:20:00.000Z"),
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      expect(actionToken).toBeTruthy();
+      const before = await fetch(`${server.url}api/dashboard`).then((response) =>
+        response.json(),
+      );
+      expect(before.threads.records).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "lease-archive",
+            decision: "archive",
+          }),
+        ]),
+      );
+
+      const response = await fetch(`${server.url}api/dashboard/thread-action`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-dev-nexus-action-token": actionToken!,
+        },
+        body: JSON.stringify({
+          threadId: "lease-archive",
+          action: "archive",
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        ok: true,
+        result: {
+          action: "archive",
+          threadId: "lease-archive",
+          scope: "local",
+        },
+      });
+      expect(fs.existsSync(worktreePath)).toBe(true);
+
+      const after = await fetch(`${server.url}api/dashboard`).then((nextResponse) =>
+        nextResponse.json(),
+      );
+      expect(
+        after.threads.records.some(
+          (thread: { id: string }) => thread.id === "lease-archive",
+        ),
+      ).toBe(false);
+      expect(after.threads.totalCount).toBe(before.threads.totalCount - 1);
+      expect(fs.existsSync(worktreePath)).toBe(true);
+    } finally {
+      await server.close();
+    }
   });
 
   it("serves a host workspace overview endpoint", async () => {

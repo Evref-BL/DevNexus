@@ -60,10 +60,20 @@ Ready tracked work appears as `ready-work` host actions. Workspace payloads also
 include a `trackedWork` summary with compact records for ready, importable,
 stale, and hidden work items.
 
-The queue is read-only guidance. Provider writes, cleanup, archive, forget, and
-assistant actions still need their own explicit action contract. When the UI can
-name the desired action but no contract exists yet, it should render a disabled
-control instead of hiding the action or guessing the mutation.
+The queue is read-only guidance. Assistant chat actions and local thread
+archive/forget actions have explicit local action contracts:
+
+```text
+POST /api/codex/thread
+POST /api/dashboard/thread-action
+```
+
+`/api/dashboard/thread-action` records a local cockpit decision only. It hides
+the selected thread from active attention, but does not delete worktrees,
+branches, notes, or provider records. Provider writes, destructive cleanup, and
+plugin setup still need their own explicit action contract. When the UI can name
+one of those desired actions but no contract exists yet, it should render a
+disabled control instead of hiding the action or guessing the mutation.
 
 ## Workspace Drill-Down
 
