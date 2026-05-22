@@ -12,7 +12,9 @@ import {
   buildNexusDashboardHostProjectIndex,
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
+  buildNexusDashboardWorkspaceShell,
   nexusDashboardEmbeddingContract,
+  nexusDashboardHostWorkspaceReferenceMatches,
   recordNexusDashboardThreadResolution,
   type BuildNexusDashboardHostSnapshotOptions,
   type BuildNexusDashboardSnapshotOptions,
@@ -385,6 +387,12 @@ export function renderNexusDashboardClientModule(): string {
     "  return response.json();",
     "}",
     "",
+    "export async function fetchDevNexusDashboardShell(baseUrl = '', workspaceId = '') {",
+    "  const response = await fetch(`${baseUrl}/api/dashboard/shell${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
+    "  if (!response.ok) throw new Error(`Dashboard shell API returned ${response.status}`);",
+    "  return response.json();",
+    "}",
+    "",
     "export async function fetchDevNexusDashboardHost(baseUrl = '', workspaceId = '') {",
     "  const response = await fetch(`${baseUrl}/api/host${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
     "  if (!response.ok) throw new Error(`Host API returned ${response.status}`);",
@@ -507,7 +515,16 @@ export function renderNexusDashboardClientModule(): string {
     "        return;",
     "      }",
     "      const shouldRefreshHost = !latestHost || Date.now() - lastHostRefreshAt >= hostRefreshMs;",
-    "      if (shouldRefreshHost && !latestHost) void refreshHostShell();",
+    "      const needsHostShell = shouldRefreshHost && !latestHost;",
+    "      if (!latestSnapshot || latestSnapshot.partial === true) {",
+    "        const shell = await fetchDevNexusDashboardShell(baseUrl, workspaceId);",
+    "        if (workspaceId !== selectedWorkspaceId) return;",
+    "        latestSnapshot = shell;",
+    "        latestError = null;",
+    "        if (!findSelectableById(shell, selectedId)) selectedId = defaultSelectedId(shell);",
+    "        renderCurrent();",
+    "      }",
+    "      if (needsHostShell) void refreshHostShell();",
     "      const snapshot = await fetchDevNexusDashboard(baseUrl, workspaceId);",
     "      if (workspaceId !== selectedWorkspaceId) return;",
     "      latestSnapshot = snapshot;",
@@ -570,6 +587,13 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '') {",
     "  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);",
+    "  const loading = snapshot.partial === true;",
+    "  const workHistory = loading ? renderProgressivePanel('Parallel work map', 'Workspace Activity', 'Loading checkout lanes, worktrees, cycles, and approvals.') : renderWorkHistory(snapshot, activeSelection);",
+    "  const threadInbox = loading ? renderProgressivePanel('HITL queue', 'Action Needed', 'Loading active threads and local decisions.') : renderThreadInbox(snapshot);",
+    "  const trackedWork = loading ? renderProgressivePanel('Tracked work', 'Issues and Work Items', 'Loading provider and local work items.') : renderTrackedWork(snapshot, activeSelection);",
+    "  const plugins = loading ? renderProgressivePanel('Extensions', 'Plugins', 'Loading local plugin candidates and capability details.') : renderPlugins(snapshot.plugins);",
+    "  const activity = loading ? renderProgressivePanel('Activity', 'Recent Signals', 'Loading workspace events.') : `<div class=\"dn-panel\"><h2>Activity</h2><div class=\"dn-events\">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>`;",
+    "  const blockers = loading ? renderProgressivePanel('Blockers', 'Blockers', 'Loading approvals and blockers.') : `<div class=\"dn-panel\"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>`;",
     "  return `<div class=\"dn-shell\">",
     "    <header class=\"dn-header\">",
     "      <div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>",
@@ -579,13 +603,13 @@ export function renderNexusDashboardClientModule(): string {
     "    ${renderSignals(snapshot.signals, activeSelection)}",
     "    ${renderSelectedItem(snapshot, activeSelection)}",
     "    <section class=\"dn-main-grid\">",
-    "      <div class=\"dn-work-stack\">${renderWorkHistory(snapshot, activeSelection)}${renderThreadInbox(snapshot)}${renderTrackedWork(snapshot, activeSelection)}</div>",
+    "      <div class=\"dn-work-stack\">${workHistory}${threadInbox}${trackedWork}</div>",
     "    </section>",
-    "    <section class=\"dn-plugin-row\">${renderPlugins(snapshot.plugins)}</section>",
+    "    <section class=\"dn-plugin-row\">${plugins}</section>",
     "    <section class=\"dn-grid dn-secondary-grid\">",
     "      <div class=\"dn-panel\"><h2>Components</h2>${renderComponents(snapshot.components, activeSelection)}</div>",
-    "      <div class=\"dn-panel\"><h2>Activity</h2><div class=\"dn-events\">${snapshot.events.slice(0, 7).map((event) => renderEvent(event, activeSelection)).join('')}</div></div>",
-    "      <div class=\"dn-panel\"><h2>Blockers</h2>${renderBlockers(snapshot, activeSelection)}</div>",
+    "      ${activity}",
+    "      ${blockers}",
     "    </section>",
     "  </div>`;",
     "}",
@@ -702,6 +726,10 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderInlineLoading(label) {",
     "  return `<p class=\"dn-inline-loading\">${escapeHtml(label)}</p>`;",
+    "}",
+    "",
+    "function renderProgressivePanel(eyebrow, title, detail) {",
+    "  return `<div class=\"dn-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">${escapeHtml(eyebrow)}</span><h2>${escapeHtml(title)}</h2></div><span class=\"dn-count\">loading</span></div>${renderInlineLoading(detail)}<div class=\"dn-skeleton-stack\" aria-hidden=\"true\"><span class=\"dn-skeleton\" style=\"width:86%\"></span><span class=\"dn-skeleton\" style=\"width:68%\"></span><span class=\"dn-skeleton\" style=\"width:42%\"></span></div></div>`;",
     "}",
     "",
     "function workspaceToneLabel(workspace) {",
@@ -959,7 +987,7 @@ export function renderNexusDashboardClientModule(): string {
     "}",
     "",
     "function renderComponents(components, selectedId) {",
-    "  return `<div class=\"dn-component-grid\">${components.map((component) => { const id = `component:${component.id}`; const git = component.git; const tone = git?.dirty ? 'warn' : component.sourceRootExists ? 'good' : 'danger'; return `<button class=\"dn-component-card ${id === selectedId ? 'selected' : ''}\" type=\"button\" data-select-id=\"${escapeHtml(id)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(component.name)}</strong><span class=\"dn-dot tone-${tone}\"></span></span><span class=\"dn-label\">${escapeHtml(component.role)} · ${escapeHtml(component.defaultTrackerId ?? 'no tracker')}</span><span class=\"dn-card-meta\">${escapeHtml(git?.branch ?? 'missing branch')} · ${escapeHtml(git?.dirty ? 'dirty' : 'clean')}</span></button>`; }).join('')}</div>`;",
+    "  return `<div class=\"dn-component-grid\">${components.map((component) => { const id = `component:${component.id}`; const git = component.git; const loading = component.sourceRootExists && !git; const tone = git?.dirty ? 'warn' : component.sourceRootExists ? (loading ? 'neutral' : 'good') : 'danger'; const branch = git?.branch ?? (loading ? 'loading branch' : 'missing branch'); const state = git ? (git.dirty ? 'dirty' : 'clean') : (loading ? 'loading' : 'missing'); return `<button class=\"dn-component-card ${id === selectedId ? 'selected' : ''}\" type=\"button\" data-select-id=\"${escapeHtml(id)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(component.name)}</strong><span class=\"dn-dot tone-${tone}\"></span></span><span class=\"dn-label\">${escapeHtml(component.role)} · ${escapeHtml(component.defaultTrackerId ?? 'no tracker')}</span><span class=\"dn-card-meta\">${escapeHtml(branch)} · ${escapeHtml(state)}</span></button>`; }).join('')}</div>`;",
     "}",
     "",
     "function renderThreadInbox(snapshot) {",
@@ -1878,6 +1906,17 @@ async function routeDashboardRequest(
       );
       return;
     }
+    if (url.pathname === "/api/dashboard/shell") {
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      const snapshot = await buildNexusDashboardWorkspaceShell(
+        selection.snapshotOptions,
+      );
+      sendJson(response, dashboardWorkspacePayload(snapshot, selection));
+      return;
+    }
     if (url.pathname === "/api/dashboard" || url.pathname === "/api/snapshot") {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
@@ -2106,9 +2145,9 @@ async function resolveDashboardWorkspaceSelection(
     };
   }
 
-  const baseHost = await buildNexusDashboardHostProjectIndex(snapshotOptions);
-  const matches = baseHost.workspaces.filter((workspace) =>
-    workspace.id === workspaceId
+  const matches = nexusDashboardHostWorkspaceReferenceMatches(
+    snapshotOptions,
+    workspaceId,
   );
   if (matches.length === 0) {
     throw new NexusDashboardRouteError(
@@ -2128,9 +2167,8 @@ async function resolveDashboardWorkspaceSelection(
   return {
     snapshotOptions: {
       ...snapshotOptions,
-      projectRoot: path.resolve(matches[0]!.root),
+      projectRoot: path.resolve(matches[0]!.reference.projectRoot),
     },
-    baseHost,
     workspaceId,
   };
 }
@@ -2142,18 +2180,16 @@ async function buildDashboardHostForRequest(
   if (!workspaceId) {
     return buildNexusDashboardHostSnapshot(snapshotOptions);
   }
-  const selection = await resolveDashboardWorkspaceSelection(
+  const baseHost = await buildNexusDashboardHostProjectIndex(snapshotOptions);
+  const selection = workspaceSelectionFromHostIndex(
     snapshotOptions,
     workspaceId,
+    baseHost,
   );
   const selectedHost = await buildNexusDashboardHostSnapshot(
     selection.snapshotOptions,
   );
-  if (!selection.baseHost) {
-    return selectedHost;
-  }
-
-  return mergeDashboardHostSnapshots(selectedHost, selection.baseHost);
+  return mergeDashboardHostSnapshots(selectedHost, baseHost);
 }
 
 async function buildDashboardProjectIndexForRequest(
@@ -2163,18 +2199,48 @@ async function buildDashboardProjectIndexForRequest(
   if (!workspaceId) {
     return buildNexusDashboardHostProjectIndex(snapshotOptions);
   }
-  const selection = await resolveDashboardWorkspaceSelection(
+  const baseHost = await buildNexusDashboardHostProjectIndex(snapshotOptions);
+  const selection = workspaceSelectionFromHostIndex(
     snapshotOptions,
     workspaceId,
+    baseHost,
   );
   const selectedHost = await buildNexusDashboardHostProjectIndex(
     selection.snapshotOptions,
   );
-  if (!selection.baseHost) {
-    return selectedHost;
-  }
+  return mergeDashboardHostSnapshots(selectedHost, baseHost);
+}
 
-  return mergeDashboardHostSnapshots(selectedHost, selection.baseHost);
+function workspaceSelectionFromHostIndex(
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  workspaceId: string,
+  baseHost: NexusDashboardHostSnapshot,
+): DashboardWorkspaceSelection {
+  const matches = baseHost.workspaces.filter((workspace) =>
+    workspace.id === workspaceId
+  );
+  if (matches.length === 0) {
+    throw new NexusDashboardRouteError(
+      "workspace_not_found",
+      `Workspace ${workspaceId} is not registered on this host`,
+      404,
+    );
+  }
+  if (matches.length > 1) {
+    throw new NexusDashboardRouteError(
+      "ambiguous_workspace",
+      `Workspace ${workspaceId} matched multiple host workspaces`,
+      409,
+    );
+  }
+  return {
+    snapshotOptions: {
+      ...snapshotOptions,
+      projectRoot: path.resolve(matches[0]!.root),
+    },
+    baseHost,
+    workspaceId,
+  };
 }
 
 function mergeDashboardHostSnapshots(
@@ -2266,7 +2332,7 @@ function workspaceContract(
     scope: diagnosticsDefaultPayload ? "diagnostics" : "workspace",
     selectedWorkspaceId: selection.workspaceId ?? snapshot.project.id,
     selectedWorkspaceRoot: selectedWorkspace?.root ?? snapshot.projectRoot,
-    hostMode: Boolean(selection.baseHost),
+    hostMode: Boolean(selection.workspaceId || selection.baseHost),
     diagnosticsDefaultPayload,
   });
 }

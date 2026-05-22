@@ -2056,6 +2056,68 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("serves a workspace shell without probing Git or provider state", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-workspace-shell-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-workspace-shell-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "workspace-shell",
+      name: "Workspace Shell",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const server = await startNexusDashboardServer({
+      homePath,
+      gitRunner: () => {
+        throw new Error("workspace shell must not run Git");
+      },
+      now: fixedClock("2026-05-21T10:24:45.000Z"),
+    });
+
+    try {
+      const response = await fetch(
+        `${server.url}api/dashboard/shell?workspace=workspace-shell`,
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        version: 1,
+        partial: true,
+        project: {
+          id: "workspace-shell",
+          name: "Workspace Shell",
+          root: registeredRoot,
+        },
+        summary: "Loading workspace signals.",
+      });
+      expect(payload.components).toHaveLength(1);
+      expect(payload.components[0].git).toBeNull();
+      expect(payload.signals.map((signal: { value: string }) => signal.value)).toContain("...");
+      expect(payload.threads.records).toEqual([]);
+      expect(payload.trackedWork.records).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves host cockpit data without a current workspace root", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-host-only-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-host-only-registered-");

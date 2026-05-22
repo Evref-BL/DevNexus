@@ -610,6 +610,7 @@ export interface NexusDashboardWeave {
 export interface NexusDashboardSnapshot {
   version: 1;
   contract: NexusDashboardEmbeddingContract;
+  partial?: boolean;
   generatedAt: string;
   projectRoot: string;
   project: NexusDashboardProjectSummary;
@@ -844,6 +845,47 @@ export async function buildNexusDashboardSnapshot(
   };
 }
 
+export async function buildNexusDashboardWorkspaceShell(
+  options: BuildNexusDashboardSnapshotOptions,
+): Promise<NexusDashboardSnapshot> {
+  const projectRoot = path.resolve(nonEmptyString(options.projectRoot, "projectRoot"));
+  const generatedAt = isoString(options.now?.() ?? new Date());
+  const projectConfig = loadProjectConfig(projectRoot);
+  const components = resolveProjectComponents(projectRoot, projectConfig);
+  const componentSummaries = components.map(summarizeComponentShell);
+  const project = projectSummary(projectRoot, projectConfig, componentSummaries);
+  const plugins = summarizeConfiguredPlugins(projectConfig);
+
+  return {
+    version: 1,
+    contract: nexusDashboardEmbeddingContract({
+      scope: "workspace",
+      selectedWorkspaceId: projectConfig.id,
+      selectedWorkspaceRoot: projectRoot,
+      hostMode: false,
+    }),
+    partial: true,
+    generatedAt,
+    projectRoot,
+    project,
+    summary: "Loading workspace signals.",
+    signals: dashboardShellSignals(componentSummaries, plugins),
+    components: componentSummaries,
+    automation: pendingDashboardResult("Loading automation status."),
+    eligibleWork: pendingDashboardResult("Loading tracked work."),
+    targetReport: pendingDashboardResult("Loading target report."),
+    worktrees: emptyWorktreeSummary(),
+    threads: emptyThreadSummary(),
+    plugins,
+    trackedWork: emptyTrackedWorkSummary(),
+    publication: [],
+    authority: null,
+    blockers: [],
+    events: [],
+    weave: workspaceShellWeave(generatedAt, project, componentSummaries),
+  };
+}
+
 export async function buildNexusDashboardHostSnapshot(
   options: BuildNexusDashboardHostSnapshotOptions = {},
 ): Promise<NexusDashboardHostSnapshot> {
@@ -955,6 +997,32 @@ export async function buildNexusDashboardHostProjectIndex(
     actionQueue: [],
     workspaces,
   };
+}
+
+export function nexusDashboardHostWorkspaceReferenceMatches(
+  options: BuildNexusDashboardHostSnapshotOptions,
+  workspaceId: string,
+): Array<{
+  reference: NexusProjectReference;
+  registered: boolean;
+  current: boolean;
+}> {
+  const homePath = path.resolve(options.homePath ?? defaultNexusHomePath());
+  const home = capture(() =>
+    loadNexusHomeConfigFile(homePath, validateNexusHomeConfigBase),
+  );
+  const currentProjectRoot =
+    options.currentProjectRoot !== undefined
+      ? options.currentProjectRoot
+        ? path.resolve(
+            nonEmptyString(options.currentProjectRoot, "currentProjectRoot"),
+          )
+        : null
+      : options.projectRoot
+        ? path.resolve(nonEmptyString(options.projectRoot, "projectRoot"))
+        : null;
+  return dashboardHostWorkspaceReferences(home.value, currentProjectRoot)
+    .filter((workspace) => workspace.reference.id === workspaceId);
 }
 
 export function nexusDashboardEmbeddingContract(options: {
@@ -2272,6 +2340,173 @@ function summarizeComponent(
   };
 }
 
+function summarizeComponentShell(
+  component: ResolvedNexusProjectComponent,
+): NexusDashboardComponentSummary {
+  return {
+    id: component.id,
+    name: component.name,
+    kind: component.kind,
+    role: component.role,
+    remoteUrl: component.remoteUrl,
+    sourceRoot: component.sourceRoot,
+    sourceRootExists: component.sourceRootExists,
+    worktreesRoot: component.worktreesRoot,
+    defaultTrackerId: component.defaultTrackerId,
+    trackerProviders: component.workTrackers.map((tracker) => tracker.provider),
+    verificationRequired: component.verification?.requirePassing ?? false,
+    publicationStrategy: component.publication?.strategy ?? null,
+    git: null,
+  };
+}
+
+function pendingDashboardResult<T>(
+  message: string,
+): NexusDashboardDataResult<T> {
+  return {
+    ok: false,
+    value: null,
+    error: {
+      name: "Pending",
+      message,
+    },
+  };
+}
+
+function emptyWorktreeSummary(): NexusDashboardWorktreeSummary {
+  return {
+    activeCount: 0,
+    staleCount: 0,
+    warnings: [],
+    records: [],
+  };
+}
+
+function emptyThreadSummary(): NexusDashboardThreadSummary {
+  return {
+    totalCount: 0,
+    activeCount: 0,
+    needsDecisionCount: 0,
+    archiveCandidateCount: 0,
+    forgetCandidateCount: 0,
+    records: [],
+  };
+}
+
+function emptyTrackedWorkSummary(): NexusDashboardTrackedWorkSummary {
+  return {
+    totalCount: 0,
+    readyCount: 0,
+    importCandidateCount: 0,
+    staleCount: 0,
+    excludedCount: 0,
+    records: [],
+  };
+}
+
+function dashboardShellSignals(
+  components: NexusDashboardComponentSummary[],
+  plugins: NexusDashboardPluginSummary,
+): NexusDashboardSignal[] {
+  return [
+    {
+      id: "components",
+      label: "Components",
+      value: String(components.length),
+      tone: "good",
+      detail: "Component list loaded.",
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      value: "...",
+      tone: "neutral",
+      detail: "Loading automation status.",
+    },
+    {
+      id: "eligible-work",
+      label: "Tracked work",
+      value: "...",
+      tone: "neutral",
+      detail: "Loading issues and work items.",
+    },
+    {
+      id: "worktrees",
+      label: "Threads",
+      value: "...",
+      tone: "neutral",
+      detail: "Loading active thread state.",
+    },
+    {
+      id: "blockers",
+      label: "Blockers",
+      value: "...",
+      tone: "neutral",
+      detail: "Loading approvals and blockers.",
+    },
+    {
+      id: "plugins",
+      label: "Plugins",
+      value: String(plugins.enabledCount),
+      tone: "neutral",
+      detail: "Configured plugins loaded; local candidates are still loading.",
+    },
+  ];
+}
+
+function workspaceShellWeave(
+  generatedAt: string,
+  project: NexusDashboardProjectSummary,
+  components: NexusDashboardComponentSummary[],
+): NexusDashboardWeave {
+  const projectNode: NexusDashboardWeaveNode = {
+    id: "project",
+    kind: "project",
+    laneId: "project",
+    label: project.name,
+    detail: project.root,
+    status: "loading",
+    timestamp: generatedAt,
+    href: project.remoteUrl,
+    actions: [],
+  };
+  const componentNodes = components.map((component) => ({
+    id: `component:${component.id}`,
+    kind: "component" as const,
+    laneId: "components",
+    label: component.name,
+    detail: `${component.role} component`,
+    status: component.sourceRootExists ? "loading" : "missing",
+    timestamp: generatedAt,
+    href: component.remoteUrl,
+    actions: [],
+  }));
+  return {
+    version: 1,
+    generatedAt,
+    lanes: [
+      {
+        id: "project",
+        label: "Workspace",
+        nodeIds: ["project"],
+      },
+      {
+        id: "components",
+        label: "Components",
+        nodeIds: componentNodes.map((node) => node.id),
+      },
+    ],
+    nodes: [projectNode, ...componentNodes],
+    edges: componentNodes.map((node) => ({
+      id: `project-${node.id}`,
+      kind: "contains",
+      from: "project",
+      to: node.id,
+      label: "contains",
+    })),
+  };
+}
+
 function collectDashboardGitState(
   repositoryPath: string,
   gitRunner: GitRunner,
@@ -2833,11 +3068,8 @@ function summarizePlugins(
   projectConfig: NexusProjectConfig,
   components: ResolvedNexusProjectComponent[],
 ): NexusDashboardPluginSummary {
-  const projections = projectPluginCapabilityProjections(projectConfig);
-  const projectionsById = new Map(projections.map((projection) => [projection.pluginId, projection]));
-  const configuredRecords = (projectConfig.plugins ?? []).map((plugin) =>
-    pluginDashboardRecord(plugin, projectionsById.get(plugin.id))
-  );
+  const configured = summarizeConfiguredPlugins(projectConfig);
+  const configuredRecords = configured.records;
   const configuredKeys = new Set(
     configuredRecords.flatMap((record) => pluginRecordKeys(record)),
   );
@@ -2849,9 +3081,27 @@ function summarizePlugins(
   const records = [...configuredRecords, ...availableRecords];
   return {
     totalCount: records.length,
-    enabledCount: configuredRecords.filter((record) => record.enabled).length,
+    enabledCount: configured.enabledCount,
     configuredCount: configuredRecords.length,
     availableCount: availableRecords.length,
+    capabilityCount: records.reduce((count, record) => count + record.capabilityCount, 0),
+    records,
+  };
+}
+
+function summarizeConfiguredPlugins(
+  projectConfig: NexusProjectConfig,
+): NexusDashboardPluginSummary {
+  const projections = projectPluginCapabilityProjections(projectConfig);
+  const projectionsById = new Map(projections.map((projection) => [projection.pluginId, projection]));
+  const records = (projectConfig.plugins ?? []).map((plugin) =>
+    pluginDashboardRecord(plugin, projectionsById.get(plugin.id))
+  );
+  return {
+    totalCount: records.length,
+    enabledCount: records.filter((record) => record.enabled).length,
+    configuredCount: records.length,
+    availableCount: 0,
     capabilityCount: records.reduce((count, record) => count + record.capabilityCount, 0),
     records,
   };
