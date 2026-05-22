@@ -383,8 +383,17 @@ describe("nexus dashboard", () => {
     expect(module).toContain("HITL queue");
     expect(module).toContain("Plugins");
     expect(module).toContain("renderThreadInbox");
+    expect(module).toContain("renderThreadActions");
     expect(module).toContain("renderPlugins");
+    expect(module).toContain("bindLocalActions");
+    expect(module).toContain("data-copy-prompt");
+    expect(module).toContain("Copy Codex brief");
     expect(module).toContain("Parallel work map");
+    expect(module).toContain("dn-work-stack");
+    expect(module).toContain("dn-plugin-row");
+    expect(module).toContain("Installed extensions");
+    expect(module).not.toContain("Capability layer");
+    expect(module).not.toContain("dn-side-stack");
     expect(module).toContain("Approval");
     expect(module).not.toContain("Human approval");
     expect(module).toContain("selectedDetail");
@@ -395,6 +404,10 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-row-height");
     expect(module).toContain("providerIcon");
     expect(module).toContain("externalLinkIcon");
+    expect(module).toContain("clipboardIcon");
+    expect(module).toContain("signal-components");
+    expect(module).toContain("work: ${branch}");
+    expect(module).not.toContain("tonebox");
     expect(module).not.toContain("renderRailLabels");
     expect(module).not.toContain("threadDetail");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
