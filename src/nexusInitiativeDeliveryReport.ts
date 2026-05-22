@@ -33,6 +33,7 @@ import {
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 
 export type NexusInitiativeDeliveryReportNextAction =
+  | "create_pull_request"
   | "collect_provider_evidence"
   | "update_branch"
   | "resolve_conflicts"
@@ -44,6 +45,7 @@ export type NexusInitiativeDeliveryReportNextAction =
   | "wait";
 
 export type NexusInitiativeDeliveryReportItemStatus =
+  | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
   | "blocked"
@@ -94,6 +96,7 @@ export interface NexusInitiativeDeliveryReportItem {
   finalReviewTarget: string;
   finalPublicationTarget: string;
   finalPullRequest: boolean;
+  finalPullRequestCreation: string;
   ciTier: NexusCiTierDecision;
   providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
   status: NexusInitiativeDeliveryReportItemStatus;
@@ -105,6 +108,7 @@ export interface NexusInitiativeDeliveryReportItem {
 export interface NexusInitiativeDeliveryReportSummary {
   itemCount: number;
   readyCount: number;
+  needsFinalPullRequestCount: number;
   needsProviderEvidenceCount: number;
   needsUpdateCount: number;
   blockedCount: number;
@@ -218,6 +222,7 @@ function reportItem(options: {
     initiativeFinalPullRequest: initiative.finalPullRequest,
     providerEvidence,
     ciTier,
+    finalPullRequestCreation: initiative.finalPullRequestCreation,
   });
 
   return {
@@ -234,6 +239,7 @@ function reportItem(options: {
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
     finalPullRequest: initiative.finalPullRequest,
+    finalPullRequestCreation: initiative.finalPullRequestCreation,
     ciTier,
     providerEvidence,
     status: classificationResult.status,
@@ -314,6 +320,7 @@ function providerEvidenceSummary(
 
 function classifyItem(options: {
   initiativeFinalPullRequest: boolean;
+  finalPullRequestCreation: string;
   providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
   ciTier: NexusCiTierDecision;
 }): {
@@ -324,6 +331,17 @@ function classifyItem(options: {
   const evidence = options.providerEvidence;
   const reasons: string[] = [];
   if (!evidence.provider) {
+    if (
+      options.initiativeFinalPullRequest &&
+      options.finalPullRequestCreation === "at_review_gate"
+    ) {
+      reasons.push("final pull request is created at the review gate");
+      return {
+        status: "needs_final_pull_request",
+        nextAction: "create_pull_request",
+        reasons,
+      };
+    }
     reasons.push("provider evidence is unavailable");
     return {
       status: "needs_provider_evidence",
@@ -423,6 +441,7 @@ function summarizeItems(
   return {
     itemCount: items.length,
     readyCount: countStatus(items, "ready"),
+    needsFinalPullRequestCount: countStatus(items, "needs_final_pull_request"),
     needsProviderEvidenceCount: countStatus(items, "needs_provider_evidence"),
     needsUpdateCount: countStatus(items, "needs_update"),
     blockedCount: countStatus(items, "blocked"),
@@ -450,6 +469,7 @@ function nextAction(
     "resolve_branch_policy",
     "resolve_failed_checks",
     "wait_for_checks",
+    "create_pull_request",
     "request_review",
     "collect_provider_evidence",
     "wait",

@@ -13,6 +13,7 @@ import type {
 } from "./nexusPublicationProviderEvidence.js";
 
 export type NexusInitiativeFinalizationNextAction =
+  | "create_pull_request"
   | "collect_provider_evidence"
   | "update_branch"
   | "resolve_conflicts"
@@ -25,6 +26,7 @@ export type NexusInitiativeFinalizationNextAction =
   | "wait";
 
 export type NexusInitiativeReviewReadinessStatus =
+  | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
   | "blocked"
@@ -34,6 +36,7 @@ export type NexusInitiativeReviewReadinessStatus =
   | "ready_for_review";
 
 export type NexusInitiativePublicationReadinessStatus =
+  | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
   | "blocked"
@@ -45,6 +48,7 @@ export type NexusInitiativePublicationReadinessStatus =
   | "ready_for_publication";
 
 type NexusInitiativeSharedReadinessStatus =
+  | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
   | "blocked"
@@ -79,6 +83,7 @@ export interface NexusInitiativeFinalizationPlanItem {
   initiativeId: string;
   integrationBranch: string | null;
   finalPublicationTarget: string;
+  finalPullRequestCreation: string;
   reviewTarget: string;
   providerEvidence: NexusInitiativeDeliveryReportItem["providerEvidence"];
   reviewReadiness: NexusInitiativeReadinessDecision<NexusInitiativeReviewReadinessStatus> & {
@@ -96,6 +101,7 @@ export interface NexusInitiativeFinalizationPlanSummary {
   itemCount: number;
   safeToReviewCount: number;
   readyForPublicationCount: number;
+  needsFinalPullRequestCount: number;
   needsProviderEvidenceCount: number;
   needsUpdateCount: number;
   blockedCount: number;
@@ -181,6 +187,7 @@ function finalizationItem(options: {
     initiativeId: options.item.initiativeId,
     integrationBranch: options.item.integrationBranch,
     finalPublicationTarget: options.item.finalPublicationTarget,
+    finalPullRequestCreation: options.item.finalPullRequestCreation,
     reviewTarget: options.item.finalReviewTarget,
     providerEvidence: options.item.providerEvidence,
     reviewReadiness: {
@@ -277,6 +284,16 @@ function sharedReadinessBlocker(
 ): NexusInitiativeReadinessDecision<NexusInitiativeSharedReadinessStatus> | null {
   const evidence = item.providerEvidence;
   if (!evidence.provider) {
+    if (
+      item.finalPullRequest &&
+      item.finalPullRequestCreation === "at_review_gate"
+    ) {
+      return {
+        status: "needs_final_pull_request",
+        nextAction: "create_pull_request",
+        reasons: ["final pull request is created at the review gate"],
+      };
+    }
     return {
       status: "needs_provider_evidence",
       nextAction: "collect_provider_evidence",
@@ -363,6 +380,9 @@ function summarizeItems(
     readyForPublicationCount: items.filter((item) =>
       item.publicationReadiness.status === "ready_for_publication"
     ).length,
+    needsFinalPullRequestCount: items.filter((item) =>
+      item.publicationReadiness.status === "needs_final_pull_request"
+    ).length,
     needsProviderEvidenceCount: items.filter((item) =>
       item.publicationReadiness.status === "needs_provider_evidence"
     ).length,
@@ -398,6 +418,7 @@ function nextAction(
     "resolve_failed_checks",
     "wait_for_checks",
     "resolve_branch_policy",
+    "create_pull_request",
     "request_review",
     "mark_ready_for_review",
     "request_publication_approval",

@@ -1,6 +1,8 @@
 import {
   defaultNexusInitiativeDeliveryConfig,
   type NexusInitiativeDeliveryConfig,
+  type NexusInitiativeDeliveryBranchPublicationStrategy,
+  type NexusInitiativeDeliveryFinalPullRequestCreationPolicy,
   type NexusInitiativeDeliveryTopology,
 } from "./nexusAutomationConfig.js";
 
@@ -17,6 +19,14 @@ export interface NexusInitiativeDeliveryBranchPlanSummary {
   requiresIntegrationBranchApproval: boolean;
 }
 
+export interface NexusInitiativeDeliveryBranchPublicationSummary {
+  strategy: NexusInitiativeDeliveryBranchPublicationStrategy;
+  publicationRemote: string | null;
+  fallbackRemote: string | null;
+  selectedRemote: string | null;
+  requiresFallbackApproval: boolean;
+}
+
 export interface NexusInitiativeDeliveryPolicySummary {
   enabled: boolean;
   activeInitiativeId: string | null;
@@ -28,7 +38,9 @@ export interface NexusInitiativeDeliveryPolicySummary {
   allowedTopologies: NexusInitiativeDeliveryTopology[];
   reviewMode: string;
   finalPullRequest: boolean;
+  finalPullRequestCreation: NexusInitiativeDeliveryFinalPullRequestCreationPolicy;
   providerNoise: string;
+  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
   branchPlan: NexusInitiativeDeliveryBranchPlanSummary;
   warnings: string[];
 }
@@ -38,6 +50,7 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
   fallbackScopeId: string | null;
   unscopedName: string;
   targetBranch: string;
+  publicationRemote?: string | null;
 }): NexusInitiativeDeliveryPolicySummary {
   const config = mergeInitiativeDeliveryDefaults(options.config);
   const activeScopeId =
@@ -77,6 +90,11 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
     config,
     fallbackScopeId: options.fallbackScopeId,
     unscopedName: options.unscopedName,
+    publicationRemote: options.publicationRemote ?? null,
+  });
+  const branchPublication = initiativeBranchPublicationSummary({
+    config,
+    publicationRemote: options.publicationRemote ?? null,
   });
 
   return {
@@ -90,7 +108,9 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
     allowedTopologies: [...config.allowedTopologies],
     reviewMode: config.review.mode,
     finalPullRequest: config.review.finalPullRequest,
+    finalPullRequestCreation: config.review.finalPullRequestCreation,
     providerNoise: config.provider.noise,
+    branchPublication,
     branchPlan: {
       topology: config.defaultTopology,
       targetBranch: options.targetBranch,
@@ -162,6 +182,10 @@ function mergeInitiativeDeliveryDefaults(
       ...defaultNexusInitiativeDeliveryConfig.provider,
       ...config.provider,
     },
+    branchPublication: {
+      ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+      ...config.branchPublication,
+    },
   };
 }
 
@@ -169,6 +193,7 @@ function initiativeDeliveryWarnings(options: {
   config: NexusInitiativeDeliveryConfig;
   fallbackScopeId: string | null;
   unscopedName: string;
+  publicationRemote: string | null;
 }): string[] {
   const warnings: string[] = [];
   if (
@@ -186,7 +211,51 @@ function initiativeDeliveryWarnings(options: {
   ) {
     warnings.push("throw-away rehearsal branches must not become publication sources");
   }
+  if (
+    options.config.enabled &&
+    options.config.branchPublication.strategy === "publication_remote" &&
+    !options.publicationRemote
+  ) {
+    warnings.push("initiative branch publication requires a configured publication remote");
+  }
   return warnings;
+}
+
+function initiativeBranchPublicationSummary(options: {
+  config: NexusInitiativeDeliveryConfig;
+  publicationRemote: string | null;
+}): NexusInitiativeDeliveryBranchPublicationSummary {
+  const { strategy, fallbackRemote } = options.config.branchPublication;
+  const selectedRemote = selectedBranchPublicationRemote({
+    strategy,
+    publicationRemote: options.publicationRemote,
+    fallbackRemote,
+  });
+  return {
+    strategy,
+    publicationRemote: options.publicationRemote,
+    fallbackRemote,
+    selectedRemote,
+    requiresFallbackApproval:
+      strategy === "publication_remote_then_fallback" && Boolean(fallbackRemote),
+  };
+}
+
+function selectedBranchPublicationRemote(options: {
+  strategy: NexusInitiativeDeliveryBranchPublicationStrategy;
+  publicationRemote: string | null;
+  fallbackRemote: string | null;
+}): string | null {
+  switch (options.strategy) {
+    case "publication_remote":
+      return options.publicationRemote;
+    case "fallback_remote":
+      return options.fallbackRemote;
+    case "publication_remote_then_fallback":
+      return options.publicationRemote ?? options.fallbackRemote;
+    case "manual_only":
+      return null;
+  }
 }
 
 function topologyUsesIntegrationBranch(

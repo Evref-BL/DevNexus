@@ -396,6 +396,10 @@ describe("nexus manual worktree worker target preparation", () => {
               enabled: true,
               activeInitiativeId: "codex-goals",
               defaultTopology: "hybrid",
+              branchPublication: {
+                strategy: "publication_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
             },
             selector: {
               statuses: ["ready"],
@@ -431,13 +435,27 @@ describe("nexus manual worktree worker target preparation", () => {
       branchTarget: "feat/codex-goals",
       finalPublicationTarget: "main",
       reviewMode: "slice_pr",
+      finalPullRequestCreation: "at_review_gate",
       providerNoise: "status_only",
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        publicationRemote: "origin",
+        fallbackRemote: "fork",
+        selectedRemote: "origin",
+        requiresFallbackApproval: true,
+      },
     });
     expect(result.setup.context!.briefingMarkdown).toContain(
       "Initiative: codex-goals",
     );
     expect(result.setup.context!.briefingMarkdown).toContain(
       "Review target: feat/codex-goals",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Final PR creation: at_review_gate",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Branch publication remote: origin (fallback: fork)",
     );
   });
 

@@ -27,6 +27,30 @@ afterEach(() => {
 });
 
 describe("initiative delivery report", () => {
+  it("reports a delayed final pull request as a review-gate action", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const report = buildNexusInitiativeDeliveryReport({
+      projectRoot,
+      componentId: "primary",
+    });
+
+    expect(report.summary).toMatchObject({
+      itemCount: 1,
+      needsFinalPullRequestCount: 1,
+      needsProviderEvidenceCount: 0,
+    });
+    expect(report.nextAction).toBe("create_pull_request");
+    expect(report.items[0]).toMatchObject({
+      status: "needs_final_pull_request",
+      nextAction: "create_pull_request",
+      finalPullRequestCreation: "at_review_gate",
+      reasons: ["final pull request is created at the review gate"],
+    });
+  });
+
   it("flags initiative pull requests that are behind the base branch", () => {
     const projectRoot = makeTempDir("dev-nexus-initiative-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

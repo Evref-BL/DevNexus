@@ -2235,9 +2235,14 @@ describe("workspace config", () => {
               review: {
                 mode: "slice_pr",
                 finalPullRequest: true,
+                finalPullRequestCreation: "at_review_gate",
               },
               provider: {
                 noise: "status_only",
+              },
+              branchPublication: {
+                strategy: "publication_remote_then_fallback",
+                fallbackRemote: "fork",
               },
             },
           },
@@ -2261,9 +2266,14 @@ describe("workspace config", () => {
       review: {
         mode: "slice_pr",
         finalPullRequest: true,
+        finalPullRequestCreation: "at_review_gate",
       },
       provider: {
         noise: "status_only",
+      },
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        fallbackRemote: "fork",
       },
     });
   });
@@ -2334,6 +2344,50 @@ describe("workspace config", () => {
         },
       }),
     ).toThrow(/integrationBranchPattern must not include \{slice\}/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                review: {
+                  finalPullRequestCreation: "always",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/finalPullRequestCreation must be/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchPublication: {
+                  strategy: "fallback_remote",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/fallbackRemote is required/);
   });
 
   it("accepts publication identity and remote guardrails", () => {

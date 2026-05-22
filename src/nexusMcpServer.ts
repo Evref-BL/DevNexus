@@ -4202,8 +4202,14 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
                   finalPublicationTarget:
                     component.publicationTrain.initiativeDelivery.branchPlan
                       .finalPublicationTarget,
+                  finalPullRequestCreation:
+                    component.publicationTrain.initiativeDelivery
+                      .finalPullRequestCreation,
                   providerNoise:
                     component.publicationTrain.initiativeDelivery.providerNoise,
+                  branchPublication:
+                    component.publicationTrain.initiativeDelivery
+                      .branchPublication,
                 }
               : null,
             warningCount: component.publicationTrain.warnings.length,

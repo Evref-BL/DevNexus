@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main } from "./cli.js";
 import {
   defaultNexusAutomationConfig,
+  defaultNexusInitiativeDeliveryConfig,
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
@@ -72,6 +73,53 @@ describe("publication operations", () => {
         cwd: sourceRoot,
         token: "installation-token",
       }),
+    ]);
+  });
+
+  it("pushes initiative branches through the configured fallback remote", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(projectRoot, initiativeFallbackPublicationProjectConfig(homePath));
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      initiativeId: "codex-goals",
+      branchPublication: {
+        strategy: "fallback_remote",
+        selectedRemote: "fork",
+      },
+    });
+    expect(result.push.plan).toMatchObject({
+      transport: "configured_remote",
+      remote: "fork",
+      refspec: "feat/codex-goals",
+    });
+    expect(calls).toEqual([
+      {
+        args: ["push", "fork", "feat/codex-goals"],
+        token: undefined,
+      },
     ]);
   });
 
@@ -1092,6 +1140,56 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
           provider: "github",
           handle: "devnexus-automation",
           id: "dev-nexus-automation-app",
+        },
+      },
+    },
+  };
+}
+
+function initiativeFallbackPublicationProjectConfig(
+  homePath: string,
+): NexusProjectConfig {
+  return {
+    ...publicationProjectConfig(homePath),
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        remote: "app",
+        targetBranch: "main",
+        push: false,
+        actor: {
+          kind: "app",
+          provider: "github",
+          handle: "devnexus-automation",
+          id: "dev-nexus-automation-app",
+        },
+        publicationTrain: {
+          enabled: true,
+          activeVersionId: null,
+          branchNaming: {
+            integrationPrefix: "integration",
+            candidatePrefix: "candidate",
+            unscopedName: "manual",
+          },
+          initiativeDelivery: {
+            ...defaultNexusInitiativeDeliveryConfig,
+            enabled: true,
+            activeInitiativeId: "codex-goals",
+            defaultTopology: "hybrid",
+            branchPublication: {
+              strategy: "fallback_remote",
+              fallbackRemote: "fork",
+            },
+          },
+          selector: {
+            statuses: ["ready"],
+            labels: [],
+            milestones: [],
+            assignees: [],
+            providerQuery: null,
+          },
         },
       },
     },

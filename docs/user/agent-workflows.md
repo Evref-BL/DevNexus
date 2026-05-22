@@ -156,6 +156,13 @@ first worktree. The words "feature", "initiative", "bugfix campaign", and
 - Use the workspace release policy for version, train, candidate, and merge
   queue decisions.
 
+For initiative delivery, let the worktree and publication tools choose the
+provider surface from policy. The default final pull-request timing is
+`at_review_gate`, so agents should not open a final PR when the initiative branch
+is created unless policy explicitly says `at_initiative_start`. When upstream
+branch pushes are unavailable, use the configured `branchPublication` fallback
+remote instead of inventing a fork or pushing with a human account.
+
 Prepare a component-scoped worktree when implementation should be isolated:
 
 ```bash

@@ -1,6 +1,12 @@
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
+  buildNexusInitiativeDeliveryPlan,
+} from "./nexusInitiativeDeliveryPlan.js";
+import type {
+  NexusInitiativeDeliveryBranchPublicationSummary,
+} from "./nexusInitiativeDeliveryPolicy.js";
+import {
   createNexusForgePublicationAdapter,
   type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
@@ -92,8 +98,14 @@ export interface NexusPublicationBranchPushResult {
   targetBranch: string | null;
   forceWithLease: boolean;
   forceWithLeaseExpectedCommit: string | null;
+  initiativeDelivery: NexusPublicationBranchPushInitiativeSummary | null;
   credential: NexusPublicationCredentialSummary;
   push: NexusPublicationGitPushResult;
+}
+
+export interface NexusPublicationBranchPushInitiativeSummary {
+  initiativeId: string;
+  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
 }
 
 export interface NexusPublicationPullRequestUpsertResult {
@@ -145,6 +157,7 @@ export interface PushNexusPublicationBranchForComponentOptions
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
+  initiativeId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   gitRunner?: NexusPublicationGitPushRunner;
@@ -257,6 +270,14 @@ export async function pushNexusPublicationBranchForComponent(
   options: PushNexusPublicationBranchForComponentOptions,
 ): Promise<NexusPublicationBranchPushResult> {
   const context = resolveNexusPublicationTargetContext(options);
+  const initiativeDelivery = resolveInitiativeBranchPushPolicy({
+    context,
+    initiativeId: options.initiativeId ?? null,
+  });
+  const remoteOverride = initiativeDelivery?.branchPublication.selectedRemote ?? null;
+  const preferConfiguredRemote = Boolean(
+    remoteOverride && remoteOverride !== context.publication.remote,
+  );
   assertSafePublicationBranchTarget({
     publication: context.publication,
     branch: options.branch,
@@ -280,6 +301,8 @@ export async function pushNexusPublicationBranchForComponent(
     authProfiles: context.authProfiles,
     baseEnv: options.baseEnv,
     gitRunner: options.gitRunner,
+    remoteOverride,
+    preferConfiguredRemote,
   });
 
   return {
@@ -291,8 +314,39 @@ export async function pushNexusPublicationBranchForComponent(
     targetBranch: options.targetBranch ?? null,
     forceWithLease: options.forceWithLease ?? false,
     forceWithLeaseExpectedCommit: options.forceWithLeaseExpectedCommit ?? null,
+    initiativeDelivery,
     credential: summarizePublicationCredential(credential),
     push,
+  };
+}
+
+function resolveInitiativeBranchPushPolicy(options: {
+  context: NexusPublicationTargetContext;
+  initiativeId: string | null;
+}): NexusPublicationBranchPushInitiativeSummary | null {
+  if (!options.initiativeId) {
+    return null;
+  }
+  if (!options.context.component) {
+    throw new Error("Initiative branch publication requires a component target.");
+  }
+  const plan = buildNexusInitiativeDeliveryPlan({
+    projectRoot: options.context.projectRoot,
+    componentId: options.context.component.id,
+    initiativeId: options.initiativeId,
+  });
+  const item = plan.items[0];
+  if (!item) {
+    throw new Error(`Initiative delivery policy was not found: ${options.initiativeId}`);
+  }
+  if (!item.initiative.branchPublication.selectedRemote) {
+    throw new Error(
+      `Initiative ${options.initiativeId} branch publication is manual-only; no push remote was selected.`,
+    );
+  }
+  return {
+    initiativeId: item.initiative.activeScopeId,
+    branchPublication: item.initiative.branchPublication,
   };
 }
 

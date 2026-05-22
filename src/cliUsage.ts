@@ -313,6 +313,7 @@ export function usage(): string {
     "  --project-repository      target the workspace metadata repository instead of a component",
     "  --branch <branch>         local branch/ref to push through the configured publication actor",
     "  --target-branch <branch>  optional destination branch; target-branch pushes still honor publication policy",
+    "  --initiative <id>         select the initiative branch-publication remote from policy",
     "  --force-with-lease        update an existing review branch only if the remote ref was not changed unexpectedly",
     "  --force-with-lease-expected <sha>  expected remote branch commit for URL-backed push leases",
     "  --repository-path <path>  git checkout to push; defaults to current directory",

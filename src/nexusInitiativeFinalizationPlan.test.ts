@@ -27,6 +27,38 @@ afterEach(() => {
 });
 
 describe("initiative finalization plan", () => {
+  it("recommends creating the final pull request only at the review gate", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      now: "2026-05-22T21:15:00.000Z",
+    });
+
+    expect(plan.nextAction).toBe("create_pull_request");
+    expect(plan.summary).toMatchObject({
+      needsFinalPullRequestCount: 1,
+      needsProviderEvidenceCount: 0,
+    });
+    expect(plan.items[0]).toMatchObject({
+      finalPullRequestCreation: "at_review_gate",
+      reviewReadiness: {
+        status: "needs_final_pull_request",
+        nextAction: "create_pull_request",
+        safeToReview: false,
+        reasons: ["final pull request is created at the review gate"],
+      },
+      publicationReadiness: {
+        status: "needs_final_pull_request",
+        nextAction: "create_pull_request",
+        authorizedToMerge: false,
+      },
+    });
+  });
+
   it("distinguishes safe review from authorized publication", () => {
     const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

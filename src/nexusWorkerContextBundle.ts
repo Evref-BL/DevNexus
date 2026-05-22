@@ -156,6 +156,14 @@ export interface NexusWorkerContextBundleWorktree {
   workItem: NexusWorkerContextBundleWorkItem | null;
 }
 
+export interface NexusWorkerContextInitiativeBranchPublication {
+  strategy: string;
+  publicationRemote: string | null;
+  fallbackRemote: string | null;
+  selectedRemote: string | null;
+  requiresFallbackApproval: boolean;
+}
+
 export interface NexusWorkerContextInitiativeDelivery {
   initiativeId: string;
   sliceSlug: string;
@@ -165,7 +173,9 @@ export interface NexusWorkerContextInitiativeDelivery {
   parentBranch: string | null;
   finalPublicationTarget: string;
   reviewMode: string;
+  finalPullRequestCreation: string;
   providerNoise: string;
+  branchPublication: NexusWorkerContextInitiativeBranchPublication;
   hitlGates: string[];
 }
 
@@ -431,6 +441,14 @@ function renderInitiativeDeliveryLines(
     `Final publication target: ${initiativeDelivery.finalPublicationTarget}`,
     `Integration branch: ${initiativeDelivery.integrationBranch ?? "none"}`,
     `Parent branch: ${initiativeDelivery.parentBranch ?? "none"}`,
+    `Final PR creation: ${initiativeDelivery.finalPullRequestCreation}`,
+    `Branch publication remote: ${
+      initiativeDelivery.branchPublication.selectedRemote ?? "manual"
+    }${
+      initiativeDelivery.branchPublication.fallbackRemote
+        ? ` (fallback: ${initiativeDelivery.branchPublication.fallbackRemote})`
+        : ""
+    }`,
     `Provider output policy: ${initiativeDelivery.providerNoise}`,
     "HITL gates:",
     ...initiativeDelivery.hitlGates.map((gate) => `- ${gate}`),
