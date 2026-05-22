@@ -19,7 +19,7 @@ Everything else is supporting detail.
 | Scope | Purpose | Default contents |
 | --- | --- | --- |
 | Host cockpit | Host-wide situation awareness. | Action queue, workspace health, active threads, plugins, host capability summary. |
-| Workspace cockpit | One workspace in context. | Selected item, work map, workspace HITL queue, components, plugins, events. |
+| Workspace cockpit | One workspace in context. | Selected item, work map, workspace HITL queue, tracked work, components, plugins, events. |
 | Selected item | One thing the user clicked. | Summary, primary action, provider links, evidence, diagnostics. |
 
 The host cockpit is not just a workspace switcher. It is the first screen when
@@ -31,7 +31,7 @@ the user wants to understand the host.
 2. Selected item summary when something is selected.
 3. Action queue.
 4. Parallel work map.
-5. Workspace, thread, component, and plugin lists.
+5. Thread, tracked work, component, and plugin lists.
 6. Diagnostics or raw evidence.
 
 This order keeps human decisions near the top and pushes supporting inventory

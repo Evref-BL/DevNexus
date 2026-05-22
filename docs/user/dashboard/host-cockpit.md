@@ -18,6 +18,7 @@ The page should answer:
 | Signal row | Give a quick status read: workspaces, attention, threads, dirty state, plugins. |
 | Action queue | Rank approvals, blockers, dirty components, stale threads, and workspace load failures. |
 | Workspaces | Show registered workspaces with compact state and drill-down links. |
+| Tracked work | Surface ready provider or local issues without opening diagnostics. |
 | Threads | Surface unfinished chats or branches that need continue, archive, forget, or rescue. |
 | Plugins | Show installed and known DevNexus plugins without burying them in diagnostics. |
 | Diagnostics | Stay on demand; do not compete with the action queue. |

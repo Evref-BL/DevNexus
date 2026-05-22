@@ -76,6 +76,7 @@ async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
   renderPlugins: (plugins: unknown) => string;
+  renderTrackedWork: (snapshot: unknown) => string;
   timelineLanes: (snapshot: unknown) => Array<{
     detail?: string;
     index: number;
@@ -96,7 +97,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderTrackedWork, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -881,6 +882,12 @@ describe("nexus dashboard", () => {
         tone: "warn",
       }),
       hostWorkspace({
+        id: "ready",
+        name: "Ready Workspace",
+        eligibleWorkCount: 2,
+        tone: "active",
+      }),
+      hostWorkspace({
         id: "blocked",
         name: "Blocked Workspace",
         blockerCount: 1,
@@ -903,6 +910,7 @@ describe("nexus dashboard", () => {
       "workspace-error",
       "blocker",
       "approval",
+      "ready-work",
       "thread",
       "dirty",
     ]);
@@ -930,6 +938,15 @@ describe("nexus dashboard", () => {
           id: "host-action:thread:thread",
           reason: "2 threads need action",
           state: "stale threads",
+        }),
+        expect.objectContaining({
+          id: "host-action:ready:ready-work",
+          reason: "2 ready items",
+          primaryAction: {
+            label: "Review work",
+            kind: "start-work",
+            workspaceId: "ready",
+          },
         }),
         expect.objectContaining({
           id: "host-action:dirty:dirty",
@@ -1095,6 +1112,7 @@ describe("nexus dashboard", () => {
         expect.objectContaining({ id: "selected-details", status: "passed" }),
         expect.objectContaining({ id: "action-buttons", status: "passed" }),
         expect.objectContaining({ id: "plugin-cards", status: "passed" }),
+        expect.objectContaining({ id: "tracked-work", status: "passed" }),
         expect.objectContaining({ id: "responsive-layout", status: "passed" }),
       ]),
     );
@@ -1258,6 +1276,50 @@ describe("nexus dashboard", () => {
     expect(html).toContain("M9 2h5v5");
   });
 
+  it("renders tracked work as compact issue cards", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderTrackedWork({
+      trackedWork: {
+        readyCount: 1,
+        importCandidateCount: 1,
+        staleCount: 0,
+        excludedCount: 0,
+        records: [
+          {
+            id: "github-42",
+            title: "Add cockpit issue lane",
+            componentId: "dev-nexus",
+            componentName: "DevNexus",
+            status: "ready",
+            kind: "ready",
+            kindLabel: "ready",
+            detail: "Ready for automation or a human to pick up.",
+            provider: "github",
+            trackerId: "github",
+            updatedAt: "2026-05-21T10:00:00.000Z",
+            actions: [
+              {
+                label: "#42: cockpit issue lane",
+                href: "https://github.com/Evref-BL/DevNexus/issues/42",
+                provider: "github",
+                kind: "issue",
+                title: "cockpit issue lane",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(html).toContain("Issues and Work Items");
+    expect(html).toContain("1 ready · 1 import · 0 stale");
+    expect(html).toContain("Add cockpit issue lane");
+    expect(html).toContain("kind-ready");
+    expect(html).toContain("provider-github kind-issue");
+    expect(html).toContain("#42: cockpit issue lane");
+  });
+
   it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
@@ -1360,6 +1422,23 @@ describe("nexus dashboard", () => {
           provider: "github",
           kind: "issue",
           title: "provider routing",
+        }),
+      ],
+    });
+    expect(snapshot.trackedWork).toMatchObject({
+      totalCount: 1,
+      readyCount: 1,
+      records: [
+        expect.objectContaining({
+          id: item.id,
+          title: "Review #42: provider routing",
+          kind: "ready",
+          actions: [
+            expect.objectContaining({
+              label: "#42: provider routing",
+              href: "https://github.com/Evref-BL/DevNexus/issues/42",
+            }),
+          ],
         }),
       ],
     });

@@ -127,7 +127,8 @@ export type NexusDashboardContractSurfaceId =
   | "actionQueue"
   | "providerActions"
   | "plugins"
-  | "threadActions";
+  | "threadActions"
+  | "trackedWork";
 
 export interface NexusDashboardContractSurface {
   field: string;
@@ -358,6 +359,38 @@ export interface NexusDashboardPluginSummary {
   records: NexusDashboardPluginRecord[];
 }
 
+export type NexusDashboardTrackedWorkKind =
+  | "ready"
+  | "import-candidate"
+  | "stale"
+  | "excluded";
+
+export interface NexusDashboardTrackedWorkItem {
+  id: string;
+  logicalItemId: string | null;
+  componentId: string;
+  componentName: string;
+  title: string;
+  status: string;
+  kind: NexusDashboardTrackedWorkKind;
+  kindLabel: string;
+  detail: string;
+  provider: string | null;
+  trackerId: string | null;
+  updatedAt: string | null;
+  webUrl: string | null;
+  actions: NexusDashboardProviderAction[];
+}
+
+export interface NexusDashboardTrackedWorkSummary {
+  totalCount: number;
+  readyCount: number;
+  importCandidateCount: number;
+  staleCount: number;
+  excludedCount: number;
+  records: NexusDashboardTrackedWorkItem[];
+}
+
 export interface NexusDashboardEvent {
   id: string;
   time: string;
@@ -419,6 +452,7 @@ export interface NexusDashboardSnapshot {
   worktrees: NexusDashboardWorktreeSummary;
   threads: NexusDashboardThreadSummary;
   plugins: NexusDashboardPluginSummary;
+  trackedWork: NexusDashboardTrackedWorkSummary;
   publication: NexusDashboardPublicationSummary[];
   authority: NexusDashboardAuthoritySummary | null;
   blockers: string[];
@@ -470,11 +504,12 @@ export type NexusDashboardHostActionKind =
   | "approval"
   | "blocker"
   | "thread"
-  | "dirty";
+  | "dirty"
+  | "ready-work";
 
 export interface NexusDashboardHostPrimaryAction {
   label: string;
-  kind: "open-workspace" | "review" | "rescue";
+  kind: "open-workspace" | "review" | "rescue" | "start-work";
   workspaceId: string;
 }
 
@@ -567,6 +602,7 @@ export async function buildNexusDashboardSnapshot(
     cleanupPlan.value?.candidates ?? [],
     runs,
   );
+  const trackedWork = summarizeTrackedWork(eligibleWork.value, providerUrls);
   const publication = summarizePublication(automation.value);
   const authority = summarizeAuthority(
     automation.value?.authority ?? targetReport.value?.authority ?? null,
@@ -621,6 +657,7 @@ export async function buildNexusDashboardSnapshot(
     worktrees,
     threads,
     plugins,
+    trackedWork,
     publication,
     authority,
     blockers,
@@ -769,6 +806,15 @@ export function nexusDashboardEmbeddingContract(options: {
         owner: "assistant-provider",
         defaultPayload: true,
         action: "start-chat",
+      },
+      trackedWork: {
+        field: options.scope === "host"
+          ? "workspaces[].eligibleWorkCount"
+          : "trackedWork",
+        endpoint: options.scope === "host" ? "/api/host" : dashboardEndpoint,
+        owner: "dev-nexus",
+        defaultPayload: true,
+        action: "read",
       },
     },
     diagnostics: {
@@ -966,6 +1012,7 @@ async function dashboardHostWorkspaceRecord(options: {
       dirtyComponentCount: value.dirtyComponentCount,
       needsDecisionCount: value.threads.needsDecisionCount,
       threadCount: value.threads.totalCount,
+      eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
       hasError: false,
     }),
     componentCount: value.componentSummaries.length,
@@ -1020,6 +1067,7 @@ function dashboardHostWorkspaceTone(options: {
   dirtyComponentCount: number;
   needsDecisionCount: number;
   threadCount: number;
+  eligibleWorkCount: number | null;
   hasError: boolean;
 }): NexusDashboardSignalTone {
   if (
@@ -1032,7 +1080,11 @@ function dashboardHostWorkspaceTone(options: {
   if (options.needsDecisionCount > 0 || options.dirtyComponentCount > 0) {
     return "warn";
   }
-  if (options.threadCount > 0 || options.automationStatus === "ready") {
+  if (
+    options.threadCount > 0 ||
+    options.automationStatus === "ready" ||
+    (options.eligibleWorkCount ?? 0) > 0
+  ) {
     return "active";
   }
   return "good";
@@ -1077,7 +1129,11 @@ function dashboardHostActionItems(
       updatedAt: workspace.updatedAt ?? workspace.generatedAt,
       primaryAction: {
         label,
-        kind: kind === "dirty" ? "rescue" : "review",
+        kind: kind === "dirty"
+          ? "rescue"
+          : kind === "ready-work"
+            ? "start-work"
+            : "review",
         workspaceId: workspace.id,
       },
       providerAction: null,
@@ -1125,6 +1181,16 @@ function dashboardHostActionItems(
       "Review threads",
     );
   }
+  if (workspace.eligibleWorkCount && workspace.eligibleWorkCount > 0) {
+    add(
+      "ready-work",
+      `${workspace.eligibleWorkCount} ready ${plural(workspace.eligibleWorkCount, "item", "items")}`,
+      "Tracked work is ready for automation or a human to pick up.",
+      "ready",
+      "active",
+      "Review work",
+    );
+  }
   if (workspace.dirtyComponentCount > 0) {
     add(
       "dirty",
@@ -1157,6 +1223,8 @@ function dashboardHostActionScore(item: NexusDashboardHostActionItem): number {
       return 90;
     case "approval":
       return 80;
+    case "ready-work":
+      return 70;
     case "thread":
       return 60;
     case "dirty":
@@ -2530,6 +2598,143 @@ function cycleActionText(cycle: NexusAutomationTargetCycleRecord): string {
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function summarizeTrackedWork(
+  summary: NexusEligibleWorkSummary | null,
+  providerUrls: NexusDashboardProviderUrls,
+): NexusDashboardTrackedWorkSummary {
+  const records: NexusDashboardTrackedWorkItem[] = [];
+  for (const component of summary?.components ?? []) {
+    for (const item of component.workItems) {
+      records.push(trackedWorkItem({
+        item,
+        component,
+        kind: "ready",
+        kindLabel: "ready",
+        detail: item.importOnly
+          ? "Ready to import before automation can select it."
+          : "Ready for automation or a human to pick up.",
+        providerUrls,
+      }));
+    }
+    for (const item of component.importCandidateWorkItems) {
+      records.push(trackedWorkItem({
+        item,
+        component,
+        kind: "import-candidate",
+        kindLabel: "import",
+        detail: "Provider work can be linked or imported into this workspace.",
+        providerUrls,
+      }));
+    }
+    for (const item of component.staleInProgressWorkItems) {
+      records.push(trackedWorkItem({
+        item,
+        component,
+        kind: "stale",
+        kindLabel: "stale",
+        detail: "In progress, but no recent cycle has advanced it.",
+        providerUrls,
+      }));
+    }
+    for (const item of component.excludedWorkItems) {
+      records.push(trackedWorkItem({
+        item,
+        component,
+        kind: "excluded",
+        kindLabel: "hidden",
+        detail: item.reasons.length > 0
+          ? item.reasons.slice(0, 2).join(", ")
+          : "Visible to the tracker, but not selectable right now.",
+        providerUrls,
+      }));
+    }
+  }
+  records.sort(compareTrackedWorkItems);
+  return {
+    totalCount:
+      (summary?.eligibleWorkItemCount ?? 0) +
+      (summary?.importCandidateWorkItemCount ?? 0) +
+      (summary?.staleInProgressWorkItemCount ?? 0) +
+      (summary?.excludedWorkItemCount ?? 0),
+    readyCount: summary?.eligibleWorkItemCount ?? 0,
+    importCandidateCount: summary?.importCandidateWorkItemCount ?? 0,
+    staleCount: summary?.staleInProgressWorkItemCount ?? 0,
+    excludedCount: summary?.excludedWorkItemCount ?? 0,
+    records: records.slice(0, 30),
+  };
+}
+
+function trackedWorkItem(options: {
+  item:
+    | NexusEligibleWorkSummary["components"][number]["workItems"][number]
+    | NexusEligibleWorkSummary["components"][number]["excludedWorkItems"][number];
+  component: NexusEligibleWorkSummary["components"][number];
+  kind: NexusDashboardTrackedWorkKind;
+  kindLabel: string;
+  detail: string;
+  providerUrls: NexusDashboardProviderUrls;
+}): NexusDashboardTrackedWorkItem {
+  const item = options.item;
+  const trackerRef =
+    "sourceTrackerRef" in item && item.sourceTrackerRef
+      ? item.sourceTrackerRef
+      : "canonicalTrackerRef" in item && item.canonicalTrackerRef
+        ? item.canonicalTrackerRef
+        : "trackerRef" in item
+          ? item.trackerRef
+          : null;
+  const actions = uniqueProviderActions([
+    ...providerActionsForHref(item.webUrl),
+    ...providerActionsFromText(
+      `${item.id} ${"logicalItemId" in item ? item.logicalItemId ?? "" : ""} ${item.title}`,
+      options.providerUrls,
+      options.component.componentId,
+    ),
+  ]);
+  return {
+    id: item.id,
+    logicalItemId: "logicalItemId" in item ? item.logicalItemId : item.id,
+    componentId: options.component.componentId,
+    componentName: options.component.componentName,
+    title: item.title,
+    status: item.status,
+    kind: options.kind,
+    kindLabel: options.kindLabel,
+    detail: options.detail,
+    provider: trackerRef?.provider ?? null,
+    trackerId: trackerRef?.trackerId ?? null,
+    updatedAt: item.updatedAt,
+    webUrl: item.webUrl,
+    actions,
+  };
+}
+
+function compareTrackedWorkItems(
+  left: NexusDashboardTrackedWorkItem,
+  right: NexusDashboardTrackedWorkItem,
+): number {
+  return trackedWorkScore(right) - trackedWorkScore(left) ||
+    (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") ||
+    left.componentName.localeCompare(right.componentName) ||
+    left.title.localeCompare(right.title);
+}
+
+function trackedWorkScore(item: NexusDashboardTrackedWorkItem): number {
+  if (item.status === "blocked") {
+    return 95;
+  }
+  switch (item.kind) {
+    case "ready":
+      return 90;
+    case "import-candidate":
+      return 70;
+    case "stale":
+      return 60;
+    case "excluded":
+      return 20;
+  }
 }
 
 function buildDashboardEvents(options: {

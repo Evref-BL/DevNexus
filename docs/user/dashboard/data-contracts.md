@@ -40,6 +40,7 @@ surfaces:
 | Provider actions | `actionQueue[].providerAction` | `actions` on events, threads, and weave nodes |
 | Plugins | `workspaces[].pluginCount` | `plugins` |
 | Thread actions | `workspaces[].needsDecisionCount` | `threads.records` |
+| Tracked work | `workspaces[].eligibleWorkCount` | `trackedWork` |
 
 ## Host Payload
 
@@ -54,6 +55,10 @@ Each host action has:
 - compact detail text
 - primary action
 - optional provider action
+
+Ready tracked work appears as `ready-work` host actions. Workspace payloads also
+include a `trackedWork` summary with compact records for ready, importable,
+stale, and hidden work items.
 
 The queue is read-only guidance. Provider writes, cleanup, archive, forget, and
 assistant actions still need their own explicit action contract.
