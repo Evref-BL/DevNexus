@@ -162,6 +162,34 @@ reference only the auth profile id and a host-local command or environment key.
 GitHub limits user-to-server tokens to the intersection of the user's access,
 the App installation's repository access, and the App's granted permissions.
 
+A `github_app_user_token` profile should normally use a host-local helper
+command. The helper owns the OAuth/device-flow state and prints a short-lived
+token response for the requested repository. DevNexus passes placeholders such
+as `{repository.owner}` and `{repository.name}` to the command and accepts
+either plain token output or JSON:
+
+```json
+{
+  "accessToken": "redacted",
+  "expiresAt": "2026-05-21T13:00:00.000Z",
+  "login": "alice",
+  "actorId": "alice",
+  "permissions": {
+    "contents": "write",
+    "issues": "write",
+    "pull_requests": "write"
+  }
+}
+```
+
+`accessToken`, `token`, or `value` provide the bearer token. `expiresAt` lets
+DevNexus reject expired helper output. `login`, `providerIdentity`, `account`,
+or `user` let DevNexus confirm the token belongs to the expected human actor.
+`permissions` lets DevNexus check the App/user intersection before a write.
+When authorization is missing, refresh fails, the App is not installed, the
+repository is not selected, or permissions are insufficient, the helper should
+exit non-zero with a concise message and no token.
+
 `gh` can still be useful. A user may keep using `gh` for manual GitHub actions,
 and a DevNexus adapter may use `gh` as one backend. Workspace workflows should
 depend on the DevNexus provider facade and auth profile id, not on hard-coded
