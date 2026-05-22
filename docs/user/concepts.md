@@ -21,6 +21,16 @@ The workspace root contains:
 
 One DevNexus workspace can coordinate one component or many components.
 
+Two workspace layouts are first-class:
+
+- **Embedded project layout:** the DevNexus workspace root is also the primary
+  component source root. Use this where DevNexus context belongs with the
+  primary project, like build-tool or editor configuration. Embedded workspaces
+  can still coordinate additional related components.
+- **Coordination workspace layout:** the DevNexus workspace root is separate
+  from its components. Use this when one agent workspace should coordinate
+  several repositories, documents, datasets, or support folders.
+
 ## Component
 
 A component is something the workspace works on. Common components are Git
@@ -51,10 +61,12 @@ Most users should let DevNexus use the default home.
 ## Runtime State
 
 DevNexus also records host-local runtime facts that should not dirty the
-workspace checkout. Worktree leases are in this category: they are advisory
-ownership hints for active branches and generated worktrees, not durable project
-history. When the workspace is a Git repository, DevNexus stores worktree lease
-state under Git metadata. It can still read the old tracked
+workspace checkout. Runtime tool installs, host setup reports, worktree leases,
+automation ledgers, and local tracker stores are in this category. When the
+workspace is a Git repository, the scaffold adds these paths to Git exclude
+metadata. Worktree leases are advisory ownership hints for active branches and
+generated worktrees, not durable project history. DevNexus stores new lease
+state under Git metadata and can still read the old
 `.dev-nexus/worktree-leases.json` file for migration compatibility.
 
 ## Work Item

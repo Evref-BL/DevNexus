@@ -96,6 +96,23 @@ function initGitRepository(cwd: string) {
   );
 }
 
+function commitAll(cwd: string, message = "initial commit") {
+  childProcess.execFileSync("git", ["add", "."], { cwd });
+  childProcess.execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=DevNexus Test",
+      "-c",
+      "user.email=dev-nexus-test@example.invalid",
+      "commit",
+      "-m",
+      message,
+    ],
+    { cwd },
+  );
+}
+
 function createComponentGitCheckout(projectRoot: string) {
   const componentRoot = path.join(projectRoot, "components", "DevNexus");
   fs.mkdirSync(componentRoot, { recursive: true });
@@ -1063,6 +1080,104 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("treats embedded workspace setup files as a readiness warning instead of blocking", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+      mcp: {
+        command: "dev-nexus",
+        args: ["mcp-stdio"],
+        agentTargets: [
+          {
+            agent: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+      },
+    });
+    fs.writeFileSync(path.join(projectRoot, "AGENTS.md"), "# Agent Guide\n", "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), projectedDevNexusMcpToml(), "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-source-root",
+        status: "passed",
+        details: expect.objectContaining({
+          sourceRootTopology: expect.objectContaining({
+            layout: "embedded",
+            state: "present",
+          }),
+        }),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "warning",
+        summary: expect.stringContaining("only DevNexus setup files"),
+      }),
+    );
+  });
+
+  it("still blocks embedded workspace readiness when product files are dirty", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-dirty-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+    });
+    fs.writeFileSync(path.join(projectRoot, "src", "local-change.txt"), "dirty\n", "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "blocked",
+        summary: expect.stringContaining("dirty local changes"),
+      }),
+    );
+  });
+
   it("uses workspace-local componentsRoot source roots in setup commands", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-components-root-");
     writeProject(projectRoot, {
@@ -1700,6 +1815,137 @@ describe("nexus setup assistant", () => {
       expect.objectContaining({
         id: "plugin-example-runtime-plugin-mcp-example_runtime-codex",
         status: "passed",
+      }),
+    );
+  });
+
+  it("shows effective exposure for agent and plugin MCP setup checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-mcp-exposure-");
+    writeProject(projectRoot, {
+      mcp: {
+        exposure: "hidden",
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "example-runtime-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "mcp-direct-runtime",
+              serverName: "direct_runtime",
+              command: "node",
+              args: ["direct-server.js"],
+              exposure: "direct",
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-gateway-runtime",
+              serverName: "gateway_runtime",
+              command: "node",
+              args: ["gateway-server.js"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-hidden-runtime",
+              serverName: "hidden_runtime",
+              command: "node",
+              args: ["hidden-server.js"],
+              exposure: "hidden",
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const checks = refreshStep.checks.join("\n");
+    expect(refreshStep.checks).toContain("test -f .codex/config.toml");
+    expect(checks).toContain("direct_runtime");
+    expect(checks).not.toContain("gateway_runtime");
+    expect(checks).not.toContain("hidden_runtime");
+
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    createComponentGitCheckout(projectRoot);
+
+    const setupCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-config-codex",
+        status: "warning",
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=workspace"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "workspace",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus_gateway",
+        status: "warning",
+        summary: expect.stringContaining("cannot confirm dev_nexus_gateway is configured"),
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-direct_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("exposure=direct source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "direct",
+            source: "server",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-gateway_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("planned for DevNexus gateway registration"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "gateway",
+            source: "plugin",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-hidden_runtime-codex",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "server",
+          }),
+        },
       }),
     );
   });

@@ -704,6 +704,90 @@ describe("workspace config", () => {
     ]);
   });
 
+  it("validates MCP exposure policy at workspace, agent, plugin, and server levels", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "mcp-exposure-project",
+      name: "MCP Exposure Project",
+      agentTargets: {
+        active: [
+          {
+            provider: "codex",
+            mcp: {
+              exposure: "gateway",
+            },
+          },
+        ],
+      },
+      mcp: {
+        exposure: "direct",
+        agentTargets: [
+          {
+            agent: "claude",
+            exposure: "hidden",
+          },
+        ],
+      },
+      plugins: [
+        {
+          id: "workflow-plugin",
+          mcpExposure: "inherit",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "workflow-mcp",
+              serverName: "workflow_mcp",
+              exposure: "gateway",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(config.mcp?.exposure).toBe("direct");
+    expect(config.agentTargets?.active[0]?.mcp?.exposure).toBe("gateway");
+    expect(config.mcp?.agentTargets?.[0]?.exposure).toBe("hidden");
+    expect(config.plugins?.[0]?.mcpExposure).toBe("inherit");
+    expect(config.plugins?.[0]?.capabilities[0]).toMatchObject({
+      kind: "mcp_server",
+      exposure: "gateway",
+    });
+  });
+
+  it("rejects unknown MCP exposure modes with config paths", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-exposure",
+        name: "Bad Exposure",
+        mcp: {
+          exposure: "public",
+        },
+      }),
+    ).toThrow(/workspace config\.mcp\.exposure must be direct, gateway, hidden, or inherit/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-plugin-exposure",
+        name: "Bad Plugin Exposure",
+        plugins: [
+          {
+            id: "bad-plugin",
+            capabilities: [
+              {
+                kind: "mcp_server",
+                id: "bad-server",
+                serverName: "bad_server",
+                exposure: "public",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/workspace config\.plugins\[0\]\.capabilities\[0\]\.exposure must be direct, gateway, hidden, or inherit/);
+  });
+
   it("normalizes legacy MCP and skill targets into compatibility policy", () => {
     const config = validateProjectConfig({
       version: 1,

@@ -29,6 +29,7 @@ export interface DevNexusCliDependencies {
   hostingProvider?: NexusProjectHostingProviderAdapter;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   now?: () => Date | string;
+  sleep?: (milliseconds: number) => Promise<void>;
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;

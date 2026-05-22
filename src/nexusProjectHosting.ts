@@ -101,7 +101,7 @@ export interface NexusHostingGitHubAppCredentialConfig {
   appId?: string;
   clientId?: string;
   slug?: string;
-  privateKeyPath: string;
+  privateKeyPath?: string;
   installationAccount?: string;
   repositories?: string[];
   apiBaseUrl?: string;

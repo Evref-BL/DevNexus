@@ -348,4 +348,104 @@ describe("nexus agent MCP config", () => {
       },
     });
   });
+
+  it("omits hidden and pending gateway MCP targets from generated config", () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    initGitInfo(projectRoot);
+    const codexConfigPath = path.join(projectRoot, ".codex", "config.toml");
+    const claudeConfigPath = path.join(projectRoot, ".mcp.json");
+    const opencodeConfigPath = path.join(projectRoot, "opencode.json");
+    fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
+    fs.writeFileSync(
+      codexConfigPath,
+      [
+        "[mcp_servers.other]",
+        'command = "other-tool"',
+        "",
+        "[mcp_servers.dev_nexus]",
+        'command = "old-dev-nexus"',
+        'args = ["mcp-stdio"]',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.writeFileSync(
+      opencodeConfigPath,
+      `${JSON.stringify({
+        mcp: {
+          other: {
+            type: "local",
+            command: ["other-tool"],
+          },
+          dev_nexus: {
+            type: "local",
+            command: ["old-dev-nexus", "mcp-stdio"],
+          },
+        },
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const result = materializeNexusProjectAgentMcpConfig({
+      projectRoot,
+      platform: "linux",
+      mcpConfig: {
+        exposure: "hidden",
+        agentTargets: [
+          { agent: "codex" },
+          { agent: "claude", exposure: "direct" },
+          { agent: "opencode", exposure: "gateway" },
+        ],
+      },
+    });
+
+    expect(result.agentTargets).toMatchObject([
+      {
+        agent: "codex",
+        configStatus: "hidden",
+        effectiveExposure: "hidden",
+        exposureSource: "workspace",
+      },
+      {
+        agent: "claude",
+        configStatus: "materialized",
+        effectiveExposure: "direct",
+        exposureSource: "agent_target",
+      },
+      {
+        agent: "opencode",
+        configStatus: "gateway_pending",
+        effectiveExposure: "gateway",
+        exposureSource: "agent_target",
+      },
+    ]);
+    expect(result.capabilityGaps).toMatchObject([
+      {
+        agent: "opencode",
+        provider: "opencode",
+        id: "mcp-gateway-projection-pending",
+        severity: "warning",
+      },
+    ]);
+    const codexConfig = fs.readFileSync(codexConfigPath, "utf8");
+    expect(codexConfig).toContain("[mcp_servers.other]");
+    expect(codexConfig).not.toContain("[mcp_servers.dev_nexus]");
+    const claudeConfig = JSON.parse(fs.readFileSync(claudeConfigPath, "utf8"));
+    expect(claudeConfig.mcpServers.dev_nexus).toEqual({
+      command: "node",
+      args: [currentNexusCliScriptPath(), "mcp-stdio"],
+    });
+    const opencodeConfig = JSON.parse(fs.readFileSync(opencodeConfigPath, "utf8"));
+    expect(opencodeConfig.mcp.other).toMatchObject({
+      type: "local",
+      command: ["other-tool"],
+    });
+    expect(opencodeConfig.mcp.dev_nexus).toBeUndefined();
+    expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
+      .toContain(".mcp.json");
+    expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
+      .not.toContain(".codex/config.toml");
+    expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
+      .not.toContain("opencode.json");
+  });
 });

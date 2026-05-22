@@ -668,14 +668,7 @@ export function loadNexusPublicationAuthProfiles(options: {
   projectConfig: NexusProjectConfig;
   homePath?: string;
 }): NexusHostingAuthProfileConfig[] {
-  const homePath = options.homePath
-    ? path.resolve(options.homePath)
-    : options.projectConfig.home
-      ? resolveNexusProjectPath({
-          projectRoot: options.projectRoot,
-          value: options.projectConfig.home,
-        })
-      : defaultNexusHomePath();
+  const homePath = resolveNexusPublicationHomePath(options);
   try {
     return loadNexusHomeConfigFile(
       homePath,
@@ -684,6 +677,21 @@ export function loadNexusPublicationAuthProfiles(options: {
   } catch {
     return [];
   }
+}
+
+export function resolveNexusPublicationHomePath(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): string {
+  return options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
 }
 
 function greenMainPublicationStatus(options: {

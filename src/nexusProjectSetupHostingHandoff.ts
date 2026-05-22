@@ -26,7 +26,7 @@ export function buildNexusProjectSetupHostingHandoff(
       metaProjectOnly: true,
       componentRepositoryHosting: "not_configured_by_project_setup",
       summary:
-        "Workspace repository hosting intent is not configured; workspace setup will only write local DevNexus files.",
+        "Workspace repository hosting intent is not configured; workspace init will only write local DevNexus files.",
       commands: [],
       missingAuthProfileIds: [],
       providerMutationsDeferred: true,
