@@ -379,7 +379,6 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("dev-nexus mcp-stdio");
     expect(output.output()).toContain("dev-nexus workspace status");
     expect(output.output()).toContain("dev-nexus workspace init");
-    expect(output.output()).toContain("dev-nexus workspace setup");
     expect(output.output()).toContain("dev-nexus workspace component add");
     expect(output.output()).toContain("dev-nexus workspace hosting status");
     expect(output.output()).toContain("dev-nexus workspace hosting plan");
@@ -421,19 +420,7 @@ describe("dev-nexus cli", () => {
     expect(output.output()).toContain("--dry-run");
     expect(output.output()).toContain("--json");
     expect(output.output()).not.toContain("--yes");
-    expect(output.output()).toContain("Provider mutations are not part of workspace setup.");
-  });
-
-  it("keeps workspace setup as an alias for workspace init", async () => {
-    const output = captureOutput();
-
-    await expect(
-      main(["workspace", "setup", "--help"], { stdout: output.writer }),
-    ).resolves.toBe(0);
-
-    expect(output.output()).toContain("dev-nexus workspace init");
-    expect(output.output()).toContain("Alias:");
-    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("Provider mutations are not part of workspace init.");
   });
 
   it("prints focused workspace component add help", async () => {
@@ -458,7 +445,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["workspace", "setup", "--bad-option", "--json"], {
+      main(["workspace", "init", "--bad-option", "--json"], {
         stdout: output.writer,
       }),
     ).resolves.toBe(1);
@@ -467,19 +454,9 @@ describe("dev-nexus cli", () => {
       ok: false,
       error: {
         code: "cli_error",
-        message: "Unknown workspace setup option: --bad-option",
+        message: "Unknown workspace init option: --bad-option",
       },
     });
-  });
-
-  it("keeps project as a compatibility alias for workspace commands", async () => {
-    const output = captureOutput();
-
-    await expect(
-      main(["project", "setup", "--help"], { stdout: output.writer }),
-    ).resolves.toBe(0);
-
-    expect(output.output()).toContain("dev-nexus workspace init");
   });
 
   it("refreshes a local project plugin and materializes skills and MCP config", async () => {
@@ -565,7 +542,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "plugin",
           "refresh",
           projectRoot,
@@ -1663,7 +1640,7 @@ describe("dev-nexus cli", () => {
           "--expected-command",
           "dev-nexus workspace status <workspace-id-or-root>",
           "--expected-command",
-          "dev-nexus workspace setup <workspace-root> --answers <answers.json>",
+          "dev-nexus workspace init <workspace-root> --answers <answers.json>",
           "--package-version",
           "0.1.0-alpha.10",
           "--json",
@@ -1678,7 +1655,7 @@ describe("dev-nexus cli", () => {
       diagnostic: {
         status: "skew_detected",
         installedPackageVersion: "0.1.0-alpha.10",
-        missingDocumentedCommands: ["dev-nexus workspace setup"],
+        missingDocumentedCommands: ["dev-nexus workspace init"],
         remediation: {
           action: "upgrade_npm_package",
         },
@@ -1704,7 +1681,7 @@ describe("dev-nexus cli", () => {
           "--installed-help-file",
           olderHelpPath,
           "--expected-command",
-          "dev-nexus workspace setup <workspace-root>",
+          "dev-nexus workspace init <workspace-root>",
         ],
         { stdout: output.writer },
       ),
@@ -1712,7 +1689,7 @@ describe("dev-nexus cli", () => {
 
     expect(output.output()).toContain("DevNexus CLI version skew: skew_detected.");
     expect(output.output()).toContain("Missing documented commands:");
-    expect(output.output()).toContain("dev-nexus workspace setup");
+    expect(output.output()).toContain("dev-nexus workspace init");
     expect(output.output()).toContain("Remediation:");
   });
 
@@ -1814,7 +1791,7 @@ describe("dev-nexus cli", () => {
 
     const statusOutput = captureOutput();
     await expect(
-      main(["project", "hosting", "status", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "status", projectRoot, "--home", homePath, "--json"], {
         stdout: statusOutput.writer,
         gitRunner,
       }),
@@ -1844,7 +1821,7 @@ describe("dev-nexus cli", () => {
 
     const planOutput = captureOutput();
     await expect(
-      main(["project", "hosting", "plan", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "plan", projectRoot, "--home", homePath, "--json"], {
         stdout: planOutput.writer,
         gitRunner,
       }),
@@ -1932,7 +1909,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "hosting", "apply", projectRoot, "--json"], {
+      main(["workspace", "hosting", "apply", projectRoot, "--json"], {
         stdout: output.writer,
         gitRunner,
       }),
@@ -2048,7 +2025,7 @@ describe("dev-nexus cli", () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "hosting", "apply", projectRoot, "--home", homePath, "--json"], {
+      main(["workspace", "hosting", "apply", projectRoot, "--home", homePath, "--json"], {
         stdout: output.writer,
         hostingProvider,
       }),
@@ -2457,11 +2434,11 @@ describe("dev-nexus cli", () => {
     );
   });
 
-  it("reports required workspace setup answers in non-interactive JSON mode", async () => {
+  it("reports required workspace init answers in non-interactive JSON mode", async () => {
     const output = captureOutput();
 
     await expect(
-      main(["project", "setup", "--json"], { stdout: output.writer }),
+      main(["workspace", "init", "--json"], { stdout: output.writer }),
     ).resolves.toBe(2);
 
     expect(JSON.parse(output.output())).toMatchObject({
@@ -2475,7 +2452,7 @@ describe("dev-nexus cli", () => {
     expect(JSON.parse(output.output()).requiredAnswers).not.toContain("home.path");
   });
 
-  it("defaults workspace setup home when answers omit home path", async () => {
+  it("defaults workspace init home when answers omit home path", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-default-home-");
     const defaultHomePath = path.join(makeTempDir("dev-nexus-default-home-"), "home");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -2507,8 +2484,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2534,8 +2511,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2555,7 +2532,7 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
-  it("previews and applies workspace setup from an answer file without provider mutations", async () => {
+  it("previews and applies workspace init from an answer file without provider mutations", async () => {
     const projectRoot = makeTempDir("dev-nexus-project-setup-");
     const homePath = makeTempDir("dev-nexus-project-setup-home-");
     const componentRoot = path.join(projectRoot, "components", "core");
@@ -2652,8 +2629,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2710,8 +2687,8 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
-          "setup",
+          "workspace",
+          "init",
           projectRoot,
           "--answers",
           answersPath,
@@ -2825,6 +2802,82 @@ describe("dev-nexus cli", () => {
     ]);
   });
 
+  it("previews and applies an embedded workspace whose primary component is the workspace root", async () => {
+    const projectRoot = makeTempDir("dev-nexus-embedded-project-setup-");
+    const homePath = makeTempDir("dev-nexus-embedded-project-setup-home-");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    const answersPath = path.join(projectRoot, "answers.json");
+    fs.writeFileSync(
+      answersPath,
+      `${JSON.stringify({
+        home: {
+          path: homePath,
+        },
+        project: {
+          id: "embedded-demo",
+          name: "Embedded Demo",
+          root: projectRoot,
+          initializeGit: false,
+          defaultBranch: "main",
+        },
+        components: [
+          {
+            id: "embedded-demo",
+            name: "Embedded Demo",
+            role: "primary",
+            source: {
+              kind: "reference_existing",
+              path: ".",
+              defaultBranch: "main",
+            },
+          },
+        ],
+        agentTargets: [
+          {
+            provider: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+        localWorkTracking: {
+          enabled: true,
+          provider: "local",
+        },
+      }, null, 2)}\n`,
+    );
+
+    const applyOutput = captureOutput();
+    await expect(
+      main(
+        [
+          "workspace",
+          "init",
+          projectRoot,
+          "--answers",
+          answersPath,
+          "--json",
+        ],
+        { stdout: applyOutput.writer },
+      ),
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(applyOutput.output())).toMatchObject({
+      ok: true,
+      applied: true,
+      projectRoot,
+    });
+    expect(loadProjectConfig(projectRoot)).toMatchObject({
+      id: "embedded-demo",
+      components: [
+        expect.objectContaining({
+          id: "embedded-demo",
+          sourceRoot: ".",
+          defaultWorkTrackerId: "local",
+        }),
+      ],
+    });
+  });
+
   it("previews and applies component add from an answer file", async () => {
     const projectRoot = makeTempDir("dev-nexus-component-add-");
     const homePath = makeTempDir("dev-nexus-component-add-home-");
@@ -2890,8 +2943,8 @@ describe("dev-nexus cli", () => {
     const setupOutput = captureOutput();
     await expect(
       main([
-        "project",
-        "setup",
+        "workspace",
+        "init",
         projectRoot,
         "--answers",
         setupAnswersPath,
@@ -2903,7 +2956,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "component",
           "add",
           projectRoot,
@@ -2929,7 +2982,7 @@ describe("dev-nexus cli", () => {
     await expect(
       main(
         [
-          "project",
+          "workspace",
           "component",
           "add",
           projectRoot,
@@ -2979,22 +3032,22 @@ describe("dev-nexus cli", () => {
         stdout: initOutput.writer,
       },
     );
-    await main(["project", "create", "HomeTool", "--home", homePath, "--json"], {
+    await main(["workspace", "create", "HomeTool", "--home", homePath, "--json"], {
       stdout: createOutput.writer,
       projectGitRunner: fakeProjectGitRunner(gitCalls),
     });
-    await main(["project", "list", "--home", homePath, "--json"], {
+    await main(["workspace", "list", "--home", homePath, "--json"], {
       stdout: listOutput.writer,
     });
 
     const created = JSON.parse(createOutput.output());
     await main(
-      ["project", "status", "home-tool", "--home", homePath, "--json"],
+      ["workspace", "status", "home-tool", "--home", homePath, "--json"],
       {
         stdout: registryStatusOutput.writer,
       },
     );
-    await main(["project", "status", created.projectRoot, "--json"], {
+    await main(["workspace", "status", created.projectRoot, "--json"], {
       stdout: pathStatusOutput.writer,
     });
 
@@ -3049,7 +3102,7 @@ describe("dev-nexus cli", () => {
     });
     await main(
       [
-        "project",
+        "workspace",
         "import",
         sourceRoot,
         "--home",
@@ -3068,7 +3121,7 @@ describe("dev-nexus cli", () => {
     );
     await main(
       [
-        "project",
+        "workspace",
         "tracker",
         "configure",
         "imported",
@@ -3086,7 +3139,7 @@ describe("dev-nexus cli", () => {
     );
     await main(
       [
-        "project",
+        "workspace",
         "tracker",
         "link",
         "imported",
@@ -5618,7 +5671,7 @@ describe("dev-nexus cli", () => {
 
     await main(
       [
-        "project",
+        "workspace",
         "mcp",
         "refresh",
         projectRoot,
@@ -5692,7 +5745,7 @@ describe("dev-nexus cli", () => {
       },
     }));
 
-    await main(["project", "mcp", "refresh", projectRoot], {
+    await main(["workspace", "mcp", "refresh", projectRoot], {
       stdout: output.writer,
     });
 
@@ -5718,7 +5771,7 @@ describe("dev-nexus cli", () => {
       },
     }));
 
-    await main(["project", "mcp", "refresh", projectRoot, "--agent", "claude"], {
+    await main(["workspace", "mcp", "refresh", projectRoot, "--agent", "claude"], {
       stdout: output.writer,
     });
 
@@ -5760,7 +5813,7 @@ describe("dev-nexus cli", () => {
     const dryRunOutput = captureOutput();
     const applyOutput = captureOutput();
 
-    await main(["project", "agent-projection", "cleanup", projectRoot, "--json"], {
+    await main(["workspace", "agent-projection", "cleanup", projectRoot, "--json"], {
       stdout: dryRunOutput.writer,
     });
 
@@ -5778,7 +5831,7 @@ describe("dev-nexus cli", () => {
     ).toBe(true);
 
     await main(
-      ["project", "agent-projection", "cleanup", projectRoot, "--apply", "--json"],
+      ["workspace", "agent-projection", "cleanup", projectRoot, "--apply", "--json"],
       {
         stdout: applyOutput.writer,
       },

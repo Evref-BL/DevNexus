@@ -49,6 +49,16 @@ describe("nexus source root topology", () => {
 
     expect(classifyNexusComponentSourceRootTopology({
       projectRoot,
+      component: component("."),
+    })).toMatchObject({
+      layout: "embedded",
+      state: "present",
+      configuredBase: "projectRoot",
+      exists: true,
+      insideProjectRoot: true,
+    });
+    expect(classifyNexusComponentSourceRootTopology({
+      projectRoot,
       component: component("componentsRoot:dev-nexus"),
     })).toMatchObject({
       layout: "workspace-local",

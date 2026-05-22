@@ -90,6 +90,23 @@ function initGitRepository(cwd: string) {
   );
 }
 
+function commitAll(cwd: string, message = "initial commit") {
+  childProcess.execFileSync("git", ["add", "."], { cwd });
+  childProcess.execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=DevNexus Test",
+      "-c",
+      "user.email=dev-nexus-test@example.invalid",
+      "commit",
+      "-m",
+      message,
+    ],
+    { cwd },
+  );
+}
+
 function createComponentGitCheckout(projectRoot: string) {
   const componentRoot = path.join(projectRoot, "components", "DevNexus");
   fs.mkdirSync(componentRoot, { recursive: true });
@@ -1008,6 +1025,104 @@ describe("nexus setup assistant", () => {
             insideProjectRoot: false,
           }),
         }),
+      }),
+    );
+  });
+
+  it("treats embedded workspace setup files as a readiness warning instead of blocking", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+      mcp: {
+        command: "dev-nexus",
+        args: ["mcp-stdio"],
+        agentTargets: [
+          {
+            agent: "codex",
+            configPath: ".codex/config.toml",
+          },
+        ],
+      },
+    });
+    fs.writeFileSync(path.join(projectRoot, "AGENTS.md"), "# Agent Guide\n", "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".codex"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, ".codex", "config.toml"), projectedDevNexusMcpToml(), "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-source-root",
+        status: "passed",
+        details: expect.objectContaining({
+          sourceRootTopology: expect.objectContaining({
+            layout: "embedded",
+            state: "present",
+          }),
+        }),
+      }),
+    );
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "warning",
+        summary: expect.stringContaining("only DevNexus setup files"),
+      }),
+    );
+  });
+
+  it("still blocks embedded workspace readiness when product files are dirty", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-embedded-dirty-");
+    fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "src", "app.txt"), "demo\n", "utf8");
+    initGitRepository(projectRoot);
+    commitAll(projectRoot);
+    writeProject(projectRoot, {
+      components: [
+        {
+          id: "demo",
+          name: "Demo",
+          kind: "git",
+          role: "primary",
+          remoteUrl: null,
+          defaultBranch: "main",
+          sourceRoot: ".",
+          relationships: [],
+        },
+      ],
+    });
+    fs.writeFileSync(path.join(projectRoot, "src", "local-change.txt"), "dirty\n", "utf8");
+
+    const check = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+
+    expect(check.checks).toContainEqual(
+      expect.objectContaining({
+        id: "component-demo-dirty-state",
+        status: "blocked",
+        summary: expect.stringContaining("dirty local changes"),
       }),
     );
   });

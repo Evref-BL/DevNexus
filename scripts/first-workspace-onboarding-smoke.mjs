@@ -199,6 +199,8 @@ try {
     `join-existing-project setup check is ${setupCheck.check?.status ?? "unknown"}.`,
   );
 
+  runEmbeddedWorkspaceSmoke({ runtimeRoot, smokeEnv });
+
   const result = {
     ok: true,
     package: {
@@ -213,6 +215,111 @@ try {
   if (!keepTemp) {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function runEmbeddedWorkspaceSmoke({ runtimeRoot, smokeEnv }) {
+  const productRoot = path.join(tempRoot, "workspace", "embedded-service");
+  fs.mkdirSync(path.join(productRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(productRoot, "src", "app.txt"), "demo\n");
+  run("git", ["init", "--initial-branch=main"], {
+    cwd: productRoot,
+    label: "initialize embedded product repo",
+  });
+  run("git", ["add", "src/app.txt"], {
+    cwd: productRoot,
+    label: "stage embedded product source",
+  });
+  run(
+    "git",
+    [
+      "-c",
+      "user.name=DevNexus Smoke",
+      "-c",
+      "user.email=dev-nexus-smoke@example.invalid",
+      "commit",
+      "-m",
+      "Initial product source",
+    ],
+    {
+      cwd: productRoot,
+      label: "commit embedded product source",
+    },
+  );
+
+  const embeddedAnswersPath = path.join(tempRoot, "embedded.setup.json");
+  writeJsonFile(embeddedAnswersPath, {
+    project: {
+      id: "embedded-service",
+      name: "Embedded Service",
+      root: productRoot,
+      initializeGit: false,
+      defaultBranch: "main",
+    },
+    components: [
+      {
+        id: "embedded-service",
+        name: "Embedded Service",
+        role: "primary",
+        source: {
+          kind: "reference_existing",
+          path: ".",
+          defaultBranch: "main",
+        },
+      },
+    ],
+    agentTargets: [
+      {
+        provider: "codex",
+        configPath: ".codex/config.toml",
+      },
+    ],
+    localWorkTracking: {
+      enabled: true,
+      provider: "local",
+    },
+  });
+
+  const applied = parseJson(
+    runDevNexus(
+      runtimeRoot,
+      ["workspace", "init", productRoot, "--answers", embeddedAnswersPath, "--json"],
+      smokeEnv,
+    ).stdout,
+    "embedded workspace init apply JSON output",
+  );
+  assertEqual(applied.ok, true, "embedded workspace init should succeed");
+  assertEqual(applied.applied, true, "embedded workspace init should apply writes");
+
+  const embeddedConfig = readJson(path.join(productRoot, "dev-nexus.project.json"));
+  assertEqual(
+    embeddedConfig.components?.[0]?.sourceRoot,
+    ".",
+    "embedded workspace primary component sourceRoot should remain project-relative",
+  );
+
+  const setupCheck = parseJson(
+    runDevNexus(
+      runtimeRoot,
+      ["setup", "check", productRoot, "join-existing-project", "--json"],
+      smokeEnv,
+    ).stdout,
+    "embedded setup check JSON output",
+  );
+  assertEqual(setupCheck.ok, true, "embedded setup check command should succeed");
+  if (setupCheck.check?.status === "blocked") {
+    throw new Error(
+      `embedded setup check is blocked: ${JSON.stringify(setupCheck.check.nextActions ?? [], null, 2)}`,
+    );
+  }
+  const sourceRootCheck = setupCheck.check?.checks?.find(
+    (check) => check.id === "component-embedded-service-source-root",
+  );
+  assertEqual(
+    sourceRootCheck?.details?.sourceRootTopology?.layout,
+    "embedded",
+    "embedded setup check should classify the root component as embedded",
+  );
+  record("embedded-workspace", "Embedded project-root workspace initialized and checked.");
 }
 
 function ensureBuilt() {

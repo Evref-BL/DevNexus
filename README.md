@@ -8,9 +8,9 @@ artifacts they may need, a task list, and the support configuration for tools
 such as Codex or Claude.
 
 Think of it like a Maven or Gradle workspace root, but for agent-assisted work
-instead of a single build. You open the DevNexus workspace root in your agent, and
-the workspace root points to the repositories, documents, or other folders you
-want to work on.
+instead of a single build. The DevNexus workspace root can be the project
+repository itself, or a separate directory that points to several repositories,
+documents, or other folders.
 
 DevNexus records structure and facts. A user or agent still chooses the work,
 edits code, reviews changes, verifies results, and decides what to publish.
@@ -72,14 +72,16 @@ run:
 dev-nexus workspace init
 ```
 
-The init command guides you through the first workspace. It uses `~/.dev-nexus`
-as the default home, uses or asks for the workspace root, asks for the primary
-component and any extra components, creates local work tracking by default, and
-generates agent files.
-Press Enter for a component source path to create it under `components/<id>`, or
-type an existing path to reference it.
+The init command uses `~/.dev-nexus` as the default home, uses or asks for the
+workspace root, asks what you are setting up, creates local work tracking by
+default, and generates agent files.
+Choose `project` for an existing Git repository or one-project setup; the primary
+component defaults to `.`. Choose `workspace` when one DevNexus root should
+coordinate several components; the primary component defaults to `components/<id>`
+unless you type another path.
+See [Getting started](docs/user/getting-started.md) for what those choices mean.
 
-After setup:
+After init:
 
 ```bash
 dev-nexus workspace status .

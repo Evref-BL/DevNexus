@@ -84,7 +84,7 @@ export function buildNexusProjectSetupReadinessReport(options: {
       status: "blocked",
       summary: error instanceof Error ? error.message : String(error),
       nextAction:
-        "Run workspace setup from a DevNexus workspace root or restore dev-nexus.project.json.",
+        "Run workspace init from a DevNexus workspace root or restore dev-nexus.project.json.",
     });
   }
 
