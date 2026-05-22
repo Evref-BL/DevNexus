@@ -85,14 +85,18 @@ view:
 ```bash
 dev-nexus dashboard snapshot <workspace-root> --json
 dev-nexus dashboard weave <workspace-root> --json
+dev-nexus dashboard serve
 dev-nexus dashboard serve <workspace-root>
 ```
 
+`dashboard serve` opens the host cockpit. Passing a workspace root starts the
+same cockpit with that workspace selected.
+
 `dashboard snapshot` combines project components, automation status, eligible
-work, target reports, worktree leases, publication and authority blockers, an
-event stream, and the current work weave. `dashboard weave` returns only the
-graph-shaped lineage data so another app can render it with its own navigation,
-auth, tenant, and project shell.
+work, target reports, worktree leases, publication, approval, and policy
+blockers, an event stream, and the current work weave. `dashboard weave` returns
+only the graph-shaped lineage data so another app can render it with its own
+navigation, auth, tenant, and project shell.
 
 The served cockpit uses the same snapshot but intentionally folds the weave into
 an interactive work-history view with click-to-inspect details. The API keeps
@@ -116,6 +120,10 @@ authentication, persistence, and policy; DevNexus owns the project-specific
 workspace facts and capability-gated next actions. The mounted dashboard
 includes a persisted `system` / `light` / `dark` theme control; hosts can set
 the initial mode with `mountDevNexusDashboard(root, { theme: "light" })`.
+
+See [Dashboard cockpit UX research](dashboard-cockpit-ux-research.md) for the
+current design constraints behind the host cockpit, action queue, work map, and
+details panels.
 
 Then record the work it selected:
 
