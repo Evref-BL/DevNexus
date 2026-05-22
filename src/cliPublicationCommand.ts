@@ -17,10 +17,25 @@ import {
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
 import {
+  buildNexusInitiativeDeliveryPlan,
+  type NexusInitiativeDeliveryPlan,
+} from "./nexusInitiativeDeliveryPlan.js";
+import {
+  buildNexusInitiativeDeliveryReport,
+  type NexusInitiativeDeliveryReport,
+  type NexusInitiativeDeliveryReportItem,
+} from "./nexusInitiativeDeliveryReport.js";
+import {
+  buildNexusInitiativeFinalizationPlan,
+  type NexusInitiativeFinalizationPlan,
+} from "./nexusInitiativeFinalizationPlan.js";
+import {
+  inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
   type NexusPublicationBranchPushResult,
+  type NexusPublicationPullRequestEvidenceResult,
   type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
@@ -103,6 +118,14 @@ interface ParsedPublicationPullRequestMergeCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationPullRequestEvidenceCommand {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  number: number;
+  json?: boolean;
+}
+
 interface ParsedPublicationTrainReadinessCommand {
   projectRoot: string;
   versionId?: string | null;
@@ -120,6 +143,25 @@ interface ParsedPublicationCandidatePlanCommand {
   fullMatrixBudgetAvailable?: boolean;
   json?: boolean;
 }
+
+interface ParsedPublicationInitiativePlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  initiativeId?: string | null;
+  json?: boolean;
+}
+
+interface ParsedPublicationInitiativeReportCommand {
+  projectRoot: string;
+  componentId?: string;
+  initiativeId?: string | null;
+  evidenceFile?: string;
+  fullMatrixBudgetAvailable?: boolean;
+  json?: boolean;
+}
+
+interface ParsedPublicationInitiativeFinalizationCommand
+  extends ParsedPublicationInitiativeReportCommand {}
 
 interface ParsedPublicationEvidenceNormalizeCommand {
   evidenceFile: string;
@@ -209,6 +251,25 @@ export async function handlePublicationCommand(
       dependencies.stdout ?? process.stdout,
     );
     return result.merge.merged ? 0 : 1;
+  }
+
+  if (argv[1] === "pull-request" && argv[2] === "evidence") {
+    const parsed = parsePublicationPullRequestEvidenceCommand(argv);
+    const result = await inspectNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
+      number: parsed.number,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestEvidenceResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
   }
 
   if (argv[1] === "green-main" && argv[2] === "plan") {
@@ -319,8 +380,63 @@ export async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "initiative-plan") {
+    const parsed = parsePublicationInitiativePlanCommand(argv);
+    const plan = buildNexusInitiativeDeliveryPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      initiativeId: parsed.initiativeId,
+    });
+    printPublicationInitiativePlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "initiative-report") {
+    const parsed = parsePublicationInitiativeReportCommand(argv);
+    const report = buildNexusInitiativeDeliveryReport({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      initiativeId: parsed.initiativeId,
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      now: dependencies.now,
+    });
+    printPublicationInitiativeReport(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "initiative-finalization") {
+    const parsed = parsePublicationInitiativeFinalizationCommand(argv);
+    const plan = buildNexusInitiativeFinalizationPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      initiativeId: parsed.initiativeId,
+      providerEvidence: parsed.evidenceFile
+        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      now: dependencies.now,
+    });
+    printPublicationInitiativeFinalizationPlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, candidate-plan, initiative-plan, initiative-report, or initiative-finalization",
   );
 }
 
@@ -582,6 +698,55 @@ function parsePublicationPullRequestMergeCommand(
   return parsed as ParsedPublicationPullRequestMergeCommand;
 }
 
+function parsePublicationPullRequestEvidenceCommand(
+  argv: string[],
+): ParsedPublicationPullRequestEvidenceCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "evidence") {
+    throw new Error("publication requires pull-request evidence");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request evidence requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestEvidenceCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request evidence option: ${arg}`);
+    }
+  }
+  if (!parsed.number) {
+    throw new Error("publication pull-request evidence requires --number");
+  }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
+
+  return parsed as ParsedPublicationPullRequestEvidenceCommand;
+}
+
 function assertSinglePublicationTarget(
   componentId: string | undefined,
   projectRepository: boolean | undefined,
@@ -789,6 +954,150 @@ function parsePublicationCandidatePlanCommand(
         break;
       default:
         throw new Error(`Unknown publication candidate-plan option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationInitiativePlanCommand(
+  argv: string[],
+): ParsedPublicationInitiativePlanCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "initiative-plan") {
+    throw new Error("publication requires initiative-plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication initiative-plan requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationInitiativePlanCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication initiative-plan option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationInitiativeReportCommand(
+  argv: string[],
+): ParsedPublicationInitiativeReportCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "initiative-report") {
+    throw new Error("publication requires initiative-report");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication initiative-report requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationInitiativeReportCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication initiative-report option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationInitiativeFinalizationCommand(
+  argv: string[],
+): ParsedPublicationInitiativeFinalizationCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "initiative-finalization") {
+    throw new Error("publication requires initiative-finalization");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication initiative-finalization requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationInitiativeFinalizationCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication initiative-finalization option: ${arg}`);
     }
   }
 
@@ -1077,6 +1386,42 @@ function printPublicationPullRequestMergeResult(
   writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
 }
 
+function printPublicationPullRequestEvidenceResult(
+  result: NexusPublicationPullRequestEvidenceResult,
+  parsed: ParsedPublicationPullRequestEvidenceCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    target: result.target,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+    evidence: result.evidence,
+    providerEvidence: [result.evidence],
+    metadata: result.metadata,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request evidence.");
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  writeLine(stdout, `  Head: ${result.evidence.headBranch ?? "unknown"}`);
+  writeLine(stdout, `  Base: ${result.evidence.targetBranch ?? "unknown"}`);
+  writeLine(stdout, `  Checks: ${result.evidence.checks?.length ?? 0}`);
+  writeLine(stdout, `  Review: ${result.evidence.reviewState ?? "unknown"}`);
+  writeLine(stdout, `  Base status: ${result.evidence.baseStatus ?? "unknown"}`);
+  writeLine(stdout, `  Mergeability: ${result.evidence.mergeability ?? "unknown"}`);
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.metadata.backend}`);
+}
+
 function formatPublicationTarget(
   target: NexusPublicationBranchPushResult["target"],
 ): string {
@@ -1261,6 +1606,154 @@ function printPublicationCandidatePlan(
   for (const warning of plan.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
   }
+}
+
+function printPublicationInitiativePlan(
+  plan: NexusInitiativeDeliveryPlan,
+  parsed: ParsedPublicationInitiativePlanCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus initiative delivery plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Initiatives: ${plan.itemCount}`);
+  for (const item of plan.items) {
+    const initiative = item.initiative;
+    const branchPlan = initiative.branchPlan;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${initiative.activeScopeId} topology=${initiative.defaultTopology}`,
+    );
+    writeLine(
+      stdout,
+      `    integration=${branchPlan.integrationBranch ?? "none"} slices=${branchPlan.sliceBranchPattern}`,
+    );
+    writeLine(
+      stdout,
+      `    base=${branchPlan.defaultSliceBaseBranch} reviewTarget=${branchPlan.defaultSliceReviewTarget} final=${branchPlan.finalPublicationTarget}`,
+    );
+    writeLine(
+      stdout,
+      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} providerNoise=${initiative.providerNoise}`,
+    );
+    if (branchPlan.requiresIntegrationBranchApproval) {
+      writeLine(stdout, "    HITL: integration branch approval required");
+    }
+  }
+  for (const warning of plan.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationInitiativeReport(
+  report: NexusInitiativeDeliveryReport,
+  parsed: ParsedPublicationInitiativeReportCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: report.nextAction,
+      summary: report.summary,
+      report,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus initiative delivery report.");
+  writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
+  writeLine(stdout, `  Next action: ${report.nextAction}`);
+  writeLine(
+    stdout,
+    `  Initiatives: ${report.summary.itemCount}; ready=${report.summary.readyCount}; needsUpdate=${report.summary.needsUpdateCount}; blocked=${report.summary.blockedCount}; reviewNeeded=${report.summary.reviewNeededCount}`,
+  );
+  for (const item of report.items) {
+    const evidence = item.providerEvidence;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${item.initiativeId} topology=${item.topology} -> ${item.status}`,
+    );
+    writeLine(
+      stdout,
+      `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} ci=${item.ciTier.tier.id}`,
+    );
+    writeLine(
+      stdout,
+      `    evidence=${evidence.provider ?? "none"} ${evidence.sourceKind ?? "no-source"} checks=${evidence.checksStatus} review=${evidence.reviewState ?? "unknown"} merge=${evidence.mergeability ?? "unknown"} base=${evidence.baseStatus ?? "unknown"} policy=${evidence.branchPolicy ?? "unknown"} draft=${evidence.draft ?? "unknown"}`,
+    );
+    if (evidence.reviewTarget) {
+      writeLine(
+        stdout,
+        `    reviewTarget=${formatReviewTarget(evidence.reviewTarget)}`,
+      );
+    }
+    if (item.reasons.length > 0) {
+      writeLine(stdout, `    reasons: ${item.reasons.join("; ")}`);
+    }
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationInitiativeFinalizationPlan(
+  plan: NexusInitiativeFinalizationPlan,
+  parsed: ParsedPublicationInitiativeFinalizationCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: plan.nextAction,
+      summary: plan.summary,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus initiative finalization plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Next action: ${plan.nextAction}`);
+  writeLine(
+    stdout,
+    `  Initiatives: ${plan.summary.itemCount}; safeToReview=${plan.summary.safeToReviewCount}; readyForPublication=${plan.summary.readyForPublicationCount}; needsReview=${plan.summary.needsReviewCount}; blocked=${plan.summary.blockedCount}`,
+  );
+  for (const item of plan.items) {
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${item.initiativeId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
+    );
+    writeLine(
+      stdout,
+      `    integration=${item.integrationBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
+    );
+    if (item.reviewReadiness.reasons.length > 0) {
+      writeLine(
+        stdout,
+        `    review reasons: ${item.reviewReadiness.reasons.join("; ")}`,
+      );
+    }
+    if (item.publicationReadiness.reasons.length > 0) {
+      writeLine(
+        stdout,
+        `    publication reasons: ${item.publicationReadiness.reasons.join("; ")}`,
+      );
+    }
+  }
+}
+
+function formatReviewTarget(
+  target: NonNullable<NexusInitiativeDeliveryReportItem["providerEvidence"]["reviewTarget"]>,
+): string {
+  const label = target.number ? `#${target.number}` : target.id ?? target.kind;
+  return target.url ? `${label} ${target.url}` : label;
 }
 
 function writeCandidatePlanItems(

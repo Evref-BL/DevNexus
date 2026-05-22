@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main } from "./cli.js";
 import {
   defaultNexusAutomationConfig,
+  inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   saveProjectConfig,
@@ -407,6 +408,106 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("reads pull request evidence through the forge adapter with App API credentials", async () => {
+    const { projectRoot } = createPublicationProject();
+    const requests: Array<{ url: string; method: string; authorization: string | null }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add App publication commands",
+            mergeable: true,
+            mergeable_state: "behind",
+            head: {
+              ref: "feat/initiative-delivery-topology",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 22 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const result = await inspectNexusPublicationPullRequestForComponent({
+      projectRoot,
+      number: 191,
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: fetchImpl,
+    });
+
+    expect(result.credential).toMatchObject({
+      profileId: "dev-nexus-app-github",
+      kind: "github_app",
+    });
+    expect(result.evidence).toMatchObject({
+      provider: "github",
+      sourceKind: "pull_request",
+      headBranch: "feat/initiative-delivery-topology",
+      targetBranch: "main",
+      reviewState: "approved",
+      baseStatus: "behind",
+      mergeability: "blocked",
+      checks: [
+        {
+          name: "Node 22 check (ubuntu-latest)",
+          conclusion: "success",
+        },
+      ],
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`))
+      .toEqual([
+        "GET /repos/Evref-BL/DevNexus/pulls/191",
+        "GET /repos/Evref-BL/DevNexus/commits/abc123/check-runs",
+        "GET /repos/Evref-BL/DevNexus/pulls/191/reviews",
+      ]);
+    expect(requests.every((request) =>
+      request.authorization === "Bearer installation-token"
+    )).toBe(true);
+  });
+
   it("merges pull requests through the forge adapter with App API credentials", async () => {
     const { projectRoot } = createPublicationProject();
     const requests: Array<{ url: string; method: string; authorization: string | null; body: unknown }> = [];
@@ -680,6 +781,103 @@ describe("publication CLI operations", () => {
         },
       },
     ]);
+  });
+
+  it("prints pull request evidence through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/pulls/191")) {
+        return new Response(
+          JSON.stringify({
+            number: 191,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/191",
+            title: "Add App publication commands",
+            mergeable: true,
+            mergeable_state: "clean",
+            head: {
+              ref: "feat/initiative-delivery-topology",
+              sha: "abc123",
+            },
+            base: {
+              ref: "main",
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/commits/abc123/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                name: "Node 22 check (ubuntu-latest)",
+                status: "completed",
+                conclusion: "success",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (pathname.endsWith("/pulls/191/reviews")) {
+        return new Response(
+          JSON.stringify([
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ message: "unexpected" }), {
+        status: 404,
+      });
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "evidence",
+        projectRoot,
+        "--number",
+        "191",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      pullRequest: {
+        number: 191,
+      },
+      evidence: {
+        provider: "github",
+        reviewState: "approved",
+        baseStatus: "current",
+        mergeability: "mergeable",
+      },
+      providerEvidence: [
+        {
+          sourceKind: "pull_request",
+          headBranch: "feat/initiative-delivery-topology",
+        },
+      ],
+    });
+    expect(stdout.output()).not.toContain("installation-token");
   });
 
   it("merges pull requests through the configured App API credential path", async () => {

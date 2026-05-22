@@ -40,6 +40,20 @@ export type NexusPublicationProviderBranchPolicy =
   | "blocked"
   | "unknown";
 
+export type NexusPublicationProviderReviewState =
+  | "approved"
+  | "waiting_for_approval"
+  | "changes_requested"
+  | "rejected"
+  | "timed_out"
+  | "unknown";
+
+export type NexusPublicationProviderBaseStatus =
+  | "current"
+  | "behind"
+  | "diverged"
+  | "unknown";
+
 export interface NexusPublicationProviderReviewTargetInput {
   kind?: string | null;
   id?: string | number | null;
@@ -93,9 +107,15 @@ export interface NexusPublicationProviderEvidenceInput {
   sourceUrl?: string | null;
   url?: string | null;
   intendedCiTier?: NexusCiTierId | string | null;
+  reviewState?: string | null;
+  reviewDecision?: string | null;
+  review?: string | null;
   checks?: NexusPublicationProviderCheckInput[];
   mergeability?: string | boolean | null;
   branchPolicy?: string | boolean | null;
+  baseStatus?: string | boolean | null;
+  baseStale?: boolean | null;
+  behindBase?: boolean | null;
   stale?: boolean | null;
   unknown?: boolean | null;
   collectedAt?: string | null;
@@ -128,9 +148,11 @@ export interface NexusPublicationProviderEvidence {
   headSha: string | null;
   targetBranch: string | null;
   intendedCiTier: NexusCiTierId | string | null;
+  reviewState: NexusPublicationProviderReviewState | null;
   checks: NexusPublicationProviderCheckEvidence[];
   mergeability: NexusPublicationProviderMergeability | null;
   branchPolicy: NexusPublicationProviderBranchPolicy | null;
+  baseStatus: NexusPublicationProviderBaseStatus | null;
   stale: boolean;
   unknown: boolean;
   collectedAt: string | null;
@@ -186,9 +208,11 @@ export function normalizeNexusPublicationProviderEvidence(
     headSha: clean(input.headSha) ?? clean(input.headCommit),
     targetBranch: clean(input.targetBranch),
     intendedCiTier: clean(input.intendedCiTier),
+    reviewState: reviewState(input),
     checks: (input.checks ?? []).map(checkEvidence),
     mergeability: mergeability(input.mergeability),
     branchPolicy: branchPolicy(input.branchPolicy),
+    baseStatus: baseStatus(input),
     stale: input.stale === true,
     unknown: input.unknown === true,
     collectedAt: clean(input.collectedAt),
@@ -561,6 +585,75 @@ function branchPolicy(
   }
   if (["blocked", "fail", "failed", "failure", "missing"].includes(token)) {
     return "blocked";
+  }
+  return "unknown";
+}
+
+function reviewState(
+  input: NexusPublicationProviderEvidenceInput,
+): NexusPublicationProviderReviewState | null {
+  const token = normalized(
+    input.reviewState ?? input.reviewDecision ?? input.review,
+  );
+  if (!token) {
+    return null;
+  }
+  if (["approved", "approve", "approval_approved"].includes(token)) {
+    return "approved";
+  }
+  if (["changes_requested", "change_requested", "request_changes"].includes(token)) {
+    return "changes_requested";
+  }
+  if (["rejected", "reject", "declined"].includes(token)) {
+    return "rejected";
+  }
+  if (["timed_out", "timeout", "expired"].includes(token)) {
+    return "timed_out";
+  }
+  if (
+    [
+      "review_required",
+      "required",
+      "pending",
+      "waiting",
+      "waiting_for_approval",
+      "unapproved",
+      "needs_approval",
+    ].includes(token)
+  ) {
+    return "waiting_for_approval";
+  }
+  return "unknown";
+}
+
+function baseStatus(
+  input: NexusPublicationProviderEvidenceInput,
+): NexusPublicationProviderBaseStatus | null {
+  if (input.behindBase === true || input.baseStale === true) {
+    return "behind";
+  }
+  if (input.behindBase === false || input.baseStale === false) {
+    return "current";
+  }
+  const value = input.baseStatus;
+  if (value === true) {
+    return "current";
+  }
+  if (value === false) {
+    return "behind";
+  }
+  const token = normalized(value);
+  if (!token) {
+    return null;
+  }
+  if (["current", "up_to_date", "up_to_base", "fresh"].includes(token)) {
+    return "current";
+  }
+  if (["behind", "stale", "out_of_date", "base_stale"].includes(token)) {
+    return "behind";
+  }
+  if (["diverged", "ahead_and_behind"].includes(token)) {
+    return "diverged";
   }
   return "unknown";
 }

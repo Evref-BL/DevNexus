@@ -2209,6 +2209,133 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts initiative delivery policy on publication trains", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "initiative-delivery-project",
+      name: "Initiative Delivery Project",
+      automation: {
+        publication: {
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            initiativeDelivery: {
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+              allowedTopologies: ["direct", "stacked", "hybrid"],
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+                allowedIntentPrefixes: ["feat/", "fix", "chore"],
+                integrationBranchPattern: "{intent}/{initiative}",
+                sliceBranchPattern: "{intent}/{initiative}/{slice}",
+              },
+              review: {
+                mode: "slice_pr",
+                finalPullRequest: true,
+              },
+              provider: {
+                noise: "status_only",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(
+      config.automation?.publication.publicationTrain?.initiativeDelivery,
+    ).toMatchObject({
+      enabled: true,
+      activeInitiativeId: "codex-goals",
+      defaultTopology: "hybrid",
+      allowedTopologies: ["direct", "stacked", "hybrid"],
+      branchNaming: {
+        defaultIntentPrefix: "feat",
+        allowedIntentPrefixes: ["feat", "fix", "chore"],
+        integrationBranchPattern: "{intent}/{initiative}",
+        sliceBranchPattern: "{intent}/{initiative}/{slice}",
+      },
+      review: {
+        mode: "slice_pr",
+        finalPullRequest: true,
+      },
+      provider: {
+        noise: "status_only",
+      },
+    });
+  });
+
+  it("rejects invalid initiative delivery policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                defaultTopology: "hybrid",
+                allowedTopologies: ["direct", "stacked"],
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultTopology must be included in allowedTopologies/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchNaming: {
+                  defaultIntentPrefix: "initiative",
+                  allowedIntentPrefixes: ["feat", "fix"],
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultIntentPrefix must be included in allowedIntentPrefixes/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "initiative-delivery-project",
+        name: "Initiative Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            publicationTrain: {
+              enabled: true,
+              initiativeDelivery: {
+                branchNaming: {
+                  integrationBranchPattern: "{intent}/{initiative}/{slice}",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/integrationBranchPattern must not include \{slice\}/);
+  });
+
   it("accepts publication identity and remote guardrails", () => {
     expect(
       validateProjectConfig({
