@@ -1622,14 +1622,17 @@ describe("nexus dashboard", () => {
 
     expect(html).toContain("dn-host-identity");
     expect(html).toContain("Mac.lan");
-    expect(html).toContain("dn-header-path-row");
-    expect(html).toContain("dn-header-path");
+    expect(html).toContain("dn-header-path-menu");
+    expect(html).toContain("dn-header-path-control");
+    expect(html).toContain("dn-header-path-value");
+    expect(html).toContain("dn-app-icon-finder");
     expect(html).toContain("/Users/gabriel.darbord/.dev-nexus");
     expect(html).toContain('data-open-target="home"');
     expect(html).toContain("dn-header-stamp");
     expect(html).toContain("Generated");
     expect(html).not.toContain('class="dn-meta"');
-    expect(html.indexOf("dn-header-path")).toBeLessThan(
+    expect(html).not.toContain("dn-header-path-row");
+    expect(html.indexOf("dn-header-path-value")).toBeLessThan(
       html.indexOf("data-open-target=\"home\""),
     );
   });
