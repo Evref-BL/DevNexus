@@ -146,6 +146,92 @@ describe("work tracking provider service", () => {
     ]);
   });
 
+  it("routes GitHub App user-to-server credentials through GitHub work tracking writes", async () => {
+    const calls: Array<{
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+      body: unknown;
+    }> = [];
+    const provider = createWorkTrackerProvider(
+      {
+        provider: "github",
+        repository: { owner: "Evref-BL", name: "DevNexus" },
+      },
+      {
+        credentials: {
+          broker: createHostAuthProfileCredentialBroker({
+            authProfiles: [
+              {
+                id: "gabriel-devnexus-app-user",
+                actorId: "gabriel",
+                provider: "github",
+                kind: "human",
+                credentialKind: "github_app_user_token",
+                account: "Gabriel-Darbord",
+                host: "github.com",
+                environmentKeys: ["GH_USER_TOKEN"],
+                purposes: ["api"],
+              },
+            ],
+            env: {
+              GH_USER_TOKEN: "user-access-token",
+            },
+          }),
+          profileId: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          providerIdentity: "Gabriel-Darbord",
+          requiredPermissions: {
+            issues: "write",
+          },
+        },
+        github: {
+          credentialRunner: false,
+          fetch: (async (input, init = {}) => {
+            calls.push({
+              url: String(input),
+              method: init.method ?? "GET",
+              headers: init.headers as Record<string, string>,
+              body: init.body ? JSON.parse(String(init.body)) : null,
+            });
+            return new Response(
+              JSON.stringify({
+                id: 2,
+                number: 12,
+                title: "Human attributed issue",
+                state: "open",
+                labels: [],
+              }),
+              {
+                status: 201,
+                headers: { "content-type": "application/json" },
+              },
+            );
+          }) as typeof fetch,
+        },
+      },
+    );
+
+    await expect(
+      provider.createWorkItem({ title: "Human attributed issue" }),
+    ).resolves.toMatchObject({
+      id: "github-12",
+      title: "Human attributed issue",
+    });
+    expect(calls).toEqual([
+      {
+        url: "https://api.github.com/repos/Evref-BL/DevNexus/issues",
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer user-access-token",
+        }),
+        body: {
+          title: "Human attributed issue",
+        },
+      },
+    ]);
+  });
+
   it("resolves async broker credentials before creating a GitHub provider", async () => {
     const credentialRequests: NexusProviderCredentialRequest[] = [];
     const calls: Array<{
