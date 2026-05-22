@@ -1177,7 +1177,8 @@ function assertCommandTokenJsonIsUsable(
   record: Record<string, unknown>,
   profile: NexusHostingAuthProfileConfig,
 ): void {
-  const status = optionalString(record.status) ?? optionalString(record.code);
+  const statusValue = optionalString(record.status) ?? optionalString(record.code);
+  const status = statusValue?.toLowerCase().replace(/-/gu, "_");
   if (
     record.refreshRequired === true ||
     record.refresh_required === true ||
@@ -1187,6 +1188,39 @@ function assertCommandTokenJsonIsUsable(
     throw new NexusProviderCredentialBrokerError(
       "refresh_required",
       `Credential command for profile ${profile.id} reported that user authorization must be refreshed.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "installation_not_found" ||
+    status === "app_not_installed" ||
+    status === "not_installed"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "installation_not_found",
+      `Credential command for profile ${profile.id} reported that the GitHub App is not installed for the target account or repository.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "repository_not_selected" ||
+    status === "repository_access_missing" ||
+    status === "repo_not_selected"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "repository_not_selected",
+      `Credential command for profile ${profile.id} reported that the target repository is not selected for this GitHub App installation.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "missing_permission" ||
+    status === "permission_missing" ||
+    status === "insufficient_permission"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "missing_permission",
+      `Credential command for profile ${profile.id} reported missing GitHub App user token permissions.`,
       { profileId: profile.id },
     );
   }
