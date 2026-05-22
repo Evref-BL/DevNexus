@@ -168,6 +168,7 @@ describe("nexus worker context bundle", () => {
           labels: ["dogfood"],
         },
       },
+      publicationScope: "component",
       publication: {
         remote: "bot",
         actor: {
@@ -262,6 +263,7 @@ describe("nexus worker context bundle", () => {
       "Treat workspace context files as read-only unless the coordinator explicitly assigns project-state ownership.",
     );
     expect(briefing).toContain(`- AGENTS.md: ${path.join(projectRoot, "AGENTS.md")}`);
+    expect(briefing).toContain("- scope: component");
     expect(briefing).toContain("- mode: review_handoff");
     expect(briefing).toContain("- direct target push: blocked");
     expect(briefing).toContain("- merge authority: none");

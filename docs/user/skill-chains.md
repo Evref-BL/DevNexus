@@ -12,6 +12,11 @@ infrastructure, `take-the-lead` changes the collaboration contract while the
 user keeps decision authority, and `initiative-workflow` holds a durable
 objective, delivery topology, and integration surface across slices.
 
+Use the sizing vocabulary in [Concepts](concepts.md#work-sizing-terms) when a
+chain needs to classify work. In this page, `slice` means an independently
+reviewable vertical increment, and `delivery topology` means the Git and review
+route used by slice branches.
+
 ```mermaid
 flowchart LR
   DN["dev-nexus"] -. workspace .-> Chain["skill chain"]

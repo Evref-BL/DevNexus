@@ -43,6 +43,9 @@ choose one enabled tracker as `defaultWorkTrackerId`.
           "name": "GitHub Mirror",
           "enabled": true,
           "roles": ["mirror", "coordination"],
+          "communication": {
+            "coordinationHandoffs": "silent"
+          },
           "workTracking": {
             "provider": "github",
             "host": "github.com",
@@ -78,11 +81,41 @@ commands:
 
 A tracker can have more than one role only when the component config says so.
 For example, a tracker can be both `mirror` and `coordination`, but a mirror
-role alone does not make it the coordination target. Today, durable DevNexus
-handoff records are read back only from local tracker stores; provider-native
-trackers such as GitHub can still be used for ordinary work-item comments, but
-DevNexus marks provider-backed coordination handoff storage as incomplete until
-provider comment reads are implemented.
+role alone does not make it the coordination target.
+
+Tracker communication policy controls whether coordination tools publish
+handoff records as tracker comments. Local trackers default to
+`coordinationHandoffs: "comment"` because local comments are durable workspace
+storage. Provider trackers default to `coordinationHandoffs: "silent"` so
+routine automation does not clutter shared systems such as GitHub Issues.
+
+Set a project default with `workTrackerCommunication`, or override one tracker
+binding with `communication`:
+
+```json
+{
+  "workTrackerCommunication": {
+    "coordinationHandoffs": "silent"
+  },
+  "components": [
+    {
+      "id": "core",
+      "workTrackers": [
+        {
+          "id": "github",
+          "roles": ["coordination"],
+          "communication": {
+            "coordinationHandoffs": "comment"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Use `"comment"` for a provider tracker only when those comments are an intended
+human-facing coordination surface.
 
 ## Default Tracker Behavior
 
@@ -274,7 +307,7 @@ When an agent is assigned a canonical local item:
 - Use link records to find existing provider mirrors.
 - Write handoffs through `coordination handoff`; if a coordination tracker is
   configured, DevNexus resolves that role before falling back to the default
-  tracker.
+  tracker and applies the tracker communication policy.
 - Include the tracker id in target-cycle records and handoffs when the selected
   item did not come from the default tracker.
 - Do not update a mirror as if it were canonical unless the assignment names

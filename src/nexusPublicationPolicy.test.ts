@@ -7,6 +7,7 @@ import {
   buildNexusPublicationGitPushPlan,
   defaultNexusAutomationConfig,
   getNexusPublicationStatus,
+  getNexusWorkspacePublicationStatus,
   loadProjectConfig,
   prepareNexusPublicationGitPush,
   pushNexusPublicationBranch,
@@ -195,6 +196,67 @@ describe("nexus publication policy", () => {
     expect(actorCommands[0]!.env.GH_TOKEN).toBeUndefined();
     expect(actorCommands[0]!.env.GITHUB_TOKEN).toBeUndefined();
     expect(() => assertNexusPublicationGuard(status)).not.toThrow();
+  });
+
+  it("reports workspace publication status against the project root repository", () => {
+    const projectRoot = makeTempDir("dev-nexus-publication-project-");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      authority: {
+        actors: [
+          {
+            id: "example-bot-actor",
+            kind: "machine_user",
+            provider: "github",
+            providerIdentity: "example-bot",
+            displayName: "Example Bot",
+          },
+        ],
+        roleBindings: [
+          {
+            actorId: "example-bot-actor",
+            roles: ["maintainer"],
+            scope: {
+              project: "publication-project",
+              repository: "git@github.com:example/project.git",
+            },
+          },
+        ],
+      },
+    }));
+    const config = loadProjectConfig(projectRoot);
+
+    const status = getNexusWorkspacePublicationStatus({
+      projectRoot,
+      projectConfig: config,
+      action: "git_push",
+      authProfiles: automationAuthProfiles(),
+      gitRunner: publicationGitRunner(projectRoot),
+      actorRunner: actorRunnerWithHandle("example-bot"),
+    });
+
+    expect(status).toMatchObject({
+      scope: "workspace",
+      componentId: null,
+      sourceRoot: projectRoot,
+      blocking: false,
+      git: {
+        repositoryPath: projectRoot,
+        remoteName: "bot",
+        remoteUrl: "git@github.com-bot:example/project.git",
+        targetBranch: "main",
+      },
+      authority: {
+        requestedAction: "git.push_target_branch",
+        allowed: true,
+      },
+    });
+    expect(status.checks).toContainEqual(
+      expect.objectContaining({
+        name: "publication:workspace:authority:git.push_target_branch",
+        status: "passed",
+      }),
+    );
   });
 
   it("blocks when the observed automation actor does not match policy", () => {

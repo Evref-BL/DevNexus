@@ -91,6 +91,8 @@ export interface NexusWorkerContextAgentTargetPolicy {
   warnings: string[];
 }
 
+export type NexusWorkerContextPublicationScope = "workspace" | "component";
+
 export type NexusWorkerContextDependencyProjectionSourceControl =
   | "support"
   | "source";
@@ -166,6 +168,7 @@ export interface NexusWorkerContextBundle {
   dependencySupport: NexusWorkerContextDependencySupport;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
+  publicationScope: NexusWorkerContextPublicationScope;
   publication: NexusAutomationPublicationConfig | null;
   gitIdentity: NexusExpectedGitIdentity | null;
   authority: NexusAuthorityComponentSummary | null;
@@ -191,6 +194,7 @@ export interface NexusWorkerContextBundleOptions {
   skills?: NexusWorkerContextSkills;
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
+  publicationScope?: NexusWorkerContextPublicationScope;
   publication?: NexusAutomationPublicationConfig | null;
   gitIdentity?: NexusExpectedGitIdentity | null;
   authority?: NexusAuthorityComponentSummary | null;
@@ -282,6 +286,7 @@ export function buildNexusWorkerContextBundle(
   const pluginFragments = normalizeWorkerPluginFragments(
     options.pluginFragments,
   );
+  const publicationScope = options.publicationScope ?? "component";
   const publication = options.publication ?? null;
   const gitIdentity = options.gitIdentity ?? null;
   const authority = options.authority ?? null;
@@ -315,6 +320,7 @@ export function buildNexusWorkerContextBundle(
     dependencySupport,
     ownership: worktree,
     worktree,
+    publicationScope,
     publication,
     gitIdentity,
     authority,
@@ -382,7 +388,7 @@ export function renderNexusWorkerBriefing(
     ...renderDependencyProjectionLines(context.dependencySupport),
     "Package fetch and install are setup-owned; workers should report missing package dependencies as setup blockers instead of running ad hoc npm install or npx fetches.",
     "",
-    ...renderPublicationPolicyLines(context.publication),
+    ...renderPublicationPolicyLines(context.publication, context.publicationScope),
     ...renderGitIdentityLines(context.gitIdentity),
     "",
     ...renderAuthorityPolicyLines(context.authority),
@@ -859,9 +865,10 @@ function renderDependencyProjectionLines(
 
 function renderPublicationPolicyLines(
   publication: NexusAutomationPublicationConfig | null,
+  scope: NexusWorkerContextPublicationScope,
 ): string[] {
   if (!publication) {
-    return ["Publication policy:", "- automation remote: none"];
+    return ["Publication policy:", `- scope: ${scope}`, "- automation remote: none"];
   }
 
   const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
@@ -871,6 +878,7 @@ function renderPublicationPolicyLines(
 
   return [
     "Publication policy:",
+    `- scope: ${scope}`,
     `- mode: ${policySummary.mode}`,
     `- target branch: ${policySummary.targetBranch ?? "none"}`,
     `- integration preference: ${policySummary.integrationPreference}`,

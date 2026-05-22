@@ -201,6 +201,10 @@ describe("nexus automation target report", () => {
           },
         ],
       },
+      workspacePublication: {
+        mode: "review_handoff",
+        targetBranch: null,
+      },
       relaunchDecision: {
         type: "report_blocked",
         reason: "Latest target cycle cycle-2 is blocked",

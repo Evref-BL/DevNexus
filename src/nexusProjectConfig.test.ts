@@ -1349,6 +1349,110 @@ describe("workspace config", () => {
     });
   });
 
+  it("accepts project and tracker communication policy", () => {
+    expect(
+      validateProjectConfig({
+        version: 1,
+        id: "tracker-policy-project",
+        name: "Tracker Policy Project",
+        workTrackerCommunication: {
+          coordinationHandoffs: "silent",
+        },
+        components: [
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                roles: ["primary", "coordination"],
+                communication: {
+                  coordinationHandoffs: "comment",
+                },
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "core",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      workTrackerCommunication: {
+        coordinationHandoffs: "silent",
+      },
+      components: [
+        {
+          workTrackers: [
+            {
+              id: "github",
+              communication: {
+                coordinationHandoffs: "comment",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("rejects invalid tracker communication policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-tracker-policy-project",
+        name: "Bad Tracker Policy Project",
+        workTrackerCommunication: {
+          coordinationHandoffs: "shout",
+        },
+        components: [],
+      }),
+    ).toThrow(/workTrackerCommunication\.coordinationHandoffs/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-tracker-policy-project",
+        name: "Bad Tracker Policy Project",
+        components: [
+          {
+            id: "core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: null,
+            defaultBranch: "main",
+            defaultWorkTrackerId: "github",
+            workTrackers: [
+              {
+                id: "github",
+                roles: ["coordination"],
+                communication: {
+                  coordinationHandoffs: "external",
+                },
+                workTracking: {
+                  provider: "github",
+                  repository: {
+                    owner: "example",
+                    name: "core",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(/workTrackers\[0\]\.communication\.coordinationHandoffs/);
+  });
+
   it("normalizes tracker discovery roles and effective default policy", () => {
     const config = validateProjectConfig({
       version: 1,

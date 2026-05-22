@@ -136,6 +136,9 @@ describe("Codex app-server initialize probe", () => {
       "turn/start",
       "turn/interrupt",
       "thread/read",
+      "thread/goal/set",
+      "thread/goal/get",
+      "thread/goal/clear",
       "mcpServerStatus/list",
       "mcpServer/tool/call",
       "plugin/list",
@@ -159,6 +162,21 @@ describe("Codex app-server initialize probe", () => {
       .toBe(true);
     expect(report.optionalCapabilities).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          capability: "thread_goal_set",
+          status: "supported",
+          method: "thread/goal/set",
+        }),
+        expect.objectContaining({
+          capability: "thread_goal_get",
+          status: "supported",
+          method: "thread/goal/get",
+        }),
+        expect.objectContaining({
+          capability: "thread_goal_clear",
+          status: "supported",
+          method: "thread/goal/clear",
+        }),
         expect.objectContaining({
           capability: "mcp_status",
           status: "supported",
@@ -197,6 +215,50 @@ describe("Codex app-server initialize probe", () => {
     );
     expect(transport.requests.map((request) => request.method)).not.toContain(
       "turn/start",
+    );
+  });
+
+  it("reports absent thread goal methods as optional, not blockers", async () => {
+    const projectRoot = saveProbeProject();
+    const transport = initializeTransport([
+      "thread/start",
+      "thread/fork",
+      "turn/start",
+      "turn/interrupt",
+      "thread/list",
+    ]);
+
+    const report = await probeCodexAppServerInitialize({
+      projectRoot,
+      client: new CodexAppServerJsonRpcClient({ transport }),
+    });
+
+    expect(report).toMatchObject({
+      status: "ready",
+      blockerKind: null,
+      blockerSummary: null,
+    });
+    expect(report.optionalCapabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capability: "thread_goal_set",
+          status: "optional",
+          method: null,
+          alternatives: ["thread/goal/set"],
+        }),
+        expect.objectContaining({
+          capability: "thread_goal_get",
+          status: "optional",
+          method: null,
+          alternatives: ["thread/goal/get"],
+        }),
+        expect.objectContaining({
+          capability: "thread_goal_clear",
+          status: "optional",
+          method: null,
+          alternatives: ["thread/goal/clear"],
+        }),
+      ]),
     );
   });
 

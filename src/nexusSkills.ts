@@ -580,8 +580,10 @@ agent leads the plan; the user decides scope, risk, and approval gates.
 3. Map the changed surfaces before writing tasks. Name the owning component,
    files or artifacts, tracker anchor, expected worktree, command working
    directory, and selected delivery topology where those are knowable.
-4. Split the work into bounded slices. Each slice needs one owner, one scope,
-   dependencies, acceptance criteria, verification commands, and handoff notes.
+4. Split the work into bounded vertical slices where possible. Each slice needs
+   one owner, one scope, dependencies, acceptance criteria, verification
+   commands, and handoff notes. Do not make slices smaller than the next real
+   review, risk, ownership, or human-in-the-loop gate requires.
 5. For Git-backed plans, choose the delivery topology before the first branch:
    direct slice, stacked slice, initiative integration branch, throw-away
    integration rehearsal, or release/version policy. Record the base branch,
@@ -608,8 +610,8 @@ Use this shape when writing a saved implementation plan:
 1. Goal and done criteria.
 2. Integration surface, delivery topology, tracker anchor, and review path.
 3. Component, artifact, or document ownership.
-4. Task slices with files, acceptance criteria, steps, verification, and
-   handoff.
+4. Work-item or vertical slices with files, acceptance criteria, steps,
+   verification, and handoff.
 5. Human approval gates and publication path.
 6. Open questions and blockers.
 
@@ -1267,9 +1269,10 @@ delivery topology says how slice branches reach it.
 3. Inventory current state: prior decisions, active branches or artifacts,
    verification already run, blockers, and unrelated work that must be
    preserved.
-4. Slice by independently reviewable progress. Each slice needs one owner, one
-   scope, one verification path, and a clear contribution to the initiative
-   surface.
+4. Slice by independently reviewable vertical progress where possible. Each
+   slice needs one owner, one scope, one verification path, and a clear
+   contribution to the initiative surface. Do not make slices smaller than the
+   next real review, risk, ownership, or human-in-the-loop gate requires.
 5. Route every slice back to the initiative surface. If a slice wants a new
    surface or objective, decide whether it belongs here or should become a
    separate initiative.
@@ -1348,21 +1351,25 @@ constraints, approvals, and final direction.
    make, and include your recommendation when you have one.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
-4. Route through the relevant skill chain and invoke the next skill in that
+4. Before routing substantial work, make a sizing and routing call: classify
+   the work shape, choose the largest coherent vertical slice that can be
+   completed and verified before the next human-in-the-loop gate, and explain
+   the tradeoff briefly.
+5. Route through the relevant skill chain and invoke the next skill in that
    chain. In a DevNexus workspace, use \`docs/user/skill-chains.md\` as the
    routing map for substantial led work when it is available. For work large
    enough to plan or slice, check whether \`parallel-work-dispatch\` would
    accelerate safe independent progress.
-5. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+6. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
-6. Track commitments, blockers, verification, and the next action so the user
+7. Track commitments, blockers, verification, and the next action so the user
    can decide from state, not from memory.
-7. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+8. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
    credentials, external provider writes, publication, destructive cleanup, or
    live runtime gates.
-8. Close loops. When a decision is made, record what changed and continue from
+9. Close loops. When a decision is made, record what changed and continue from
    that decision instead of relitigating it.
-9. End every substantive response with a push toward the next step: the
+10. End every substantive response with a push toward the next step: the
    recommended next action, the human-in-the-loop unblock needed, a short set
    of direction choices with your default, or a ready-to-run prompt the user
    can approve.
@@ -1380,6 +1387,32 @@ prompt instead of ending on a passive status summary.
 When leading multi-step work, choose the current skill chain before taking the
 next action. Say the chain when it matters, then invoke the next skill in that
 chain.
+
+## Sizing And Routing Call
+
+Use ordinary product and Agile planning terms so the recommendation is
+understandable across tools:
+
+- Direct answer: no durable work item is needed.
+- Task: one narrow technical action or support step.
+- Bug: a defect to reproduce, diagnose, fix, and verify.
+- Product Backlog Item or story: one independently useful vertical slice that
+  can reach Definition of Done in one led pass.
+- Epic: a larger outcome that must be split into related stories or Product
+  Backlog Items.
+- Initiative: a durable objective spanning multiple epics, components,
+  surfaces, or decision cycles.
+
+Do not equate "lead" with "make tiny slices." Prefer the largest coherent
+vertical slice that can be implemented, reviewed, verified, and handed off
+before the next real human-in-the-loop gate. Split only when scope uncertainty,
+review boundaries, ownership, risk, verification cost, provider mutation,
+credentials, or live-runtime safety make a smaller gate necessary.
+
+Estimate the shape of the work, not a calendar promise, unless the user asks
+for an actual time estimate. Use evidence from the codebase and tracker first;
+if the shape is uncertain, perform the next reversible discovery step, then
+revise the routing call.
 
 For Git-backed initiative work, choose the Git delivery topology before
 preparing a worktree. Direct slice topology is the default when slices can land
@@ -1456,6 +1489,17 @@ Source: openai/openai-agents-python docs/human_in_the_loop.md at
 45effb4b7d7de1226ebba7ba304bccfcf0a37fdf.
 https://github.com/openai/openai-agents-python/blob/45effb4b7d7de1226ebba7ba304bccfcf0a37fdf/docs/human_in_the_loop.md
 https://openai.github.io/openai-agents-python/human_in_the_loop/
+
+Terminology references: Scrum Guide 2020 for Product Backlog Items,
+Increment, Sprint Goal, and Definition of Done; Agile Alliance glossary for
+epic and estimation; Atlassian Agile Coach for story, epic, and initiative
+hierarchy; Microsoft Engineering Fundamentals Playbook for work item hierarchy;
+Ministry of Testing glossary for vertical slice.
+https://scrumguides.org/scrum-guide.html
+https://agilealliance.org/agile101/agile-glossary/
+https://www.atlassian.com/agile/project-management/epics-stories-themes
+https://microsoft.github.io/code-with-engineering-playbook/documentation/guidance/work-items/
+https://www.ministryoftesting.com/software-testing-glossary/vertical-slice
 `,
   ),
   designWithUserSkill,
@@ -1647,7 +1691,10 @@ Use this skill when a plan, specification, or Product Requirements Document (PRD
 
 1. Gather the source plan, existing issue context, tracker conventions, and relevant domain glossary or Architecture Decision Records.
 2. Explore enough code to understand the current implementation state before proposing issue boundaries.
-3. Split the work into tracer-bullet vertical slices: each issue should deliver a narrow end-to-end behavior that can be demonstrated or verified on its own.
+3. Split the work into vertical slices: each issue should deliver an end-to-end
+   behavior or result that can be demonstrated or verified on its own. Use a
+   technical task only when the work cannot honestly be framed as user-visible
+   or end-to-end progress.
 4. Mark each proposed slice as human-in-the-loop (HITL) when it needs product, design, architecture, or external judgment, or autonomous agent-ready (AFK) when it can be implemented and verified without human interaction.
 5. Present the proposed issue list for review with title, type, blockers, user stories covered, and acceptance criteria.
 6. After approval, create or update tracker issues in dependency order. Do not close or rewrite the parent issue unless explicitly asked.

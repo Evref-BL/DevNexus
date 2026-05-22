@@ -177,7 +177,10 @@ function appServerProjectConfig(
   };
 }
 
-function initializeResult(request: CodexAppServerJsonRpcRequest): CodexAppServerJsonRpcResponse {
+function initializeResult(
+  request: CodexAppServerJsonRpcRequest,
+  extraMethods: readonly string[] = [],
+): CodexAppServerJsonRpcResponse {
   return {
     id: request.id,
     result: {
@@ -188,6 +191,7 @@ function initializeResult(request: CodexAppServerJsonRpcRequest): CodexAppServer
           "turn/start",
           "turn/interrupt",
           "thread/read",
+          ...extraMethods,
         ],
       },
     },
@@ -364,6 +368,164 @@ describe("nexus automation Codex app-server launch", () => {
         resultFile: result.resultFile,
       },
     });
+  });
+
+  it("sets a Codex Goal after thread creation when the app-server supports goals", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-goal-");
+    const sourceRoot = path.join(projectRoot, "source");
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    const projectConfig = appServerProjectConfig();
+    projectConfig.automation = {
+      ...projectConfig.automation!,
+      target: {
+        ...projectConfig.automation!.target,
+        id: "goal-target",
+        objective: "Use Codex Goals to finish bounded DevNexus targets.",
+      },
+    };
+    saveProjectConfig(projectRoot, projectConfig);
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request, ["thread/goal/set"]);
+      }
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: { threadId: "thread-goal" },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          result: {},
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "completed",
+          summary: "Codex app-server projected the target into a thread Goal",
+        });
+        return {
+          id: request.id,
+          result: { turnId: "turn-goal" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-goal-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        cwd: (input) => input.sourceRoot,
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      launch: {
+        codexAppServer: {
+          status: "completed",
+          threadId: "thread-goal",
+          turnId: "turn-goal",
+        },
+      },
+    });
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "turn/start",
+    ]);
+
+    const goalParams = requestParams(transport, "thread/goal/set");
+    expect(goalParams).toMatchObject({
+      threadId: "thread-goal",
+      objective: expect.stringContaining(
+        "Use Codex Goals to finish bounded DevNexus targets.",
+      ),
+    });
+    expect(goalParams).not.toHaveProperty("tokenBudget");
+    const objective = goalParams.objective as string;
+    expect(objective).toContain(result.resultFile!);
+    expect(objective).toContain("App-server launch task");
+    expect(objective).toContain("Stop and report blocked");
+    expect(objective).not.toContain("\\n");
+  });
+
+  it("continues the turn when the Codex app-server reports goals are disabled", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-goal-disabled-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request, ["thread/goal/set"]);
+      }
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: { threadId: "thread-goal-disabled" },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          error: {
+            code: -32600,
+            message: "goals feature is disabled",
+          },
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "completed",
+          summary: "Codex app-server continued without goal projection",
+        });
+        return {
+          id: request.id,
+          result: { turnId: "turn-goal-disabled" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-goal-disabled-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      launch: {
+        codexAppServer: {
+          status: "completed",
+          threadId: "thread-goal-disabled",
+          turnId: "turn-goal-disabled",
+        },
+      },
+    });
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "turn/start",
+    ]);
   });
 
   it("forks a durable app-server thread when explicitly requested", async () => {
