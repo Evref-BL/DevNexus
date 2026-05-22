@@ -147,6 +147,7 @@ describe("README onboarding guardrails", () => {
     expect(quickStart).toContain("Choose `project`");
     expect(quickStart).toContain("Choose `workspace`");
     expect(quickStart).toContain("existing Git repository");
+    expect(quickStart).toContain("related components");
     expect(quickStart).toContain("primary component");
     expect(quickStart).toContain("components/<id>");
     expect(quickStart).toContain("AGENTS.md");
@@ -167,7 +168,8 @@ describe("README onboarding guardrails", () => {
     expect(combined).toContain("Embedded project layout");
     expect(combined).toContain("Coordination workspace layout");
     expect(combined).toContain("Choose what you are setting up");
-    expect(combined).toContain("accept `.` as the primary component source path");
+    expect(combined).toContain("accept `.` as the primary component");
+    expect(combined).toContain("additional related components");
     expect(combined).toContain("Unrelated dirty product files still block readiness");
   });
 
