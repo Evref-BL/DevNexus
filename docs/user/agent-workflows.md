@@ -15,6 +15,13 @@ Agents should not rely on the diagrams being loaded automatically. Skills such
 as `take-the-lead` include compact routing rules and can use the skill-chain
 page as supporting context when the workspace docs are available.
 
+When `take-the-lead` is active, the agent should treat the chains as routing
+rules: choose the current chain, invoke the next skill, and evaluate
+`parallel-work-dispatch` when independent domains appear. A user request to lead
+the work is enough authorization to recommend subagents, subject to workspace
+policy, tool availability, cost, provider-mutation, credential, and runtime
+approval gates.
+
 ## MCP Server
 
 Start the generic stdio Model Context Protocol (MCP) server with:

@@ -353,10 +353,19 @@ describe("nexus skills", () => {
       "End every substantive response",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
+      "Route through the relevant skill chain",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
       "recommended next action",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "choose the Git delivery topology before",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "parallel-work-dispatch",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Do not wait for the user to say \"use subagents\" again",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
       "docs/user/skill-chains.md",
@@ -420,6 +429,12 @@ describe("nexus skills", () => {
     );
     expect(skillMarkdown["parallel-work-dispatch"]).toContain(
       "skills/dispatching-parallel-agents/SKILL.md",
+    );
+    expect(skillMarkdown["parallel-work-dispatch"]).toContain(
+      "agent-led coordination through",
+    );
+    expect(skillMarkdown["parallel-work-dispatch"]).toContain(
+      "Check delegation fit",
     );
     expect(skillMarkdown["parallel-work-dispatch"]).toContain(
       "must not revert edits made by others",

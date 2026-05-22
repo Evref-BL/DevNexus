@@ -829,7 +829,7 @@ component ownership, worktree policy, tracker records, and publication gates.
 const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   "parallel-work-dispatch",
   "parallel-work-dispatch",
-  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use only when independent slices can be delegated safely and the user has asked for subagents or parallel agent work.",
+  "Parallel work coordination workflow adapted from Superpowers dispatching-parallel-agents and subagent-driven-development. Use when independent slices can be delegated safely and the user has asked for subagents, parallel agent work, or agent-led coordination through take-the-lead.",
   [
     "skills/dispatching-parallel-agents/SKILL.md",
     "skills/subagent-driven-development/SKILL.md",
@@ -837,39 +837,49 @@ const parallelWorkDispatchSkill = adaptedSuperpowersSkill(
   `
 # Parallel Work Dispatch
 
-Use this skill when the user has explicitly asked for subagents or parallel
-agent work, and the work can be split into independent domains.
+Use this skill when independent work can be delegated safely and the user has
+asked for subagents, parallel agent work, or agent-led coordination through
+\`take-the-lead\`. Under \`take-the-lead\`, the coordinator should decide when
+parallel work is useful instead of waiting for the user to name subagents.
 
 ## Workflow
 
 1. Identify the independent domains. Good boundaries are separate components,
    disjoint files, separate tracker items, unrelated failures, or independent
    artifacts with no shared mutable state.
-2. Keep the coordinator local to the initiative surface. The coordinator owns
+2. Check delegation fit: enough context to brief a worker, no likely shared-file
+   collisions, useful sidecar work while the coordinator continues, available
+   agent or subagent tooling, and a clear review and integration path.
+3. Keep the coordinator local to the initiative surface. The coordinator owns
    the plan, delivery topology, branch or artifact set, tracker anchor,
    integration order, and final verification.
-3. Assign each worker one bounded task with an explicit write scope, expected
+4. Assign each worker one bounded task with an explicit write scope, expected
    output, verification command, and handoff format. Tell workers they are not
    alone in the codebase and must not revert edits made by others.
-4. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
+5. Use isolated DevNexus worktrees, disjoint files, or non-overlapping artifact
    paths for mutating work. Avoid parallel edits to the same file unless one
    agent is explicitly the integrator.
-5. Dispatch only sidecar work that can progress while the coordinator continues
+6. Dispatch only sidecar work that can progress while the coordinator continues
    useful non-overlapping work. Keep immediate blockers local when waiting would
    stall the critical path.
-6. Review returned work before integration: spec fit first, then implementation
+7. Review returned work before integration: spec fit first, then implementation
    quality, then conflict risk. Ask the worker to fix its own slice when review
    finds issues.
-7. Integrate deliberately. Use DevNexus coordination status or integration
+8. Integrate deliberately. Use DevNexus coordination status or integration
    planning when multiple branches or handoffs exist, then run focused and
    broader verification from the integration surface.
-8. Record the result in the tracker, target-cycle facts, coordination handoff,
+9. Record the result in the tracker, target-cycle facts, coordination handoff,
    or pull request so the parallel work does not vanish into chat history.
 
 ## Guardrails
 
 - Do not dispatch subagents unless the user explicitly requested subagents,
-  delegation, or parallel agent work.
+  delegation, parallel agent work, or agent-led coordination through
+  \`take-the-lead\`.
+- Do not dispatch subagents for small direct tasks where coordination overhead
+  exceeds useful parallel progress.
+- Do not launch external workers when tool availability, workspace policy, cost,
+  credentials, or provider writes require human-in-the-loop approval.
 - Do not delegate urgent blocking work when the coordinator's next action
   depends on the result.
 - Do not give a worker the whole chat transcript when a focused prompt with
@@ -1338,16 +1348,19 @@ constraints, approvals, and final direction.
    make, and include your recommendation when you have one.
 3. Keep momentum: choose the next reversible action, execute it, then report the
    result and next decision point.
-4. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
+4. Route through the relevant skill chain and invoke the next skill in that
+   chain. For work large enough to plan or slice, check whether
+   \`parallel-work-dispatch\` would accelerate safe independent progress.
+5. Make tradeoffs explicit. Prefer "I recommend X because Y; the cost is Z" over
    open-ended option dumps.
-5. Track commitments, blockers, verification, and the next action so the user
+6. Track commitments, blockers, verification, and the next action so the user
    can decide from state, not from memory.
-6. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
+7. Pause for human-in-the-loop decisions at scope, risk, cost, safety,
    credentials, external provider writes, publication, destructive cleanup, or
    live runtime gates.
-7. Close loops. When a decision is made, record what changed and continue from
+8. Close loops. When a decision is made, record what changed and continue from
    that decision instead of relitigating it.
-8. End every substantive response with a push toward the next step: the
+9. End every substantive response with a push toward the next step: the
    recommended next action, the human-in-the-loop unblock needed, a short set
    of direction choices with your default, or a ready-to-run prompt the user
    can approve.
@@ -1372,6 +1385,13 @@ independently; stacked topology fits dependent slices; initiative integration
 branch topology needs explicit approval; throw-away integration branches are
 for rehearsal only.
 
+Treat \`parallel-work-dispatch\` as an optional branch in every substantial
+chain, not only in version work. Evaluate it after triage, design, planning,
+or issue slicing exposes independent domains. Use it when work can be split
+by component, disjoint files, separate tracker items, independent failures, or
+separate artifacts; skip it when the task is small, tightly coupled, blocked by
+one decision, or would force workers into the same mutable files.
+
 - Unclear goal or scope: \`triage\` or \`design-with-user\`.
 - Existing plan that needs pressure: \`grill-me\`; use \`grill-with-docs\` when
   code, glossary terms, docs, or Architecture Decision Records should decide.
@@ -1390,6 +1410,16 @@ for rehearsal only.
   \`to-issues\` -> delivery topology decision ->
   \`write-implementation-plan\`, then execute and verify each slice before
   final approval.
+
+## Delegation Decision
+
+Under \`take-the-lead\`, the user's request to lead authorizes the agent to
+recommend and use subagents when the workspace supports them and the work is
+actually parallelizable. Do not wait for the user to say "use subagents" again.
+Before dispatching, confirm the split, write scopes, verification, integration
+path, and any human-in-the-loop gate for cost, provider mutation, credentials,
+or live runtime actions. If subagent tooling is unavailable, continue inline
+and say what would have been delegated.
 
 In a DevNexus workspace, consult \`docs/user/skill-chains.md\` for the full
 workflow-composition diagrams when the route is unclear or the work spans a

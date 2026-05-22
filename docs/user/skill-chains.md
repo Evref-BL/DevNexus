@@ -3,11 +3,14 @@
 DevNexus skills should compose as workflow verbs. These workflow composition
 diagrams show common skill chains, using skills as nodes and decisions as
 diamonds. The diagrams are supporting maps; the skill text carries the compact
-rules agents should follow when the diagrams are not rendered. Some skills are
-frames rather than phases: `dev-nexus` provides workspace infrastructure,
-`take-the-lead` changes the collaboration contract while the user keeps
-decision authority, and `initiative-workflow` holds a durable objective,
-delivery topology, and integration surface across slices.
+rules agents should follow when the diagrams are not rendered. `take-the-lead`
+should actively route work through these chains instead of treating them as
+background documentation.
+
+Some skills are frames rather than phases: `dev-nexus` provides workspace
+infrastructure, `take-the-lead` changes the collaboration contract while the
+user keeps decision authority, and `initiative-workflow` holds a durable
+objective, delivery topology, and integration surface across slices.
 
 ```mermaid
 flowchart LR
@@ -32,6 +35,28 @@ flowchart TD
   Start -->|"existing plan, project evidence needed"| GrillDocs["grill-with-docs"]
   GrillDocs --> Docs["documentation"]
   GrillDocs --> ADR["architecture-review"]
+```
+
+## Delegation Overlay
+
+`parallel-work-dispatch` is an optional branch on any substantial chain, not a
+separate workflow that only starts when the user says "subagents". Under
+`take-the-lead`, the agent should decide whether delegation is useful after a
+chain exposes independent domains.
+
+Use `parallel-work-dispatch` when there are separate components, disjoint files,
+separate tracker items, independent failures, or separate artifacts with clear
+write scopes and verification paths. Skip it for small direct tasks, tightly
+coupled edits, tasks blocked by one decision, or work that would force workers
+into the same mutable files.
+
+```mermaid
+flowchart TD
+  A["active skill chain"] --> B{"Independent domains?"}
+  B -->|"yes, useful sidecar work"| C["parallel-work-dispatch"]
+  C --> D["review returned work"]
+  D --> E["integrate and verify"]
+  B -->|"no or overhead too high"| F["continue inline"]
 ```
 
 ## Git Delivery Topologies
