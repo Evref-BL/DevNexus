@@ -112,6 +112,7 @@ import type {
   NexusAutomationWorkTrackerProviderFactory,
 } from "./nexusAutomationRunOnce.js";
 import type {
+  NexusAutomationCodexAppServerGoalMetadata,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 import {
@@ -282,6 +283,7 @@ export interface NexusAutomationAgentLaunchResult {
 }
 
 export type {
+  NexusAutomationCodexAppServerGoalMetadata,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunchMetadata.js";
 

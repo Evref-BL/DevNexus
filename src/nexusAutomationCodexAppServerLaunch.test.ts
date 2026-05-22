@@ -388,7 +388,7 @@ describe("nexus automation Codex app-server launch", () => {
 
     const transport = new MockCodexAppServerTransport((request) => {
       if (request.method === "initialize") {
-        return initializeResult(request, ["thread/goal/set"]);
+        return initializeResult(request, ["thread/goal/set", "thread/goal/get"]);
       }
       if (request.method === "thread/start") {
         return {
@@ -399,7 +399,7 @@ describe("nexus automation Codex app-server launch", () => {
       if (request.method === "thread/goal/set") {
         return {
           id: request.id,
-          result: {},
+          result: { goalId: "goal-1" },
         };
       }
       if (request.method === "turn/start") {
@@ -410,6 +410,19 @@ describe("nexus automation Codex app-server launch", () => {
         return {
           id: request.id,
           result: { turnId: "turn-goal" },
+        };
+      }
+      if (request.method === "thread/goal/get") {
+        return {
+          id: request.id,
+          result: {
+            goalId: "goal-1",
+            threadId: "thread-goal",
+            status: "completed",
+            tokenBudget: 100000,
+            tokensUsed: 4250,
+            timeUsedMs: 90000,
+          },
         };
       }
       throw new Error(`unexpected method ${request.method}`);
@@ -435,6 +448,18 @@ describe("nexus automation Codex app-server launch", () => {
           status: "completed",
           threadId: "thread-goal",
           turnId: "turn-goal",
+          goal: {
+            requested: true,
+            set: true,
+            readAvailable: true,
+            goalId: "goal-1",
+            threadId: "thread-goal",
+            status: "completed",
+            tokenBudget: 100000,
+            tokensUsed: 4250,
+            timeUsedMs: 90000,
+            unavailableReason: null,
+          },
         },
       },
     });
@@ -443,6 +468,7 @@ describe("nexus automation Codex app-server launch", () => {
       "thread/start",
       "thread/goal/set",
       "turn/start",
+      "thread/goal/get",
     ]);
 
     const goalParams = requestParams(transport, "thread/goal/set");
@@ -458,6 +484,180 @@ describe("nexus automation Codex app-server launch", () => {
     expect(objective).toContain("App-server launch task");
     expect(objective).toContain("Stop and report blocked");
     expect(objective).not.toContain("\\n");
+  });
+
+  it("records budget-limited Goal facts without treating them as successful completion", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-goal-budget-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request, ["thread/goal/set", "thread/goal/get"]);
+      }
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: { threadId: "thread-budget" },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          result: { goal: { id: "goal-budget" } },
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "blocked",
+          summary: "Goal budget was exhausted before completion",
+          error: "goal budget limited",
+        });
+        return {
+          id: request.id,
+          result: { turnId: "turn-budget" },
+        };
+      }
+      if (request.method === "thread/goal/get") {
+        return {
+          id: request.id,
+          result: {
+            goal: {
+              id: "goal-budget",
+              threadId: "thread-budget",
+              status: "budgetLimited",
+              tokenBudget: 1000,
+              tokensUsed: 1000,
+              timeUsedMs: 45000,
+            },
+          },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-goal-budget-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      summary: "Goal budget was exhausted before completion",
+      launch: {
+        error: "goal budget limited",
+        codexAppServer: {
+          status: "blocked",
+          threadId: "thread-budget",
+          turnId: "turn-budget",
+          failureSummary: "goal budget limited",
+          goal: {
+            requested: true,
+            set: true,
+            readAvailable: true,
+            goalId: "goal-budget",
+            threadId: "thread-budget",
+            status: "budgetLimited",
+            tokenBudget: 1000,
+            tokensUsed: 1000,
+            timeUsedMs: 45000,
+            unavailableReason: null,
+          },
+        },
+      },
+    });
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "turn/start",
+      "thread/goal/get",
+    ]);
+  });
+
+  it("records missing Goal read support as optional app-server absence", async () => {
+    const projectRoot = makeTempDir("dev-nexus-app-server-goal-no-read-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, appServerProjectConfig());
+    await createReadyWork(projectRoot);
+
+    const transport = new MockCodexAppServerTransport((request) => {
+      if (request.method === "initialize") {
+        return initializeResult(request, ["thread/goal/set"]);
+      }
+      if (request.method === "thread/start") {
+        return {
+          id: request.id,
+          result: { threadId: "thread-write-only-goal" },
+        };
+      }
+      if (request.method === "thread/goal/set") {
+        return {
+          id: request.id,
+          result: { goalId: "goal-write-only" },
+        };
+      }
+      if (request.method === "turn/start") {
+        writeResultFromTurnRequest(request, {
+          status: "completed",
+          summary: "Codex app-server completed without Goal readback",
+        });
+        return {
+          id: request.id,
+          result: { turnId: "turn-write-only-goal" },
+        };
+      }
+      throw new Error(`unexpected method ${request.method}`);
+    });
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "app-server-goal-no-read-run",
+      now: fixedClock(
+        "2026-05-16T10:00:00.000Z",
+        "2026-05-16T10:01:00.000Z",
+      ),
+      launcher: createNexusAutomationCodexAppServerLauncher({
+        clientFactory: () => new CodexAppServerJsonRpcClient({ transport }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      launch: {
+        codexAppServer: {
+          status: "completed",
+          threadId: "thread-write-only-goal",
+          turnId: "turn-write-only-goal",
+          goal: {
+            requested: true,
+            set: true,
+            readAvailable: false,
+            goalId: "goal-write-only",
+            threadId: "thread-write-only-goal",
+            status: null,
+            tokenBudget: null,
+            tokensUsed: null,
+            timeUsedMs: null,
+            unavailableReason: "thread/goal/get unavailable",
+          },
+        },
+      },
+    });
+    expect(transport.requests.map((request) => request.method)).toEqual([
+      "initialize",
+      "thread/start",
+      "thread/goal/set",
+      "turn/start",
+    ]);
   });
 
   it("continues the turn when the Codex app-server reports goals are disabled", async () => {

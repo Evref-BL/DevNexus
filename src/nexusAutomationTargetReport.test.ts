@@ -216,6 +216,101 @@ describe("nexus automation target report", () => {
     });
   });
 
+  it("surfaces Codex Goal lifecycle facts in execution reports", () => {
+    const projectRoot = makeTempDir("dev-nexus-target-report-goal-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:00:00.000Z",
+      record: {
+        id: "run-goal-budget",
+        projectId: "report-demo",
+        status: "blocked",
+        summary: "Goal budget was exhausted before completion.",
+        error: "goal budget limited",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "blocked",
+          action: "thread_start",
+          runId: "run-goal-budget",
+          profileId: "codex-app-server",
+          threadId: "thread-budget",
+          turnId: "turn-budget",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: path.join(projectRoot, "source"),
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus", "result.json"),
+          failureSummary: "goal budget limited",
+          goal: {
+            requested: true,
+            set: true,
+            readAvailable: true,
+            goalId: "goal-budget",
+            threadId: "thread-budget",
+            status: "budgetLimited",
+            tokenBudget: 1000,
+            tokensUsed: 1000,
+            timeUsedMs: 45000,
+            unavailableReason: null,
+          },
+        },
+      },
+    });
+    appendNexusAutomationTargetCycleRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-16T10:05:00.000Z",
+      record: {
+        id: "cycle-goal-budget",
+        projectId: "report-demo",
+        targetId: "dogfood",
+        runId: "run-goal-budget",
+        status: "blocked",
+        summary: "Goal budget limited the Codex thread.",
+        blockers: ["Goal budget limited before completion."],
+      },
+    });
+
+    const report = buildNexusAutomationTargetReport({
+      projectRoot,
+      now: "2026-05-16T10:10:00.000Z",
+    });
+
+    expect(report.executionSummary?.runs[0]?.codexAppServer?.goal)
+      .toMatchObject({
+        requested: true,
+        set: true,
+        readAvailable: true,
+        goalId: "goal-budget",
+        threadId: "thread-budget",
+        status: "budgetLimited",
+        tokenBudget: 1000,
+        tokensUsed: 1000,
+        timeUsedMs: 45000,
+        unavailableReason: null,
+      });
+    const componentRun = report.componentProgress
+      .flatMap((component) => component.runs)
+      .find((run) => run.runId === "run-goal-budget");
+    expect(componentRun?.codexAppServer?.goal).toMatchObject({
+      status: "budgetLimited",
+      tokenBudget: 1000,
+      tokensUsed: 1000,
+      timeUsedMs: 45000,
+    });
+    expect(report.relaunchDecision).toMatchObject({
+      type: "report_blocked",
+      latestRunId: "run-goal-budget",
+    });
+  });
+
   it("adds compact version planning readiness facts when configured", async () => {
     const projectRoot = makeTempDir("dev-nexus-target-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

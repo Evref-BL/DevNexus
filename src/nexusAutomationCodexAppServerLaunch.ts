@@ -14,6 +14,7 @@ import type {
   NexusAutomationAgentLaunchResult,
   NexusAutomationAgentLaunchStatus,
   NexusAutomationAgentLauncher,
+  NexusAutomationCodexAppServerGoalMetadata,
   NexusAutomationCodexAppServerLaunchMetadata,
 } from "./nexusAutomationAgentLaunch.js";
 import {
@@ -105,6 +106,7 @@ export function createNexusAutomationCodexAppServerLauncher(
     let ephemeral = true;
     let threadId: string | null = null;
     let turnId: string | null = null;
+    let goal: NexusAutomationCodexAppServerGoalMetadata | null = null;
     const fork = options.fork ?? null;
     const action = fork ? "thread_fork" : "thread_start";
 
@@ -154,7 +156,7 @@ export function createNexusAutomationCodexAppServerLauncher(
           "id",
           "thread.id",
         ], "thread id");
-        await maybeSetCodexThreadGoal({
+        goal = await maybeSetCodexThreadGoal({
           adapter,
           input,
           threadId,
@@ -187,6 +189,11 @@ export function createNexusAutomationCodexAppServerLauncher(
             options.turnCompletionNotificationTimeoutMs ??
             defaultTurnCompletionNotificationTimeoutMs,
         });
+        goal = await maybeReadCodexThreadGoal({
+          adapter,
+          threadId,
+          goal,
+        });
 
         const reported = readNexusAutomationAgentResultFile(input.resultFile);
         if (reported.status !== "loaded") {
@@ -205,6 +212,7 @@ export function createNexusAutomationCodexAppServerLauncher(
               ephemeral,
               cwd,
               failureSummary: reported.error,
+              goal,
             }),
           };
         }
@@ -233,6 +241,7 @@ export function createNexusAutomationCodexAppServerLauncher(
             ephemeral,
             cwd,
             failureSummary: resultFailureSummary,
+            goal,
           }),
         };
       } finally {
@@ -259,6 +268,7 @@ export function createNexusAutomationCodexAppServerLauncher(
                 ephemeral,
                 cwd: cwd || input.projectRoot,
                 failureSummary,
+                goal,
               }),
             }
           : {}),
@@ -564,14 +574,26 @@ async function maybeSetCodexThreadGoal(options: {
   input: NexusAutomationAgentLaunchInput;
   threadId: string;
   goalOptions: CreateNexusAutomationCodexAppServerLauncherOptions["goal"];
-}): Promise<void> {
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
   const projection = resolveCodexThreadGoalProjection(options.goalOptions);
-  if (!projection.enabled || !options.adapter.capabilities.threadGoalSet.available) {
-    return;
+  if (!projection.enabled) {
+    return null;
+  }
+
+  const base = codexThreadGoalMetadata({
+    threadId: options.threadId,
+    tokenBudget: projection.tokenBudget,
+    readAvailable: options.adapter.capabilities.threadGoalGet.available,
+  });
+  if (!options.adapter.capabilities.threadGoalSet.available) {
+    return {
+      ...base,
+      unavailableReason: "thread/goal/set unavailable",
+    };
   }
 
   try {
-    await options.adapter.client.request(
+    const result = await options.adapter.client.request(
       options.adapter.capabilities.threadGoalSet.method,
       codexThreadGoalSetParams({
         input: options.input,
@@ -579,12 +601,160 @@ async function maybeSetCodexThreadGoal(options: {
         tokenBudget: projection.tokenBudget,
       }),
     );
+    return mergeCodexThreadGoalMetadata(base, result, {
+      set: true,
+      unavailableReason: null,
+    });
   } catch (error) {
     if (isCodexThreadGoalUnavailableError(error)) {
-      return;
+      return {
+        ...base,
+        unavailableReason: codexThreadGoalUnavailableReason(error),
+      };
     }
     throw error;
   }
+}
+
+async function maybeReadCodexThreadGoal(options: {
+  adapter: CodexAppServerCapabilityAdapter;
+  threadId: string;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
+}): Promise<NexusAutomationCodexAppServerGoalMetadata | null> {
+  if (!options.goal?.requested) {
+    return options.goal;
+  }
+  if (!options.goal.set) {
+    return options.goal;
+  }
+  if (!options.adapter.capabilities.threadGoalGet.available) {
+    return {
+      ...options.goal,
+      readAvailable: false,
+      unavailableReason:
+        options.goal.unavailableReason ?? "thread/goal/get unavailable",
+    };
+  }
+
+  try {
+    const result = await options.adapter.client.request(
+      options.adapter.capabilities.threadGoalGet.method,
+      compactRecord({
+        threadId: options.threadId,
+        goalId: options.goal.goalId ?? undefined,
+      }),
+    );
+    return mergeCodexThreadGoalMetadata(options.goal, result, {
+      readAvailable: true,
+      unavailableReason: null,
+    });
+  } catch (error) {
+    if (isCodexThreadGoalReadUnavailableError(error)) {
+      return {
+        ...options.goal,
+        readAvailable: false,
+        unavailableReason: codexThreadGoalUnavailableReason(error),
+      };
+    }
+    throw error;
+  }
+}
+
+function codexThreadGoalMetadata(options: {
+  threadId: string;
+  tokenBudget?: number | null;
+  readAvailable: boolean;
+}): NexusAutomationCodexAppServerGoalMetadata {
+  return {
+    requested: true,
+    set: false,
+    readAvailable: options.readAvailable,
+    goalId: null,
+    threadId: options.threadId,
+    status: null,
+    tokenBudget: options.tokenBudget ?? null,
+    tokensUsed: null,
+    timeUsedMs: null,
+    unavailableReason: null,
+  };
+}
+
+function mergeCodexThreadGoalMetadata(
+  base: NexusAutomationCodexAppServerGoalMetadata,
+  value: unknown,
+  overrides: Partial<NexusAutomationCodexAppServerGoalMetadata>,
+): NexusAutomationCodexAppServerGoalMetadata {
+  if (!isRecord(value)) {
+    return {
+      ...base,
+      ...overrides,
+    };
+  }
+
+  return {
+    ...base,
+    goalId: firstStringAtPath(value, [
+      "goalId",
+      "goal_id",
+      "id",
+      "goal.id",
+      "goal.goalId",
+      "goal.goal_id",
+    ]) ?? base.goalId,
+    threadId: firstStringAtPath(value, [
+      "threadId",
+      "thread_id",
+      "thread.id",
+      "goal.threadId",
+      "goal.thread_id",
+      "goal.thread.id",
+    ]) ?? base.threadId,
+    status: firstStringAtPath(value, [
+      "status",
+      "state",
+      "goal.status",
+      "goal.state",
+    ]) ?? base.status,
+    tokenBudget: firstNumberAtPath(value, [
+      "tokenBudget",
+      "token_budget",
+      "budget.tokenBudget",
+      "budget.token_budget",
+      "budget.tokens",
+      "goal.tokenBudget",
+      "goal.token_budget",
+      "goal.budget.tokenBudget",
+      "goal.budget.token_budget",
+      "goal.budget.tokens",
+    ]) ?? base.tokenBudget,
+    tokensUsed: firstNumberAtPath(value, [
+      "tokensUsed",
+      "tokens_used",
+      "usage.tokensUsed",
+      "usage.tokens_used",
+      "usage.tokens",
+      "goal.tokensUsed",
+      "goal.tokens_used",
+      "goal.usage.tokensUsed",
+      "goal.usage.tokens_used",
+      "goal.usage.tokens",
+    ]) ?? base.tokensUsed,
+    timeUsedMs: firstNumberAtPath(value, [
+      "timeUsedMs",
+      "time_used_ms",
+      "timeMs",
+      "usage.timeUsedMs",
+      "usage.time_used_ms",
+      "usage.timeMs",
+      "goal.timeUsedMs",
+      "goal.time_used_ms",
+      "goal.timeMs",
+      "goal.usage.timeUsedMs",
+      "goal.usage.time_used_ms",
+      "goal.usage.timeMs",
+    ]) ?? base.timeUsedMs,
+    ...overrides,
+  };
 }
 
 function codexThreadGoalSetParams(options: {
@@ -688,6 +858,34 @@ function isCodexThreadGoalUnavailableError(error: unknown): boolean {
   const message = error.message.toLowerCase();
   return /goals? feature is disabled/.test(message) ||
     /goals? (are|is) (disabled|unavailable|unsupported)/.test(message);
+}
+
+function isCodexThreadGoalReadUnavailableError(error: unknown): boolean {
+  if (!(error instanceof CodexAppServerJsonRpcError)) {
+    return false;
+  }
+  if (error.method !== "thread/goal/get") {
+    return false;
+  }
+  if (error.code === -32601) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return /goals? feature is disabled/.test(message) ||
+    /goals? (are|is) (disabled|unavailable|unsupported)/.test(message);
+}
+
+function codexThreadGoalUnavailableReason(error: unknown): string {
+  if (error instanceof CodexAppServerJsonRpcError) {
+    if (error.code === -32601) {
+      return `${error.method} unavailable`;
+    }
+
+    return error.message;
+  }
+
+  return "Codex Goal unavailable";
 }
 
 function codexExecutionParams(options: {
@@ -849,6 +1047,7 @@ function codexAppServerMetadata(options: {
   ephemeral: boolean;
   cwd: string;
   failureSummary: string | null;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
 }): NexusAutomationCodexAppServerLaunchMetadata {
   return {
     provider: "codex-app-server",
@@ -867,6 +1066,7 @@ function codexAppServerMetadata(options: {
     reasoning: options.profile.reasoning,
     resultFile: options.input.resultFile,
     failureSummary: options.failureSummary,
+    goal: options.goal,
   };
 }
 
@@ -918,6 +1118,26 @@ function firstStringAtPath(
     const candidate = valueAtPath(value, path);
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function firstNumberAtPath(
+  value: Record<string, unknown>,
+  paths: readonly string[],
+): number | null {
+  for (const path of paths) {
+    const candidate = valueAtPath(value, path);
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
+    }
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
     }
   }
 

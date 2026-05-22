@@ -4,6 +4,19 @@ export type NexusAutomationCodexAppServerLaunchStatus =
   | "failed"
   | "blocked";
 
+export interface NexusAutomationCodexAppServerGoalMetadata {
+  requested: boolean;
+  set: boolean;
+  readAvailable: boolean;
+  goalId: string | null;
+  threadId: string | null;
+  status: string | null;
+  tokenBudget: number | null;
+  tokensUsed: number | null;
+  timeUsedMs: number | null;
+  unavailableReason: string | null;
+}
+
 export interface NexusAutomationCodexAppServerLaunchMetadata {
   provider: "codex-app-server";
   status: NexusAutomationCodexAppServerLaunchStatus;
@@ -21,4 +34,5 @@ export interface NexusAutomationCodexAppServerLaunchMetadata {
   reasoning: string | null;
   resultFile: string;
   failureSummary: string | null;
+  goal: NexusAutomationCodexAppServerGoalMetadata | null;
 }

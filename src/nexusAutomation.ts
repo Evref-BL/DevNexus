@@ -628,6 +628,52 @@ function normalizeCodexAppServerLaunchMetadata(
       "automation run.codexAppServer.resultFile",
     ),
     failureSummary: optionalNullableString(record.failureSummary) ?? null,
+    goal: normalizeCodexAppServerGoalMetadata(record.goal),
+  };
+}
+
+function normalizeCodexAppServerGoalMetadata(
+  value: unknown,
+): NexusAutomationCodexAppServerLaunchMetadata["goal"] {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new NexusAutomationError(
+      "automation run.codexAppServer.goal must be an object",
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    requested: requiredBoolean(
+      record.requested,
+      "automation run.codexAppServer.goal.requested",
+    ),
+    set: requiredBoolean(
+      record.set,
+      "automation run.codexAppServer.goal.set",
+    ),
+    readAvailable: requiredBoolean(
+      record.readAvailable,
+      "automation run.codexAppServer.goal.readAvailable",
+    ),
+    goalId: optionalNullableString(record.goalId) ?? null,
+    threadId: optionalNullableString(record.threadId) ?? null,
+    status: optionalNullableString(record.status) ?? null,
+    tokenBudget: optionalNullableFiniteNumber(
+      record.tokenBudget,
+      "automation run.codexAppServer.goal.tokenBudget",
+    ),
+    tokensUsed: optionalNullableFiniteNumber(
+      record.tokensUsed,
+      "automation run.codexAppServer.goal.tokensUsed",
+    ),
+    timeUsedMs: optionalNullableFiniteNumber(
+      record.timeUsedMs,
+      "automation run.codexAppServer.goal.timeUsedMs",
+    ),
+    unavailableReason: optionalNullableString(record.unavailableReason) ?? null,
   };
 }
 
@@ -743,6 +789,17 @@ function requiredBoolean(value: unknown, name: string): boolean {
   }
 
   throw new NexusAutomationError(`${name} must be a boolean`);
+}
+
+function optionalNullableFiniteNumber(value: unknown, name: string): number | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new NexusAutomationError(`${name} must be a finite number`);
+  }
+
+  return value;
 }
 
 function optionalIsoString(value: unknown, name: string): string | null {
