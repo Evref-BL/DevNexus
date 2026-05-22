@@ -627,23 +627,14 @@ export async function createNexusCoordinationHandoff(
     ...recordBase,
     leaseId: lease.id,
   };
-  let comment: WorkComment;
-  try {
-    comment = await workItemServiceForContext(context, options.now).addComment({
-      projectRoot: context.projectRoot,
-      componentId: context.component.id,
-      trackerId: coordinationTracker.tracker.id,
-      ref: { id: target.itemId },
-      body: formatCoordinationHandoffComment(record),
-    });
-  } catch (error) {
-    throw new Error(
-      `Coordination handoff comment failed for component "${context.component.id}" ` +
-        `tracker "${coordinationTracker.tracker.id}" provider ` +
-        `"${coordinationTracker.tracker.workTracking.provider}" item "${target.itemId}": ` +
-        errorDetail(error),
-    );
-  }
+  const comment = await coordinationHandoffPublisher({
+    context,
+    tracker: coordinationTracker,
+  }).publish({
+    target,
+    record,
+    now: options.now,
+  });
 
   return {
     project: projectSummary(context),
@@ -2077,6 +2068,60 @@ function assertCoordinationHandoffWriteCapability(options: {
     diagnostic.message,
     diagnostic,
   );
+}
+
+interface CoordinationHandoffPublisher {
+  publish(options: {
+    target: { itemId: string };
+    record: NexusCoordinationHandoffRecord;
+    now?: () => Date | string;
+  }): Promise<WorkComment | null>;
+}
+
+const noopCoordinationHandoffPublisher: CoordinationHandoffPublisher = {
+  async publish() {
+    return null;
+  },
+};
+
+function coordinationHandoffPublisher(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+}): CoordinationHandoffPublisher {
+  if (options.tracker.tracker.communication.coordinationHandoffs === "silent") {
+    return noopCoordinationHandoffPublisher;
+  }
+
+  return commentCoordinationHandoffPublisher(options);
+}
+
+function commentCoordinationHandoffPublisher(options: {
+  context: ResolvedCoordinationContext;
+  tracker: ResolvedCoordinationTracker;
+}): CoordinationHandoffPublisher {
+  return {
+    async publish(input) {
+      try {
+        return await workItemServiceForContext(
+          options.context,
+          input.now,
+        ).addComment({
+          projectRoot: options.context.projectRoot,
+          componentId: options.context.component.id,
+          trackerId: options.tracker.tracker.id,
+          ref: { id: input.target.itemId },
+          body: formatCoordinationHandoffComment(input.record),
+        });
+      } catch (error) {
+        throw new Error(
+          `Coordination handoff comment failed for component "${options.context.component.id}" ` +
+            `tracker "${options.tracker.tracker.id}" provider ` +
+            `"${options.tracker.tracker.workTracking.provider}" item "${input.target.itemId}": ` +
+            errorDetail(error),
+        );
+      }
+    },
+  };
 }
 
 function coordinationProviderCapabilityDiagnostic(options: {

@@ -379,6 +379,11 @@ function validateHostingAuthProfile(
     pathName,
   );
   const purposes = optionalCredentialPurposes(record, "purposes", pathName);
+  const repositoryScopes = optionalStringArray(
+    record,
+    "repositoryScopes",
+    pathName,
+  );
   const githubApp = validateHostingGitHubAppCredentialConfig(
     record.githubApp,
     pathName,
@@ -401,6 +406,7 @@ function validateHostingAuthProfile(
     ...(commandArgs !== undefined ? { commandArgs } : {}),
     ...(environmentKeys !== undefined ? { environmentKeys } : {}),
     ...(purposes !== undefined ? { purposes } : {}),
+    ...(repositoryScopes !== undefined ? { repositoryScopes } : {}),
     ...(githubApp !== undefined ? { githubApp } : {}),
   };
 }

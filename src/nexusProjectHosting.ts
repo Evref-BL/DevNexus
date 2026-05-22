@@ -124,6 +124,7 @@ export interface NexusHostingAuthProfileConfig {
   commandArgs?: string[];
   environmentKeys?: string[];
   purposes?: NexusHostingAuthProfileCredentialPurpose[];
+  repositoryScopes?: string[];
   githubApp?: NexusHostingGitHubAppCredentialConfig;
 }
 

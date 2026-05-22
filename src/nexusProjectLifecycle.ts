@@ -4,9 +4,11 @@ import path from "node:path";
 import {
   loadProjectConfig,
   normalizeComponentWorkTrackers,
+  normalizeNexusProjectTrackerCommunicationPolicy,
   projectConfigPath,
   projectWorktreesRootPath,
   validateProjectConfig,
+  type NormalizedNexusProjectTrackerCommunicationPolicy,
   type NormalizedNexusProjectTrackerDiscoveryPolicy,
   type NexusProjectComponentConfig,
   type NexusProjectWorkTrackerBindingConfig,
@@ -33,6 +35,7 @@ export interface ResolvedNexusProjectWorkTracker {
   enabled: boolean;
   roles: NexusProjectWorkTrackerBindingConfig["roles"];
   default: boolean;
+  communication: NormalizedNexusProjectTrackerCommunicationPolicy;
   workTracking: NexusProjectWorkTrackerBindingConfig["workTracking"];
   workTrackingCapabilities: TrackerCapabilities;
   workTrackingCapabilityReport: WorkTrackerCapabilityReport;
@@ -211,7 +214,11 @@ export function resolveProjectComponent(
   );
   const normalizedWorkTrackers = normalizeComponentWorkTrackers(component);
   const workTrackers = normalizedWorkTrackers.trackers.map((tracker) =>
-    resolveProjectWorkTracker(tracker, normalizedWorkTrackers.defaultTrackerId),
+    resolveProjectWorkTracker(
+      tracker,
+      normalizedWorkTrackers.defaultTrackerId,
+      projectConfig.workTrackerCommunication,
+    ),
   );
   const defaultWorkTracking =
     normalizedWorkTrackers.defaultTracker?.workTracking ?? null;
@@ -252,6 +259,7 @@ export function resolveProjectComponent(
 function resolveProjectWorkTracker(
   tracker: NexusProjectWorkTrackerBindingConfig,
   defaultTrackerId: string | null,
+  projectCommunication: NexusProjectConfig["workTrackerCommunication"],
 ): ResolvedNexusProjectWorkTracker {
   return {
     id: tracker.id,
@@ -260,6 +268,11 @@ function resolveProjectWorkTracker(
     enabled: tracker.enabled,
     roles: tracker.roles,
     default: defaultTrackerId === tracker.id,
+    communication: normalizeNexusProjectTrackerCommunicationPolicy({
+      provider: tracker.workTracking.provider,
+      project: projectCommunication,
+      tracker: tracker.communication,
+    }),
     workTracking: tracker.workTracking,
     workTrackingCapabilities: workTrackerCapabilitiesForConfig(
       tracker.workTracking,

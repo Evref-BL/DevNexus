@@ -114,6 +114,7 @@ describe("home config primitives", () => {
             githubCliConfigDir: path.join(homePath, "gh-example-bot"),
             command: "gh-example-bot",
             environmentKeys: ["GH_CONFIG_DIR"],
+            repositoryScopes: ["Evref-BL/DevNexus"],
           },
           {
             id: "dev-nexus-app",
@@ -167,6 +168,7 @@ describe("home config primitives", () => {
         githubCliConfigDir: path.join(homePath, "gh-example-bot"),
         command: "gh-example-bot",
         environmentKeys: ["GH_CONFIG_DIR"],
+        repositoryScopes: ["Evref-BL/DevNexus"],
       },
       {
         id: "dev-nexus-app",
