@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  appendNexusAutomationRunRecord,
   appendNexusAutomationTargetCycleRecord,
   buildNexusDashboardSnapshot,
   CodexAppServerJsonRpcClient,
@@ -268,6 +269,9 @@ class MockCodexAppServerTransport implements CodexAppServerJsonRpcTransport {
     if (request.method === "thread/start") {
       return { id: request.id, result: { thread: { id: "thread-1" } } };
     }
+    if (request.method === "thread/resume") {
+      return { id: request.id, result: { thread: { id: "existing-thread" } } };
+    }
     if (request.method === "turn/start") {
       return { id: request.id, result: { turn: { id: "turn-1" } } };
     }
@@ -294,9 +298,9 @@ class RecordingCodexChatStarter implements NexusDashboardCodexChatStarter {
   ): Promise<NexusDashboardCodexChatStartResult> {
     this.starts.push(options);
     return {
-      status: "started",
+      status: options.threadId ? "resumed" : "started",
       profileId: "codex-app-server",
-      threadId: "thread-1",
+      threadId: options.threadId ?? "thread-1",
       turnId: "turn-1",
       cwd: options.cwd ?? options.projectRoot,
       model: "gpt-5.5",
@@ -499,11 +503,20 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderPlugins");
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
-    expect(module).toContain("Copy Codex brief");
-    expect(module).toContain("Start Codex chat");
-    expect(module).toContain("data-start-codex-prompt");
+    expect(module).toContain("Copy brief");
+    expect(module).toContain("Start chat");
+    expect(module).toContain("Resume chat");
+    expect(module).toContain("data-start-chat-prompt");
+    expect(module).toContain("data-chat-target-id");
     expect(module).toContain("/api/codex/thread");
     expect(module).toContain("x-dev-nexus-action-token");
+    expect(module).toContain("renderChatActionStrip");
+    expect(module).toContain("detailPrompt");
+    expect(module).toContain("sentenceLine");
+    expect(module).toContain("stripTerminalPunctuation");
+    expect(module).not.toContain("Copy Codex brief");
+    expect(module).not.toContain("Start Codex chat");
+    expect(module).not.toContain("data-start-codex-prompt");
     expect(module).toContain("Parallel work map");
     expect(module).toContain("dn-work-stack");
     expect(module).toContain("dn-plugin-row");
@@ -599,6 +612,132 @@ describe("nexus dashboard", () => {
     expect(codexChatStarter.closed).toBe(true);
   });
 
+  it("resumes a recorded assistant thread for cockpit targets", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-server-resume-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    writeNexusWorktreeLeaseStore(projectRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(config.id),
+      ],
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-21T10:02:00.000Z",
+      record: {
+        id: "run-chat-1",
+        projectId: config.id,
+        componentId: "primary",
+        status: "completed",
+        startedAt: "2026-05-21T10:01:00.000Z",
+        finishedAt: "2026-05-21T10:02:00.000Z",
+        workItemId: "local-1",
+        branchName: "codex/dev-nexus/github-114-dashboard",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-chat-1",
+          profileId: "codex-app-server",
+          threadId: "existing-thread",
+          turnId: "turn-old",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: false,
+          threadPersistence: "durable",
+          cwd: projectRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus", "automation", "result.json"),
+          failureSummary: null,
+        },
+      },
+    });
+    appendNexusAutomationRunRecord({
+      projectRoot,
+      config: config.automation!,
+      now: "2026-05-21T10:03:00.000Z",
+      record: {
+        id: "run-chat-ephemeral",
+        projectId: config.id,
+        componentId: "primary",
+        status: "completed",
+        startedAt: "2026-05-21T10:02:30.000Z",
+        finishedAt: "2026-05-21T10:03:00.000Z",
+        workItemId: "local-1",
+        branchName: "codex/dev-nexus/github-114-dashboard",
+        codexAppServer: {
+          provider: "codex-app-server",
+          status: "completed",
+          action: "thread_start",
+          runId: "run-chat-ephemeral",
+          profileId: "codex-app-server",
+          threadId: "ephemeral-thread",
+          turnId: "turn-ephemeral",
+          sourceThreadId: null,
+          sourceTurnId: null,
+          ephemeral: true,
+          threadPersistence: "ephemeral",
+          cwd: projectRoot,
+          model: "gpt-5.5",
+          reasoning: "high",
+          resultFile: path.join(projectRoot, ".dev-nexus", "automation", "result.json"),
+          failureSummary: null,
+        },
+      },
+    });
+    const codexChatStarter = new RecordingCodexChatStarter();
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      codexChatStarter,
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      const response = await fetch(`${server.url}api/codex/thread`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-dev-nexus-action-token": actionToken!,
+        },
+        body: JSON.stringify({
+          prompt: "Continue cockpit target.",
+          title: "Resume dashboard branch",
+          targetId: "thread:lease-dashboard",
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body).toMatchObject({
+        ok: true,
+        result: {
+          status: "resumed",
+          profileId: "codex-app-server",
+          threadId: "existing-thread",
+          turnId: "turn-1",
+        },
+      });
+      expect(codexChatStarter.starts).toEqual([
+        {
+          projectRoot,
+          prompt: "Continue cockpit target.",
+          title: "Resume dashboard branch",
+          threadId: "existing-thread",
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("rejects browser-controlled profile and cwd values for Codex thread actions", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-server-guard-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -624,6 +763,8 @@ describe("nexus dashboard", () => {
           prompt: "Review blocked approval.",
           profileId: "other-profile",
           cwd: "/tmp",
+          threadId: "other-thread",
+          assistantThreadId: "other-thread",
         }),
       });
       const body = await response.json();
@@ -690,6 +831,70 @@ describe("nexus dashboard", () => {
           {
             type: "text",
             text: "Review this thread.",
+            text_elements: [],
+          },
+        ],
+      });
+    } finally {
+      await starter.close();
+    }
+
+    expect(transport.closed).toBe(true);
+  });
+
+  it("resumes a durable Codex app-server chat from a known thread id", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-codex-resume-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      automation: appServerAutomationConfig(),
+    }));
+    const transport = new MockCodexAppServerTransport();
+    const starter = createNexusDashboardCodexChatStarter({
+      clientFactory: () =>
+        new CodexAppServerJsonRpcClient({
+          transport,
+        }),
+    });
+
+    try {
+      const result = await starter.start({
+        projectRoot,
+        prompt: "Resume this thread.",
+        threadId: "existing-thread",
+      });
+
+      expect(result).toMatchObject({
+        status: "resumed",
+        profileId: "codex-app-server",
+        threadId: "existing-thread",
+        turnId: "turn-1",
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        reasoning: "high",
+        threadPersistence: "durable",
+      });
+      expect(transport.requests.map((request) => request.method)).toEqual([
+        "initialize",
+        "thread/resume",
+        "turn/start",
+      ]);
+      expect(transport.requests[1]?.params).toMatchObject({
+        threadId: "existing-thread",
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+      });
+      expect(transport.requests[2]?.params).toMatchObject({
+        threadId: "existing-thread",
+        cwd: projectRoot,
+        model: "gpt-5.5",
+        effort: "high",
+        approvalPolicy: "never",
+        input: [
+          {
+            type: "text",
+            text: "Resume this thread.",
             text_elements: [],
           },
         ],

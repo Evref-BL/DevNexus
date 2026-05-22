@@ -369,27 +369,29 @@ export function renderNexusDashboardClientModule(): string {
     "        button.dataset.copied = 'error';",
     "        if (label) label.textContent = 'Copy failed';",
     "      }",
-    "      setTimeout(() => { delete button.dataset.copied; if (label) label.textContent = 'Copy Codex brief'; }, 1600);",
+    "      setTimeout(() => { delete button.dataset.copied; if (label) label.textContent = 'Copy brief'; }, 1600);",
     "    });",
     "  });",
-    "  container.querySelectorAll('[data-start-codex-prompt]').forEach((button) => {",
+    "  container.querySelectorAll('[data-start-chat-prompt]').forEach((button) => {",
     "    button.addEventListener('click', async () => {",
-    "      const prompt = button.getAttribute('data-start-codex-prompt') ?? '';",
-    "      const title = button.getAttribute('data-start-codex-title') ?? '';",
+    "      const prompt = button.getAttribute('data-start-chat-prompt') ?? '';",
+    "      const title = button.getAttribute('data-start-chat-title') ?? '';",
+    "      const targetId = button.getAttribute('data-chat-target-id') ?? '';",
+    "      const startingLabel = button.getAttribute('data-chat-resume') === 'true' ? 'Resuming...' : 'Starting...';",
     "      const label = button.querySelector('.dn-action-label');",
     "      button.disabled = true;",
-    "      if (label) label.textContent = 'Starting...';",
+    "      if (label) label.textContent = startingLabel;",
     "      try {",
     "        const headers = { 'content-type': 'application/json' };",
     "        if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;",
     "        const response = await fetch(`${baseUrl}/api/codex/thread`, {",
     "          method: 'POST',",
     "          headers,",
-    "          body: JSON.stringify({ prompt, title }),",
+    "          body: JSON.stringify({ prompt, title, targetId }),",
     "        });",
     "        const payload = await response.json();",
     "        if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);",
-    "        if (label) label.textContent = 'Chat started';",
+    "        if (label) label.textContent = payload.result?.status === 'resumed' ? 'Chat resumed' : 'Chat started';",
     "        button.title = `Thread ${payload.result?.threadId ?? 'started'}`;",
     "      } catch (error) {",
     "        if (label) label.textContent = 'Setup needed';",
@@ -438,7 +440,7 @@ export function renderNexusDashboardClientModule(): string {
     "function renderInspector(snapshot, selectedId) {",
     "  const detail = selectedDetail(snapshot, selectedId);",
     "  const body = formatDisplayText(detail.body);",
-    "  return `<aside class=\"dn-panel dn-inspector\"><span class=\"dn-eyebrow\">Details</span><h2>${escapeHtml(truncate(detail.title, 80))}</h2><p title=\"${escapeHtml(body)}\">${escapeHtml(truncate(body, 220))}</p>${renderActionStrip(detail.actions)}<dl class=\"dn-detail-grid\">${detail.facts.map((fact) => { const value = formatDisplayText(fact[1]); return `<div><dt>${escapeHtml(fact[0])}</dt><dd title=\"${escapeHtml(value)}\">${escapeHtml(truncate(value, 90))}</dd></div>`; }).join('')}</dl>${detail.events.length ? `<div class=\"dn-related\"><span class=\"dn-label\">Related activity</span>${detail.events.slice(0, 3).map((event) => `<article><strong>${escapeHtml(truncate(event.title, 70))}</strong><p>${escapeHtml(truncate(formatDisplayText(event.body), 140))}</p>${renderActionStrip(event.actions, 'compact')}</article>`).join('')}</div>` : ''}</aside>`;",
+    "  return `<aside class=\"dn-panel dn-inspector\"><span class=\"dn-eyebrow\">Details</span><h2>${escapeHtml(truncate(detail.title, 80))}</h2><p title=\"${escapeHtml(body)}\">${escapeHtml(truncate(body, 220))}</p>${renderActionStrip(detail.actions)}${renderChatActionStrip(detail.chat)}<dl class=\"dn-detail-grid\">${detail.facts.map((fact) => { const value = formatDisplayText(fact[1]); return `<div><dt>${escapeHtml(fact[0])}</dt><dd title=\"${escapeHtml(value)}\">${escapeHtml(truncate(value, 90))}</dd></div>`; }).join('')}</dl>${detail.events.length ? `<div class=\"dn-related\"><span class=\"dn-label\">Related activity</span>${detail.events.slice(0, 3).map((event) => `<article><strong>${escapeHtml(truncate(event.title, 70))}</strong><p>${escapeHtml(truncate(formatDisplayText(event.body), 140))}</p>${renderActionStrip(event.actions, 'compact')}</article>`).join('')}</div>` : ''}</aside>`;",
     "}",
     "",
     "function renderComponents(components, selectedId) {",
@@ -459,23 +461,61 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderThreadActions(thread) {",
     "  const links = uniqueActions(thread.actions ?? []).slice(0, 2).map((action) => `<a class=\"dn-action\" href=\"${escapeHtml(action.href)}\" target=\"_blank\" rel=\"noreferrer\" aria-label=\"${escapeHtml(externalActionLabel(action))}\">${providerIcon(action.provider)}<span class=\"dn-action-label\">${escapeHtml(action.label ?? 'Open provider')}</span>${externalLinkIcon()}</a>`).join('');",
-    "  const prompt = codexThreadPrompt(thread);",
+    "  const prompt = cockpitThreadPrompt(thread);",
     "  const title = `Continue ${thread.title}`;",
-    "  return `<div class=\"dn-action-strip compact\">${links}<button class=\"dn-action dn-start-action\" type=\"button\" data-start-codex-prompt=\"${escapeHtml(prompt)}\" data-start-codex-title=\"${escapeHtml(title)}\">${codexIcon()}<span class=\"dn-action-label\">Start Codex chat</span></button><button class=\"dn-action dn-local-action\" type=\"button\" data-copy-prompt=\"${escapeHtml(prompt)}\">${clipboardIcon()}<span class=\"dn-action-label\">Copy Codex brief</span></button></div>`;",
+    "  return `<div class=\"dn-action-strip compact\">${links}${renderChatButtons({ prompt, title, targetId: `thread:${thread.id}`, resumeThreadId: thread.assistantThreadId })}</div>`;",
     "}",
     "",
-    "function codexThreadPrompt(thread) {",
+    "function renderChatActionStrip(chat, mode = '') {",
+    "  if (!chat?.prompt) return '';",
+    "  const className = mode ? `dn-action-strip ${mode}` : 'dn-action-strip';",
+    "  return `<div class=\"${className}\">${renderChatButtons(chat)}</div>`;",
+    "}",
+    "",
+    "function renderChatButtons(chat) {",
+    "  const title = chat.title ?? 'Continue in chat';",
+    "  const targetId = chat.targetId ?? '';",
+    "  const resume = Boolean(chat.resumeThreadId);",
+    "  const primaryLabel = resume ? 'Resume chat' : 'Start chat';",
+    "  return `<button class=\"dn-action dn-start-action\" type=\"button\" data-start-chat-prompt=\"${escapeHtml(chat.prompt)}\" data-start-chat-title=\"${escapeHtml(title)}\" data-chat-target-id=\"${escapeHtml(targetId)}\" data-chat-resume=\"${resume ? 'true' : 'false'}\">${chatIcon()}<span class=\"dn-action-label\">${primaryLabel}</span></button><button class=\"dn-action dn-local-action\" type=\"button\" data-copy-prompt=\"${escapeHtml(chat.prompt)}\">${clipboardIcon()}<span class=\"dn-action-label\">Copy brief</span></button>`;",
+    "}",
+    "",
+    "function cockpitThreadPrompt(thread) {",
     "  const lines = [",
-    "    `Continue DevNexus cockpit thread: ${thread.title}.`,",
-    "    `Decision: ${thread.decisionLabel}.`,",
-    "    `Reason: ${formatDisplayText(thread.decisionDetail)}.`,",
-    "    thread.componentId ? `Component: ${thread.componentId}.` : '',",
-    "    thread.branchName ? `Branch: ${thread.branchName}.` : '',",
-    "    thread.workItemId ? `Work item: ${thread.workItemId}.` : '',",
-    "    thread.hostId ? `Host: ${thread.hostId}.` : '',",
+    "    sentenceLine('Continue cockpit thread', thread.title),",
+    "    sentenceLine('Decision', thread.decisionLabel),",
+    "    sentenceLine('Reason', thread.decisionDetail),",
+    "    thread.componentId ? sentenceLine('Component', thread.componentId) : '',",
+    "    thread.branchName ? sentenceLine('Branch', thread.branchName) : '',",
+    "    thread.workItemId ? sentenceLine('Work item', thread.workItemId) : '',",
+    "    thread.hostId ? sentenceLine('Host', thread.hostId) : '',",
     "    'Inspect the current workspace state, preserve unrelated changes, and recommend the next safe action.'",
     "  ].filter(Boolean);",
     "  return lines.join('\\n');",
+    "}",
+    "",
+    "function detailPrompt(detail) {",
+    "  const lines = [",
+    "    sentenceLine('Continue cockpit item', detail.title),",
+    "    sentenceLine('Status', factValue(detail.facts, 'Status')),",
+    "    sentenceLine('Type', factValue(detail.facts, 'Type')),",
+    "    sentenceLine('Reason', detail.body),",
+    "    'Inspect the current workspace state, preserve unrelated changes, and recommend the next safe action.'",
+    "  ].filter(Boolean);",
+    "  return lines.join('\\n');",
+    "}",
+    "",
+    "function sentenceLine(label, value) {",
+    "  const text = stripTerminalPunctuation(formatDisplayText(value));",
+    "  return text ? `${label}: ${text}.` : '';",
+    "}",
+    "",
+    "function stripTerminalPunctuation(value) {",
+    "  return String(value ?? '').trim().replace(/([.!?,;:]+)([\"')\\]]*)$/u, '$2').trim();",
+    "}",
+    "",
+    "function factValue(facts, label) {",
+    "  return facts.find((fact) => fact[0] === label)?.[1] ?? '';",
     "}",
     "",
     "function renderPlugins(plugins) {",
@@ -521,7 +561,7 @@ export function renderNexusDashboardClientModule(): string {
     "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 2.5h4M6.5 1.5h3A1.5 1.5 0 0111 3v.5H5V3a1.5 1.5 0 011.5-1.5zM4 3.5H3A1.5 1.5 0 001.5 5v8A1.5 1.5 0 003 14.5h10A1.5 1.5 0 0014.5 13V5A1.5 1.5 0 0013 3.5h-1\"/></svg>';",
     "}",
     "",
-    "function codexIcon() {",
+    "function chatIcon() {",
     "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3.5h10A1.5 1.5 0 0114.5 5v4A1.5 1.5 0 0113 10.5H8l-3.5 3v-3H3A1.5 1.5 0 011.5 9V5A1.5 1.5 0 013 3.5z\"/><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" d=\"M5 6.5h6M5 8.5h3\"/></svg>';",
     "}",
     "",
@@ -669,7 +709,17 @@ export function renderNexusDashboardClientModule(): string {
     "  enrichNodeFacts(snapshot, node, facts);",
     "  const events = relatedEvents(snapshot, node?.id);",
     "  const actions = uniqueActions([...(node?.actions ?? []), ...events.flatMap((event) => event.actions ?? [])]);",
-    "  return { title: displayTitle(node, snapshot), body: displayBody(node, snapshot), facts, events, actions };",
+    "  const detail = { title: displayTitle(node, snapshot), body: displayBody(node, snapshot), facts, events, actions };",
+    "  return { ...detail, chat: detailChat(node, detail) };",
+    "}",
+    "",
+    "function detailChat(node, detail) {",
+    "  if (!node || !isActionableNode(node)) return null;",
+    "  return { prompt: detailPrompt(detail), title: `Continue ${detail.title}` };",
+    "}",
+    "",
+    "function isActionableNode(node) {",
+    "  return ['authority', 'blocker', 'worktree', 'run', 'target-cycle'].includes(node.kind) || ['blocked', 'failed', 'dirty', 'missing', 'stale'].includes(node.status);",
     "}",
     "",
     "function displayTitle(node, snapshot) {",
@@ -714,9 +764,9 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function signalDetail(snapshot, id) {",
     "  const signal = snapshot.signals.find((candidate) => `signal:${candidate.id}` === id) ?? snapshot.signals[0];",
-    "  if (id === 'signal:worktrees' && snapshot.threads) return { title: 'Threads', body: 'Open work threads are shown in Action Needed.', facts: [['Open', String(snapshot.threads.totalCount)], ['Needs review', String(snapshot.threads.needsDecisionCount)]], events: [], actions: [] };",
+    "  if (id === 'signal:worktrees' && snapshot.threads) return { title: 'Threads', body: 'Open work threads are shown in Action Needed.', facts: [['Open', String(snapshot.threads.totalCount)], ['Needs review', String(snapshot.threads.needsDecisionCount)]], events: [], actions: [], chat: null };",
     "  const events = id === 'signal:blockers' ? snapshot.events.filter((event) => event.id.startsWith('blocker-')).slice(0, 3) : snapshot.events.slice(0, 2);",
-    "  return { title: signal?.label ?? 'Signal', body: signal?.detail ?? snapshot.summary, facts: [['Value', signal?.value ?? 'unknown'], ['Tone', signal?.tone ?? 'neutral'], ['Project', snapshot.project.name]], events, actions: uniqueActions(events.flatMap((event) => event.actions ?? [])) };",
+    "  return { title: signal?.label ?? 'Signal', body: signal?.detail ?? snapshot.summary, facts: [['Value', signal?.value ?? 'unknown'], ['Tone', signal?.tone ?? 'neutral'], ['Project', snapshot.project.name]], events, actions: uniqueActions(events.flatMap((event) => event.actions ?? [])), chat: null };",
     "}",
     "",
     "function enrichNodeFacts(snapshot, node, facts) {",
@@ -965,12 +1015,19 @@ async function routeCodexThreadStart(
     const body = await readJsonBody(request);
     const prompt = requiredStringField(body, "prompt");
     const title = optionalStringField(body, "title");
+    const targetId = optionalStringField(body, "targetId");
     rejectClientControlledField(body, "profileId");
     rejectClientControlledField(body, "cwd");
+    rejectClientControlledField(body, "threadId");
+    rejectClientControlledField(body, "assistantThreadId");
+    const resumeThreadId = targetId
+      ? await resolveDashboardResumeThreadId(snapshotOptions, targetId)
+      : null;
     const result = await codexChatStarter.start({
       projectRoot: snapshotOptions.projectRoot,
       prompt,
       ...(title ? { title } : {}),
+      ...(resumeThreadId ? { threadId: resumeThreadId } : {}),
     });
     sendJson(response, { ok: true, result }, 201);
   } catch (error) {
@@ -989,6 +1046,22 @@ async function routeCodexThreadStart(
       statusCode,
     );
   }
+}
+
+async function resolveDashboardResumeThreadId(
+  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  targetId: string,
+): Promise<string | null> {
+  if (!targetId.startsWith("thread:")) {
+    return null;
+  }
+  const threadRecordId = targetId.slice("thread:".length);
+  if (!threadRecordId) {
+    return null;
+  }
+  const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
+  return snapshot.threads.records.find((record) => record.id === threadRecordId)
+    ?.assistantThreadId ?? null;
 }
 
 function requireDashboardMutationRequest(

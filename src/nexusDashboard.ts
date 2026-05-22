@@ -248,6 +248,8 @@ export interface NexusDashboardThreadRecord {
   pushed: boolean | null;
   cleanupSafe: boolean | null;
   cleanupBlockers: string[];
+  assistantProvider: "codex" | null;
+  assistantThreadId: string | null;
   updatedAt: string;
   actions: NexusDashboardProviderAction[];
 }
@@ -400,6 +402,7 @@ export async function buildNexusDashboardSnapshot(
     worktrees,
     providerUrls,
     cleanupPlan.value?.candidates ?? [],
+    runs,
   );
   const publication = summarizePublication(automation.value);
   const authority = summarizeAuthority(
@@ -1244,8 +1247,10 @@ function summarizeThreads(
   worktrees: NexusDashboardWorktreeSummary,
   providerUrls: NexusDashboardProviderUrls,
   cleanupCandidates: NexusCleanupCandidate[],
+  runs: NexusAutomationRunRecord[],
 ): NexusDashboardThreadSummary {
   const matchedCleanupIds = new Set<string>();
+  const assistantThreads = assistantThreadIndex(runs);
   const leaseRecords = worktrees.records
     .map((worktree): NexusDashboardThreadRecord => {
       const cleanup = cleanupCandidateForThread(cleanupCandidates, worktree);
@@ -1258,6 +1263,12 @@ function summarizeThreads(
         providerUrls,
         worktree.componentId,
       );
+      const assistantThread = assistantThreadForWork({
+        index: assistantThreads,
+        componentId: worktree.componentId,
+        workItemId: worktree.workItemId,
+        branchName: worktree.branchName,
+      });
       return {
         id: worktree.id,
         title: threadTitle(worktree),
@@ -1275,13 +1286,15 @@ function summarizeThreads(
         pushed: worktree.pushed,
         cleanupSafe: cleanup?.safeToDelete ?? null,
         cleanupBlockers: cleanup?.blockers ?? [],
+        assistantProvider: assistantThread ? "codex" : null,
+        assistantThreadId: assistantThread?.threadId ?? null,
         updatedAt: worktree.updatedAt,
         actions,
       };
     });
   const cleanupRecords = cleanupCandidates
     .filter((candidate) => !matchedCleanupIds.has(candidate.id))
-    .map((candidate) => cleanupThreadRecord(candidate, providerUrls));
+    .map((candidate) => cleanupThreadRecord(candidate, providerUrls, assistantThreads));
   const records = uniqueThreadRecords([...leaseRecords, ...cleanupRecords]).sort((left, right) => {
     const priority = threadDecisionPriority(left.decision) - threadDecisionPriority(right.decision);
     return priority !== 0 ? priority : right.updatedAt.localeCompare(left.updatedAt);
@@ -1338,9 +1351,16 @@ function preferThreadRecord(
 function cleanupThreadRecord(
   candidate: NexusCleanupCandidate,
   providerUrls: NexusDashboardProviderUrls,
+  assistantThreads: Map<string, AssistantThreadReference>,
 ): NexusDashboardThreadRecord {
   const decision = cleanupThreadDecision(candidate);
   const actionText = `${candidate.branch ?? ""} ${candidate.id}`;
+  const assistantThread = assistantThreadForWork({
+    index: assistantThreads,
+    componentId: candidate.componentId,
+    workItemId: candidate.lease?.workItemId ?? null,
+    branchName: candidate.branch,
+  });
   return {
     id: candidate.id,
     title: cleanupThreadTitle(candidate),
@@ -1358,9 +1378,80 @@ function cleanupThreadRecord(
     pushed: candidate.git.ahead === 0 ? true : candidate.git.ahead ? false : null,
     cleanupSafe: candidate.safeToDelete,
     cleanupBlockers: candidate.blockers,
+    assistantProvider: assistantThread ? "codex" : null,
+    assistantThreadId: assistantThread?.threadId ?? null,
     updatedAt: "",
     actions: providerActionsFromText(actionText, providerUrls, candidate.componentId),
   };
+}
+
+interface AssistantThreadReference {
+  threadId: string;
+  finishedAt: string | null;
+  startedAt: string;
+}
+
+function assistantThreadIndex(
+  runs: NexusAutomationRunRecord[],
+): Map<string, AssistantThreadReference> {
+  const index = new Map<string, AssistantThreadReference>();
+  for (const run of runs) {
+    const appServer = run.codexAppServer;
+    const threadId = appServer?.threadId;
+    if (!threadId || appServer.ephemeral || appServer.threadPersistence !== "durable") {
+      continue;
+    }
+    const reference: AssistantThreadReference = {
+      threadId,
+      finishedAt: run.finishedAt,
+      startedAt: run.startedAt,
+    };
+    for (const key of assistantThreadKeys({
+      componentId: run.componentId,
+      workItemId: run.workItemId,
+      branchName: run.branchName,
+    })) {
+      const previous = index.get(key);
+      if (!previous || assistantThreadReferenceTime(reference) > assistantThreadReferenceTime(previous)) {
+        index.set(key, reference);
+      }
+    }
+  }
+
+  return index;
+}
+
+function assistantThreadForWork(options: {
+  index: Map<string, AssistantThreadReference>;
+  componentId: string | null;
+  workItemId: string | null;
+  branchName: string | null;
+}): AssistantThreadReference | null {
+  for (const key of assistantThreadKeys(options)) {
+    const reference = options.index.get(key);
+    if (reference) {
+      return reference;
+    }
+  }
+
+  return null;
+}
+
+function assistantThreadKeys(options: {
+  componentId: string | null;
+  workItemId: string | null;
+  branchName: string | null;
+}): string[] {
+  const componentId = options.componentId ?? "workspace";
+  return [
+    options.branchName ? `branch:${componentId}:${options.branchName}` : null,
+    options.workItemId ? `work:${componentId}:${options.workItemId}` : null,
+  ].filter((key): key is string => Boolean(key));
+}
+
+function assistantThreadReferenceTime(reference: AssistantThreadReference): number {
+  const time = new Date(reference.finishedAt ?? reference.startedAt).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function cleanupThreadDecision(

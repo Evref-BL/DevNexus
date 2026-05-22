@@ -25,10 +25,11 @@ export interface NexusDashboardCodexChatStartOptions {
   title?: string | null;
   profileId?: string | null;
   cwd?: string | null;
+  threadId?: string | null;
 }
 
 export interface NexusDashboardCodexChatStartResult {
-  status: "started";
+  status: "started" | "resumed";
   profileId: string;
   threadId: string;
   turnId: string;
@@ -98,6 +99,7 @@ class NexusDashboardCodexChatStarterImpl
   ): Promise<NexusDashboardCodexChatStartResult> {
     const projectRoot = requiredNonEmptyString(options.projectRoot, "projectRoot");
     const prompt = requiredNonEmptyString(options.prompt, "prompt");
+    const requestedThreadId = optionalNonEmptyString(options.threadId, "threadId");
     const projectConfig = loadProjectConfig(projectRoot);
     const profile = resolveCodexAppServerProfile(projectConfig, options.profileId);
     const cwd = requiredNonEmptyString(options.cwd ?? projectRoot, "cwd");
@@ -110,20 +112,35 @@ class NexusDashboardCodexChatStarterImpl
         profile,
         cwd,
       });
-      const threadResult = await cached.client.request(
-        "thread/start",
-        codexThreadStartParams({
-          profile,
-          projectConfig,
-          cwd,
-        }),
-      );
-      const threadId = extractId(threadResult, [
-        "threadId",
-        "thread_id",
-        "id",
-        "thread.id",
-      ], "thread id");
+      const threadId = requestedThreadId ??
+        extractId(
+          await cached.client.request(
+            "thread/start",
+            codexThreadStartParams({
+              profile,
+              projectConfig,
+              cwd,
+            }),
+          ),
+          [
+            "threadId",
+            "thread_id",
+            "id",
+            "thread.id",
+          ],
+          "thread id",
+        );
+      if (requestedThreadId) {
+        await cached.client.request(
+          "thread/resume",
+          codexThreadResumeParams({
+            profile,
+            projectConfig,
+            cwd,
+            threadId: requestedThreadId,
+          }),
+        );
+      }
       const turnResult = await cached.client.request(
         "turn/start",
         codexTurnStartParams({
@@ -142,7 +159,7 @@ class NexusDashboardCodexChatStarterImpl
       ], "turn id");
 
       return {
-        status: "started",
+        status: requestedThreadId ? "resumed" : "started",
         profileId: profile.id,
         threadId,
         turnId,
@@ -331,6 +348,22 @@ function codexThreadStartParams(options: {
   });
 }
 
+function codexThreadResumeParams(options: {
+  profile: NexusAutomationAgentProfilePolicy;
+  projectConfig: NexusProjectConfig;
+  cwd: string;
+  threadId: string;
+}): Record<string, unknown> {
+  return compactRecord({
+    threadId: options.threadId,
+    cwd: options.cwd,
+    model: options.profile.model ?? undefined,
+    approvalPolicy: codexApprovalPolicy(options.profile) ?? undefined,
+    sandbox: codexSandboxMode(options.profile) ?? undefined,
+    config: codexMcpConfig(options.projectConfig),
+  });
+}
+
 function codexTurnStartParams(options: {
   profile: NexusAutomationAgentProfilePolicy;
   projectConfig: NexusProjectConfig;
@@ -465,6 +498,20 @@ function compactRecord(record: Record<string, unknown>): Record<string, unknown>
 function requiredNonEmptyString(value: unknown, name: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new NexusDashboardCodexChatError(`${name} must be a non-empty string`, 400);
+  }
+
+  return value.trim();
+}
+
+function optionalNonEmptyString(
+  value: unknown,
+  name: string,
+): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new NexusDashboardCodexChatError(`${name} must be a string`, 400);
   }
 
   return value.trim();
