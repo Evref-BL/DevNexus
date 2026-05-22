@@ -76,7 +76,9 @@ async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
   renderPlugins: (plugins: unknown) => string;
+  renderSignal: (signal: unknown, selectedId?: string | null) => string;
   renderTrackedWork: (snapshot: unknown, selectedId?: string | null) => string;
+  renderThreadInbox: (snapshot: unknown, selectedId?: string | null) => string;
   renderThreadActions: (thread: {
     actions?: unknown[];
     assistantThreadId?: string | null;
@@ -88,10 +90,11 @@ async function loadDashboardClientTestHooks(): Promise<{
   }) => string;
   selectedDetail: (snapshot: unknown, selectedId?: string | null) => {
     actions: Array<{ href: string; label: string }>;
-    chat: { prompt: string; targetId?: string; title: string } | null;
+    chat: { prompt: string; resumeThreadId?: string | null; targetId?: string; title: string } | null;
     facts: Array<[string, string]>;
     title: string;
   };
+  signalPanelTarget: (id: string) => string;
   timelineLanes: (snapshot: unknown) => Array<{
     detail?: string;
     index: number;
@@ -112,7 +115,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderThreadActions, renderTrackedWork, selectedDetail, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1080,6 +1083,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("bindWorkspaceControls");
     expect(module).toContain("bindHostSignalControls");
     expect(module).toContain("data-host-focus");
+    expect(module).toContain("data-scroll-target");
+    expect(module).toContain("scrollToDashboardSection");
+    expect(module).toContain("signalPanelTarget");
     expect(module).toContain("filteredHostActions");
     expect(module).toContain("filteredHostWorkspaces");
     expect(module).toContain("host-action-queue");
@@ -1091,6 +1097,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("targetSelectionId");
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
+    expect(module).toContain("threadSelectId");
+    expect(module).toContain("threadDetail");
+    expect(module).toContain("id=\"hitl-queue\"");
     expect(module).toContain("renderThreadPolicyAction");
     expect(module).toContain("renderPlugins");
     expect(module).toContain("pluginPills");
@@ -1144,6 +1153,11 @@ describe("nexus dashboard", () => {
     expect(module).toContain("selectedDetail");
     expect(module).toContain("renderSelectedItem");
     expect(module).toContain("dn-selected-panel");
+    expect(module).toContain("id=\"selected-item\"");
+    expect(module).toContain("id=\"tracked-work-panel\"");
+    expect(module).toContain("id=\"plugins-panel\"");
+    expect(module).toContain("id=\"components-panel\"");
+    expect(module).toContain("id=\"blockers-panel\"");
     expect(module).toContain("Selected item");
     expect(module).toContain("Summary");
     expect(module).toContain("Actions");
@@ -1173,7 +1187,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("rowGuides");
     expect(module).not.toContain("tonebox");
     expect(module).not.toContain("renderRailLabels");
-    expect(module).not.toContain("threadDetail");
+    expect(module).toContain("threadDetail");
     expect(module).toContain("left: calc(-115px + (var(--dn-lane) * 18px))");
     expect(module).toContain("-webkit-line-clamp: 3");
     expect(module).toContain("dn-action-strip");
@@ -1435,6 +1449,89 @@ describe("nexus dashboard", () => {
       title: "Continue Add cockpit issue lane",
     });
     expect(detail.chat?.prompt).toContain("Continue cockpit item: Add cockpit issue lane.");
+  });
+
+  it("routes signal cards to the relevant cockpit section", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    expect(hooks.signalPanelTarget("components")).toBe("components-panel");
+    expect(hooks.signalPanelTarget("eligible-work")).toBe("tracked-work-panel");
+    expect(hooks.signalPanelTarget("worktrees")).toBe("hitl-queue");
+    expect(hooks.signalPanelTarget("blockers")).toBe("blockers-panel");
+    expect(hooks.signalPanelTarget("plugins")).toBe("plugins-panel");
+
+    const html = hooks.renderSignal({
+      id: "eligible-work",
+      label: "Tracked work",
+      value: "2",
+      detail: "Ready issues",
+    }, "signal:eligible-work");
+
+    expect(html).toContain('data-select-id="signal:eligible-work"');
+    expect(html).toContain('data-scroll-target="tracked-work-panel"');
+    expect(html).toContain("selected");
+  });
+
+  it("makes HITL threads selectable with the same chat actions as the queue", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      events: [],
+      weave: {
+        nodes: [],
+      },
+      threads: {
+        records: [
+          {
+            id: "thread-1",
+            title: "Review dashboard thread",
+            decision: "archive",
+            decisionLabel: "Archive",
+            decisionDetail: "Useful notes, but not active work.",
+            branchName: "codex/dev-nexus/dashboard-thread",
+            componentId: "dev-nexus",
+            hostId: "local",
+            workItemId: "github-42",
+            updatedAt: "2026-05-21T10:00:00.000Z",
+            assistantThreadId: "codex-thread-1",
+            actions: [
+              {
+                label: "Open issue #42",
+                href: "https://github.com/Evref-BL/DevNexus/issues/42",
+                provider: "github",
+                kind: "issue",
+                title: "Dashboard thread",
+              },
+            ],
+          },
+        ],
+        needsDecisionCount: 1,
+        incomplete: false,
+      },
+    };
+
+    const html = hooks.renderThreadInbox(snapshot, "thread:thread-1");
+    expect(html).toContain('id="hitl-queue"');
+    expect(html).toContain('data-select-id="thread:thread-1"');
+    expect(html).toContain('data-scroll-target="selected-item"');
+    expect(html).toContain("selected");
+    expect(html).toContain("Resume chat");
+
+    const detail = hooks.selectedDetail(snapshot, "thread:thread-1");
+    expect(detail.title).toBe("Review dashboard thread");
+    expect(detail.actions).toEqual([
+      expect.objectContaining({
+        href: "https://github.com/Evref-BL/DevNexus/issues/42",
+      }),
+    ]);
+    expect(detail.chat).toMatchObject({
+      resumeThreadId: "codex-thread-1",
+      targetId: "thread:thread-1",
+      title: "Continue Review dashboard thread",
+    });
   });
 
   it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
