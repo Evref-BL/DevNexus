@@ -1,5 +1,3 @@
-import type { NexusProjectSetupAuthInventory } from "./nexusProjectSetupAuthInventory.js";
-import type { NexusProjectSetupHostingHandoff } from "./nexusProjectSetupHostingHandoff.js";
 import { defaultNexusHomePath } from "./nexusHomeConfig.js";
 
 export type NexusProjectSetupMutationClass =
@@ -166,6 +164,60 @@ export interface NexusProjectSetupAuthProfileAnswers {
   credentialMethod: NexusProjectSetupCredentialMethod;
 }
 
+export type NexusProjectSetupAuthRequirement =
+  | "required_now"
+  | "optional_later"
+  | "provider_mutation_only";
+
+export type NexusProjectSetupAuthCapabilityStatus =
+  | "available"
+  | "missing"
+  | "manual"
+  | "unknown";
+
+export interface NexusProjectSetupAuthReference {
+  path: string;
+  purpose: string;
+  provider?: NexusProjectSetupAuthProvider | NexusProjectSetupWorkTrackingProvider;
+  requirement: NexusProjectSetupAuthRequirement;
+}
+
+export interface NexusProjectSetupAuthCapabilityCheck {
+  id: string;
+  title: string;
+  status: NexusProjectSetupAuthCapabilityStatus;
+  summary: string;
+  nextAction: string;
+}
+
+export interface NexusProjectSetupAuthInventoryEntry {
+  id: string;
+  provider: NexusProjectSetupAuthProvider;
+  actorKind: NexusProjectSetupAuthProfileAnswers["actorKind"];
+  account: string | null;
+  host: string | null;
+  credentialMethodKind: NexusProjectSetupCredentialMethod["kind"];
+  credentialReference: string | null;
+  highestRequirement: NexusProjectSetupAuthRequirement;
+  references: NexusProjectSetupAuthReference[];
+  capabilityChecks: NexusProjectSetupAuthCapabilityCheck[];
+}
+
+export interface NexusProjectSetupMissingAuthReference {
+  profileId: string;
+  references: NexusProjectSetupAuthReference[];
+  nextAction: string;
+}
+
+export interface NexusProjectSetupAuthInventory {
+  profiles: NexusProjectSetupAuthInventoryEntry[];
+  missingProfiles: NexusProjectSetupMissingAuthReference[];
+  requiredNowProfileIds: string[];
+  providerMutationOnlyProfileIds: string[];
+  optionalLaterProfileIds: string[];
+  summary: string;
+}
+
 export interface NexusProjectSetupMetaHostingIntent {
   provider: NexusProjectSetupMetaHostingProvider;
   host?: string;
@@ -175,6 +227,35 @@ export interface NexusProjectSetupMetaHostingIntent {
   humanAuthProfileId?: string;
   automationAuthProfileId?: string;
   providerMutationAuthProfileId?: string;
+}
+
+export type NexusProjectSetupHostingHandoffStatus =
+  | "not_configured"
+  | "planned"
+  | "blocked_on_auth";
+
+export interface NexusProjectSetupHostingHandoffCommand {
+  id: "hosting-status" | "hosting-plan" | "hosting-apply";
+  title: string;
+  command: string;
+  providerMutation: boolean;
+  allowedDuringProjectSetup: boolean;
+  authProfileId: string | null;
+}
+
+export interface NexusProjectSetupHostingHandoff {
+  status: NexusProjectSetupHostingHandoffStatus;
+  provider: NexusProjectSetupMetaHostingIntent["provider"] | null;
+  host: string | null;
+  namespace: string | null;
+  repositoryName: string | null;
+  defaultBranch: string | null;
+  metaProjectOnly: true;
+  componentRepositoryHosting: "not_configured_by_project_setup";
+  summary: string;
+  commands: NexusProjectSetupHostingHandoffCommand[];
+  missingAuthProfileIds: string[];
+  providerMutationsDeferred: true;
 }
 
 export interface NexusProjectSetupPublicationAnswers {

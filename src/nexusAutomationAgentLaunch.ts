@@ -70,12 +70,13 @@ import {
 } from "./nexusAutomationWorkTrackerSummary.js";
 import {
   listNexusEligibleWorkByComponent,
-  type NexusEligibleWorkExcludedItem,
   type NexusEligibleWorkItem,
   type NexusEligibleWorkMode,
   type NexusEligibleWorkProviderFactory,
-  type NexusEligibleWorkTrackerQueryResult,
 } from "./nexusEligibleWork.js";
+import type {
+  NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationEligibleWorkItems.js";
 import {
   claimNexusEligibleWorkItem,
   type NexusWorkItemClaimObservation,
@@ -176,15 +177,9 @@ export interface NexusAutomationAgentLaunchComponentContext {
   relationships: ResolvedNexusProjectComponent["relationships"];
 }
 
-export interface NexusAutomationComponentEligibleWorkItems {
-  componentId: string;
-  workItems: WorkItem[];
-  importCandidateWorkItems?: NexusEligibleWorkItem[];
-  excludedWorkItems?: NexusEligibleWorkExcludedItem[];
-  warnings?: string[];
-  blockers?: string[];
-  trackerResults?: NexusEligibleWorkTrackerQueryResult[];
-}
+export type {
+  NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationEligibleWorkItems.js";
 
 export type NexusAutomationAgentLaunchWorkItemClaimStatus =
   NexusWorkItemClaimResult["status"] | "blocked" | "disabled";

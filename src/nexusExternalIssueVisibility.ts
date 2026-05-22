@@ -1,6 +1,6 @@
 import type {
   NexusAutomationComponentEligibleWorkItems,
-} from "./nexusAutomationAgentLaunch.js";
+} from "./nexusAutomationEligibleWorkItems.js";
 import type { NexusEligibleWorkItem } from "./nexusEligibleWork.js";
 import {
   nexusWorkItemDiscoveryTrackerSelection,

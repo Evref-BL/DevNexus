@@ -1,66 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import type {
-  NexusProjectSetupAuthProfileAnswers,
-  NexusProjectSetupCredentialMethod,
   NexusProjectSetupAnswers,
+  NexusProjectSetupAuthCapabilityCheck,
+  NexusProjectSetupAuthInventory,
+  NexusProjectSetupAuthInventoryEntry,
+  NexusProjectSetupAuthProfileAnswers,
   NexusProjectSetupAuthProvider,
-  NexusProjectSetupWorkTrackingProvider,
+  NexusProjectSetupAuthReference,
+  NexusProjectSetupAuthRequirement,
+  NexusProjectSetupCredentialMethod,
+  NexusProjectSetupMissingAuthReference,
 } from "./nexusProjectSetupModel.js";
 
-export type NexusProjectSetupAuthRequirement =
-  | "required_now"
-  | "optional_later"
-  | "provider_mutation_only";
-
-export type NexusProjectSetupAuthCapabilityStatus =
-  | "available"
-  | "missing"
-  | "manual"
-  | "unknown";
-
-export interface NexusProjectSetupAuthReference {
-  path: string;
-  purpose: string;
-  provider?: NexusProjectSetupAuthProvider | NexusProjectSetupWorkTrackingProvider;
-  requirement: NexusProjectSetupAuthRequirement;
-}
-
-export interface NexusProjectSetupAuthCapabilityCheck {
-  id: string;
-  title: string;
-  status: NexusProjectSetupAuthCapabilityStatus;
-  summary: string;
-  nextAction: string;
-}
-
-export interface NexusProjectSetupAuthInventoryEntry {
-  id: string;
-  provider: NexusProjectSetupAuthProvider;
-  actorKind: NexusProjectSetupAuthProfileAnswers["actorKind"];
-  account: string | null;
-  host: string | null;
-  credentialMethodKind: NexusProjectSetupCredentialMethod["kind"];
-  credentialReference: string | null;
-  highestRequirement: NexusProjectSetupAuthRequirement;
-  references: NexusProjectSetupAuthReference[];
-  capabilityChecks: NexusProjectSetupAuthCapabilityCheck[];
-}
-
-export interface NexusProjectSetupMissingAuthReference {
-  profileId: string;
-  references: NexusProjectSetupAuthReference[];
-  nextAction: string;
-}
-
-export interface NexusProjectSetupAuthInventory {
-  profiles: NexusProjectSetupAuthInventoryEntry[];
-  missingProfiles: NexusProjectSetupMissingAuthReference[];
-  requiredNowProfileIds: string[];
-  providerMutationOnlyProfileIds: string[];
-  optionalLaterProfileIds: string[];
-  summary: string;
-}
+export type {
+  NexusProjectSetupAuthCapabilityCheck,
+  NexusProjectSetupAuthCapabilityStatus,
+  NexusProjectSetupAuthInventory,
+  NexusProjectSetupAuthInventoryEntry,
+  NexusProjectSetupAuthReference,
+  NexusProjectSetupAuthRequirement,
+  NexusProjectSetupMissingAuthReference,
+} from "./nexusProjectSetupModel.js";
 
 export interface BuildNexusProjectSetupAuthInventoryOptions {
   env?: Record<string, string | undefined>;
