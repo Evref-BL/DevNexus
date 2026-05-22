@@ -969,7 +969,7 @@ export function buildNexusDashboardWeave(options: {
     { id: "work", label: "Work", nodeIds: [] },
     { id: "branches", label: "Branches", nodeIds: [] },
     { id: "cycles", label: "Cycles", nodeIds: [] },
-    { id: "authority", label: "Policy", nodeIds: [] },
+    { id: "authority", label: "Approvals", nodeIds: [] },
   ];
   const nodes: NexusDashboardWeaveNode[] = [];
   const edges: NexusDashboardWeaveEdge[] = [];

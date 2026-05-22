@@ -44,6 +44,42 @@ function fixedClock(timestamp: string): () => string {
   return () => timestamp;
 }
 
+async function loadDashboardClientTestHooks(): Promise<{
+  historyRows: (snapshot: unknown) => {
+    rows: Array<{ detail: string; lane: number; node: { id: string }; title: string }>;
+    lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>;
+  };
+  renderBranchGraph: (
+    rows: Array<{ lane: number }>,
+    lanes: Array<{ index: number }>,
+  ) => string;
+  renderLaneKey: (
+    lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
+  ) => string;
+  timelineLanes: (snapshot: unknown) => Array<{
+    detail?: string;
+    index: number;
+    label: string;
+    shortLabel: string;
+  }>;
+}> {
+  const source = `${renderNexusDashboardClientModule()
+    .replace(
+      "export async function fetchDevNexusDashboard",
+      "async function fetchDevNexusDashboard",
+    )
+    .replace(
+      "export async function fetchDevNexusDashboardHost",
+      "async function fetchDevNexusDashboardHost",
+    )
+    .replace(
+      "export function mountDevNexusDashboard",
+      "function mountDevNexusDashboard",
+    )}
+export { historyRows, renderBranchGraph, renderLaneKey, timelineLanes };`;
+  return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+}
+
 function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjectConfig {
   return {
     version: 1,
@@ -761,7 +797,11 @@ describe("nexus dashboard", () => {
     expect(module).toContain("externalLinkIcon");
     expect(module).toContain("clipboardIcon");
     expect(module).toContain("signal-components");
-    expect(module).toContain("work: ${branch}");
+    expect(module).toContain("Source checkout");
+    expect(module).toContain("Worktree branch");
+    expect(module).toContain("Other worktrees");
+    expect(module).toContain("Approvals and blockers");
+    expect(module).toContain("rowGuides");
     expect(module).not.toContain("tonebox");
     expect(module).not.toContain("renderRailLabels");
     expect(module).not.toContain("threadDetail");
@@ -771,6 +811,130 @@ describe("nexus dashboard", () => {
     expect(module).toContain("target=\"_blank\"");
     expect(module).toContain("formatDisplayText");
     expect(module).toContain("signalIcon");
+  });
+
+  it("labels parallel work-map lanes without repeating branch names as row titles", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      project: {
+        defaultBranch: "main",
+        name: "Dashboard Demo",
+        root: "/tmp/dashboard-demo",
+      },
+      weave: {
+        nodes: [
+          {
+            id: "branch:main",
+            kind: "branch",
+            label: "main",
+            detail: "origin/main",
+            status: "clean",
+            timestamp: null,
+          },
+          {
+            id: "worktree:alpha",
+            kind: "worktree",
+            label: "codex/dev-nexus/alpha-branch",
+            detail: "working on Mac.lan",
+            status: "working",
+            timestamp: "2026-05-21T10:00:00.000Z",
+          },
+          {
+            id: "worktree:beta",
+            kind: "worktree",
+            label: "codex/dev-nexus/beta-branch",
+            detail: "working on Mac.lan",
+            status: "working",
+            timestamp: "2026-05-21T09:00:00.000Z",
+          },
+          {
+            id: "worktree:gamma",
+            kind: "worktree",
+            label: "codex/dev-nexus/gamma-branch",
+            detail: "working on Mac.lan",
+            status: "working",
+            timestamp: "2026-05-21T08:00:00.000Z",
+          },
+          {
+            id: "target-cycle:cycle-1",
+            kind: "target-cycle",
+            label: "cycle-1",
+            detail: "Completed provider links.",
+            status: "completed",
+            timestamp: "2026-05-21T07:00:00.000Z",
+          },
+          {
+            id: "authority",
+            kind: "authority",
+            label: "Approval",
+            detail: "One provider action needs approval.",
+            status: "blocked",
+            timestamp: null,
+          },
+        ],
+      },
+      worktrees: {
+        records: [
+          {
+            id: "alpha",
+            branchName: "codex/dev-nexus/alpha-branch",
+            componentId: "dev-nexus",
+            workItemId: "github-114",
+            hostId: "Mac.lan",
+            updatedAt: "2026-05-21T10:00:00.000Z",
+          },
+          {
+            id: "beta",
+            branchName: "codex/dev-nexus/beta-branch",
+            componentId: "dev-nexus",
+            workItemId: "github-115",
+            hostId: "Mac.lan",
+            updatedAt: "2026-05-21T09:00:00.000Z",
+          },
+          {
+            id: "gamma",
+            branchName: "codex/dev-nexus/gamma-branch",
+            componentId: "dev-nexus",
+            workItemId: "github-116",
+            hostId: "Mac.lan",
+            updatedAt: "2026-05-21T08:00:00.000Z",
+          },
+        ],
+      },
+    };
+
+    const lanes = hooks.timelineLanes(snapshot);
+    expect(lanes.map((lane) => [lane.label, lane.detail])).toEqual([
+      ["Source checkout", "main"],
+      ["Worktree branch", "dev-nexus/alpha-branch"],
+      ["Worktree branch", "dev-nexus/beta-branch"],
+      ["Other worktrees", "1 more branches"],
+      ["Runs and cycles", "Coordinator history"],
+      ["Approvals and blockers", "Human decisions"],
+    ]);
+
+    const laneKey = hooks.renderLaneKey(lanes);
+    expect(laneKey).toContain("<strong>Worktree branch</strong>");
+    expect(laneKey).toContain("dev-nexus/alpha-branch");
+    expect(laneKey).toContain("Human decisions");
+
+    const timeline = hooks.historyRows(snapshot);
+    const alphaRow = timeline.rows.find((row) => row.node.id === "worktree:alpha");
+    const gammaRow = timeline.rows.find((row) => row.node.id === "worktree:gamma");
+    expect(alphaRow).toMatchObject({
+      title: "github-114",
+      lane: 1,
+    });
+    expect(alphaRow?.title).not.toContain("alpha-branch");
+    expect(alphaRow?.detail).toContain("dev-nexus/alpha-branch");
+    expect(gammaRow).toMatchObject({
+      title: "dev-nexus/gamma-branch",
+      lane: 3,
+    });
+
+    const graph = hooks.renderBranchGraph(timeline.rows, timeline.lanes);
+    expect(graph).toContain(" H 118");
+    expect(graph).not.toContain(" C ");
   });
 
   it("serves a Codex thread action endpoint for dashboard prompts", async () => {
