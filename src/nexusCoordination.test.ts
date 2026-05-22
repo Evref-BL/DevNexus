@@ -154,6 +154,10 @@ function providerCoordinationProjectConfig(options: {
   sourceRoot: string;
   worktreesRoot: string;
   primaryStorePath: string;
+  projectCommunication?: NexusProjectConfig["workTrackerCommunication"];
+  coordinationCommunication?: NonNullable<
+    NonNullable<NexusProjectConfig["components"][number]["workTrackers"]>[number]["communication"]
+  >;
 }): NexusProjectConfig {
   return {
     version: 1,
@@ -170,6 +174,9 @@ function providerCoordinationProjectConfig(options: {
       provider: "vibe-kanban",
       projectId: null,
     },
+    ...(options.projectCommunication
+      ? { workTrackerCommunication: options.projectCommunication }
+      : {}),
     components: [
       {
         id: "dev-nexus",
@@ -197,6 +204,9 @@ function providerCoordinationProjectConfig(options: {
             name: "GitHub Coordination",
             enabled: true,
             roles: ["coordination"],
+            ...(options.coordinationCommunication
+              ? { communication: options.coordinationCommunication }
+              : {}),
             workTracking: {
               provider: "github",
               repository: {
@@ -469,6 +479,10 @@ function writeTrackerLink(options: {
   trackerId: string;
   trackerName: string;
   itemId: string;
+  itemNumber?: number | null;
+  provider?: string;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
   timestamp: string;
 }): void {
   writeText(
@@ -489,15 +503,15 @@ function writeTrackerLink(options: {
               {
                 trackerId: options.trackerId,
                 trackerName: options.trackerName,
-                provider: "local",
+                provider: options.provider ?? "local",
                 host: null,
                 repositoryId: null,
-                repositoryOwner: null,
-                repositoryName: null,
+                repositoryOwner: options.repositoryOwner ?? null,
+                repositoryName: options.repositoryName ?? null,
                 projectId: null,
                 boardId: null,
                 itemId: options.itemId,
-                itemNumber: null,
+                itemNumber: options.itemNumber ?? null,
                 itemKey: null,
                 nodeId: null,
                 webUrl: null,
@@ -1273,6 +1287,167 @@ describe("nexus coordination", () => {
       loadLocalWorkTrackingStore(path.join(projectRoot, coordinationStorePath))
         .comments[coordinationItem.id],
     ).toHaveLength(1);
+  });
+
+  it("keeps GitHub coordination handoffs silent by default", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-181");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      providerCoordinationProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-18T08:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary selected item",
+      status: "in_progress",
+    });
+    writeTrackerLink({
+      projectRoot,
+      projectId: "coordination-demo",
+      componentId: "dev-nexus",
+      logicalItemId: primaryItem.id,
+      trackerId: "coordination",
+      trackerName: "GitHub Coordination",
+      itemId: "7",
+      itemNumber: 7,
+      provider: "github",
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      timestamp: "2026-05-18T08:03:00.000Z",
+    });
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("GitHub should not be called for silent handoff publication");
+    });
+    vi.stubEnv("GITHUB_TOKEN", "coordination-test-token");
+
+    const handoff = await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      trackerRole: "coordination",
+      status: "ready",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:10:00.000Z",
+    });
+
+    expect(handoff.comment).toBeNull();
+    expect(handoff.record).toMatchObject({
+      workItemId: primaryItem.id,
+      coordinationTargetRef: {
+        trackerId: "coordination",
+        provider: "github",
+        itemId: "7",
+      },
+    });
+    expect(handoff.lease).toMatchObject({
+      status: "ready",
+      workItemId: primaryItem.id,
+      branchName: "codex/shared-coordination",
+    });
+  });
+
+  it("lets GitHub coordination trackers opt in to handoff comments", async () => {
+    const projectRoot = makeTempDir("dev-nexus-coordination-project-");
+    const sourceRoot = path.join(projectRoot, "source");
+    const worktreePath = path.join(projectRoot, "worktrees", "dev-nexus", "local-182");
+    const primaryStorePath = ".dev-nexus/work-items-primary.json";
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(worktreePath, { recursive: true });
+    saveProjectConfig(
+      projectRoot,
+      providerCoordinationProjectConfig({
+        sourceRoot,
+        worktreesRoot: "worktrees/dev-nexus",
+        primaryStorePath,
+        coordinationCommunication: {
+          coordinationHandoffs: "comment",
+        },
+      }),
+    );
+    const primaryItem = await createLocalWorkTrackerProvider({
+      projectRoot,
+      config: { provider: "local", storePath: primaryStorePath },
+      now: () => "2026-05-18T08:00:00.000Z",
+    }).createWorkItem({
+      projectRoot,
+      title: "Primary selected item",
+      status: "in_progress",
+    });
+    writeTrackerLink({
+      projectRoot,
+      projectId: "coordination-demo",
+      componentId: "dev-nexus",
+      logicalItemId: primaryItem.id,
+      trackerId: "coordination",
+      trackerName: "GitHub Coordination",
+      itemId: "7",
+      itemNumber: 7,
+      provider: "github",
+      repositoryOwner: "example",
+      repositoryName: "demo",
+      timestamp: "2026-05-18T08:03:00.000Z",
+    });
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+    const fetchMock: typeof fetch = async (input, init = {}) => {
+      calls.push({
+        url: String(input),
+        method: init.method,
+      });
+      return new Response(
+        JSON.stringify({
+          id: 9002,
+          node_id: "IC_provider_handoff_write",
+          body: JSON.parse(String(init.body)).body,
+          user: { login: "devnexus-automation[bot]" },
+          created_at: "2026-05-18T08:10:00.000Z",
+          updated_at: "2026-05-18T08:10:00.000Z",
+          html_url: "https://github.com/example/demo/issues/7#issuecomment-9002",
+        }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("GITHUB_TOKEN", "coordination-test-token");
+
+    const handoff = await createNexusCoordinationHandoff({
+      projectRoot,
+      componentId: "dev-nexus",
+      workItemId: primaryItem.id,
+      trackerRole: "coordination",
+      status: "ready",
+      currentPath: worktreePath,
+      gitRunner: fakeGitRunner(worktreePath, []),
+      now: () => "2026-05-18T08:10:00.000Z",
+    });
+
+    expect(handoff.comment).toMatchObject({
+      id: "github-comment-9002",
+      trackerRef: {
+        trackerId: "coordination",
+      },
+    });
+    expect(calls).toEqual([
+      {
+        url: "https://api.github.com/repos/example/demo/issues/7/comments",
+        method: "POST",
+      },
+    ]);
   });
 
   it("reads GitHub-backed coordination handoffs from provider comments", async () => {
