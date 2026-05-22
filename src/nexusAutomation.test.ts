@@ -64,6 +64,45 @@ describe("nexus automation", () => {
     );
   });
 
+  it("normalizes work item claim authority backend config", () => {
+    expect(automationConfig({}).workItemClaims.authority).toEqual({
+      backend: "optimistic_tracker",
+      postgres: {
+        connectionProfileId: null,
+      },
+    });
+
+    expect(
+      automationConfig({
+        workItemClaims: {
+          authority: {
+            backend: "postgres",
+            postgres: {
+              connectionProfileId: "shared-claims",
+            },
+          },
+        },
+      }).workItemClaims.authority,
+    ).toEqual({
+      backend: "postgres",
+      postgres: {
+        connectionProfileId: "shared-claims",
+      },
+    });
+
+    expect(() =>
+      automationConfig({
+        workItemClaims: {
+          authority: {
+            backend: "sqlite",
+          },
+        },
+      }),
+    ).toThrow(
+      /project config\.automation\.workItemClaims\.authority\.backend/,
+    );
+  });
+
   it("builds a bounded tracker query and selects the first eligible work item", () => {
     const config = automationConfig({
       selector: {

@@ -3697,6 +3697,7 @@ export function summarizeProjectStatus(project: NexusProjectStatusBase) {
       project.workTrackers.map((tracker) => tracker.provider),
     ),
     workTrackers: project.workTrackers.map(summarizeResolvedWorkTracker),
+    workItemClaimAuthority: project.workItemClaimAuthority,
     workTracking: summarizeWorkTracking(project.workTracking ?? null),
     unsupportedWorkTrackingCapabilities:
       project.workTrackingCapabilityReport?.unsupported ?? null,
@@ -3858,6 +3859,7 @@ export function summarizeAutomationStatus(status: NexusAutomationStatus) {
     })),
     omittedCurrentActorCount: omittedCount(status.currentActors),
     authority: summarizeAuthorityProject(status.authority),
+    workItemClaimAuthority: status.workItemClaimAuthority,
     selectorQuery: status.selectorQuery,
     candidateCount: status.candidateCount,
     eligibleWorkMode: status.eligibleWorkMode,

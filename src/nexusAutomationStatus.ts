@@ -11,6 +11,7 @@ import {
 } from "./nexusAutomation.js";
 import type {
   NexusAutomationConfig,
+  NexusAutomationWorkItemClaimAuthorityBackend,
   NexusAutomationPublicationConfig,
 } from "./nexusAutomationConfig.js";
 import {
@@ -118,6 +119,11 @@ export type NexusAutomationLockStatusKind =
   | "stale"
   | "invalid";
 
+export type NexusAutomationWorkItemClaimAuthorityStatusKind =
+  | "disabled"
+  | "ready"
+  | "blocked";
+
 export interface NexusAutomationStatusLock {
   path: string;
   status: NexusAutomationLockStatusKind;
@@ -126,6 +132,16 @@ export interface NexusAutomationStatusLock {
   acquiredAt: string | null;
   expiresAt: string | null;
   message: string;
+}
+
+export interface NexusAutomationWorkItemClaimAuthorityStatus {
+  enabled: boolean;
+  backend: NexusAutomationWorkItemClaimAuthorityBackend;
+  status: NexusAutomationWorkItemClaimAuthorityStatusKind;
+  summary: string;
+  postgresConnectionProfileId: string | null;
+  blockers: string[];
+  warnings: string[];
 }
 
 export interface GetNexusAutomationStatusOptions {
@@ -162,6 +178,7 @@ export interface NexusAutomationStatus {
   publication: NexusPublicationStatus[];
   currentActors: NexusCurrentActorResolution[];
   authority: NexusAuthorityProjectSummary;
+  workItemClaimAuthority: NexusAutomationWorkItemClaimAuthorityStatus;
   selectorQuery: WorkItemQuery | null;
   candidateCount: number | null;
   eligibleWorkMode: NexusEligibleWorkMode;
@@ -179,6 +196,58 @@ export class NexusAutomationStatusError extends Error {
     super(message);
     this.name = "NexusAutomationStatusError";
   }
+}
+
+export function summarizeNexusAutomationWorkItemClaimAuthorityStatus(
+  automationConfig: NexusAutomationConfig | null,
+): NexusAutomationWorkItemClaimAuthorityStatus {
+  const authority = automationConfig?.workItemClaims.authority ?? {
+    backend: "optimistic_tracker" as const,
+    postgres: {
+      connectionProfileId: null,
+    },
+  };
+  const postgresConnectionProfileId =
+    authority.postgres.connectionProfileId ?? null;
+
+  if (!automationConfig?.workItemClaims.enabled) {
+    return {
+      enabled: false,
+      backend: authority.backend,
+      status: "disabled",
+      summary: "Work item claims are disabled",
+      postgresConnectionProfileId,
+      blockers: [],
+      warnings: [],
+    };
+  }
+
+  if (authority.backend === "postgres" && !postgresConnectionProfileId) {
+    const blocker =
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId";
+    return {
+      enabled: true,
+      backend: authority.backend,
+      status: "blocked",
+      summary: blocker,
+      postgresConnectionProfileId,
+      blockers: [blocker],
+      warnings: [],
+    };
+  }
+
+  return {
+    enabled: true,
+    backend: authority.backend,
+    status: "ready",
+    summary:
+      authority.backend === "postgres"
+        ? `PostgreSQL claim authority is configured with connection profile ${postgresConnectionProfileId}`
+        : "Optimistic tracker claim authority is configured",
+    postgresConnectionProfileId,
+    blockers: [],
+    warnings: [],
+  };
 }
 
 export async function getNexusAutomationStatus(
@@ -304,6 +373,36 @@ export async function getNexusAutomationStatus(
       eligibleWorkItems: null,
       externalIssueVisibility,
       selectedWorkItem: null,
+    });
+  }
+
+  const workItemClaimAuthority =
+    summarizeNexusAutomationWorkItemClaimAuthorityStatus(automationConfig);
+  if (workItemClaimAuthority.status === "blocked") {
+    return statusResult({
+      projectRoot,
+      sourceRoot,
+      components,
+      projectConfig,
+      automationConfig,
+      status: "blocked",
+      summary: workItemClaimAuthority.summary,
+      lock,
+      ledger,
+      backoff,
+      preflight: [
+        {
+          name: "workItemClaimAuthority",
+          status: "failed",
+          message: workItemClaimAuthority.summary,
+        },
+      ],
+      selectorQuery: null,
+      candidateCount: null,
+      eligibleWorkItems: null,
+      externalIssueVisibility,
+      selectedWorkItem: null,
+      workItemClaimAuthority,
     });
   }
 
@@ -791,6 +890,7 @@ type AutomationStatusInput = Omit<
   | "target"
   | "targetCycles"
   | "authority"
+  | "workItemClaimAuthority"
 > &
   Partial<
     Pick<
@@ -809,6 +909,7 @@ type AutomationStatusInput = Omit<
       | "target"
       | "targetCycles"
       | "authority"
+      | "workItemClaimAuthority"
     >
   >;
 
@@ -874,6 +975,11 @@ function statusResult(result: AutomationStatusInput): NexusAutomationStatus {
     publication: result.publication ?? [],
     currentActors,
     authority,
+    workItemClaimAuthority:
+      result.workItemClaimAuthority ??
+      summarizeNexusAutomationWorkItemClaimAuthorityStatus(
+        result.automationConfig,
+      ),
     components,
     componentEligibleWorkItems: result.componentEligibleWorkItems ?? null,
     eligibleWorkMode: result.eligibleWorkMode ?? "default",

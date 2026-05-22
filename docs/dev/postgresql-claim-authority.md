@@ -203,10 +203,28 @@ Acceptance:
 - Misconfigured PostgreSQL reports a blocker without falling back silently to
   optimistic tracker claims unless fallback is configured.
 
+Current config shape:
+
+- `automation.workItemClaims.authority.backend`: `optimistic_tracker` or
+  `postgres`.
+- `automation.workItemClaims.authority.postgres.connectionProfileId`: host-local
+  credential/profile binding reference. Portable project config must not store
+  the raw connection string.
+
 Verification:
 
 - Focused config, CLI, and MCP tests.
 - `npm run build`
+
+Progress:
+
+- 2026-05-22: Slice 3A added backend selection to automation work-item claim
+  config, exposed claim-authority readiness through project and automation
+  status plus CLI/MCP JSON/text output, blocks PostgreSQL authority when no
+  connection profile is configured, and prevents direct claim-next calls from
+  silently falling back to optimistic tracker claims when PostgreSQL is selected
+  but no runtime adapter is injected. No live database or dependency wiring was
+  introduced.
 
 ### Slice 4: Coordinator Enforcement
 

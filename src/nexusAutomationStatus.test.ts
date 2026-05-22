@@ -103,12 +103,58 @@ describe("nexus automation status", () => {
       ledger: {
         runs: [],
       },
+      workItemClaimAuthority: {
+        backend: "optimistic_tracker",
+        status: "ready",
+        postgresConnectionProfileId: null,
+        blockers: [],
+      },
     });
     expect(result.preflight.every((check) => check.status === "passed")).toBe(true);
     expect(
       fs.existsSync(path.join(projectRoot, ".dev-nexus", "automation")),
     ).toBe(false);
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
+  it("blocks PostgreSQL claim authority without a connection profile", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        workItemClaims: {
+          ...config.automation!.workItemClaims,
+          authority: {
+            ...config.automation!.workItemClaims.authority,
+            backend: "postgres",
+          },
+        },
+      },
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      workItemClaimAuthority: {
+        backend: "postgres",
+        status: "blocked",
+        postgresConnectionProfileId: null,
+        blockers: [
+          "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+        ],
+      },
+      selectedWorkItem: null,
+    });
+    expect(result.summary).toContain(
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+    );
   });
 
   it("reports agent launch readiness without selecting one work item", async () => {

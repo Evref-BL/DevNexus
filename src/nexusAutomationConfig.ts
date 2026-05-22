@@ -7,6 +7,9 @@ import {
 export type NexusAutomationMode = "run_once" | "agent_launch";
 export type NexusAutomationEligibleWorkMode = "default" | "discovery";
 export type NexusAutomationWorkItemClaimStalePolicy = "report" | "reclaim";
+export type NexusAutomationWorkItemClaimAuthorityBackend =
+  | "optimistic_tracker"
+  | "postgres";
 export type NexusAutomationSafetyProfile =
   | "local"
   | "isolated"
@@ -70,11 +73,33 @@ export interface NexusAutomationLockConfig {
   staleAfterMs: number;
 }
 
+export interface NexusAutomationPostgresWorkItemClaimAuthorityConfig {
+  connectionProfileId: string | null;
+}
+
+export interface NexusAutomationWorkItemClaimAuthorityConfig {
+  backend: NexusAutomationWorkItemClaimAuthorityBackend;
+  postgres: NexusAutomationPostgresWorkItemClaimAuthorityConfig;
+}
+
 export interface NexusAutomationWorkItemClaimConfig {
   enabled: boolean;
   leaseDurationMs: number;
   staleClaimPolicy: NexusAutomationWorkItemClaimStalePolicy;
+  authority: NexusAutomationWorkItemClaimAuthorityConfig;
 }
+
+type PartialNexusAutomationWorkItemClaimAuthorityConfig = Partial<
+  Omit<NexusAutomationWorkItemClaimAuthorityConfig, "postgres">
+> & {
+  postgres?: Partial<NexusAutomationPostgresWorkItemClaimAuthorityConfig>;
+};
+
+type PartialNexusAutomationWorkItemClaimConfig = Partial<
+  Omit<NexusAutomationWorkItemClaimConfig, "authority">
+> & {
+  authority?: PartialNexusAutomationWorkItemClaimAuthorityConfig;
+};
 
 export interface NexusAutomationBackoffConfig {
   failureLimit: number;
@@ -288,6 +313,12 @@ export const defaultNexusAutomationConfig: NexusAutomationConfig = {
     enabled: true,
     leaseDurationMs: 60 * 60 * 1000,
     staleClaimPolicy: "report",
+    authority: {
+      backend: "optimistic_tracker",
+      postgres: {
+        connectionProfileId: null,
+      },
+    },
   },
   backoff: {
     failureLimit: 3,
@@ -443,6 +474,14 @@ export function validateNexusAutomationConfig(
     workItemClaims: {
       ...defaultNexusAutomationConfig.workItemClaims,
       ...workItemClaims,
+      authority: {
+        ...defaultNexusAutomationConfig.workItemClaims.authority,
+        ...workItemClaims.authority,
+        postgres: {
+          ...defaultNexusAutomationConfig.workItemClaims.authority.postgres,
+          ...workItemClaims.authority?.postgres,
+        },
+      },
     },
     backoff: {
       ...defaultNexusAutomationConfig.backoff,
@@ -789,13 +828,14 @@ function validateLockConfig(value: unknown): Partial<NexusAutomationLockConfig> 
 
 function validateWorkItemClaimConfig(
   value: unknown,
-): Partial<NexusAutomationWorkItemClaimConfig> {
+): PartialNexusAutomationWorkItemClaimConfig {
   if (value === undefined) {
     return {};
   }
 
   const pathName = "project config.automation.workItemClaims";
   const record = assertRecord(value, pathName);
+  const authority = validateWorkItemClaimAuthorityConfig(record.authority);
   return {
     ...optionalBooleanField(record, "enabled", pathName),
     ...optionalPositiveIntegerField(record, "leaseDurationMs", pathName),
@@ -804,6 +844,37 @@ function validateWorkItemClaimConfig(
       "staleClaimPolicy",
       pathName,
     ),
+    ...(Object.keys(authority).length > 0 ? { authority } : {}),
+  };
+}
+
+function validateWorkItemClaimAuthorityConfig(
+  value: unknown,
+): PartialNexusAutomationWorkItemClaimAuthorityConfig {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.workItemClaims.authority";
+  const record = assertRecord(value, pathName);
+  const postgres = validatePostgresWorkItemClaimAuthorityConfig(record.postgres);
+  return {
+    ...optionalWorkItemClaimAuthorityBackendField(record, "backend", pathName),
+    ...(Object.keys(postgres).length > 0 ? { postgres } : {}),
+  };
+}
+
+function validatePostgresWorkItemClaimAuthorityConfig(
+  value: unknown,
+): Partial<NexusAutomationPostgresWorkItemClaimAuthorityConfig> {
+  if (value === undefined) {
+    return {};
+  }
+
+  const pathName = "project config.automation.workItemClaims.authority.postgres";
+  const record = assertRecord(value, pathName);
+  return {
+    ...optionalNullableStringField(record, "connectionProfileId", pathName),
   };
 }
 
@@ -822,6 +893,27 @@ function optionalWorkItemClaimStalePolicyField<Key extends string>(
 
   throw new NexusAutomationConfigError(
     `${pathName}.${key} must be report or reclaim`,
+  );
+}
+
+function optionalWorkItemClaimAuthorityBackendField<Key extends string>(
+  record: Record<string, unknown>,
+  key: Key,
+  pathName: string,
+): Partial<Record<Key, NexusAutomationWorkItemClaimAuthorityBackend>> {
+  const value = record[key];
+  if (value === undefined) {
+    return {};
+  }
+  if (value === "optimistic_tracker" || value === "postgres") {
+    return { [key]: value } as Record<
+      Key,
+      NexusAutomationWorkItemClaimAuthorityBackend
+    >;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName}.${key} must be optimistic_tracker or postgres`,
   );
 }
 

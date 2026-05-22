@@ -167,6 +167,57 @@ describe("optimistic work item claims", () => {
     expect(provider.comments).toEqual([]);
   });
 
+  it("does not fall back to optimistic claims when PostgreSQL authority is configured", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    const postgresAutomationConfig = {
+      ...automationConfig(),
+      workItemClaims: {
+        ...automationConfig().workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: postgresAutomationConfig,
+    });
+    const provider = new ClaimMemoryProvider([
+      workItem("github-17", "PostgreSQL authority only", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+
+    await expect(
+      claimNexusEligibleWorkItem({
+        projectRoot,
+        projectConfig: {
+          ...config,
+          automation: postgresAutomationConfig,
+        },
+        components: resolveProjectComponents(projectRoot, {
+          ...config,
+          automation: postgresAutomationConfig,
+        }),
+        automationConfig: postgresAutomationConfig,
+        providerFactory: providerFactory(provider),
+        owner: {
+          hostId: "host-a",
+        },
+        now: () => "2026-05-20T10:00:00.000Z",
+      }),
+    ).rejects.toThrow(
+      /PostgreSQL claim authority is configured but no runtime claim authority adapter was provided/,
+    );
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
   it("returns no-claim when no candidate matches the configured selector", async () => {
     const projectRoot = makeTempDir("dev-nexus-claim-");
     const config = projectConfig();

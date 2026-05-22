@@ -456,6 +456,11 @@ describe("DevNexus MCP server", () => {
       detail: "summary",
       project: {
         componentCount: 1,
+        workItemClaimAuthority: {
+          backend: "optimistic_tracker",
+          enabled: true,
+          postgresConnectionProfileId: null,
+        },
         components: [
           {
             id: "primary",

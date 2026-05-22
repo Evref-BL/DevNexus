@@ -234,8 +234,7 @@ export async function claimNexusEligibleWorkItem(
     now: options.now,
   });
   const now = currentDate(options.now);
-  const claimAuthority =
-    options.claimAuthority ?? optimisticTrackerClaimAuthority;
+  const claimAuthority = claimAuthorityForConfig(options);
   const activeClaims: NexusWorkItemClaimObservation[] = [];
   if (eligibleWork.eligibleWorkItems.length === 0) {
     const inspectedClaims = await inspectExistingWorkItemClaims({
@@ -499,8 +498,7 @@ async function maybeReclaimStaleClaim(options: {
     leaseDurationMs:
       options.options.leaseDurationMs ?? defaultLeaseDurationMs,
   });
-  const claimAuthority =
-    options.options.claimAuthority ?? optimisticTrackerClaimAuthority;
+  const claimAuthority = claimAuthorityForConfig(options.options);
   if (!claimAuthority.reclaimExpiredClaim) {
     return null;
   }
@@ -576,6 +574,25 @@ function noClaimResult(
     skippedCandidates,
     ...claimDiagnosticsFields(diagnostics),
   };
+}
+
+function claimAuthorityForConfig(
+  options: Pick<
+    ClaimNexusEligibleWorkItemOptions,
+    "automationConfig" | "claimAuthority"
+  >,
+): NexusWorkItemClaimAuthority {
+  if (options.claimAuthority) {
+    return options.claimAuthority;
+  }
+  const backend = options.automationConfig.workItemClaims.authority.backend;
+  if (backend === "optimistic_tracker") {
+    return optimisticTrackerClaimAuthority;
+  }
+
+  throw new Error(
+    "PostgreSQL claim authority is configured but no runtime claim authority adapter was provided",
+  );
 }
 
 function claimDiagnosticsFields(diagnostics: {

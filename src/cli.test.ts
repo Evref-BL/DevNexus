@@ -5206,6 +5206,12 @@ describe("dev-nexus cli", () => {
       lock: {
         status: "none",
       },
+      workItemClaimAuthority: {
+        backend: "optimistic_tracker",
+        status: "ready",
+        postgresConnectionProfileId: null,
+        blockers: [],
+      },
       externalIssueVisibility: {
         componentCount: 1,
         defaultTrackerOnlyComponentCount: 1,

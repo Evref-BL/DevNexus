@@ -92,6 +92,7 @@ import {
 import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
+  type NexusAutomationWorkItemClaimAuthorityStatus,
 } from "./nexusAutomationStatus.js";
 import {
   summarizeAutomationStatus,
@@ -6164,6 +6165,12 @@ function printProjectStatusResult(
     stdout,
     `  Default tracker: ${project.defaultTrackerId ?? "not configured"}`,
   );
+  if (project.workItemClaimAuthority) {
+    writeLine(
+      stdout,
+      `  Work item claim authority: ${project.workItemClaimAuthority.backend}`,
+    );
+  }
   writeLine(stdout, `  Trackers: ${project.workTrackers.length}`);
   for (const tracker of project.workTrackers) {
     const state = tracker.enabled ? "enabled" : "disabled";
@@ -7894,6 +7901,7 @@ function printAutomationStatusResult(
     }
   }
   printAuthorityProjectSummary(result.authority, stdout);
+  printWorkItemClaimAuthorityStatus(result.workItemClaimAuthority, stdout);
   if (result.externalIssueVisibility) {
     printExternalIssueVisibilitySummary(result.externalIssueVisibility, stdout);
   }
@@ -7930,6 +7938,28 @@ function printAutomationStatusResult(
         `  Last run: ${lastRun.id} ${lastRun.status} ${lastRun.summary ?? ""}`.trimEnd(),
       );
     }
+  }
+}
+
+function printWorkItemClaimAuthorityStatus(
+  status: NexusAutomationWorkItemClaimAuthorityStatus,
+  stdout: TextWriter,
+): void {
+  writeLine(
+    stdout,
+    `  Work item claim authority: ${status.backend} ${status.status}`,
+  );
+  if (status.postgresConnectionProfileId) {
+    writeLine(
+      stdout,
+      `    PostgreSQL profile: ${status.postgresConnectionProfileId}`,
+    );
+  }
+  for (const blocker of status.blockers) {
+    writeLine(stdout, `    Blocker: ${blocker}`);
+  }
+  for (const warning of status.warnings) {
+    writeLine(stdout, `    Warning: ${warning}`);
   }
 }
 
