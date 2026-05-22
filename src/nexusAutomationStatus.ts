@@ -16,8 +16,10 @@ import type {
 import {
   preflightNexusAutomationAgentLaunch,
   type NexusAutomationAgentLaunchComponentProvider,
-  type NexusAutomationComponentEligibleWorkItems,
 } from "./nexusAutomationAgentLaunch.js";
+import type {
+  NexusAutomationComponentEligibleWorkItems,
+} from "./nexusAutomationEligibleWorkItems.js";
 import {
   normalizeNexusAutomationAgentPolicy,
   type NexusAutomationAgentPolicy,
@@ -943,6 +945,7 @@ function currentAutomationActors(options: {
         publicationByComponent.get(component.id)?.policy ??
         localOnlyPublicationPolicy(),
       authProfiles,
+      repository: component.remoteUrl,
     })
   );
 }

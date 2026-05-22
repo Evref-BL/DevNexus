@@ -23,6 +23,7 @@ export type NexusProviderCredentialErrorCode =
   | "expired_credential"
   | "unsupported_purpose"
   | "async_required"
+  | "refresh_required"
   | "installation_not_found"
   | "repository_not_selected"
   | "missing_permission"
@@ -109,6 +110,8 @@ interface CommandTokenResult {
   authorizationHeader?: string;
   env?: Record<string, string>;
   expiresAt?: string | null;
+  actorId?: string;
+  providerIdentity?: string;
   scopes?: string[];
   permissions?: Record<string, string>;
 }
@@ -465,6 +468,12 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
 
     const commandToken = parseCommandTokenResult(result.stdout, profile);
     assertNotExpired(commandToken.expiresAt, this.now(), profile.id);
+    assertCommandTokenActorMatches(profile, request, commandToken);
+    assertCredentialPermissionMetadata(
+      profile,
+      request.requiredPermissions,
+      commandToken.permissions,
+    );
     const token =
       commandToken.token ?? tokenFromEnvironment(commandToken.env, profile);
     if (!token && !commandToken.authorizationHeader) {
@@ -550,9 +559,17 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     request: NexusProviderCredentialRequest,
     purposes: NexusProviderCredentialPurpose[],
   ): Promise<NexusResolvedProviderCredential> {
+    const privateKeyPath = profile.githubApp?.privateKeyPath;
+    if (!privateKeyPath) {
+      throw new NexusProviderCredentialBrokerError(
+        "missing_profile",
+        `GitHub App profile ${profile.id} must configure githubApp.privateKeyPath for installation token exchange.`,
+        { profileId: profile.id },
+      );
+    }
     const githubApp = {
       ...profile.githubApp!,
-      privateKeyPath: this.resolveConfiguredPath(profile.githubApp!.privateKeyPath),
+      privateKeyPath: this.resolveConfiguredPath(privateKeyPath),
     };
     const installationAccount = githubApp.installationAccount ?? profile.account;
     if (!installationAccount) {
@@ -1030,6 +1047,22 @@ function withGitHubAppGitCredential(
     : credential;
 }
 
+function assertCredentialPermissionMetadata(
+  profile: NexusHostingAuthProfileConfig,
+  requiredPermissions: Record<string, string> | undefined,
+  grantedPermissions: Record<string, string> | undefined,
+): void {
+  if (!requiredPermissions || !grantedPermissions) {
+    return;
+  }
+  assertPermissionSet(
+    profile,
+    requiredPermissions,
+    grantedPermissions,
+    "Credential",
+  );
+}
+
 function tokenFromEnvironment(
   env: Record<string, string | undefined> | undefined,
   profile: NexusHostingAuthProfileConfig,
@@ -1123,6 +1156,7 @@ function parseCommandTokenJson(
   }
 
   const record = value as Record<string, unknown>;
+  assertCommandTokenJsonIsUsable(record, profile);
   const token =
     optionalString(record.token) ??
     optionalString(record.accessToken) ??
@@ -1130,13 +1164,74 @@ function parseCommandTokenJson(
   const authorizationHeader = optionalString(record.authorizationHeader);
   const expiresAt =
     optionalString(record.expiresAt) ?? optionalString(record.expires_at);
+  const actorId = optionalString(record.actorId);
+  const providerIdentity =
+    optionalString(record.providerIdentity) ??
+    optionalString(record.account) ??
+    optionalString(record.login) ??
+    optionalString(record.user);
   return {
     ...(token ? { token } : {}),
     ...(authorizationHeader ? { authorizationHeader } : {}),
     ...(expiresAt !== undefined ? { expiresAt } : {}),
+    ...(actorId ? { actorId } : {}),
+    ...(providerIdentity ? { providerIdentity } : {}),
     ...parseScopes(record.scopes),
     ...parsePermissions(record.permissions),
   };
+}
+
+function assertCommandTokenJsonIsUsable(
+  record: Record<string, unknown>,
+  profile: NexusHostingAuthProfileConfig,
+): void {
+  const statusValue = optionalString(record.status) ?? optionalString(record.code);
+  const status = statusValue?.toLowerCase().replace(/-/gu, "_");
+  if (
+    record.refreshRequired === true ||
+    record.refresh_required === true ||
+    status === "refresh_required" ||
+    status === "refresh_needed"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "refresh_required",
+      `Credential command for profile ${profile.id} reported that user authorization must be refreshed.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "installation_not_found" ||
+    status === "app_not_installed" ||
+    status === "not_installed"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "installation_not_found",
+      `Credential command for profile ${profile.id} reported that the GitHub App is not installed for the target account or repository.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "repository_not_selected" ||
+    status === "repository_access_missing" ||
+    status === "repo_not_selected"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "repository_not_selected",
+      `Credential command for profile ${profile.id} reported that the target repository is not selected for this GitHub App installation.`,
+      { profileId: profile.id },
+    );
+  }
+  if (
+    status === "missing_permission" ||
+    status === "permission_missing" ||
+    status === "insufficient_permission"
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "missing_permission",
+      `Credential command for profile ${profile.id} reported missing GitHub App user token permissions.`,
+      { profileId: profile.id },
+    );
+  }
 }
 
 function parseEnvironmentOutput(output: string): Record<string, string> {
@@ -1218,6 +1313,43 @@ function assertNotExpired(
   }
 }
 
+function assertCommandTokenActorMatches(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+  commandToken: CommandTokenResult,
+): void {
+  const expectedActorId = request.actorId?.trim() || profile.actorId?.trim();
+  if (
+    commandToken.actorId &&
+    expectedActorId &&
+    commandToken.actorId !== expectedActorId
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "wrong_actor",
+      `Credential command for profile ${profile.id} returned actor ${commandToken.actorId}, not expected actor ${expectedActorId}.`,
+      { profileId: profile.id },
+    );
+  }
+
+  const expectedIdentity =
+    request.providerIdentity?.trim() || profile.account?.trim();
+  if (
+    commandToken.providerIdentity &&
+    expectedIdentity &&
+    !providerIdentitiesEqual(commandToken.providerIdentity, expectedIdentity)
+  ) {
+    throw new NexusProviderCredentialBrokerError(
+      "wrong_actor",
+      `Credential command for profile ${profile.id} returned identity ${commandToken.providerIdentity}, not expected identity ${expectedIdentity}.`,
+      { profileId: profile.id },
+    );
+  }
+}
+
+function providerIdentitiesEqual(left: string, right: string): boolean {
+  return left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
+}
+
 function expandCommandArg(
   arg: string,
   request: NexusProviderCredentialRequest,
@@ -1292,10 +1424,15 @@ function isGitHubAppCredentialProfile(
   profile: NexusHostingAuthProfileConfig,
   request: NexusProviderCredentialRequest,
 ): boolean {
+  const githubApp = profile.githubApp;
   return (
     normalizeProviderName(profile.provider) === "github" &&
     normalizeProviderName(request.provider) === "github" &&
-    Boolean(profile.githubApp)
+    profile.credentialKind !== "github_app_user_token" &&
+    Boolean(githubApp) &&
+    (profile.kind === "app" ||
+      profile.credentialKind === "github_app" ||
+      Boolean(githubApp?.privateKeyPath))
   );
 }
 
@@ -1308,6 +1445,7 @@ function isGitHubAppTransportCredentialProfile(
     normalizeProviderName(request.provider) === "github" &&
     (profile.kind === "app" ||
       profile.credentialKind === "github_app" ||
+      profile.credentialKind === "github_app_user_token" ||
       Boolean(profile.githubApp))
   );
 }
@@ -1344,6 +1482,9 @@ function createGitHubAppJwt(
 
   let privateKey: string;
   try {
+    if (!config.privateKeyPath) {
+      throw new Error("githubApp.privateKeyPath is not configured");
+    }
     privateKey = readFile(config.privateKeyPath);
   } catch (error) {
     throw new NexusProviderCredentialBrokerError(
@@ -1463,6 +1604,20 @@ function assertGitHubAppPermissions(
   requiredPermissions: Record<string, string> | undefined,
   grantedPermissions: Record<string, string> | undefined,
 ): void {
+  assertPermissionSet(
+    profile,
+    requiredPermissions,
+    grantedPermissions,
+    "GitHub App profile",
+  );
+}
+
+function assertPermissionSet(
+  profile: NexusHostingAuthProfileConfig,
+  requiredPermissions: Record<string, string> | undefined,
+  grantedPermissions: Record<string, string> | undefined,
+  subject: string,
+): void {
   if (!requiredPermissions) {
     return;
   }
@@ -1472,7 +1627,7 @@ function assertGitHubAppPermissions(
     if (!permissionSatisfies(granted, required)) {
       throw new NexusProviderCredentialBrokerError(
         "missing_permission",
-        `GitHub App profile ${profile.id} requires ${permission}:${required}, but granted ${
+        `${subject} ${profile.id} requires ${permission}:${required}, but granted ${
           granted ?? "none"
         }.`,
         { profileId: profile.id },

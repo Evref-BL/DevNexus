@@ -72,6 +72,51 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("pushes review branches through GitHub App user-to-server credentials for human actors", async () => {
+    const { projectRoot, sourceRoot } = createHumanUserTokenPublicationProject();
+    const calls: Array<{ cwd: string; token: string | undefined }> = [];
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/human-attributed-auth",
+      baseEnv: {
+        DEV_NEXUS_TEST_USER_TOKEN: "user-access-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (_args, options) => {
+        calls.push({
+          cwd: options.cwd,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.credential).toMatchObject({
+      profileId: "gabriel-devnexus-app-user",
+      actorId: "gabriel",
+      account: "Gabriel-Darbord",
+      kind: "github_app_user_token",
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
+      },
+    });
+    expect(result.push.plan.transport).toBe("https_token");
+    expect(JSON.stringify(result.push.plan)).not.toContain("user-access-token");
+    expect(calls).toEqual([
+      {
+        cwd: sourceRoot,
+        token: "user-access-token",
+      },
+    ]);
+  });
+
   it("pushes workspace metadata branches through the App when project repository is selected", async () => {
     const { projectRoot } = createMultiComponentPublicationProject();
     const calls: Array<{ args: readonly string[]; cwd: string; token: string | undefined }> = [];
@@ -198,6 +243,59 @@ describe("publication operations", () => {
           base: "main",
           title: "Add App publication commands",
           body: "Use DevNexus App credentials for publication.",
+        },
+      },
+    ]);
+  });
+
+  it("creates pull requests through GitHub App user-to-server API credentials", async () => {
+    const { projectRoot } = createHumanUserTokenPublicationProject();
+    const requests: Array<{ authorization: string | null; body: unknown }> = [];
+    const result = await upsertNexusPublicationPullRequestForComponent({
+      projectRoot,
+      head: "codex/dev-nexus/human-attributed-auth",
+      title: "Use human-attributed App credentials",
+      body: "Publish with a GitHub App user-to-server token.",
+      draft: true,
+      baseEnv: {
+        DEV_NEXUS_TEST_USER_TOKEN: "user-access-token",
+      } as NodeJS.ProcessEnv,
+      fetch: (async (_input, init) => {
+        requests.push({
+          authorization: new Headers(init?.headers).get("authorization"),
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return new Response(
+          JSON.stringify({
+            number: 214,
+            html_url: "https://github.com/Evref-BL/DevNexus/pull/214",
+            state: "open",
+            title: "Use human-attributed App credentials",
+          }),
+          { status: 201 },
+        );
+      }) as typeof fetch,
+    });
+
+    expect(result.credential).toMatchObject({
+      profileId: "gabriel-devnexus-app-user",
+      actorId: "gabriel",
+      account: "Gabriel-Darbord",
+      kind: "github_app_user_token",
+    });
+    expect(result.pullRequest).toMatchObject({
+      number: 214,
+      title: "Use human-attributed App credentials",
+    });
+    expect(requests).toEqual([
+      {
+        authorization: "Bearer user-access-token",
+        body: {
+          head: "codex/dev-nexus/human-attributed-auth",
+          base: "main",
+          title: "Use human-attributed App credentials",
+          body: "Publish with a GitHub App user-to-server token.",
+          draft: true,
         },
       },
     ]);
@@ -494,6 +592,7 @@ describe("publication CLI operations", () => {
         "Add App publication commands",
         "--body",
         "Use DevNexus App credentials for publication.",
+        "--draft",
         "--json",
       ],
       {
@@ -526,6 +625,7 @@ describe("publication CLI operations", () => {
           base: "main",
           title: "Add App publication commands",
           body: "Use DevNexus App credentials for publication.",
+          draft: true,
         },
       },
     ]);
@@ -609,6 +709,38 @@ function createPublicationProject(): { projectRoot: string; homePath: string; so
   return { projectRoot, homePath, sourceRoot };
 }
 
+function createHumanUserTokenPublicationProject(): {
+  projectRoot: string;
+  homePath: string;
+  sourceRoot: string;
+} {
+  const projectRoot = makeTempDir("dev-nexus-publication-user-token-");
+  const homePath = path.join(projectRoot, "home");
+  const sourceRoot = path.join(projectRoot, "source");
+  fs.mkdirSync(sourceRoot, { recursive: true });
+  savePublicationHomeConfig(homePath);
+  saveProjectConfig(projectRoot, {
+    ...publicationProjectConfig(homePath),
+    automation: {
+      ...defaultNexusAutomationConfig,
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        remote: "app",
+        targetBranch: "main",
+        push: false,
+        actor: {
+          kind: "human",
+          provider: "github",
+          handle: "Gabriel-Darbord",
+          id: "gabriel",
+        },
+      },
+    },
+  });
+  return { projectRoot, homePath, sourceRoot };
+}
+
 function createMultiComponentPublicationProject(): {
   projectRoot: string;
   homePath: string;
@@ -669,6 +801,17 @@ function savePublicationHomeConfig(homePath: string): void {
           host: "github.com",
           purposes: ["api", "git"],
           environmentKeys: ["DEV_NEXUS_TEST_APP_TOKEN"],
+        },
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          host: "github.com",
+          purposes: ["api", "git"],
+          environmentKeys: ["DEV_NEXUS_TEST_USER_TOKEN"],
         },
       ],
       projects: [],

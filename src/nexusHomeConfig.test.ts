@@ -135,6 +135,18 @@ describe("home config primitives", () => {
               tokenRefreshBufferSeconds: 300,
             },
           },
+          {
+            id: "alice-devnexus-app-user",
+            actorId: "alice",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "alice",
+            host: "github.com",
+            environmentKeys: ["GH_TOKEN"],
+            purposes: ["api", "git"],
+            command: path.join(homePath, "github-app-user-token.mjs"),
+          },
         ],
       }).authProfiles,
     ).toEqual([
@@ -175,6 +187,18 @@ describe("home config primitives", () => {
           repositories: ["DevNexus"],
           tokenRefreshBufferSeconds: 300,
         },
+      },
+      {
+        id: "alice-devnexus-app-user",
+        actorId: "alice",
+        provider: "github",
+        kind: "human",
+        credentialKind: "github_app_user_token",
+        account: "alice",
+        host: "github.com",
+        environmentKeys: ["GH_TOKEN"],
+        purposes: ["api", "git"],
+        command: path.join(homePath, "github-app-user-token.mjs"),
       },
     ]);
 
@@ -218,6 +242,56 @@ describe("home config primitives", () => {
         projects: [],
       }),
     ).toThrow(/githubApp\.appId or authProfiles\[0\]\.githubApp\.clientId/);
+  });
+
+  it("allows GitHub App user-token profiles to carry app metadata without a private key", () => {
+    const homePath = path.join(makeTempDir("dev-nexus-home-"), "home");
+
+    expect(
+      validateNexusHomeConfigBase({
+        version: 1,
+        paths: {
+          projectsRoot: "projects",
+          workspacesRoot: "workspaces",
+        },
+        authProfiles: [
+          {
+            id: "alice-devnexus-app-user",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "alice",
+            host: "github.com",
+            command: path.join(homePath, "github-app-user-token.mjs"),
+            purposes: ["api", "git"],
+            githubApp: {
+              clientId: "Iv23example",
+              slug: "devnexus-automation",
+              installationAccount: "Evref-BL",
+              repositories: ["DevNexus"],
+              tokenRefreshBufferSeconds: 300,
+            },
+          },
+        ],
+        projects: [],
+      }).authProfiles?.[0],
+    ).toEqual({
+      id: "alice-devnexus-app-user",
+      provider: "github",
+      kind: "human",
+      credentialKind: "github_app_user_token",
+      account: "alice",
+      host: "github.com",
+      command: path.join(homePath, "github-app-user-token.mjs"),
+      purposes: ["api", "git"],
+      githubApp: {
+        clientId: "Iv23example",
+        slug: "devnexus-automation",
+        installationAccount: "Evref-BL",
+        repositories: ["DevNexus"],
+        tokenRefreshBufferSeconds: 300,
+      },
+    });
   });
 
   it("validates host-local host overlays by stable host id", () => {

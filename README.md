@@ -85,9 +85,8 @@ After setup:
 dev-nexus workspace status .
 ```
 
-Do not open the component repository as the agent workspace when you want
-DevNexus support. Open the DevNexus workspace root. The component repositories
-are the things DevNexus points to.
+Open the DevNexus workspace root when you want DevNexus support in the agent.
+Component repositories stay as components the workspace points to.
 
 Copy-paste prompt for Codex or Claude:
 
@@ -116,8 +115,8 @@ Components:
 - load-test-lab
 ```
 
-Use one `workspace init` run for that shape. Do not create four DevNexus
-workspaces unless you truly want four separate agent workspaces.
+Use one `workspace init` run for that shape. Create separate DevNexus workspaces
+only when you want separate agent workspaces and separate workspace state.
 
 For a detailed version of this example, see
 [First workspace from existing components](docs/user/first-workspace-existing-components.md).
@@ -186,8 +185,8 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 - [First workspace from existing components](docs/user/first-workspace-existing-components.md)
   shows how to coordinate several existing folders in one workspace.
 - [Providers, auth, and hosting](docs/user/providers-auth-hosting.md) covers
-  GitHub Apps, GitHub CLI profiles, GitLab, Jira, user accounts, machine-user
-  accounts, and workspace repository hosting.
+  GitHub Apps, user-to-server profiles, GitHub CLI profiles, GitLab, Jira, user
+  accounts, machine-user accounts, and workspace repository hosting.
 - [Publication workflows](docs/user/publication-workflows.md) explains the
   simple review-handoff default and the optional green-main, CI tier, and
   publication train paths.
@@ -206,6 +205,11 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
 npm install
 npm run check
 ```
+
+`npm run check` includes `npm run smoke:onboarding`, which packs the local
+package, installs it into a fresh temporary npm project, initializes a first
+workspace from an answer file, and verifies `workspace status` plus `setup
+check`.
 
 DevNexus is infrastructure. It gives agents a shared operating context; it does
 not replace user judgment, workspace ownership, verification, or publication

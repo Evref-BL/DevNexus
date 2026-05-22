@@ -287,6 +287,327 @@ describe("provider credential broker", () => {
     ]);
   });
 
+  it("resolves command-backed GitHub App user access tokens for human actors", () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          host: "github.com",
+          environmentKeys: ["GH_TOKEN"],
+          purposes: ["api", "git"],
+          command: "/secrets/github-app-user-token.mjs",
+          commandArgs: ["--repo", "{repository.owner}/{repository.name}"],
+        },
+      ],
+      commandRunner: (command, args) => {
+        calls.push({ command, args });
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            accessToken: "user-access-token",
+            expiresAt: "2026-05-21T13:00:00.000Z",
+            permissions: {
+              contents: "write",
+              issues: "write",
+            },
+          }),
+          stderr: "",
+        };
+      },
+      now: "2026-05-21T12:30:00.000Z",
+    });
+
+    expect(
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+        requiredPermissions: {
+          contents: "write",
+          issues: "read",
+        },
+      }),
+    ).toMatchObject({
+      kind: "github_app_user_token",
+      actorId: "gabriel",
+      providerIdentity: "Gabriel-Darbord",
+      account: "Gabriel-Darbord",
+      authorizationHeader: "Bearer user-access-token",
+      permissions: {
+        contents: "write",
+        issues: "write",
+      },
+      secret: {
+        kind: "token",
+        value: "user-access-token",
+      },
+    });
+
+    expect(
+      broker.resolveCredential({
+        provider: "github",
+        purpose: "git",
+        profileId: "gabriel-devnexus-app-user",
+        repository: {
+          owner: "Evref-BL",
+          name: "DevNexus",
+        },
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+    ).toMatchObject({
+      kind: "github_app_user_token",
+      secret: {
+        kind: "token",
+        value: "user-access-token",
+      },
+      gitCredential: {
+        protocol: "https",
+        host: "github.com",
+        path: "Evref-BL/DevNexus.git",
+      },
+    });
+    expect(calls).toEqual([
+      {
+        command: "/secrets/github-app-user-token.mjs",
+        args: ["--repo", "Evref-BL/DevNexus"],
+      },
+      {
+        command: "/secrets/github-app-user-token.mjs",
+        args: ["--repo", "Evref-BL/DevNexus"],
+      },
+    ]);
+  });
+
+  it("checks command-backed GitHub App user token permission metadata", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          token: "user-access-token",
+          permissions: {
+            contents: "read",
+          },
+        }),
+        stderr: "",
+      }),
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+        requiredPermissions: {
+          contents: "write",
+        },
+      }),
+      "missing_permission",
+    );
+  });
+
+  it("rejects command-backed GitHub App user tokens for the wrong user", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          accessToken: "wrong-user-access-token",
+          login: "Other-User",
+          permissions: {
+            issues: "write",
+          },
+        }),
+        stderr: "",
+      }),
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+      }),
+      "wrong_actor",
+    );
+  });
+
+  it("fails closed when a GitHub App user token helper reports missing authorization", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 1,
+        stdout: "",
+        stderr:
+          "GitHub App user authorization is missing; run device flow again.",
+      }),
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+      }),
+      "command_failed",
+    );
+  });
+
+  it("rejects expired GitHub App user tokens from command helpers", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          accessToken: "expired-user-access-token",
+          login: "Gabriel-Darbord",
+          expiresAt: "2026-05-21T12:00:00.000Z",
+        }),
+        stderr: "",
+      }),
+      now: "2026-05-21T12:30:00.000Z",
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+      }),
+      "expired_credential",
+    );
+  });
+
+  it("reports refresh-required GitHub App user token helper output distinctly", () => {
+    const broker = createHostAuthProfileCredentialBroker({
+      authProfiles: [
+        {
+          id: "gabriel-devnexus-app-user",
+          actorId: "gabriel",
+          provider: "github",
+          kind: "human",
+          credentialKind: "github_app_user_token",
+          account: "Gabriel-Darbord",
+          command: "/secrets/github-app-user-token.mjs",
+        },
+      ],
+      commandRunner: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          status: "refresh_required",
+          login: "Gabriel-Darbord",
+        }),
+        stderr: "",
+      }),
+    });
+
+    expectCredentialError(
+      () => broker.resolveCredential({
+        provider: "github",
+        purpose: "api",
+        profileId: "gabriel-devnexus-app-user",
+      }),
+      "refresh_required",
+    );
+  });
+
+  it.each([
+    ["installation_not_found", "installation_not_found"],
+    ["app_not_installed", "installation_not_found"],
+    ["repository_not_selected", "repository_not_selected"],
+    ["missing_permission", "missing_permission"],
+  ] as const)(
+    "reports structured GitHub App user token helper status %s distinctly",
+    (status, expectedCode) => {
+      const broker = createHostAuthProfileCredentialBroker({
+        authProfiles: [
+          {
+            id: "gabriel-devnexus-app-user",
+            actorId: "gabriel",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "Gabriel-Darbord",
+            command: "/secrets/github-app-user-token.mjs",
+          },
+        ],
+        commandRunner: () => ({
+          status: 0,
+          stdout: JSON.stringify({
+            status,
+            login: "Gabriel-Darbord",
+          }),
+          stderr: "",
+        }),
+      });
+
+      expectCredentialError(
+        () => broker.resolveCredential({
+          provider: "github",
+          purpose: "api",
+          profileId: "gabriel-devnexus-app-user",
+        }),
+        expectedCode,
+      );
+    },
+  );
+
   it("mints and caches GitHub App installation tokens with repository and permission metadata", async () => {
     const privateKey = testPrivateKey();
     const calls: Array<{

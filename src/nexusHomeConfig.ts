@@ -20,7 +20,7 @@ import type {
   NexusHomeHostTransportKind,
   NexusHomeHostWorkspaceRootsConfig,
 } from "./nexusHostRegistry.js";
-import type { NexusProjectReference } from "./nexusProjectRegistry.js";
+import type { NexusProjectReference } from "./nexusProjectReference.js";
 
 export const devNexusHomeConfigFileName = "dev-nexus.home.json";
 export const nexusLogsDirectoryName = "logs";
@@ -255,13 +255,14 @@ function validateHostingAuthProfileCredentialKind(
     value === "git_credential" ||
     value === "command_token" ||
     value === "github_app" ||
+    value === "github_app_user_token" ||
     value === "unknown"
   ) {
     return value;
   }
 
   throw new NexusConfigError(
-    `${pathName} must be environment_token, provider_cli, git_credential, command_token, github_app, or unknown`,
+    `${pathName} must be environment_token, provider_cli, git_credential, command_token, github_app, github_app_user_token, or unknown`,
   );
 }
 
@@ -297,6 +298,7 @@ function optionalCredentialPurposes(
 function validateHostingGitHubAppCredentialConfig(
   value: unknown,
   profilePathName: string,
+  options: { requirePrivateKey?: boolean } = {},
 ): NexusHostingGitHubAppCredentialConfig | undefined {
   if (value === undefined) {
     return undefined;
@@ -307,6 +309,10 @@ function validateHostingGitHubAppCredentialConfig(
   const appId = optionalString(record, "appId", pathName);
   const clientId = optionalString(record, "clientId", pathName);
   const slug = optionalString(record, "slug", pathName);
+  const privateKeyPath =
+    (options.requirePrivateKey ?? true)
+      ? requiredString(record, "privateKeyPath", pathName)
+      : optionalString(record, "privateKeyPath", pathName);
   const installationAccount = optionalString(
     record,
     "installationAccount",
@@ -330,7 +336,7 @@ function validateHostingGitHubAppCredentialConfig(
     ...(appId !== undefined ? { appId } : {}),
     ...(clientId !== undefined ? { clientId } : {}),
     ...(slug !== undefined ? { slug } : {}),
-    privateKeyPath: requiredString(record, "privateKeyPath", pathName),
+    ...(privateKeyPath !== undefined ? { privateKeyPath } : {}),
     ...(installationAccount !== undefined ? { installationAccount } : {}),
     ...(repositories !== undefined ? { repositories } : {}),
     ...(apiBaseUrl !== undefined ? { apiBaseUrl } : {}),
@@ -373,6 +379,7 @@ function validateHostingAuthProfile(
   const githubApp = validateHostingGitHubAppCredentialConfig(
     record.githubApp,
     pathName,
+    { requirePrivateKey: credentialKind !== "github_app_user_token" },
   );
 
   return {

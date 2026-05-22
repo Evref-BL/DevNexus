@@ -82,6 +82,89 @@ describe("nexus forge publication facade", () => {
     expect(calls).toEqual([]);
   });
 
+  it("verifies GitHub App user-to-server credentials as user actors", async () => {
+    const calls: CapturedFetchCall[] = [];
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential({
+        profileId: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        account: "Gabriel-Darbord",
+        kind: "github_app_user_token",
+        authorizationHeader: "Bearer user-access-token",
+      }),
+      fetch: queuedFetch(calls, [
+        {
+          body: {
+            login: "Gabriel-Darbord",
+          },
+        },
+      ]),
+    });
+
+    await expect(
+      adapter.verifyActor({
+        expected: {
+          kind: "human",
+          provider: "github",
+          handle: "Gabriel-Darbord",
+          id: "gabriel",
+        },
+      }),
+    ).resolves.toMatchObject({
+      matched: true,
+      observed: {
+        provider: "github",
+        handle: "Gabriel-Darbord",
+        source: "github_rest_user",
+        backend: "github_rest",
+      },
+    });
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`))
+      .toEqual(["GET /user"]);
+  });
+
+  it("reports wrong-user GitHub App user-to-server credentials as mismatched", async () => {
+    const adapter = createNexusForgePublicationAdapter({
+      repository: githubRepository(),
+      credential: restCredential({
+        profileId: "gabriel-devnexus-app-user",
+        actorId: "gabriel",
+        providerIdentity: "Gabriel-Darbord",
+        account: "Gabriel-Darbord",
+        kind: "github_app_user_token",
+        authorizationHeader: "Bearer other-user-access-token",
+      }),
+      fetch: queuedFetch([], [
+        {
+          body: {
+            login: "Other-User",
+          },
+        },
+      ]),
+    });
+
+    await expect(
+      adapter.verifyActor({
+        expected: {
+          kind: "human",
+          provider: "github",
+          handle: "Gabriel-Darbord",
+          id: "gabriel",
+        },
+      }),
+    ).resolves.toMatchObject({
+      matched: false,
+      observed: {
+        provider: "github",
+        handle: "Other-User",
+        source: "github_rest_user",
+        backend: "github_rest",
+      },
+    });
+  });
+
   it("creates, updates, merges, and closes GitHub resources through REST", async () => {
     const calls: CapturedFetchCall[] = [];
     const adapter = createNexusForgePublicationAdapter({
@@ -128,6 +211,7 @@ describe("nexus forge publication facade", () => {
         base: "main",
         title: "Feature",
         body: "Body",
+        draft: true,
       }),
     ).resolves.toMatchObject({
       number: 12,
@@ -179,6 +263,7 @@ describe("nexus forge publication facade", () => {
       base: "main",
       title: "Feature",
       body: "Body",
+      draft: true,
     });
     expect(calls[2]!.body).toEqual({
       merge_method: "squash",
@@ -347,6 +432,7 @@ describe("nexus forge publication facade", () => {
         head: "codex/dev-nexus/github-148",
         base: "main",
         title: "Feature",
+        draft: true,
       }),
     ).resolves.toMatchObject({
       number: 12,
@@ -391,6 +477,7 @@ describe("nexus forge publication facade", () => {
       ["pr", "merge"],
       ["issue", "close"],
     ]);
+    expect(calls[1]!.args).toContain("--draft");
   });
 
   it("reports provider request failures with capability context", async () => {

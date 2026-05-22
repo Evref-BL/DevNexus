@@ -14,6 +14,10 @@ import {
   defaultNexusAutomationConfig,
 } from "./nexusAutomationConfig.js";
 import {
+  saveNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+} from "./nexusHomeConfig.js";
+import {
   recordNexusSetupStep,
 } from "./nexusSetupAssistant.js";
 import {
@@ -213,6 +217,61 @@ describe("nexus workspace setup readiness", () => {
 
     expect(report.verdict).toBe("ready");
     expect(report.actions).toEqual([]);
+  });
+
+  it("warns when GitHub App user-to-server profiles still need host-local authorization checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-readiness-app-user-");
+    const homePath = makeTempDir("dev-nexus-readiness-app-user-home-");
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        authProfiles: [
+          {
+            id: "gabriel-devnexus-app-user",
+            actorId: "gabriel",
+            provider: "github",
+            kind: "human",
+            credentialKind: "github_app_user_token",
+            account: "Gabriel-Darbord",
+            host: "github.com",
+            purposes: ["api", "git"],
+            command: "/secrets/github-app-user-token.mjs",
+          },
+        ],
+        projects: [],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const config = projectConfig({ home: homePath });
+    config.hosting!.remotes = [
+      {
+        name: "origin",
+        role: "human",
+        protocol: "https",
+        authProfile: "gabriel-devnexus-app-user",
+      },
+    ];
+    saveProjectConfig(projectRoot, config);
+    writeReadySupport(projectRoot);
+
+    const report = buildNexusProjectSetupReadinessReport({ projectRoot });
+
+    expect(report.verdict).toBe("ready_with_warnings");
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "auth-inventory",
+          status: "warning",
+          summary: expect.stringContaining("gabriel-devnexus-app-user"),
+          nextAction: expect.stringContaining("user-token helper"),
+        }),
+      ]),
+    );
   });
 
   it("prints CLI JSON for missing support files", async () => {
