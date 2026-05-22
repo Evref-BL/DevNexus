@@ -256,6 +256,7 @@ describe("publication operations", () => {
       head: "codex/dev-nexus/human-attributed-auth",
       title: "Use human-attributed App credentials",
       body: "Publish with a GitHub App user-to-server token.",
+      draft: true,
       baseEnv: {
         DEV_NEXUS_TEST_USER_TOKEN: "user-access-token",
       } as NodeJS.ProcessEnv,
@@ -294,6 +295,7 @@ describe("publication operations", () => {
           base: "main",
           title: "Use human-attributed App credentials",
           body: "Publish with a GitHub App user-to-server token.",
+          draft: true,
         },
       },
     ]);
@@ -590,6 +592,7 @@ describe("publication CLI operations", () => {
         "Add App publication commands",
         "--body",
         "Use DevNexus App credentials for publication.",
+        "--draft",
         "--json",
       ],
       {
@@ -622,6 +625,7 @@ describe("publication CLI operations", () => {
           base: "main",
           title: "Add App publication commands",
           body: "Use DevNexus App credentials for publication.",
+          draft: true,
         },
       },
     ]);

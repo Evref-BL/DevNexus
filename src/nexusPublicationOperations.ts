@@ -143,6 +143,7 @@ export interface UpsertNexusPublicationPullRequestForComponentOptions
   base?: string | null;
   title: string;
   body?: string | null;
+  draft?: boolean;
 }
 
 export interface MergeNexusPublicationPullRequestForComponentOptions
@@ -287,6 +288,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
       "main",
     title: options.title,
     ...(options.body !== undefined ? { body: options.body } : {}),
+    ...(options.draft === true ? { draft: true } : {}),
   });
 
   return {

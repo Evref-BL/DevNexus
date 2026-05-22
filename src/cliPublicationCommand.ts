@@ -90,6 +90,7 @@ interface ParsedPublicationPullRequestUpsertCommand {
   title: string;
   body?: string | null;
   bodyFile?: string | null;
+  draft?: boolean;
   json?: boolean;
 }
 
@@ -177,6 +178,7 @@ export async function handlePublicationCommand(
       base: parsed.base,
       title: parsed.title,
       body: publicationPullRequestBody(parsed),
+      draft: parsed.draft,
       baseEnv: dependencies.env ?? process.env,
       fetch: dependencies.fetch,
       credentialCommandRunner: dependencies.credentialCommandRunner,
@@ -503,6 +505,9 @@ function parsePublicationPullRequestUpsertCommand(
         break;
       case "--body-file":
         parsed.bodyFile = next();
+        break;
+      case "--draft":
+        parsed.draft = true;
         break;
       case "--json":
         parsed.json = true;
@@ -1291,4 +1296,3 @@ function formatGreenMainStep(step: NexusGreenMainCommandStep): string {
           .join(" ")} `;
   return `${envPrefix}${step.command}${step.note ? ` (${step.note})` : ""}`;
 }
-
