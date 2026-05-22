@@ -215,6 +215,19 @@ function capabilityCheckForCredentialMethod(options: {
         "Token store reference",
         method.reference,
       );
+    case "github_app_user_to_server": {
+      const helperAvailable = options.commandExists(method.helperCommand);
+      return {
+        id: `${options.profile.id}-github-app-user-to-server`,
+        title: "Check GitHub App user-to-server helper",
+        status: helperAvailable ? "manual" : "missing",
+        summary: helperAvailable
+          ? `GitHub App user-to-server helper ${method.helperCommand} is available; token values were not read.`
+          : `GitHub App user-to-server helper ${method.helperCommand} is not available.`,
+        nextAction:
+          `Run ${method.helperCommand} status for ${options.profile.account ?? "the expected user"} and verify the App user authorization, refresh token, App installation, repository access, and requested permissions.`,
+      };
+    }
     case "manual":
       return {
         id: `${options.profile.id}-manual`,
@@ -267,6 +280,14 @@ function credentialReference(method: NexusProjectSetupCredentialMethod): string 
     case "http_api_token_reference":
     case "token_store_reference":
       return method.reference;
+    case "github_app_user_to_server":
+      return [
+        method.helperCommand,
+        method.appSlug ? `app=${method.appSlug}` : null,
+        method.authorizationMode ? `authorization=${method.authorizationMode}` : null,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join(" ");
     case "manual":
       return method.instructions ?? null;
   }

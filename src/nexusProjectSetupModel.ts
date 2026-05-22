@@ -71,6 +71,12 @@ export type NexusProjectSetupCredentialMethod =
       reference: string;
     }
   | {
+      kind: "github_app_user_to_server";
+      helperCommand: string;
+      appSlug?: string;
+      authorizationMode?: "device_flow" | "web_callback" | "manual";
+    }
+  | {
       kind: "manual";
       instructions?: string;
     };
@@ -885,6 +891,15 @@ function normalizeCredentialMethod(
       return {
         kind: "token_store_reference",
         reference: method.reference,
+      };
+    case "github_app_user_to_server":
+      return {
+        kind: "github_app_user_to_server",
+        helperCommand: method.helperCommand,
+        ...(method.appSlug ? { appSlug: method.appSlug } : {}),
+        ...(method.authorizationMode
+          ? { authorizationMode: method.authorizationMode }
+          : {}),
       };
     case "manual":
       return {

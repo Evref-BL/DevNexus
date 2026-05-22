@@ -178,4 +178,44 @@ describe("workspace setup auth inventory", () => {
       ]),
     );
   });
+
+  it("reports GitHub App user-to-server helper readiness without reading tokens", () => {
+    const setupAnswers = answers();
+    setupAnswers.authProfiles!.push({
+      id: "alice-devnexus-app-user",
+      provider: "github",
+      actorKind: "human",
+      account: "alice",
+      credentialMethod: {
+        kind: "github_app_user_to_server",
+        helperCommand: "devnexus-github-app-user-token",
+        appSlug: "devnexus-automation",
+        authorizationMode: "device_flow",
+      },
+    });
+    setupAnswers.publication!.humanAuthProfileId = "alice-devnexus-app-user";
+
+    const inventory = buildNexusProjectSetupAuthInventory(setupAnswers, {
+      commandExists: (command) => command === "devnexus-github-app-user-token",
+    });
+
+    expect(inventory.profiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "alice-devnexus-app-user",
+          actorKind: "human",
+          credentialMethodKind: "github_app_user_to_server",
+          credentialReference:
+            "devnexus-github-app-user-token app=devnexus-automation authorization=device_flow",
+          capabilityChecks: [
+            expect.objectContaining({
+              status: "manual",
+              summary: expect.stringContaining("token values were not read"),
+              nextAction: expect.stringContaining("App user authorization"),
+            }),
+          ],
+        }),
+      ]),
+    );
+  });
 });

@@ -2786,13 +2786,16 @@ function hostingAuthProfileChecks(
         ? `envKeys=${profile.environmentKeys.join(",")}`
         : null,
     ].filter((detail): detail is string => Boolean(detail));
+    const userToServer = profile.credentialKind === "github_app_user_token";
     return {
       id: `github-hosting-auth-profile-${setupCheckIdPart(profileId)}`,
       title: `GitHub auth profile ${profileId}`,
-      status: "passed",
+      status: userToServer ? "warning" : "passed",
       summary:
-        `Host-local GitHub auth profile ${profileId} is configured${details.length > 0 ? ` (${details.join(", ")})` : ""}.`,
-      nextAction: null,
+        `Host-local GitHub auth profile ${profileId} is configured${details.length > 0 ? ` (${details.join(", ")})` : ""}${userToServer ? "; user authorization was not checked." : "."}`,
+      nextAction: userToServer
+        ? "Run the host-local GitHub App user-token helper status/auth command and verify the authorizing user, App installation, selected repository, token refresh, and requested permissions."
+        : null,
     };
   });
 }
