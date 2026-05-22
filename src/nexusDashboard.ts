@@ -1435,6 +1435,22 @@ function providerActionsFromText(
         title,
       });
     }
+    for (const match of text.matchAll(/#(\d+)\b/gu)) {
+      const number = match[1];
+      const index = match.index ?? 0;
+      const prefix = text.slice(Math.max(0, index - 20), index);
+      if (/\b(?:PR|pull request|issue|GitHub)\s*$/iu.test(prefix)) {
+        continue;
+      }
+      const title = actionTitleFromText(text, number);
+      actions.push({
+        label: actionLabel("issue", number, title),
+        href: `${repositoryUrl}/issues/${number}`,
+        provider: "github",
+        kind: "issue",
+        title,
+      });
+    }
   }
   return uniqueProviderActions(actions).slice(0, 3);
 }

@@ -53,6 +53,15 @@ async function loadDashboardClientTestHooks(): Promise<{
     rows: Array<{ lane: number }>,
     lanes: Array<{ index: number }>,
   ) => string;
+  renderActionStrip: (
+    actions: Array<{
+      href: string;
+      kind: string;
+      label: string;
+      provider: string;
+      title: string | null;
+    }>,
+  ) => string;
   renderLaneKey: (
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
@@ -76,7 +85,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { historyRows, renderBranchGraph, renderLaneKey, timelineLanes };`;
+export { historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -935,6 +944,71 @@ describe("nexus dashboard", () => {
     const graph = hooks.renderBranchGraph(timeline.rows, timeline.lanes);
     expect(graph).toContain(" H 118");
     expect(graph).not.toContain(" C ");
+  });
+
+  it("renders compact provider chips with provider and external-link affordances", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderActionStrip([
+      {
+        label: "Open issue #42",
+        href: "https://github.com/Evref-BL/DevNexus/issues/42",
+        provider: "github",
+        kind: "issue",
+        title: null,
+      },
+      {
+        label: "PR #66: provider links",
+        href: "https://github.com/Evref-BL/DevNexus/pull/66",
+        provider: "github",
+        kind: "pull-request",
+        title: "provider links",
+      },
+    ]);
+
+    expect(html).toContain("provider-github kind-issue");
+    expect(html).toContain("provider-github kind-pull-request");
+    expect(html).toContain('<span class="dn-action-label">#42</span>');
+    expect(html).toContain('<span class="dn-action-label">PR #66: provider links</span>');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain("opens in a new tab");
+    expect(html).toContain("M9 2h5v5");
+  });
+
+  it("extracts GitHub provider actions from bare issue references", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-provider-actions-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const tracker = createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-21T09:00:00.000Z"),
+    });
+    const item = await tracker.createWorkItem({
+      projectRoot,
+      title: "Review #42: provider routing",
+      status: "ready",
+    });
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:05:00.000Z"),
+    });
+
+    expect(
+      snapshot.weave.nodes.find((node) => node.id === `work-item:primary-${item.id}`),
+    ).toMatchObject({
+      actions: [
+        expect.objectContaining({
+          label: "#42: provider routing",
+          href: "https://github.com/Evref-BL/DevNexus/issues/42",
+          provider: "github",
+          kind: "issue",
+          title: "provider routing",
+        }),
+      ],
+    });
   });
 
   it("serves a Codex thread action endpoint for dashboard prompts", async () => {
