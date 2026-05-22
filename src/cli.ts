@@ -74,6 +74,7 @@ import {
   resolveNexusPublicationPolicy,
   NexusPublicationActorStatus,
   NexusPublicationStatus,
+  type NexusPublicationGitPushRunner,
 } from "./nexusPublicationPolicy.js";
 import type { NexusGitIdentityStatus } from "./nexusGitIdentity.js";
 import {
@@ -217,6 +218,15 @@ import {
   type NexusPublicationTrainProviderEvidenceInput,
   type NexusPublicationTrainReadinessReport,
 } from "./nexusPublicationTrainReadiness.js";
+import {
+  mergeNexusPublicationPullRequestForComponent,
+  pushNexusPublicationBranchForComponent,
+  upsertNexusPublicationPullRequestForComponent,
+  type NexusPublicationBranchPushResult,
+  type NexusPublicationPullRequestMergeResult,
+  type NexusPublicationPullRequestUpsertResult,
+} from "./nexusPublicationOperations.js";
+import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCredentialBroker.js";
 import {
   buildNexusCandidateBranchPlan,
   type NexusCandidateBranchPlan,
@@ -383,6 +393,10 @@ interface TextWriter {
 export interface DevNexusCliDependencies {
   stdout?: TextWriter;
   stderr?: TextWriter;
+  env?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+  credentialCommandRunner?: NexusProviderCredentialCommandRunner;
+  publicationGitPushRunner?: NexusPublicationGitPushRunner;
   commandRunner?: NexusAutomationCommandRunner;
   gitRunner?: GitRunner;
   projectGitRunner?: ProjectGitRunner;
@@ -980,6 +994,38 @@ interface ParsedPublicationGreenMainPlanCommand {
   json?: boolean;
 }
 
+interface ParsedPublicationBranchPushCommand {
+  projectRoot: string;
+  componentId?: string;
+  repositoryPath?: string;
+  branch: string;
+  targetBranch?: string | null;
+  forceWithLease?: boolean;
+  forceWithLeaseExpectedCommit?: string | null;
+  dryRun?: boolean;
+  json?: boolean;
+}
+
+interface ParsedPublicationPullRequestUpsertCommand {
+  projectRoot: string;
+  componentId?: string;
+  number?: number | null;
+  head: string;
+  base?: string | null;
+  title: string;
+  body?: string | null;
+  bodyFile?: string | null;
+  json?: boolean;
+}
+
+interface ParsedPublicationPullRequestMergeCommand {
+  projectRoot: string;
+  componentId?: string;
+  number: number;
+  method?: "merge" | "squash" | "rebase";
+  json?: boolean;
+}
+
 interface ParsedPublicationTrainReadinessCommand {
   projectRoot: string;
   versionId?: string | null;
@@ -1103,6 +1149,9 @@ export function usage(): string {
     "  dev-nexus remote-execution result get <workspace-root> <request-id> [options]",
     "  dev-nexus remote-execution ssh-plan <workspace-root> <request-id> [options]",
     "  dev-nexus worktree prepare <workspace-root> [options]",
+    "  dev-nexus publication branch-push <workspace-root> --branch <branch> [options]",
+    "  dev-nexus publication pull-request upsert <workspace-root> --head <branch> --title <title> [options]",
+    "  dev-nexus publication pull-request merge <workspace-root> --number <number> [options]",
     "  dev-nexus publication green-main plan <workspace-root> --pr <number> --checks-file <json-file> [options]",
     "  dev-nexus publication evidence normalize <json-file> [options]",
     "  dev-nexus publication merge-queue-readiness <workspace-root> [options]",
@@ -1349,6 +1398,32 @@ export function usage(): string {
     "  --worker-agent <provider> assigned worker provider target, such as codex or claude",
     "  --write-scope <path>      intended lease write scope; repeatable",
     "  --lease-note <text>       lease note; repeatable",
+    "  --json",
+    "",
+    "Options for publication branch-push:",
+    "  --component <id>          defaults to the primary component",
+    "  --branch <branch>         local branch/ref to push through the configured publication actor",
+    "  --target-branch <branch>  optional destination branch; target-branch pushes still honor publication policy",
+    "  --force-with-lease        update an existing review branch only if the remote ref was not changed unexpectedly",
+    "  --force-with-lease-expected <sha>  expected remote branch commit for URL-backed push leases",
+    "  --repository-path <path>  git checkout to push; defaults to current directory",
+    "  --dry-run                 resolve the App credential and print the redacted push plan without running git",
+    "  --json",
+    "",
+    "Options for publication pull-request upsert:",
+    "  --component <id>          defaults to the primary component",
+    "  --number <number>         update an existing pull request instead of creating one",
+    "  --head <branch>           review branch to publish",
+    "  --base <branch>           defaults to component or publication target branch",
+    "  --title <text>",
+    "  --body <text>",
+    "  --body-file <path>",
+    "  --json",
+    "",
+    "Options for publication pull-request merge:",
+    "  --component <id>          defaults to the primary component",
+    "  --number <number>",
+    "  --method <merge|squash|rebase>  defaults to merge",
     "  --json",
     "",
     "Options for publication green-main plan:",
@@ -2610,6 +2685,72 @@ async function handlePublicationCommand(
   argv: string[],
   dependencies: DevNexusCliDependencies,
 ): Promise<number> {
+  if (argv[1] === "branch-push") {
+    const parsed = parsePublicationBranchPushCommand(argv);
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+      branch: parsed.branch,
+      targetBranch: parsed.targetBranch,
+      forceWithLease: parsed.forceWithLease,
+      forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+      gitRunner: parsed.dryRun
+        ? dryRunPublicationGitPushRunner
+        : dependencies.publicationGitPushRunner,
+    });
+    printPublicationBranchPushResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.push.git.exitCode === 0 || parsed.dryRun ? 0 : 1;
+  }
+
+  if (argv[1] === "pull-request" && argv[2] === "upsert") {
+    const parsed = parsePublicationPullRequestUpsertCommand(argv);
+    const result = await upsertNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      number: parsed.number,
+      head: parsed.head,
+      base: parsed.base,
+      title: parsed.title,
+      body: publicationPullRequestBody(parsed),
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestUpsertResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "pull-request" && argv[2] === "merge") {
+    const parsed = parsePublicationPullRequestMergeCommand(argv);
+    const result = await mergeNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      number: parsed.number,
+      method: parsed.method,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestMergeResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return result.merge.merged ? 0 : 1;
+  }
+
   if (argv[1] === "green-main" && argv[2] === "plan") {
     const parsed = parsePublicationGreenMainPlanCommand(argv);
     const checks = readGreenMainChecksInput(parsed.checksFile);
@@ -2719,7 +2860,7 @@ async function handlePublicationCommand(
   }
 
   throw new Error(
-    "publication requires green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
   );
 }
 
@@ -5695,6 +5836,192 @@ function parsePublicationGreenMainPlanCommand(
   return parsed as ParsedPublicationGreenMainPlanCommand;
 }
 
+function parsePublicationBranchPushCommand(
+  argv: string[],
+): ParsedPublicationBranchPushCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "branch-push") {
+    throw new Error("publication requires branch-push");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication branch-push requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationBranchPushCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--repository-path":
+        parsed.repositoryPath = next();
+        break;
+      case "--branch":
+        parsed.branch = next();
+        break;
+      case "--target-branch":
+        parsed.targetBranch = next();
+        break;
+      case "--force-with-lease":
+        parsed.forceWithLease = true;
+        break;
+      case "--force-with-lease-expected":
+        parsed.forceWithLease = true;
+        parsed.forceWithLeaseExpectedCommit = next();
+        break;
+      case "--dry-run":
+        parsed.dryRun = true;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication branch-push option: ${arg}`);
+    }
+  }
+  if (!parsed.branch) {
+    throw new Error("publication branch-push requires --branch");
+  }
+
+  return parsed as ParsedPublicationBranchPushCommand;
+}
+
+function parsePublicationPullRequestUpsertCommand(
+  argv: string[],
+): ParsedPublicationPullRequestUpsertCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "upsert") {
+    throw new Error("publication requires pull-request upsert");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request upsert requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestUpsertCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--head":
+        parsed.head = next();
+        break;
+      case "--base":
+        parsed.base = next();
+        break;
+      case "--title":
+        parsed.title = next();
+        break;
+      case "--body":
+        parsed.body = next();
+        break;
+      case "--body-file":
+        parsed.bodyFile = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request upsert option: ${arg}`);
+    }
+  }
+  if (!parsed.head) {
+    throw new Error("publication pull-request upsert requires --head");
+  }
+  if (!parsed.title) {
+    throw new Error("publication pull-request upsert requires --title");
+  }
+  if (parsed.body !== undefined && parsed.bodyFile) {
+    throw new Error("publication pull-request upsert accepts --body or --body-file, not both");
+  }
+
+  return parsed as ParsedPublicationPullRequestUpsertCommand;
+}
+
+function parsePublicationPullRequestMergeCommand(
+  argv: string[],
+): ParsedPublicationPullRequestMergeCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "merge") {
+    throw new Error("publication requires pull-request merge");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request merge requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestMergeCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--method":
+        parsed.method = parsePublicationPullRequestMergeMethod(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request merge option: ${arg}`);
+    }
+  }
+  if (!parsed.number) {
+    throw new Error("publication pull-request merge requires --number");
+  }
+
+  return parsed as ParsedPublicationPullRequestMergeCommand;
+}
+
+function parsePublicationPullRequestMergeMethod(
+  value: string,
+  optionName: string,
+): "merge" | "squash" | "rebase" {
+  if (value === "merge" || value === "squash" || value === "rebase") {
+    return value;
+  }
+
+  throw new Error(`${optionName} must be merge, squash, or rebase`);
+}
+
 function parsePublicationTrainReadinessCommand(
   argv: string[],
 ): ParsedPublicationTrainReadinessCommand {
@@ -5909,6 +6236,27 @@ function readGreenMainChecksInput(
   throw new Error(
     "publication green-main checks file must be an array or an object with checks",
   );
+}
+
+const dryRunPublicationGitPushRunner: NexusPublicationGitPushRunner = (
+  args: readonly string[],
+) => ({
+  args: [...args],
+  stdout: "",
+  stderr: "dry-run: git push was not executed",
+  exitCode: null,
+});
+
+function publicationPullRequestBody(
+  parsed: ParsedPublicationPullRequestUpsertCommand,
+): string | null | undefined {
+  if (parsed.body !== undefined) {
+    return parsed.body;
+  }
+  if (parsed.bodyFile) {
+    return fs.readFileSync(path.resolve(parsed.bodyFile), "utf8");
+  }
+  return undefined;
 }
 
 function readPublicationTrainEvidenceInput(
@@ -9037,6 +9385,126 @@ function printPublicationGreenMainPlan(
   for (const step of Object.values(plan.commands)) {
     writeLine(stdout, `    ${step.title}: ${formatGreenMainStep(step)}`);
   }
+}
+
+function printPublicationBranchPushResult(
+  result: NexusPublicationBranchPushResult,
+  parsed: ParsedPublicationBranchPushCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: parsed.dryRun || result.push.git.exitCode === 0,
+    dryRun: Boolean(parsed.dryRun),
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    repository: result.repository,
+    branch: result.branch,
+    targetBranch: result.targetBranch,
+    forceWithLease: result.forceWithLease,
+    forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
+    credential: result.credential,
+    push: {
+      git: result.push.git,
+      plan: {
+        ...result.push.plan,
+        args: result.push.plan.redactedArgs,
+        redactedArgs: result.push.plan.redactedArgs,
+        environment: result.push.plan.redactedEnvironment,
+      },
+    },
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(
+    stdout,
+    `DevNexus publication branch ${parsed.dryRun ? "push dry-run" : "pushed"}.`,
+  );
+  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Branch: ${result.branch}`);
+  if (result.targetBranch) {
+    writeLine(stdout, `  Target branch: ${result.targetBranch}`);
+  }
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Transport: ${result.push.plan.transport}`);
+  writeLine(stdout, `  Refspec: ${result.push.plan.refspec}`);
+  if (result.forceWithLease) {
+    writeLine(stdout, "  Force with lease: true");
+  }
+  if (result.forceWithLeaseExpectedCommit) {
+    writeLine(stdout, `  Expected remote commit: ${result.forceWithLeaseExpectedCommit}`);
+  }
+  writeLine(stdout, `  Exit code: ${result.push.git.exitCode ?? "not-run"}`);
+  if (result.push.git.stderr.trim()) {
+    writeLine(stdout, `  Git: ${result.push.git.stderr.trim()}`);
+  }
+}
+
+function printPublicationPullRequestUpsertResult(
+  result: NexusPublicationPullRequestUpsertResult,
+  parsed: ParsedPublicationPullRequestUpsertCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request upserted.");
+  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  if (result.pullRequest.url) {
+    writeLine(stdout, `  URL: ${result.pullRequest.url}`);
+  }
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.pullRequest.metadata.backend}`);
+}
+
+function printPublicationPullRequestMergeResult(
+  result: NexusPublicationPullRequestMergeResult,
+  parsed: ParsedPublicationPullRequestMergeCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: result.merge.merged,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+    merge: result.merge,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request merged.");
+  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  writeLine(stdout, `  Method: ${result.pullRequest.method}`);
+  writeLine(stdout, `  Merged: ${result.merge.merged ? "yes" : "no"}`);
+  if (result.merge.sha) {
+    writeLine(stdout, `  SHA: ${result.merge.sha}`);
+  }
+  if (result.merge.message) {
+    writeLine(stdout, `  Message: ${result.merge.message}`);
+  }
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
 }
 
 function printPublicationTrainReadinessReport(

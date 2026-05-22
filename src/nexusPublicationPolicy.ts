@@ -84,6 +84,8 @@ export interface NexusPublicationGitPushPlan {
   refspec: string;
   branch: string;
   targetBranch: string | null;
+  forceWithLease: boolean;
+  forceWithLeaseExpectedCommit: string | null;
 }
 
 export interface NexusPublicationGitPushInvocation {
@@ -532,6 +534,8 @@ export function buildNexusPublicationGitPushPlan(options: {
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
+  forceWithLease?: boolean;
+  forceWithLeaseExpectedCommit?: string | null;
   credential?: NexusResolvedProviderCredential | null;
   projectRoot?: string;
   authProfiles?: NexusHostingAuthProfileConfig[];
@@ -544,6 +548,8 @@ export function prepareNexusPublicationGitPush(options: {
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
+  forceWithLease?: boolean;
+  forceWithLeaseExpectedCommit?: string | null;
   credential?: NexusResolvedProviderCredential | null;
   projectRoot?: string;
   authProfiles?: NexusHostingAuthProfileConfig[];
@@ -553,8 +559,17 @@ export function prepareNexusPublicationGitPush(options: {
   );
   const branch = requiredPublicationValue(options.branch, "branch");
   const targetBranch = options.targetBranch?.trim() || null;
+  const forceWithLease = options.forceWithLease ?? false;
+  const forceWithLeaseExpectedCommit =
+    options.forceWithLeaseExpectedCommit?.trim() || null;
   const refspec =
     targetBranch && targetBranch !== branch ? `${branch}:${targetBranch}` : branch;
+  const forceWithLeaseArg = publicationForceWithLeaseArg({
+    branch,
+    targetBranch,
+    forceWithLease,
+    expectedCommit: forceWithLeaseExpectedCommit,
+  });
   const environment = {
     ...publicationCommandEnvironment(options.policy, {
       projectRoot: options.projectRoot,
@@ -578,6 +593,9 @@ export function prepareNexusPublicationGitPush(options: {
       repositoryPath,
       branch,
       targetBranch,
+      forceWithLease,
+      forceWithLeaseExpectedCommit,
+      forceWithLeaseArg,
       refspec,
       environment,
       credential,
@@ -588,7 +606,12 @@ export function prepareNexusPublicationGitPush(options: {
     options.policy.remote ?? defaultNexusAutomationConfig.publication.remote,
     "publication remote",
   );
-  const args = ["push", remote, refspec];
+  const args = [
+    "push",
+    ...(forceWithLeaseArg ? [forceWithLeaseArg] : []),
+    remote,
+    refspec,
+  ];
   return {
     plan: {
       command: "git",
@@ -603,6 +626,8 @@ export function prepareNexusPublicationGitPush(options: {
       refspec,
       branch,
       targetBranch,
+      forceWithLease,
+      forceWithLeaseExpectedCommit,
     },
     secretEnvironment: {},
   };
@@ -613,6 +638,8 @@ export function pushNexusPublicationBranch(options: {
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
+  forceWithLease?: boolean;
+  forceWithLeaseExpectedCommit?: string | null;
   credential?: NexusResolvedProviderCredential | null;
   projectRoot?: string;
   authProfiles?: NexusHostingAuthProfileConfig[];
@@ -1434,6 +1461,9 @@ function prepareTokenBackedGitPush(options: {
   repositoryPath: string;
   branch: string;
   targetBranch: string | null;
+  forceWithLease: boolean;
+  forceWithLeaseExpectedCommit: string | null;
+  forceWithLeaseArg: string | null;
   refspec: string;
   environment: Record<string, string>;
   credential: NexusResolvedProviderCredential;
@@ -1463,6 +1493,7 @@ function prepareTokenBackedGitPush(options: {
     "-c",
     `credential.helper=${helper}`,
     "push",
+    ...(options.forceWithLeaseArg ? [options.forceWithLeaseArg] : []),
     remote,
     options.refspec,
   ];
@@ -1483,6 +1514,8 @@ function prepareTokenBackedGitPush(options: {
       refspec: options.refspec,
       branch: options.branch,
       targetBranch: options.targetBranch,
+      forceWithLease: options.forceWithLease,
+      forceWithLeaseExpectedCommit: options.forceWithLeaseExpectedCommit,
     },
     secretEnvironment: {
       [tokenEnvironmentKey]: token,
@@ -1540,6 +1573,25 @@ function publicationPermissionSatisfies(
     return granted === required;
   }
   return grantedLevel >= requiredLevel;
+}
+
+function publicationForceWithLeaseArg(options: {
+  branch: string;
+  targetBranch: string | null;
+  forceWithLease: boolean;
+  expectedCommit: string | null;
+}): string | null {
+  if (!options.forceWithLease && !options.expectedCommit) {
+    return null;
+  }
+  if (!options.expectedCommit) {
+    return "--force-with-lease";
+  }
+  const destinationBranch = options.targetBranch || options.branch;
+  const destinationRef = destinationBranch.startsWith("refs/")
+    ? destinationBranch
+    : `refs/heads/${destinationBranch}`;
+  return `--force-with-lease=${destinationRef}:${options.expectedCommit}`;
 }
 
 function defaultPublicationGitPushRunner(

@@ -12,7 +12,6 @@ import {
 import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
-  type ResolvedNexusProjectWorkTracker,
 } from "./nexusProjectLifecycle.js";
 import {
   buildNexusForgePublicationOperationPlan,
@@ -21,6 +20,11 @@ import {
   type NexusForgePublicationOperationPlan,
   type NexusForgeRepositoryRef,
 } from "./nexusForgePublication.js";
+import {
+  nexusForgeRepositoryFromGitHubRepository,
+  resolveNexusGitHubRepository,
+  selectNexusGitHubPrimaryTracker,
+} from "./nexusForgeRepositoryResolver.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 
 export type NexusGreenMainPublicationPlanStatus =
@@ -199,10 +203,16 @@ export function buildNexusGreenMainPublicationPlan(
     projectConfig,
     options.componentId,
   );
-  const tracker = githubTracker(component);
-  const repository = githubRepository(tracker);
+  const tracker = selectNexusGitHubPrimaryTracker(
+    component,
+    "green-main publication",
+  );
+  const repository = resolveNexusGitHubRepository(
+    tracker,
+    "green-main publication",
+  );
   const repoArg = `${repository.owner}/${repository.name}`;
-  const forgeRepository = githubForgeRepository(repository);
+  const forgeRepository = nexusForgeRepositoryFromGitHubRepository(repository);
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
   const greenMain = {
     ...defaultNexusAutomationGreenMainConfig,
@@ -301,64 +311,6 @@ function resolveGreenMainComponent(
 
 function missingComponent(componentId: string | undefined): never {
   throw new Error(`Component ${componentId ?? "<default>"} was not found.`);
-}
-
-function githubTracker(
-  component: ResolvedNexusProjectComponent,
-): ResolvedNexusProjectWorkTracker {
-  const tracker =
-    component.workTrackers.find(
-      (candidate) =>
-        candidate.id === component.defaultTrackerId &&
-        candidate.provider === "github",
-    ) ??
-    component.workTrackers.find(
-      (candidate) => candidate.default && candidate.provider === "github",
-    ) ??
-    component.workTrackers.find(
-      (candidate) =>
-        candidate.roles.includes("primary") && candidate.provider === "github",
-    );
-  if (!tracker) {
-    throw new Error(
-      `Component ${component.id} does not have a GitHub primary/default tracker for green-main publication.`,
-    );
-  }
-
-  return tracker;
-}
-
-function githubRepository(tracker: ResolvedNexusProjectWorkTracker): {
-  owner: string;
-  name: string;
-  host: string | null;
-} {
-  const workTracking = tracker.workTracking;
-  if (workTracking.provider !== "github") {
-    throw new Error(`Tracker ${tracker.id} is not a GitHub tracker.`);
-  }
-  if (!workTracking.repository?.owner || !workTracking.repository.name) {
-    throw new Error(
-      `Tracker ${tracker.id} must configure a GitHub repository owner and name for green-main publication.`,
-    );
-  }
-
-  return {
-    owner: workTracking.repository.owner,
-    name: workTracking.repository.name,
-    host: workTracking.host ?? "github.com",
-  };
-}
-
-function githubForgeRepository(
-  repository: ReturnType<typeof githubRepository>,
-): NexusForgeRepositoryRef {
-  return {
-    provider: "github",
-    owner: repository.owner,
-    name: repository.name,
-    host: repository.host,
-  };
 }
 
 function evaluateRequiredCheck(
