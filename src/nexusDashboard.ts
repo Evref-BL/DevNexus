@@ -284,6 +284,10 @@ export interface NexusDashboardPluginRecord {
   mcpServerCount: number;
   setupActionCount: number;
   dependencyProjectionCount: number;
+  projectedSkills: string[];
+  mcpServers: string[];
+  setupHints: string[];
+  dependencyHints: string[];
 }
 
 export interface NexusDashboardPluginSummary {
@@ -2116,11 +2120,18 @@ function compactThreadBranch(value: string): string {
   return parts.length > 2 ? parts.slice(-2).join("/") : value;
 }
 
+type DashboardPluginCapability =
+  | NexusPluginCapabilityProjection["capabilities"][number]
+  | NonNullable<NexusProjectConfig["plugins"]>[number]["capabilities"][number];
+
 function summarizePlugins(
   projectConfig: NexusProjectConfig,
 ): NexusDashboardPluginSummary {
   const projections = projectPluginCapabilityProjections(projectConfig);
-  const records = projections.map(pluginDashboardRecord);
+  const projectionsById = new Map(projections.map((projection) => [projection.pluginId, projection]));
+  const records = (projectConfig.plugins ?? []).map((plugin) =>
+    pluginDashboardRecord(plugin, projectionsById.get(plugin.id))
+  );
   return {
     totalCount: records.length,
     enabledCount: records.filter((record) => record.enabled).length,
@@ -2130,23 +2141,58 @@ function summarizePlugins(
 }
 
 function pluginDashboardRecord(
-  plugin: NexusPluginCapabilityProjection,
+  plugin: NonNullable<NexusProjectConfig["plugins"]>[number],
+  projection: NexusPluginCapabilityProjection | undefined,
 ): NexusDashboardPluginRecord {
+  const capabilities = projection?.capabilities ?? plugin.capabilities;
   return {
-    id: plugin.pluginId,
-    name: plugin.pluginName ?? plugin.pluginId,
-    version: plugin.version,
-    enabled: true,
-    capabilityCount: plugin.capabilityCount,
-    projectedSkillCount: plugin.capabilities.filter((capability) => capability.kind === "projected_skill").length,
-    mcpServerCount: plugin.capabilities.filter((capability) => capability.kind === "mcp_server").length,
-    setupActionCount: plugin.capabilities.filter((capability) =>
+    id: plugin.id,
+    name: plugin.name ?? plugin.id,
+    version: plugin.version ?? null,
+    enabled: plugin.enabled !== false,
+    capabilityCount: capabilities.length,
+    projectedSkillCount: capabilities.filter((capability) => capability.kind === "projected_skill").length,
+    mcpServerCount: capabilities.filter((capability) => capability.kind === "mcp_server").length,
+    setupActionCount: capabilities.filter((capability) =>
       capability.kind === "setup_obligation" ||
       capability.kind === "environment_hint" ||
       capability.kind === "cleanup_hook",
     ).length,
-    dependencyProjectionCount: plugin.capabilities.filter((capability) => capability.kind === "dependency_projection").length,
+    dependencyProjectionCount: capabilities.filter((capability) => capability.kind === "dependency_projection").length,
+    projectedSkills: capabilities
+      .filter((capability) => capability.kind === "projected_skill")
+      .map((capability) => capability.skillId)
+      .slice(0, 3),
+    mcpServers: capabilities
+      .filter((capability) => capability.kind === "mcp_server")
+      .map((capability) => capability.serverName)
+      .slice(0, 3),
+    setupHints: capabilities
+      .filter((capability) =>
+        capability.kind === "setup_obligation" ||
+        capability.kind === "environment_hint" ||
+        capability.kind === "cleanup_hook"
+      )
+      .map(pluginSetupHint)
+      .slice(0, 2),
+    dependencyHints: capabilities
+      .filter((capability) => capability.kind === "dependency_projection")
+      .map((capability) => `${capability.source} -> ${capability.target}`)
+      .slice(0, 2),
   };
+}
+
+function pluginSetupHint(capability: DashboardPluginCapability): string {
+  if (capability.kind === "environment_hint") {
+    return capability.required ? `${capability.variable} required` : capability.variable;
+  }
+  if (capability.kind === "cleanup_hook") {
+    return capability.trigger ? `${capability.trigger} cleanup` : "cleanup hook";
+  }
+  if (capability.kind === "setup_obligation") {
+    return capability.description;
+  }
+  return capability.id;
 }
 
 function summarizePublication(

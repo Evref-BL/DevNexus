@@ -74,6 +74,7 @@ async function loadDashboardClientTestHooks(): Promise<{
   renderLaneKey: (
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
+  renderPlugins: (plugins: unknown) => string;
   timelineLanes: (snapshot: unknown) => Array<{
     detail?: string;
     index: number;
@@ -94,7 +95,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -529,6 +530,8 @@ describe("nexus dashboard", () => {
         capabilityCount: 2,
         mcpServerCount: 1,
         projectedSkillCount: 1,
+        projectedSkills: ["typescript-diagnose"],
+        mcpServers: ["dev-nexus-typescript"],
       }),
     ]);
     expect(snapshot.weave.nodes.map((node) => node.id)).toEqual(
@@ -661,6 +664,62 @@ describe("nexus dashboard", () => {
           id: "lease-merged",
           decision: "merged",
           decisionLabel: "Merged",
+        }),
+      ]),
+    );
+  });
+
+  it("summarizes enabled and disabled plugins for cockpit cards", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-plugins-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      plugins: [
+        ...(projectConfig().plugins ?? []),
+        {
+          id: "dev-nexus-research",
+          name: "DevNexus Research",
+          version: "0.1.0-test",
+          enabled: false,
+          capabilities: [
+            {
+              kind: "setup_obligation",
+              id: "research-corpus",
+              description: "Prepare research corpus",
+              required: true,
+            },
+            {
+              kind: "dependency_projection",
+              id: "research-node-modules",
+              source: "node_modules",
+              target: "node_modules",
+              required: true,
+            },
+          ],
+        },
+      ],
+    });
+    saveProjectConfig(projectRoot, config);
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner: fakeGitRunner(),
+      now: fixedClock("2026-05-21T10:05:00.000Z"),
+    });
+
+    expect(snapshot.plugins).toMatchObject({
+      totalCount: 2,
+      enabledCount: 1,
+      capabilityCount: 4,
+    });
+    expect(snapshot.plugins.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "dev-nexus-research",
+          enabled: false,
+          setupActionCount: 1,
+          dependencyProjectionCount: 1,
+          setupHints: ["Prepare research corpus"],
+          dependencyHints: ["node_modules -> node_modules"],
         }),
       ]),
     );
@@ -868,6 +927,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
     expect(module).toContain("renderPlugins");
+    expect(module).toContain("pluginPills");
+    expect(module).toContain("Install actions appear only");
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
     expect(module).toContain("Copy prompt");
@@ -1102,6 +1163,56 @@ describe("nexus dashboard", () => {
     );
     expect(prompt).not.toContain("..");
     expect(prompt).not.toContain("Codex");
+  });
+
+  it("renders plugin cards without unsafe install buttons", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderPlugins({
+      totalCount: 2,
+      enabledCount: 1,
+      capabilityCount: 4,
+      records: [
+        {
+          id: "dev-nexus-typescript",
+          name: "DevNexus TypeScript",
+          version: "0.1.0-test",
+          enabled: true,
+          capabilityCount: 2,
+          projectedSkillCount: 1,
+          mcpServerCount: 1,
+          setupActionCount: 0,
+          dependencyProjectionCount: 0,
+          projectedSkills: ["typescript-diagnose"],
+          mcpServers: ["dev-nexus-typescript"],
+          setupHints: [],
+          dependencyHints: [],
+        },
+        {
+          id: "dev-nexus-research",
+          name: "DevNexus Research",
+          version: null,
+          enabled: false,
+          capabilityCount: 2,
+          projectedSkillCount: 0,
+          mcpServerCount: 0,
+          setupActionCount: 1,
+          dependencyProjectionCount: 1,
+          projectedSkills: [],
+          mcpServers: [],
+          setupHints: ["Prepare research corpus"],
+          dependencyHints: ["node_modules -> node_modules"],
+        },
+      ],
+    });
+
+    expect(html).toContain("1 enabled · 1 disabled · 4 capabilities");
+    expect(html).toContain("Skill: typescript-diagnose");
+    expect(html).toContain("MCP: dev-nexus-typescript");
+    expect(html).toContain("Setup: Prepare research corpus");
+    expect(html).toContain("Deps: node_modules -&gt; node_modules");
+    expect(html).toContain("Install actions appear only after a trusted plugin source");
+    expect(html).not.toContain("<button");
   });
 
   it("extracts GitHub provider actions from bare issue references", async () => {
