@@ -79,6 +79,8 @@ import type {
 } from "./nexusAutomationEligibleWorkItems.js";
 import {
   claimNexusEligibleWorkItem,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusWorkItemClaimObservation,
   type NexusWorkItemClaimOwner,
   type NexusWorkItemClaimOwnerInput,
@@ -193,6 +195,7 @@ export interface NexusAutomationAgentLaunchWorkItemClaim {
   logicalWorkItemId: string | null;
   workItemTitle: string | null;
   owner: NexusWorkItemClaimOwner | null;
+  authorityClaim: NexusWorkItemClaimAuthorityRecord | null;
   reclaimedFrom: NexusWorkItemClaimObservation | null;
   skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
   activeClaims: NexusWorkItemClaimObservation[];
@@ -314,6 +317,7 @@ export interface RunNexusAutomationAgentLaunchOnceOptions {
   runtimePackageCommandRunner?: NexusNpmRuntimeCommandRunner;
   mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
   workItemClaimOwner?: NexusWorkItemClaimOwnerInput;
+  claimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
   now?: () => Date | string;
   launcher: NexusAutomationAgentLauncher;
@@ -741,6 +745,7 @@ export async function runNexusAutomationAgentLaunchOnce(
           }),
           providerOptions: options.providerOptions,
           env: discoveryEnv,
+          claimAuthority: options.claimAuthority,
           owner: workItemClaimOwner({
             options,
             runId,
@@ -1316,6 +1321,7 @@ function agentLaunchWorkItemClaim(
       logicalWorkItemId: claim.workItem.externalRef?.itemId ?? claim.workItem.id,
       workItemTitle: claim.workItem.title,
       owner: claim.owner,
+      authorityClaim: claim.authorityClaim ?? null,
       reclaimedFrom: claim.reclaimedFrom ?? null,
       skippedCandidates: claim.skippedCandidates,
       activeClaims: claim.activeClaims ?? [],
@@ -1333,6 +1339,7 @@ function agentLaunchWorkItemClaim(
       logicalWorkItemId: claim.candidate.externalRef?.itemId ?? claim.candidate.id,
       workItemTitle: claim.candidate.title,
       owner: claim.owner,
+      authorityClaim: claim.authorityClaim ?? null,
       reclaimedFrom: claim.reclaimedFrom ?? null,
       skippedCandidates: claim.skippedCandidates,
       activeClaims: claim.activeClaims ?? [],
@@ -1349,6 +1356,7 @@ function agentLaunchWorkItemClaim(
     logicalWorkItemId: null,
     workItemTitle: null,
     owner: null,
+    authorityClaim: null,
     reclaimedFrom: null,
     skippedCandidates: claim.skippedCandidates,
     activeClaims: claim.activeClaims ?? [],
@@ -1366,6 +1374,7 @@ function disabledWorkItemClaim(): NexusAutomationAgentLaunchWorkItemClaim {
     logicalWorkItemId: null,
     workItemTitle: null,
     owner: null,
+    authorityClaim: null,
     reclaimedFrom: null,
     skippedCandidates: [],
     activeClaims: [],
@@ -1385,6 +1394,7 @@ function blockedWorkItemClaim(
     logicalWorkItemId: null,
     workItemTitle: null,
     owner: null,
+    authorityClaim: null,
     reclaimedFrom: null,
     skippedCandidates: [],
     activeClaims: [],
@@ -1675,6 +1685,12 @@ function agentLaunchEnvironment(
     DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",
     DEV_NEXUS_CLAIM_OWNER_ID: input.workItemClaim?.owner?.ownerId ?? "",
     DEV_NEXUS_CLAIM_EXPIRES_AT: input.workItemClaim?.owner?.expiresAt ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_KIND:
+      input.workItemClaim?.authorityClaim?.authorityKind ?? "",
+    DEV_NEXUS_CLAIM_FENCING_TOKEN:
+      input.workItemClaim?.authorityClaim?.fencingToken.toString() ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_STATE:
+      input.workItemClaim?.authorityClaim?.state ?? "",
   };
 }
 

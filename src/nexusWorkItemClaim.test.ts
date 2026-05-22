@@ -6,6 +6,8 @@ import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
   claimNexusEligibleWorkItem,
   type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusEligibleWorkClaimProviderFactory,
 } from "./nexusWorkItemClaim.js";
 import type {
@@ -176,6 +178,67 @@ describe("optimistic work item claims", () => {
     expect(provider.comments).toEqual([]);
   });
 
+  it("rejects an authority-backed claim when post-claim verification fails", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-19", "Authority claim verification", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "token_mismatch",
+          claim: authorityClaim ?? undefined,
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: {
+        hostId: "host-a",
+      },
+      leaseTokenFactory: () => "authority-token",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "lost_race",
+      reason: "verification_failed",
+      authorityClaim: {
+        authorityKind: "test-authority",
+        fencingToken: 41,
+      },
+      owner: {
+        leaseToken: "authority-token",
+      },
+    });
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
   it("does not fall back to optimistic claims when PostgreSQL authority is configured", async () => {
     const projectRoot = makeTempDir("dev-nexus-claim-");
     const config = projectConfig();
@@ -318,6 +381,12 @@ describe("optimistic work item claims", () => {
       "lock",
       "select",
       "upsert",
+      "COMMIT",
+      "end",
+      "connect",
+      "BEGIN",
+      'SET LOCAL search_path TO "dev_nexus", public',
+      "select",
       "COMMIT",
       "end",
     ]);
@@ -1043,6 +1112,36 @@ function cloneClaimRow(
     owner: { ...row.owner },
     providerMirrorWarnings: [...row.providerMirrorWarnings],
     ...(row.reclaimedFrom ? { reclaimedFrom: { ...row.reclaimedFrom } } : {}),
+  };
+}
+
+function testAuthorityClaim(
+  input: NexusWorkItemClaimAuthorityClaimCandidateOptions,
+): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: input.projectId,
+      componentId: input.candidate.componentId,
+      trackerId: input.tracker.id,
+      provider: input.ref.provider ?? input.candidate.provider,
+      workItemId: input.ref.id ?? input.candidate.id,
+      ...(input.ref.externalRef?.repositoryOwner
+        ? { repositoryOwner: input.ref.externalRef.repositoryOwner }
+        : {}),
+      ...(input.ref.externalRef?.repositoryName
+        ? { repositoryName: input.ref.externalRef.repositoryName }
+        : {}),
+      ...(input.ref.externalRef?.itemNumber
+        ? { itemNumber: input.ref.externalRef.itemNumber }
+        : {}),
+    },
+    owner: input.owner,
+    fencingToken: 41,
+    state: "active",
+    claimedAt: input.owner.claimedAt,
+    expiresAt: input.owner.expiresAt,
+    lastHeartbeatAt: input.now.toISOString(),
   };
 }
 

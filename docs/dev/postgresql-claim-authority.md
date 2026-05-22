@@ -273,6 +273,13 @@ Verification:
 - `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCoordinatorLoop.test.ts`
 - `npm run build`
 
+Progress:
+
+- 2026-05-23: Slice 4A added post-claim authority verification before
+  coordinator launch and carries verified authority/fencing facts into the agent
+  context and launch environment. Projects without authority-backed claims keep
+  the existing optimistic tracker behavior.
+
 ### Slice 5: Documentation And Optional Live Smoke
 
 Scope:
@@ -302,8 +309,6 @@ Verification:
 
 ## Open Decisions
 
-- Use `pg` directly or keep the PostgreSQL backend behind an injected client
-  supplied by host-local setup.
 - Store claim history forever, retain by age/count, or let operators prune.
 - Treat provider mirror failure as claimed-with-warning or claim-release by
   default.

@@ -20,6 +20,9 @@ import {
   type GitRunner,
   type NexusAutomationConfig,
   type NexusAutomationCommandRunner,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectConfig,
   type NexusPublicationActorRunner,
   type WorkTrackerProvider,
@@ -939,6 +942,173 @@ describe("nexus automation agent launch", () => {
     });
   });
 
+  it("passes verified authority fencing facts to launched agents", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Authority claim context",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 77);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "verified",
+          claim: authorityClaim!,
+        };
+      },
+    };
+
+    const commandRunner: NexusAutomationCommandRunner = (command, options) => {
+      expect(options.env.DEV_NEXUS_WORK_ITEM_CLAIM_STATUS).toBe("claimed");
+      expect(options.env.DEV_NEXUS_CLAIM_AUTHORITY_KIND).toBe("test-authority");
+      expect(options.env.DEV_NEXUS_CLAIM_FENCING_TOKEN).toBe("77");
+      expect(options.env.DEV_NEXUS_CLAIM_AUTHORITY_STATE).toBe("active");
+
+      const context = JSON.parse(
+        fs.readFileSync(options.env.DEV_NEXUS_AGENT_CONTEXT_FILE!, "utf8"),
+      );
+      expect(context.workItemClaim).toMatchObject({
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 77,
+          state: "active",
+          owner: {
+            leaseToken: "lease-authority-1",
+          },
+        },
+      });
+      fs.writeFileSync(
+        options.env.DEV_NEXUS_AGENT_RESULT_FILE!,
+        `${JSON.stringify({
+          status: "completed",
+          summary: "Coordinator saw authority fencing",
+        })}\n`,
+        "utf8",
+      );
+
+      return {
+        command,
+        cwd: options.cwd,
+        stdout: "launched",
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-authority-claim",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-authority-1",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: createNexusAutomationAgentCommandLauncher({
+        command: "codex run",
+        commandRunner,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      workItemClaim: {
+        status: "claimed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 77,
+        },
+      },
+    });
+  });
+
+  it("skips launch when an authority-backed claim cannot be verified", async () => {
+    const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-16T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Authority claim rejected",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 78);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "token_mismatch",
+          claim: authorityClaim ?? undefined,
+        };
+      },
+    };
+
+    const result = await runNexusAutomationAgentLaunchOnce({
+      projectRoot,
+      runId: "agent-authority-claim-rejected",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-authority-rejected",
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      launcher: () => {
+        throw new Error("launcher should not run");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "skipped",
+      summary: expect.stringContaining("lost race"),
+      launch: null,
+      workItemClaim: {
+        status: "lost_race",
+        reason: "verification_failed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 78,
+        },
+      },
+    });
+  });
+
   it("skips launch when claim verification loses a race", async () => {
     const projectRoot = makeTempDir("dev-nexus-agent-launch-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -1779,3 +1949,34 @@ describe("nexus automation agent launch", () => {
     });
   });
 });
+
+function testAuthorityClaim(
+  input: NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  fencingToken: number,
+): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: input.projectId,
+      componentId: input.candidate.componentId,
+      trackerId: input.tracker.id,
+      provider: input.ref.provider ?? input.candidate.provider,
+      workItemId: input.ref.id ?? input.candidate.id,
+      ...(input.ref.externalRef?.repositoryOwner
+        ? { repositoryOwner: input.ref.externalRef.repositoryOwner }
+        : {}),
+      ...(input.ref.externalRef?.repositoryName
+        ? { repositoryName: input.ref.externalRef.repositoryName }
+        : {}),
+      ...(input.ref.externalRef?.itemNumber
+        ? { itemNumber: input.ref.externalRef.itemNumber }
+        : {}),
+    },
+    owner: input.owner,
+    fencingToken,
+    state: "active",
+    claimedAt: input.owner.claimedAt,
+    expiresAt: input.owner.expiresAt,
+    lastHeartbeatAt: input.now.toISOString(),
+  };
+}

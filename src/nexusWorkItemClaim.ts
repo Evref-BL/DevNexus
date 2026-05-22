@@ -58,6 +58,7 @@ import type {
 } from "./workTrackingTypes.js";
 import type {
   NexusWorkItemClaimAuthority,
+  NexusWorkItemClaimAuthorityRecord,
   NexusWorkItemClaimObservation,
   NexusWorkItemClaimOwner,
   NexusWorkItemClaimOwnerInput,
@@ -365,6 +366,30 @@ export async function claimNexusEligibleWorkItem(
         ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
       };
     }
+    const verification = await verifyAuthorityBackedClaim({
+      claimAuthority,
+      authorityClaim: claimAttempt.authorityClaim,
+      provider,
+      ref,
+      owner,
+      now,
+    });
+    if (verification.status === "lost_race") {
+      return {
+        status: "lost_race",
+        reason: "verification_failed",
+        candidate: fresh,
+        observedWorkItem: verification.observedWorkItem,
+        componentId: candidate.componentId,
+        trackerId: tracker.id,
+        owner,
+        ...(verification.authorityClaim
+          ? { authorityClaim: verification.authorityClaim }
+          : {}),
+        skippedCandidates,
+        ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
+      };
+    }
 
     return {
       status: "claimed",
@@ -372,8 +397,8 @@ export async function claimNexusEligibleWorkItem(
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,
-      ...(claimAttempt.authorityClaim
-        ? { authorityClaim: claimAttempt.authorityClaim }
+      ...(verification.authorityClaim
+        ? { authorityClaim: verification.authorityClaim }
         : {}),
       skippedCandidates,
       ...claimDiagnosticsFields({ activeClaims, staleClaims: [] }),
@@ -564,6 +589,31 @@ async function maybeReclaimStaleClaim(options: {
       ...claimDiagnosticsFields({ activeClaims, staleClaims }),
     };
   }
+  const verification = await verifyAuthorityBackedClaim({
+    claimAuthority,
+    authorityClaim: reclaimAttempt.authorityClaim,
+    provider,
+    ref,
+    owner,
+    now: options.now,
+  });
+  if (verification.status === "lost_race") {
+    return {
+      status: "lost_race",
+      reason: "verification_failed",
+      candidate: workItem,
+      observedWorkItem: verification.observedWorkItem,
+      componentId: candidate.componentId,
+      trackerId: tracker.id,
+      owner,
+      ...(verification.authorityClaim
+        ? { authorityClaim: verification.authorityClaim }
+        : {}),
+      skippedCandidates: options.skippedCandidates,
+      reclaimedFrom: staleClaim.observation,
+      ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+    };
+  }
 
   return {
     status: "claimed",
@@ -571,12 +621,60 @@ async function maybeReclaimStaleClaim(options: {
     componentId: candidate.componentId,
     trackerId: tracker.id,
     owner,
-    ...(reclaimAttempt.authorityClaim
-      ? { authorityClaim: reclaimAttempt.authorityClaim }
+    ...(verification.authorityClaim
+      ? { authorityClaim: verification.authorityClaim }
       : {}),
     skippedCandidates: options.skippedCandidates,
     reclaimedFrom: staleClaim.observation,
     ...claimDiagnosticsFields({ activeClaims, staleClaims }),
+  };
+}
+
+async function verifyAuthorityBackedClaim(options: {
+  claimAuthority: NexusWorkItemClaimAuthority;
+  authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+  provider: WorkTrackerProvider;
+  ref: WorkItemRef;
+  owner: NexusWorkItemClaimOwner;
+  now: Date;
+}): Promise<
+  | {
+      status: "verified";
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+    }
+  | {
+      status: "lost_race";
+      observedWorkItem: WorkItem;
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+    }
+> {
+  if (!options.authorityClaim || !options.claimAuthority.verifyClaim) {
+    return {
+      status: "verified",
+      ...(options.authorityClaim
+        ? { authorityClaim: options.authorityClaim }
+        : {}),
+    };
+  }
+
+  const verification = await options.claimAuthority.verifyClaim({
+    key: options.authorityClaim.key,
+    leaseToken: options.owner.leaseToken,
+    now: options.now,
+  });
+  if (verification.status === "verified") {
+    return {
+      status: "verified",
+      authorityClaim: verification.claim,
+    };
+  }
+
+  return {
+    status: "lost_race",
+    observedWorkItem: await options.provider.getWorkItem(options.ref),
+    ...(verification.claim
+      ? { authorityClaim: verification.claim }
+      : { authorityClaim: options.authorityClaim }),
   };
 }
 
