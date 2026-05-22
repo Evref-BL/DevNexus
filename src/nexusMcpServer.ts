@@ -638,6 +638,9 @@ const tools: McpTool[] = [
         branchName: { type: "string" },
         worktreeName: { type: "string" },
         baseRef: { type: ["string", "null"] },
+        initiativeId: { type: ["string", "null"] },
+        initiativeSlice: { type: ["string", "null"] },
+        branchIntent: { type: ["string", "null"] },
         hostId: { type: ["string", "null"] },
         agentId: { type: ["string", "null"] },
         workerAgentProvider: { type: ["string", "null"] },
@@ -1599,6 +1602,13 @@ export async function callDevNexusMcpTool(
           branchName: optionalString(args, "branchName", "arguments"),
           worktreeName: optionalString(args, "worktreeName", "arguments"),
           baseRef: optionalNullableString(args, "baseRef", "arguments"),
+          initiativeId: optionalNullableString(args, "initiativeId", "arguments"),
+          initiativeSlice: optionalNullableString(
+            args,
+            "initiativeSlice",
+            "arguments",
+          ),
+          branchIntent: optionalNullableString(args, "branchIntent", "arguments"),
           hostId: optionalNullableString(args, "hostId", "arguments"),
           agentId: optionalNullableString(args, "agentId", "arguments"),
           workerAgentProvider: optionalNullableString(

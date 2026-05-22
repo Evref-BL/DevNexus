@@ -861,6 +861,9 @@ interface ParsedWorktreePrepareCommand {
   branchName?: string;
   worktreeName?: string;
   baseRef?: string | null;
+  initiativeId?: string | null;
+  initiativeSlice?: string | null;
+  branchIntent?: string | null;
   topic?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
@@ -1709,6 +1712,9 @@ async function handleWorktreeCommand(
       branchName: parsed.branchName,
       worktreeName: parsed.worktreeName,
       baseRef: parsed.baseRef,
+      initiativeId: parsed.initiativeId,
+      initiativeSlice: parsed.initiativeSlice,
+      branchIntent: parsed.branchIntent,
       topic: parsed.topic,
       workItemId: resolvedWorkItem.itemId ?? parsed.workItemId,
       workItemTitle:
@@ -4249,6 +4255,15 @@ function parseWorktreePrepareCommand(
         break;
       case "--no-base-ref":
         parsed.baseRef = null;
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--initiative-slice":
+        parsed.initiativeSlice = next();
+        break;
+      case "--branch-intent":
+        parsed.branchIntent = next();
         break;
       case "--host":
         parsed.hostId = next();
@@ -7035,6 +7050,12 @@ function printWorktreePrepareResult(
   writeLine(stdout, `  Lease: ${result.lease.id}`);
   if (result.worktree.baseRef) {
     writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
+  }
+  if (result.setup.context?.context.initiativeDelivery) {
+    const initiative = result.setup.context.context.initiativeDelivery;
+    writeLine(stdout, `  Initiative: ${initiative.initiativeId}`);
+    writeLine(stdout, `  Review target: ${initiative.branchTarget}`);
+    writeLine(stdout, `  Final target: ${initiative.finalPublicationTarget}`);
   }
   for (const action of result.nextActions) {
     writeLine(stdout, `  Next: ${action}`);

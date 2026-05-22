@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
+  defaultNexusInitiativeDeliveryConfig,
   materializeNexusProjectSkills,
   nexusWorkerContextJsonPath,
   prepareNexusManualWorktree,
@@ -368,6 +369,75 @@ describe("nexus manual worktree worker target preparation", () => {
     });
     expect(result.setup.context!.briefingMarkdown).toContain(
       "- automation Git identity: Example Bot <bot@example.invalid>",
+    );
+  });
+
+  it("derives branch, base ref, and worker context from initiative delivery policy", () => {
+    const { projectRoot, calls } = prepareProject({
+      automation: {
+        ...defaultNexusAutomationConfig,
+        setup: {
+          dependencyLinks: [],
+        },
+        publication: {
+          ...defaultNexusAutomationConfig.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: null,
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+              labels: [],
+              milestones: [],
+              assignees: [],
+              providerQuery: null,
+            },
+          },
+        },
+      },
+    });
+
+    const result = prepareNexusManualWorktree({
+      projectRoot,
+      componentId: "primary",
+      initiativeId: "codex-goals",
+      initiativeSlice: "target projection",
+      branchIntent: "feat",
+      gitRunner: fakeGitRunner(calls),
+    });
+    const context = JSON.parse(
+      fs.readFileSync(nexusWorkerContextJsonPath(result.worktree.worktreePath), "utf8"),
+    );
+
+    expect(result.worktree.branchName).toBe("feat/codex-goals/target-projection");
+    expect(result.worktree.baseRef).toBe("feat/codex-goals");
+    expect(context.initiativeDelivery).toMatchObject({
+      initiativeId: "codex-goals",
+      sliceSlug: "target-projection",
+      topology: "hybrid",
+      integrationBranch: "feat/codex-goals",
+      branchTarget: "feat/codex-goals",
+      finalPublicationTarget: "main",
+      reviewMode: "slice_pr",
+      providerNoise: "status_only",
+    });
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Initiative: codex-goals",
+    );
+    expect(result.setup.context!.briefingMarkdown).toContain(
+      "Review target: feat/codex-goals",
     );
   });
 
