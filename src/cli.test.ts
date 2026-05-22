@@ -7,6 +7,7 @@ import {
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
+  defaultNexusInitiativeDeliveryConfig,
   defaultNexusPublicationTrainCiTierPolicy,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
@@ -6932,6 +6933,92 @@ describe("dev-nexus cli", () => {
               ciTierDefault: "remote_smoke",
               selectorLabels: [],
               requiresPublicLabel: false,
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("prints read-only initiative delivery plans", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          publicationTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            initiativeDelivery: {
+              ...defaultNexusInitiativeDeliveryConfig,
+              enabled: true,
+              activeInitiativeId: "codex-goals",
+              defaultTopology: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      ["publication", "initiative-plan", projectRoot, "--component", "primary"],
+      {
+        stdout: textOutput.writer,
+      },
+    );
+    await main(
+      [
+        "publication",
+        "initiative-plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+      },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus initiative delivery plan.");
+    expect(textOutput.output()).toContain(
+      "primary: active=codex-goals topology=hybrid",
+    );
+    expect(textOutput.output()).toContain(
+      "integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      plan: {
+        itemCount: 1,
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            initiative: {
+              activeScopeId: "codex-goals",
+              defaultTopology: "hybrid",
+              branchPlan: {
+                integrationBranch: "feat/codex-goals",
+                sliceBranchPattern: "feat/codex-goals/{slice}",
+                finalPublicationTarget: "main",
+              },
             },
           },
         ],

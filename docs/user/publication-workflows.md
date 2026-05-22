@@ -201,6 +201,12 @@ Plan candidate branches:
 dev-nexus publication candidate-plan <workspace-root> --version v-next
 ```
 
+Review initiative delivery branch routing:
+
+```bash
+dev-nexus publication initiative-plan <workspace-root> --component api
+```
+
 ## Choosing A Path
 
 Start with `review_handoff` unless the workspace already has a reason to do

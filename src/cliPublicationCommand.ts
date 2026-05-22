@@ -17,6 +17,10 @@ import {
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
 import {
+  buildNexusInitiativeDeliveryPlan,
+  type NexusInitiativeDeliveryPlan,
+} from "./nexusInitiativeDeliveryPlan.js";
+import {
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
@@ -118,6 +122,13 @@ interface ParsedPublicationCandidatePlanCommand {
   integrationBranchName?: string | null;
   candidateBranchName?: string | null;
   fullMatrixBudgetAvailable?: boolean;
+  json?: boolean;
+}
+
+interface ParsedPublicationInitiativePlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  initiativeId?: string | null;
   json?: boolean;
 }
 
@@ -319,8 +330,23 @@ export async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "initiative-plan") {
+    const parsed = parsePublicationInitiativePlanCommand(argv);
+    const plan = buildNexusInitiativeDeliveryPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      initiativeId: parsed.initiativeId,
+    });
+    printPublicationInitiativePlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, candidate-plan, or initiative-plan",
   );
 }
 
@@ -795,6 +821,48 @@ function parsePublicationCandidatePlanCommand(
   return parsed;
 }
 
+function parsePublicationInitiativePlanCommand(
+  argv: string[],
+): ParsedPublicationInitiativePlanCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "initiative-plan") {
+    throw new Error("publication requires initiative-plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication initiative-plan requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationInitiativePlanCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--initiative":
+        parsed.initiativeId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication initiative-plan option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function readGreenMainChecksInput(
   inputPath: string,
 ): NexusGreenMainCheckRunInput[] {
@@ -1256,6 +1324,50 @@ function printPublicationCandidatePlan(
         stdout,
         `    ${overlap.changedArea}: ${overlap.workItemIds.join(", ")} (${overlap.branches.join(", ")})`,
       );
+    }
+  }
+  for (const warning of plan.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationInitiativePlan(
+  plan: NexusInitiativeDeliveryPlan,
+  parsed: ParsedPublicationInitiativePlanCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus initiative delivery plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Initiatives: ${plan.itemCount}`);
+  for (const item of plan.items) {
+    const initiative = item.initiative;
+    const branchPlan = initiative.branchPlan;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${initiative.activeScopeId} topology=${initiative.defaultTopology}`,
+    );
+    writeLine(
+      stdout,
+      `    integration=${branchPlan.integrationBranch ?? "none"} slices=${branchPlan.sliceBranchPattern}`,
+    );
+    writeLine(
+      stdout,
+      `    base=${branchPlan.defaultSliceBaseBranch} reviewTarget=${branchPlan.defaultSliceReviewTarget} final=${branchPlan.finalPublicationTarget}`,
+    );
+    writeLine(
+      stdout,
+      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} providerNoise=${initiative.providerNoise}`,
+    );
+    if (branchPlan.requiresIntegrationBranchApproval) {
+      writeLine(stdout, "    HITL: integration branch approval required");
     }
   }
   for (const warning of plan.warnings) {
