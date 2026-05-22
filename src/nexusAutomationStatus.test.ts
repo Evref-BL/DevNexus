@@ -271,6 +271,29 @@ describe("nexus automation status", () => {
     expect(JSON.stringify(missingAdapter.workItemClaimAuthority)).not.toContain(
       "postgres://claims@example.invalid/db",
     );
+
+    const adapterAvailable = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      env: {
+        DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
+      },
+      postgresClaimAdapterStatus: "available",
+    });
+
+    expect(adapterAvailable).toMatchObject({
+      status: "idle",
+      workItemClaimAuthority: {
+        status: "ready",
+        postgresProfile: {
+          profileStatus: "available",
+          profileId: "shared-claims",
+          connectionStringEnvPresent: true,
+          adapterStatus: "available",
+        },
+        blockers: [],
+      },
+    });
   });
 
   it("reports agent launch readiness without selecting one work item", async () => {

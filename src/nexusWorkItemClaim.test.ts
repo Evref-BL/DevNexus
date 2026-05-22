@@ -8,11 +8,20 @@ import {
   type NexusWorkItemClaimAuthority,
   type NexusEligibleWorkClaimProviderFactory,
 } from "./nexusWorkItemClaim.js";
+import type {
+  NexusNodePostgresModule,
+} from "./nexusNodePostgresClaimSqlClient.js";
+import type {
+  NexusPostgresClaimAuthorityRow,
+} from "./nexusPostgresWorkItemClaimAuthority.js";
 import {
   resolveProjectComponents,
 } from "./nexusProjectLifecycle.js";
 import {
+  createDefaultNexusHomeConfigBase,
   saveProjectConfig,
+  saveNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
   type NexusProjectConfig,
   type WorkComment,
   type WorkItem,
@@ -212,10 +221,118 @@ describe("optimistic work item claims", () => {
         now: () => "2026-05-20T10:00:00.000Z",
       }),
     ).rejects.toThrow(
-      /PostgreSQL claim authority is configured but no runtime claim authority adapter was provided/,
+      /PostgreSQL claim authority profile shared-claims was not found in DevNexus home config/,
     );
     expect(provider.updates).toEqual([]);
     expect(provider.comments).toEqual([]);
+  });
+
+  it("uses host-local PostgreSQL profiles with an optional node-postgres adapter", async () => {
+    const root = makeTempDir("dev-nexus-claim-");
+    const projectRoot = path.join(root, "workspace");
+    const homePath = path.join(root, "home");
+    const config = projectConfig();
+    const postgresAutomationConfig = {
+      ...automationConfig(),
+      workItemClaims: {
+        ...automationConfig().workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      home: homePath,
+      automation: postgresAutomationConfig,
+    });
+    saveNexusHomeConfigFile(
+      homePath,
+      createDefaultNexusHomeConfigBase(homePath, {
+        claimAuthorityProfiles: [
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+            schema: "dev_nexus",
+          },
+        ],
+      }),
+      validateNexusHomeConfigBase,
+    );
+    const provider = new ClaimMemoryProvider([
+      workItem("github-18", "PostgreSQL adapter claim", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    const nodePostgres = new ClaimNodePostgresHarness();
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: {
+        ...config,
+        home: homePath,
+        automation: postgresAutomationConfig,
+      },
+      components: resolveProjectComponents(projectRoot, {
+        ...config,
+        home: homePath,
+        automation: postgresAutomationConfig,
+      }),
+      automationConfig: postgresAutomationConfig,
+      providerFactory: providerFactory(provider),
+      owner: {
+        hostId: "host-a",
+      },
+      leaseTokenFactory: () => "postgres-token-1",
+      env: {
+        DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
+      },
+      nodePostgresModule: nodePostgres.module,
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      authorityClaim: {
+        authorityKind: "postgres",
+        fencingToken: 1,
+        owner: {
+          leaseToken: "postgres-token-1",
+        },
+      },
+      workItem: {
+        id: "github-18",
+        status: "in_progress",
+      },
+    });
+    expect(nodePostgres.events).toEqual([
+      "connect",
+      "BEGIN",
+      'SET LOCAL search_path TO "dev_nexus", public',
+      "lock",
+      "select",
+      "upsert",
+      "COMMIT",
+      "end",
+    ]);
+    expect(provider.updates).toEqual([
+      {
+        ref: {
+          provider: "github",
+          id: "github-18",
+          externalRef: workItem("github-18").externalRef,
+        },
+        patch: {
+          status: "in_progress",
+        },
+      },
+    ]);
   });
 
   it("returns no-claim when no candidate matches the configured selector", async () => {
@@ -843,6 +960,90 @@ class ClaimMemoryProvider implements WorkTrackerProvider {
 
     return item;
   }
+}
+
+class ClaimNodePostgresHarness {
+  readonly rows = new Map<string, NexusPostgresClaimAuthorityRow>();
+  readonly events: string[] = [];
+  private nextFencingToken = 1;
+  readonly module: NexusNodePostgresModule = {
+    Client: class {
+      constructor(
+        readonly config: object,
+        private readonly harness: ClaimNodePostgresHarness =
+          activeClaimNodePostgresHarness!,
+      ) {}
+
+      async connect(): Promise<void> {
+        this.harness.events.push("connect");
+      }
+
+      async query(
+        sql: string,
+        params: readonly unknown[] = [],
+      ): Promise<{ rows: unknown[] }> {
+        return this.harness.query(sql, params);
+      }
+
+      async end(): Promise<void> {
+        this.harness.events.push("end");
+      }
+    },
+  };
+
+  constructor() {
+    activeClaimNodePostgresHarness = this;
+  }
+
+  async query(
+    sql: string,
+    params: readonly unknown[],
+  ): Promise<{ rows: unknown[] }> {
+    if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+      this.events.push(sql);
+      return { rows: [] };
+    }
+    if (sql.startsWith("SET LOCAL search_path")) {
+      this.events.push(sql);
+      return { rows: [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:lock")) {
+      this.events.push("lock");
+      return { rows: [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:select")) {
+      this.events.push("select");
+      const row = this.rows.get(String(params[0]));
+      return { rows: row ? [cloneClaimRow(row)] : [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:upsert")) {
+      this.events.push("upsert");
+      const input = params[0] as NexusPostgresClaimAuthorityRow;
+      const row = {
+        ...cloneClaimRow(input),
+        fencingToken: this.nextFencingToken,
+      };
+      this.nextFencingToken += 1;
+      this.rows.set(row.keyHash, row);
+      return { rows: [cloneClaimRow(row)] };
+    }
+
+    throw new Error(`Unexpected SQL: ${sql}`);
+  }
+}
+
+let activeClaimNodePostgresHarness: ClaimNodePostgresHarness | null = null;
+
+function cloneClaimRow(
+  row: NexusPostgresClaimAuthorityRow,
+): NexusPostgresClaimAuthorityRow {
+  return {
+    ...row,
+    key: { ...row.key },
+    owner: { ...row.owner },
+    providerMirrorWarnings: [...row.providerMirrorWarnings],
+    ...(row.reclaimedFrom ? { reclaimedFrom: { ...row.reclaimedFrom } } : {}),
+  };
 }
 
 function matchesQuery(item: WorkItem, query: WorkItemQuery): boolean {

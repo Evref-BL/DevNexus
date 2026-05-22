@@ -30,6 +30,14 @@
   "engines": {
     "node": ">=22"
   },
+  "peerDependencies": {
+    "pg": "^8.21.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

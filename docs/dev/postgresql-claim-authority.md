@@ -245,6 +245,11 @@ Progress:
   strings, and automation status reports missing profile, missing environment
   binding, and missing optional `node_postgres` adapter blockers without opening
   a database connection.
+- 2026-05-22: Slice 3C added the optional `pg` peer dependency and dynamic
+  `node_postgres` runtime adapter. Claim-next now resolves host-local
+  PostgreSQL profiles through CLI, MCP, and automation launch paths, while the
+  normal suite still uses injected/fake SQL clients and does not require a live
+  database.
 
 ### Slice 4: Coordinator Enforcement
 

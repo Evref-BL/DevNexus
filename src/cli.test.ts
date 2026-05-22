@@ -7889,6 +7889,90 @@ describe("dev-nexus cli", () => {
     });
   });
 
+  it("resolves PostgreSQL claim profiles from claim-next --home", async () => {
+    const root = makeTempDir("dev-nexus-cli-claim-");
+    const projectRoot = path.join(root, "workspace");
+    const homePath = path.join(root, "home");
+    const config = githubWorkItemProjectConfig();
+    const postgresAutomationConfig = {
+      ...config.automation!,
+      workItemClaims: {
+        ...config.automation!.workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: postgresAutomationConfig,
+    });
+    fs.mkdirSync(homePath, { recursive: true });
+    fs.writeFileSync(
+      path.join(homePath, "dev-nexus.home.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          paths: {
+            projectsRoot: path.join(homePath, "projects"),
+            workspacesRoot: path.join(homePath, "workspaces"),
+          },
+          projects: [],
+          claimAuthorityProfiles: [
+            {
+              id: "shared-claims",
+              backend: "postgres",
+              driver: "node_postgres",
+              connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+              schema: "dev_nexus",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    const provider = new ClaimMemoryProvider([
+      githubWorkItem("github-13", "PostgreSQL claim through CLI", {
+        labels: ["automation"],
+      }),
+    ]);
+    const stdout = captureOutput();
+
+    const exitCode = await main(
+      [
+        "work-item",
+        "claim-next",
+        projectRoot,
+        "--home",
+        homePath,
+        "--host",
+        "host-a",
+        "--json",
+      ],
+      {
+        stdout: stdout.writer,
+        env: {},
+        now: fixedClock("2026-05-20T10:00:00.000Z"),
+        workItemClaimProviderFactory: claimProviderFactory(provider),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      error: {
+        message:
+          "PostgreSQL claim authority profile shared-claims requires environment variable DEV_NEXUS_CLAIMS_DATABASE_URL",
+      },
+    });
+    expect(provider.updates).toEqual([]);
+  });
+
   it("reports no eligible work through claim-next without failing the CLI", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-claim-");
     saveProjectConfig(projectRoot, githubWorkItemProjectConfig());

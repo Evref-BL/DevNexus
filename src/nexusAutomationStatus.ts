@@ -55,6 +55,9 @@ import {
   type NexusClaimAuthorityProfileConfig,
 } from "./nexusHomeConfig.js";
 import {
+  detectNexusNodePostgresAdapterStatus,
+} from "./nexusNodePostgresClaimSqlClient.js";
+import {
   automationWorkItemDiscoveryCredentialResolver,
   automationWorkTrackerProviderOptions,
   loadNexusAutomationAuthProfiles,
@@ -179,6 +182,10 @@ export interface GetNexusAutomationStatusOptions {
   providerOptions?: CreateWorkTrackerProviderOptions;
   gitRunner?: GitRunner;
   publicationActorRunner?: NexusPublicationActorRunner;
+  postgresClaimAdapterStatus?: Extract<
+    NexusAutomationPostgresClaimAuthorityAdapterStatusKind,
+    "available" | "missing"
+  >;
   now?: () => Date | string;
 }
 
@@ -226,6 +233,10 @@ export interface SummarizeNexusAutomationWorkItemClaimAuthorityStatusOptions {
   projectConfig?: NexusProjectConfig;
   homePath?: string;
   env?: NodeJS.ProcessEnv;
+  postgresClaimAdapterStatus?: Extract<
+    NexusAutomationPostgresClaimAuthorityAdapterStatusKind,
+    "available" | "missing"
+  >;
 }
 
 export function summarizeNexusAutomationWorkItemClaimAuthorityStatus(
@@ -372,6 +383,28 @@ function postgresWorkItemClaimAuthorityStatus(options: {
 
   const blocker =
     `PostgreSQL claim authority profile ${profile.id} requires optional node-postgres runtime adapter support`;
+  const adapterStatus =
+    options.options.postgresClaimAdapterStatus ??
+    detectNexusNodePostgresAdapterStatus();
+  if (adapterStatus === "available") {
+    return {
+      enabled: true,
+      backend: "postgres",
+      status: "ready",
+      summary:
+        `PostgreSQL claim authority is configured with profile ${profile.id}`,
+      postgresConnectionProfileId: profile.id,
+      postgresProfile: postgresProfileStatus({
+        profile,
+        profileStatus: "available",
+        connectionStringEnvPresent,
+        adapterStatus,
+      }),
+      blockers: [],
+      warnings: [],
+    };
+  }
+
   return {
     enabled: true,
     backend: "postgres",
@@ -382,7 +415,7 @@ function postgresWorkItemClaimAuthorityStatus(options: {
       profile,
       profileStatus: "available",
       connectionStringEnvPresent,
-      adapterStatus: "missing",
+      adapterStatus,
     }),
     blockers: [blocker],
     warnings: [],
@@ -473,6 +506,7 @@ export async function getNexusAutomationStatus(
       projectConfig,
       homePath: options.homePath,
       env: discoveryEnv,
+      postgresClaimAdapterStatus: options.postgresClaimAdapterStatus,
     });
   const automationStatusResult = (
     result: AutomationStatusInput,

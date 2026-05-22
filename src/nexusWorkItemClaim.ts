@@ -26,6 +26,22 @@ import {
   type CreateWorkTrackerProviderOptions,
 } from "./workTrackingProviderService.js";
 import {
+  defaultNexusHomePath,
+  loadNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
+  type NexusClaimAuthorityProfileConfig,
+} from "./nexusHomeConfig.js";
+import {
+  createNexusNodePostgresClaimSqlClient,
+  type NexusNodePostgresModule,
+} from "./nexusNodePostgresClaimSqlClient.js";
+import {
+  NexusPostgresWorkItemClaimAuthority,
+} from "./nexusPostgresWorkItemClaimAuthority.js";
+import {
+  resolveNexusProjectPath,
+} from "./nexusPathResolver.js";
+import {
   nexusWorkItemDiscoveryCredentialEnvironment,
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
@@ -93,9 +109,12 @@ export interface ClaimNexusEligibleWorkItemOptions {
   provider?: WorkTrackerProvider;
   providerFactory?: NexusEligibleWorkClaimProviderFactory;
   providerOptions?: CreateWorkTrackerProviderOptions;
+  homePath?: string;
   env?: NodeJS.ProcessEnv;
   owner: NexusWorkItemClaimOwnerInput;
   claimAuthority?: NexusWorkItemClaimAuthority;
+  nodePostgresModule?: NexusNodePostgresModule;
+  nodePostgresModuleLoader?: () => Promise<unknown>;
   leaseDurationMs?: number;
   staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   leaseTokenFactory?: () => string;
@@ -234,7 +253,7 @@ export async function claimNexusEligibleWorkItem(
     now: options.now,
   });
   const now = currentDate(options.now);
-  const claimAuthority = claimAuthorityForConfig(options);
+  const claimAuthority = await claimAuthorityForConfig(options, projectRoot, env);
   const activeClaims: NexusWorkItemClaimObservation[] = [];
   if (eligibleWork.eligibleWorkItems.length === 0) {
     const inspectedClaims = await inspectExistingWorkItemClaims({
@@ -247,6 +266,8 @@ export async function claimNexusEligibleWorkItem(
     });
     const reclaimed = await maybeReclaimStaleClaim({
       options,
+      projectRoot,
+      env,
       inspection: inspectedClaims,
       now,
       skippedCandidates: [],
@@ -373,6 +394,8 @@ export async function claimNexusEligibleWorkItem(
   ];
   const reclaimed = await maybeReclaimStaleClaim({
     options,
+    projectRoot,
+    env,
     inspection: inspectedClaims,
     now,
     skippedCandidates,
@@ -476,6 +499,8 @@ async function inspectExistingWorkItemClaims(options: {
 
 async function maybeReclaimStaleClaim(options: {
   options: ClaimNexusEligibleWorkItemOptions;
+  projectRoot: string;
+  env: NodeJS.ProcessEnv;
   inspection: ClaimInspectionResult;
   now: Date;
   skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
@@ -498,7 +523,11 @@ async function maybeReclaimStaleClaim(options: {
     leaseDurationMs:
       options.options.leaseDurationMs ?? defaultLeaseDurationMs,
   });
-  const claimAuthority = claimAuthorityForConfig(options.options);
+  const claimAuthority = await claimAuthorityForConfig(
+    options.options,
+    options.projectRoot,
+    options.env,
+  );
   if (!claimAuthority.reclaimExpiredClaim) {
     return null;
   }
@@ -576,12 +605,19 @@ function noClaimResult(
   };
 }
 
-function claimAuthorityForConfig(
+async function claimAuthorityForConfig(
   options: Pick<
     ClaimNexusEligibleWorkItemOptions,
-    "automationConfig" | "claimAuthority"
+    | "automationConfig"
+    | "claimAuthority"
+    | "projectConfig"
+    | "homePath"
+    | "nodePostgresModule"
+    | "nodePostgresModuleLoader"
   >,
-): NexusWorkItemClaimAuthority {
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): Promise<NexusWorkItemClaimAuthority> {
   if (options.claimAuthority) {
     return options.claimAuthority;
   }
@@ -590,9 +626,77 @@ function claimAuthorityForConfig(
     return optimisticTrackerClaimAuthority;
   }
 
-  throw new Error(
-    "PostgreSQL claim authority is configured but no runtime claim authority adapter was provided",
-  );
+  return postgresClaimAuthorityForConfig(options, projectRoot, env);
+}
+
+async function postgresClaimAuthorityForConfig(
+  options: Pick<
+    ClaimNexusEligibleWorkItemOptions,
+    | "automationConfig"
+    | "projectConfig"
+    | "homePath"
+    | "nodePostgresModule"
+    | "nodePostgresModuleLoader"
+  >,
+  projectRoot: string,
+  env: NodeJS.ProcessEnv,
+): Promise<NexusWorkItemClaimAuthority> {
+  const profileId =
+    options.automationConfig.workItemClaims.authority.postgres.connectionProfileId;
+  if (!profileId) {
+    throw new Error(
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+    );
+  }
+
+  const profile = loadClaimAuthorityProfiles({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    homePath: options.homePath,
+  }).find((candidate) => candidate.id === profileId);
+  if (!profile) {
+    throw new Error(
+      `PostgreSQL claim authority profile ${profileId} was not found in DevNexus home config`,
+    );
+  }
+
+  const connectionString = optionalNonEmptyString(env[profile.connectionStringEnv]);
+  if (!connectionString) {
+    throw new Error(
+      `PostgreSQL claim authority profile ${profile.id} requires environment variable ${profile.connectionStringEnv}`,
+    );
+  }
+
+  const client = await createNexusNodePostgresClaimSqlClient({
+    connectionString,
+    schema: profile.schema,
+    module: options.nodePostgresModule,
+    loadModule: options.nodePostgresModuleLoader,
+  });
+  return new NexusPostgresWorkItemClaimAuthority({ client });
+}
+
+function loadClaimAuthorityProfiles(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  homePath?: string;
+}): NexusClaimAuthorityProfileConfig[] {
+  const homePath = options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+  try {
+    return loadNexusHomeConfigFile(
+      homePath,
+      validateNexusHomeConfigBase,
+    ).claimAuthorityProfiles ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function claimDiagnosticsFields(diagnostics: {

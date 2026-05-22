@@ -562,6 +562,7 @@ interface ParsedWorkItemDiscoveryStatusCommand {
 
 interface ParsedWorkItemClaimNextCommand {
   projectRoot: string;
+  homePath?: string;
   componentId?: string;
   trackerId?: string;
   mode?: NexusEligibleWorkMode;
@@ -2749,6 +2750,9 @@ async function claimNextWorkItem(
     projectConfig,
     components: resolveProjectComponents(projectRoot, projectConfig),
     automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    homePath: parsed.homePath
+      ? resolvedCommandHomePath(parsed.homePath)
+      : undefined,
     componentId: parsed.componentId,
     trackerId: parsed.trackerId,
     mode: parsed.mode,
@@ -2760,6 +2764,7 @@ async function claimNextWorkItem(
     leaseDurationMs: parsed.leaseDurationMs,
     staleClaimPolicy: parsed.staleClaimPolicy,
     providerFactory: dependencies.workItemClaimProviderFactory,
+    env: dependencies.env,
     leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
     now: dependencies.now,
   });
@@ -4384,6 +4389,9 @@ function parseWorkItemClaimNextCommand(
     switch (arg) {
       case "--component":
         parsed.componentId = next();
+        break;
+      case "--home":
+        parsed.homePath = next();
         break;
       case "--tracker":
         parsed.trackerId = next();

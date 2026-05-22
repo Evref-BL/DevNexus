@@ -1935,6 +1935,7 @@ export async function callDevNexusMcpTool(
               agentId: optionalNullableString(args, "agentId", "arguments"),
               ownerId: optionalNullableString(args, "ownerId", "arguments"),
             },
+            homePath: optionalString(args, "homePath", "arguments"),
             leaseDurationMs: optionalPositiveInteger(
               args,
               "leaseDurationMs",

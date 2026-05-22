@@ -730,6 +730,7 @@ export async function runNexusAutomationAgentLaunchOnce(
           projectConfig,
           components,
           automationConfig,
+          homePath: options.homePath,
           selectorQuery,
           mode: options.eligibleWorkMode ?? automationConfig.eligibleWorkMode,
           provider: options.provider,
