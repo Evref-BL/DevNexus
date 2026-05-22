@@ -175,8 +175,16 @@ Acceptance:
 
 Verification:
 
-- `npm test -- src/nexusPostgresClaimAuthority.test.ts`
+- `npm test -- src/nexusPostgresWorkItemClaimAuthority.test.ts`
 - `npm run build`
+
+Progress:
+
+- 2026-05-22: Slice 2A added a PostgreSQL authority backend behind an injected
+  transaction/query client, exported explicit schema DDL, and covered one-winner
+  claim, fencing, heartbeat, release, expired reclaim, inspection, and
+  provider-mirror warning behavior with a fake SQL harness. No `pg` dependency
+  or live database requirement was introduced.
 
 ### Slice 3: Configuration And Surfaces
 

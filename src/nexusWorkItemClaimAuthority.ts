@@ -81,6 +81,7 @@ export interface NexusWorkItemClaimAuthorityRecord {
   lastHeartbeatAt: string;
   releasedAt?: string | null;
   reclaimedFrom?: NexusWorkItemClaimAuthorityRecord;
+  providerMirrorWarnings?: string[];
 }
 
 export type NexusWorkItemClaimResult =
@@ -566,6 +567,9 @@ function cloneClaimAuthorityRecord(
     owner: cloneClaimOwner(claim.owner),
     ...(claim.reclaimedFrom
       ? { reclaimedFrom: cloneClaimAuthorityRecord(claim.reclaimedFrom) }
+      : {}),
+    ...(claim.providerMirrorWarnings
+      ? { providerMirrorWarnings: [...claim.providerMirrorWarnings] }
       : {}),
   };
 }
