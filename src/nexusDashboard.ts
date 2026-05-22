@@ -37,6 +37,7 @@ import {
 } from "./nexusEligibleWorkSummary.js";
 import {
   loadProjectConfig,
+  projectWorktreesRootPath,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
@@ -281,6 +282,7 @@ export interface NexusDashboardWorktreeSummary {
     status: string;
     effectiveStatus: string;
     branchName: string | null;
+    worktreePath: string | null;
     hostId: string;
     agentId: string | null;
     stale: boolean;
@@ -544,7 +546,12 @@ export async function buildNexusDashboardSnapshot(
   const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
   const cycles = readTargetCycles(projectRoot, projectConfig);
   const runs = readRuns(projectRoot, projectConfig);
-  const worktrees = summarizeWorktrees(worktreeCollection.value);
+  const worktrees = summarizeWorktrees(
+    projectRoot,
+    projectConfig,
+    componentSummaries,
+    worktreeCollection.value,
+  );
   const plugins = summarizePlugins(projectConfig);
   const cleanupPlan = capture(() =>
     buildNexusCleanupPlan({
@@ -852,7 +859,12 @@ async function dashboardHostWorkspaceRecord(options: {
       }),
     );
     const runs = readRuns(root, projectConfig);
-    const worktrees = summarizeWorktrees(worktreeCollection.value);
+    const worktrees = summarizeWorktrees(
+      root,
+      projectConfig,
+      componentSummaries,
+      worktreeCollection.value,
+    );
     const threads = summarizeThreads(
       worktrees,
       providerUrls,
@@ -1925,6 +1937,9 @@ function gitRawStdout(
 }
 
 function summarizeWorktrees(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  components: NexusDashboardComponentSummary[],
   collection: NexusWorktreeLeaseCollection | null,
 ): NexusDashboardWorktreeSummary {
   return {
@@ -1940,6 +1955,12 @@ function summarizeWorktrees(
         status: record.status,
         effectiveStatus: record.effectiveStatus,
         branchName: record.branchName,
+        worktreePath: dashboardLeaseWorktreePath(
+          projectRoot,
+          projectConfig,
+          components,
+          record,
+        ),
         hostId: record.hostId,
         agentId: record.agentId,
         stale: record.stale,
@@ -1949,6 +1970,35 @@ function summarizeWorktrees(
         writeScope: record.writeScope,
       })) ?? [],
   };
+}
+
+function dashboardLeaseWorktreePath(
+  projectRoot: string,
+  projectConfig: NexusProjectConfig,
+  components: NexusDashboardComponentSummary[],
+  lease: NexusWorktreeLeaseSummary,
+): string | null {
+  const relativePath = lease.worktree.relativePath ?? "";
+  if (lease.worktree.base === "projectRoot") {
+    return path.resolve(projectRoot, relativePath);
+  }
+  if (lease.worktree.base === "projectWorktreesRoot") {
+    return path.resolve(
+      projectWorktreesRootPath(projectRoot, projectConfig),
+      relativePath,
+    );
+  }
+  const componentId = lease.worktree.componentId ?? lease.scope.componentId;
+  const component = componentId
+    ? components.find((candidate) => candidate.id === componentId)
+    : null;
+  if (lease.worktree.base === "componentWorktreesRoot" && component) {
+    return path.resolve(component.worktreesRoot, relativePath);
+  }
+  if (lease.worktree.base === "componentSourceRoot" && component) {
+    return path.resolve(component.sourceRoot, relativePath);
+  }
+  return null;
 }
 
 function summarizeThreads(

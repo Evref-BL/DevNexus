@@ -4,6 +4,8 @@ import http, {
   type ServerResponse,
 } from "node:http";
 import { randomBytes } from "node:crypto";
+import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import {
   buildNexusDashboardHostActionQueue,
@@ -34,6 +36,7 @@ export interface StartNexusDashboardServerOptions {
   gitRunner?: GitRunner;
   now?: () => Date | string;
   codexChatStarter?: NexusDashboardCodexChatStarter;
+  localResourceOpener?: NexusDashboardLocalResourceOpener;
 }
 
 export interface NexusDashboardServerHandle {
@@ -69,6 +72,33 @@ interface NexusDashboardDiagnosticsPayload {
   publication: NexusDashboardSnapshot["publication"];
 }
 
+export type NexusDashboardLocalOpenTarget = "home" | "project";
+
+export type NexusDashboardLocalOpenApp = "file" | "code" | "terminal";
+
+export interface NexusDashboardLocalOpenRequest {
+  target: NexusDashboardLocalOpenTarget;
+  app: NexusDashboardLocalOpenApp;
+  path: string;
+}
+
+export interface NexusDashboardLocalOpenResult
+  extends NexusDashboardLocalOpenRequest {
+  ok: boolean;
+  command?: string;
+  args?: string[];
+  error?: string;
+}
+
+export type NexusDashboardLocalResourceOpener = (
+  request: NexusDashboardLocalOpenRequest,
+) => Promise<NexusDashboardLocalOpenResult>;
+
+interface DashboardThreadActionContext {
+  threadId: string | null;
+  cwd: string | null;
+}
+
 class NexusDashboardRouteError extends Error {
   constructor(
     readonly code: string,
@@ -95,6 +125,8 @@ export async function startNexusDashboardServer(
   };
   const codexChatStarter =
     options.codexChatStarter ?? createNexusDashboardCodexChatStarter();
+  const localResourceOpener =
+    options.localResourceOpener ?? openDashboardLocalResource;
   const actionToken = randomBytes(24).toString("base64url");
   const server = http.createServer((request, response) => {
     void routeDashboardRequest(
@@ -102,6 +134,7 @@ export async function startNexusDashboardServer(
       response,
       snapshotOptions,
       codexChatStarter,
+      localResourceOpener,
       actionToken,
     );
   });
@@ -160,12 +193,14 @@ export function renderNexusDashboardClientModule(): string {
     "const styles = `",
     ":root { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; color: var(--dn-text); background: var(--dn-bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-synthesis: none; }",
     ":root[data-dev-nexus-theme='dark'] { color-scheme: dark; --dn-bg: #0b100e; --dn-surface: #121915; --dn-surface-raised: #17211c; --dn-surface-muted: rgba(12, 18, 15, 0.76); --dn-weave-bg: rgba(8, 12, 10, 0.58); --dn-text: #eef5ec; --dn-strong: #f3f8f0; --dn-muted: #aebbae; --dn-label: #87998d; --dn-border: rgba(180, 210, 188, 0.18); --dn-border-muted: rgba(180, 210, 188, 0.12); --dn-border-strong: rgba(180, 210, 188, 0.28); --dn-pill-text: #dfe8df; --dn-control-active: #203127; --dn-control-hover: rgba(180, 210, 188, 0.1); --dn-good: #67d29e; --dn-active: #79a7ff; --dn-warn: #e4b15f; --dn-warn-soft: #f2d49b; --dn-danger: #ff8b78; --dn-neutral: #b3c0b5; }",
-    ":root[data-dev-nexus-theme='light'] { color-scheme: light; --dn-bg: #f5f8f6; --dn-surface: #ffffff; --dn-surface-raised: #edf3ef; --dn-surface-muted: rgba(235, 242, 238, 0.86); --dn-weave-bg: rgba(236, 244, 241, 0.9); --dn-text: #16231b; --dn-strong: #0f1813; --dn-muted: #55685d; --dn-label: #687d71; --dn-border: rgba(42, 73, 55, 0.18); --dn-border-muted: rgba(42, 73, 55, 0.12); --dn-border-strong: rgba(42, 73, 55, 0.28); --dn-pill-text: #27372e; --dn-control-active: #dcebe3; --dn-control-hover: rgba(42, 73, 55, 0.08); --dn-good: #167f53; --dn-active: #265dcc; --dn-warn: #9a641c; --dn-warn-soft: #77500f; --dn-danger: #bc3b2f; --dn-neutral: #526459; }",
+    ":root[data-dev-nexus-theme='light'] { color-scheme: light; --dn-bg: #f5f8f6; --dn-surface: #ffffff; --dn-surface-raised: #edf3ef; --dn-surface-muted: rgba(235, 242, 238, 0.86); --dn-weave-bg: rgba(236, 244, 241, 0.9); --dn-text: #16231b; --dn-strong: #0f1813; --dn-muted: #55685d; --dn-label: #687d71; --dn-border: rgba(42, 73, 55, 0.18); --dn-border-muted: rgba(42, 73, 55, 0.12); --dn-border-strong: rgba(42, 73, 55, 0.28); --dn-pill-text: #27372e; --dn-control-active: #dcebe3; --dn-control-hover: rgba(42, 73, 55, 0.08); --dn-good: #167f53; --dn-active: #265dcc; --dn-warn: #d89400; --dn-warn-soft: #8c5b00; --dn-danger: #bc3b2f; --dn-neutral: #526459; }",
     ":root { --dn-grid-line: rgba(180, 210, 188, 0.055); --dn-shadow: 0 22px 60px rgba(0, 0, 0, 0.28); --dn-branch-0: #1aa7ff; --dn-branch-1: #e51ec3; --dn-branch-2: #35dd54; --dn-branch-3: #ff9f0a; --dn-branch-4: #9b5cff; --dn-branch-5: #17d6cf; --dn-branch-faint: rgba(238, 245, 236, 0.16); }",
     ":root[data-dev-nexus-theme='light'] { --dn-grid-line: rgba(31, 115, 93, 0.085); --dn-shadow: 0 18px 40px rgba(34, 50, 42, 0.1); --dn-branch-0: #0076c9; --dn-branch-1: #c01494; --dn-branch-2: #168e35; --dn-branch-3: #b66100; --dn-branch-4: #6a3fd6; --dn-branch-5: #008a84; --dn-branch-faint: rgba(22, 35, 27, 0.14); }",
-    "@media (prefers-color-scheme: light) { :root:not([data-dev-nexus-theme]) { color-scheme: light; --dn-bg: #f5f8f6; --dn-surface: #ffffff; --dn-surface-raised: #edf3ef; --dn-surface-muted: rgba(235, 242, 238, 0.86); --dn-weave-bg: rgba(236, 244, 241, 0.9); --dn-text: #16231b; --dn-strong: #0f1813; --dn-muted: #55685d; --dn-label: #687d71; --dn-border: rgba(42, 73, 55, 0.18); --dn-border-muted: rgba(42, 73, 55, 0.12); --dn-border-strong: rgba(42, 73, 55, 0.28); --dn-pill-text: #27372e; --dn-control-active: #dcebe3; --dn-control-hover: rgba(42, 73, 55, 0.08); --dn-good: #167f53; --dn-active: #265dcc; --dn-warn: #9a641c; --dn-warn-soft: #77500f; --dn-danger: #bc3b2f; --dn-neutral: #526459; } }",
+    "@media (prefers-color-scheme: light) { :root:not([data-dev-nexus-theme]) { color-scheme: light; --dn-bg: #f5f8f6; --dn-surface: #ffffff; --dn-surface-raised: #edf3ef; --dn-surface-muted: rgba(235, 242, 238, 0.86); --dn-weave-bg: rgba(236, 244, 241, 0.9); --dn-text: #16231b; --dn-strong: #0f1813; --dn-muted: #55685d; --dn-label: #687d71; --dn-border: rgba(42, 73, 55, 0.18); --dn-border-muted: rgba(42, 73, 55, 0.12); --dn-border-strong: rgba(42, 73, 55, 0.28); --dn-pill-text: #27372e; --dn-control-active: #dcebe3; --dn-control-hover: rgba(42, 73, 55, 0.08); --dn-good: #167f53; --dn-active: #265dcc; --dn-warn: #d89400; --dn-warn-soft: #8c5b00; --dn-danger: #bc3b2f; --dn-neutral: #526459; } }",
     "* { box-sizing: border-box; }",
     "body { margin: 0; min-width: 320px; color: var(--dn-text); background: linear-gradient(90deg, var(--dn-grid-line) 1px, transparent 1px), linear-gradient(0deg, var(--dn-grid-line) 1px, transparent 1px), linear-gradient(135deg, color-mix(in srgb, var(--dn-bg) 88%, var(--dn-branch-0) 12%), var(--dn-bg) 44%, color-mix(in srgb, var(--dn-bg) 86%, var(--dn-branch-1) 14%)); background-size: 28px 28px, 28px 28px, auto; }",
+    "@keyframes dn-spin { to { transform: rotate(360deg); } }",
+    "@keyframes dn-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }",
     "button, input, select { font: inherit; }",
     ".dn-shell { width: min(1520px, 100%); margin: 0 auto; padding: 24px; }",
     ".dn-header { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; min-height: 210px; overflow: hidden; padding: 32px; border: 1px solid var(--dn-border); border-radius: 8px; background: linear-gradient(135deg, color-mix(in srgb, var(--dn-surface) 88%, var(--dn-branch-0) 12%), color-mix(in srgb, var(--dn-surface) 92%, var(--dn-branch-5) 8%) 52%, color-mix(in srgb, var(--dn-surface) 90%, var(--dn-branch-1) 10%)); box-shadow: var(--dn-shadow); }",
@@ -192,6 +227,16 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-action-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }",
     ".dn-action-strip.compact { margin-top: 0; }",
     ".dn-action-strip.compact .dn-action { min-height: 28px; padding: 5px 8px; font-size: 0.72rem; }",
+    ".dn-open-menu { position: relative; justify-self: end; }",
+    ".dn-open-menu summary { list-style: none; }",
+    ".dn-open-menu summary::-webkit-details-marker { display: none; }",
+    ".dn-open-trigger { min-width: 126px; justify-content: space-between; }",
+    ".dn-open-options { position: absolute; right: 0; z-index: 10; display: grid; gap: 4px; min-width: 168px; margin-top: 6px; padding: 7px; border: 1px solid var(--dn-border); border-radius: 8px; background: var(--dn-surface); box-shadow: var(--dn-shadow); }",
+    ".dn-open-option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 0; border-radius: 6px; color: var(--dn-strong); background: transparent; text-align: left; cursor: pointer; }",
+    ".dn-open-option:hover { background: var(--dn-control-hover); }",
+    ".dn-open-option:disabled { opacity: 0.7; cursor: wait; }",
+    ".dn-open-option svg, .dn-open-trigger svg { flex: 0 0 auto; width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }",
+    ".dn-open-option .dn-action-label { display: block; }",
     ".dn-theme-toggle { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--dn-border); border-radius: 8px; background: var(--dn-surface); }",
     ".dn-theme-toggle button { min-width: 66px; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--dn-muted); background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 800; }",
     ".dn-theme-toggle button:hover { color: var(--dn-text); background: var(--dn-control-hover); }",
@@ -220,7 +265,7 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-signal strong { display: block; margin: 6px 0; color: var(--dn-strong); font-size: 1.35rem; line-height: 1; overflow-wrap: anywhere; }",
     ".dn-signal p, .dn-event p, .dn-panel p { margin: 0; color: var(--dn-muted); }",
     ".dn-signal p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.92rem; }",
-    ".dn-host-signal { cursor: default; } .dn-host-signal:hover { transform: none; }",
+    ".dn-host-signal { width: 100%; }",
     ".dn-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.9fr); gap: 14px; }",
     ".dn-panel { min-width: 0; padding: 16px; }",
     ".dn-panel h2 { margin: 0 0 12px; color: var(--dn-strong); font-size: 1rem; letter-spacing: 0; }",
@@ -283,9 +328,10 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-thread-list { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }",
     ".dn-plugin-list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }",
     ".dn-host-main-grid { display: grid; grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1.28fr); gap: 14px; align-items: start; margin-top: 14px; }",
+    ".dn-host-panel, .dn-host-action-panel, .dn-selected-panel { scroll-margin-top: 18px; }",
     ".dn-host-action-list { display: grid; gap: 10px; }",
-    ".dn-host-action-card { display: grid; gap: 7px; min-width: 0; padding: 12px; border: 1px solid color-mix(in srgb, var(--dn-warn) 34%, var(--dn-border)); border-left: 5px solid var(--dn-warn); border-radius: 8px; color: inherit; background: color-mix(in srgb, var(--dn-surface-muted) 80%, var(--dn-warn) 20%); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease; }",
-    ".dn-host-action-card:hover { border-color: var(--dn-warn); transform: translateY(-1px); }",
+    ".dn-host-action-card { --dn-project-accent: var(--dn-warn); display: grid; gap: 7px; min-width: 0; padding: 12px; border: 1px solid color-mix(in srgb, var(--dn-project-accent) 34%, var(--dn-border)); border-left: 5px solid var(--dn-project-accent); border-radius: 8px; color: inherit; background: color-mix(in srgb, var(--dn-surface-muted) 80%, var(--dn-project-accent) 20%); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease; }",
+    ".dn-host-action-card:hover { border-color: var(--dn-project-accent); transform: translateY(-1px); }",
     ".dn-host-action-card strong { min-width: 0; overflow: hidden; color: var(--dn-strong); text-overflow: ellipsis; white-space: nowrap; }",
     ".dn-event-card, .dn-blocker-card { display: grid; gap: 6px; min-width: 0; }",
     ".dn-component-card, .dn-event, .dn-blocker { display: grid; gap: 6px; min-width: 0; padding: 11px; border: 1px solid var(--dn-border-muted); border-radius: 8px; color: inherit; background: var(--dn-surface-muted); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }",
@@ -302,8 +348,14 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-event strong { color: var(--dn-strong); }",
     ".dn-event p, .dn-blocker strong { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }",
     ".tone-good { color: var(--dn-good); } .tone-active { color: var(--dn-active); } .tone-warn { color: var(--dn-warn); } .tone-danger { color: var(--dn-danger); } .tone-neutral { color: var(--dn-neutral); }",
+    ".dn-loading-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 16px; overflow: hidden; }",
+    ".dn-loader { width: 34px; height: 34px; border: 3px solid color-mix(in srgb, var(--dn-active) 22%, var(--dn-border)); border-top-color: var(--dn-active); border-radius: 999px; animation: dn-spin 820ms linear infinite; }",
+    ".dn-loading-copy { display: grid; gap: 8px; min-width: 0; }",
+    ".dn-skeleton-stack { display: grid; gap: 8px; margin-top: 4px; }",
+    ".dn-skeleton { position: relative; height: 12px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--dn-surface-raised) 80%, var(--dn-active) 20%); }",
+    ".dn-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dn-active) 24%, transparent), transparent); animation: dn-shimmer 1.35s ease-in-out infinite; }",
     "@media (max-width: 1120px) { .dn-signals { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dn-grid, .dn-main-grid, .dn-host-main-grid, .dn-secondary-grid, .dn-selected-layout { grid-template-columns: 1fr; } }",
-    "@media (max-width: 680px) { .dn-shell { padding: 12px; } .dn-header { grid-template-columns: 1fr; padding: 20px; } .dn-header-actions { justify-items: stretch; } .dn-meta { min-width: 0; } .dn-theme-toggle button { min-width: 0; flex: 1; } .dn-signals { grid-template-columns: 1fr; } .dn-panel-heading { align-items: flex-start; flex-direction: column; } .dn-history-item { grid-template-columns: minmax(0, 1fr) auto; } .dn-history-detail { display: none; } .dn-detail-grid { grid-template-columns: 1fr; } }",
+    "@media (max-width: 680px) { .dn-shell { padding: 12px; } .dn-header { grid-template-columns: 1fr; padding: 20px; } .dn-header-actions { justify-items: stretch; } .dn-meta { min-width: 0; } .dn-open-menu { justify-self: stretch; } .dn-open-trigger { width: 100%; } .dn-open-options { left: 0; right: auto; } .dn-theme-toggle button { min-width: 0; flex: 1; } .dn-signals { grid-template-columns: 1fr; } .dn-panel-heading { align-items: flex-start; flex-direction: column; } .dn-history-item { grid-template-columns: minmax(0, 1fr) auto; } .dn-history-detail { display: none; } .dn-detail-grid { grid-template-columns: 1fr; } }",
     "`;",
     "",
     "export async function fetchDevNexusDashboard(baseUrl = '', workspaceId = '') {",
@@ -379,6 +431,7 @@ export function renderNexusDashboardClientModule(): string {
     "    bindThemeControls(root, setThemeMode);",
     "    bindSelectionControls(root, setSelectedId);",
     "    bindWorkspaceControls(root, setWorkspaceId);",
+    "    bindScrollControls(root);",
     "    bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId);",
     "  }",
     "  function renderCurrent() {",
@@ -463,7 +516,7 @@ export function renderNexusDashboardClientModule(): string {
     "  return `<div class=\"dn-shell\">",
     "    <header class=\"dn-header\">",
     "      <div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>",
-    "      <div class=\"dn-header-actions\">${renderHostNavButton(selectedWorkspaceId)}<div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot.generatedAt))}</strong><span>Root</span><strong title=\"${escapeHtml(snapshot.project.root)}\">${escapeHtml(compactPath(snapshot.project.root))}</strong></div>${renderThemeToggle(themeMode)}</div>",
+    "      <div class=\"dn-header-actions\">${renderHostNavButton(selectedWorkspaceId)}${renderOpenMenu('project', 'Project')}<div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot.generatedAt))}</strong><span>Root</span><strong title=\"${escapeHtml(snapshot.project.root)}\">${escapeHtml(compactPath(snapshot.project.root))}</strong></div>${renderThemeToggle(themeMode)}</div>",
     "    </header>",
     "    ${renderHostOverview(host, snapshot, selectedWorkspaceId)}",
     "    ${renderSignals(snapshot.signals, activeSelection)}",
@@ -482,7 +535,7 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function renderHostDashboard(host, themeMode) {",
     "  const summary = `${host.workspaceCount} workspaces, ${host.needsAttentionCount} need attention`;",
-    "  return `<div class=\"dn-shell dn-host-dashboard\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>Host Cockpit</h1><p>${escapeHtml(summary)}</p></div><div class=\"dn-header-actions\"><div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(host.generatedAt))}</strong><span>Home</span><strong title=\"${escapeHtml(host.homePath)}\">${escapeHtml(compactPath(host.homePath))}</strong></div>${renderThemeToggle(themeMode)}</div></header>${renderHostSignals(host)}<section class=\"dn-host-main-grid\">${renderHostActionQueue(host)}${renderHostOverview(host, null, '', { hostMode: true })}</section></div>`;",
+    "  return `<div class=\"dn-shell dn-host-dashboard\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>Host Cockpit</h1><p>${escapeHtml(summary)}</p></div><div class=\"dn-header-actions\">${renderOpenMenu('home', 'Home')}<div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(host.generatedAt))}</strong><span>Home</span><strong title=\"${escapeHtml(host.homePath)}\">${escapeHtml(compactPath(host.homePath))}</strong></div>${renderThemeToggle(themeMode)}</div></header>${renderHostSignals(host)}<section class=\"dn-host-main-grid\">${renderHostActionQueue(host)}${renderHostOverview(host, null, '', { hostMode: true })}</section></div>`;",
     "}",
     "",
     "function renderHostSignals(host) {",
@@ -498,23 +551,45 @@ export function renderNexusDashboardClientModule(): string {
     "    { id: 'eligible-work', label: 'Dirty', value: String(dirty), detail: 'Component checkouts with local changes' },",
     "    { id: 'plugins', label: 'Plugins', value: String(plugins), detail: 'Installed DevNexus plugin instances' },",
     "  ];",
-    "  return `<section class=\"dn-signals\" aria-label=\"Host signals\">${signals.map((signal) => `<article class=\"dn-signal dn-host-signal signal-${escapeAttribute(signal.id)}\"><span class=\"dn-signal-top\"><span class=\"dn-signal-icon\">${signalIcon(signal.id)}</span><span class=\"dn-label\">${escapeHtml(signal.label)}</span></span><strong>${escapeHtml(signal.value)}</strong><p>${escapeHtml(signal.detail)}</p></article>`).join('')}</section>`;",
+    "  return `<section class=\"dn-signals\" aria-label=\"Host signals\">${signals.map((signal) => `<button class=\"dn-signal dn-host-signal signal-${escapeAttribute(signal.id)}\" type=\"button\" data-scroll-target=\"${escapeHtml(hostSignalTarget(signal.id))}\"><span class=\"dn-signal-top\"><span class=\"dn-signal-icon\">${signalIcon(signal.id)}</span><span class=\"dn-label\">${escapeHtml(signal.label)}</span></span><strong>${escapeHtml(signal.value)}</strong><p>${escapeHtml(signal.detail)}</p></button>`).join('')}</section>`;",
+    "}",
+    "",
+    "function hostSignalTarget(id) {",
+    "  if (id === 'components' || id === 'plugins') return 'host-workspaces';",
+    "  return 'host-action-queue';",
     "}",
     "",
     "function renderHostActionQueue(host) {",
     "  const actions = host?.actionQueue ?? [];",
     "  const body = actions.length ? actions.slice(0, 8).map(renderHostActionCard).join('') : '<p>No workspace needs attention.</p>';",
-    "  return `<section class=\"dn-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host HITL</span><h2>Action Queue</h2></div><span class=\"dn-count\">${escapeHtml(`${actions.length} actions`)}</span></div><div class=\"dn-host-action-list\">${body}</div></section>`;",
+    "  return `<section class=\"dn-panel dn-host-action-panel\" id=\"host-action-queue\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host HITL</span><h2>Action Queue</h2></div><span class=\"dn-count\">${escapeHtml(`${actions.length} actions`)}</span></div><div class=\"dn-host-action-list\">${body}</div></section>`;",
     "}",
     "",
     "function renderHostActionCard(action) {",
     "  const updated = action.updatedAt ? ` · ${formatTime(action.updatedAt)}` : '';",
     "  const detail = formatDisplayText(action.detail);",
-    "  return `<button class=\"dn-host-action-card action-${escapeAttribute(action.kind)}\" type=\"button\" data-workspace-id=\"${escapeHtml(action.workspaceId)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(action.workspaceName)}</strong><span class=\"dn-thread-decision decision-${action.tone === 'danger' ? 'rescue' : 'review'}\">${escapeHtml(action.state)}</span></span><span class=\"dn-card-meta\">${escapeHtml(action.reason)}${escapeHtml(updated)}</span><p title=\"${escapeHtml(detail)}\">${escapeHtml(truncate(detail, 110))}</p><span class=\"dn-action-label\">${escapeHtml(action.primaryAction?.label ?? 'Open workspace')}</span></button>`;",
+    "  return `<button class=\"dn-host-action-card action-${escapeAttribute(action.kind)}\" style=\"${projectAccentStyle(action.workspaceId)}\" type=\"button\" data-workspace-id=\"${escapeHtml(action.workspaceId)}\"><span class=\"dn-card-title\"><strong>${escapeHtml(action.workspaceName)}</strong><span class=\"dn-thread-decision decision-${action.tone === 'danger' ? 'rescue' : 'review'}\">${escapeHtml(action.state)}</span></span><span class=\"dn-card-meta\">${escapeHtml(action.reason)}${escapeHtml(updated)}</span><p title=\"${escapeHtml(detail)}\">${escapeHtml(truncate(detail, 110))}</p><span class=\"dn-action-label\">${escapeHtml(action.primaryAction?.label ?? 'Open workspace')}</span></button>`;",
     "}",
     "",
     "function renderHostNavButton(selectedWorkspaceId) {",
     "  return selectedWorkspaceId ? `<button class=\"dn-action\" type=\"button\" data-workspace-id=\"\">${signalIcon('worktrees')}<span class=\"dn-action-label\">Host cockpit</span></button>` : '';",
+    "}",
+    "",
+    "function renderOpenMenu(target, label) {",
+    "  const safeTarget = target === 'home' ? 'home' : 'project';",
+    "  return `<details class=\"dn-open-menu\"><summary class=\"dn-action dn-open-trigger\">${folderIcon()}<span class=\"dn-action-label\">${escapeHtml(label)}</span><span aria-hidden=\"true\">v</span></summary><div class=\"dn-open-options\"><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"code\">${codeIcon()}<span class=\"dn-action-label\">VS Code</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"file\">${finderIcon()}<span class=\"dn-action-label\">Finder</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"terminal\">${terminalIcon()}<span class=\"dn-action-label\">Terminal</span></button></div></details>`;",
+    "}",
+    "",
+    "function projectAccentStyle(value) {",
+    "  const index = stableAccentIndex(value);",
+    "  return `--dn-project-accent:var(--dn-branch-${index}); --dn-workspace-accent:var(--dn-project-accent);`;",
+    "}",
+    "",
+    "function stableAccentIndex(value) {",
+    "  const text = String(value ?? 'workspace');",
+    "  let hash = 0;",
+    "  for (let index = 0; index < text.length; index += 1) hash = ((hash * 31) + text.charCodeAt(index)) >>> 0;",
+    "  return hash % 6;",
     "}",
     "",
     "function sumBy(values, selector) {",
@@ -524,14 +599,14 @@ export function renderNexusDashboardClientModule(): string {
     "function renderLoading(themeMode, host, selectedWorkspaceId = '') {",
     "  const title = selectedWorkspaceId ? 'Switching workspace' : 'Loading host cockpit';",
     "  const detail = selectedWorkspaceId ? 'Loading workspace state.' : 'Reading registered workspaces, threads, plugins, and approvals.';",
-    "  return `<div class=\"dn-shell\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p></div><div class=\"dn-header-actions\">${renderHostNavButton(selectedWorkspaceId)}${renderThemeToggle(themeMode)}</div></header>${renderHostOverview(host, null, selectedWorkspaceId)}<section class=\"dn-panel\" style=\"margin-top:16px\"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(detail)}</p></section></div>`;",
+    "  return `<div class=\"dn-shell\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p></div><div class=\"dn-header-actions\">${renderHostNavButton(selectedWorkspaceId)}${renderThemeToggle(themeMode)}</div></header>${renderHostOverview(host, null, selectedWorkspaceId)}<section class=\"dn-panel dn-loading-panel\" aria-busy=\"true\"><span class=\"dn-loader\" aria-hidden=\"true\"></span><div class=\"dn-loading-copy\"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(detail)}</p><div class=\"dn-skeleton-stack\" aria-hidden=\"true\"><span class=\"dn-skeleton\" style=\"width:92%\"></span><span class=\"dn-skeleton\" style=\"width:76%\"></span><span class=\"dn-skeleton\" style=\"width:54%\"></span></div></div></section></div>`;",
     "}",
     "",
     "function renderHostOverview(host, snapshot, selectedWorkspaceId = '', options = {}) {",
     "  const workspaces = host?.workspaces ?? [];",
     "  if (!workspaces.length) return '';",
     "  const count = `${host.needsAttentionCount ?? 0} need attention · ${host.workspaceCount ?? workspaces.length} workspaces`;",
-    "  return `<section class=\"dn-panel dn-host-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>Workspaces</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId, !options.hostMode)).join('')}</div></section>`;",
+    "  return `<section class=\"dn-panel dn-host-panel\" id=\"host-workspaces\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>Workspaces</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId, !options.hostMode)).join('')}</div></section>`;",
     "}",
     "",
     "function renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId = '', highlightCurrent = true) {",
@@ -541,7 +616,7 @@ export function renderNexusDashboardClientModule(): string {
     "  const title = workspace.current && snapshot ? snapshot.project.name : workspace.name;",
     "  const meta = [`${workspace.componentCount} components`, `${workspace.needsDecisionCount} active HITL`, `${workspace.threadCount} active`, `${workspace.pluginCount} plugins`];",
     "  const selected = workspace.id === selectedWorkspaceId || (highlightCurrent && !selectedWorkspaceId && workspace.current) ? 'selected' : '';",
-    "  return `<button class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)} ${selected}\" type=\"button\" data-workspace-id=\"${escapeHtml(workspace.id)}\" aria-label=\"Open ${escapeHtml(title)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></button>`;",
+    "  return `<button class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)} ${selected}\" style=\"${projectAccentStyle(workspace.id)}\" type=\"button\" data-workspace-id=\"${escapeHtml(workspace.id)}\" aria-label=\"Open ${escapeHtml(title)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></button>`;",
     "}",
     "",
     "function workspaceToneLabel(workspace) {",
@@ -574,7 +649,45 @@ export function renderNexusDashboardClientModule(): string {
     "  });",
     "}",
     "",
+    "function bindScrollControls(container) {",
+    "  container.querySelectorAll('[data-scroll-target]').forEach((button) => {",
+    "    button.addEventListener('click', () => {",
+    "      const targetId = button.getAttribute('data-scroll-target') ?? '';",
+    "      const target = targetId ? document.getElementById(targetId) : null;",
+    "      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });",
+    "    });",
+    "  });",
+    "}",
+    "",
     "function bindLocalActions(container, baseUrl = '', actionToken = '', workspaceId = '') {",
+    "  container.querySelectorAll('[data-open-target][data-open-app]').forEach((button) => {",
+    "    button.addEventListener('click', async () => {",
+    "      const target = button.getAttribute('data-open-target') ?? '';",
+    "      const app = button.getAttribute('data-open-app') ?? '';",
+    "      const label = button.querySelector('.dn-action-label');",
+    "      const originalLabel = label?.textContent ?? '';",
+    "      button.disabled = true;",
+    "      if (label) label.textContent = 'Opening...';",
+    "      try {",
+    "        const headers = { 'content-type': 'application/json' };",
+    "        if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;",
+    "        const response = await fetch(`${baseUrl}/api/local/open${workspaceQuery(workspaceId)}`, {",
+    "          method: 'POST',",
+    "          headers,",
+    "          body: JSON.stringify({ target, app }),",
+    "        });",
+    "        const payload = await response.json();",
+    "        if (!response.ok || payload?.ok !== true) throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);",
+    "        if (label) label.textContent = 'Opened';",
+    "        button.closest('details')?.removeAttribute('open');",
+    "      } catch (error) {",
+    "        if (label) label.textContent = 'Setup needed';",
+    "        button.title = error instanceof Error ? error.message : String(error);",
+    "      } finally {",
+    "        setTimeout(() => { if (label) label.textContent = originalLabel; button.disabled = false; }, 1200);",
+    "      }",
+    "    });",
+    "  });",
     "  container.querySelectorAll('[data-copy-prompt]').forEach((button) => {",
     "    button.addEventListener('click', async () => {",
     "      const prompt = button.getAttribute('data-copy-prompt') ?? '';",
@@ -819,6 +932,22 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function clipboardIcon() {",
     "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 2.5h4M6.5 1.5h3A1.5 1.5 0 0111 3v.5H5V3a1.5 1.5 0 011.5-1.5zM4 3.5H3A1.5 1.5 0 001.5 5v8A1.5 1.5 0 003 14.5h10A1.5 1.5 0 0014.5 13V5A1.5 1.5 0 0013 3.5h-1\"/></svg>';",
+    "}",
+    "",
+    "function folderIcon() {",
+    "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M1.5 4.5A1.5 1.5 0 013 3h3l1.2 1.5H13A1.5 1.5 0 0114.5 6v6A1.5 1.5 0 0113 13.5H3A1.5 1.5 0 011.5 12z\"/></svg>';",
+    "}",
+    "",
+    "function codeIcon() {",
+    "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M6 4L2.5 8 6 12\"/><path d=\"M10 4l3.5 4L10 12\"/><path d=\"M8.8 2.5l-1.6 11\"/></svg>';",
+    "}",
+    "",
+    "function finderIcon() {",
+    "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><rect x=\"2\" y=\"2\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M8 2v12\"/><path d=\"M4.5 6h.01\"/><path d=\"M11.5 6h.01\"/><path d=\"M5 10.5c1.8 1 4.2 1 6 0\"/></svg>';",
+    "}",
+    "",
+    "function terminalIcon() {",
+    "  return '<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><rect x=\"1.8\" y=\"2.5\" width=\"12.4\" height=\"11\" rx=\"1.5\"/><path d=\"M4 6l2 2-2 2\"/><path d=\"M8 10h4\"/></svg>';",
     "}",
     "",
     "function chatIcon() {",
@@ -1394,6 +1523,7 @@ async function routeDashboardRequest(
   response: ServerResponse,
   snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   codexChatStarter: NexusDashboardCodexChatStarter,
+  localResourceOpener: NexusDashboardLocalResourceOpener,
   actionToken: string,
 ): Promise<void> {
   const method = request.method ?? "GET";
@@ -1404,6 +1534,17 @@ async function routeDashboardRequest(
       response,
       snapshotOptions,
       codexChatStarter,
+      actionToken,
+      url,
+    );
+    return;
+  }
+  if (method === "POST" && url.pathname === "/api/local/open") {
+    await routeLocalOpen(
+      request,
+      response,
+      snapshotOptions,
+      localResourceOpener,
       actionToken,
       url,
     );
@@ -1518,16 +1659,51 @@ async function routeCodexThreadStart(
       snapshotOptions,
       workspaceId,
     );
-    const resumeThreadId = targetId
-      ? await resolveDashboardResumeThreadId(selection.snapshotOptions, targetId)
+    const threadContext = targetId
+      ? await resolveDashboardThreadActionContext(selection.snapshotOptions, targetId)
       : null;
     const result = await codexChatStarter.start({
       projectRoot: selection.snapshotOptions.projectRoot,
       prompt,
       ...(title ? { title } : {}),
-      ...(resumeThreadId ? { threadId: resumeThreadId } : {}),
+      ...(threadContext?.threadId ? { threadId: threadContext.threadId } : {}),
+      ...(threadContext?.cwd ? { cwd: threadContext.cwd } : {}),
     });
     sendJson(response, { ok: true, result }, 201);
+  } catch (error) {
+    sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
+  }
+}
+
+async function routeLocalOpen(
+  request: IncomingMessage,
+  response: ServerResponse,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  localResourceOpener: NexusDashboardLocalResourceOpener,
+  actionToken: string,
+  url: URL,
+): Promise<void> {
+  try {
+    requireDashboardMutationRequest(request, actionToken);
+    const workspaceId = workspaceIdFromUrl(url);
+    const body = await readJsonBody(request);
+    const target = requiredLocalOpenTarget(body, "target");
+    const app = requiredLocalOpenApp(body, "app");
+    rejectClientControlledField(body, "path");
+    rejectClientControlledField(body, "cwd");
+    rejectClientControlledField(body, "projectRoot");
+    rejectClientControlledField(body, "workspaceRoot");
+    const targetPath = await dashboardLocalOpenPath(
+      snapshotOptions,
+      workspaceId,
+      target,
+    );
+    const result = await localResourceOpener({
+      target,
+      app,
+      path: targetPath,
+    });
+    sendJson(response, { ok: result.ok, result }, result.ok ? 200 : 502);
   } catch (error) {
     sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
   }
@@ -1736,10 +1912,10 @@ function dashboardErrorBody(error: unknown): unknown {
   };
 }
 
-async function resolveDashboardResumeThreadId(
+async function resolveDashboardThreadActionContext(
   snapshotOptions: BuildNexusDashboardSnapshotOptions,
   targetId: string,
-): Promise<string | null> {
+): Promise<DashboardThreadActionContext | null> {
   if (!targetId.startsWith("thread:")) {
     return null;
   }
@@ -1748,8 +1924,107 @@ async function resolveDashboardResumeThreadId(
     return null;
   }
   const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
-  return snapshot.threads.records.find((record) => record.id === threadRecordId)
-    ?.assistantThreadId ?? null;
+  const thread = snapshot.threads.records.find((record) =>
+    record.id === threadRecordId
+  );
+  const worktree = snapshot.worktrees.records.find((record) =>
+    record.id === threadRecordId
+  );
+  if (!thread && !worktree) {
+    return null;
+  }
+  return {
+    threadId: thread?.assistantThreadId ?? null,
+    cwd: dashboardChatCwd(worktree?.worktreePath ?? null),
+  };
+}
+
+function dashboardChatCwd(worktreePath: string | null): string | null {
+  if (!worktreePath) {
+    return null;
+  }
+  const resolvedWorktreePath = path.resolve(worktreePath);
+  if (!fs.existsSync(resolvedWorktreePath)) {
+    return null;
+  }
+  return resolvedWorktreePath;
+}
+
+async function dashboardLocalOpenPath(
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  workspaceId: string | null,
+  target: NexusDashboardLocalOpenTarget,
+): Promise<string> {
+  if (target === "home") {
+    const host = await buildNexusDashboardHostSnapshot(snapshotOptions);
+    return host.homePath;
+  }
+  const selection = await resolveDashboardWorkspaceSelection(
+    snapshotOptions,
+    workspaceId,
+  );
+  return selection.snapshotOptions.projectRoot;
+}
+
+async function openDashboardLocalResource(
+  request: NexusDashboardLocalOpenRequest,
+): Promise<NexusDashboardLocalOpenResult> {
+  const { command, args } = dashboardLocalOpenCommand(request);
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.once("error", (error) => {
+      resolve({
+        ...request,
+        ok: false,
+        command,
+        args,
+        error: error.message,
+      });
+    });
+    child.once("spawn", () => {
+      child.unref();
+      resolve({
+        ...request,
+        ok: true,
+        command,
+        args,
+      });
+    });
+  });
+}
+
+function dashboardLocalOpenCommand(
+  request: NexusDashboardLocalOpenRequest,
+): { command: string; args: string[] } {
+  if (process.platform === "darwin") {
+    if (request.app === "code") {
+      return { command: "open", args: ["-a", "Visual Studio Code", request.path] };
+    }
+    if (request.app === "terminal") {
+      return { command: "open", args: ["-a", "Terminal", request.path] };
+    }
+    return { command: "open", args: [request.path] };
+  }
+  if (process.platform === "win32") {
+    if (request.app === "code") {
+      return { command: "cmd.exe", args: ["/d", "/s", "/c", "start", "", "code", request.path] };
+    }
+    if (request.app === "terminal") {
+      return { command: "cmd.exe", args: ["/d", "/s", "/c", "start", "", "cmd", "/k", "cd", "/d", request.path] };
+    }
+    return { command: "explorer.exe", args: [request.path] };
+  }
+  if (request.app === "code") {
+    return { command: "code", args: [request.path] };
+  }
+  if (request.app === "terminal") {
+    return { command: "x-terminal-emulator", args: ["--working-directory", request.path] };
+  }
+  return { command: "xdg-open", args: [request.path] };
 }
 
 function requireDashboardMutationRequest(
@@ -1878,6 +2153,34 @@ function optionalStringField(
   return field.trim() || undefined;
 }
 
+function requiredLocalOpenTarget(
+  value: unknown,
+  fieldName: string,
+): NexusDashboardLocalOpenTarget {
+  const target = requiredStringField(value, fieldName);
+  if (target === "home" || target === "project") {
+    return target;
+  }
+  throw new NexusDashboardCodexChatError(
+    `${fieldName} must be home or project`,
+    400,
+  );
+}
+
+function requiredLocalOpenApp(
+  value: unknown,
+  fieldName: string,
+): NexusDashboardLocalOpenApp {
+  const app = requiredStringField(value, fieldName);
+  if (app === "file" || app === "code" || app === "terminal") {
+    return app;
+  }
+  throw new NexusDashboardCodexChatError(
+    `${fieldName} must be file, code, or terminal`,
+    400,
+  );
+}
+
 function rejectClientControlledField(
   value: unknown,
   fieldName: string,
@@ -1885,7 +2188,7 @@ function rejectClientControlledField(
   const record = plainRecord(value);
   if (record[fieldName] !== undefined && record[fieldName] !== null) {
     throw new NexusDashboardCodexChatError(
-      `${fieldName} is server-controlled for dashboard chat actions`,
+      `${fieldName} is server-controlled for dashboard actions`,
       400,
     );
   }

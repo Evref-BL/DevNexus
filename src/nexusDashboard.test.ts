@@ -972,6 +972,11 @@ describe("nexus dashboard", () => {
     expect(module).toContain("Host HITL");
     expect(module).toContain("Action Queue");
     expect(module).toContain("renderLoading");
+    expect(module).toContain("dn-loading-panel");
+    expect(module).toContain("dn-loader");
+    expect(module).toContain("dn-skeleton");
+    expect(module).toContain("@keyframes dn-spin");
+    expect(module).toContain("@keyframes dn-shimmer");
     expect(module).toContain("Loading host cockpit");
     expect(module).toContain("Switching workspace");
     expect(module).toContain("hostRefreshMs");
@@ -982,6 +987,10 @@ describe("nexus dashboard", () => {
     expect(module).toContain("readWorkspaceIdFromLocation");
     expect(module).toContain("writeWorkspaceIdToLocation");
     expect(module).toContain("bindWorkspaceControls");
+    expect(module).toContain("bindScrollControls");
+    expect(module).toContain("data-scroll-target");
+    expect(module).toContain("host-action-queue");
+    expect(module).toContain("host-workspaces");
     expect(module).toContain("data-workspace-id");
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
@@ -991,6 +1000,13 @@ describe("nexus dashboard", () => {
     expect(module).toContain("bindLocalActions");
     expect(module).toContain("data-copy-prompt");
     expect(module).toContain("Copy prompt");
+    expect(module).toContain("renderOpenMenu");
+    expect(module).toContain("/api/local/open");
+    expect(module).toContain("data-open-target");
+    expect(module).toContain("data-open-app");
+    expect(module).toContain("Finder");
+    expect(module).toContain("VS Code");
+    expect(module).toContain("Terminal");
     expect(module).not.toContain("Copy brief");
     expect(module).toContain("Start chat");
     expect(module).toContain("Resume chat");
@@ -1030,6 +1046,10 @@ describe("nexus dashboard", () => {
     expect(module).toContain("dn-branch-svg");
     expect(module).toContain("const rowHeight = 34");
     expect(module).toContain("data-row-height");
+    expect(module).toContain("--dn-project-accent");
+    expect(module).toContain("projectAccentStyle");
+    expect(module).toContain("stableAccentIndex");
+    expect(module).not.toContain("--dn-warn: #9a641c");
     expect(module).toContain("providerIcon");
     expect(module).toContain("externalLinkIcon");
     expect(module).toContain("clipboardIcon");
@@ -1623,11 +1643,21 @@ describe("nexus dashboard", () => {
     const homePath = makeTempDir("dev-nexus-dashboard-chat-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-chat-registered-");
     const currentRoot = makeTempDir("dev-nexus-dashboard-chat-current-");
+    const registeredWorktreesRoot = makeTempDir(
+      "dev-nexus-dashboard-chat-worktrees-",
+    );
+    const registeredWorktreePath = path.join(
+      registeredWorktreesRoot,
+      "primary",
+      "dashboard",
+    );
     fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(registeredWorktreePath, { recursive: true });
     fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
     const registeredConfig = projectConfig({
       id: "chat-registered",
       name: "Chat Registered",
+      worktreesRoot: registeredWorktreesRoot,
     });
     const currentConfig = projectConfig({
       id: "chat-current",
@@ -1635,6 +1665,15 @@ describe("nexus dashboard", () => {
     });
     saveProjectConfig(registeredRoot, registeredConfig);
     saveProjectConfig(currentRoot, currentConfig);
+    writeNexusWorktreeLeaseStore(registeredRoot, {
+      version: 1,
+      updatedAt: "2026-05-21T10:00:00.000Z",
+      leases: [
+        worktreeLease(registeredConfig.id, {
+          id: "lease-dashboard",
+        }),
+      ],
+    });
     saveNexusHomeConfigFile(
       homePath,
       {
@@ -1676,6 +1715,7 @@ describe("nexus dashboard", () => {
           body: JSON.stringify({
             prompt: "Review selected workspace.",
             title: "Selected workspace",
+            targetId: "thread:lease-dashboard",
           }),
         },
       );
@@ -1686,6 +1726,112 @@ describe("nexus dashboard", () => {
           projectRoot: registeredRoot,
           prompt: "Review selected workspace.",
           title: "Selected workspace",
+          cwd: registeredWorktreePath,
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("opens home and project directories through server-owned paths", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-open-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-open-registered-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "open-registered",
+      name: "Open Registered",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const opened: Array<{ app: string; target: string; path: string }> = [];
+    const server = await startNexusDashboardServer({
+      homePath,
+      localResourceOpener: async (request) => {
+        opened.push(request);
+        return {
+          ok: true,
+          app: request.app,
+          target: request.target,
+          path: request.path,
+        };
+      },
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      const openProject = await fetch(
+        `${server.url}api/local/open?workspace=open-registered`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-dev-nexus-action-token": actionToken!,
+          },
+          body: JSON.stringify({
+            target: "project",
+            app: "terminal",
+          }),
+        },
+      ).then(async (response) => ({
+        status: response.status,
+        body: await response.json(),
+      }));
+      const rejected = await fetch(
+        `${server.url}api/local/open?workspace=open-registered`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-dev-nexus-action-token": actionToken!,
+          },
+          body: JSON.stringify({
+            target: "project",
+            app: "file",
+            path: "/tmp/evil",
+          }),
+        },
+      ).then(async (response) => ({
+        status: response.status,
+        body: await response.json(),
+      }));
+
+      expect(openProject.status).toBe(200);
+      expect(openProject.body).toMatchObject({
+        ok: true,
+        result: {
+          app: "terminal",
+          target: "project",
+          path: registeredRoot,
+        },
+      });
+      expect(rejected.status).toBe(400);
+      expect(rejected.body.error.message).toContain("path is server-controlled");
+      expect(opened).toEqual([
+        {
+          app: "terminal",
+          target: "project",
+          path: registeredRoot,
         },
       ]);
     } finally {
