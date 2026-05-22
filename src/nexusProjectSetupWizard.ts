@@ -152,7 +152,7 @@ export async function applyNexusProjectSetup(
   const proposal = previewNexusProjectSetup(options.answers);
   if (proposal.status !== "ready") {
     throw new Error(
-      `workspace setup proposal is blocked: ${proposal.diagnostics
+      `workspace init proposal is blocked: ${proposal.diagnostics
         .map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`)
         .join("; ")}`,
     );
@@ -161,7 +161,7 @@ export async function applyNexusProjectSetup(
     (operation) => operation.mutationClass === "provider_mutation",
   );
   if (providerMutation?.allowedDuringLocalSetup) {
-    throw new Error("workspace setup refuses provider mutations during local setup");
+    throw new Error("workspace init refuses provider mutations during local setup");
   }
 
   const projectRoot = path.resolve(proposal.answers.project.root);
@@ -346,7 +346,7 @@ export function buildNexusProjectConfigFromSetupAnswers(
 
 export function renderNexusProjectSetupRequiredAnswers(): string {
   return [
-    "workspace init/setup requires --answers <json-file> in non-interactive mode.",
+    "workspace init requires --answers <json-file> in non-interactive mode.",
     "Required answer paths:",
     ...nexusProjectSetupRequiredAnswerPaths.map((answer) => `- ${answer}`),
   ].join("\n");
@@ -452,7 +452,10 @@ async function promptForNexusProjectSetupAnswers(options: {
 
     const agent = await askWithDefault(rl, "Agent target", "codex");
     const localTracker = await askWithDefault(rl, "Enable local tracker? (yes/no)", "yes");
-    const initializeGit = await askWithDefault(rl, "Initialize meta Git repo? (yes/no)", "yes");
+    const projectHasGit = gitCheckoutExists(projectRoot);
+    const initializeGit = projectHasGit
+      ? true
+      : yesNo(await askWithDefault(rl, "Initialize Git repo? (yes/no)", "yes"));
     const agentProvider = normalizeAgentProvider(agent);
 
     return {
@@ -463,7 +466,7 @@ async function promptForNexusProjectSetupAnswers(options: {
         id: projectId,
         name: projectName,
         root: projectRoot,
-        initializeGit: yesNo(initializeGit),
+        initializeGit,
       },
       components,
       agentTargets: [
@@ -515,9 +518,13 @@ function defaultPrimaryComponentSourcePath(
 type NexusProjectSetupWorkspaceLayout = "project" | "workspace";
 
 function defaultWorkspaceLayout(projectRoot: string): NexusProjectSetupWorkspaceLayout {
-  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"))
+  return gitCheckoutExists(projectRoot)
     ? "project"
     : "workspace";
+}
+
+function gitCheckoutExists(projectRoot: string): boolean {
+  return fs.existsSync(path.join(path.resolve(projectRoot), ".git"));
 }
 
 async function askWorkspaceLayout(

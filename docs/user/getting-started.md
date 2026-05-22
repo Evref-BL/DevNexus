@@ -196,8 +196,7 @@ profile, GitLab CLI profile, environment-variable name, or token store id. See
 
 ## Low-Level Commands
 
-`workspace init` is the first-workspace command. `workspace setup` is an alias
-for the same local setup flow.
+`workspace init` is the first-workspace command.
 
 Use `workspace create` only when you want a low-level local scaffold. Use
 `workspace import <source-root>` only when one existing source checkout should

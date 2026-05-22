@@ -123,6 +123,8 @@ describe("nexus workspace setup wizard", () => {
     expect(stdout.output()).toContain("Workspace layout");
     expect(stdout.output()).toContain("project");
     expect(stdout.output()).toContain("workspace");
+    expect(stdout.output()).toContain("Initialize Git repo? (yes/no)");
+    expect(stdout.output()).not.toContain("Initialize meta Git repo");
     expect(stdout.output()).toContain("~/.dev-nexus unless --home is supplied");
     expect(stdout.output()).not.toContain("DevNexus home [");
   });
@@ -139,7 +141,6 @@ describe("nexus workspace setup wizard", () => {
       "",
       "",
       "repo",
-      "",
       "",
       "",
       "",
@@ -169,6 +170,7 @@ describe("nexus workspace setup wizard", () => {
         id: "existing-repo",
         name: "Existing Repo",
         root: projectRoot,
+        initializeGit: true,
       },
       components: [
         {
@@ -181,6 +183,7 @@ describe("nexus workspace setup wizard", () => {
         },
       ],
     });
+    expect(stdout.output()).not.toContain("Initialize Git repo? (yes/no)");
   });
 
   it("can choose a coordination workspace layout inside an existing Git checkout", async () => {
@@ -193,7 +196,6 @@ describe("nexus workspace setup wizard", () => {
       "",
       "workspace",
       "core",
-      "",
       "",
       "",
       "",
