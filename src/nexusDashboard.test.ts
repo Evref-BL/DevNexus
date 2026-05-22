@@ -75,6 +75,7 @@ async function loadDashboardClientTestHooks(): Promise<{
   renderLaneKey: (
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
+  renderHostOverview: (host: unknown, snapshot?: unknown, selectedWorkspaceId?: string, options?: unknown) => string;
   renderPlugins: (plugins: unknown) => string;
   renderSignal: (signal: unknown, selectedId?: string | null) => string;
   renderTrackedWork: (snapshot: unknown, selectedId?: string | null) => string;
@@ -115,7 +116,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostOverview, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -566,7 +567,7 @@ describe("nexus dashboard", () => {
     expect(snapshot.signals.find((signal) => signal.id === "worktrees")).toMatchObject({
       label: "Threads",
       value: "2",
-      detail: "1 needs action",
+      detail: "1 thread needs action",
     });
     expect(snapshot.signals.find((signal) => signal.id === "plugins")).toMatchObject({
       label: "Plugins",
@@ -1348,7 +1349,7 @@ describe("nexus dashboard", () => {
       ["Source checkout", "main"],
       ["Worktree branch", "dev-nexus/alpha-branch"],
       ["Worktree branch", "dev-nexus/beta-branch"],
-      ["Other worktrees", "1 more branches"],
+      ["Other worktrees", "1 more branch"],
       ["Runs and cycles", "Coordinator history"],
       ["Approvals and blockers", "Human decisions"],
     ]);
@@ -1444,7 +1445,7 @@ describe("nexus dashboard", () => {
     const html = hooks.renderTrackedWork(snapshot, "tracked-work:dev-nexus:github-42");
 
     expect(html).toContain("Issues and Work Items");
-    expect(html).toContain("1 ready · 1 import · 0 stale");
+    expect(html).toContain("1 ready item · 1 import candidate · 0 stale items");
     expect(html).toContain("Add cockpit issue lane");
     expect(html).toContain("kind-ready");
     expect(html).toContain("selected");
@@ -1495,6 +1496,57 @@ describe("nexus dashboard", () => {
     expect(html).toContain('data-select-id="signal:eligible-work"');
     expect(html).toContain('data-scroll-target="tracked-work-panel"');
     expect(html).toContain("selected");
+  });
+
+  it("uses singular nouns for one-count cockpit labels", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const hostHtml = hooks.renderHostOverview({
+      partial: false,
+      workspaceCount: 1,
+      needsAttentionCount: 1,
+      workspaces: [
+        {
+          id: "workspace-one",
+          name: "Workspace One",
+          root: "/tmp/workspace-one",
+          registered: true,
+          current: false,
+          loading: false,
+          tone: "active",
+          summary: "Workspace has one plugin.",
+          componentCount: 1,
+          needsDecisionCount: 1,
+          threadCount: 1,
+          pluginCount: 1,
+          blockerCount: 0,
+          automationStatus: "idle",
+          dirtyComponentCount: 0,
+          eligibleWorkCount: 0,
+        },
+      ],
+    }, null, "", { hostMode: false });
+
+    expect(hostHtml).toContain("1 needs attention · 1 workspace");
+    expect(hostHtml).toContain("1 component");
+    expect(hostHtml).toContain("1 active HITL");
+    expect(hostHtml).toContain("1 active thread");
+    expect(hostHtml).toContain("1 plugin");
+    expect(hostHtml).not.toContain("1 components");
+    expect(hostHtml).not.toContain("1 active threads");
+    expect(hostHtml).not.toContain("1 plugins");
+
+    const pluginHtml = hooks.renderPlugins({
+      enabledCount: 1,
+      availableCount: 1,
+      capabilityCount: 1,
+      records: [],
+    });
+
+    expect(pluginHtml).toContain("1 enabled plugin · 1 available plugin · 1 capability");
+    expect(pluginHtml).not.toContain("1 enabled plugins");
+    expect(pluginHtml).not.toContain("1 available plugins");
+    expect(pluginHtml).not.toContain("1 capabilities");
   });
 
   it("makes HITL threads selectable with the same chat actions as the queue", async () => {
@@ -1642,7 +1694,7 @@ describe("nexus dashboard", () => {
       ],
     });
 
-    expect(html).toContain("1 enabled · 1 disabled · 4 capabilities");
+    expect(html).toContain("1 enabled plugin · 1 disabled plugin · 4 capabilities");
     expect(html).toContain("Skill: typescript-diagnose");
     expect(html).toContain("MCP: dev-nexus-typescript");
     expect(html).toContain("Setup: Prepare research corpus");
@@ -1691,7 +1743,7 @@ describe("nexus dashboard", () => {
       ],
     });
 
-    expect(html).toContain("0 enabled · 1 available");
+    expect(html).toContain("0 enabled plugins · 1 available plugin");
     expect(html).toContain("available");
     expect(html).toContain("@evref-bl/dev-nexus-research");
     expect(html).toContain("Research workflow support for DevNexus.");

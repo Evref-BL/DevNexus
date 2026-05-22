@@ -1708,24 +1708,24 @@ function dashboardHostWorkspaceSummary(value: {
   eligibleWorkCount: number | null;
 }): string {
   const review = value.threads.needsDecisionCount > 0
-    ? `${value.threads.needsDecisionCount} need action`
+    ? `${value.threads.needsDecisionCount} ${plural(value.threads.needsDecisionCount, "action", "actions")} needed`
     : "no review needed";
   const dirty = value.dirtyComponentCount > 0
     ? `${value.dirtyComponentCount} dirty`
     : "clean";
   const warnings = value.warningCount > 0
-    ? `${value.warningCount} warnings`
+    ? `${value.warningCount} ${plural(value.warningCount, "warning", "warnings")}`
     : "no warnings";
   const approvals = value.approvalCount > 0
-    ? `${value.approvalCount} approvals`
+    ? `${value.approvalCount} ${plural(value.approvalCount, "approval", "approvals")}`
     : "no approvals";
   const blockers = value.blockerCount > 0
-    ? `${value.blockerCount} blockers`
+    ? `${value.blockerCount} ${plural(value.blockerCount, "blocker", "blockers")}`
     : "no blockers";
   const ready = value.eligibleWorkCount && value.eligibleWorkCount > 0
     ? `${value.eligibleWorkCount} ready`
     : "no ready work";
-  return `${value.componentSummaries.length} components, ${value.threads.totalCount} active threads, ${review}, ${approvals}, ${blockers}, ${dirty}, ${ready}, ${warnings}, ${value.plugins.enabledCount} plugins`;
+  return `${value.componentSummaries.length} ${plural(value.componentSummaries.length, "component", "components")}, ${value.threads.totalCount} active ${plural(value.threads.totalCount, "thread", "threads")}, ${review}, ${approvals}, ${blockers}, ${dirty}, ${ready}, ${warnings}, ${value.plugins.enabledCount} ${plural(value.plugins.enabledCount, "plugin", "plugins")}`;
 }
 
 function dashboardHostWorkspaceTone(options: {
@@ -1846,7 +1846,7 @@ function dashboardHostActionItems(
   if (workspace.needsDecisionCount > 0) {
     add(
       "thread",
-      `${workspace.needsDecisionCount} ${plural(workspace.needsDecisionCount, "thread", "threads")} need action`,
+      `${workspace.needsDecisionCount} ${plural(workspace.needsDecisionCount, "thread", "threads")} ${workspace.needsDecisionCount === 1 ? "needs" : "need"} action`,
       "Unfinished work needs continue, archive, forget, or rescue.",
       workspace.staleThreadCount > 0 ? "stale threads" : "review needed",
       "warn",
@@ -4112,7 +4112,7 @@ function dashboardSignals(
 
 function threadSignalDetail(threads: NexusDashboardThreadSummary): string {
   if (threads.needsDecisionCount > 0) {
-    return `${threads.needsDecisionCount} needs action`;
+    return `${threads.needsDecisionCount} ${plural(threads.needsDecisionCount, "thread", "threads")} ${threads.needsDecisionCount === 1 ? "needs" : "need"} action`;
   }
   if (threads.forgetCandidateCount > 0) {
     return `${threads.forgetCandidateCount} ready to forget`;
@@ -4155,7 +4155,7 @@ function dashboardSummary(
     readyCount > 0 ? `${readyCount} ready ${plural(readyCount, "item", "items")}` : "no ready items",
     `${threads.totalCount} ${plural(threads.totalCount, "thread", "threads")}`,
     threads.needsDecisionCount > 0
-      ? `${threads.needsDecisionCount} need action`
+      ? `${threads.needsDecisionCount} ${plural(threads.needsDecisionCount, "thread", "threads")} ${threads.needsDecisionCount === 1 ? "needs" : "need"} action`
       : "threads current",
     blockers.length > 0 ? `${blockers.length} ${plural(blockers.length, "blocker", "blockers")}` : "no blockers",
     automation ? `automation ${automation.status}` : "automation unknown",
