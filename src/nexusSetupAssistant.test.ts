@@ -1653,6 +1653,127 @@ describe("nexus setup assistant", () => {
     );
   });
 
+  it("shows effective exposure for agent and plugin MCP setup checks", () => {
+    const projectRoot = makeTempDir("dev-nexus-setup-mcp-exposure-");
+    writeProject(projectRoot, {
+      mcp: {
+        exposure: "hidden",
+        agentTargets: [{ agent: "codex" }],
+      },
+      plugins: [
+        {
+          id: "example-runtime-plugin",
+          enabled: true,
+          mcpExposure: "gateway",
+          capabilities: [
+            {
+              kind: "mcp_server",
+              id: "mcp-direct-runtime",
+              serverName: "direct_runtime",
+              command: "node",
+              args: ["direct-server.js"],
+              exposure: "direct",
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-gateway-runtime",
+              serverName: "gateway_runtime",
+              command: "node",
+              args: ["gateway-server.js"],
+            },
+            {
+              kind: "mcp_server",
+              id: "mcp-hidden-runtime",
+              serverName: "hidden_runtime",
+              command: "node",
+              args: ["hidden-server.js"],
+              exposure: "hidden",
+            },
+          ],
+        },
+      ],
+    });
+
+    const plan = buildNexusSetupPlan({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "macos",
+    });
+    const refreshStep = plan.steps.find(
+      (step) => step.id === "refresh-agent-mcp-and-skills",
+    )!;
+    const checks = refreshStep.checks.join("\n");
+    expect(refreshStep.checks).not.toContain("test -f .codex/config.toml");
+    expect(checks).toContain("direct_runtime");
+    expect(checks).not.toContain("gateway_runtime");
+    expect(checks).not.toContain("hidden_runtime");
+
+    fs.mkdirSync(path.join(projectRoot, ".git"));
+    createComponentGitCheckout(projectRoot);
+
+    const setupCheck = buildNexusSetupCheck({
+      projectRoot,
+      flowId: "join-existing-project",
+      platform: "windows",
+    });
+
+    expect(setupCheck.checks).not.toContainEqual(
+      expect.objectContaining({ id: "agent-mcp-config-codex" }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "agent-mcp-server-codex-dev_nexus",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=workspace"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "workspace",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-direct_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("exposure=direct source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "direct",
+            source: "server",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-gateway_runtime-codex",
+        status: "warning",
+        summary: expect.stringContaining("planned for DevNexus gateway registration"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "gateway",
+            source: "plugin",
+          }),
+        },
+      }),
+    );
+    expect(setupCheck.checks).toContainEqual(
+      expect.objectContaining({
+        id: "plugin-example-runtime-plugin-mcp-hidden_runtime-codex",
+        status: "passed",
+        summary: expect.stringContaining("exposure=hidden source=server"),
+        details: {
+          exposure: expect.objectContaining({
+            mode: "hidden",
+            source: "server",
+          }),
+        },
+      }),
+    );
+  });
+
   it("warns when a plugin MCP server uses a stale command line", () => {
     const projectRoot = makeTempDir("dev-nexus-setup-plugin-mcp-stale-");
     writeProject(projectRoot, {
