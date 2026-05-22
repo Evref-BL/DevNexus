@@ -23,7 +23,7 @@ adds research-domain context for projects that opt into it.
 - It does not vendor or adapt upstream Academic Research Skills content.
 - It does not call external search, citation, export, Zotero, or document
   rendering services.
-- It should not be enabled in the dogfood root until setup and projection
+- It should not be enabled in a shared self-hosting root until setup and projection
   behavior has been tested for a research project.
 
 ## Verification

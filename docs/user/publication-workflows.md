@@ -209,5 +209,5 @@ check decisions. Add CI tiers when hosted CI cost or platform coverage needs
 policy. Add publication trains when the team wants to batch related work before
 final publication.
 
-Dogfood workspaces can use the advanced path to reduce CI noise and protect
+Self-hosting workspaces can use the advanced path to reduce CI noise and protect
 shared branches. That is an opt-in operating profile, not the DevNexus default.
