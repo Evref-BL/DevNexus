@@ -18,10 +18,18 @@ export const codexAppServerReadMethodCandidates = [
   "thread/list",
 ] as const;
 
+export const codexAppServerGoalMethods = [
+  "thread/goal/set",
+  "thread/goal/get",
+  "thread/goal/clear",
+] as const;
+
 export type CodexAppServerControlMethod =
   (typeof codexAppServerControlMethods)[number];
 export type CodexAppServerReadMethod =
   (typeof codexAppServerReadMethodCandidates)[number];
+export type CodexAppServerGoalMethod =
+  (typeof codexAppServerGoalMethods)[number];
 
 export interface CodexAppServerMethodAvailability {
   method: string;
@@ -42,6 +50,9 @@ export interface CodexAppServerCapabilitySet {
   threadRead: CodexAppServerMethodAvailability;
   threadList: CodexAppServerMethodAvailability;
   threadReadOrList: CodexAppServerAlternativeCapability;
+  threadGoalSet: CodexAppServerMethodAvailability;
+  threadGoalGet: CodexAppServerMethodAvailability;
+  threadGoalClear: CodexAppServerMethodAvailability;
   mcp: CodexAppServerMcpCapabilitySet;
 }
 
@@ -126,6 +137,9 @@ export function detectCodexAppServerCapabilities(
       method: readMethod,
       alternatives: [...codexAppServerReadMethodCandidates],
     },
+    threadGoalSet: availability("thread/goal/set", methods),
+    threadGoalGet: availability("thread/goal/get", methods),
+    threadGoalClear: availability("thread/goal/clear", methods),
     mcp: detectCodexAppServerMcpCapabilities(methodNames),
   };
 }
