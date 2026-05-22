@@ -3,6 +3,9 @@
 This is a repo-local Codex plugin prototype for the agent-client plugin
 initiative. It is not a public marketplace package.
 
+Default exposure, runtime, distribution, and uninstall rules are documented in
+[`docs/dev/agent-client-plugins.md`](../../docs/dev/agent-client-plugins.md).
+
 ## What It Contains
 
 - `.codex-plugin/plugin.json` with Codex plugin metadata.

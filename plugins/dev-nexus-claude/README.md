@@ -3,6 +3,9 @@
 This is a repo-local Claude Code plugin prototype for the agent-client plugin
 initiative. It is not a marketplace package.
 
+Default exposure, runtime, distribution, and uninstall rules are documented in
+[`docs/dev/agent-client-plugins.md`](../../docs/dev/agent-client-plugins.md).
+
 ## What It Contains
 
 - `.claude-plugin/plugin.json` with Claude Code plugin metadata.

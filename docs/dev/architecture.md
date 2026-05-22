@@ -81,6 +81,10 @@ When adding an MCP tool, keep the same boundary as the CLI:
 - Avoid live provider mutation unless the workspace policy and command path make
   that mutation explicit.
 
+Agent-client plugins for Codex and Claude use a narrower default exposure
+policy than the full core MCP server. The current policy is in
+[Agent-client plugin policy](agent-client-plugins.md).
+
 ## Plugin Capabilities
 
 Plugins are additive capability records inside a DevNexus workspace. They do not
