@@ -142,6 +142,15 @@ Verification:
 - `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusAutomationCoordinatorLoop.test.ts`
 - `npm run build`
 
+Progress:
+
+- 2026-05-22: Slice 1A added `NexusWorkItemClaimAuthority` and delegated
+  ready-candidate acquisition through the default optimistic tracker authority.
+  No database dependency was introduced.
+- Remaining Slice 1 work: add the in-memory authority contract and lifecycle
+  operations for verify, heartbeat, release, reclaim, and inspection before
+  introducing PostgreSQL.
+
 ### Slice 2: PostgreSQL Backend Contract
 
 Scope:

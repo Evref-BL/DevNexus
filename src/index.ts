@@ -39,6 +39,7 @@ export * from "./nexusExternalIssueVisibility.js";
 export * from "./nexusForgePublication.js";
 export * from "./nexusForgeRepositoryResolver.js";
 export * from "./nexusWorkItemDiscoveryStatus.js";
+export * from "./nexusWorkItemClaimAuthority.js";
 export * from "./nexusWorkItemClaim.js";
 export * from "./nexusWorkItemRouting.js";
 export * from "./nexusAgentMcpConfig.js";

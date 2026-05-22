@@ -40,49 +40,28 @@ import type {
   WorkStatus,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
-
-export interface NexusWorkItemClaimOwnerInput {
-  hostId: string;
-  agentId?: string | null;
-  ownerId?: string | null;
-}
-
-export interface NexusWorkItemClaimOwner {
-  version: 1;
-  hostId: string;
-  agentId: string | null;
-  ownerId: string | null;
-  leaseToken: string;
-  claimedAt: string;
-  expiresAt: string;
-}
-
-export type NexusWorkItemStaleClaimPolicy = "report" | "reclaim";
-
-export interface NexusWorkItemClaimObservation {
-  id: string;
-  title: string;
-  componentId: string;
-  trackerId: string;
-  observedStatus: WorkStatus;
-  owner: NexusWorkItemClaimOwner;
-}
-
-export type NexusWorkItemClaimSkipReason =
-  | "missing_tracker"
-  | "no_longer_ready"
-  | "already_in_progress"
-  | "claimed_by_another_owner"
-  | "selector_mismatch";
-
-export interface NexusWorkItemClaimSkippedCandidate {
-  id: string;
-  title: string;
-  componentId: string;
-  trackerId: string | null;
-  reason: NexusWorkItemClaimSkipReason;
-  observedStatus: WorkStatus | null;
-}
+import type {
+  NexusWorkItemClaimAuthority,
+  NexusWorkItemClaimObservation,
+  NexusWorkItemClaimOwner,
+  NexusWorkItemClaimOwnerInput,
+  NexusWorkItemClaimResult,
+  NexusWorkItemClaimSkipReason,
+  NexusWorkItemClaimSkippedCandidate,
+  NexusWorkItemStaleClaimPolicy,
+} from "./nexusWorkItemClaimAuthority.js";
+export type {
+  NexusWorkItemClaimAuthority,
+  NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  NexusWorkItemClaimAuthorityClaimCandidateResult,
+  NexusWorkItemClaimObservation,
+  NexusWorkItemClaimOwner,
+  NexusWorkItemClaimOwnerInput,
+  NexusWorkItemClaimResult,
+  NexusWorkItemClaimSkipReason,
+  NexusWorkItemClaimSkippedCandidate,
+  NexusWorkItemStaleClaimPolicy,
+} from "./nexusWorkItemClaimAuthority.js";
 
 export type NexusEligibleWorkClaimProviderFactory = (
   context: NexusEligibleWorkProviderContext,
@@ -102,48 +81,12 @@ export interface ClaimNexusEligibleWorkItemOptions {
   providerOptions?: CreateWorkTrackerProviderOptions;
   env?: NodeJS.ProcessEnv;
   owner: NexusWorkItemClaimOwnerInput;
+  claimAuthority?: NexusWorkItemClaimAuthority;
   leaseDurationMs?: number;
   staleClaimPolicy?: NexusWorkItemStaleClaimPolicy;
   leaseTokenFactory?: () => string;
   now?: () => Date | string;
 }
-
-export type NexusWorkItemClaimResult =
-  | {
-      status: "claimed";
-      workItem: WorkItem;
-      componentId: string;
-      trackerId: string;
-      owner: NexusWorkItemClaimOwner;
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-      reclaimedFrom?: NexusWorkItemClaimObservation;
-    }
-  | {
-      status: "no_claim";
-      reason:
-        | "no_eligible_candidate"
-        | "candidates_not_claimable"
-        | "active_claims"
-        | "stale_claims";
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-    }
-  | {
-      status: "lost_race";
-      reason: "verification_failed";
-      candidate: WorkItem;
-      observedWorkItem: WorkItem;
-      componentId: string;
-      trackerId: string;
-      owner: NexusWorkItemClaimOwner;
-      skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-      activeClaims?: NexusWorkItemClaimObservation[];
-      staleClaims?: NexusWorkItemClaimObservation[];
-      reclaimedFrom?: NexusWorkItemClaimObservation;
-    };
 
 const defaultLeaseDurationMs = 60 * 60 * 1000;
 const claimMarkerName = "dev-nexus-work-item-claim";
@@ -163,6 +106,47 @@ interface ClaimInspectionResult {
   activeClaims: ClaimInspectionCandidate[];
   staleClaims: ClaimInspectionCandidate[];
 }
+
+const optimisticTrackerClaimAuthority: NexusWorkItemClaimAuthority = {
+  kind: "optimistic-tracker",
+  async claimCandidate(options) {
+    assertWorkTrackerCapability(
+      options.provider,
+      "update",
+      "claim work items",
+    );
+    await options.provider.updateWorkItem(options.ref, {
+      status: "in_progress",
+      description: descriptionWithClaim(
+        options.freshWorkItem.description,
+        options.owner,
+      ),
+    });
+    const observed = await options.provider.getWorkItem(options.ref);
+    const observedClaim = activeWorkItemClaim(observed, options.now);
+    if (
+      observed.status !== "in_progress" ||
+      observedClaim?.leaseToken !== options.owner.leaseToken
+    ) {
+      return {
+        status: "lost_race",
+        observedWorkItem: observed,
+      };
+    }
+
+    if (options.provider.capabilities.comment) {
+      await options.provider.addComment(
+        options.ref,
+        claimComment(options.owner),
+      );
+    }
+
+    return {
+      status: "claimed",
+      workItem: observed,
+    };
+  },
+};
 
 export async function claimNexusEligibleWorkItem(
   options: ClaimNexusEligibleWorkItemOptions,
@@ -199,6 +183,8 @@ export async function claimNexusEligibleWorkItem(
     now: options.now,
   });
   const now = currentDate(options.now);
+  const claimAuthority =
+    options.claimAuthority ?? optimisticTrackerClaimAuthority;
   const activeClaims: NexusWorkItemClaimObservation[] = [];
   if (eligibleWork.eligibleWorkItems.length === 0) {
     const inspectedClaims = await inspectExistingWorkItemClaims({
@@ -241,7 +227,6 @@ export async function claimNexusEligibleWorkItem(
 
     const { provider, tracker } = resolved;
     assertWorkTrackerCapability(provider, "get", "verify claim candidates");
-    assertWorkTrackerCapability(provider, "update", "claim work items");
     const ref = workItemRefForCandidate(candidate);
     const fresh = await provider.getWorkItem(ref);
     const activeClaim = activeWorkItemClaim(fresh, now);
@@ -283,21 +268,21 @@ export async function claimNexusEligibleWorkItem(
       now,
       leaseDurationMs: options.leaseDurationMs ?? defaultLeaseDurationMs,
     });
-    await provider.updateWorkItem(ref, {
-      status: "in_progress",
-      description: descriptionWithClaim(fresh.description, owner),
+    const claimAttempt = await claimAuthority.claimCandidate({
+      candidate,
+      tracker,
+      provider,
+      ref,
+      freshWorkItem: fresh,
+      owner,
+      now,
     });
-    const observed = await provider.getWorkItem(ref);
-    const observedClaim = activeWorkItemClaim(observed, now);
-    if (
-      observed.status !== "in_progress" ||
-      observedClaim?.leaseToken !== owner.leaseToken
-    ) {
+    if (claimAttempt.status === "lost_race") {
       return {
         status: "lost_race",
         reason: "verification_failed",
         candidate: fresh,
-        observedWorkItem: observed,
+        observedWorkItem: claimAttempt.observedWorkItem,
         componentId: candidate.componentId,
         trackerId: tracker.id,
         owner,
@@ -306,13 +291,9 @@ export async function claimNexusEligibleWorkItem(
       };
     }
 
-    if (provider.capabilities.comment) {
-      await provider.addComment(ref, claimComment(owner));
-    }
-
     return {
       status: "claimed",
-      workItem: observed,
+      workItem: claimAttempt.workItem,
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,

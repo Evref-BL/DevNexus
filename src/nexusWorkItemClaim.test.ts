@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
   claimNexusEligibleWorkItem,
+  type NexusWorkItemClaimAuthority,
   type NexusEligibleWorkClaimProviderFactory,
 } from "./nexusWorkItemClaim.js";
 import {
@@ -94,6 +95,76 @@ describe("optimistic work item claims", () => {
     expect(provider.comments).toHaveLength(1);
     expect(provider.comments[0]?.body).toContain("host-a");
     expect(provider.comments[0]?.body).toContain("lease-token-1");
+  });
+
+  it("delegates ready candidate acquisition to an injected claim authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-16", "Authority claim", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    const authorityCalls: string[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityCalls.push(
+          `${input.tracker.id}:${input.candidate.id}:${input.owner.leaseToken}`,
+        );
+        expect(input.provider).toBe(provider);
+        expect(input.ref).toMatchObject({
+          provider: "github",
+          id: "github-16",
+        });
+        expect(input.freshWorkItem).toMatchObject({
+          id: "github-16",
+          status: "ready",
+        });
+
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+      },
+      leaseDurationMs: 30 * 60 * 1000,
+      leaseTokenFactory: () => "authority-token",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+        leaseToken: "authority-token",
+      },
+      workItem: {
+        id: "github-16",
+        status: "in_progress",
+      },
+    });
+    expect(authorityCalls).toEqual(["github:github-16:authority-token"]);
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
   });
 
   it("returns no-claim when no candidate matches the configured selector", async () => {
