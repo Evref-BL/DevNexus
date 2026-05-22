@@ -440,6 +440,91 @@ describe("optimistic work item claims", () => {
     expect(provider.comments[0]?.body).toContain("expired-token");
   });
 
+  it("delegates stale reclaim to an injected claim authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-17", "Authority reclaim", {
+        status: "in_progress",
+        labels: ["automation"],
+        description: claimBlock({
+          leaseToken: "expired-token",
+          hostId: "host-b",
+          agentId: "agent-b",
+          claimedAt: "2026-05-20T09:00:00.000Z",
+          expiresAt: "2026-05-20T09:30:00.000Z",
+        }),
+      }),
+    ]);
+    const authorityCalls: string[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not be used for stale reclaim");
+      },
+      async reclaimExpiredClaim(input) {
+        authorityCalls.push(
+          `${input.tracker.id}:${input.candidate.id}:` +
+            `${input.previousOwner.leaseToken}:${input.owner.leaseToken}`,
+        );
+        expect(input.provider).toBe(provider);
+        expect(input.ref).toMatchObject({
+          provider: "github",
+          id: "github-17",
+        });
+        expect(input.freshWorkItem).toMatchObject({
+          id: "github-17",
+          status: "in_progress",
+        });
+
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: { hostId: "host-a", agentId: "agent-a" },
+      leaseTokenFactory: () => "new-token",
+      staleClaimPolicy: "reclaim",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      workItem: {
+        id: "github-17",
+        status: "in_progress",
+      },
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+        leaseToken: "new-token",
+      },
+      reclaimedFrom: {
+        owner: {
+          leaseToken: "expired-token",
+        },
+      },
+    });
+    expect(authorityCalls).toEqual([
+      "github:github-17:expired-token:new-token",
+    ]);
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
   it("refuses to reclaim active claims even when reclaim is enabled", async () => {
     const projectRoot = makeTempDir("dev-nexus-claim-");
     const config = projectConfig();

@@ -220,17 +220,19 @@ describe("memory work item claim authority", () => {
 
     await expect(
       authority.reclaimExpiredClaim({
-        key: stale.key,
-        owner: owner("new-token", {
-          claimedAt: "2026-05-22T10:31:00.000Z",
-          expiresAt: "2026-05-22T11:01:00.000Z",
+        ...claimInput({
+          id: "github-4",
+          owner: owner("new-token", {
+            claimedAt: "2026-05-22T10:31:00.000Z",
+            expiresAt: "2026-05-22T11:01:00.000Z",
+          }),
+          now: "2026-05-22T10:31:00.000Z",
         }),
-        workItem: workItem("github-4"),
-        now: date("2026-05-22T10:31:00.000Z"),
+        previousOwner: stale.owner,
       }),
     ).resolves.toMatchObject({
       status: "claimed",
-      claim: {
+      authorityClaim: {
         owner: {
           leaseToken: "new-token",
         },

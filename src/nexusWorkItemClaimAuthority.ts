@@ -133,6 +133,11 @@ export interface NexusWorkItemClaimAuthorityClaimCandidateOptions {
   now: Date;
 }
 
+export interface NexusWorkItemClaimAuthorityReclaimExpiredClaimOptions
+  extends NexusWorkItemClaimAuthorityClaimCandidateOptions {
+  previousOwner: NexusWorkItemClaimOwner;
+}
+
 export type NexusWorkItemClaimAuthorityClaimCandidateResult =
   | {
       status: "claimed";
@@ -180,13 +185,18 @@ export type NexusWorkItemClaimAuthorityReleaseResult =
 export type NexusWorkItemClaimAuthorityReclaimResult =
   | {
       status: "claimed";
-      claim: NexusWorkItemClaimAuthorityRecord;
       workItem: WorkItem;
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
+    }
+  | {
+      status: "lost_race";
+      observedWorkItem: WorkItem;
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
     }
   | {
       status: "rejected";
       reason: "missing_claim" | "active_claim" | "released";
-      claim?: NexusWorkItemClaimAuthorityRecord;
+      authorityClaim?: NexusWorkItemClaimAuthorityRecord;
     };
 
 export interface NexusWorkItemClaimAuthorityInspectOptions {
@@ -221,12 +231,9 @@ export interface NexusWorkItemClaimAuthority {
     leaseToken: string;
     now: Date;
   }): Promise<NexusWorkItemClaimAuthorityReleaseResult>;
-  reclaimExpiredClaim?(options: {
-    key: NexusWorkItemClaimAuthorityKey;
-    owner: NexusWorkItemClaimOwner;
-    workItem: WorkItem;
-    now: Date;
-  }): Promise<NexusWorkItemClaimAuthorityReclaimResult>;
+  reclaimExpiredClaim?(
+    options: NexusWorkItemClaimAuthorityReclaimExpiredClaimOptions,
+  ): Promise<NexusWorkItemClaimAuthorityReclaimResult>;
   inspectClaims?(
     options: NexusWorkItemClaimAuthorityInspectOptions,
   ): Promise<NexusWorkItemClaimAuthorityInspectResult>;
@@ -363,13 +370,11 @@ export class NexusMemoryWorkItemClaimAuthority
     };
   }
 
-  async reclaimExpiredClaim(options: {
-    key: NexusWorkItemClaimAuthorityKey;
-    owner: NexusWorkItemClaimOwner;
-    workItem: WorkItem;
-    now: Date;
-  }): Promise<NexusWorkItemClaimAuthorityReclaimResult> {
-    const existing = this.claims.get(serializedClaimAuthorityKey(options.key));
+  async reclaimExpiredClaim(
+    options: NexusWorkItemClaimAuthorityReclaimExpiredClaimOptions,
+  ): Promise<NexusWorkItemClaimAuthorityReclaimResult> {
+    const key = nexusWorkItemClaimAuthorityKey(options);
+    const existing = this.claims.get(serializedClaimAuthorityKey(key));
     if (!existing) {
       return {
         status: "rejected",
@@ -380,19 +385,19 @@ export class NexusMemoryWorkItemClaimAuthority
       return {
         status: "rejected",
         reason: "released",
-        claim: cloneClaimAuthorityRecord(existing),
+        authorityClaim: cloneClaimAuthorityRecord(existing),
       };
     }
     if (!claimIsExpired(existing, options.now)) {
       return {
         status: "rejected",
         reason: "active_claim",
-        claim: cloneClaimAuthorityRecord(existing),
+        authorityClaim: cloneClaimAuthorityRecord(existing),
       };
     }
 
     const claim = this.createClaim({
-      key: options.key,
+      key,
       owner: options.owner,
       now: options.now,
       reclaimedFrom: cloneClaimAuthorityRecord(existing),
@@ -400,8 +405,8 @@ export class NexusMemoryWorkItemClaimAuthority
 
     return {
       status: "claimed",
-      claim: cloneClaimAuthorityRecord(claim),
-      workItem: claimedWorkItem(options.workItem),
+      authorityClaim: cloneClaimAuthorityRecord(claim),
+      workItem: claimedWorkItem(options.freshWorkItem),
     };
   }
 

@@ -63,6 +63,7 @@ export type {
   NexusWorkItemClaimAuthorityInspectResult,
   NexusWorkItemClaimAuthorityKey,
   NexusWorkItemClaimAuthorityRecord,
+  NexusWorkItemClaimAuthorityReclaimExpiredClaimOptions,
   NexusWorkItemClaimAuthorityReclaimResult,
   NexusWorkItemClaimAuthorityReleaseResult,
   NexusWorkItemClaimAuthorityState,
@@ -151,6 +152,43 @@ const optimisticTrackerClaimAuthority: NexusWorkItemClaimAuthority = {
       await options.provider.addComment(
         options.ref,
         claimComment(options.owner),
+      );
+    }
+
+    return {
+      status: "claimed",
+      workItem: observed,
+    };
+  },
+  async reclaimExpiredClaim(options) {
+    assertWorkTrackerCapability(
+      options.provider,
+      "update",
+      "reclaim stale work item claims",
+    );
+    await options.provider.updateWorkItem(options.ref, {
+      status: "in_progress",
+      description: descriptionWithClaim(
+        options.freshWorkItem.description,
+        options.owner,
+      ),
+    });
+    const observed = await options.provider.getWorkItem(options.ref);
+    const observedClaim = activeWorkItemClaim(observed, options.now);
+    if (
+      observed.status !== "in_progress" ||
+      observedClaim?.leaseToken !== options.owner.leaseToken
+    ) {
+      return {
+        status: "lost_race",
+        observedWorkItem: observed,
+      };
+    }
+
+    if (options.provider.capabilities.comment) {
+      await options.provider.addComment(
+        options.ref,
+        reclaimComment(options.owner, options.previousOwner),
       );
     }
 
@@ -453,7 +491,6 @@ async function maybeReclaimStaleClaim(options: {
 
   const staleClaim = options.inspection.staleClaims[0]!;
   const { provider, ref, workItem, candidate, tracker } = staleClaim;
-  assertWorkTrackerCapability(provider, "update", "reclaim stale work item claims");
   const owner = claimOwner({
     input: options.options.owner,
     leaseToken:
@@ -462,45 +499,54 @@ async function maybeReclaimStaleClaim(options: {
     leaseDurationMs:
       options.options.leaseDurationMs ?? defaultLeaseDurationMs,
   });
-  await provider.updateWorkItem(ref, {
-    status: "in_progress",
-    description: descriptionWithClaim(workItem.description, owner),
+  const claimAuthority =
+    options.options.claimAuthority ?? optimisticTrackerClaimAuthority;
+  if (!claimAuthority.reclaimExpiredClaim) {
+    return null;
+  }
+  const reclaimAttempt = await claimAuthority.reclaimExpiredClaim({
+    projectId: options.options.projectConfig.id,
+    candidate,
+    tracker,
+    provider,
+    ref,
+    freshWorkItem: workItem,
+    previousOwner: staleClaim.observation.owner,
+    owner,
+    now: options.now,
   });
-  const observed = await provider.getWorkItem(ref);
-  const observedClaim = activeWorkItemClaim(observed, options.now);
   const activeClaims = options.activeClaims ?? [];
   const staleClaims = options.inspection.staleClaims.map((item) => item.observation);
-  if (
-    observed.status !== "in_progress" ||
-    observedClaim?.leaseToken !== owner.leaseToken
-  ) {
+  if (reclaimAttempt.status === "rejected") {
+    return null;
+  }
+  if (reclaimAttempt.status === "lost_race") {
     return {
       status: "lost_race",
       reason: "verification_failed",
       candidate: workItem,
-      observedWorkItem: observed,
+      observedWorkItem: reclaimAttempt.observedWorkItem,
       componentId: candidate.componentId,
       trackerId: tracker.id,
       owner,
+      ...(reclaimAttempt.authorityClaim
+        ? { authorityClaim: reclaimAttempt.authorityClaim }
+        : {}),
       skippedCandidates: options.skippedCandidates,
       reclaimedFrom: staleClaim.observation,
       ...claimDiagnosticsFields({ activeClaims, staleClaims }),
     };
   }
 
-  if (provider.capabilities.comment) {
-    await provider.addComment(
-      ref,
-      reclaimComment(owner, staleClaim.observation.owner),
-    );
-  }
-
   return {
     status: "claimed",
-    workItem: observed,
+    workItem: reclaimAttempt.workItem,
     componentId: candidate.componentId,
     trackerId: tracker.id,
     owner,
+    ...(reclaimAttempt.authorityClaim
+      ? { authorityClaim: reclaimAttempt.authorityClaim }
+      : {}),
     skippedCandidates: options.skippedCandidates,
     reclaimedFrom: staleClaim.observation,
     ...claimDiagnosticsFields({ activeClaims, staleClaims }),

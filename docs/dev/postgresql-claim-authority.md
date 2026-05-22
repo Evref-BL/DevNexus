@@ -150,9 +150,10 @@ Progress:
 - 2026-05-22: Slice 1B added the in-memory authority contract for active
   claims, duplicate rejection, verify, heartbeat, release, stale inspection,
   reclaim, and fencing-token increments.
-- Remaining Slice 1 work: decide whether stale reclaim in
-  `claimNexusEligibleWorkItem` should route through authority backends before
-  introducing PostgreSQL.
+- 2026-05-22: Slice 1C routed stale reclaim in
+  `claimNexusEligibleWorkItem` through the authority backend while preserving
+  the optimistic tracker default behavior.
+- Slice 1 is ready to feed the PostgreSQL backend slice.
 
 ### Slice 2: PostgreSQL Backend Contract
 
