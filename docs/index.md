@@ -30,8 +30,8 @@ publication rules agents need before they edit code.
   and workspace repository hosting.
 - [Multi-tracker work tracking](user/multi-tracker.md) covers local and
   provider-backed trackers.
-- [Dashboard cockpit UX research](user/dashboard-cockpit-ux-research.md)
-  records source-backed design constraints for the host and workspace cockpit.
+- [Dashboard cockpit](user/dashboard/index.md) covers the host dashboard,
+  workspace drill-downs, HITL actions, plugins, and embeddable data contracts.
 
 ## Project Internals
 
