@@ -207,6 +207,11 @@ npm install
 npm run check
 ```
 
+`npm run check` includes `npm run smoke:onboarding`, which packs the local
+package, installs it into a fresh temporary npm project, initializes a first
+workspace from an answer file, and verifies `workspace status` plus `setup
+check`.
+
 DevNexus is infrastructure. It gives agents a shared operating context; it does
 not replace user judgment, workspace ownership, verification, or publication
 policy.
