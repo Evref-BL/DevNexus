@@ -76,7 +76,13 @@ async function loadDashboardClientTestHooks(): Promise<{
     lanes: Array<{ detail?: string; index: number; label: string; shortLabel: string }>,
   ) => string;
   renderPlugins: (plugins: unknown) => string;
-  renderTrackedWork: (snapshot: unknown) => string;
+  renderTrackedWork: (snapshot: unknown, selectedId?: string | null) => string;
+  selectedDetail: (snapshot: unknown, selectedId?: string | null) => {
+    actions: Array<{ href: string; label: string }>;
+    chat: { prompt: string; targetId?: string; title: string } | null;
+    facts: Array<[string, string]>;
+    title: string;
+  };
   timelineLanes: (snapshot: unknown) => Array<{
     detail?: string;
     index: number;
@@ -97,7 +103,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderTrackedWork, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderLaneKey, renderPlugins, renderTrackedWork, selectedDetail, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1279,7 +1285,7 @@ describe("nexus dashboard", () => {
   it("renders tracked work as compact issue cards", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
-    const html = hooks.renderTrackedWork({
+    const snapshot = {
       trackedWork: {
         readyCount: 1,
         importCandidateCount: 1,
@@ -1310,14 +1316,40 @@ describe("nexus dashboard", () => {
           },
         ],
       },
-    });
+    };
+    const html = hooks.renderTrackedWork(snapshot, "tracked-work:dev-nexus:github-42");
 
     expect(html).toContain("Issues and Work Items");
     expect(html).toContain("1 ready · 1 import · 0 stale");
     expect(html).toContain("Add cockpit issue lane");
     expect(html).toContain("kind-ready");
+    expect(html).toContain("selected");
+    expect(html).toContain('data-select-id="tracked-work:dev-nexus:github-42"');
     expect(html).toContain("provider-github kind-issue");
     expect(html).toContain("#42: cockpit issue lane");
+
+    const detail = hooks.selectedDetail({
+      ...snapshot,
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      events: [],
+      weave: {
+        nodes: [],
+      },
+    }, "tracked-work:dev-nexus:github-42");
+    expect(detail.title).toBe("Add cockpit issue lane");
+    expect(detail.actions).toEqual([
+      expect.objectContaining({
+        href: "https://github.com/Evref-BL/DevNexus/issues/42",
+      }),
+    ]);
+    expect(detail.chat).toMatchObject({
+      targetId: "tracked-work:dev-nexus:github-42",
+      title: "Continue Add cockpit issue lane",
+    });
+    expect(detail.chat?.prompt).toContain("Continue cockpit item: Add cockpit issue lane.");
   });
 
   it("generates provider-neutral thread prompts without duplicate punctuation", async () => {
