@@ -359,6 +359,18 @@ describe("nexus skills", () => {
       "routing map for substantial led work",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
+      "Sizing And Routing Call",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "largest coherent vertical slice",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Product Backlog Item or story",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
+      "Estimate the shape of the work",
+    );
+    expect(skillMarkdown["take-the-lead"]).toContain(
       "recommended next action",
     );
     expect(skillMarkdown["take-the-lead"]).toContain(
