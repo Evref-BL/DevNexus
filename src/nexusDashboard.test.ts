@@ -345,6 +345,7 @@ function hostWorkspace(
     pluginCount: 0,
     automationStatus: "idle",
     eligibleWorkCount: 0,
+    firstReadyWorkSelectionId: null,
     updatedAt: "2026-05-21T10:00:00.000Z",
     error: null,
     ...overrides,
@@ -891,6 +892,7 @@ describe("nexus dashboard", () => {
         id: "ready",
         name: "Ready Workspace",
         eligibleWorkCount: 2,
+        firstReadyWorkSelectionId: "tracked-work:primary:github-42",
         tone: "active",
       }),
       hostWorkspace({
@@ -931,6 +933,7 @@ describe("nexus dashboard", () => {
             label: "Review workspace",
             kind: "review",
             workspaceId: "broken",
+            targetSelectionId: null,
           },
         }),
         expect.objectContaining({
@@ -952,6 +955,7 @@ describe("nexus dashboard", () => {
             label: "Review work",
             kind: "start-work",
             workspaceId: "ready",
+            targetSelectionId: "tracked-work:primary:github-42",
           },
         }),
         expect.objectContaining({
@@ -961,6 +965,7 @@ describe("nexus dashboard", () => {
             label: "Rescue changes",
             kind: "rescue",
             workspaceId: "dirty",
+            targetSelectionId: null,
           },
         }),
       ]),
@@ -1018,6 +1023,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("host-workspaces");
     expect(module).toContain("dn-host-sticky-panel");
     expect(module).toContain("data-workspace-id");
+    expect(module).toContain("data-workspace-selection-id");
+    expect(module).toContain("targetSelectionId");
     expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
     expect(module).toContain("renderPlugins");

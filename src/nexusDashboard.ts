@@ -495,6 +495,7 @@ export interface NexusDashboardHostWorkspaceRecord {
   pluginCount: number;
   automationStatus: string | null;
   eligibleWorkCount: number | null;
+  firstReadyWorkSelectionId: string | null;
   updatedAt: string | null;
   error: NexusDashboardDataError | null;
 }
@@ -511,6 +512,7 @@ export interface NexusDashboardHostPrimaryAction {
   label: string;
   kind: "open-workspace" | "review" | "rescue" | "start-work";
   workspaceId: string;
+  targetSelectionId: string | null;
 }
 
 export interface NexusDashboardHostActionItem {
@@ -952,6 +954,7 @@ async function dashboardHostWorkspaceRecord(options: {
       pluginCount: 0,
       automationStatus: null,
       eligibleWorkCount: null,
+      firstReadyWorkSelectionId: null,
       updatedAt: null,
       error: localFacts.error,
     };
@@ -1025,9 +1028,22 @@ async function dashboardHostWorkspaceRecord(options: {
     pluginCount: value.plugins.enabledCount,
     automationStatus: automation.value?.status ?? null,
     eligibleWorkCount: eligibleWork.value?.eligibleWorkItemCount ?? null,
+    firstReadyWorkSelectionId: firstReadyWorkSelectionId(eligibleWork.value),
     updatedAt,
     error: null,
   };
+}
+
+function firstReadyWorkSelectionId(
+  eligibleWork: NexusEligibleWorkSummary | null,
+): string | null {
+  const firstItem = eligibleWork?.components
+    .flatMap((component) => component.workItems)
+    .find((item) => item.selectable !== false) ??
+    eligibleWork?.components.flatMap((component) => component.workItems)[0];
+  return firstItem
+    ? `tracked-work:${firstItem.componentId}:${firstItem.id}`
+    : null;
 }
 
 function dashboardHostWorkspaceSummary(value: {
@@ -1135,6 +1151,9 @@ function dashboardHostActionItems(
             ? "start-work"
             : "review",
         workspaceId: workspace.id,
+        targetSelectionId: kind === "ready-work"
+          ? workspace.firstReadyWorkSelectionId
+          : null,
       },
       providerAction: null,
     });
