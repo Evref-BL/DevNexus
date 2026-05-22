@@ -74,6 +74,7 @@ export interface NexusInitiativeDeliveryProviderEvidenceSummary {
   mergeability: NexusPublicationProviderEvidence["mergeability"];
   branchPolicy: NexusPublicationProviderBranchPolicy | null;
   baseStatus: NexusPublicationProviderBaseStatus | null;
+  draft: boolean | null;
   stale: boolean;
   unknown: boolean;
   collectedAt: string | null;
@@ -302,6 +303,7 @@ function providerEvidenceSummary(
     mergeability: evidence?.mergeability ?? null,
     branchPolicy: evidence?.branchPolicy ?? null,
     baseStatus: evidence?.baseStatus ?? null,
+    draft: evidence ? booleanMetadata(evidence.metadata, "draft") : null,
     stale: evidence?.stale ?? false,
     unknown: evidence?.unknown ?? false,
     collectedAt: evidence?.collectedAt ?? null,
@@ -343,14 +345,6 @@ function classifyItem(options: {
       reasons,
     };
   }
-  if (evidence.branchPolicy === "blocked") {
-    reasons.push("branch policy is blocked");
-    return {
-      status: "blocked",
-      nextAction: "resolve_branch_policy",
-      reasons,
-    };
-  }
   if (evidence.checksStatus === "failed" || evidence.checksStatus === "missing") {
     reasons.push(evidence.checksMessage);
     return {
@@ -383,6 +377,9 @@ function classifyItem(options: {
     options.initiativeFinalPullRequest &&
     evidence.reviewState !== "approved"
   ) {
+    if (evidence.draft === true) {
+      reasons.push("pull request is draft");
+    }
     reasons.push(
       `pull request review state is ${evidence.reviewState ?? "unknown"}`,
     );
@@ -392,12 +389,30 @@ function classifyItem(options: {
       reasons,
     };
   }
+  if (evidence.branchPolicy === "blocked") {
+    reasons.push(
+      evidence.draft === true ? "pull request is draft" : "branch policy is blocked",
+    );
+    return {
+      status: "blocked",
+      nextAction: "resolve_branch_policy",
+      reasons,
+    };
+  }
 
   return {
     status: "ready",
     nextAction: "ready_for_final_publication",
     reasons,
   };
+}
+
+function booleanMetadata(
+  metadata: Record<string, unknown>,
+  key: string,
+): boolean | null {
+  const value = metadata[key];
+  return typeof value === "boolean" ? value : null;
 }
 
 function summarizeItems(

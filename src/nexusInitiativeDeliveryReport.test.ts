@@ -142,6 +142,59 @@ describe("initiative delivery report", () => {
       reasons: [],
     });
   });
+
+  it("treats draft final pull requests as review-needed before publication policy", () => {
+    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+
+    const report = buildNexusInitiativeDeliveryReport({
+      projectRoot,
+      componentId: "primary",
+      providerEvidence: [
+        {
+          provider: "github",
+          sourceKind: "pull_request",
+          reviewTarget: 243,
+          headBranch: "feat/codex-goals",
+          targetBranch: "main",
+          intendedCiTier: "remote_smoke",
+          reviewState: "waiting_for_approval",
+          mergeability: "mergeable",
+          branchPolicy: "blocked",
+          baseStatus: "current",
+          metadata: {
+            draft: true,
+          },
+          checks: [
+            { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+          ],
+        },
+      ],
+    });
+
+    expect(report.summary).toMatchObject({
+      itemCount: 1,
+      reviewNeededCount: 1,
+      blockedCount: 0,
+      readyCount: 0,
+    });
+    expect(report.nextAction).toBe("request_review");
+    expect(report.items[0]).toMatchObject({
+      status: "review_needed",
+      nextAction: "request_review",
+      providerEvidence: {
+        checksStatus: "success",
+        reviewState: "waiting_for_approval",
+        branchPolicy: "blocked",
+        draft: true,
+      },
+      reasons: [
+        "pull request is draft",
+        "pull request review state is waiting_for_approval",
+      ],
+    });
+  });
 });
 
 function projectConfig(): NexusProjectConfig {

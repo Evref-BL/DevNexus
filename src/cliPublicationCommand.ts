@@ -1608,7 +1608,7 @@ function printPublicationInitiativeReport(
     );
     writeLine(
       stdout,
-      `    evidence=${evidence.provider ?? "none"} ${evidence.sourceKind ?? "no-source"} checks=${evidence.checksStatus} review=${evidence.reviewState ?? "unknown"} merge=${evidence.mergeability ?? "unknown"} base=${evidence.baseStatus ?? "unknown"} policy=${evidence.branchPolicy ?? "unknown"}`,
+      `    evidence=${evidence.provider ?? "none"} ${evidence.sourceKind ?? "no-source"} checks=${evidence.checksStatus} review=${evidence.reviewState ?? "unknown"} merge=${evidence.mergeability ?? "unknown"} base=${evidence.baseStatus ?? "unknown"} policy=${evidence.branchPolicy ?? "unknown"} draft=${evidence.draft ?? "unknown"}`,
     );
     if (evidence.reviewTarget) {
       writeLine(
