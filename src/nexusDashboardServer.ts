@@ -9,6 +9,8 @@ import {
   buildNexusDashboardHostSnapshot,
   buildNexusDashboardSnapshot,
   type BuildNexusDashboardSnapshotOptions,
+  type NexusDashboardHostSnapshot,
+  type NexusDashboardHostWorkspaceRecord,
   type NexusDashboardSnapshot,
 } from "./nexusDashboard.js";
 import {
@@ -37,6 +39,22 @@ export interface NexusDashboardServerHandle {
   url: string;
   server: Server;
   close: () => Promise<void>;
+}
+
+interface DashboardWorkspaceSelection {
+  readonly snapshotOptions: BuildNexusDashboardSnapshotOptions;
+  readonly baseHost?: NexusDashboardHostSnapshot;
+}
+
+class NexusDashboardRouteError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "NexusDashboardRouteError";
+  }
 }
 
 export async function startNexusDashboardServer(
@@ -162,7 +180,9 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-signal-top, .dn-card-title, .dn-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }",
     ".dn-host-panel { margin: 16px 0; background: linear-gradient(135deg, color-mix(in srgb, var(--dn-surface) 92%, var(--dn-branch-5) 8%), var(--dn-surface)); }",
     ".dn-workspace-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }",
-    ".dn-workspace-card { --dn-workspace-accent: var(--dn-neutral); display: grid; gap: 7px; min-width: 0; padding: 11px; border: 1px solid color-mix(in srgb, var(--dn-workspace-accent) 34%, var(--dn-border)); border-left: 5px solid var(--dn-workspace-accent); border-radius: 8px; background: color-mix(in srgb, var(--dn-surface-muted) 82%, var(--dn-workspace-accent) 18%); }",
+    ".dn-workspace-card { --dn-workspace-accent: var(--dn-neutral); display: grid; gap: 7px; min-width: 0; padding: 11px; border: 1px solid color-mix(in srgb, var(--dn-workspace-accent) 34%, var(--dn-border)); border-left: 5px solid var(--dn-workspace-accent); border-radius: 8px; color: inherit; background: color-mix(in srgb, var(--dn-surface-muted) 82%, var(--dn-workspace-accent) 18%); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }",
+    ".dn-workspace-card:hover { transform: translateY(-1px); border-color: var(--dn-workspace-accent); }",
+    ".dn-workspace-card.selected { box-shadow: 0 0 0 2px color-mix(in srgb, var(--dn-workspace-accent) 26%, transparent) inset; }",
     ".dn-workspace-card.tone-good { --dn-workspace-accent: var(--dn-good); } .dn-workspace-card.tone-active { --dn-workspace-accent: var(--dn-active); } .dn-workspace-card.tone-warn { --dn-workspace-accent: var(--dn-warn); } .dn-workspace-card.tone-danger { --dn-workspace-accent: var(--dn-danger); }",
     ".dn-workspace-card strong { min-width: 0; overflow: hidden; color: var(--dn-strong); text-overflow: ellipsis; white-space: nowrap; }",
     ".dn-workspace-card p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.8rem; }",
@@ -245,16 +265,21 @@ export function renderNexusDashboardClientModule(): string {
     "@media (max-width: 680px) { .dn-shell { padding: 12px; } .dn-header { grid-template-columns: 1fr; padding: 20px; } .dn-header-actions { justify-items: stretch; } .dn-meta { min-width: 0; } .dn-theme-toggle button { min-width: 0; flex: 1; } .dn-signals { grid-template-columns: 1fr; } .dn-panel-heading { align-items: flex-start; flex-direction: column; } .dn-history-item { grid-template-columns: minmax(0, 1fr) auto; } .dn-history-detail { display: none; } .dn-detail-grid { grid-template-columns: 1fr; } }",
     "`;",
     "",
-    "export async function fetchDevNexusDashboard(baseUrl = '') {",
-    "  const response = await fetch(`${baseUrl}/api/dashboard`, { cache: 'no-store' });",
+    "export async function fetchDevNexusDashboard(baseUrl = '', workspaceId = '') {",
+    "  const response = await fetch(`${baseUrl}/api/dashboard${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
     "  if (!response.ok) throw new Error(`Dashboard API returned ${response.status}`);",
     "  return response.json();",
     "}",
     "",
-    "export async function fetchDevNexusDashboardHost(baseUrl = '') {",
-    "  const response = await fetch(`${baseUrl}/api/host`, { cache: 'no-store' });",
+    "export async function fetchDevNexusDashboardHost(baseUrl = '', workspaceId = '') {",
+    "  const response = await fetch(`${baseUrl}/api/host${workspaceQuery(workspaceId)}`, { cache: 'no-store' });",
     "  if (!response.ok) throw new Error(`Host API returned ${response.status}`);",
     "  return response.json();",
+    "}",
+    "",
+    "function workspaceQuery(workspaceId) {",
+    "  const id = normalizeWorkspaceId(workspaceId);",
+    "  return id ? `?workspace=${encodeURIComponent(id)}` : '';",
     "}",
     "",
     "export function mountDevNexusDashboard(root, options = {}) {",
@@ -264,6 +289,7 @@ export function renderNexusDashboardClientModule(): string {
     "  const refreshMs = options.refreshMs ?? defaultRefreshMs;",
     "  const hostRefreshMs = options.hostRefreshMs ?? Math.max(refreshMs * 4, 60000);",
     "  let themeMode = normalizeThemeMode(options.theme ?? readStoredThemeMode());",
+    "  let selectedWorkspaceId = normalizeWorkspaceId(options.workspaceId ?? readWorkspaceIdFromLocation());",
     "  let selectedId = null;",
     "  let latestSnapshot = null;",
     "  let latestHost = null;",
@@ -294,26 +320,44 @@ export function renderNexusDashboardClientModule(): string {
     "    selectedId = String(nextSelectedId ?? '');",
     "    renderCurrent();",
     "  }",
+    "  function setWorkspaceId(nextWorkspaceId) {",
+    "    if (disposed) return;",
+    "    const normalized = normalizeWorkspaceId(nextWorkspaceId);",
+    "    if (normalized === selectedWorkspaceId) return;",
+    "    selectedWorkspaceId = normalized;",
+    "    selectedId = null;",
+    "    latestSnapshot = null;",
+    "    latestError = null;",
+    "    lastHostRefreshAt = 0;",
+    "    writeWorkspaceIdToLocation(selectedWorkspaceId);",
+    "    renderCurrent();",
+    "    void refresh(true);",
+    "  }",
     "  function renderRoot(markup) {",
     "    root.innerHTML = markup;",
     "    bindThemeControls(root, setThemeMode);",
     "    bindSelectionControls(root, setSelectedId);",
-    "    bindLocalActions(root, baseUrl, actionToken);",
+    "    bindWorkspaceControls(root, setWorkspaceId);",
+    "    bindLocalActions(root, baseUrl, actionToken, selectedWorkspaceId);",
     "  }",
     "  function renderCurrent() {",
     "    if (disposed) return;",
     "    if (latestSnapshot) {",
-    "      renderRoot(renderDashboard(latestSnapshot, themeMode, selectedId, latestHost));",
+    "      renderRoot(renderDashboard(latestSnapshot, themeMode, selectedId, latestHost, selectedWorkspaceId));",
     "    } else if (latestError) {",
     "      renderRoot(renderError(latestError, themeMode));",
+    "    } else {",
+    "      renderRoot(renderLoading(themeMode, latestHost, selectedWorkspaceId));",
     "    }",
     "  }",
-    "  async function refresh() {",
-    "    if (inFlight) return;",
+    "  async function refresh(force = false) {",
+    "    if (inFlight && !force) return;",
     "    inFlight = true;",
     "    try {",
     "      const shouldRefreshHost = !latestHost || Date.now() - lastHostRefreshAt >= hostRefreshMs;",
-    "      const snapshot = await fetchDevNexusDashboard(baseUrl);",
+    "      const workspaceId = selectedWorkspaceId;",
+    "      const snapshot = await fetchDevNexusDashboard(baseUrl, workspaceId);",
+    "      if (workspaceId !== selectedWorkspaceId) return;",
     "      latestSnapshot = snapshot;",
     "      latestError = null;",
     "      if (!findSelectableById(snapshot, selectedId)) selectedId = defaultSelectedId(snapshot);",
@@ -331,7 +375,10 @@ export function renderNexusDashboardClientModule(): string {
     "    if (hostInFlight) return;",
     "    hostInFlight = true;",
     "    try {",
-    "      latestHost = await fetchDevNexusDashboardHost(baseUrl);",
+    "      const workspaceId = selectedWorkspaceId;",
+    "      const host = await fetchDevNexusDashboardHost(baseUrl, workspaceId);",
+    "      if (workspaceId !== selectedWorkspaceId) return;",
+    "      latestHost = host;",
     "      lastHostRefreshAt = Date.now();",
     "      renderCurrent();",
     "    } catch {",
@@ -340,6 +387,7 @@ export function renderNexusDashboardClientModule(): string {
     "      hostInFlight = false;",
     "    }",
     "  }",
+    "  renderCurrent();",
     "  void refresh();",
     "  const timer = setInterval(refresh, refreshMs);",
     "  return { dispose() { disposed = true; clearInterval(timer); if (systemThemeQuery?.removeEventListener) systemThemeQuery.removeEventListener('change', onSystemThemeChange); else if (systemThemeQuery?.removeListener) systemThemeQuery.removeListener(onSystemThemeChange); } };",
@@ -353,14 +401,14 @@ export function renderNexusDashboardClientModule(): string {
     "  document.head.appendChild(style);",
     "}",
     "",
-    "function renderDashboard(snapshot, themeMode, selectedId, host) {",
+    "function renderDashboard(snapshot, themeMode, selectedId, host, selectedWorkspaceId = '') {",
     "  const activeSelection = findSelectableById(snapshot, selectedId) ? selectedId : defaultSelectedId(snapshot);",
     "  return `<div class=\"dn-shell\">",
     "    <header class=\"dn-header\">",
     "      <div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(snapshot.project.name)}</h1><p>${escapeHtml(snapshot.summary)}</p></div>",
     "      <div class=\"dn-header-actions\"><div class=\"dn-meta\"><span>Generated</span><strong>${escapeHtml(formatTime(snapshot.generatedAt))}</strong><span>Root</span><strong title=\"${escapeHtml(snapshot.project.root)}\">${escapeHtml(compactPath(snapshot.project.root))}</strong></div>${renderThemeToggle(themeMode)}</div>",
     "    </header>",
-    "    ${renderHostOverview(host, snapshot)}",
+    "    ${renderHostOverview(host, snapshot, selectedWorkspaceId)}",
     "    ${renderSignals(snapshot.signals, activeSelection)}",
     "    <section class=\"dn-main-grid\">",
     "      <div class=\"dn-work-stack\">${renderWorkHistory(snapshot, activeSelection)}${renderThreadInbox(snapshot)}</div>",
@@ -375,20 +423,26 @@ export function renderNexusDashboardClientModule(): string {
     "  </div>`;",
     "}",
     "",
-    "function renderHostOverview(host, snapshot) {",
+    "function renderLoading(themeMode, host, selectedWorkspaceId = '') {",
+    "  const title = selectedWorkspaceId ? 'Switching workspace' : 'Loading cockpit';",
+    "  return `<div class=\"dn-shell\"><header class=\"dn-header\"><div><span class=\"dn-eyebrow\">DevNexus cockpit</span><h1>${escapeHtml(title)}</h1><p>Loading workspace state.</p></div><div class=\"dn-header-actions\">${renderThemeToggle(themeMode)}</div></header>${renderHostOverview(host, null, selectedWorkspaceId)}<section class=\"dn-panel\" style=\"margin-top:16px\"><h2>${escapeHtml(title)}</h2><p>Reading project state, threads, plugins, and approvals.</p></section></div>`;",
+    "}",
+    "",
+    "function renderHostOverview(host, snapshot, selectedWorkspaceId = '') {",
     "  const workspaces = host?.workspaces ?? [];",
     "  if (!workspaces.length) return '';",
     "  const count = `${host.needsAttentionCount ?? 0} need attention · ${host.workspaceCount ?? workspaces.length} workspaces`;",
-    "  return `<section class=\"dn-panel dn-host-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>Workspaces</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot)).join('')}</div></section>`;",
+    "  return `<section class=\"dn-panel dn-host-panel\"><div class=\"dn-panel-heading\"><div><span class=\"dn-eyebrow\">Host cockpit</span><h2>Workspaces</h2></div><span class=\"dn-count\">${escapeHtml(count)}</span></div><div class=\"dn-workspace-list\">${workspaces.slice(0, 8).map((workspace) => renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId)).join('')}</div></section>`;",
     "}",
     "",
-    "function renderWorkspaceCard(workspace, snapshot) {",
+    "function renderWorkspaceCard(workspace, snapshot, selectedWorkspaceId = '') {",
     "  const current = workspace.current ? 'current' : (workspace.registered ? 'registered' : 'local');",
     "  const status = workspace.error ? 'unavailable' : workspaceToneLabel(workspace);",
     "  const detail = formatDisplayText(workspace.summary);",
-    "  const title = workspace.current ? snapshot.project.name : workspace.name;",
+    "  const title = workspace.current && snapshot ? snapshot.project.name : workspace.name;",
     "  const meta = [`${workspace.componentCount} components`, `${workspace.needsDecisionCount} active HITL`, `${workspace.threadCount} active`, `${workspace.pluginCount} plugins`];",
-    "  return `<article class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></article>`;",
+    "  const selected = workspace.id === selectedWorkspaceId || (!selectedWorkspaceId && workspace.current) ? 'selected' : '';",
+    "  return `<button class=\"dn-workspace-card tone-${escapeAttribute(workspace.tone)} ${selected}\" type=\"button\" data-workspace-id=\"${escapeHtml(workspace.id)}\" aria-label=\"Open ${escapeHtml(title)}\"><span class=\"dn-card-title\"><strong title=\"${escapeHtml(workspace.root)}\">${escapeHtml(title)}</strong><span class=\"dn-thread-decision decision-${workspace.needsDecisionCount > 0 ? 'rescue' : 'continue'}\">${escapeHtml(current)}</span></span><p title=\"${escapeHtml(detail)}\">${escapeHtml(detail)}</p><div class=\"dn-workspace-meta\"><span>${escapeHtml(status)}</span>${meta.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></button>`;",
     "}",
     "",
     "function workspaceToneLabel(workspace) {",
@@ -415,7 +469,13 @@ export function renderNexusDashboardClientModule(): string {
     "  });",
     "}",
     "",
-    "function bindLocalActions(container, baseUrl = '', actionToken = '') {",
+    "function bindWorkspaceControls(container, onSelect) {",
+    "  container.querySelectorAll('[data-workspace-id]').forEach((button) => {",
+    "    button.addEventListener('click', () => onSelect(button.getAttribute('data-workspace-id')));",
+    "  });",
+    "}",
+    "",
+    "function bindLocalActions(container, baseUrl = '', actionToken = '', workspaceId = '') {",
     "  container.querySelectorAll('[data-copy-prompt]').forEach((button) => {",
     "    button.addEventListener('click', async () => {",
     "      const prompt = button.getAttribute('data-copy-prompt') ?? '';",
@@ -443,7 +503,7 @@ export function renderNexusDashboardClientModule(): string {
     "      try {",
     "        const headers = { 'content-type': 'application/json' };",
     "        if (actionToken) headers['x-dev-nexus-action-token'] = actionToken;",
-    "        const response = await fetch(`${baseUrl}/api/codex/thread`, {",
+    "        const response = await fetch(`${baseUrl}/api/codex/thread${workspaceQuery(workspaceId)}`, {",
     "          method: 'POST',",
     "          headers,",
     "          body: JSON.stringify({ prompt, title, targetId }),",
@@ -949,6 +1009,32 @@ export function renderNexusDashboardClientModule(): string {
     "  }",
     "}",
     "",
+    "function normalizeWorkspaceId(value) {",
+    "  return String(value ?? '').trim();",
+    "}",
+    "",
+    "function readWorkspaceIdFromLocation() {",
+    "  try {",
+    "    if (typeof window === 'undefined') return '';",
+    "    return new URL(window.location.href).searchParams.get('workspace') ?? '';",
+    "  } catch {",
+    "    return '';",
+    "  }",
+    "}",
+    "",
+    "function writeWorkspaceIdToLocation(workspaceId) {",
+    "  try {",
+    "    if (typeof window === 'undefined' || !window.history?.replaceState) return;",
+    "    const url = new URL(window.location.href);",
+    "    const id = normalizeWorkspaceId(workspaceId);",
+    "    if (id) url.searchParams.set('workspace', id);",
+    "    else url.searchParams.delete('workspace');",
+    "    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);",
+    "  } catch {",
+    "    // Embedded dashboards may not expose a mutable location.",
+    "  }",
+    "}",
+    "",
     "function truncate(value, limit) {",
     "  const text = String(value ?? '');",
     "  return text.length > limit ? `${text.slice(0, Math.max(0, limit - 3))}...` : text;",
@@ -998,6 +1084,7 @@ async function routeDashboardRequest(
       snapshotOptions,
       codexChatStarter,
       actionToken,
+      url,
     );
     return;
   }
@@ -1028,41 +1115,50 @@ async function routeDashboardRequest(
       return;
     }
     if (url.pathname === "/api/dashboard" || url.pathname === "/api/snapshot") {
-      sendJson(response, await buildNexusDashboardSnapshot(snapshotOptions));
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      sendJson(response, await buildNexusDashboardSnapshot(selection.snapshotOptions));
       return;
     }
     if (url.pathname === "/api/host") {
-      sendJson(response, await buildNexusDashboardHostSnapshot(snapshotOptions));
+      sendJson(
+        response,
+        await buildDashboardHostForRequest(snapshotOptions, workspaceIdFromUrl(url)),
+      );
       return;
     }
     if (url.pathname === "/api/weave") {
-      const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
       sendJson(response, snapshot.weave);
       return;
     }
     if (url.pathname === "/api/events") {
-      const snapshot = await buildNexusDashboardSnapshot(snapshotOptions);
+      const selection = await resolveDashboardWorkspaceSelection(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
+      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
       sendJson(response, { events: snapshot.events });
       return;
     }
     if (url.pathname === "/api/projects") {
-      const host = await buildNexusDashboardHostSnapshot(snapshotOptions);
+      const host = await buildDashboardHostForRequest(
+        snapshotOptions,
+        workspaceIdFromUrl(url),
+      );
       sendJson(response, { projects: host.workspaces });
       return;
     }
     response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ ok: false, error: "not_found" }));
   } catch (error) {
-    response.writeHead(500, { "content-type": "application/json; charset=utf-8" });
-    response.end(
-      JSON.stringify({
-        ok: false,
-        error: {
-          name: error instanceof Error ? error.name : "Error",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      }),
-    );
+    sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
   }
 }
 
@@ -1072,43 +1168,165 @@ async function routeCodexThreadStart(
   snapshotOptions: BuildNexusDashboardSnapshotOptions,
   codexChatStarter: NexusDashboardCodexChatStarter,
   actionToken: string,
+  url: URL,
 ): Promise<void> {
   try {
     requireDashboardMutationRequest(request, actionToken);
+    const workspaceId = workspaceIdFromUrl(url);
     const body = await readJsonBody(request);
     const prompt = requiredStringField(body, "prompt");
     const title = optionalStringField(body, "title");
     const targetId = optionalStringField(body, "targetId");
     rejectClientControlledField(body, "profileId");
+    rejectClientControlledField(body, "projectRoot");
+    rejectClientControlledField(body, "workspaceRoot");
     rejectClientControlledField(body, "cwd");
     rejectClientControlledField(body, "threadId");
     rejectClientControlledField(body, "assistantThreadId");
+    const selection = await resolveDashboardWorkspaceSelection(
+      snapshotOptions,
+      workspaceId,
+    );
     const resumeThreadId = targetId
-      ? await resolveDashboardResumeThreadId(snapshotOptions, targetId)
+      ? await resolveDashboardResumeThreadId(selection.snapshotOptions, targetId)
       : null;
     const result = await codexChatStarter.start({
-      projectRoot: snapshotOptions.projectRoot,
+      projectRoot: selection.snapshotOptions.projectRoot,
       prompt,
       ...(title ? { title } : {}),
       ...(resumeThreadId ? { threadId: resumeThreadId } : {}),
     });
     sendJson(response, { ok: true, result }, 201);
   } catch (error) {
-    const statusCode = error instanceof NexusDashboardCodexChatError
-      ? error.statusCode
-      : 500;
-    sendJson(
-      response,
-      {
-        ok: false,
-        error: {
-          name: error instanceof Error ? error.name : "Error",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      },
-      statusCode,
+    sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
+  }
+}
+
+function workspaceIdFromUrl(url: URL): string | null {
+  if (!url.searchParams.has("workspace")) {
+    return null;
+  }
+  const workspaceId = url.searchParams.get("workspace")?.trim() ?? "";
+  if (!workspaceId) {
+    throw new NexusDashboardRouteError(
+      "invalid_workspace",
+      "workspace must be a non-empty host workspace id",
+      400,
     );
   }
+  return workspaceId;
+}
+
+async function resolveDashboardWorkspaceSelection(
+  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  workspaceId: string | null,
+): Promise<DashboardWorkspaceSelection> {
+  if (!workspaceId) {
+    return { snapshotOptions };
+  }
+
+  const baseHost = await buildNexusDashboardHostSnapshot(snapshotOptions);
+  const matches = baseHost.workspaces.filter((workspace) =>
+    workspace.id === workspaceId
+  );
+  if (matches.length === 0) {
+    throw new NexusDashboardRouteError(
+      "workspace_not_found",
+      `Workspace ${workspaceId} is not registered on this host`,
+      404,
+    );
+  }
+  if (matches.length > 1) {
+    throw new NexusDashboardRouteError(
+      "ambiguous_workspace",
+      `Workspace ${workspaceId} matched multiple host workspaces`,
+      409,
+    );
+  }
+
+  return {
+    snapshotOptions: {
+      ...snapshotOptions,
+      projectRoot: path.resolve(matches[0]!.root),
+    },
+    baseHost,
+  };
+}
+
+async function buildDashboardHostForRequest(
+  snapshotOptions: BuildNexusDashboardSnapshotOptions,
+  workspaceId: string | null,
+): Promise<NexusDashboardHostSnapshot> {
+  const selection = await resolveDashboardWorkspaceSelection(
+    snapshotOptions,
+    workspaceId,
+  );
+  const selectedHost = await buildNexusDashboardHostSnapshot(
+    selection.snapshotOptions,
+  );
+  if (!selection.baseHost) {
+    return selectedHost;
+  }
+
+  return mergeDashboardHostSnapshots(selectedHost, selection.baseHost);
+}
+
+function mergeDashboardHostSnapshots(
+  selectedHost: NexusDashboardHostSnapshot,
+  baseHost: NexusDashboardHostSnapshot,
+): NexusDashboardHostSnapshot {
+  const workspaceByRoot = new Map<string, NexusDashboardHostWorkspaceRecord>();
+  for (const workspace of selectedHost.workspaces) {
+    workspaceByRoot.set(path.resolve(workspace.root), workspace);
+  }
+  for (const workspace of baseHost.workspaces) {
+    const key = path.resolve(workspace.root);
+    if (workspaceByRoot.has(key)) {
+      continue;
+    }
+    workspaceByRoot.set(key, { ...workspace, current: false });
+  }
+
+  const workspaces = [...workspaceByRoot.values()].sort((left, right) => {
+    if (left.current !== right.current) {
+      return left.current ? -1 : 1;
+    }
+    return left.name.localeCompare(right.name);
+  });
+  return {
+    ...selectedHost,
+    workspaceCount: workspaces.length,
+    needsAttentionCount: workspaces.filter((workspace) =>
+      workspace.needsDecisionCount > 0 ||
+      workspace.blockerCount > 0 ||
+      workspace.automationStatus === "blocked" ||
+      workspace.error !== null
+    ).length,
+    workspaces,
+  };
+}
+
+function dashboardErrorStatusCode(error: unknown): number {
+  if (
+    error instanceof NexusDashboardRouteError ||
+    error instanceof NexusDashboardCodexChatError
+  ) {
+    return error.statusCode;
+  }
+  return 500;
+}
+
+function dashboardErrorBody(error: unknown): unknown {
+  return {
+    ok: false,
+    error: {
+      name: error instanceof Error ? error.name : "Error",
+      message: error instanceof Error ? error.message : String(error),
+      ...(error instanceof NexusDashboardRouteError
+        ? { code: error.code }
+        : {}),
+    },
+  };
 }
 
 async function resolveDashboardResumeThreadId(

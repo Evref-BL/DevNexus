@@ -580,8 +580,18 @@ describe("nexus dashboard", () => {
     expect(module).toContain("renderThreadInbox");
     expect(module).toContain("renderHostOverview");
     expect(module).toContain("renderWorkspaceCard");
+    expect(module).toContain("renderLoading");
+    expect(module).toContain("Switching workspace");
     expect(module).toContain("hostRefreshMs");
     expect(module).toContain("hostInFlight");
+    expect(module).toContain("workspaceQuery");
+    expect(module).toContain("?workspace=");
+    expect(module).toContain("selectedWorkspaceId");
+    expect(module).toContain("readWorkspaceIdFromLocation");
+    expect(module).toContain("writeWorkspaceIdToLocation");
+    expect(module).toContain("bindWorkspaceControls");
+    expect(module).toContain("data-workspace-id");
+    expect(module).toContain("renderCurrent();");
     expect(module).toContain("renderThreadActions");
     expect(module).toContain("renderPlugins");
     expect(module).toContain("bindLocalActions");
@@ -592,6 +602,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-start-chat-prompt");
     expect(module).toContain("data-chat-target-id");
     expect(module).toContain("/api/codex/thread");
+    expect(module).toContain("/api/codex/thread${workspaceQuery(workspaceId)}");
     expect(module).toContain("/api/host");
     expect(module).toContain("x-dev-nexus-action-token");
     expect(module).toContain("renderChatActionStrip");
@@ -745,6 +756,21 @@ describe("nexus dashboard", () => {
       const projects = await fetch(`${server.url}api/projects`).then((response) =>
         response.json(),
       );
+      const selectedHost = await fetch(
+        `${server.url}api/host?workspace=server-registered`,
+      ).then((response) => response.json());
+      const selectedDashboard = await fetch(
+        `${server.url}api/dashboard?workspace=server-registered`,
+      ).then((response) => response.json());
+      const selectedWeave = await fetch(
+        `${server.url}api/weave?workspace=server-registered`,
+      ).then((response) => response.json());
+      const selectedEvents = await fetch(
+        `${server.url}api/events?workspace=server-registered`,
+      ).then((response) => response.json());
+      const missingResponse = await fetch(
+        `${server.url}api/dashboard?workspace=missing-workspace`,
+      );
 
       expect(host).toMatchObject({
         version: 1,
@@ -759,6 +785,114 @@ describe("nexus dashboard", () => {
       expect(projects.projects.map((workspace: { id: string }) => workspace.id)).toEqual([
         "server-current",
         "server-registered",
+      ]);
+      expect(selectedHost).toMatchObject({
+        version: 1,
+        homePath,
+        currentProjectRoot: registeredRoot,
+        workspaceCount: 2,
+      });
+      expect(
+        selectedHost.workspaces.find(
+          (workspace: { id: string }) => workspace.id === "server-registered",
+        ),
+      ).toMatchObject({
+        current: true,
+        root: registeredRoot,
+      });
+      expect(
+        selectedHost.workspaces.find(
+          (workspace: { id: string }) => workspace.id === "server-current",
+        ),
+      ).toMatchObject({
+        current: false,
+        root: currentRoot,
+      });
+      expect(selectedDashboard.project).toMatchObject({
+        id: "server-registered",
+        name: "Server Registered",
+        root: registeredRoot,
+      });
+      expect(selectedWeave.nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "project", label: "Server Registered" }),
+        ]),
+      );
+      expect(Array.isArray(selectedEvents.events)).toBe(true);
+      expect(missingResponse.status).toBe(404);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("starts dashboard chats in the selected host workspace", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-chat-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-chat-registered-");
+    const currentRoot = makeTempDir("dev-nexus-dashboard-chat-current-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "chat-registered",
+      name: "Chat Registered",
+    });
+    const currentConfig = projectConfig({
+      id: "chat-current",
+      name: "Chat Current",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveProjectConfig(currentRoot, currentConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const codexChatStarter = new RecordingCodexChatStarter();
+    const server = await startNexusDashboardServer({
+      projectRoot: currentRoot,
+      homePath,
+      codexChatStarter,
+    });
+
+    try {
+      const html = await fetch(server.url).then((response) => response.text());
+      const actionToken = html.match(
+        /__DEV_NEXUS_DASHBOARD_ACTION_TOKEN__ = "([^"]+)"/u,
+      )?.[1];
+      const response = await fetch(
+        `${server.url}api/codex/thread?workspace=chat-registered`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-dev-nexus-action-token": actionToken!,
+          },
+          body: JSON.stringify({
+            prompt: "Review selected workspace.",
+            title: "Selected workspace",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+      expect(codexChatStarter.starts).toEqual([
+        {
+          projectRoot: registeredRoot,
+          prompt: "Review selected workspace.",
+          title: "Selected workspace",
+        },
       ]);
     } finally {
       await server.close();
