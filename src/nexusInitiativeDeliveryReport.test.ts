@@ -47,6 +47,11 @@ describe("initiative delivery report", () => {
       status: "needs_final_pull_request",
       nextAction: "create_pull_request",
       finalPullRequestCreation: "at_review_gate",
+      stack: {
+        status: "active",
+        rootBranch: "feat/codex-goals",
+        defaultParentBranch: "feat/codex-goals",
+      },
       reasons: ["final pull request is created at the review gate"],
     });
   });
@@ -116,6 +121,31 @@ describe("initiative delivery report", () => {
             mergeability: "mergeable",
             branchPolicy: "clear",
             baseStatus: "behind",
+          },
+          branchUpdateDecision: {
+            status: "behind",
+            recommendation: "merge_update",
+            conflictRisk: "unknown",
+            ciFreshnessRisk: "stale",
+            forceWithLeaseRequired: false,
+            humanInTheLoop: false,
+            choices: [
+              {
+                id: "merge_update",
+                recommended: true,
+                forceWithLeaseRequired: false,
+              },
+              {
+                id: "rebase",
+                recommended: false,
+                humanInTheLoop: true,
+                forceWithLeaseRequired: true,
+              },
+              {
+                id: "no_update",
+                recommended: false,
+              },
+            ],
           },
           reasons: ["review branch base status is behind"],
         },

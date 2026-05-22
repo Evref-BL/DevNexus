@@ -7,9 +7,18 @@ import {
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
 import {
+  buildNexusInitiativeBranchUpdateDecision,
+  type NexusInitiativeBranchUpdateDecision,
+} from "./nexusInitiativeBranchUpdateDecision.js";
+import {
   buildNexusInitiativeDeliveryPlan,
   type NexusInitiativeDeliveryPlanItem,
 } from "./nexusInitiativeDeliveryPlan.js";
+import type {
+  NexusInitiativeDeliveryBranchPublicationSummary,
+  NexusInitiativeDeliveryPolicySummary,
+  NexusInitiativeDeliveryPullRequestHeadSummary,
+} from "./nexusInitiativeDeliveryPolicy.js";
 import {
   classifyNexusPublicationProviderEvidenceChecks,
   findNexusPublicationProviderEvidence,
@@ -93,10 +102,14 @@ export interface NexusInitiativeDeliveryReportItem {
   providerNoise: string;
   integrationBranch: string | null;
   sliceBranchPattern: string;
+  stack: NexusInitiativeDeliveryPolicySummary["branchPlan"]["stack"];
   finalReviewTarget: string;
   finalPublicationTarget: string;
   finalPullRequest: boolean;
   finalPullRequestCreation: string;
+  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
+  finalPullRequestHead: NexusInitiativeDeliveryPullRequestHeadSummary;
+  branchUpdateDecision: NexusInitiativeBranchUpdateDecision;
   ciTier: NexusCiTierDecision;
   providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
   status: NexusInitiativeDeliveryReportItemStatus;
@@ -236,10 +249,25 @@ function reportItem(options: {
     providerNoise: initiative.providerNoise,
     integrationBranch: branchPlan.integrationBranch,
     sliceBranchPattern: branchPlan.sliceBranchPattern,
+    stack: branchPlan.stack,
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
     finalPullRequest: initiative.finalPullRequest,
     finalPullRequestCreation: initiative.finalPullRequestCreation,
+    branchPublication: initiative.branchPublication,
+    finalPullRequestHead: initiative.branchPublication.finalPullRequestHead,
+    branchUpdateDecision: buildNexusInitiativeBranchUpdateDecision({
+      baseStatus: providerEvidence.baseStatus,
+      headBranch: providerEvidence.headBranch ?? branchName,
+      baseBranch: branchPlan.finalPublicationTarget,
+      pushRemote: initiative.branchPublication.selectedRemote,
+      publicBranch: providerEvidence.sourceKind === "pull_request" ||
+        providerEvidence.sourceKind === "branch" ||
+        providerEvidence.reviewTarget !== null,
+      stackedBranch: branchPlan.stack.status === "active" &&
+        (branchPlan.stack.topology === "stacked" ||
+          branchPlan.stack.topology === "hybrid"),
+    }),
     ciTier,
     providerEvidence,
     status: classificationResult.status,

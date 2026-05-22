@@ -250,6 +250,14 @@ Initiative delivery uses three read-only surfaces:
   final publication. A green, approved pull request still stops at the human
   publication gate unless policy explicitly grants more authority.
 
+For stacked and hybrid topology, the plan also carries a stack summary:
+publication eligibility, root branch, default parent branch, review target, and
+any known slice entries. Worker context records the selected slice parent and
+stack position when the slice worktree is prepared. DevNexus also exposes a
+provider-neutral restack plan model for branch graph facts; it reports which
+branches need update, which pushed branches require `--force-with-lease`, and
+which updates need human approval.
+
 `finalPullRequestCreation` controls when the final initiative pull request is
 opened. The default, `at_review_gate`, avoids creating a long-lived PR while the
 initiative branch is still accumulating commits. Use `at_initiative_start` only
@@ -262,6 +270,21 @@ be pushed. `publication_remote` uses the component publication remote.
 a fork, for machines or actors that cannot push to the upstream repository.
 `fallback_remote` always targets the fallback. `manual_only` reports the branch
 shape without selecting a push remote.
+
+When the selected fallback remote is a GitHub fork, DevNexus resolves the remote
+URL and renders the final pull-request head as `owner:branch`. If the fallback
+remote is missing or does not point at a GitHub repository, finalization blocks
+with a setup action instead of guessing. `branch-push --initiative` probes
+`publication_remote_then_fallback` with read-only `git push --dry-run` calls and
+uses the fallback only when the publication remote rejects the dry run.
+
+When provider evidence says the initiative review branch is behind or diverged,
+`initiative-report` and `initiative-finalization` include a branch update
+decision. The default recommendation is a merge update into the review branch:
+it refreshes CI without rewriting public history. Rebase remains an explicit
+alternative for teams that want a linear branch, but it requires human approval
+and a `--force-with-lease` push. Leaving the branch unchanged keeps the risk that
+CI passes against stale base code and fails after merge.
 
 For GitHub, keep routine provider output quiet. Prefer PR bodies, checks,
 labels, and DevNexus reports for ordinary state. Comments should be reserved

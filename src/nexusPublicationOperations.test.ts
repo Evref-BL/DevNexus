@@ -123,6 +123,194 @@ describe("publication operations", () => {
     ]);
   });
 
+  it("selects fallback remotes after publication remote dry-run permission denial", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        if (args.join(" ") === "push --dry-run app feat/codex-goals") {
+          return {
+            args: [...args],
+            stdout: "",
+            stderr: "ERROR: permission denied",
+            exitCode: 1,
+          };
+        }
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      branchPublication: {
+        strategy: "publication_remote_then_fallback",
+        selectedRemote: "fork",
+      },
+      remoteSelection: {
+        status: "fallback_selected",
+        selectedRemote: "fork",
+        probes: [
+          {
+            remote: "app",
+            writable: false,
+          },
+          {
+            remote: "fork",
+            writable: true,
+          },
+        ],
+      },
+    });
+    expect(result.push.plan).toMatchObject({
+      transport: "configured_remote",
+      remote: "fork",
+      refspec: "feat/codex-goals",
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["push", "--dry-run", "app", "feat/codex-goals"],
+      ["push", "--dry-run", "fork", "feat/codex-goals"],
+      ["push", "fork", "feat/codex-goals"],
+    ]);
+  });
+
+  it("keeps initiative branch pushes on the publication remote when the dry-run succeeds", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "feat/codex-goals",
+      initiativeId: "codex-goals",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args, options) => {
+        calls.push({
+          args,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.initiativeDelivery).toMatchObject({
+      remoteSelection: {
+        status: "publication_remote_writable",
+        selectedRemote: "app",
+        probes: [
+          {
+            remote: "app",
+            writable: true,
+          },
+        ],
+      },
+    });
+    expect(result.push.plan.transport).toBe("https_token");
+    expect(calls[0]!.args).toEqual([
+      "push",
+      "--dry-run",
+      "app",
+      "feat/codex-goals",
+    ]);
+    expect(calls[1]!.args).toContain("push");
+    expect(calls[1]!.args).toContain("https://github.com/Evref-BL/DevNexus.git");
+    expect(calls[1]!.args).toContain("feat/codex-goals");
+  });
+
+  it("blocks initiative fallback selection before live push when fallback setup fails", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "feat/codex-goals",
+        initiativeId: "codex-goals",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        }),
+      }),
+    ).rejects.toThrow(/fix remote fork before publishing the initiative branch/u);
+  });
+
+  it("reports manual-only initiative branch publication as a structured blocker", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(homePath, "manual_only", null),
+    );
+
+    await expect(
+      pushNexusPublicationBranchForComponent({
+        projectRoot,
+        repositoryPath: sourceRoot,
+        branch: "feat/codex-goals",
+        initiativeId: "codex-goals",
+        baseEnv: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        gitRunner: () => {
+          throw new Error("git should not run for manual-only publication");
+        },
+      }),
+    ).rejects.toMatchObject({
+      remoteSelection: {
+        status: "blocked",
+        reasons: ["initiative branch publication is manual-only"],
+      },
+    });
+  });
+
+
   it("pushes review branches through GitHub App user-to-server credentials for human actors", async () => {
     const { projectRoot, sourceRoot } = createHumanUserTokenPublicationProject();
     const calls: Array<{ cwd: string; token: string | undefined }> = [];
@@ -687,6 +875,141 @@ describe("publication CLI operations", () => {
     expect(calls).toEqual([{ token: "installation-token" }]);
   });
 
+  it("prints selected initiative branch-push fallback plans as JSON", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const stdout = textWriter();
+    const gitRunner: NexusPublicationGitPushRunner = (args) => {
+      if (args.join(" ") === "push --dry-run app feat/codex-goals") {
+        return {
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        };
+      }
+      return {
+        args: [...args],
+        stdout: "",
+        stderr: "Everything up-to-date",
+        exitCode: 0,
+      };
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "branch-push",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "feat/codex-goals",
+        "--initiative",
+        "codex-goals",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: gitRunner,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      dryRun: true,
+      initiativeDelivery: {
+        branchPublication: {
+          strategy: "publication_remote_then_fallback",
+          selectedRemote: "fork",
+        },
+        remoteSelection: {
+          status: "fallback_selected",
+          selectedRemote: "fork",
+          reasons: [
+            "publication remote app rejected a dry-run branch push",
+            "fallback remote fork accepted a dry-run branch push",
+          ],
+        },
+      },
+      push: {
+        plan: {
+          transport: "configured_remote",
+          remote: "fork",
+        },
+      },
+    });
+  });
+
+  it("prints blocked initiative branch-push setup actions as JSON", async () => {
+    const { projectRoot, homePath, sourceRoot } = createPublicationProject();
+    saveProjectConfig(
+      projectRoot,
+      initiativeFallbackPublicationProjectConfig(
+        homePath,
+        "publication_remote_then_fallback",
+      ),
+    );
+    const stdout = textWriter();
+
+    const exitCode = await main(
+      [
+        "publication",
+        "branch-push",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "feat/codex-goals",
+        "--initiative",
+        "codex-goals",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        publicationGitPushRunner: (args) => ({
+          args: [...args],
+          stdout: "",
+          stderr: "ERROR: permission denied",
+          exitCode: 1,
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: false,
+      error: {
+        code: "initiative_branch_publication_blocked",
+      },
+      initiativeDelivery: {
+        remoteSelection: {
+          status: "blocked",
+          selectedRemote: null,
+          reasons: ["fallback remote fork rejected a dry-run branch push"],
+          setupActions: [
+            "fix remote fork before publishing the initiative branch",
+          ],
+        },
+      },
+    });
+  });
+
   it("prints project repository branch-push results through the CLI", async () => {
     const { projectRoot } = createMultiComponentPublicationProject();
     const stdout = textWriter();
@@ -1148,6 +1471,11 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
 
 function initiativeFallbackPublicationProjectConfig(
   homePath: string,
+  strategy:
+    | "fallback_remote"
+    | "manual_only"
+    | "publication_remote_then_fallback" = "fallback_remote",
+  fallbackRemote: string | null = "fork",
 ): NexusProjectConfig {
   return {
     ...publicationProjectConfig(homePath),
@@ -1179,8 +1507,8 @@ function initiativeFallbackPublicationProjectConfig(
             activeInitiativeId: "codex-goals",
             defaultTopology: "hybrid",
             branchPublication: {
-              strategy: "fallback_remote",
-              fallbackRemote: "fork",
+              strategy,
+              fallbackRemote,
             },
           },
           selector: {

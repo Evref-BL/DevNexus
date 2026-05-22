@@ -863,6 +863,8 @@ interface ParsedWorktreePrepareCommand {
   baseRef?: string | null;
   initiativeId?: string | null;
   initiativeSlice?: string | null;
+  initiativeParentBranch?: string | null;
+  initiativeStackPosition?: number | null;
   branchIntent?: string | null;
   topic?: string | null;
   workItemId?: string | null;
@@ -1714,6 +1716,8 @@ async function handleWorktreeCommand(
       baseRef: parsed.baseRef,
       initiativeId: parsed.initiativeId,
       initiativeSlice: parsed.initiativeSlice,
+      initiativeParentBranch: parsed.initiativeParentBranch,
+      initiativeStackPosition: parsed.initiativeStackPosition,
       branchIntent: parsed.branchIntent,
       topic: parsed.topic,
       workItemId: resolvedWorkItem.itemId ?? parsed.workItemId,
@@ -4261,6 +4265,12 @@ function parseWorktreePrepareCommand(
         break;
       case "--initiative-slice":
         parsed.initiativeSlice = next();
+        break;
+      case "--initiative-parent":
+        parsed.initiativeParentBranch = next();
+        break;
+      case "--initiative-stack-position":
+        parsed.initiativeStackPosition = parsePositiveInteger(next(), arg);
         break;
       case "--branch-intent":
         parsed.branchIntent = next();

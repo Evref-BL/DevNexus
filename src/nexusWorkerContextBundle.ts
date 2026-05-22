@@ -171,6 +171,9 @@ export interface NexusWorkerContextInitiativeDelivery {
   integrationBranch: string | null;
   branchTarget: string;
   parentBranch: string | null;
+  stackPosition: number | null;
+  childBranches: string[];
+  stackPublicationEligible: boolean;
   finalPublicationTarget: string;
   reviewMode: string;
   finalPullRequestCreation: string;
@@ -441,6 +444,7 @@ function renderInitiativeDeliveryLines(
     `Final publication target: ${initiativeDelivery.finalPublicationTarget}`,
     `Integration branch: ${initiativeDelivery.integrationBranch ?? "none"}`,
     `Parent branch: ${initiativeDelivery.parentBranch ?? "none"}`,
+    `Stack position: ${initiativeDelivery.stackPosition ?? "none"}`,
     `Final PR creation: ${initiativeDelivery.finalPullRequestCreation}`,
     `Branch publication remote: ${
       initiativeDelivery.branchPublication.selectedRemote ?? "manual"

@@ -73,6 +73,8 @@ export interface PrepareNexusManualWorktreeOptions {
   baseRef?: string | null;
   initiativeId?: string | null;
   initiativeSlice?: string | null;
+  initiativeParentBranch?: string | null;
+  initiativeStackPosition?: number | null;
   branchIntent?: string | null;
   topic?: string | null;
   workItemId?: string | null;
@@ -305,6 +307,8 @@ export function prepareNexusManualWorktree(
         componentId: target.ownerId,
         initiativeId: options.initiativeId,
         sliceSlug: options.initiativeSlice ?? slug,
+        parentBranch: options.initiativeParentBranch,
+        stackPosition: options.initiativeStackPosition,
         branchIntent: options.branchIntent,
       })
     : null;
@@ -609,6 +613,8 @@ function resolveManualWorktreeInitiativeDelivery(options: {
   componentId: string;
   initiativeId: string;
   sliceSlug: string;
+  parentBranch?: string | null;
+  stackPosition?: number | null;
   branchIntent?: string | null;
 }): ResolvedManualWorktreeInitiativeDelivery {
   const plan = buildNexusInitiativeDeliveryPlan({
@@ -640,6 +646,13 @@ function resolveManualWorktreeInitiativeDelivery(options: {
     initiative: initiative.branchSlug,
     slice: sliceSlug,
   });
+  const stack = initiative.branchPlan.stack;
+  const parentBranch =
+    options.parentBranch?.trim() ||
+    (stack.status === "active" ? stack.defaultParentBranch : null);
+  const stackPosition = options.stackPosition ??
+    (stack.status === "active" ? 1 : null);
+  const branchTarget = parentBranch ?? initiative.branchPlan.defaultSliceReviewTarget;
   const hitlGates = [
     ...(initiative.branchPlan.requiresIntegrationBranchApproval
       ? ["integration branch approval"]
@@ -651,14 +664,17 @@ function resolveManualWorktreeInitiativeDelivery(options: {
 
   return {
     branchName,
-    baseRef: initiative.branchPlan.defaultSliceBaseBranch,
+    baseRef: parentBranch ?? initiative.branchPlan.defaultSliceBaseBranch,
     context: {
       initiativeId: initiative.activeScopeId,
       sliceSlug,
       topology: initiative.defaultTopology,
       integrationBranch: initiative.branchPlan.integrationBranch,
-      branchTarget: initiative.branchPlan.defaultSliceReviewTarget,
-      parentBranch: null,
+      branchTarget,
+      parentBranch,
+      stackPosition,
+      childBranches: [],
+      stackPublicationEligible: stack.publicationEligible,
       finalPublicationTarget: initiative.branchPlan.finalPublicationTarget,
       reviewMode: initiative.reviewMode,
       finalPullRequestCreation: initiative.finalPullRequestCreation,

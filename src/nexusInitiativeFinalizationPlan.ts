@@ -8,12 +8,14 @@ import {
   type NexusMergeQueueReadinessReport,
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
+import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
 import type {
   NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
 
 export type NexusInitiativeFinalizationNextAction =
   | "create_pull_request"
+  | "manual_pull_request"
   | "collect_provider_evidence"
   | "update_branch"
   | "resolve_conflicts"
@@ -78,12 +80,42 @@ export interface NexusInitiativeMergeQueueFinalizationSummary {
   warnings: string[];
 }
 
+export type NexusInitiativeFinalPullRequestActionStatus =
+  | "not_required"
+  | "already_exists"
+  | "create_at_initiative_start"
+  | "create_at_review_gate"
+  | "manual_only"
+  | "blocked";
+
+export interface NexusInitiativeFinalPullRequestProviderAction {
+  kind: "pull_request_upsert";
+  componentId: string;
+  head: string;
+  base: string;
+  title: string;
+  body: string;
+  draft: boolean;
+}
+
+export interface NexusInitiativeFinalPullRequestAction {
+  status: NexusInitiativeFinalPullRequestActionStatus;
+  humanInTheLoop: boolean;
+  providerAction: NexusInitiativeFinalPullRequestProviderAction | null;
+  cliCommand: string | null;
+  reasons: string[];
+}
+
 export interface NexusInitiativeFinalizationPlanItem {
   componentId: string;
   initiativeId: string;
   integrationBranch: string | null;
+  stack: NexusInitiativeDeliveryReportItem["stack"];
   finalPublicationTarget: string;
   finalPullRequestCreation: string;
+  finalPullRequestHead: NexusInitiativeDeliveryReportItem["finalPullRequestHead"];
+  finalPullRequestAction: NexusInitiativeFinalPullRequestAction;
+  branchUpdateDecision: NexusInitiativeDeliveryReportItem["branchUpdateDecision"];
   reviewTarget: string;
   providerEvidence: NexusInitiativeDeliveryReportItem["providerEvidence"];
   reviewReadiness: NexusInitiativeReadinessDecision<NexusInitiativeReviewReadinessStatus> & {
@@ -178,16 +210,31 @@ function finalizationItem(options: {
   workflowTriggers: NexusMergeQueueWorkflowTriggerInput[];
   now?: Date | string | (() => Date | string);
 }): NexusInitiativeFinalizationPlanItem {
-  const reviewDecision = classifyReviewReadiness(options.item);
+  const finalPullRequestAction = buildFinalPullRequestAction({
+    item: options.item,
+    projectRoot: options.projectRoot,
+  });
+  const reviewDecision = classifyReviewReadiness(
+    options.item,
+    finalPullRequestAction,
+  );
   const mergeQueue = mergeQueueSummary(options);
-  const publicationDecision = classifyPublicationReadiness(options.item, mergeQueue);
+  const publicationDecision = classifyPublicationReadiness(
+    options.item,
+    mergeQueue,
+    finalPullRequestAction,
+  );
 
   return {
     componentId: options.item.componentId,
     initiativeId: options.item.initiativeId,
     integrationBranch: options.item.integrationBranch,
+    stack: options.item.stack,
     finalPublicationTarget: options.item.finalPublicationTarget,
     finalPullRequestCreation: options.item.finalPullRequestCreation,
+    finalPullRequestHead: options.item.finalPullRequestHead,
+    finalPullRequestAction,
+    branchUpdateDecision: options.item.branchUpdateDecision,
     reviewTarget: options.item.finalReviewTarget,
     providerEvidence: options.item.providerEvidence,
     reviewReadiness: {
@@ -210,8 +257,9 @@ function finalizationItem(options: {
 
 function classifyReviewReadiness(
   item: NexusInitiativeDeliveryReportItem,
+  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
 ): NexusInitiativeReadinessDecision<NexusInitiativeReviewReadinessStatus> {
-  const blocker = sharedReadinessBlocker(item);
+  const blocker = sharedReadinessBlocker(item, finalPullRequestAction);
   if (blocker) {
     return blocker;
   }
@@ -228,8 +276,9 @@ function classifyReviewReadiness(
 function classifyPublicationReadiness(
   item: NexusInitiativeDeliveryReportItem,
   mergeQueue: NexusInitiativeMergeQueueFinalizationSummary | null,
+  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
 ): NexusInitiativeReadinessDecision<NexusInitiativePublicationReadinessStatus> {
-  const blocker = sharedReadinessBlocker(item);
+  const blocker = sharedReadinessBlocker(item, finalPullRequestAction);
   if (blocker) {
     return blocker;
   }
@@ -281,19 +330,34 @@ function classifyPublicationReadiness(
 
 function sharedReadinessBlocker(
   item: NexusInitiativeDeliveryReportItem,
+  finalPullRequestAction: NexusInitiativeFinalPullRequestAction,
 ): NexusInitiativeReadinessDecision<NexusInitiativeSharedReadinessStatus> | null {
   const evidence = item.providerEvidence;
+  if (finalPullRequestAction.status === "manual_only") {
+    return {
+      status: "needs_final_pull_request",
+      nextAction: "manual_pull_request",
+      reasons: finalPullRequestAction.reasons,
+    };
+  }
+  if (finalPullRequestAction.status === "blocked") {
+    return {
+      status: "blocked",
+      nextAction: "resolve_branch_policy",
+      reasons: finalPullRequestAction.reasons,
+    };
+  }
+  if (
+    finalPullRequestAction.status === "create_at_review_gate" ||
+    finalPullRequestAction.status === "create_at_initiative_start"
+  ) {
+    return {
+      status: "needs_final_pull_request",
+      nextAction: "create_pull_request",
+      reasons: finalPullRequestAction.reasons,
+    };
+  }
   if (!evidence.provider) {
-    if (
-      item.finalPullRequest &&
-      item.finalPullRequestCreation === "at_review_gate"
-    ) {
-      return {
-        status: "needs_final_pull_request",
-        nextAction: "create_pull_request",
-        reasons: ["final pull request is created at the review gate"],
-      };
-    }
     return {
       status: "needs_provider_evidence",
       nextAction: "collect_provider_evidence",
@@ -340,6 +404,165 @@ function sharedReadinessBlocker(
     };
   }
   return null;
+}
+
+function buildFinalPullRequestAction(options: {
+  item: NexusInitiativeDeliveryReportItem;
+  projectRoot: string;
+}): NexusInitiativeFinalPullRequestAction {
+  if (!options.item.finalPullRequest) {
+    return {
+      status: "not_required",
+      humanInTheLoop: false,
+      providerAction: null,
+      cliCommand: null,
+      reasons: [],
+    };
+  }
+  if (finalPullRequestExists(options.item)) {
+    return {
+      status: "already_exists",
+      humanInTheLoop: false,
+      providerAction: null,
+      cliCommand: null,
+      reasons: [],
+    };
+  }
+  if (options.item.finalPullRequestCreation === "manual_only") {
+    return {
+      status: "manual_only",
+      humanInTheLoop: true,
+      providerAction: null,
+      cliCommand: null,
+      reasons: ["final pull request creation is manual-only"],
+    };
+  }
+  if (
+    options.item.finalPullRequestHead.status === "blocked" ||
+    options.item.finalPullRequestHead.status === "manual_only"
+  ) {
+    return {
+      status: "blocked",
+      humanInTheLoop: true,
+      providerAction: null,
+      cliCommand: null,
+      reasons: [
+        options.item.finalPullRequestHead.setupAction ??
+        "final pull request head cannot be resolved",
+      ],
+    };
+  }
+
+  const headBranch = options.item.finalPullRequestHead.branch ??
+    options.item.integrationBranch ??
+    options.item.providerEvidence.headBranch ??
+    options.item.providerEvidence.headRef;
+  const head = options.item.finalPullRequestHead.displayRef ?? headBranch;
+  if (!head || !headBranch) {
+    return {
+      status: "blocked",
+      humanInTheLoop: true,
+      providerAction: null,
+      cliCommand: null,
+      reasons: ["final pull request head branch is unavailable"],
+    };
+  }
+
+  const status = finalPullRequestActionStatus(
+    options.item.finalPullRequestCreation,
+  );
+  if (!status) {
+    return {
+      status: "blocked",
+      humanInTheLoop: true,
+      providerAction: null,
+      cliCommand: null,
+      reasons: [
+        `unsupported final pull request creation policy: ${options.item.finalPullRequestCreation}`,
+      ],
+    };
+  }
+
+  const title = `Finalize initiative ${options.item.initiativeId}`;
+  const providerAction: NexusInitiativeFinalPullRequestProviderAction = {
+    kind: "pull_request_upsert",
+    componentId: options.item.componentId,
+    head,
+    base: options.item.finalPublicationTarget,
+    title,
+    body: finalPullRequestBody(options.item, headBranch),
+    draft: false,
+  };
+
+  return {
+    status,
+    humanInTheLoop: false,
+    providerAction,
+    cliCommand: finalPullRequestCliCommand(options.projectRoot, providerAction),
+    reasons: [finalPullRequestActionReason(status)],
+  };
+}
+
+function finalPullRequestExists(item: NexusInitiativeDeliveryReportItem): boolean {
+  return Boolean(
+    item.providerEvidence.provider &&
+      (item.providerEvidence.sourceKind === "pull_request" ||
+        item.providerEvidence.reviewTarget),
+  );
+}
+
+function finalPullRequestActionStatus(
+  policy: string,
+): "create_at_initiative_start" | "create_at_review_gate" | null {
+  if (policy === "at_initiative_start") {
+    return "create_at_initiative_start";
+  }
+  if (policy === "at_review_gate") {
+    return "create_at_review_gate";
+  }
+  return null;
+}
+
+function finalPullRequestActionReason(
+  status: "create_at_initiative_start" | "create_at_review_gate",
+): string {
+  return status === "create_at_initiative_start"
+    ? "final pull request should have been created at initiative start"
+    : "final pull request is created at the review gate";
+}
+
+function finalPullRequestBody(
+  item: NexusInitiativeDeliveryReportItem,
+  head: string,
+): string {
+  return `Finalize initiative ${item.initiativeId}.
+
+Head: ${head}
+Base: ${item.finalPublicationTarget}
+Review target: ${item.finalReviewTarget}
+
+Run initiative-finalization with current provider evidence before publication.`;
+}
+
+function finalPullRequestCliCommand(
+  projectRoot: string,
+  action: NexusInitiativeFinalPullRequestProviderAction,
+): string {
+  return [
+    "dev-nexus",
+    "publication",
+    "pull-request",
+    "upsert",
+    projectRoot,
+    "--component",
+    action.componentId,
+    "--head",
+    action.head,
+    "--base",
+    action.base,
+    "--title",
+    action.title,
+  ].map(shellQuoteArgument).join(" ");
 }
 
 function mergeQueueSummary(options: {
@@ -419,6 +642,7 @@ function nextAction(
     "wait_for_checks",
     "resolve_branch_policy",
     "create_pull_request",
+    "manual_pull_request",
     "request_review",
     "mark_ready_for_review",
     "request_publication_approval",
