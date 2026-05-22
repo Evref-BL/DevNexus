@@ -9,6 +9,11 @@ import {
   writeLine,
   type TextWriter,
 } from "./cliSupport.js";
+import {
+  assertCliMutationAllowed,
+  type DevNexusCliDependencies,
+} from "./cliCommandContext.js";
+export type { DevNexusCliDependencies } from "./cliCommandContext.js";
 import { handleCiFailureIntakeCommand } from "./cliCiFailureIntakeCommand.js";
 import {
   projectComponentAddUsage,
@@ -36,7 +41,6 @@ import {
 } from "./cliRemoteExecutionCommand.js";
 import {
   createNexusAutomationCommandExecutor,
-  type NexusAutomationCommandRunner,
 } from "./nexusAutomationCommandExecutor.js";
 import {
   createNexusAutomationAgentCommandLauncher,
@@ -104,7 +108,6 @@ import {
   resolveNexusPublicationPolicy,
   NexusPublicationActorStatus,
   NexusPublicationStatus,
-  type NexusPublicationGitPushRunner,
 } from "./nexusPublicationPolicy.js";
 import type { NexusGitIdentityStatus } from "./nexusGitIdentity.js";
 import {
@@ -167,7 +170,6 @@ import {
   recordNexusSetupStep,
   type NexusSetupCheck,
   type NexusSetupFlowSummary,
-  type NexusMcpRuntimeProcess,
   type NexusSetupPlan,
   type NexusSetupPlatform,
   type NexusSetupRecordedStepStatus,
@@ -189,20 +191,12 @@ import {
 } from "./nexusAgentProjectionCleanup.js";
 import { runDevNexusMcpStdioServer } from "./nexusMcpServer.js";
 import {
-  assertNexusSharedCheckoutMutationAllowed,
-  parseNexusSharedCheckoutGuardOverride,
-  NexusSharedCheckoutGuardError,
-  type NexusCheckoutMutationClass,
-  type NexusSharedCheckoutGuardOverride,
-} from "./nexusSharedCheckoutGuard.js";
-import {
   prepareNexusManualWorktree,
   resolveNexusManualWorktreeWorkItem,
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
 import { buildNexusQuickFixPlan } from "./nexusQuickFix.js";
-import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCredentialBroker.js";
 import {
   nexusAuthorityMutationBlock,
   resolveNexusCurrentAutomationActor,
@@ -259,7 +253,6 @@ import {
   type NexusProjectHostingLocalRemoteCommand,
   type NexusProjectHostingLocalRemoteCommandResult,
   type NexusProjectHostingPlanResult,
-  type NexusProjectHostingProviderAdapter,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
 import {
@@ -290,7 +283,6 @@ import {
 } from "./nexusWorkItemDiscoveryStatus.js";
 import {
   claimNexusEligibleWorkItem,
-  type NexusEligibleWorkClaimProviderFactory,
   type NexusWorkItemClaimResult,
   type NexusWorkItemStaleClaimPolicy,
 } from "./nexusWorkItemClaim.js";
@@ -337,7 +329,6 @@ import {
   type UnlinkWorkItemTrackerReferenceResult,
 } from "./workItemTrackerLinks.js";
 import { defaultGitRunner, type GitRunner } from "./gitWorktreeService.js";
-import type { ProjectGitRunner } from "./nexusProjectLifecycle.js";
 import type {
   WorkComment,
   WorkItem,
@@ -345,25 +336,6 @@ import type {
   WorkStatus,
   WorkStatusQuery,
 } from "./workTrackingTypes.js";
-
-export interface DevNexusCliDependencies {
-  stdout?: TextWriter;
-  stderr?: TextWriter;
-  env?: NodeJS.ProcessEnv;
-  fetch?: typeof fetch;
-  credentialCommandRunner?: NexusProviderCredentialCommandRunner;
-  publicationGitPushRunner?: NexusPublicationGitPushRunner;
-  commandRunner?: NexusAutomationCommandRunner;
-  gitRunner?: GitRunner;
-  projectGitRunner?: ProjectGitRunner;
-  hostingProvider?: NexusProjectHostingProviderAdapter;
-  mcpRuntimeProcesses?: readonly NexusMcpRuntimeProcess[] | false;
-  now?: () => Date | string;
-  sharedCheckoutGuard?: "enforce" | "disabled";
-  sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
-  workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
-  workItemClaimLeaseTokenFactory?: () => string;
-}
 
 interface ProjectHostingStatusCliResult {
   projectRoot: string;
@@ -8665,89 +8637,6 @@ function projectSetupApplyNextActions(
   return buildNexusProjectSetupApplyNextActions(result, {
     quoteArgument: shellQuoteArgument,
   });
-}
-
-function assertCliMutationAllowed(
-  dependencies: DevNexusCliDependencies,
-  options: {
-    projectRoot: string;
-    command: string;
-    mutationClass: NexusCheckoutMutationClass;
-    targetPath?: string | null;
-    componentId?: string | null;
-  },
-): void {
-  if (!shouldEnforceCliSharedCheckoutGuard(dependencies)) {
-    return;
-  }
-
-  try {
-    assertNexusSharedCheckoutMutationAllowed({
-      projectRoot: options.projectRoot,
-      command: options.command,
-      mutationClass: options.mutationClass,
-      targetPath: options.targetPath,
-      componentId: options.componentId,
-      gitRunner: dependencies.gitRunner,
-      override: cliSharedCheckoutGuardOverride(dependencies),
-    });
-  } catch (error) {
-    if (error instanceof NexusSharedCheckoutGuardError) {
-      throw new Error(
-        JSON.stringify(
-          {
-            ok: false,
-            error: "shared_checkout_mutation_refused",
-            guard: error.decision,
-          },
-          null,
-          2,
-        ),
-      );
-    }
-    throw error;
-  }
-}
-
-function shouldEnforceCliSharedCheckoutGuard(
-  dependencies: DevNexusCliDependencies,
-): boolean {
-  const envMode = process.env.DEV_NEXUS_SHARED_CHECKOUT_GUARD?.trim().toLowerCase();
-  if (envMode === "off" || envMode === "disabled") {
-    return false;
-  }
-  if (dependencies.sharedCheckoutGuard === "disabled") {
-    return false;
-  }
-  if (dependencies.sharedCheckoutGuard === "enforce" || envMode === "enforce") {
-    return true;
-  }
-
-  return !hasInjectedCliDependency(dependencies);
-}
-
-function hasInjectedCliDependency(dependencies: DevNexusCliDependencies): boolean {
-  return Boolean(
-    dependencies.stdout ||
-      dependencies.stderr ||
-      dependencies.commandRunner ||
-      dependencies.gitRunner ||
-      dependencies.projectGitRunner ||
-      dependencies.hostingProvider ||
-      dependencies.now,
-  );
-}
-
-function cliSharedCheckoutGuardOverride(
-  dependencies: DevNexusCliDependencies,
-): NexusSharedCheckoutGuardOverride | null {
-  if (dependencies.sharedCheckoutGuardOverride !== undefined) {
-    return dependencies.sharedCheckoutGuardOverride;
-  }
-
-  return parseNexusSharedCheckoutGuardOverride(
-    process.env.DEV_NEXUS_SHARED_CHECKOUT_GUARD_OVERRIDE,
-  );
 }
 
 if (isCliEntrypoint(import.meta.url)) {
