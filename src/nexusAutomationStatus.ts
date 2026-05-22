@@ -52,6 +52,7 @@ import {
   defaultNexusHomePath,
   loadNexusHomeConfigFile,
   validateNexusHomeConfigBase,
+  type NexusClaimAuthorityProfileConfig,
 } from "./nexusHomeConfig.js";
 import {
   automationWorkItemDiscoveryCredentialResolver,
@@ -124,6 +125,17 @@ export type NexusAutomationWorkItemClaimAuthorityStatusKind =
   | "ready"
   | "blocked";
 
+export type NexusAutomationPostgresClaimAuthorityProfileStatusKind =
+  | "not_required"
+  | "missing"
+  | "available";
+
+export type NexusAutomationPostgresClaimAuthorityAdapterStatusKind =
+  | "not_required"
+  | "not_checked"
+  | "missing"
+  | "available";
+
 export interface NexusAutomationStatusLock {
   path: string;
   status: NexusAutomationLockStatusKind;
@@ -134,12 +146,23 @@ export interface NexusAutomationStatusLock {
   message: string;
 }
 
+export interface NexusAutomationPostgresClaimAuthorityProfileStatus {
+  profileId: string | null;
+  profileStatus: NexusAutomationPostgresClaimAuthorityProfileStatusKind;
+  driver: string | null;
+  schema: string | null;
+  connectionStringEnv: string | null;
+  connectionStringEnvPresent: boolean | null;
+  adapterStatus: NexusAutomationPostgresClaimAuthorityAdapterStatusKind;
+}
+
 export interface NexusAutomationWorkItemClaimAuthorityStatus {
   enabled: boolean;
   backend: NexusAutomationWorkItemClaimAuthorityBackend;
   status: NexusAutomationWorkItemClaimAuthorityStatusKind;
   summary: string;
   postgresConnectionProfileId: string | null;
+  postgresProfile: NexusAutomationPostgresClaimAuthorityProfileStatus | null;
   blockers: string[];
   warnings: string[];
 }
@@ -198,8 +221,16 @@ export class NexusAutomationStatusError extends Error {
   }
 }
 
+export interface SummarizeNexusAutomationWorkItemClaimAuthorityStatusOptions {
+  projectRoot?: string;
+  projectConfig?: NexusProjectConfig;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
 export function summarizeNexusAutomationWorkItemClaimAuthorityStatus(
   automationConfig: NexusAutomationConfig | null,
+  options: SummarizeNexusAutomationWorkItemClaimAuthorityStatusOptions = {},
 ): NexusAutomationWorkItemClaimAuthorityStatus {
   const authority = automationConfig?.workItemClaims.authority ?? {
     backend: "optimistic_tracker" as const,
@@ -217,6 +248,16 @@ export function summarizeNexusAutomationWorkItemClaimAuthorityStatus(
       status: "disabled",
       summary: "Work item claims are disabled",
       postgresConnectionProfileId,
+      postgresProfile:
+        authority.backend === "postgres"
+          ? postgresProfileStatus({
+              profileId: postgresConnectionProfileId,
+              profileStatus: postgresConnectionProfileId
+                ? "missing"
+                : "not_required",
+              adapterStatus: "not_checked",
+            })
+          : null,
       blockers: [],
       warnings: [],
     };
@@ -231,23 +272,164 @@ export function summarizeNexusAutomationWorkItemClaimAuthorityStatus(
       status: "blocked",
       summary: blocker,
       postgresConnectionProfileId,
+      postgresProfile: postgresProfileStatus({
+        profileId: null,
+        profileStatus: "missing",
+        adapterStatus: "not_checked",
+      }),
       blockers: [blocker],
       warnings: [],
     };
+  }
+
+  if (authority.backend === "postgres") {
+    return postgresWorkItemClaimAuthorityStatus({
+      authority,
+      options,
+    });
   }
 
   return {
     enabled: true,
     backend: authority.backend,
     status: "ready",
-    summary:
-      authority.backend === "postgres"
-        ? `PostgreSQL claim authority is configured with connection profile ${postgresConnectionProfileId}`
-        : "Optimistic tracker claim authority is configured",
+    summary: "Optimistic tracker claim authority is configured",
     postgresConnectionProfileId,
+    postgresProfile: null,
     blockers: [],
     warnings: [],
   };
+}
+
+function postgresWorkItemClaimAuthorityStatus(options: {
+  authority: NexusAutomationConfig["workItemClaims"]["authority"];
+  options: SummarizeNexusAutomationWorkItemClaimAuthorityStatusOptions;
+}): NexusAutomationWorkItemClaimAuthorityStatus {
+  const profileId = options.authority.postgres.connectionProfileId;
+  if (!profileId) {
+    const blocker =
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId";
+    return {
+      enabled: true,
+      backend: "postgres",
+      status: "blocked",
+      summary: blocker,
+      postgresConnectionProfileId: null,
+      postgresProfile: postgresProfileStatus({
+        profileId: null,
+        profileStatus: "missing",
+        adapterStatus: "not_checked",
+      }),
+      blockers: [blocker],
+      warnings: [],
+    };
+  }
+
+  const profile = loadClaimAuthorityProfiles(options.options).find(
+    (candidate) => candidate.id === profileId,
+  );
+  if (!profile) {
+    const blocker =
+      `PostgreSQL claim authority profile ${profileId} was not found in DevNexus home config`;
+    return {
+      enabled: true,
+      backend: "postgres",
+      status: "blocked",
+      summary: blocker,
+      postgresConnectionProfileId: profileId,
+      postgresProfile: postgresProfileStatus({
+        profileId,
+        profileStatus: "missing",
+        adapterStatus: "not_checked",
+      }),
+      blockers: [blocker],
+      warnings: [],
+    };
+  }
+
+  const connectionStringEnvPresent = Boolean(
+    options.options.env?.[profile.connectionStringEnv]?.trim(),
+  );
+  if (!connectionStringEnvPresent) {
+    const blocker =
+      `PostgreSQL claim authority profile ${profile.id} requires environment variable ${profile.connectionStringEnv}`;
+    return {
+      enabled: true,
+      backend: "postgres",
+      status: "blocked",
+      summary: blocker,
+      postgresConnectionProfileId: profile.id,
+      postgresProfile: postgresProfileStatus({
+        profile,
+        profileStatus: "available",
+        connectionStringEnvPresent,
+        adapterStatus: "not_checked",
+      }),
+      blockers: [blocker],
+      warnings: [],
+    };
+  }
+
+  const blocker =
+    `PostgreSQL claim authority profile ${profile.id} requires optional node-postgres runtime adapter support`;
+  return {
+    enabled: true,
+    backend: "postgres",
+    status: "blocked",
+    summary: blocker,
+    postgresConnectionProfileId: profile.id,
+    postgresProfile: postgresProfileStatus({
+      profile,
+      profileStatus: "available",
+      connectionStringEnvPresent,
+      adapterStatus: "missing",
+    }),
+    blockers: [blocker],
+    warnings: [],
+  };
+}
+
+function postgresProfileStatus(options: {
+  profile?: NexusClaimAuthorityProfileConfig;
+  profileId?: string | null;
+  profileStatus: NexusAutomationPostgresClaimAuthorityProfileStatusKind;
+  connectionStringEnvPresent?: boolean | null;
+  adapterStatus: NexusAutomationPostgresClaimAuthorityAdapterStatusKind;
+}): NexusAutomationPostgresClaimAuthorityProfileStatus {
+  return {
+    profileId: options.profile?.id ?? options.profileId ?? null,
+    profileStatus: options.profileStatus,
+    driver: options.profile?.driver ?? null,
+    schema: options.profile?.schema ?? null,
+    connectionStringEnv: options.profile?.connectionStringEnv ?? null,
+    connectionStringEnvPresent: options.connectionStringEnvPresent ?? null,
+    adapterStatus: options.adapterStatus,
+  };
+}
+
+function loadClaimAuthorityProfiles(
+  options: SummarizeNexusAutomationWorkItemClaimAuthorityStatusOptions,
+): NexusClaimAuthorityProfileConfig[] {
+  if (!options.projectRoot || !options.projectConfig) {
+    return [];
+  }
+
+  const homePath = options.homePath
+    ? path.resolve(options.homePath)
+    : options.projectConfig.home
+      ? resolveNexusProjectPath({
+          projectRoot: options.projectRoot,
+          value: options.projectConfig.home,
+        })
+      : defaultNexusHomePath();
+  try {
+    return loadNexusHomeConfigFile(
+      homePath,
+      validateNexusHomeConfigBase,
+    ).claimAuthorityProfiles ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getNexusAutomationStatus(
@@ -285,8 +467,23 @@ export async function getNexusAutomationStatus(
     components,
     discoveryStatus,
   });
+  const workItemClaimAuthority =
+    summarizeNexusAutomationWorkItemClaimAuthorityStatus(automationConfig, {
+      projectRoot,
+      projectConfig,
+      homePath: options.homePath,
+      env: discoveryEnv,
+    });
+  const automationStatusResult = (
+    result: AutomationStatusInput,
+  ): NexusAutomationStatus =>
+    statusResult({
+      ...result,
+      workItemClaimAuthority:
+        result.workItemClaimAuthority ?? workItemClaimAuthority,
+    });
   if (!automationConfig?.enabled) {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -310,7 +507,7 @@ export async function getNexusAutomationStatus(
   const ledger = readNexusAutomationRunLedger(projectRoot, automationConfig);
   const lock = readNexusAutomationStatusLock(projectRoot, automationConfig, now);
   if (lock.status === "active") {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -330,7 +527,7 @@ export async function getNexusAutomationStatus(
     });
   }
   if (lock.status === "invalid") {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -356,7 +553,7 @@ export async function getNexusAutomationStatus(
     now,
   );
   if (!backoff.shouldRun) {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -376,10 +573,8 @@ export async function getNexusAutomationStatus(
     });
   }
 
-  const workItemClaimAuthority =
-    summarizeNexusAutomationWorkItemClaimAuthorityStatus(automationConfig);
   if (workItemClaimAuthority.status === "blocked") {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -415,7 +610,7 @@ export async function getNexusAutomationStatus(
     });
     if (componentProviders.length === 0) {
       const summary = "No workspace component has work tracking configured";
-      return statusResult({
+      return automationStatusResult({
         projectRoot,
         sourceRoot,
         components,
@@ -467,7 +662,7 @@ export async function getNexusAutomationStatus(
     ];
     const failedChecks = preflight.filter((check) => check.status === "failed");
     if (failedChecks.length > 0) {
-      return statusResult({
+      return automationStatusResult({
         projectRoot,
         sourceRoot,
         components,
@@ -512,7 +707,7 @@ export async function getNexusAutomationStatus(
     const eligibleWorkItems = eligibleWork.eligibleWorkItems;
     if (eligibleWork.blockers.length > 0) {
       const summary = eligibleWork.blockers.join("; ");
-      return statusResult({
+      return automationStatusResult({
         projectRoot,
         sourceRoot,
         components,
@@ -556,7 +751,7 @@ export async function getNexusAutomationStatus(
         ? `Agent launch ready with ${eligibleWorkItems.length} eligible work item(s)`
         : "No eligible work item matched the automation selector";
 
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -589,7 +784,7 @@ export async function getNexusAutomationStatus(
 
   if (!primaryComponent.workTracking) {
     const summary = "Primary component work tracking is not configured";
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -652,7 +847,7 @@ export async function getNexusAutomationStatus(
   });
   const failedChecks = preflight.filter((check) => check.status === "failed");
   if (failedChecks.length > 0) {
-    return statusResult({
+    return automationStatusResult({
       projectRoot,
       sourceRoot,
       components,
@@ -686,7 +881,7 @@ export async function getNexusAutomationStatus(
     ? `Selected work item ${selectedWorkItem.id}: ${selectedWorkItem.title}`
     : "No eligible work item matched the automation selector";
 
-  return statusResult({
+  return automationStatusResult({
     projectRoot,
     sourceRoot,
     components,

@@ -210,6 +210,20 @@ Current config shape:
 - `automation.workItemClaims.authority.postgres.connectionProfileId`: host-local
   credential/profile binding reference. Portable project config must not store
   the raw connection string.
+- Host-local `dev-nexus.home.json` may define `claimAuthorityProfiles`:
+
+  ```json
+  {
+    "id": "shared-claims",
+    "backend": "postgres",
+    "driver": "node_postgres",
+    "connectionStringEnv": "DEV_NEXUS_CLAIMS_DATABASE_URL",
+    "schema": "dev_nexus"
+  }
+  ```
+
+  The environment variable name is stored in home config. The connection string
+  value remains outside DevNexus config.
 
 Verification:
 
@@ -225,6 +239,12 @@ Progress:
   silently falling back to optimistic tracker claims when PostgreSQL is selected
   but no runtime adapter is injected. No live database or dependency wiring was
   introduced.
+- 2026-05-22: Slice 3B kept PostgreSQL support in core as an opt-in backend
+  while leaving the driver dependency optional. DevNexus home config now accepts
+  host-local claim authority profiles, rejects stored database connection
+  strings, and automation status reports missing profile, missing environment
+  binding, and missing optional `node_postgres` adapter blockers without opening
+  a database connection.
 
 ### Slice 4: Coordinator Enforcement
 
