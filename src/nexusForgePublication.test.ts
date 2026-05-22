@@ -211,6 +211,7 @@ describe("nexus forge publication facade", () => {
         base: "main",
         title: "Feature",
         body: "Body",
+        draft: true,
       }),
     ).resolves.toMatchObject({
       number: 12,
@@ -262,6 +263,7 @@ describe("nexus forge publication facade", () => {
       base: "main",
       title: "Feature",
       body: "Body",
+      draft: true,
     });
     expect(calls[2]!.body).toEqual({
       merge_method: "squash",
@@ -430,6 +432,7 @@ describe("nexus forge publication facade", () => {
         head: "codex/dev-nexus/github-148",
         base: "main",
         title: "Feature",
+        draft: true,
       }),
     ).resolves.toMatchObject({
       number: 12,
@@ -474,6 +477,7 @@ describe("nexus forge publication facade", () => {
       ["pr", "merge"],
       ["issue", "close"],
     ]);
+    expect(calls[1]!.args).toContain("--draft");
   });
 
   it("reports provider request failures with capability context", async () => {
