@@ -298,6 +298,7 @@ function optionalCredentialPurposes(
 function validateHostingGitHubAppCredentialConfig(
   value: unknown,
   profilePathName: string,
+  credentialKind?: NexusHostingAuthProfileCredentialKind,
 ): NexusHostingGitHubAppCredentialConfig | undefined {
   if (value === undefined) {
     return undefined;
@@ -315,6 +316,7 @@ function validateHostingGitHubAppCredentialConfig(
   );
   const repositories = optionalStringArray(record, "repositories", pathName);
   const apiBaseUrl = optionalString(record, "apiBaseUrl", pathName);
+  const privateKeyPath = optionalString(record, "privateKeyPath", pathName);
   const tokenRefreshBufferSeconds = optionalPositiveInteger(
     record,
     "tokenRefreshBufferSeconds",
@@ -326,12 +328,18 @@ function validateHostingGitHubAppCredentialConfig(
       `${pathName}.appId or ${pathName}.clientId must be set`,
     );
   }
+  if (
+    credentialKind !== "github_app_user_token" &&
+    privateKeyPath === undefined
+  ) {
+    throw new NexusConfigError(`${pathName}.privateKeyPath must be set`);
+  }
 
   return {
     ...(appId !== undefined ? { appId } : {}),
     ...(clientId !== undefined ? { clientId } : {}),
     ...(slug !== undefined ? { slug } : {}),
-    privateKeyPath: requiredString(record, "privateKeyPath", pathName),
+    ...(privateKeyPath !== undefined ? { privateKeyPath } : {}),
     ...(installationAccount !== undefined ? { installationAccount } : {}),
     ...(repositories !== undefined ? { repositories } : {}),
     ...(apiBaseUrl !== undefined ? { apiBaseUrl } : {}),
@@ -374,6 +382,7 @@ function validateHostingAuthProfile(
   const githubApp = validateHostingGitHubAppCredentialConfig(
     record.githubApp,
     pathName,
+    credentialKind,
   );
 
   return {

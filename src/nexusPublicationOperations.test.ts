@@ -11,6 +11,8 @@ import {
   saveNexusHomeConfigFile,
   upsertNexusPublicationPullRequestForComponent,
   validateNexusHomeConfigBase,
+  writeNexusGitHubAppUserToken,
+  type NexusHostingAuthProfileConfig,
   type NexusProjectConfig,
   type NexusPublicationGitPushRunner,
 } from "./index.js";
@@ -113,6 +115,55 @@ describe("publication operations", () => {
       {
         cwd: sourceRoot,
         token: "user-access-token",
+      },
+    ]);
+  });
+
+  it("pushes review branches through stored GitHub App user-to-server credentials", async () => {
+    const { projectRoot, homePath, sourceRoot } = createHumanUserTokenPublicationProject();
+    writeNexusGitHubAppUserToken({
+      homePath,
+      profile: publicationUserTokenProfile(),
+      token: {
+        accessToken: "stored-user-access-token",
+        expiresAt: "2099-05-22T18:00:00.000Z",
+        refreshToken: "stored-refresh-token",
+        refreshTokenExpiresAt: "2099-11-22T10:00:00.000Z",
+        login: "Gabriel-Darbord",
+      },
+      now: () => new Date("2026-05-22T10:00:00.000Z"),
+    });
+    const calls: Array<{ cwd: string; token: string | undefined }> = [];
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/human-attributed-auth",
+      gitRunner: (_args, options) => {
+        calls.push({
+          cwd: options.cwd,
+          token: options.env.DEV_NEXUS_GIT_TOKEN,
+        });
+        return {
+          args: [],
+          stdout: "",
+          stderr: "Everything up-to-date",
+          exitCode: 0,
+        };
+      },
+    });
+
+    expect(result.credential).toMatchObject({
+      profileId: "gabriel-devnexus-app-user",
+      actorId: "gabriel",
+      account: "Gabriel-Darbord",
+      kind: "github_app_user_token",
+    });
+    expect(JSON.stringify(result.push.plan)).not.toContain("stored-user-access-token");
+    expect(calls).toEqual([
+      {
+        cwd: sourceRoot,
+        token: "stored-user-access-token",
       },
     ]);
   });
@@ -802,17 +853,7 @@ function savePublicationHomeConfig(homePath: string): void {
           purposes: ["api", "git"],
           environmentKeys: ["DEV_NEXUS_TEST_APP_TOKEN"],
         },
-        {
-          id: "gabriel-devnexus-app-user",
-          actorId: "gabriel",
-          provider: "github",
-          kind: "human",
-          credentialKind: "github_app_user_token",
-          account: "Gabriel-Darbord",
-          host: "github.com",
-          purposes: ["api", "git"],
-          environmentKeys: ["DEV_NEXUS_TEST_USER_TOKEN"],
-        },
+        publicationUserTokenProfile(),
       ],
       projects: [],
     },
@@ -855,6 +896,26 @@ function publicationProjectConfig(homePath: string): NexusProjectConfig {
           id: "dev-nexus-automation-app",
         },
       },
+    },
+  };
+}
+
+function publicationUserTokenProfile(): NexusHostingAuthProfileConfig {
+  return {
+    id: "gabriel-devnexus-app-user",
+    actorId: "gabriel",
+    provider: "github",
+    kind: "human",
+    credentialKind: "github_app_user_token",
+    account: "Gabriel-Darbord",
+    host: "github.com",
+    purposes: ["api", "git"],
+    environmentKeys: ["DEV_NEXUS_TEST_USER_TOKEN"],
+    githubApp: {
+      clientId: "Iv23client",
+      slug: "devnexus-automation",
+      installationAccount: "Evref-BL",
+      repositories: ["DevNexus"],
     },
   };
 }

@@ -29,6 +29,7 @@ import {
 import {
   loadNexusPublicationAuthProfiles,
   pushNexusPublicationBranch,
+  resolveNexusPublicationHomePath,
   resolveNexusPublicationPolicy,
   type NexusPublicationGitPushResult,
   type NexusPublicationGitPushRunner,
@@ -37,6 +38,7 @@ import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 
 export interface NexusPublicationComponentContext {
   projectRoot: string;
+  homePath: string;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
   publication: NexusAutomationPublicationConfig;
@@ -46,6 +48,7 @@ export interface NexusPublicationComponentContext {
 
 export interface NexusPublicationProjectContext {
   projectRoot: string;
+  homePath: string;
   projectConfig: NexusProjectConfig;
   component: null;
   publication: NexusAutomationPublicationConfig;
@@ -161,6 +164,10 @@ export function resolveNexusPublicationComponentContext(options: {
 }): NexusPublicationComponentContext {
   const projectRoot = path.resolve(required(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
+  const homePath = resolveNexusPublicationHomePath({
+    projectRoot,
+    projectConfig,
+  });
   const component = resolveComponent(
     projectRoot,
     projectConfig,
@@ -176,6 +183,7 @@ export function resolveNexusPublicationComponentContext(options: {
 
   return {
     projectRoot,
+    homePath,
     projectConfig,
     component,
     publication,
@@ -198,6 +206,10 @@ export function resolveNexusPublicationTargetContext(options: {
 
   const projectRoot = path.resolve(required(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
+  const homePath = resolveNexusPublicationHomePath({
+    projectRoot,
+    projectConfig,
+  });
   const publication = resolveNexusPublicationPolicy(projectConfig);
   const authProfiles = loadNexusPublicationAuthProfiles({
     projectRoot,
@@ -210,6 +222,7 @@ export function resolveNexusPublicationTargetContext(options: {
 
   return {
     projectRoot,
+    homePath,
     projectConfig,
     component: null,
     publication,
@@ -368,6 +381,7 @@ async function resolvePublicationCredential(options: {
   const broker = createHostAuthProfileCredentialBroker({
     authProfiles: options.context.authProfiles,
     projectRoot: options.context.projectRoot,
+    homePath: options.context.homePath,
     env: options.runtime.baseEnv,
     commandRunner: options.runtime.credentialCommandRunner,
     fetch: options.runtime.fetch,
