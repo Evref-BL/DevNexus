@@ -997,6 +997,7 @@ interface ParsedPublicationGreenMainPlanCommand {
 interface ParsedPublicationBranchPushCommand {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   repositoryPath?: string;
   branch: string;
   targetBranch?: string | null;
@@ -1009,6 +1010,7 @@ interface ParsedPublicationBranchPushCommand {
 interface ParsedPublicationPullRequestUpsertCommand {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   number?: number | null;
   head: string;
   base?: string | null;
@@ -1021,6 +1023,7 @@ interface ParsedPublicationPullRequestUpsertCommand {
 interface ParsedPublicationPullRequestMergeCommand {
   projectRoot: string;
   componentId?: string;
+  projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
   json?: boolean;
@@ -1402,6 +1405,7 @@ export function usage(): string {
     "",
     "Options for publication branch-push:",
     "  --component <id>          defaults to the primary component",
+    "  --project-repository      target the workspace metadata repository instead of a component",
     "  --branch <branch>         local branch/ref to push through the configured publication actor",
     "  --target-branch <branch>  optional destination branch; target-branch pushes still honor publication policy",
     "  --force-with-lease        update an existing review branch only if the remote ref was not changed unexpectedly",
@@ -1412,6 +1416,7 @@ export function usage(): string {
     "",
     "Options for publication pull-request upsert:",
     "  --component <id>          defaults to the primary component",
+    "  --project-repository      target the workspace metadata repository instead of a component",
     "  --number <number>         update an existing pull request instead of creating one",
     "  --head <branch>           review branch to publish",
     "  --base <branch>           defaults to component or publication target branch",
@@ -1422,6 +1427,7 @@ export function usage(): string {
     "",
     "Options for publication pull-request merge:",
     "  --component <id>          defaults to the primary component",
+    "  --project-repository      target the workspace metadata repository instead of a component",
     "  --number <number>",
     "  --method <merge|squash|rebase>  defaults to merge",
     "  --json",
@@ -2690,6 +2696,7 @@ async function handlePublicationCommand(
     const result = await pushNexusPublicationBranchForComponent({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
       repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
       branch: parsed.branch,
       targetBranch: parsed.targetBranch,
@@ -2715,6 +2722,7 @@ async function handlePublicationCommand(
     const result = await upsertNexusPublicationPullRequestForComponent({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
       number: parsed.number,
       head: parsed.head,
       base: parsed.base,
@@ -2737,6 +2745,7 @@ async function handlePublicationCommand(
     const result = await mergeNexusPublicationPullRequestForComponent({
       projectRoot: parsed.projectRoot,
       componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
       number: parsed.number,
       method: parsed.method,
       baseEnv: dependencies.env ?? process.env,
@@ -5864,6 +5873,9 @@ function parsePublicationBranchPushCommand(
       case "--component":
         parsed.componentId = next();
         break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
       case "--repository-path":
         parsed.repositoryPath = next();
         break;
@@ -5893,6 +5905,7 @@ function parsePublicationBranchPushCommand(
   if (!parsed.branch) {
     throw new Error("publication branch-push requires --branch");
   }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
 
   return parsed as ParsedPublicationBranchPushCommand;
 }
@@ -5924,6 +5937,9 @@ function parsePublicationPullRequestUpsertCommand(
     switch (arg) {
       case "--component":
         parsed.componentId = next();
+        break;
+      case "--project-repository":
+        parsed.projectRepository = true;
         break;
       case "--number":
         parsed.number = parsePositiveInteger(next(), arg);
@@ -5959,6 +5975,7 @@ function parsePublicationPullRequestUpsertCommand(
   if (parsed.body !== undefined && parsed.bodyFile) {
     throw new Error("publication pull-request upsert accepts --body or --body-file, not both");
   }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
 
   return parsed as ParsedPublicationPullRequestUpsertCommand;
 }
@@ -5991,6 +6008,9 @@ function parsePublicationPullRequestMergeCommand(
       case "--component":
         parsed.componentId = next();
         break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
       case "--number":
         parsed.number = parsePositiveInteger(next(), arg);
         break;
@@ -6007,8 +6027,18 @@ function parsePublicationPullRequestMergeCommand(
   if (!parsed.number) {
     throw new Error("publication pull-request merge requires --number");
   }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
 
   return parsed as ParsedPublicationPullRequestMergeCommand;
+}
+
+function assertSinglePublicationTarget(
+  componentId: string | undefined,
+  projectRepository: boolean | undefined,
+): void {
+  if (componentId && projectRepository) {
+    throw new Error("publication accepts --component or --project-repository, not both");
+  }
 }
 
 function parsePublicationPullRequestMergeMethod(
@@ -9397,6 +9427,7 @@ function printPublicationBranchPushResult(
     dryRun: Boolean(parsed.dryRun),
     projectRoot: result.projectRoot,
     componentId: result.componentId,
+    target: result.target,
     repository: result.repository,
     branch: result.branch,
     targetBranch: result.targetBranch,
@@ -9422,7 +9453,7 @@ function printPublicationBranchPushResult(
     stdout,
     `DevNexus publication branch ${parsed.dryRun ? "push dry-run" : "pushed"}.`,
   );
-  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branch}`);
   if (result.targetBranch) {
@@ -9452,6 +9483,7 @@ function printPublicationPullRequestUpsertResult(
     ok: true,
     projectRoot: result.projectRoot,
     componentId: result.componentId,
+    target: result.target,
     repository: result.repository,
     credential: result.credential,
     pullRequest: result.pullRequest,
@@ -9462,7 +9494,7 @@ function printPublicationPullRequestUpsertResult(
   }
 
   writeLine(stdout, "DevNexus publication pull request upserted.");
-  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
   if (result.pullRequest.url) {
@@ -9481,6 +9513,7 @@ function printPublicationPullRequestMergeResult(
     ok: result.merge.merged,
     projectRoot: result.projectRoot,
     componentId: result.componentId,
+    target: result.target,
     repository: result.repository,
     credential: result.credential,
     pullRequest: result.pullRequest,
@@ -9492,7 +9525,7 @@ function printPublicationPullRequestMergeResult(
   }
 
   writeLine(stdout, "DevNexus publication pull request merged.");
-  writeLine(stdout, `  Component: ${result.componentId}`);
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
   writeLine(stdout, `  Method: ${result.pullRequest.method}`);
@@ -9505,6 +9538,16 @@ function printPublicationPullRequestMergeResult(
   }
   writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
   writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
+}
+
+function formatPublicationTarget(
+  target: NexusPublicationBranchPushResult["target"],
+): string {
+  if (target.kind === "project") {
+    return `project ${target.id}`;
+  }
+
+  return `component ${target.componentId ?? target.id}`;
 }
 
 function printPublicationTrainReadinessReport(

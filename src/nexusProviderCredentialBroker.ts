@@ -389,6 +389,7 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
         );
       }
       assertProfileActorMatches(profile, request);
+      assertProfileRepositoryMatches(profile, request);
       return profile;
     }
 
@@ -401,14 +402,26 @@ class HostAuthProfileCredentialBroker implements NexusProviderCredentialBroker {
     const actorProfiles = hostProfiles.filter((profile) =>
       profileActorMatches(profile, request),
     );
+    const repositoryProfiles = actorProfiles.filter((profile) =>
+      profileRepositoryMatches(profile, request),
+    );
 
-    if (actorProfiles.length === 1) {
-      return actorProfiles[0]!;
+    if (repositoryProfiles.length === 1) {
+      return repositoryProfiles[0]!;
     }
-    if (actorProfiles.length > 1) {
+    if (repositoryProfiles.length > 1) {
       throw new NexusProviderCredentialBrokerError(
         "ambiguous_profile",
         `Multiple auth profiles match provider ${request.provider}; specify profileId.`,
+      );
+    }
+    if (actorProfiles.length > 0) {
+      const repository = request.repository?.owner && request.repository.name
+        ? `${request.repository.owner}/${request.repository.name}`
+        : request.repository?.name ?? request.repository?.path ?? "<unspecified>";
+      throw new NexusProviderCredentialBrokerError(
+        "repository_not_selected",
+        `No ${request.provider} auth profile matches repository ${repository}.`,
       );
     }
     if (
@@ -887,6 +900,70 @@ function profileActorMatches(
   }
 
   return true;
+}
+
+function assertProfileRepositoryMatches(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+): void {
+  if (profileRepositoryMatches(profile, request)) {
+    return;
+  }
+
+  const repository = request.repository?.owner && request.repository.name
+    ? `${request.repository.owner}/${request.repository.name}`
+    : request.repository?.name ?? request.repository?.path ?? "<unspecified>";
+  throw new NexusProviderCredentialBrokerError(
+    "repository_not_selected",
+    `Auth profile ${profile.id} does not match repository ${repository}.`,
+    { profileId: profile.id },
+  );
+}
+
+function profileRepositoryMatches(
+  profile: NexusHostingAuthProfileConfig,
+  request: NexusProviderCredentialRequest,
+): boolean {
+  const githubApp = profile.githubApp;
+  if (!githubApp || normalizeProviderName(profile.provider) !== "github") {
+    return true;
+  }
+
+  const requestedOwner = request.repository?.owner?.trim();
+  const requestedName = request.repository?.name?.trim();
+  if (!requestedName) {
+    return true;
+  }
+
+  const installationAccount = githubApp.installationAccount?.trim();
+  if (
+    installationAccount &&
+    requestedOwner &&
+    installationAccount.toLowerCase() !== requestedOwner.toLowerCase()
+  ) {
+    return false;
+  }
+
+  const selected = githubApp.repositories;
+  if (!selected || selected.length === 0) {
+    return true;
+  }
+
+  return selected.some((repository) => {
+    const normalized = repository.trim();
+    if (!normalized) {
+      return false;
+    }
+    const [owner, name] = normalized.includes("/")
+      ? normalized.split("/", 2)
+      : [installationAccount ?? requestedOwner, normalized];
+    return (
+      (!owner ||
+        !requestedOwner ||
+        owner.toLowerCase() === requestedOwner.toLowerCase()) &&
+      name?.toLowerCase() === requestedName.toLowerCase()
+    );
+  });
 }
 
 function credentialPurposes(

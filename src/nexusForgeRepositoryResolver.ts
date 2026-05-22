@@ -60,6 +60,24 @@ export function resolveNexusGitHubRepository(
   };
 }
 
+export function resolveNexusGitHubRepositoryFromRemoteUrl(
+  remoteUrl: string | null | undefined,
+  context: string,
+  options: { trackerId?: string } = {},
+): NexusGitHubRepositorySelection {
+  const parsed = parseGitHubRemoteUrl(remoteUrl);
+  if (!parsed) {
+    throw new Error(`Project repository remote must be a GitHub URL for ${context}.`);
+  }
+
+  return {
+    owner: parsed.owner,
+    name: parsed.name,
+    host: parsed.host,
+    trackerId: options.trackerId ?? "project",
+  };
+}
+
 export function nexusForgeRepositoryFromGitHubRepository(
   repository: NexusGitHubRepositorySelection,
 ): NexusForgeRepositoryRef {
@@ -68,5 +86,52 @@ export function nexusForgeRepositoryFromGitHubRepository(
     owner: repository.owner,
     name: repository.name,
     host: repository.host,
+  };
+}
+
+function parseGitHubRemoteUrl(
+  remoteUrl: string | null | undefined,
+): { host: string; owner: string; name: string } | null {
+  const normalized = remoteUrl?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const scp = /^(?:[^@]+@)?([^:]+):([^/]+)\/(.+)$/u.exec(normalized);
+  if (scp) {
+    return normalizeGitHubRepositoryParts(scp[1]!, scp[2]!, scp[3]!);
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (url.protocol !== "https:" && url.protocol !== "http:" && url.protocol !== "ssh:") {
+      return null;
+    }
+    const [owner, name, ...extra] = url.pathname.replace(/^\/+/u, "").split("/");
+    if (extra.length > 0) {
+      return null;
+    }
+    return normalizeGitHubRepositoryParts(url.hostname, owner, name);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGitHubRepositoryParts(
+  host: string | undefined,
+  owner: string | undefined,
+  name: string | undefined,
+): { host: string; owner: string; name: string } | null {
+  const normalizedHost = host?.trim() || "github.com";
+  const normalizedOwner = owner?.trim();
+  const normalizedName = name?.trim().replace(/\.git$/u, "");
+  if (!normalizedOwner || !normalizedName || normalizedName.includes("/")) {
+    return null;
+  }
+
+  return {
+    host: normalizedHost,
+    owner: normalizedOwner,
+    name: normalizedName,
   };
 }
