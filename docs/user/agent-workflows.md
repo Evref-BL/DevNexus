@@ -170,6 +170,12 @@ Use `initiative-finalization` to get the final PR action; for GitHub forks it
 renders the `owner:branch` head ref when the fallback remote URL identifies the
 fork.
 
+For stacked or hybrid work, pass `--initiative-parent` and
+`--initiative-stack-position` when a slice is not the first slice in the stack.
+The generated worker context records the parent branch and stack position, so
+later agents can distinguish a normal update from a restack. Restacking a
+pushed branch requires human approval when it needs `--force-with-lease`.
+
 If `initiative-report` or `initiative-finalization` says the review branch is
 behind or diverged, prefer the reported merge-update command unless a human
 explicitly chooses rebase. Rebase rewrites the branch and needs a

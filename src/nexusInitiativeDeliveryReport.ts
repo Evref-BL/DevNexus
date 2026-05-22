@@ -16,6 +16,7 @@ import {
 } from "./nexusInitiativeDeliveryPlan.js";
 import type {
   NexusInitiativeDeliveryBranchPublicationSummary,
+  NexusInitiativeDeliveryPolicySummary,
   NexusInitiativeDeliveryPullRequestHeadSummary,
 } from "./nexusInitiativeDeliveryPolicy.js";
 import {
@@ -101,6 +102,7 @@ export interface NexusInitiativeDeliveryReportItem {
   providerNoise: string;
   integrationBranch: string | null;
   sliceBranchPattern: string;
+  stack: NexusInitiativeDeliveryPolicySummary["branchPlan"]["stack"];
   finalReviewTarget: string;
   finalPublicationTarget: string;
   finalPullRequest: boolean;
@@ -247,6 +249,7 @@ function reportItem(options: {
     providerNoise: initiative.providerNoise,
     integrationBranch: branchPlan.integrationBranch,
     sliceBranchPattern: branchPlan.sliceBranchPattern,
+    stack: branchPlan.stack,
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
     finalPullRequest: initiative.finalPullRequest,

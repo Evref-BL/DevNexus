@@ -18,6 +18,33 @@ export interface NexusInitiativeDeliveryBranchPlanSummary {
   finalPublicationTarget: string;
   usesStackParent: boolean;
   requiresIntegrationBranchApproval: boolean;
+  stack: NexusInitiativeDeliveryStackSummary;
+}
+
+export type NexusInitiativeDeliveryStackStatus =
+  | "not_applicable"
+  | "active"
+  | "excluded_from_publication";
+
+export interface NexusInitiativeDeliveryStackSliceSummary {
+  order: number;
+  sliceSlug: string;
+  branch: string;
+  parentBranch: string | null;
+  childBranches: string[];
+  reviewTarget: string;
+  publicationEligible: boolean;
+}
+
+export interface NexusInitiativeDeliveryStackSummary {
+  status: NexusInitiativeDeliveryStackStatus;
+  topology: NexusInitiativeDeliveryTopology;
+  publicationEligible: boolean;
+  rootBranch: string | null;
+  defaultParentBranch: string | null;
+  defaultReviewTarget: string;
+  finalPublicationTarget: string;
+  slices: NexusInitiativeDeliveryStackSliceSummary[];
 }
 
 export interface NexusInitiativeDeliveryBranchPublicationSummary {
@@ -152,8 +179,35 @@ export function summarizeNexusInitiativeDeliveryPolicy(options: {
       finalPublicationTarget: options.targetBranch,
       usesStackParent,
       requiresIntegrationBranchApproval: usesIntegrationBranch,
+      stack: stackSummary({
+        topology: config.defaultTopology,
+        usesStackParent,
+        integrationBranch: usesIntegrationBranch ? integrationBranch : null,
+        targetBranch: options.targetBranch,
+        defaultSliceReviewTarget,
+      }),
     },
     warnings,
+  };
+}
+
+export function buildNexusInitiativeStackSliceSummary(options: {
+  order: number;
+  sliceSlug: string;
+  branch: string;
+  parentBranch: string | null;
+  childBranches?: string[];
+  reviewTarget: string;
+  publicationEligible: boolean;
+}): NexusInitiativeDeliveryStackSliceSummary {
+  return {
+    order: options.order,
+    sliceSlug: options.sliceSlug,
+    branch: options.branch,
+    parentBranch: options.parentBranch,
+    childBranches: [...(options.childBranches ?? [])],
+    reviewTarget: options.reviewTarget,
+    publicationEligible: options.publicationEligible,
   };
 }
 
@@ -247,6 +301,52 @@ function initiativeDeliveryWarnings(options: {
     warnings.push("initiative branch publication requires a configured publication remote");
   }
   return warnings;
+}
+
+function stackSummary(options: {
+  topology: NexusInitiativeDeliveryTopology;
+  usesStackParent: boolean;
+  integrationBranch: string | null;
+  targetBranch: string;
+  defaultSliceReviewTarget: string;
+}): NexusInitiativeDeliveryStackSummary {
+  const publicationEligible = options.topology !== "throwaway_rehearsal";
+  if (!publicationEligible) {
+    const rootBranch = options.integrationBranch ?? options.targetBranch;
+    return {
+      status: "excluded_from_publication",
+      topology: options.topology,
+      publicationEligible,
+      rootBranch,
+      defaultParentBranch: rootBranch,
+      defaultReviewTarget: options.defaultSliceReviewTarget,
+      finalPublicationTarget: options.targetBranch,
+      slices: [],
+    };
+  }
+  if (!options.usesStackParent) {
+    return {
+      status: "not_applicable",
+      topology: options.topology,
+      publicationEligible,
+      rootBranch: null,
+      defaultParentBranch: null,
+      defaultReviewTarget: options.defaultSliceReviewTarget,
+      finalPublicationTarget: options.targetBranch,
+      slices: [],
+    };
+  }
+  const rootBranch = options.integrationBranch ?? options.targetBranch;
+  return {
+    status: publicationEligible ? "active" : "excluded_from_publication",
+    topology: options.topology,
+    publicationEligible,
+    rootBranch,
+    defaultParentBranch: rootBranch,
+    defaultReviewTarget: options.defaultSliceReviewTarget,
+    finalPublicationTarget: options.targetBranch,
+    slices: [],
+  };
 }
 
 function initiativeBranchPublicationSummary(options: {

@@ -250,6 +250,14 @@ Initiative delivery uses three read-only surfaces:
   final publication. A green, approved pull request still stops at the human
   publication gate unless policy explicitly grants more authority.
 
+For stacked and hybrid topology, the plan also carries a stack summary:
+publication eligibility, root branch, default parent branch, review target, and
+any known slice entries. Worker context records the selected slice parent and
+stack position when the slice worktree is prepared. DevNexus also exposes a
+provider-neutral restack plan model for branch graph facts; it reports which
+branches need update, which pushed branches require `--force-with-lease`, and
+which updates need human approval.
+
 `finalPullRequestCreation` controls when the final initiative pull request is
 opened. The default, `at_review_gate`, avoids creating a long-lived PR while the
 initiative branch is still accumulating commits. Use `at_initiative_start` only

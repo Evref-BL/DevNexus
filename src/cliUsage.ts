@@ -300,6 +300,8 @@ export function usage(): string {
     "  --no-base-ref             create the branch from the source checkout HEAD",
     "  --initiative <id>         derive branch/base/context from initiative delivery policy",
     "  --initiative-slice <slug> slice slug for initiative branch naming",
+    "  --initiative-parent <branch> parent branch for stacked initiative slices",
+    "  --initiative-stack-position <n> 1-based stack position for this slice",
     "  --branch-intent <prefix>  branch intent prefix such as feat, fix, chore, or docs",
     "  --host <id>               lease host id; defaults to local hostname",
     "  --agent <id>              optional lease agent/chat id",

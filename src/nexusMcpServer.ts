@@ -704,6 +704,8 @@ const tools: McpTool[] = [
         baseRef: { type: ["string", "null"] },
         initiativeId: { type: ["string", "null"] },
         initiativeSlice: { type: ["string", "null"] },
+        initiativeParentBranch: { type: ["string", "null"] },
+        initiativeStackPosition: { type: "number" },
         branchIntent: { type: ["string", "null"] },
         hostId: { type: ["string", "null"] },
         agentId: { type: ["string", "null"] },
@@ -1711,6 +1713,16 @@ export async function callDevNexusMcpTool(
           initiativeSlice: optionalNullableString(
             args,
             "initiativeSlice",
+            "arguments",
+          ),
+          initiativeParentBranch: optionalNullableString(
+            args,
+            "initiativeParentBranch",
+            "arguments",
+          ),
+          initiativeStackPosition: optionalPositiveInteger(
+            args,
+            "initiativeStackPosition",
             "arguments",
           ),
           branchIntent: optionalNullableString(args, "branchIntent", "arguments"),

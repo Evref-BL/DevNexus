@@ -110,6 +110,7 @@ export interface NexusInitiativeFinalizationPlanItem {
   componentId: string;
   initiativeId: string;
   integrationBranch: string | null;
+  stack: NexusInitiativeDeliveryReportItem["stack"];
   finalPublicationTarget: string;
   finalPullRequestCreation: string;
   finalPullRequestHead: NexusInitiativeDeliveryReportItem["finalPullRequestHead"];
@@ -228,6 +229,7 @@ function finalizationItem(options: {
     componentId: options.item.componentId,
     initiativeId: options.item.initiativeId,
     integrationBranch: options.item.integrationBranch,
+    stack: options.item.stack,
     finalPublicationTarget: options.item.finalPublicationTarget,
     finalPullRequestCreation: options.item.finalPullRequestCreation,
     finalPullRequestHead: options.item.finalPullRequestHead,

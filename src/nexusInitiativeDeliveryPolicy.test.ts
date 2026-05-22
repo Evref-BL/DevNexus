@@ -77,6 +77,14 @@ describe("initiative delivery policy", () => {
         finalPublicationTarget: "main",
         usesStackParent: true,
         requiresIntegrationBranchApproval: true,
+        stack: {
+          status: "active",
+          topology: "hybrid",
+          publicationEligible: true,
+          rootBranch: "feat/codex-goals",
+          defaultParentBranch: "feat/codex-goals",
+          defaultReviewTarget: "feat/codex-goals",
+        },
       },
     });
   });
@@ -107,8 +115,44 @@ describe("initiative delivery policy", () => {
       defaultSliceReviewTarget: "main",
       finalReviewTarget: "main",
       requiresIntegrationBranchApproval: false,
+      stack: {
+        status: "not_applicable",
+        publicationEligible: true,
+        rootBranch: null,
+        defaultParentBranch: null,
+      },
     });
     expect(summary.branchPlan.sliceBranchPattern).toBe("fix/small-fixes/{slice}");
+  });
+
+  it("summarizes stacked topology with target-rooted slice parents", () => {
+    const summary = summarizeNexusInitiativeDeliveryPolicy({
+      config: initiativeConfig({
+        enabled: true,
+        activeInitiativeId: "stacked-work",
+        defaultTopology: "stacked",
+      }),
+      fallbackScopeId: null,
+      unscopedName: "manual",
+      targetBranch: "main",
+      publicationRemote: "app",
+    });
+
+    expect(summary.branchPlan).toMatchObject({
+      topology: "stacked",
+      integrationBranch: null,
+      defaultSliceBaseBranch: "main",
+      defaultSliceReviewTarget: "parent_slice_or_target",
+      stack: {
+        status: "active",
+        topology: "stacked",
+        publicationEligible: true,
+        rootBranch: "main",
+        defaultParentBranch: "main",
+        defaultReviewTarget: "parent_slice_or_target",
+        slices: [],
+      },
+    });
   });
 
   it("uses publication train scope when no active initiative id is configured", () => {
@@ -143,6 +187,12 @@ describe("initiative delivery policy", () => {
     });
 
     expect(summary.activeScopeId).toBe("manual");
+    expect(summary.branchPlan.stack).toMatchObject({
+      status: "excluded_from_publication",
+      publicationEligible: false,
+      rootBranch: "feat/manual",
+      defaultParentBranch: "feat/manual",
+    });
     expect(summary.warnings).toEqual([
       "initiative delivery has no active initiative id; using manual",
       "throw-away rehearsal branches must not become publication sources",

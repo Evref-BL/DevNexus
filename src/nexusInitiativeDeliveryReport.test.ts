@@ -47,6 +47,11 @@ describe("initiative delivery report", () => {
       status: "needs_final_pull_request",
       nextAction: "create_pull_request",
       finalPullRequestCreation: "at_review_gate",
+      stack: {
+        status: "active",
+        rootBranch: "feat/codex-goals",
+        defaultParentBranch: "feat/codex-goals",
+      },
       reasons: ["final pull request is created at the review gate"],
     });
   });
