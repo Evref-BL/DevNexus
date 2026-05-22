@@ -4,8 +4,9 @@ import http, {
   type ServerResponse,
 } from "node:http";
 import { randomBytes } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   buildNexusDashboardHostActionQueue,
@@ -110,6 +111,11 @@ export type NexusDashboardLocalResourceOpener = (
 interface DashboardThreadActionContext {
   threadId: string | null;
   cwd: string | null;
+}
+
+interface NexusDashboardLocalAppIcon {
+  readonly body: Buffer | string;
+  readonly contentType: string;
 }
 
 class NexusDashboardRouteError extends Error {
@@ -278,6 +284,9 @@ export function renderNexusDashboardClientModule(): string {
     ".dn-open-option svg, .dn-open-trigger svg, .dn-header-path-control svg { flex: 0 0 auto; width: 16px; height: 16px; }",
     ".dn-open-option svg:not(.dn-app-icon), .dn-open-trigger svg, .dn-header-path-control svg:not(.dn-app-icon) { stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }",
     ".dn-app-icon { overflow: visible; } .dn-app-icon path, .dn-app-icon rect { stroke: none; } .dn-app-icon-vscode path { fill: #2f80ed; } .dn-app-icon-finder .finder-left { fill: #5bb6ff; } .dn-app-icon-finder .finder-right { fill: #dbeeff; } .dn-app-icon-finder path { stroke: #123354; stroke-width: 0.75; fill: none; } .dn-app-icon-terminal rect { fill: #24272e; } .dn-app-icon-terminal path { stroke: #d7f7df; stroke-width: 1.35; fill: none; stroke-linecap: round; stroke-linejoin: round; }",
+    ".dn-app-icon-shell { display: inline-grid; place-items: center; flex: 0 0 auto; width: 16px; height: 16px; }",
+    ".dn-app-icon-shell > * { grid-area: 1 / 1; }",
+    ".dn-app-icon-img { position: relative; z-index: 1; width: 16px; height: 16px; border-radius: 3px; object-fit: contain; opacity: 0; }",
     ".dn-open-option .dn-action-label { display: block; }",
     ".dn-theme-toggle { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--dn-border); border-radius: 8px; background: var(--dn-surface); }",
     ".dn-theme-toggle button { min-width: 66px; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--dn-muted); background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 800; }",
@@ -755,11 +764,11 @@ export function renderNexusDashboardClientModule(): string {
     "function renderPathOpenMenu(target, label, pathValue) {",
     "  const safeTarget = target === 'home' ? 'home' : 'project';",
     "  const value = pathValue ?? '';",
-    "  return `<details class=\"dn-open-menu dn-header-path-menu\"><summary class=\"dn-header-path-control\">${finderIcon()}<span class=\"dn-header-path-copy\"><span class=\"dn-header-path-label\">${escapeHtml(label)}</span><strong class=\"dn-header-path-value\" title=\"${escapeHtml(value)}\">${escapeHtml(compactPath(value))}</strong></span><span class=\"dn-open-chevron-shell\">${chevronDownIcon()}</span></summary>${renderOpenOptions(safeTarget)}</details>`;",
+    "  return `<details class=\"dn-open-menu dn-header-path-menu\"><summary class=\"dn-header-path-control\">${localAppIcon('file', finderIcon())}<span class=\"dn-header-path-copy\"><span class=\"dn-header-path-label\">${escapeHtml(label)}</span><strong class=\"dn-header-path-value\" title=\"${escapeHtml(value)}\">${escapeHtml(compactPath(value))}</strong></span><span class=\"dn-open-chevron-shell\">${chevronDownIcon()}</span></summary>${renderOpenOptions(safeTarget)}</details>`;",
     "}",
     "",
     "function renderOpenOptions(safeTarget) {",
-    "  return `<div class=\"dn-open-options\"><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"code\">${codeIcon()}<span class=\"dn-action-label\">VS Code</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"file\">${finderIcon()}<span class=\"dn-action-label\">Finder</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"terminal\">${terminalIcon()}<span class=\"dn-action-label\">Terminal</span></button></div>`;",
+    "  return `<div class=\"dn-open-options\"><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"code\">${localAppIcon('code', codeIcon())}<span class=\"dn-action-label\">VS Code</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"file\">${localAppIcon('file', finderIcon())}<span class=\"dn-action-label\">Finder</span></button><button class=\"dn-open-option\" type=\"button\" data-open-target=\"${safeTarget}\" data-open-app=\"terminal\">${localAppIcon('terminal', terminalIcon())}<span class=\"dn-action-label\">Terminal</span></button></div>`;",
     "}",
     "",
     "const projectAccentCount = 7;",
@@ -1360,6 +1369,11 @@ export function renderNexusDashboardClientModule(): string {
     "",
     "function codeIcon() {",
     "  return '<svg class=\"dn-app-icon dn-app-icon-vscode\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M13.9 2.1 10.7.7 5.6 5.6 2.5 3.3 1.1 4 4.2 8l-3.1 4 1.4.7 3.1-2.3 5.1 4.9 3.2-1.4V2.1zM10.6 5v6L7.2 8l3.4-3z\"/></svg>';",
+    "}",
+    "",
+    "function localAppIcon(app, fallback) {",
+    "  const src = `/api/local/app-icon?app=${encodeURIComponent(app)}`;",
+    "  return `<span class=\"dn-app-icon-shell\"><img class=\"dn-app-icon-img\" src=\"${src}\" alt=\"\" aria-hidden=\"true\" onload=\"this.style.opacity='1';this.nextElementSibling.style.display='none'\" onerror=\"this.remove()\">${fallback}</span>`;",
     "}",
     "",
     "function finderIcon() {",
@@ -2071,6 +2085,11 @@ async function routeDashboardRequest(
       );
       return;
     }
+    if (url.pathname === "/api/local/app-icon") {
+      const icon = await dashboardLocalAppIcon(localOpenAppFromUrl(url));
+      sendBinary(response, icon.contentType, icon.body);
+      return;
+    }
     if (url.pathname === "/api/dashboard/shell") {
       const selection = await resolveDashboardWorkspaceSelection(
         snapshotOptions,
@@ -2610,6 +2629,105 @@ async function dashboardLocalOpenPath(
   return selection.snapshotOptions.projectRoot;
 }
 
+function localOpenAppFromUrl(url: URL): NexusDashboardLocalOpenApp {
+  const value = url.searchParams.get("app");
+  if (value === "file" || value === "code" || value === "terminal") {
+    return value;
+  }
+  throw new NexusDashboardRouteError(
+    "invalid_app",
+    "local app icon requires app=file, app=code, or app=terminal",
+    400,
+  );
+}
+
+async function dashboardLocalAppIcon(
+  app: NexusDashboardLocalOpenApp,
+): Promise<NexusDashboardLocalAppIcon> {
+  const pngPath = await dashboardDarwinAppIconPng(app);
+  if (pngPath) {
+    return {
+      body: await fs.promises.readFile(pngPath),
+      contentType: "image/png",
+    };
+  }
+  return {
+    body: fallbackLocalAppIconSvg(app),
+    contentType: "image/svg+xml; charset=utf-8",
+  };
+}
+
+async function dashboardDarwinAppIconPng(
+  app: NexusDashboardLocalOpenApp,
+): Promise<string | null> {
+  if (process.platform !== "darwin") return null;
+  const source = dashboardDarwinAppIconSource(app);
+  if (!source) return null;
+  try {
+    const stat = await fs.promises.stat(source);
+    const cacheRoot = path.join(os.tmpdir(), "dev-nexus-dashboard-app-icons");
+    await fs.promises.mkdir(cacheRoot, { recursive: true });
+    const target = path.join(
+      cacheRoot,
+      `${app}-${stat.size}-${Math.trunc(stat.mtimeMs)}.png`,
+    );
+    if (!fs.existsSync(target)) {
+      await execFilePromise("sips", [
+        "-s",
+        "format",
+        "png",
+        source,
+        "--out",
+        target,
+      ]);
+    }
+    return target;
+  } catch {
+    return null;
+  }
+}
+
+function dashboardDarwinAppIconSource(
+  app: NexusDashboardLocalOpenApp,
+): string | null {
+  const homeApplications = path.join(os.homedir(), "Applications");
+  const candidates: Record<NexusDashboardLocalOpenApp, string[]> = {
+    code: [
+      "/Applications/Visual Studio Code.app/Contents/Resources/Code.icns",
+      path.join(homeApplications, "Visual Studio Code.app/Contents/Resources/Code.icns"),
+      "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/Code - Insiders.icns",
+      path.join(homeApplications, "Visual Studio Code - Insiders.app/Contents/Resources/Code - Insiders.icns"),
+    ],
+    file: [
+      "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FinderIcon.icns",
+    ],
+    terminal: [
+      "/System/Applications/Utilities/Terminal.app/Contents/Resources/Terminal.icns",
+      "/Applications/Utilities/Terminal.app/Contents/Resources/Terminal.icns",
+    ],
+  };
+  return candidates[app].find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+function execFilePromise(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { windowsHide: true }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+function fallbackLocalAppIconSvg(app: NexusDashboardLocalOpenApp): string {
+  const colors: Record<NexusDashboardLocalOpenApp, string> = {
+    code: "#2f80ed",
+    file: "#5bb6ff",
+    terminal: "#24272e",
+  };
+  const color = colors[app];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="${color}"/></svg>`;
+}
+
 async function openDashboardLocalResource(
   request: NexusDashboardLocalOpenRequest,
 ): Promise<NexusDashboardLocalOpenResult> {
@@ -2731,6 +2849,19 @@ function sendText(
   response.writeHead(statusCode, {
     "content-type": contentType,
     "cache-control": "no-store",
+  });
+  response.end(body);
+}
+
+function sendBinary(
+  response: ServerResponse,
+  contentType: string,
+  body: Buffer | string,
+  statusCode = 200,
+): void {
+  response.writeHead(statusCode, {
+    "content-type": contentType,
+    "cache-control": "public, max-age=86400",
   });
   response.end(body);
 }

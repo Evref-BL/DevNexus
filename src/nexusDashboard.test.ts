@@ -1147,6 +1147,8 @@ describe("nexus dashboard", () => {
     expect(module).toContain("/api/local/open");
     expect(module).toContain("data-open-target");
     expect(module).toContain("data-open-app");
+    expect(module).toContain("/api/local/app-icon?app=");
+    expect(module).toContain("dn-app-icon-img");
     expect(module).toContain("Finder");
     expect(module).toContain("VS Code");
     expect(module).toContain("Terminal");
@@ -1625,7 +1627,9 @@ describe("nexus dashboard", () => {
     expect(html).toContain("dn-header-path-menu");
     expect(html).toContain("dn-header-path-control");
     expect(html).toContain("dn-header-path-value");
+    expect(html).toContain("dn-app-icon-img");
     expect(html).toContain("dn-app-icon-finder");
+    expect(html).toContain("/api/local/app-icon?app=file");
     expect(html).toContain("/Users/gabriel.darbord/.dev-nexus");
     expect(html).toContain('data-open-target="home"');
     expect(html).toContain("dn-header-stamp");
@@ -2858,8 +2862,15 @@ describe("nexus dashboard", () => {
           }),
         },
       ).then(async (response) => ({
+          status: response.status,
+          body: await response.json(),
+        }));
+      const localAppIcon = await fetch(
+        `${server.url}api/local/app-icon?app=file`,
+      ).then(async (response) => ({
         status: response.status,
-        body: await response.json(),
+        contentType: response.headers.get("content-type") ?? "",
+        bytes: (await response.arrayBuffer()).byteLength,
       }));
 
       expect(openProject.status).toBe(200);
@@ -2873,6 +2884,9 @@ describe("nexus dashboard", () => {
       });
       expect(rejected.status).toBe(400);
       expect(rejected.body.error.message).toContain("path is server-controlled");
+      expect(localAppIcon.status).toBe(200);
+      expect(localAppIcon.contentType).toMatch(/^image\//u);
+      expect(localAppIcon.bytes).toBeGreaterThan(0);
       expect(opened).toEqual([
         {
           app: "terminal",
