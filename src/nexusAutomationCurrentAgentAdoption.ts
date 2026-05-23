@@ -114,6 +114,12 @@ import type {
   WorkTrackerProvider,
   WorkTrackingConfig,
 } from "./workTrackingTypes.js";
+import {
+  isAsciiIdentifierSegmentCharacter,
+  isLowerAsciiIdentifierSegmentCharacter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 import type {
   WorktreePublicationDecisionInput,
   WorktreeVerificationInput,
@@ -2222,11 +2228,12 @@ function timestampSegment(timestamp: string): string {
 }
 
 function safeIdSegment(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isLowerAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   if (!normalized) {
     throw new NexusAutomationCurrentAgentAdoptionError(
       "runIdPrefix must contain at least one safe character",
@@ -2309,10 +2316,12 @@ function normalizeStringArray(value: unknown, name: string): string[] {
 }
 
 function safePathSegment(value: string): string {
-  const normalized = value
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim(),
+      (character) => !isAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   if (!normalized) {
     throw new NexusAutomationCurrentAgentAdoptionError(
       "runId must contain at least one safe character",

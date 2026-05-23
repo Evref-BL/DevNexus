@@ -18,6 +18,11 @@ import {
   type NexusProjectHostingRepositoryVisibility,
   type NexusProjectHostingStatusResult,
 } from "./nexusProjectHosting.js";
+import {
+  isLowerAsciiIdentifierSegmentCharacter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 const DEFAULT_FIXTURE_PREFIX = "dev-nexus-fixture-";
 const DEFAULT_MAX_PASSES = 8;
@@ -562,15 +567,20 @@ function firstApplyProblem(
 }
 
 function truthyEnvValue(value: string | undefined): boolean {
-  return /^(1|true|yes|on)$/iu.test(value?.trim() ?? "");
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "1" ||
+    normalized === "true" ||
+    normalized === "yes" ||
+    normalized === "on";
 }
 
 function normalizeFixturePart(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isLowerAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   return normalized || defaultFixtureRunId();
 }
 

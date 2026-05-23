@@ -45,6 +45,11 @@ import type {
   WorkItemRef,
   WorkStatus,
 } from "./workTrackingTypes.js";
+import {
+  isLowerAsciiIdentifierSegmentCharacter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export type NexusAutomationCoordinatorLoopAction =
   | "launched"
@@ -1518,11 +1523,12 @@ function coordinatorLoopCycleId(
 }
 
 function safeIdSegment(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isLowerAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   if (!normalized) {
     throw new NexusAutomationCoordinatorLoopError(
       "runIdPrefix must contain at least one safe character",

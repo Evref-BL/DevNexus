@@ -27,6 +27,11 @@ import {
 import {
   resolveLocalWorkTrackingStorePath,
 } from "./workTrackingLocalProvider.js";
+import {
+  isLowerAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export type NexusProjectSetupReadinessVerdict =
   | "ready"
@@ -501,5 +506,10 @@ function isDirectory(directoryPath: string): boolean {
 }
 
 function checkIdPart(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "") || "default";
+  return trimHyphens(
+    replaceRunsWithHyphen(
+      value.toLowerCase(),
+      (character) => !isLowerAsciiLetterOrDigit(character),
+    ),
+  ) || "default";
 }

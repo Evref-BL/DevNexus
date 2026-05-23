@@ -54,6 +54,11 @@ import {
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
 import {
+  isAsciiIdentifierSegmentCharacter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
+import {
   buildNexusMcpRuntimeFreshnessChecks,
   type NexusMcpRuntimeProcess,
 } from "./nexusSetupAssistant.js";
@@ -2054,10 +2059,12 @@ function launchResult(
 }
 
 function safePathSegment(value: string): string {
-  const normalized = value
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim(),
+      (character) => !isAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   if (!normalized) {
     throw new NexusAutomationAgentLaunchError(
       "runId must contain at least one safe character",

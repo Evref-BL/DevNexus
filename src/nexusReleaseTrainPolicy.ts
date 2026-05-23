@@ -15,6 +15,7 @@ import { readNexusGitRemoteFacts } from "./nexusGitRemoteFacts.js";
 import type { NexusProjectConfig } from "./nexusProjectConfig.js";
 import type { ResolvedNexusProjectComponent } from "./nexusProjectLifecycle.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 import type { NexusVersionConfig } from "./nexusVersionPlanningConfig.js";
 
 export interface NexusReleaseTrainBranchPolicySummary {
@@ -254,5 +255,5 @@ function trainBranchName(
   activeVersionId: string | null,
   unscopedName: string,
 ): string {
-  return `${prefix.replace(/\/+$/u, "")}/${activeVersionId ?? unscopedName}`;
+  return `${stripTrailingSlashes(prefix)}/${activeVersionId ?? unscopedName}`;
 }

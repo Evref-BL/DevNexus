@@ -1196,7 +1196,21 @@ function itemFingerprintTokens(value: string): string[] {
 }
 
 function stripTrailingFingerprintPunctuation(value: string): string {
-  return value.replace(/[.,;:!?]+$/u, "");
+  let end = value.length;
+  while (end > 0 && isFingerprintTrailingPunctuation(value[end - 1]!)) {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+}
+
+function isFingerprintTrailingPunctuation(character: string): boolean {
+  return character === "." ||
+    character === "," ||
+    character === ";" ||
+    character === ":" ||
+    character === "!" ||
+    character === "?";
 }
 
 function sourceReferenceForItem(

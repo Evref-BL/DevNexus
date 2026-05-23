@@ -4,6 +4,7 @@ import {
   vibeKanbanPinnedVersion,
   type VibeKanbanApiOptions,
 } from "./vibeKanbanApi.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 
 export interface VibeKanbanOrganization {
   id: string;
@@ -140,7 +141,7 @@ function remoteRequestHeaders(accessToken: string): Record<string, string> {
 }
 
 function normalizeBaseUrl(value: string): string {
-  return value.replace(/\/+$/, "");
+  return stripTrailingSlashes(value);
 }
 
 async function getVibeKanbanInfo(

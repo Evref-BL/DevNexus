@@ -22,12 +22,27 @@ export function replaceRunsWithHyphen(
   value: string,
   shouldReplace: (character: string) => boolean,
 ): string {
+  return replaceRunsWithCharacter(value, "-", shouldReplace);
+}
+
+export function replaceRunsWithUnderscore(
+  value: string,
+  shouldReplace: (character: string) => boolean,
+): string {
+  return replaceRunsWithCharacter(value, "_", shouldReplace);
+}
+
+export function replaceRunsWithCharacter(
+  value: string,
+  replacement: string,
+  shouldReplace: (character: string) => boolean,
+): string {
   const result: string[] = [];
   let replacing = false;
   for (const character of value) {
     if (shouldReplace(character)) {
       if (!replacing) {
-        result.push("-");
+        result.push(replacement);
       }
       replacing = true;
     } else {
@@ -40,12 +55,20 @@ export function replaceRunsWithHyphen(
 }
 
 export function trimHyphens(value: string): string {
+  return trimCharacter(value, "-");
+}
+
+export function trimUnderscores(value: string): string {
+  return trimCharacter(value, "_");
+}
+
+export function trimCharacter(value: string, character: string): string {
   let start = 0;
   let end = value.length;
-  while (start < end && value[start] === "-") {
+  while (start < end && value[start] === character) {
     start += 1;
   }
-  while (end > start && value[end - 1] === "-") {
+  while (end > start && value[end - 1] === character) {
     end -= 1;
   }
 
@@ -105,4 +128,20 @@ export function isAsciiLetterOrDigit(character: string): boolean {
   return isLowerAsciiLetter(character) ||
     isUpperAsciiLetter(character) ||
     isAsciiDigit(character);
+}
+
+export function isAsciiIdentifierSegmentCharacter(character: string): boolean {
+  return isAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
+}
+
+export function isLowerAsciiIdentifierSegmentCharacter(
+  character: string,
+): boolean {
+  return isLowerAsciiLetterOrDigit(character) ||
+    character === "." ||
+    character === "_" ||
+    character === "-";
 }

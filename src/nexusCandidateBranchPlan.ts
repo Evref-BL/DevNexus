@@ -5,6 +5,7 @@ import {
   type NexusReleaseTrainReadinessReport,
   type NexusReleaseTrainVersionGroup,
 } from "./nexusReleaseTrainReadiness.js";
+import { stripTrailingSlashes } from "./nexusTextNormalization.js";
 import type { NexusCiTierDecision } from "./nexusCiTierPolicy.js";
 
 export type NexusCandidateBranchPlanNextAction =
@@ -318,7 +319,7 @@ function planNextAction(options: {
 }
 
 function branchName(prefix: string, versionId: string | null, unscopedName: string): string {
-  return `${prefix.replace(/\/+$/u, "")}/${versionId ?? unscopedName}`;
+  return `${stripTrailingSlashes(prefix)}/${versionId ?? unscopedName}`;
 }
 
 function uniqueStrings(values: string[]): string[] {

@@ -18,6 +18,11 @@ import {
 import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
 import type { CreateWorkTrackerProviderOptions } from "./workTrackingProviderService.js";
 import type { WorkTrackerProvider } from "./workTrackingTypes.js";
+import {
+  isAsciiIdentifierSegmentCharacter,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
 
 export type NexusAutomationSchedulerAction = "ran" | "waited" | "stopped";
 export type NexusAutomationSchedulerStopReason =
@@ -255,10 +260,12 @@ function schedulerRunId(
 }
 
 function safeRunIdPrefix(value: string): string {
-  const normalized = value
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim(),
+      (character) => !isAsciiIdentifierSegmentCharacter(character),
+    ),
+  );
   if (!normalized) {
     throw new NexusAutomationSchedulerError(
       "runIdPrefix must contain at least one safe character",

@@ -1,3 +1,10 @@
+import {
+  isLowerAsciiIdentifierSegmentCharacter,
+  isLowerAsciiLetterOrDigit,
+  replaceRunsWithHyphen,
+  trimHyphens,
+} from "./nexusTextNormalization.js";
+
 export type NexusProjectHostingProviderName = "github";
 
 export type NexusProjectHostingRepositoryVisibility =
@@ -3194,7 +3201,10 @@ function principalIdPart(access: NexusProjectHostingAccessStatusRecord): string 
 }
 
 function normalizePlanIdPart(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/gu, "-");
+  return replaceRunsWithHyphen(
+    value.trim().toLowerCase(),
+    (character) => !isLowerAsciiIdentifierSegmentCharacter(character),
+  );
 }
 
 function isCollaboratorPrincipal(
@@ -3287,9 +3297,10 @@ function preflightResult(options: {
 }
 
 function slugifyProjectName(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+  return trimHyphens(
+    replaceRunsWithHyphen(
+      value.trim().toLowerCase(),
+      (character) => !isLowerAsciiLetterOrDigit(character),
+    ),
+  );
 }

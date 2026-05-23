@@ -6,6 +6,11 @@ import type {
   NexusAuthorityProviderState,
   NexusAuthorityPullRequestReviewSignal,
 } from "./nexusAuthority.js";
+import {
+  isLowerAsciiLetterOrDigit,
+  replaceRunsWithUnderscore,
+  trimUnderscores,
+} from "./nexusTextNormalization.js";
 
 export const nexusAuthorityProviderNeutralSignals = [
   "unknown",
@@ -686,12 +691,15 @@ function firstSignal<T extends string>(values: T[], preference: T[]): T | null {
 }
 
 function normalizedToken(value: string | null | undefined): string {
-  return (value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const withoutPossessives = [...(value ?? "").trim().toLowerCase()].filter(
+    (character) => character !== "'" && character !== "’",
+  );
+  return trimUnderscores(
+    replaceRunsWithUnderscore(
+      withoutPossessives.join(""),
+      (character) => !isLowerAsciiLetterOrDigit(character),
+    ),
+  );
 }
 
 function dedupeStrings(values: string[]): string[] {
