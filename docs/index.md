@@ -38,6 +38,8 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [Review policy design](dev/review-policy.md) records the source-backed
+  concept for local, provider, and gated review behavior.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the
   current Codex and Claude plugin exposure, runtime, distribution, and uninstall
   decisions.

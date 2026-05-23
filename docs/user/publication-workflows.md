@@ -55,6 +55,11 @@ dev-nexus work-item comment <workspace-root> local-1 --component api --body "Pre
 The user or maintainer decides whether to push, open a pull request, merge, or
 ask for more work.
 
+DevNexus treats review and publication as separate concepts. Review decides how
+a change is checked and approved; publication decides whether it may be pushed,
+merged, queued, or released. The target review-policy design is recorded in
+[Review policy design](../dev/review-policy.md).
+
 ## When To Opt Into Advanced Publication
 
 Use a richer publication policy when local handoff is no longer enough.
