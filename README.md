@@ -200,6 +200,9 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
   files.
 - [Agent workflows](docs/user/agent-workflows.md) covers MCP tools, worktrees,
   automation loops, result files, and coordination handoffs.
+- [PostgreSQL claim authority](docs/user/postgresql-claim-authority.md) explains
+  the opt-in shared claim backend, setup steps, lease policy, and references for
+  the heartbeat defaults.
 - [Multi-tracker work tracking](docs/user/multi-tracker.md) covers local and
   provider-backed trackers.
 - [Architecture notes](docs/dev/architecture.md) covers internal design.

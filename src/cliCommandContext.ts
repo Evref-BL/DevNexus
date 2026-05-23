@@ -7,7 +7,10 @@ import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCreden
 import type { NexusPublicationGitPushRunner } from "./nexusPublicationPolicy.js";
 import type { NexusProjectHostingProviderAdapter } from "./nexusProjectHosting.js";
 import type { NexusMcpRuntimeProcess } from "./nexusSetupAssistant.js";
-import type { NexusEligibleWorkClaimProviderFactory } from "./nexusWorkItemClaim.js";
+import type {
+  NexusEligibleWorkClaimProviderFactory,
+  NexusWorkItemClaimAuthority,
+} from "./nexusWorkItemClaim.js";
 import {
   assertNexusSharedCheckoutMutationAllowed,
   parseNexusSharedCheckoutGuardOverride,
@@ -33,6 +36,7 @@ export interface DevNexusCliDependencies {
   sharedCheckoutGuard?: "enforce" | "disabled";
   sharedCheckoutGuardOverride?: NexusSharedCheckoutGuardOverride | null;
   workItemClaimProviderFactory?: NexusEligibleWorkClaimProviderFactory;
+  workItemClaimAuthority?: NexusWorkItemClaimAuthority;
   workItemClaimLeaseTokenFactory?: () => string;
 }
 

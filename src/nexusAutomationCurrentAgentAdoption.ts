@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -28,6 +29,7 @@ import {
   preflightNexusAutomationAgentLaunch,
   type NexusAutomationAgentLaunchComponentContext,
   type NexusAutomationAgentLaunchComponentProvider,
+  type NexusAutomationAgentLaunchWorkItemClaim,
 } from "./nexusAutomationAgentLaunch.js";
 import type {
   NexusAutomationComponentEligibleWorkItems,
@@ -90,6 +92,18 @@ import {
   resolveProjectComponents,
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
+import {
+  claimNexusEligibleWorkItem,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimOwnerInput,
+} from "./nexusWorkItemClaim.js";
+import {
+  automationComponentEligibleWorkItemsForClaim as componentEligibleWorkItemsForClaim,
+  automationWorkItemClaimFromResult as currentAgentWorkItemClaim,
+  automationWorkItemClaimSkipSummary,
+  blockedAutomationWorkItemClaim as blockedWorkItemClaim,
+  disabledAutomationWorkItemClaim as disabledWorkItemClaim,
+} from "./nexusAutomationWorkItemClaimContext.js";
 import {
   createWorkTrackerProviderAsync,
   type CreateWorkTrackerProviderOptions,
@@ -184,6 +198,7 @@ export interface NexusAutomationCurrentAgentAdoptionContext {
   authority: NexusAuthorityProjectSummary;
   result: NexusAutomationCurrentAgentResultContract;
   eligibleWorkItems: WorkItem[];
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
   externalIssueVisibility: NexusExternalIssueVisibilitySummary;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   safety: NexusAutomationConfig["safety"];
@@ -215,6 +230,9 @@ export interface AdoptNexusAutomationCurrentAgentOptions {
   publicationActorRunner?: NexusPublicationActorRunner;
   now?: () => Date | string;
   env?: NodeJS.ProcessEnv;
+  workItemClaimOwner?: NexusWorkItemClaimOwnerInput;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  workItemClaimLeaseTokenFactory?: () => string;
   targetCycleId?: string | null;
   coordinatorLoop?: boolean;
 }
@@ -234,6 +252,7 @@ export interface AdoptNexusAutomationCurrentAgentResult {
   preflight: NexusAutomationPreflightCheck[];
   selectorQuery: WorkItemQuery | null;
   eligibleWorkItems: WorkItem[];
+  workItemClaim?: NexusAutomationAgentLaunchWorkItemClaim | null;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   components: ResolvedNexusProjectComponent[];
   contextFile: string | null;
@@ -325,6 +344,7 @@ export async function adoptNexusAutomationCurrentAgent(
   let preflight: NexusAutomationPreflightCheck[] = [];
   let selectorQuery: WorkItemQuery | null = null;
   let eligibleWorkItems: WorkItem[] = [];
+  let workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null = null;
   let componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[] = [];
   let contextFile: string | null = null;
   let resultFile: string | null = null;
@@ -462,6 +482,7 @@ export async function adoptNexusAutomationCurrentAgent(
         preflight,
         selectorQuery,
         eligibleWorkItems,
+        workItemClaim,
         componentEligibleWorkItems,
         components,
         contextFile,
@@ -596,6 +617,63 @@ export async function adoptNexusAutomationCurrentAgent(
       });
     }
 
+    const reusableFiles = currentAgentAdoptionFiles({ projectRoot, runId });
+    if (
+      reused &&
+      fs.existsSync(reusableFiles.contextFile) &&
+      fs.existsSync(reusableFiles.metadataFile)
+    ) {
+      contextFile = reusableFiles.contextFile;
+      resultFile = reusableFiles.resultFile;
+      metadataFile = reusableFiles.metadataFile;
+      const context = readCurrentAgentAdoptionContext(contextFile);
+      selectorQuery = context.automation.selectorQuery;
+      eligibleWorkItems = context.eligibleWorkItems;
+      workItemClaim = context.workItemClaim ?? null;
+      componentEligibleWorkItems = context.componentEligibleWorkItems;
+      const resultContract = currentAgentResultContract(resultFile);
+      return adoptionResult({
+        runId,
+        projectRoot,
+        sourceRoot,
+        projectConfig,
+        automationConfig,
+        status: "started",
+        shouldProceed: true,
+        reused,
+        summary: "Current agent adoption context reused",
+        ledger,
+        lock,
+        preflight,
+        selectorQuery,
+        eligibleWorkItems,
+        workItemClaim,
+        componentEligibleWorkItems,
+        components,
+        contextFile,
+        resultFile,
+        metadataFile,
+        environment: currentAgentAdoptionEnvironment(
+          options.env ?? process.env,
+          {
+            runId,
+            startedAt: context.startedAt,
+            projectRoot,
+            sourceRoot,
+            components,
+            automationConfig,
+            eligibleWorkItems,
+            workItemClaim,
+            contextFile,
+            resultFile,
+            metadataFile,
+            targetCycleId: context.adoption.targetCycleId,
+          },
+        ),
+        result: resultContract,
+      });
+    }
+
     selectorQuery = buildNexusAutomationWorkItemQuery(automationConfig);
     componentEligibleWorkItems = await listEligibleWorkItemsByComponent(
       componentProviders,
@@ -606,6 +684,142 @@ export async function adoptNexusAutomationCurrentAgent(
     eligibleWorkItems = componentEligibleWorkItems.flatMap(
       (component) => component.workItems,
     );
+    if (automationConfig.workItemClaims.enabled) {
+      try {
+        const claim = await claimNexusEligibleWorkItem({
+          projectRoot,
+          projectConfig,
+          components,
+          automationConfig,
+          homePath: options.homePath,
+          selectorQuery,
+          provider: options.provider,
+          providerFactory: currentAgentClaimProviderFactory({
+            options,
+            projectRoot,
+            projectConfig,
+          }),
+          providerOptions: options.providerOptions,
+          env: options.env,
+          claimAuthority: options.claimAuthority,
+          owner: currentAgentWorkItemClaimOwner({
+            options,
+            runId,
+          }),
+          leaseDurationMs: automationConfig.workItemClaims.leaseDurationMs,
+          staleClaimPolicy: automationConfig.workItemClaims.staleClaimPolicy,
+          leaseTokenFactory: options.workItemClaimLeaseTokenFactory,
+          now: options.now,
+        });
+        workItemClaim = currentAgentWorkItemClaim(claim);
+        if (claim.status === "claimed") {
+          eligibleWorkItems = [claim.workItem];
+          componentEligibleWorkItems = componentEligibleWorkItemsForClaim({
+            componentEligibleWorkItems,
+            claim,
+          });
+        } else {
+          const finishedAt = currentIso(options.now);
+          const summary = automationWorkItemClaimSkipSummary(
+            workItemClaim,
+            "current-agent adoption",
+          );
+          ledger = appendNexusAutomationRunRecord({
+            projectRoot,
+            config: automationConfig,
+            now: finishedAt,
+            record: {
+              id: runId,
+              projectId: projectConfig.id,
+              status: "skipped",
+              startedAt,
+              finishedAt,
+              sourceRoot,
+              summary,
+            },
+          });
+          releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
+          return adoptionResult({
+            runId,
+            projectRoot,
+            sourceRoot,
+            projectConfig,
+            automationConfig,
+            status: "skipped",
+            shouldProceed: false,
+            reused,
+            summary,
+            ledger,
+            lock,
+            preflight,
+            selectorQuery,
+            eligibleWorkItems,
+            workItemClaim,
+            componentEligibleWorkItems,
+            components,
+            contextFile,
+            resultFile,
+            metadataFile,
+            environment: null,
+            result: null,
+          });
+        }
+      } catch (error) {
+        const finishedAt = currentIso(options.now);
+        const summary =
+          `Work-item claim coordination blocked: ${errorMessage(error)}`;
+        workItemClaim = blockedWorkItemClaim(summary);
+        ledger = appendNexusAutomationRunRecord({
+          projectRoot,
+          config: automationConfig,
+          now: finishedAt,
+          record: {
+            id: runId,
+            projectId: projectConfig.id,
+            status: "blocked",
+            startedAt,
+            finishedAt,
+            sourceRoot,
+            summary,
+            error: summary,
+          },
+        });
+        releaseNexusAutomationRunLock({ projectRoot, config: automationConfig, runId });
+        return adoptionResult({
+          runId,
+          projectRoot,
+          sourceRoot,
+          projectConfig,
+          automationConfig,
+          status: "blocked",
+          shouldProceed: false,
+          reused,
+          summary,
+          ledger,
+          lock,
+          preflight: [
+            ...preflight,
+            {
+              name: "workItemClaim",
+              status: "failed",
+              message: summary,
+            },
+          ],
+          selectorQuery,
+          eligibleWorkItems,
+          workItemClaim,
+          componentEligibleWorkItems,
+          components,
+          contextFile,
+          resultFile,
+          metadataFile,
+          environment: null,
+          result: null,
+        });
+      }
+    } else {
+      workItemClaim = disabledWorkItemClaim();
+    }
     if (eligibleWorkItems.length === 0) {
       const summary = "No eligible work item matched the automation selector";
       const finishedAt = currentIso(options.now);
@@ -679,6 +893,7 @@ export async function adoptNexusAutomationCurrentAgent(
           automationConfig,
           selectorQuery,
           eligibleWorkItems,
+          workItemClaim,
           componentEligibleWorkItems,
           authProfiles,
           resultFile,
@@ -707,6 +922,7 @@ export async function adoptNexusAutomationCurrentAgent(
       preflight,
       selectorQuery,
       eligibleWorkItems,
+      workItemClaim,
       componentEligibleWorkItems,
       components,
       contextFile,
@@ -722,6 +938,7 @@ export async function adoptNexusAutomationCurrentAgent(
           components,
           automationConfig,
           eligibleWorkItems,
+          workItemClaim,
           contextFile,
           resultFile,
           metadataFile,
@@ -1089,6 +1306,40 @@ async function createCurrentAgentProvider(options: {
   });
 }
 
+function currentAgentClaimProviderFactory(options: {
+  options: AdoptNexusAutomationCurrentAgentOptions;
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+}) {
+  if (!options.options.providerFactory) {
+    return undefined;
+  }
+
+  return (context: {
+    component: ResolvedNexusProjectComponent;
+    tracker: { workTracking: WorkTrackingConfig };
+  }) =>
+    options.options.providerFactory!({
+      projectRoot: options.projectRoot,
+      sourceRoot: context.component.sourceRoot,
+      projectConfig: options.projectConfig,
+      component: context.component,
+      workTracking: context.tracker.workTracking,
+    } satisfies NexusAutomationProviderContext);
+}
+
+function currentAgentWorkItemClaimOwner(options: {
+  options: AdoptNexusAutomationCurrentAgentOptions;
+  runId: string;
+}): NexusWorkItemClaimOwnerInput {
+  const configured = options.options.workItemClaimOwner;
+  return {
+    hostId: configured?.hostId ?? os.hostname(),
+    agentId: configured?.agentId ?? options.runId,
+    ownerId: configured?.ownerId ?? options.options.owner ?? null,
+  };
+}
+
 async function listEligibleWorkItemsByComponent(
   componentProviders: NexusAutomationAgentLaunchComponentProvider[],
   selectorQuery: WorkItemQuery,
@@ -1160,6 +1411,7 @@ function buildCurrentAgentAdoptionContext(input: {
   automationConfig: NexusAutomationConfig;
   selectorQuery: WorkItemQuery;
   eligibleWorkItems: WorkItem[];
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
   componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
   authProfiles: NexusHostingAuthProfileConfig[];
   resultFile: string;
@@ -1221,6 +1473,7 @@ function buildCurrentAgentAdoptionContext(input: {
     authority,
     result: currentAgentResultContract(input.resultFile),
     eligibleWorkItems: input.eligibleWorkItems,
+    workItemClaim: input.workItemClaim,
     externalIssueVisibility: buildNexusExternalIssueVisibilitySummary({
       components: input.components,
       componentEligibleWorkItems: input.componentEligibleWorkItems,
@@ -1334,6 +1587,7 @@ function currentAgentAdoptionEnvironment(
     components: ResolvedNexusProjectComponent[];
     automationConfig: NexusAutomationConfig;
     eligibleWorkItems: WorkItem[];
+    workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
     contextFile: string;
     resultFile: string;
     metadataFile: string;
@@ -1383,6 +1637,25 @@ function currentAgentAdoptionEnvironment(
     DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS: input.eligibleWorkItems
       .map((item) => item.id)
       .join(","),
+    DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: input.workItemClaim?.status ?? "none",
+    DEV_NEXUS_CLAIMED_WORK_ITEM_ID: input.workItemClaim?.workItemId ?? "",
+    DEV_NEXUS_CLAIM_COMPONENT_ID: input.workItemClaim?.componentId ?? "",
+    DEV_NEXUS_CLAIM_TRACKER_ID: input.workItemClaim?.trackerId ?? "",
+    DEV_NEXUS_CLAIM_LEASE_DURATION_MS:
+      input.automationConfig.workItemClaims.leaseDurationMs.toString(),
+    DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS:
+      input.automationConfig.workItemClaims.heartbeatIntervalMs.toString(),
+    DEV_NEXUS_CLAIM_LEASE_TOKEN: input.workItemClaim?.owner?.leaseToken ?? "",
+    DEV_NEXUS_CLAIM_HOST_ID: input.workItemClaim?.owner?.hostId ?? "",
+    DEV_NEXUS_CLAIM_AGENT_ID: input.workItemClaim?.owner?.agentId ?? "",
+    DEV_NEXUS_CLAIM_OWNER_ID: input.workItemClaim?.owner?.ownerId ?? "",
+    DEV_NEXUS_CLAIM_EXPIRES_AT: input.workItemClaim?.owner?.expiresAt ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_KIND:
+      input.workItemClaim?.authorityClaim?.authorityKind ?? "",
+    DEV_NEXUS_CLAIM_FENCING_TOKEN:
+      input.workItemClaim?.authorityClaim?.fencingToken.toString() ?? "",
+    DEV_NEXUS_CLAIM_AUTHORITY_STATE:
+      input.workItemClaim?.authorityClaim?.state ?? "",
   };
 }
 
@@ -2063,6 +2336,10 @@ function delayUntil(target: Date | string, now: Date | string): number {
 function currentIso(now?: () => Date | string): string {
   const value = now ? now() : new Date();
   return dateFrom(value, "now").toISOString();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function dateFrom(value: Date | string, name: string): Date {

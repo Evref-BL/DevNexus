@@ -424,12 +424,18 @@ process.
 
 ```bash
 dev-nexus automation current-agent adopt <workspace-root> --run-id current-1 --json
+dev-nexus automation current-agent heartbeat <workspace-root> --json
 dev-nexus automation current-agent record <workspace-root> --run-id current-1 --status completed --summary "Completed requested work."
 ```
 
 If adoption returns `shouldProceed: false`, the current agent must not continue
 the automation run. If it returns `true`, the agent proceeds under the returned
 `DEV_NEXUS_*` environment values and records the terminal result.
+Use `current-agent heartbeat` during long-running work when the adoption context
+contains an authority-backed claim. The default claim lease is 60 minutes, and
+the default heartbeat interval exposed as `DEV_NEXUS_CLAIM_HEARTBEAT_INTERVAL_MS`
+is 20 minutes. Call the heartbeat before that interval elapses unless the
+project config overrides the cadence.
 
 ## Publication Boundary
 

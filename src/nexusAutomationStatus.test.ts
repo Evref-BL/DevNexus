@@ -3,11 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createDefaultNexusHomeConfigBase,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
   getNexusAutomationStatus,
   nexusAutomationLockPath,
+  saveNexusHomeConfigFile,
   saveProjectConfig,
+  validateNexusHomeConfigBase,
   type GitCommandResult,
   type GitRunner,
   type NexusProjectConfig,
@@ -103,12 +106,195 @@ describe("nexus automation status", () => {
       ledger: {
         runs: [],
       },
+      workItemClaimAuthority: {
+        backend: "optimistic_tracker",
+        status: "ready",
+        postgresConnectionProfileId: null,
+        blockers: [],
+      },
     });
     expect(result.preflight.every((check) => check.status === "passed")).toBe(true);
     expect(
       fs.existsSync(path.join(projectRoot, ".dev-nexus", "automation")),
     ).toBe(false);
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
+  });
+
+  it("blocks PostgreSQL claim authority without a connection profile", async () => {
+    const projectRoot = makeTempDir("dev-nexus-status-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: {
+        ...config.automation!,
+        workItemClaims: {
+          ...config.automation!.workItemClaims,
+          authority: {
+            ...config.automation!.workItemClaims.authority,
+            backend: "postgres",
+          },
+        },
+      },
+    });
+
+    const result = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      workItemClaimAuthority: {
+        backend: "postgres",
+        status: "blocked",
+        postgresConnectionProfileId: null,
+        blockers: [
+          "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+        ],
+      },
+      selectedWorkItem: null,
+    });
+    expect(result.summary).toContain(
+      "PostgreSQL claim authority requires project config.automation.workItemClaims.authority.postgres.connectionProfileId",
+    );
+  });
+
+  it("reports PostgreSQL claim authority profile and runtime blockers", async () => {
+    const root = makeTempDir("dev-nexus-status-project-");
+    const projectRoot = path.join(root, "workspace");
+    const homePath = path.join(root, "home");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const config = projectConfig({
+      home: homePath,
+    });
+    const postgresAutomationConfig = {
+      ...config.automation!,
+      workItemClaims: {
+        ...config.automation!.workItemClaims,
+        authority: {
+          ...config.automation!.workItemClaims.authority,
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: postgresAutomationConfig,
+    });
+
+    const missingProfile = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      env: {},
+    });
+
+    expect(missingProfile.workItemClaimAuthority).toMatchObject({
+      backend: "postgres",
+      status: "blocked",
+      postgresConnectionProfileId: "shared-claims",
+      postgresProfile: {
+        profileStatus: "missing",
+        profileId: "shared-claims",
+        connectionStringEnv: null,
+        connectionStringEnvPresent: null,
+        adapterStatus: "not_checked",
+      },
+      blockers: [
+        "PostgreSQL claim authority profile shared-claims was not found in DevNexus home config",
+      ],
+    });
+
+    saveNexusHomeConfigFile(
+      homePath,
+      createDefaultNexusHomeConfigBase(homePath, {
+        claimAuthorityProfiles: [
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+            schema: "dev_nexus",
+          },
+        ],
+      }),
+      validateNexusHomeConfigBase,
+    );
+
+    const missingEnv = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      env: {},
+    });
+
+    expect(missingEnv.workItemClaimAuthority).toMatchObject({
+      status: "blocked",
+      postgresProfile: {
+        profileStatus: "available",
+        profileId: "shared-claims",
+        driver: "node_postgres",
+        schema: "dev_nexus",
+        connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+        connectionStringEnvPresent: false,
+        adapterStatus: "not_checked",
+      },
+      blockers: [
+        "PostgreSQL claim authority profile shared-claims requires environment variable DEV_NEXUS_CLAIMS_DATABASE_URL",
+      ],
+    });
+
+    const missingAdapter = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      env: {
+        DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
+      },
+      postgresClaimAdapterStatus: "missing",
+    });
+
+    expect(missingAdapter.workItemClaimAuthority).toMatchObject({
+      status: "blocked",
+      postgresProfile: {
+        profileStatus: "available",
+        profileId: "shared-claims",
+        driver: "node_postgres",
+        connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+        connectionStringEnvPresent: true,
+        adapterStatus: "missing",
+      },
+      blockers: [
+        "PostgreSQL claim authority profile shared-claims requires optional node-postgres runtime adapter support",
+      ],
+    });
+    expect(JSON.stringify(missingAdapter.workItemClaimAuthority)).not.toContain(
+      "postgres://claims@example.invalid/db",
+    );
+
+    const adapterAvailable = await getNexusAutomationStatus({
+      projectRoot,
+      now: fixedClock("2026-05-16T10:00:00.000Z"),
+      env: {
+        DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
+      },
+      postgresClaimAdapterStatus: "available",
+    });
+
+    expect(adapterAvailable).toMatchObject({
+      status: "idle",
+      workItemClaimAuthority: {
+        status: "ready",
+        postgresProfile: {
+          profileStatus: "available",
+          profileId: "shared-claims",
+          connectionStringEnvPresent: true,
+          adapterStatus: "available",
+        },
+        blockers: [],
+      },
+    });
   });
 
   it("reports agent launch readiness without selecting one work item", async () => {
@@ -131,6 +317,7 @@ describe("nexus automation status", () => {
           agent: {
             ...projectConfig().automation!.agent,
             coordinatorProfileId: "codex-deep",
+            timeoutMs: 120000,
             maxConcurrentSubagents: 2,
             profiles: [
               {

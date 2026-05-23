@@ -7,6 +7,9 @@ import {
   projectWorktreesRootPath,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import type {
+  NexusAutomationWorkItemClaimAuthorityBackend,
+} from "./nexusAutomationConfig.js";
 import {
   summarizeNexusAuthorityForProject,
   type NexusAuthorityProjectSummary,
@@ -68,11 +71,18 @@ export interface NexusProjectStatusBase {
   hosts: NexusProjectHostStatus[];
   runnerProfiles: NexusRunnerProfileStatus[];
   authority: NexusAuthorityProjectSummary | null;
+  workItemClaimAuthority: NexusProjectWorkItemClaimAuthorityStatus | null;
   agentTargets: NexusProjectAgentProjectionStatus | null;
   projectConfigPath: string;
   projectConfigExists: boolean;
   worktreesRoot: string;
   worktreesRootExists: boolean;
+}
+
+export interface NexusProjectWorkItemClaimAuthorityStatus {
+  enabled: boolean;
+  backend: NexusAutomationWorkItemClaimAuthorityBackend;
+  postgresConnectionProfileId: string | null;
 }
 
 export interface BuildNexusProjectStatusOptions {
@@ -184,6 +194,15 @@ export function buildNexusProjectStatus(
             repository: component.remoteUrl,
           })),
         })
+      : null,
+    workItemClaimAuthority: config?.automation
+      ? {
+          enabled: config.automation.workItemClaims.enabled,
+          backend: config.automation.workItemClaims.authority.backend,
+          postgresConnectionProfileId:
+            config.automation.workItemClaims.authority.postgres
+              .connectionProfileId,
+        }
       : null,
     projectConfigPath: resolvedProjectConfigPath,
     projectConfigExists: Boolean(config),

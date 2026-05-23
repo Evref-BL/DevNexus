@@ -92,6 +92,7 @@ import {
 import {
   getNexusAutomationStatus,
   type NexusAutomationStatus,
+  type NexusAutomationWorkItemClaimAuthorityStatus,
 } from "./nexusAutomationStatus.js";
 import {
   summarizeAutomationStatus,
@@ -212,6 +213,11 @@ import {
   summarizeNexusManualWorktreeResult,
   type PrepareNexusManualWorktreeResult,
 } from "./nexusManualWorktree.js";
+import {
+  heartbeatNexusAgentClaim,
+  verifyNexusAgentClaimForMutation,
+  type NexusAgentClaimGuardResult,
+} from "./nexusAgentClaimGuard.js";
 import { buildNexusQuickFixPlan } from "./nexusQuickFix.js";
 import {
   nexusAuthorityMutationBlock,
@@ -561,6 +567,7 @@ interface ParsedWorkItemDiscoveryStatusCommand {
 
 interface ParsedWorkItemClaimNextCommand {
   projectRoot: string;
+  homePath?: string;
   componentId?: string;
   trackerId?: string;
   mode?: NexusEligibleWorkMode;
@@ -911,6 +918,12 @@ interface ParsedAutomationCurrentAgentAdoptCommand {
   projectRoot: string;
   runId?: string;
   owner?: string;
+  json?: boolean;
+}
+
+interface ParsedAutomationCurrentAgentHeartbeatCommand {
+  projectRoot: string;
+  leaseDurationMs?: number;
   json?: boolean;
 }
 
@@ -1707,6 +1720,14 @@ async function handleWorktreeCommand(
       parsed,
       dependencies,
     );
+    await verifyNexusAgentClaimForMutation({
+      projectRoot: path.resolve(parsed.projectRoot),
+      componentId: resolvedWorkItem.componentId ?? parsed.componentId ?? null,
+      workItemId: resolvedWorkItem.itemId ?? parsed.workItemId ?? null,
+      env: dependencies.env ?? process.env,
+      claimAuthority: dependencies.workItemClaimAuthority,
+      now: dependencies.now,
+    });
     const result = prepareNexusManualWorktree({
       projectRoot: parsed.projectRoot,
       componentId: resolvedWorkItem.componentId ?? parsed.componentId,
@@ -2633,6 +2654,19 @@ async function handleAutomationCurrentAgentCommand(
     return 0;
   }
 
+  if (command === "heartbeat") {
+    const parsed = parseAutomationCurrentAgentHeartbeatCommand(argv);
+    const result = await heartbeatNexusAgentClaim({
+      projectRoot: path.resolve(parsed.projectRoot),
+      env: dependencies.env ?? process.env,
+      claimAuthority: dependencies.workItemClaimAuthority,
+      leaseDurationMs: parsed.leaseDurationMs,
+      now: dependencies.now,
+    });
+    printAutomationCurrentAgentHeartbeatResult(result, parsed, stdout);
+    return 0;
+  }
+
   if (command === "record") {
     const parsed = parseAutomationCurrentAgentRecordCommand(argv);
     assertCliMutationAllowed(dependencies, {
@@ -2640,6 +2674,14 @@ async function handleAutomationCurrentAgentCommand(
       command: "automation current-agent record",
       mutationClass: "target_state",
     });
+    if (currentAgentResultRequiresVerifiedClaim(parsed.result)) {
+      await verifyNexusAgentClaimForMutation({
+        projectRoot: path.resolve(parsed.projectRoot),
+        env: dependencies.env ?? process.env,
+        claimAuthority: dependencies.workItemClaimAuthority,
+        now: dependencies.now,
+      });
+    }
     const result = recordNexusAutomationCurrentAgentAdoptionResult({
       projectRoot: parsed.projectRoot,
       runId: parsed.runId,
@@ -2650,7 +2692,13 @@ async function handleAutomationCurrentAgentCommand(
     return 0;
   }
 
-  throw new Error("automation current-agent requires adopt or record");
+  throw new Error("automation current-agent requires adopt, heartbeat, or record");
+}
+
+function currentAgentResultRequiresVerifiedClaim(
+  result: NexusAutomationCurrentAgentAdoptionResultInput,
+): boolean {
+  return result.status === "completed";
 }
 
 function resolveAutomationCommandCliOptions(
@@ -2758,6 +2806,9 @@ async function claimNextWorkItem(
     projectConfig,
     components: resolveProjectComponents(projectRoot, projectConfig),
     automationConfig: projectConfig.automation ?? defaultNexusAutomationConfig,
+    homePath: parsed.homePath
+      ? resolvedCommandHomePath(parsed.homePath)
+      : undefined,
     componentId: parsed.componentId,
     trackerId: parsed.trackerId,
     mode: parsed.mode,
@@ -2769,6 +2820,7 @@ async function claimNextWorkItem(
     leaseDurationMs: parsed.leaseDurationMs,
     staleClaimPolicy: parsed.staleClaimPolicy,
     providerFactory: dependencies.workItemClaimProviderFactory,
+    env: dependencies.env,
     leaseTokenFactory: dependencies.workItemClaimLeaseTokenFactory,
     now: dependencies.now,
   });
@@ -4409,6 +4461,9 @@ function parseWorkItemClaimNextCommand(
       case "--component":
         parsed.componentId = next();
         break;
+      case "--home":
+        parsed.homePath = next();
+        break;
       case "--tracker":
         parsed.trackerId = next();
         break;
@@ -5770,6 +5825,44 @@ function parseAutomationCurrentAgentAdoptCommand(
   return parsed as ParsedAutomationCurrentAgentAdoptCommand;
 }
 
+function parseAutomationCurrentAgentHeartbeatCommand(
+  argv: string[],
+): ParsedAutomationCurrentAgentHeartbeatCommand {
+  const [, , , projectRoot, ...rest] = argv;
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("automation current-agent heartbeat requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedAutomationCurrentAgentHeartbeatCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--lease-ms":
+      case "--lease-duration-ms":
+        parsed.leaseDurationMs = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown automation current-agent heartbeat option: ${arg}`);
+    }
+  }
+
+  return parsed as ParsedAutomationCurrentAgentHeartbeatCommand;
+}
+
 function parseAutomationCurrentAgentRecordCommand(
   argv: string[],
 ): ParsedAutomationCurrentAgentRecordCommand {
@@ -6189,6 +6282,12 @@ function printProjectStatusResult(
     stdout,
     `  Default tracker: ${project.defaultTrackerId ?? "not configured"}`,
   );
+  if (project.workItemClaimAuthority) {
+    writeLine(
+      stdout,
+      `  Work item claim authority: ${project.workItemClaimAuthority.backend}`,
+    );
+  }
   writeLine(stdout, `  Trackers: ${project.workTrackers.length}`);
   for (const tracker of project.workTrackers) {
     const state = tracker.enabled ? "enabled" : "disabled";
@@ -7794,6 +7893,26 @@ function printAutomationCurrentAgentAdoptionResult(
   }
 }
 
+function printAutomationCurrentAgentHeartbeatResult(
+  result: NexusAgentClaimGuardResult,
+  parsed: ParsedAutomationCurrentAgentHeartbeatCommand,
+  stdout: TextWriter,
+): void {
+  const payload = { ok: true, ...result };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, `DevNexus current-agent claim ${result.status}.`);
+  writeLine(stdout, `  Summary: ${result.reason}`);
+  if (result.authorityClaim) {
+    writeLine(stdout, `  Authority: ${result.authorityClaim.authorityKind}`);
+    writeLine(stdout, `  Fencing token: ${result.authorityClaim.fencingToken}`);
+    writeLine(stdout, `  Expires at: ${result.authorityClaim.expiresAt}`);
+  }
+}
+
 function printAutomationCurrentAgentRecordResult(
   result: ReturnType<typeof recordNexusAutomationCurrentAgentAdoptionResult>,
   parsed: ParsedAutomationCurrentAgentRecordCommand,
@@ -7931,6 +8050,7 @@ function printAutomationStatusResult(
     }
   }
   printAuthorityProjectSummary(result.authority, stdout);
+  printWorkItemClaimAuthorityStatus(result.workItemClaimAuthority, stdout);
   if (result.externalIssueVisibility) {
     printExternalIssueVisibilitySummary(result.externalIssueVisibility, stdout);
   }
@@ -7967,6 +8087,28 @@ function printAutomationStatusResult(
         `  Last run: ${lastRun.id} ${lastRun.status} ${lastRun.summary ?? ""}`.trimEnd(),
       );
     }
+  }
+}
+
+function printWorkItemClaimAuthorityStatus(
+  status: NexusAutomationWorkItemClaimAuthorityStatus,
+  stdout: TextWriter,
+): void {
+  writeLine(
+    stdout,
+    `  Work item claim authority: ${status.backend} ${status.status}`,
+  );
+  if (status.postgresConnectionProfileId) {
+    writeLine(
+      stdout,
+      `    PostgreSQL profile: ${status.postgresConnectionProfileId}`,
+    );
+  }
+  for (const blocker of status.blockers) {
+    writeLine(stdout, `    Blocker: ${blocker}`);
+  }
+  for (const warning of status.warnings) {
+    writeLine(stdout, `    Warning: ${warning}`);
   }
 }
 

@@ -21,6 +21,7 @@ export const devNexusCoreMcpToolNames = [
   "publication_feature_report",
   "publication_feature_finalization",
   "current_agent_adopt",
+  "current_agent_heartbeat",
   "current_agent_record",
   "worktree_prepare",
   "coordination_status",

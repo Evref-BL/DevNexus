@@ -2017,7 +2017,14 @@ describe("workspace config", () => {
       workItemClaims: {
         enabled: true,
         leaseDurationMs: 3600000,
+        heartbeatIntervalMs: 1200000,
         staleClaimPolicy: "report",
+        authority: {
+          backend: "optimistic_tracker",
+          postgres: {
+            connectionProfileId: null,
+          },
+        },
       },
       backoff: {
         failureLimit: 3,
@@ -3801,6 +3808,25 @@ describe("workspace config", () => {
         },
       }),
     ).toThrow(/project config\.automation\.workItemClaims\.staleClaimPolicy/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "invalid-automation-claim-authority",
+        name: "Invalid Automation Claim Authority",
+        kanban: {
+          provider: "vibe-kanban",
+          projectId: null,
+        },
+        automation: {
+          workItemClaims: {
+            authority: {
+              backend: "sqlite",
+            },
+          },
+        },
+      }),
+    ).toThrow(/project config\.automation\.workItemClaims\.authority\.backend/);
 
     expect(() =>
       validateProjectConfig({

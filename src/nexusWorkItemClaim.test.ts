@@ -5,13 +5,25 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
 import {
   claimNexusEligibleWorkItem,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusEligibleWorkClaimProviderFactory,
 } from "./nexusWorkItemClaim.js";
+import type {
+  NexusNodePostgresModule,
+} from "./nexusNodePostgresClaimSqlClient.js";
+import type {
+  NexusPostgresClaimAuthorityRow,
+} from "./nexusPostgresWorkItemClaimAuthority.js";
 import {
   resolveProjectComponents,
 } from "./nexusProjectLifecycle.js";
 import {
+  createDefaultNexusHomeConfigBase,
   saveProjectConfig,
+  saveNexusHomeConfigFile,
+  validateNexusHomeConfigBase,
   type NexusProjectConfig,
   type WorkComment,
   type WorkItem,
@@ -94,6 +106,302 @@ describe("optimistic work item claims", () => {
     expect(provider.comments).toHaveLength(1);
     expect(provider.comments[0]?.body).toContain("host-a");
     expect(provider.comments[0]?.body).toContain("lease-token-1");
+  });
+
+  it("delegates ready candidate acquisition to an injected claim authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-16", "Authority claim", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    const authorityCalls: string[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityCalls.push(
+          `${input.tracker.id}:${input.candidate.id}:${input.owner.leaseToken}`,
+        );
+        expect(input.provider).toBe(provider);
+        expect(input.ref).toMatchObject({
+          provider: "github",
+          id: "github-16",
+        });
+        expect(input.freshWorkItem).toMatchObject({
+          id: "github-16",
+          status: "ready",
+        });
+
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+      },
+      leaseDurationMs: 30 * 60 * 1000,
+      leaseTokenFactory: () => "authority-token",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+        leaseToken: "authority-token",
+      },
+      workItem: {
+        id: "github-16",
+        status: "in_progress",
+      },
+    });
+    expect(authorityCalls).toEqual(["github:github-16:authority-token"]);
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
+  it("rejects an authority-backed claim when post-claim verification fails", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-19", "Authority claim verification", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "token_mismatch",
+          claim: authorityClaim ?? undefined,
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: {
+        hostId: "host-a",
+      },
+      leaseTokenFactory: () => "authority-token",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "lost_race",
+      reason: "verification_failed",
+      authorityClaim: {
+        authorityKind: "test-authority",
+        fencingToken: 41,
+      },
+      owner: {
+        leaseToken: "authority-token",
+      },
+    });
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
+  it("does not fall back to optimistic claims when PostgreSQL authority is configured", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    const postgresAutomationConfig = {
+      ...automationConfig(),
+      workItemClaims: {
+        ...automationConfig().workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      automation: postgresAutomationConfig,
+    });
+    const provider = new ClaimMemoryProvider([
+      workItem("github-17", "PostgreSQL authority only", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+
+    await expect(
+      claimNexusEligibleWorkItem({
+        projectRoot,
+        projectConfig: {
+          ...config,
+          automation: postgresAutomationConfig,
+        },
+        components: resolveProjectComponents(projectRoot, {
+          ...config,
+          automation: postgresAutomationConfig,
+        }),
+        automationConfig: postgresAutomationConfig,
+        providerFactory: providerFactory(provider),
+        owner: {
+          hostId: "host-a",
+        },
+        now: () => "2026-05-20T10:00:00.000Z",
+      }),
+    ).rejects.toThrow(
+      /PostgreSQL claim authority profile shared-claims was not found in DevNexus home config/,
+    );
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
+  it("uses host-local PostgreSQL profiles with an optional node-postgres adapter", async () => {
+    const root = makeTempDir("dev-nexus-claim-");
+    const projectRoot = path.join(root, "workspace");
+    const homePath = path.join(root, "home");
+    const config = projectConfig();
+    const postgresAutomationConfig = {
+      ...automationConfig(),
+      workItemClaims: {
+        ...automationConfig().workItemClaims,
+        authority: {
+          backend: "postgres" as const,
+          postgres: {
+            connectionProfileId: "shared-claims",
+          },
+        },
+      },
+    };
+    saveProjectConfig(projectRoot, {
+      ...config,
+      home: homePath,
+      automation: postgresAutomationConfig,
+    });
+    saveNexusHomeConfigFile(
+      homePath,
+      createDefaultNexusHomeConfigBase(homePath, {
+        claimAuthorityProfiles: [
+          {
+            id: "shared-claims",
+            backend: "postgres",
+            driver: "node_postgres",
+            connectionStringEnv: "DEV_NEXUS_CLAIMS_DATABASE_URL",
+            schema: "dev_nexus",
+          },
+        ],
+      }),
+      validateNexusHomeConfigBase,
+    );
+    const provider = new ClaimMemoryProvider([
+      workItem("github-18", "PostgreSQL adapter claim", {
+        labels: ["automation"],
+        description: "Issue body.",
+      }),
+    ]);
+    const nodePostgres = new ClaimNodePostgresHarness();
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: {
+        ...config,
+        home: homePath,
+        automation: postgresAutomationConfig,
+      },
+      components: resolveProjectComponents(projectRoot, {
+        ...config,
+        home: homePath,
+        automation: postgresAutomationConfig,
+      }),
+      automationConfig: postgresAutomationConfig,
+      providerFactory: providerFactory(provider),
+      owner: {
+        hostId: "host-a",
+      },
+      leaseTokenFactory: () => "postgres-token-1",
+      env: {
+        DEV_NEXUS_CLAIMS_DATABASE_URL: "postgres://claims@example.invalid/db",
+      },
+      nodePostgresModule: nodePostgres.module,
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      authorityClaim: {
+        authorityKind: "postgres",
+        fencingToken: 1,
+        owner: {
+          leaseToken: "postgres-token-1",
+        },
+      },
+      workItem: {
+        id: "github-18",
+        status: "in_progress",
+      },
+    });
+    expect(nodePostgres.events).toEqual([
+      "connect",
+      "BEGIN",
+      'SET LOCAL search_path TO "dev_nexus", public',
+      "lock",
+      "select",
+      "upsert",
+      "COMMIT",
+      "end",
+      "connect",
+      "BEGIN",
+      'SET LOCAL search_path TO "dev_nexus", public',
+      "select",
+      "COMMIT",
+      "end",
+    ]);
+    expect(provider.updates).toEqual([
+      {
+        ref: {
+          provider: "github",
+          id: "github-18",
+          externalRef: workItem("github-18").externalRef,
+        },
+        patch: {
+          status: "in_progress",
+        },
+      },
+    ]);
   });
 
   it("returns no-claim when no candidate matches the configured selector", async () => {
@@ -369,6 +677,91 @@ describe("optimistic work item claims", () => {
     expect(provider.comments[0]?.body).toContain("expired-token");
   });
 
+  it("delegates stale reclaim to an injected claim authority", async () => {
+    const projectRoot = makeTempDir("dev-nexus-claim-");
+    const config = projectConfig();
+    saveProjectConfig(projectRoot, config);
+    const provider = new ClaimMemoryProvider([
+      workItem("github-17", "Authority reclaim", {
+        status: "in_progress",
+        labels: ["automation"],
+        description: claimBlock({
+          leaseToken: "expired-token",
+          hostId: "host-b",
+          agentId: "agent-b",
+          claimedAt: "2026-05-20T09:00:00.000Z",
+          expiresAt: "2026-05-20T09:30:00.000Z",
+        }),
+      }),
+    ]);
+    const authorityCalls: string[] = [];
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate() {
+        throw new Error("claimCandidate should not be used for stale reclaim");
+      },
+      async reclaimExpiredClaim(input) {
+        authorityCalls.push(
+          `${input.tracker.id}:${input.candidate.id}:` +
+            `${input.previousOwner.leaseToken}:${input.owner.leaseToken}`,
+        );
+        expect(input.provider).toBe(provider);
+        expect(input.ref).toMatchObject({
+          provider: "github",
+          id: "github-17",
+        });
+        expect(input.freshWorkItem).toMatchObject({
+          id: "github-17",
+          status: "in_progress",
+        });
+
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+        };
+      },
+    };
+
+    const result = await claimNexusEligibleWorkItem({
+      projectRoot,
+      projectConfig: config,
+      components: resolveProjectComponents(projectRoot, config),
+      automationConfig: automationConfig(),
+      providerFactory: providerFactory(provider),
+      claimAuthority,
+      owner: { hostId: "host-a", agentId: "agent-a" },
+      leaseTokenFactory: () => "new-token",
+      staleClaimPolicy: "reclaim",
+      now: () => "2026-05-20T10:00:00.000Z",
+    });
+
+    expect(result).toMatchObject({
+      status: "claimed",
+      workItem: {
+        id: "github-17",
+        status: "in_progress",
+      },
+      owner: {
+        hostId: "host-a",
+        agentId: "agent-a",
+        leaseToken: "new-token",
+      },
+      reclaimedFrom: {
+        owner: {
+          leaseToken: "expired-token",
+        },
+      },
+    });
+    expect(authorityCalls).toEqual([
+      "github:github-17:expired-token:new-token",
+    ]);
+    expect(provider.updates).toEqual([]);
+    expect(provider.comments).toEqual([]);
+  });
+
   it("refuses to reclaim active claims even when reclaim is enabled", async () => {
     const projectRoot = makeTempDir("dev-nexus-claim-");
     const config = projectConfig();
@@ -636,6 +1029,120 @@ class ClaimMemoryProvider implements WorkTrackerProvider {
 
     return item;
   }
+}
+
+class ClaimNodePostgresHarness {
+  readonly rows = new Map<string, NexusPostgresClaimAuthorityRow>();
+  readonly events: string[] = [];
+  private nextFencingToken = 1;
+  readonly module: NexusNodePostgresModule = {
+    Client: class {
+      constructor(
+        readonly config: object,
+        private readonly harness: ClaimNodePostgresHarness =
+          activeClaimNodePostgresHarness!,
+      ) {}
+
+      async connect(): Promise<void> {
+        this.harness.events.push("connect");
+      }
+
+      async query(
+        sql: string,
+        params: readonly unknown[] = [],
+      ): Promise<{ rows: unknown[] }> {
+        return this.harness.query(sql, params);
+      }
+
+      async end(): Promise<void> {
+        this.harness.events.push("end");
+      }
+    },
+  };
+
+  constructor() {
+    activeClaimNodePostgresHarness = this;
+  }
+
+  async query(
+    sql: string,
+    params: readonly unknown[],
+  ): Promise<{ rows: unknown[] }> {
+    if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+      this.events.push(sql);
+      return { rows: [] };
+    }
+    if (sql.startsWith("SET LOCAL search_path")) {
+      this.events.push(sql);
+      return { rows: [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:lock")) {
+      this.events.push("lock");
+      return { rows: [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:select")) {
+      this.events.push("select");
+      const row = this.rows.get(String(params[0]));
+      return { rows: row ? [cloneClaimRow(row)] : [] };
+    }
+    if (sql.includes("dev-nexus-postgres-claim-authority:upsert")) {
+      this.events.push("upsert");
+      const input = params[0] as NexusPostgresClaimAuthorityRow;
+      const row = {
+        ...cloneClaimRow(input),
+        fencingToken: this.nextFencingToken,
+      };
+      this.nextFencingToken += 1;
+      this.rows.set(row.keyHash, row);
+      return { rows: [cloneClaimRow(row)] };
+    }
+
+    throw new Error(`Unexpected SQL: ${sql}`);
+  }
+}
+
+let activeClaimNodePostgresHarness: ClaimNodePostgresHarness | null = null;
+
+function cloneClaimRow(
+  row: NexusPostgresClaimAuthorityRow,
+): NexusPostgresClaimAuthorityRow {
+  return {
+    ...row,
+    key: { ...row.key },
+    owner: { ...row.owner },
+    providerMirrorWarnings: [...row.providerMirrorWarnings],
+    ...(row.reclaimedFrom ? { reclaimedFrom: { ...row.reclaimedFrom } } : {}),
+  };
+}
+
+function testAuthorityClaim(
+  input: NexusWorkItemClaimAuthorityClaimCandidateOptions,
+): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: input.projectId,
+      componentId: input.candidate.componentId,
+      trackerId: input.tracker.id,
+      provider: input.ref.provider ?? input.candidate.provider,
+      workItemId: input.ref.id ?? input.candidate.id,
+      ...(input.ref.externalRef?.repositoryOwner
+        ? { repositoryOwner: input.ref.externalRef.repositoryOwner }
+        : {}),
+      ...(input.ref.externalRef?.repositoryName
+        ? { repositoryName: input.ref.externalRef.repositoryName }
+        : {}),
+      ...(input.ref.externalRef?.itemNumber
+        ? { itemNumber: input.ref.externalRef.itemNumber }
+        : {}),
+    },
+    owner: input.owner,
+    fencingToken: 41,
+    state: "active",
+    claimedAt: input.owner.claimedAt,
+    expiresAt: input.owner.expiresAt,
+    lastHeartbeatAt: input.now.toISOString(),
+  };
 }
 
 function matchesQuery(item: WorkItem, query: WorkItemQuery): boolean {
