@@ -17,6 +17,7 @@ import {
   resolveNexusCurrentAutomationActor,
   resolveNexusEffectiveAuthority,
   type NexusAuthorityAction,
+  type NexusAuthorityProviderChecksSignal,
   type NexusAuthorityProviderState,
   type NexusEffectiveAuthorityResolution,
 } from "./nexusAuthority.js";
@@ -884,18 +885,10 @@ function greenMainChecksStatus(options: {
 }): NexusGreenMainPublicationStatus["checks"] {
   const signal = options.providerState?.pullRequest?.checks ?? "unknown";
   const source = options.greenMain.integrationPreference;
-  const status: NexusGreenMainChecksStatus =
-    options.greenMain.requiredChecks.length === 0 && signal === "unknown"
-      ? "not_required"
-      : signal === "checks_passed"
-        ? "green"
-        : signal === "checks_failed"
-          ? "failed"
-          : signal === "checks_stale"
-            ? "stale"
-            : signal === "checks_pending"
-              ? "pending"
-              : "unknown";
+  const status = greenMainChecksStatusValue({
+    signal,
+    hasRequiredChecks: options.greenMain.requiredChecks.length > 0,
+  });
   const requiredChecks = [...options.greenMain.requiredChecks];
   const checksLabel = requiredChecks.length > 0
     ? requiredChecks.join(", ")
@@ -912,6 +905,28 @@ function greenMainChecksStatus(options: {
       staleChecks: options.greenMain.staleChecks,
     }),
   };
+}
+
+function greenMainChecksStatusValue(options: {
+  signal: NexusAuthorityProviderChecksSignal;
+  hasRequiredChecks: boolean;
+}): NexusGreenMainChecksStatus {
+  if (!options.hasRequiredChecks && options.signal === "unknown") {
+    return "not_required";
+  }
+
+  switch (options.signal) {
+    case "checks_passed":
+      return "green";
+    case "checks_failed":
+      return "failed";
+    case "checks_stale":
+      return "stale";
+    case "checks_pending":
+      return "pending";
+    default:
+      return "unknown";
+  }
 }
 
 function greenMainChecksMessage(options: {
