@@ -77,6 +77,7 @@ async function loadDashboardClientTestHooks(): Promise<{
   ) => string;
   renderHostDashboard: (host: unknown, themeMode?: string, hostFocus?: string) => string;
   renderHostOverview: (host: unknown, snapshot?: unknown, selectedWorkspaceId?: string, options?: unknown) => string;
+  renderProjectHeaderActions: (snapshot: unknown, themeMode?: string, selectedWorkspaceId?: string) => string;
   renderPlugins: (plugins: unknown) => string;
   renderSignal: (signal: unknown, selectedId?: string | null) => string;
   renderTrackedWork: (snapshot: unknown, selectedId?: string | null) => string;
@@ -117,7 +118,7 @@ async function loadDashboardClientTestHooks(): Promise<{
       "export function mountDevNexusDashboard",
       "function mountDevNexusDashboard",
     )}
-export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
+export { cockpitThreadPrompt, historyRows, renderActionStrip, renderBranchGraph, renderHostDashboard, renderHostOverview, renderLaneKey, renderPlugins, renderProjectHeaderActions, renderSignal, renderThreadActions, renderThreadInbox, renderTrackedWork, selectedDetail, signalPanelTarget, timelineLanes };`;
   return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -1640,6 +1641,34 @@ describe("nexus dashboard", () => {
     expect(html.indexOf("dn-header-path-value")).toBeLessThan(
       html.indexOf("data-open-target=\"home\""),
     );
+  });
+
+  it("renders workspace headers with the compact project path controls", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderProjectHeaderActions({
+      generatedAt: "2026-05-23T09:15:00.000Z",
+      project: {
+        name: "DevNexus PLexus",
+        root: "/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus",
+      },
+    }, "dark", "dev-nexus-plexus");
+
+    expect(html).toContain("dn-project-header-actions");
+    expect(html).toContain("Host cockpit");
+    expect(html).toContain("dn-header-strip");
+    expect(html).toContain("dn-header-stamp");
+    expect(html).toContain("Generated");
+    expect(html).toContain("dn-header-path-menu");
+    expect(html).toContain("dn-header-path-control");
+    expect(html).toContain("dn-header-path-value");
+    expect(html).toContain("dn-app-icon-finder");
+    expect(html).toContain("/api/local/app-icon?app=file");
+    expect(html).toContain("Project");
+    expect(html).toContain("/Users/gabriel.darbord/dev-nexus/dev-nexus-plexus");
+    expect(html).toContain('data-open-target="project"');
+    expect(html).not.toContain('class="dn-meta"');
+    expect(html).not.toContain("Root</span>");
   });
 
   it("keeps host workspaces above the action queue like project pages", async () => {
