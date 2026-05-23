@@ -911,6 +911,12 @@ describe("nexus dashboard", () => {
           lastSeenAt: "2026-05-23T08:50:00.000Z",
           updatedAt: "2026-05-23T08:50:00.000Z",
         }),
+        worktreeLease(config.id, {
+          id: "lease-quality-audit",
+          branchName: "codex/dev-nexus/---quality+++audit---",
+          lastSeenAt: "2026-05-23T08:55:00.000Z",
+          updatedAt: "2026-05-23T08:55:00.000Z",
+        }),
       ],
     });
 
@@ -937,6 +943,14 @@ describe("nexus dashboard", () => {
           status: "active",
           branchCount: 1,
           branches: ["codex/dev-nexus/dashboard-cockpit-kit"],
+        }),
+        expect.objectContaining({
+          id: "feature:inferred:quality-audit",
+          title: "---quality+++audit---",
+          branchStrategy: "inferred",
+          status: "active",
+          branchCount: 1,
+          branches: ["codex/dev-nexus/---quality+++audit---"],
         }),
       ]),
     );
@@ -3394,7 +3408,8 @@ describe("nexus dashboard", () => {
     });
     const item = await tracker.createWorkItem({
       projectRoot,
-      title: "Review #42: provider routing",
+      title:
+        "Review HTTPS://GITHUB.COM/Evref-BL/DevNexus/pull/66, then #42: provider routing",
       status: "ready",
     });
 
@@ -3409,11 +3424,15 @@ describe("nexus dashboard", () => {
     ).toMatchObject({
       actions: [
         expect.objectContaining({
-          label: "#42: provider routing",
+          label: "Open PR #66",
+          href: "https://github.com/Evref-BL/DevNexus/pull/66",
+          provider: "github",
+          kind: "pull-request",
+        }),
+        expect.objectContaining({
           href: "https://github.com/Evref-BL/DevNexus/issues/42",
           provider: "github",
           kind: "issue",
-          title: "provider routing",
         }),
       ],
     });
@@ -3423,11 +3442,15 @@ describe("nexus dashboard", () => {
       records: [
         expect.objectContaining({
           id: item.id,
-          title: "Review #42: provider routing",
+          title:
+            "Review HTTPS://GITHUB.COM/Evref-BL/DevNexus/pull/66, then #42: provider routing",
           kind: "ready",
           actions: [
             expect.objectContaining({
-              label: "#42: provider routing",
+              label: "Open PR #66",
+              href: "https://github.com/Evref-BL/DevNexus/pull/66",
+            }),
+            expect.objectContaining({
               href: "https://github.com/Evref-BL/DevNexus/issues/42",
             }),
           ],

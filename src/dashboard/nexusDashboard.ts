@@ -2510,8 +2510,8 @@ function providerActionsFromText(
     componentId ?? inferComponentIdFromText(text, providerUrls),
   );
   const actions: NexusDashboardProviderAction[] = [];
-  for (const match of text.matchAll(/https:\/\/github\.com\/[^\s<>()"'`]+/giu)) {
-    actions.push(...providerActionsForHref(match[0].replace(/[.,;:]+$/u, "")));
+  for (const href of githubLinksFromText(text)) {
+    actions.push(...providerActionsForHref(href));
   }
   if (repositoryUrl) {
     for (const match of text.matchAll(/\b(?:PR|pull request)\s*#(\d+)\b/giu)) {
@@ -2565,6 +2565,41 @@ function providerActionsFromText(
     }
   }
   return uniqueProviderActions(actions).slice(0, 3);
+}
+
+function githubLinksFromText(text: string): string[] {
+  const prefix = "https://github.com/";
+  const lowerText = text.toLowerCase();
+  const links: string[] = [];
+  let searchStart = 0;
+  for (;;) {
+    const start = lowerText.indexOf(prefix, searchStart);
+    if (start < 0) {
+      return links;
+    }
+
+    let end = start + prefix.length;
+    while (end < text.length && !isProviderUrlTerminator(text[end]!)) {
+      end += 1;
+    }
+    const href = trimTrailingProviderPunctuation(text.slice(start, end));
+    if (href.length > prefix.length) {
+      links.push(href);
+    }
+    searchStart = end;
+  }
+}
+
+function isProviderUrlTerminator(char: string): boolean {
+  return char.trim() === "" || "<>()\"'`".includes(char);
+}
+
+function trimTrailingProviderPunctuation(value: string): string {
+  let end = value.length;
+  while (end > 0 && ".,;:".includes(value[end - 1]!)) {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 function actionLabel(
@@ -3509,11 +3544,37 @@ function featureIntentPrefixes(): Set<string> {
 }
 
 function dashboardFeatureSlug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "") || "manual";
+  let slug = "";
+  for (const char of value.trim().toLowerCase()) {
+    if (isDashboardFeatureSlugChar(char)) {
+      slug += char;
+    } else if (slug && !slug.endsWith("-")) {
+      slug += "-";
+    }
+  }
+  return trimEdgeDashes(slug) || "manual";
+}
+
+function isDashboardFeatureSlugChar(char: string): boolean {
+  return (
+    (char >= "a" && char <= "z") ||
+    (char >= "0" && char <= "9") ||
+    char === "." ||
+    char === "_" ||
+    char === "-"
+  );
+}
+
+function trimEdgeDashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "-") {
+    start += 1;
+  }
+  while (end > start && value[end - 1] === "-") {
+    end -= 1;
+  }
+  return value.slice(start, end);
 }
 
 function branchBelongsToFeature(
@@ -3548,7 +3609,11 @@ function normalizeFeatureBranchForMatching(branchName: string): string {
 }
 
 function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/u, "");
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 function dashboardFeatureStatus(options: {
