@@ -346,74 +346,55 @@ export function validateNexusProjectSetupAnswers(
     ...findNexusProjectSetupSecretDiagnostics(answers),
   ];
 
-  if (!nonEmptyString(answers.project?.id)) {
-    diagnostics.push(errorDiagnostic("project.id", "Project id is required."));
-  }
-  if (!nonEmptyString(answers.project?.name)) {
-    diagnostics.push(errorDiagnostic("project.name", "Workspace name is required."));
-  }
-  if (!nonEmptyString(answers.project?.root)) {
-    diagnostics.push(errorDiagnostic("project.root", "Workspace root is required."));
+  validateProjectIdentity(answers.project, diagnostics);
+  if (!validateComponentTopology(answers.components, diagnostics)) {
+    return diagnostics;
   }
 
-  if (!Array.isArray(answers.components) || answers.components.length === 0) {
+  const authProfileIds = validateAuthProfiles(answers.authProfiles ?? [], diagnostics);
+  const componentIds = new Set(
+    answers.components
+      .map((component) => component.id)
+      .filter(nonEmptyString),
+  );
+  validateWorkTrackers(answers.workTrackers ?? [], componentIds, authProfileIds, diagnostics);
+  validateReferencedAuthProfiles(answers, authProfileIds, diagnostics);
+
+  return diagnostics;
+}
+
+function validateProjectIdentity(
+  project: NexusProjectSetupAnswers["project"] | undefined,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  if (!nonEmptyString(project?.id)) {
+    diagnostics.push(errorDiagnostic("project.id", "Project id is required."));
+  }
+  if (!nonEmptyString(project?.name)) {
+    diagnostics.push(errorDiagnostic("project.name", "Workspace name is required."));
+  }
+  if (!nonEmptyString(project?.root)) {
+    diagnostics.push(errorDiagnostic("project.root", "Workspace root is required."));
+  }
+}
+
+function validateComponentTopology(
+  components: NexusProjectSetupAnswers["components"] | undefined,
+  diagnostics: NexusProjectSetupDiagnostic[],
+): components is NexusProjectSetupComponentAnswers[] {
+  if (!Array.isArray(components) || components.length === 0) {
     diagnostics.push(errorDiagnostic("components", "At least one component is required."));
-    return diagnostics;
+    return false;
   }
 
   const seenComponentIds = new Set<string>();
   let primaryCount = 0;
-  for (const [index, component] of answers.components.entries()) {
-    const pathPrefix = `components[${index}]`;
-    if (!nonEmptyString(component.id)) {
-      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, "Component id is required."));
-    } else if (seenComponentIds.has(component.id)) {
-      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, `Duplicate component id: ${component.id}.`));
-    } else {
-      seenComponentIds.add(component.id);
-    }
-
+  for (const [index, component] of components.entries()) {
+    validateComponentIdentity(component, index, seenComponentIds, diagnostics);
     if (component.role === "primary") {
       primaryCount += 1;
     }
-
-    if (!component.source) {
-      diagnostics.push(errorDiagnostic(`${pathPrefix}.source`, "Component source strategy is required."));
-      continue;
-    }
-
-    switch (component.source.kind) {
-      case "reference_existing":
-        if (!nonEmptyString(component.source.path)) {
-          diagnostics.push(errorDiagnostic(
-            `${pathPrefix}.source.path`,
-            "Existing component references require a source path.",
-          ));
-        }
-        break;
-      case "clone_project_local":
-        if (!nonEmptyString(component.source.remoteUrl)) {
-          diagnostics.push(errorDiagnostic(
-            `${pathPrefix}.source.remoteUrl`,
-            "Workspace-local component clones require a remote URL.",
-          ));
-        }
-        break;
-      case "create_local":
-        if (!nonEmptyString(component.source.path)) {
-          diagnostics.push(errorDiagnostic(
-            `${pathPrefix}.source.path`,
-            "New local components require a target path.",
-          ));
-        }
-        break;
-      default:
-        diagnostics.push(errorDiagnostic(
-          `${pathPrefix}.source.kind`,
-          `Unsupported component source strategy: ${String(component.source.kind)}.`,
-        ));
-        break;
-    }
+    validateComponentSource(component, index, diagnostics);
   }
 
   if (primaryCount !== 1) {
@@ -423,95 +404,227 @@ export function validateNexusProjectSetupAnswers(
     ));
   }
 
-  for (const [index, profile] of (answers.authProfiles ?? []).entries()) {
-    if (!nonEmptyString(profile.id)) {
-      diagnostics.push(errorDiagnostic(`authProfiles[${index}].id`, "Auth profile id is required."));
-    }
-    if (!profile.credentialMethod) {
-      diagnostics.push(errorDiagnostic(
-        `authProfiles[${index}].credentialMethod`,
-        "Auth profiles require a host-local credential method reference.",
-      ));
-    }
+  return true;
+}
+
+function validateComponentIdentity(
+  component: NexusProjectSetupComponentAnswers,
+  index: number,
+  seenComponentIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const pathPrefix = `components[${index}]`;
+  if (!nonEmptyString(component.id)) {
+    diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, "Component id is required."));
+  } else if (seenComponentIds.has(component.id)) {
+    diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, `Duplicate component id: ${component.id}.`));
+  } else {
+    seenComponentIds.add(component.id);
+  }
+}
+
+function validateComponentSource(
+  component: NexusProjectSetupComponentAnswers,
+  index: number,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const pathPrefix = `components[${index}]`;
+  if (!component.source) {
+    diagnostics.push(errorDiagnostic(`${pathPrefix}.source`, "Component source strategy is required."));
+    return;
   }
 
-  const authProfileIds = new Set<string>();
-  for (const [index, profile] of (answers.authProfiles ?? []).entries()) {
-    if (!nonEmptyString(profile.id)) {
-      continue;
-    }
-    if (authProfileIds.has(profile.id)) {
+  switch (component.source.kind) {
+    case "reference_existing":
+      validateRequiredString(
+        component.source.path,
+        `${pathPrefix}.source.path`,
+        "Existing component references require a source path.",
+        diagnostics,
+      );
+      return;
+    case "clone_project_local":
+      validateRequiredString(
+        component.source.remoteUrl,
+        `${pathPrefix}.source.remoteUrl`,
+        "Workspace-local component clones require a remote URL.",
+        diagnostics,
+      );
+      return;
+    case "create_local":
+      validateRequiredString(
+        component.source.path,
+        `${pathPrefix}.source.path`,
+        "New local components require a target path.",
+        diagnostics,
+      );
+      return;
+    default:
       diagnostics.push(errorDiagnostic(
-        `authProfiles[${index}].id`,
-        `Duplicate auth profile id: ${profile.id}.`,
+        `${pathPrefix}.source.kind`,
+        `Unsupported component source strategy: ${String(component.source.kind)}.`,
       ));
-    }
+  }
+}
+
+function validateAuthProfiles(
+  profiles: NexusProjectSetupAuthProfileAnswers[],
+  diagnostics: NexusProjectSetupDiagnostic[],
+): Set<string> {
+  const authProfileIds = new Set<string>();
+  for (const [index, profile] of profiles.entries()) {
+    validateAuthProfile(profile, index, authProfileIds, diagnostics);
+  }
+  return authProfileIds;
+}
+
+function validateAuthProfile(
+  profile: NexusProjectSetupAuthProfileAnswers,
+  index: number,
+  authProfileIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  if (!nonEmptyString(profile.id)) {
+    diagnostics.push(errorDiagnostic(`authProfiles[${index}].id`, "Auth profile id is required."));
+  } else if (authProfileIds.has(profile.id)) {
+    diagnostics.push(errorDiagnostic(
+      `authProfiles[${index}].id`,
+      `Duplicate auth profile id: ${profile.id}.`,
+    ));
+  } else {
     authProfileIds.add(profile.id);
   }
-
-  const componentIds = new Set(
-    (answers.components ?? [])
-      .map((component) => component.id)
-      .filter(nonEmptyString),
-  );
-  const workTrackerIds = new Set<string>();
-  for (const [index, tracker] of (answers.workTrackers ?? []).entries()) {
-    const pathPrefix = `workTrackers[${index}]`;
-    if (!nonEmptyString(tracker.id)) {
-      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, "Work tracker id is required."));
-    } else if (workTrackerIds.has(tracker.id)) {
-      diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, `Duplicate work tracker id: ${tracker.id}.`));
-    } else {
-      workTrackerIds.add(tracker.id);
-    }
-    if (tracker.componentId && !componentIds.has(tracker.componentId)) {
-      diagnostics.push(errorDiagnostic(
-        `${pathPrefix}.componentId`,
-        `Work tracker references unknown component: ${tracker.componentId}.`,
-      ));
-    }
-    if (tracker.authProfileId && !authProfileIds.has(tracker.authProfileId)) {
-      diagnostics.push(errorDiagnostic(
-        `${pathPrefix}.authProfileId`,
-        `Work tracker references unknown auth profile: ${tracker.authProfileId}.`,
-      ));
-    }
-    switch (tracker.provider) {
-      case "local":
-        break;
-      case "github":
-        if (!nonEmptyString(tracker.repositoryOwner)) {
-          diagnostics.push(errorDiagnostic(`${pathPrefix}.repositoryOwner`, "GitHub trackers require repositoryOwner."));
-        }
-        if (!nonEmptyString(tracker.repositoryName)) {
-          diagnostics.push(errorDiagnostic(`${pathPrefix}.repositoryName`, "GitHub trackers require repositoryName."));
-        }
-        break;
-      case "gitlab":
-        if (
-          !nonEmptyString(tracker.repositoryId) &&
-          !(nonEmptyString(tracker.repositoryOwner) && nonEmptyString(tracker.repositoryName))
-        ) {
-          diagnostics.push(errorDiagnostic(
-            `${pathPrefix}.repositoryId`,
-            "GitLab trackers require repositoryId or repositoryOwner plus repositoryName.",
-          ));
-        }
-        break;
-      case "jira":
-        if (!nonEmptyString(tracker.projectKey)) {
-          diagnostics.push(errorDiagnostic(`${pathPrefix}.projectKey`, "Jira trackers require projectKey."));
-        }
-        break;
-      default:
-        diagnostics.push(errorDiagnostic(
-          `${pathPrefix}.provider`,
-          `Unsupported work tracker provider: ${String(tracker.provider)}.`,
-        ));
-        break;
-    }
+  if (!profile.credentialMethod) {
+    diagnostics.push(errorDiagnostic(
+      `authProfiles[${index}].credentialMethod`,
+      "Auth profiles require a host-local credential method reference.",
+    ));
   }
+}
 
+function validateWorkTrackers(
+  trackers: NexusProjectSetupWorkTrackerAnswers[],
+  componentIds: Set<string>,
+  authProfileIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const workTrackerIds = new Set<string>();
+  for (const [index, tracker] of trackers.entries()) {
+    validateWorkTrackerIdentity(tracker, index, workTrackerIds, diagnostics);
+    validateWorkTrackerReferences(tracker, index, componentIds, authProfileIds, diagnostics);
+    validateWorkTrackerProviderFields(tracker, index, diagnostics);
+  }
+}
+
+function validateWorkTrackerIdentity(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  index: number,
+  workTrackerIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const pathPrefix = `workTrackers[${index}]`;
+  if (!nonEmptyString(tracker.id)) {
+    diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, "Work tracker id is required."));
+  } else if (workTrackerIds.has(tracker.id)) {
+    diagnostics.push(errorDiagnostic(`${pathPrefix}.id`, `Duplicate work tracker id: ${tracker.id}.`));
+  } else {
+    workTrackerIds.add(tracker.id);
+  }
+}
+
+function validateWorkTrackerReferences(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  index: number,
+  componentIds: Set<string>,
+  authProfileIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const pathPrefix = `workTrackers[${index}]`;
+  if (tracker.componentId && !componentIds.has(tracker.componentId)) {
+    diagnostics.push(errorDiagnostic(
+      `${pathPrefix}.componentId`,
+      `Work tracker references unknown component: ${tracker.componentId}.`,
+    ));
+  }
+  if (tracker.authProfileId && !authProfileIds.has(tracker.authProfileId)) {
+    diagnostics.push(errorDiagnostic(
+      `${pathPrefix}.authProfileId`,
+      `Work tracker references unknown auth profile: ${tracker.authProfileId}.`,
+    ));
+  }
+}
+
+function validateWorkTrackerProviderFields(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  index: number,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  const pathPrefix = `workTrackers[${index}]`;
+  switch (tracker.provider) {
+    case "local":
+      return;
+    case "github":
+      validateGitHubTrackerFields(tracker, pathPrefix, diagnostics);
+      return;
+    case "gitlab":
+      validateGitLabTrackerFields(tracker, pathPrefix, diagnostics);
+      return;
+    case "jira":
+      validateRequiredString(
+        tracker.projectKey,
+        `${pathPrefix}.projectKey`,
+        "Jira trackers require projectKey.",
+        diagnostics,
+      );
+      return;
+    default:
+      diagnostics.push(errorDiagnostic(
+        `${pathPrefix}.provider`,
+        `Unsupported work tracker provider: ${String(tracker.provider)}.`,
+      ));
+  }
+}
+
+function validateGitHubTrackerFields(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  pathPrefix: string,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  validateRequiredString(
+    tracker.repositoryOwner,
+    `${pathPrefix}.repositoryOwner`,
+    "GitHub trackers require repositoryOwner.",
+    diagnostics,
+  );
+  validateRequiredString(
+    tracker.repositoryName,
+    `${pathPrefix}.repositoryName`,
+    "GitHub trackers require repositoryName.",
+    diagnostics,
+  );
+}
+
+function validateGitLabTrackerFields(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+  pathPrefix: string,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  if (
+    !nonEmptyString(tracker.repositoryId) &&
+    !(nonEmptyString(tracker.repositoryOwner) && nonEmptyString(tracker.repositoryName))
+  ) {
+    diagnostics.push(errorDiagnostic(
+      `${pathPrefix}.repositoryId`,
+      "GitLab trackers require repositoryId or repositoryOwner plus repositoryName.",
+    ));
+  }
+}
+
+function validateReferencedAuthProfiles(
+  answers: NexusProjectSetupAnswers,
+  authProfileIds: Set<string>,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
   for (const [pathName, profileId] of [
     ["hostingIntent.humanAuthProfileId", answers.hostingIntent?.humanAuthProfileId],
     ["hostingIntent.automationAuthProfileId", answers.hostingIntent?.automationAuthProfileId],
@@ -526,8 +639,17 @@ export function validateNexusProjectSetupAnswers(
       ));
     }
   }
+}
 
-  return diagnostics;
+function validateRequiredString(
+  value: unknown,
+  pathName: string,
+  message: string,
+  diagnostics: NexusProjectSetupDiagnostic[],
+) {
+  if (!nonEmptyString(value)) {
+    diagnostics.push(errorDiagnostic(pathName, message));
+  }
 }
 
 export function renderNexusProjectSetupProposalSummary(
@@ -567,7 +689,21 @@ export function renderNexusProjectSetupProposalSummary(
 export function buildNexusProjectSetupOperations(
   answers: NexusProjectSetupAnswers,
 ): NexusProjectSetupOperation[] {
-  const operations: NexusProjectSetupOperation[] = [
+  return [
+    ...baseWorkspaceSetupOperations(),
+    ...projectRegistrationOperations(answers.home),
+    ...workspaceGitOperations(answers.project),
+    ...localWorkTrackingOperations(answers.localWorkTracking),
+    ...componentSourceOperations(answers.components),
+    ...agentTargetOperations(answers.agentTargets ?? []),
+    ...authProfileOperations(answers.authProfiles ?? []),
+    ...hostingIntentOperations(answers.hostingIntent),
+    ...readinessCheckOperations(answers.readinessChecks ?? []),
+  ];
+}
+
+function baseWorkspaceSetupOperations(): NexusProjectSetupOperation[] {
+  return [
     {
       id: "write-project-config",
       title: "Write DevNexus workspace configuration",
@@ -585,132 +721,192 @@ export function buildNexusProjectSetupOperations(
       summary: "Create DevNexus support directories, AGENTS.md, skills, and MCP projection files for selected agent targets.",
     },
   ];
+}
 
-  if (answers.home.registerProject !== false) {
-    operations.push({
+function projectRegistrationOperations(
+  home: NexusProjectSetupHomeAnswers,
+): NexusProjectSetupOperation[] {
+  if (home.registerProject === false) {
+    return [];
+  }
+
+  return [
+    {
       id: "register-project-home",
       title: "Register workspace in DevNexus home",
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
       summary: "Record the workspace in the selected host-local DevNexus home registry.",
-    });
+    },
+  ];
+}
+
+function workspaceGitOperations(
+  project: NexusProjectSetupProjectAnswers,
+): NexusProjectSetupOperation[] {
+  if (!project.initializeGit) {
+    return [];
   }
 
-  if (answers.project.initializeGit) {
-    operations.push({
+  return [
+    {
       id: "initialize-workspace-git",
       title: "Initialize local workspace Git repository",
       mutationClass: "local_git_operation",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
       summary: "Initialize the local workspace repository without creating or pushing any remote repository.",
-    });
+    },
+  ];
+}
+
+function localWorkTrackingOperations(
+  localWorkTracking: NexusProjectSetupLocalWorkTrackingAnswers | undefined,
+): NexusProjectSetupOperation[] {
+  if (localWorkTracking?.enabled === false) {
+    return [];
   }
 
-  if (answers.localWorkTracking?.enabled !== false) {
-    operations.push({
+  return [
+    {
       id: "write-local-tracker-store",
       title: "Write local work-item tracker store",
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
-      summary: `Create or preserve the local tracker store at ${answers.localWorkTracking?.storePath ?? ".dev-nexus/work-items"}.`,
-    });
-  }
+      summary: `Create or preserve the local tracker store at ${localWorkTracking?.storePath ?? ".dev-nexus/work-items"}.`,
+    },
+  ];
+}
 
-  for (const component of answers.components) {
-    if (component.source.kind === "clone_project_local") {
-      operations.push({
-        id: `clone-component-${operationIdPart(component.id)}`,
-        title: `Clone component ${component.id}`,
-        mutationClass: "local_git_operation",
-        phase: "local_setup",
-        allowedDuringLocalSetup: true,
-        summary: `Clone ${component.source.remoteUrl ?? "the configured remote"} into the workspace-local component source area.`,
-      });
-    }
-    if (component.source.kind === "create_local") {
-      operations.push({
-        id: `create-component-${operationIdPart(component.id)}`,
-        title: `Create local component ${component.id}`,
-        mutationClass: "local_file_write",
-        phase: "local_setup",
-        allowedDuringLocalSetup: true,
-        summary: `Create the local component source directory at ${component.source.path ?? `components/${component.id}`}.`,
-      });
-      if (component.source.initializeGit) {
-        operations.push({
-          id: `initialize-component-git-${operationIdPart(component.id)}`,
-          title: `Initialize Git for component ${component.id}`,
-          mutationClass: "local_git_operation",
-          phase: "local_setup",
-          allowedDuringLocalSetup: true,
-          summary: "Initialize only the local component repository; provider hosting remains a later explicit phase.",
-        });
-      }
-    }
-  }
+function componentSourceOperations(
+  components: NexusProjectSetupComponentAnswers[],
+): NexusProjectSetupOperation[] {
+  return components.flatMap(componentSourceOperation);
+}
 
-  for (const target of answers.agentTargets ?? []) {
-    operations.push({
-      id: `project-agent-target-${operationIdPart(target.id ?? target.provider)}`,
-      title: `Workspace ${target.provider} agent support`,
+function componentSourceOperation(
+  component: NexusProjectSetupComponentAnswers,
+): NexusProjectSetupOperation[] {
+  if (component.source.kind === "clone_project_local") {
+    return [cloneComponentOperation(component)];
+  }
+  if (component.source.kind === "create_local") {
+    return createLocalComponentOperations(component);
+  }
+  return [];
+}
+
+function cloneComponentOperation(
+  component: NexusProjectSetupComponentAnswers,
+): NexusProjectSetupOperation {
+  return {
+    id: `clone-component-${operationIdPart(component.id)}`,
+    title: `Clone component ${component.id}`,
+    mutationClass: "local_git_operation",
+    phase: "local_setup",
+    allowedDuringLocalSetup: true,
+    summary: `Clone ${component.source.remoteUrl ?? "the configured remote"} into the workspace-local component source area.`,
+  };
+}
+
+function createLocalComponentOperations(
+  component: NexusProjectSetupComponentAnswers,
+): NexusProjectSetupOperation[] {
+  const operations: NexusProjectSetupOperation[] = [
+    {
+      id: `create-component-${operationIdPart(component.id)}`,
+      title: `Create local component ${component.id}`,
       mutationClass: "local_file_write",
       phase: "local_setup",
       allowedDuringLocalSetup: true,
-      summary: `Write configured local support for ${target.provider}${target.configPath ? ` at ${target.configPath}` : ""}.`,
-    });
-  }
-
-  for (const profile of answers.authProfiles ?? []) {
+      summary: `Create the local component source directory at ${component.source.path ?? `components/${component.id}`}.`,
+    },
+  ];
+  if (component.source.initializeGit) {
     operations.push({
-      id: `check-auth-profile-${operationIdPart(profile.id)}`,
-      title: `Check auth profile ${profile.id}`,
-      mutationClass: "host_local_auth_check",
-      phase: "readiness",
+      id: `initialize-component-git-${operationIdPart(component.id)}`,
+      title: `Initialize Git for component ${component.id}`,
+      mutationClass: "local_git_operation",
+      phase: "local_setup",
       allowedDuringLocalSetup: true,
-      authProfileId: profile.id,
-      summary: `Check host-local ${profile.provider} credentials for the ${profile.actorKind} actor without reading or writing shared secrets.`,
+      summary: "Initialize only the local component repository; provider hosting remains a later explicit phase.",
     });
   }
+  return operations;
+}
 
-  if (answers.hostingIntent) {
-    operations.push({
+function agentTargetOperations(
+  targets: NexusProjectSetupAgentTargetAnswers[],
+): NexusProjectSetupOperation[] {
+  return targets.map((target) => ({
+    id: `project-agent-target-${operationIdPart(target.id ?? target.provider)}`,
+    title: `Workspace ${target.provider} agent support`,
+    mutationClass: "local_file_write",
+    phase: "local_setup",
+    allowedDuringLocalSetup: true,
+    summary: `Write configured local support for ${target.provider}${target.configPath ? ` at ${target.configPath}` : ""}.`,
+  }));
+}
+
+function authProfileOperations(
+  profiles: NexusProjectSetupAuthProfileAnswers[],
+): NexusProjectSetupOperation[] {
+  return profiles.map((profile) => ({
+    id: `check-auth-profile-${operationIdPart(profile.id)}`,
+    title: `Check auth profile ${profile.id}`,
+    mutationClass: "host_local_auth_check",
+    phase: "readiness",
+    allowedDuringLocalSetup: true,
+    authProfileId: profile.id,
+    summary: `Check host-local ${profile.provider} credentials for the ${profile.actorKind} actor without reading or writing shared secrets.`,
+  }));
+}
+
+function hostingIntentOperations(
+  hostingIntent: NexusProjectSetupMetaHostingIntent | undefined,
+): NexusProjectSetupOperation[] {
+  if (!hostingIntent) {
+    return [];
+  }
+
+  return [
+    {
       id: "read-hosting-status",
       title: "Read workspace repository hosting status",
       mutationClass: "provider_read",
       phase: "readiness",
       allowedDuringLocalSetup: true,
-      authProfileId: answers.hostingIntent.humanAuthProfileId ?? answers.hostingIntent.automationAuthProfileId,
-      summary: `Read ${answers.hostingIntent.provider} metadata for ${answers.hostingIntent.namespace}/${answers.hostingIntent.repositoryName} when credentials are available.`,
-    });
-    operations.push({
+      authProfileId: hostingIntent.humanAuthProfileId ?? hostingIntent.automationAuthProfileId,
+      summary: `Read ${hostingIntent.provider} metadata for ${hostingIntent.namespace}/${hostingIntent.repositoryName} when credentials are available.`,
+    },
+    {
       id: "apply-hosting-intent",
       title: "Apply workspace repository hosting intent",
       mutationClass: "provider_mutation",
       phase: "next_phase",
       allowedDuringLocalSetup: false,
-      authProfileId: answers.hostingIntent.providerMutationAuthProfileId,
+      authProfileId: hostingIntent.providerMutationAuthProfileId,
       summary: "Create repositories, push remotes, repair collaborators, or accept invitations only through explicit hosting plan/apply commands.",
-    });
-  }
+    },
+  ];
+}
 
-  for (const check of answers.readinessChecks ?? []) {
-    if (check.provider && check.provider !== "local") {
-      operations.push({
-        id: `readiness-provider-report-${operationIdPart(check.id)}`,
-        title: check.title,
-        mutationClass: "provider_read",
-        phase: "readiness",
-        allowedDuringLocalSetup: true,
-        authProfileId: check.requiresAuthProfileId,
-        summary: "Read provider-backed readiness information only when credentials are configured.",
-      });
-    }
-  }
-
-  return operations;
+function readinessCheckOperations(
+  checks: NexusProjectSetupReadinessCheckAnswers[],
+): NexusProjectSetupOperation[] {
+  return checks
+    .filter((check) => check.provider && check.provider !== "local")
+    .map((check) => ({
+      id: `readiness-provider-report-${operationIdPart(check.id)}`,
+      title: check.title,
+      mutationClass: "provider_read",
+      phase: "readiness",
+      allowedDuringLocalSetup: true,
+      authProfileId: check.requiresAuthProfileId,
+      summary: "Read provider-backed readiness information only when credentials are configured.",
+    }));
 }
 
 export function findNexusProjectSetupSecretDiagnostics(
@@ -726,139 +922,181 @@ function normalizeNexusProjectSetupAnswers(
 ): NexusProjectSetupAnswers {
   return {
     version: 1,
-    home: {
-      path: answers.home?.path ?? defaultNexusHomePath(),
-      ...(answers.home?.registerProject !== undefined
-        ? { registerProject: answers.home.registerProject }
-        : {}),
+    home: normalizeHomeAnswers(answers.home),
+    project: normalizeProjectAnswers(answers.project),
+    components: normalizeComponentAnswers(answers.components ?? []),
+    ...normalizeOptionalAnswerSections(answers),
+  };
+}
+
+function normalizeHomeAnswers(
+  home: NexusProjectSetupAnswers["home"] | undefined,
+): NexusProjectSetupHomeAnswers {
+  return {
+    path: home?.path ?? defaultNexusHomePath(),
+    ...(home?.registerProject !== undefined ? { registerProject: home.registerProject } : {}),
+  };
+}
+
+function normalizeProjectAnswers(
+  project: NexusProjectSetupAnswers["project"] | undefined,
+): NexusProjectSetupProjectAnswers {
+  return {
+    id: project?.id ?? "",
+    name: project?.name ?? "",
+    root: project?.root ?? "",
+    ...(project?.initializeGit !== undefined ? { initializeGit: project.initializeGit } : {}),
+    ...(project?.defaultBranch ? { defaultBranch: project.defaultBranch } : {}),
+  };
+}
+
+function normalizeComponentAnswers(
+  components: NexusProjectSetupComponentAnswers[],
+): NexusProjectSetupComponentAnswers[] {
+  return components.map(normalizeComponentAnswer);
+}
+
+function normalizeComponentAnswer(
+  component: NexusProjectSetupComponentAnswers,
+): NexusProjectSetupComponentAnswers {
+  const source = component.source ?? { kind: "reference_existing" as const };
+  return {
+    id: component.id,
+    ...(component.name ? { name: component.name } : {}),
+    role: component.role,
+    source: {
+      kind: source.kind,
+      ...(source.path ? { path: source.path } : {}),
+      ...(source.remoteUrl ? { remoteUrl: source.remoteUrl } : {}),
+      ...(source.defaultBranch ? { defaultBranch: source.defaultBranch } : {}),
+      ...(source.initializeGit !== undefined ? { initializeGit: source.initializeGit } : {}),
     },
-    project: {
-      id: answers.project?.id ?? "",
-      name: answers.project?.name ?? "",
-      root: answers.project?.root ?? "",
-      ...(answers.project?.initializeGit !== undefined
-        ? { initializeGit: answers.project.initializeGit }
-        : {}),
-      ...(answers.project?.defaultBranch ? { defaultBranch: answers.project.defaultBranch } : {}),
-    },
-    components: (answers.components ?? []).map((component) => {
-      const source = component.source ?? { kind: "reference_existing" as const };
-      return {
-        id: component.id,
-        ...(component.name ? { name: component.name } : {}),
-        role: component.role,
-        source: {
-          kind: source.kind,
-          ...(source.path ? { path: source.path } : {}),
-          ...(source.remoteUrl ? { remoteUrl: source.remoteUrl } : {}),
-          ...(source.defaultBranch ? { defaultBranch: source.defaultBranch } : {}),
-          ...(source.initializeGit !== undefined
-            ? { initializeGit: source.initializeGit }
-            : {}),
-        },
-      };
-    }),
-    ...(answers.agentTargets
-      ? {
-          agentTargets: answers.agentTargets.map((target) => ({
-            provider: target.provider,
-            ...(target.id ? { id: target.id } : {}),
-            ...(target.configPath ? { configPath: target.configPath } : {}),
-          })),
-        }
+  };
+}
+
+function normalizeOptionalAnswerSections(
+  answers: NexusProjectSetupAnswers,
+): Partial<NexusProjectSetupAnswers> {
+  return {
+    ...optionalSection("agentTargets", answers.agentTargets?.map(normalizeAgentTargetAnswer)),
+    ...optionalSection("localWorkTracking", normalizeLocalWorkTrackingAnswers(answers.localWorkTracking)),
+    ...optionalSection("workTrackers", answers.workTrackers?.map(normalizeWorkTrackerAnswer)),
+    ...optionalSection("authProfiles", answers.authProfiles?.map(normalizeAuthProfileAnswer)),
+    ...optionalSection("hostingIntent", normalizeHostingIntentAnswers(answers.hostingIntent)),
+    ...optionalSection("publication", normalizePublicationAnswers(answers.publication)),
+    ...optionalSection("readinessChecks", answers.readinessChecks?.map(normalizeReadinessCheckAnswer)),
+  };
+}
+
+function normalizeAgentTargetAnswer(
+  target: NexusProjectSetupAgentTargetAnswers,
+): NexusProjectSetupAgentTargetAnswers {
+  return {
+    provider: target.provider,
+    ...(target.id ? { id: target.id } : {}),
+    ...(target.configPath ? { configPath: target.configPath } : {}),
+  };
+}
+
+function normalizeLocalWorkTrackingAnswers(
+  localWorkTracking: NexusProjectSetupLocalWorkTrackingAnswers | undefined,
+): NexusProjectSetupLocalWorkTrackingAnswers | undefined {
+  if (!localWorkTracking) {
+    return undefined;
+  }
+  return {
+    enabled: localWorkTracking.enabled,
+    provider: "local",
+    ...(localWorkTracking.storePath ? { storePath: localWorkTracking.storePath } : {}),
+  };
+}
+
+function normalizeWorkTrackerAnswer(
+  tracker: NexusProjectSetupWorkTrackerAnswers,
+): NexusProjectSetupWorkTrackerAnswers {
+  return {
+    id: tracker.id,
+    ...(tracker.componentId ? { componentId: tracker.componentId } : {}),
+    provider: tracker.provider,
+    ...(tracker.role ? { role: tracker.role } : {}),
+    ...(tracker.authProfileId ? { authProfileId: tracker.authProfileId } : {}),
+    ...(tracker.host ? { host: tracker.host } : {}),
+    ...(tracker.repositoryOwner ? { repositoryOwner: tracker.repositoryOwner } : {}),
+    ...(tracker.repositoryName ? { repositoryName: tracker.repositoryName } : {}),
+    ...(tracker.repositoryId ? { repositoryId: tracker.repositoryId } : {}),
+    ...(tracker.projectKey ? { projectKey: tracker.projectKey } : {}),
+    ...(tracker.issueType ? { issueType: tracker.issueType } : {}),
+  };
+}
+
+function normalizeAuthProfileAnswer(
+  profile: NexusProjectSetupAuthProfileAnswers,
+): NexusProjectSetupAuthProfileAnswers {
+  return {
+    id: profile.id,
+    provider: profile.provider,
+    actorKind: profile.actorKind,
+    ...(profile.account ? { account: profile.account } : {}),
+    ...(profile.host ? { host: profile.host } : {}),
+    credentialMethod: normalizeCredentialMethod(profile.credentialMethod),
+  };
+}
+
+function normalizeHostingIntentAnswers(
+  hostingIntent: NexusProjectSetupMetaHostingIntent | undefined,
+): NexusProjectSetupMetaHostingIntent | undefined {
+  if (!hostingIntent) {
+    return undefined;
+  }
+  return {
+    provider: hostingIntent.provider,
+    ...(hostingIntent.host ? { host: hostingIntent.host } : {}),
+    namespace: hostingIntent.namespace,
+    repositoryName: hostingIntent.repositoryName,
+    ...(hostingIntent.defaultBranch ? { defaultBranch: hostingIntent.defaultBranch } : {}),
+    ...(hostingIntent.humanAuthProfileId ? { humanAuthProfileId: hostingIntent.humanAuthProfileId } : {}),
+    ...(hostingIntent.automationAuthProfileId
+      ? { automationAuthProfileId: hostingIntent.automationAuthProfileId }
       : {}),
-    ...(answers.localWorkTracking
-      ? {
-          localWorkTracking: {
-            enabled: answers.localWorkTracking.enabled,
-            provider: "local",
-            ...(answers.localWorkTracking.storePath
-              ? { storePath: answers.localWorkTracking.storePath }
-              : {}),
-          },
-        }
-      : {}),
-    ...(answers.workTrackers
-      ? {
-          workTrackers: answers.workTrackers.map((tracker) => ({
-            id: tracker.id,
-            ...(tracker.componentId ? { componentId: tracker.componentId } : {}),
-            provider: tracker.provider,
-            ...(tracker.role ? { role: tracker.role } : {}),
-            ...(tracker.authProfileId ? { authProfileId: tracker.authProfileId } : {}),
-            ...(tracker.host ? { host: tracker.host } : {}),
-            ...(tracker.repositoryOwner ? { repositoryOwner: tracker.repositoryOwner } : {}),
-            ...(tracker.repositoryName ? { repositoryName: tracker.repositoryName } : {}),
-            ...(tracker.repositoryId ? { repositoryId: tracker.repositoryId } : {}),
-            ...(tracker.projectKey ? { projectKey: tracker.projectKey } : {}),
-            ...(tracker.issueType ? { issueType: tracker.issueType } : {}),
-          })),
-        }
-      : {}),
-    ...(answers.authProfiles
-      ? {
-          authProfiles: answers.authProfiles.map((profile) => ({
-            id: profile.id,
-            provider: profile.provider,
-            actorKind: profile.actorKind,
-            ...(profile.account ? { account: profile.account } : {}),
-            ...(profile.host ? { host: profile.host } : {}),
-            credentialMethod: normalizeCredentialMethod(profile.credentialMethod),
-          })),
-        }
-      : {}),
-    ...(answers.hostingIntent
-      ? {
-          hostingIntent: {
-            provider: answers.hostingIntent.provider,
-            ...(answers.hostingIntent.host ? { host: answers.hostingIntent.host } : {}),
-            namespace: answers.hostingIntent.namespace,
-            repositoryName: answers.hostingIntent.repositoryName,
-            ...(answers.hostingIntent.defaultBranch
-              ? { defaultBranch: answers.hostingIntent.defaultBranch }
-              : {}),
-            ...(answers.hostingIntent.humanAuthProfileId
-              ? { humanAuthProfileId: answers.hostingIntent.humanAuthProfileId }
-              : {}),
-            ...(answers.hostingIntent.automationAuthProfileId
-              ? { automationAuthProfileId: answers.hostingIntent.automationAuthProfileId }
-              : {}),
-            ...(answers.hostingIntent.providerMutationAuthProfileId
-              ? { providerMutationAuthProfileId: answers.hostingIntent.providerMutationAuthProfileId }
-              : {}),
-          },
-        }
-      : {}),
-    ...(answers.publication
-      ? {
-          publication: {
-            posture: answers.publication.posture,
-            ...(answers.publication.remote ? { remote: answers.publication.remote } : {}),
-            ...(answers.publication.targetBranch
-              ? { targetBranch: answers.publication.targetBranch }
-              : {}),
-            ...(answers.publication.automationAuthProfileId
-              ? { automationAuthProfileId: answers.publication.automationAuthProfileId }
-              : {}),
-            ...(answers.publication.humanAuthProfileId
-              ? { humanAuthProfileId: answers.publication.humanAuthProfileId }
-              : {}),
-          },
-        }
-      : {}),
-    ...(answers.readinessChecks
-      ? {
-          readinessChecks: answers.readinessChecks.map((check) => ({
-            id: check.id,
-            title: check.title,
-            ...(check.provider ? { provider: check.provider } : {}),
-            ...(check.requiresAuthProfileId
-              ? { requiresAuthProfileId: check.requiresAuthProfileId }
-              : {}),
-          })),
-        }
+    ...(hostingIntent.providerMutationAuthProfileId
+      ? { providerMutationAuthProfileId: hostingIntent.providerMutationAuthProfileId }
       : {}),
   };
+}
+
+function normalizePublicationAnswers(
+  publication: NexusProjectSetupPublicationAnswers | undefined,
+): NexusProjectSetupPublicationAnswers | undefined {
+  if (!publication) {
+    return undefined;
+  }
+  return {
+    posture: publication.posture,
+    ...(publication.remote ? { remote: publication.remote } : {}),
+    ...(publication.targetBranch ? { targetBranch: publication.targetBranch } : {}),
+    ...(publication.automationAuthProfileId
+      ? { automationAuthProfileId: publication.automationAuthProfileId }
+      : {}),
+    ...(publication.humanAuthProfileId ? { humanAuthProfileId: publication.humanAuthProfileId } : {}),
+  };
+}
+
+function normalizeReadinessCheckAnswer(
+  check: NexusProjectSetupReadinessCheckAnswers,
+): NexusProjectSetupReadinessCheckAnswers {
+  return {
+    id: check.id,
+    title: check.title,
+    ...(check.provider ? { provider: check.provider } : {}),
+    ...(check.requiresAuthProfileId ? { requiresAuthProfileId: check.requiresAuthProfileId } : {}),
+  };
+}
+
+function optionalSection<K extends keyof NexusProjectSetupAnswers>(
+  key: K,
+  value: NexusProjectSetupAnswers[K] | undefined,
+): Partial<Pick<NexusProjectSetupAnswers, K>> {
+  return value === undefined ? {} : { [key]: value } as Pick<NexusProjectSetupAnswers, K>;
 }
 
 function normalizeCredentialMethod(
