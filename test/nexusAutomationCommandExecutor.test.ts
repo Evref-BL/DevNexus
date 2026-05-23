@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   createNexusAutomationCommandExecutor,
   defaultNexusAutomationCommandRunner,
+  parseNexusAutomationCommandExpression,
   type NexusAutomationCommandRunner,
 } from "../src/nexusAutomationCommandExecutor.js";
 import {
@@ -253,5 +254,49 @@ describe("nexus automation command executor", () => {
     expect(result.stdout).toContain("first line");
     expect(result.stdout).toContain("[dev-nexus output truncated:");
     expect(result.stderr).toContain("warning line");
+  });
+
+  it("runs default commands without implicit shell interpretation", () => {
+    const script = [
+      "if (!process.argv.includes('literal;echo injected')) process.exit(2);",
+      "process.stdout.write('argv ok\\n');",
+    ].join("");
+    const result = defaultNexusAutomationCommandRunner(
+      `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)} "literal;echo injected"`,
+      {
+        cwd: process.cwd(),
+        env: process.env,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.error).toBeUndefined();
+    expect(result.stdout).toContain("argv ok");
+  });
+
+  it("rejects legacy command strings that rely on implicit shell control syntax", () => {
+    const result = defaultNexusAutomationCommandRunner(
+      `${JSON.stringify(process.execPath)} -e "process.exit(0)" && echo injected`,
+      {
+        cwd: process.cwd(),
+        env: process.env,
+      },
+    );
+
+    expect(result.exitCode).toBeNull();
+    expect(result.error).toMatch(/unsupported shell control syntax/);
+  });
+
+  it("parses profile-style quoted command strings into argv pieces", () => {
+    expect(
+      parseNexusAutomationCommandExpression(
+        '"C:\\\\Program Files\\\\OpenAI\\\\Codex\\\\codex.exe" exec --model "GPT 5" ""',
+      ),
+    ).toEqual({
+      command: "C:\\Program Files\\OpenAI\\Codex\\codex.exe",
+      args: ["exec", "--model", "GPT 5", ""],
+      display:
+        '"C:\\\\Program Files\\\\OpenAI\\\\Codex\\\\codex.exe" exec --model "GPT 5" ""',
+    });
   });
 });

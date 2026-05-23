@@ -40,6 +40,8 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [Automation command execution](dev/automation-command-execution.md) records
+  the argv execution policy for local automation commands.
 - [PostgreSQL claim authority initiative](dev/postgresql-claim-authority.md)
   tracks the long-lived design and slice plan for strong multi-host claim
   coordination.

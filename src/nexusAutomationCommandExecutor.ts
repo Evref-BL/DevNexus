@@ -27,6 +27,12 @@ export interface NexusAutomationCommandRunOptions {
   timeoutMs?: number;
 }
 
+export interface NexusAutomationCommandSpec {
+  command: string;
+  args: string[];
+  display: string;
+}
+
 export interface NexusAutomationCommandRunResult {
   command: string;
   cwd: string;
@@ -132,13 +138,25 @@ export function defaultNexusAutomationCommandRunner(
   command: string,
   options: NexusAutomationCommandRunOptions,
 ): NexusAutomationCommandRunResult {
+  const commandSpec = safeParseNexusAutomationCommandExpression(command);
+  if ("error" in commandSpec) {
+    return {
+      command: commandSpec.display,
+      cwd: options.cwd,
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      error: commandSpec.error,
+    };
+  }
+
   const capture = createCommandCaptureFiles();
   let result: ReturnType<typeof spawnSync> | null = null;
   try {
-    result = spawnSync(command, {
+    result = spawnSync(commandSpec.command, commandSpec.args, {
       cwd: options.cwd,
       env: options.env,
-      shell: true,
+      shell: false,
       stdio: ["ignore", capture.stdoutFd, capture.stderrFd],
       timeout: options.timeoutMs,
       windowsHide: true,
@@ -149,7 +167,7 @@ export function defaultNexusAutomationCommandRunner(
 
   try {
     return {
-      command,
+      command: commandSpec.display,
       cwd: options.cwd,
       stdout: readOutputPreview(capture.stdoutPath),
       stderr: readOutputPreview(capture.stderrPath),
@@ -171,6 +189,138 @@ export function summarizeNexusAutomationCommandRunResult(
   const exit = result.exitCode === null ? "no exit code" : `exit ${result.exitCode}`;
   const output = commandOutputDiagnostic(result);
   return output ? `${exit}: ${truncate(output, 240)}` : exit;
+}
+
+export function parseNexusAutomationCommandExpression(
+  command: string,
+): NexusAutomationCommandSpec {
+  const display = requiredNonEmptyString(command, "command");
+  const words = splitNexusAutomationCommandExpression(display);
+  if (words.length === 0 || words[0]!.trim().length === 0) {
+    throw new NexusAutomationCommandExecutorError(
+      "command must contain an executable",
+    );
+  }
+
+  return {
+    command: words[0]!,
+    args: words.slice(1),
+    display,
+  };
+}
+
+function safeParseNexusAutomationCommandExpression(command: string):
+  | NexusAutomationCommandSpec
+  | { display: string; error: string } {
+  try {
+    return parseNexusAutomationCommandExpression(command);
+  } catch (error) {
+    return {
+      display: typeof command === "string" && command.trim()
+        ? command.trim()
+        : "<invalid command>",
+      error: errorMessage(error),
+    };
+  }
+}
+
+// Legacy CLI/config values stay string-compatible, but DevNexus treats them as
+// argv expressions, not shell scripts. Unquoted shell control syntax is rejected
+// so callers must choose a shell executable explicitly when they really need one.
+function splitNexusAutomationCommandExpression(command: string): string[] {
+  const words: string[] = [];
+  let current = "";
+  let tokenStarted = false;
+  let quote: "'" | "\"" | null = null;
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index]!;
+    if (char === "\r" || char === "\n") {
+      throw new NexusAutomationCommandExecutorError(
+        "command must not contain line breaks",
+      );
+    }
+
+    if (!quote && /\s/u.test(char)) {
+      if (tokenStarted) {
+        words.push(current);
+        current = "";
+        tokenStarted = false;
+      }
+      continue;
+    }
+
+    if (!quote && isUnsupportedShellControlCharacter(char)) {
+      throw new NexusAutomationCommandExecutorError(
+        `command uses unsupported shell control syntax: ${char}`,
+      );
+    }
+
+    if (char === "'" && quote !== "\"") {
+      tokenStarted = true;
+      quote = quote === "'" ? null : "'";
+      continue;
+    }
+
+    if (char === "\"" && quote !== "'") {
+      tokenStarted = true;
+      quote = quote === "\"" ? null : "\"";
+      continue;
+    }
+
+    if (char === "\\" && quote !== "'") {
+      const escaped = command[index + 1];
+      if (!escaped) {
+        throw new NexusAutomationCommandExecutorError(
+          "command must not end with a trailing escape",
+        );
+      }
+      if (shouldEscapeCommandCharacter(escaped, quote)) {
+        current += escaped;
+        tokenStarted = true;
+        index += 1;
+        continue;
+      }
+    }
+
+    current += char;
+    tokenStarted = true;
+  }
+
+  if (quote) {
+    throw new NexusAutomationCommandExecutorError(
+      "command contains an unterminated quoted argument",
+    );
+  }
+  if (tokenStarted) {
+    words.push(current);
+  }
+
+  return words;
+}
+
+function isUnsupportedShellControlCharacter(char: string): boolean {
+  return char === "&" ||
+    char === "|" ||
+    char === ";" ||
+    char === "<" ||
+    char === ">" ||
+    char === "(" ||
+    char === ")";
+}
+
+function shouldEscapeCommandCharacter(
+  escaped: string,
+  quote: "'" | "\"" | null,
+): boolean {
+  if (quote === "\"") {
+    return escaped === "\"" || escaped === "\\";
+  }
+
+  return /\s/u.test(escaped) ||
+    escaped === "'" ||
+    escaped === "\"" ||
+    escaped === "\\";
 }
 
 function createCommandCaptureFiles(): {
@@ -394,4 +544,8 @@ function requiredNonEmptyString(value: unknown, name: string): string {
   }
 
   return value.trim();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
