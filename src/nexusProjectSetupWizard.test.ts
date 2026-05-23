@@ -295,7 +295,7 @@ describe("nexus workspace setup wizard", () => {
         role: "dependency",
         source: {
           kind: "create_local",
-          path: path.join("packages", "api"),
+          path: "packages/api",
           initializeGit: true,
         },
       },
@@ -305,7 +305,7 @@ describe("nexus workspace setup wizard", () => {
         role: "optional",
         source: {
           kind: "create_local",
-          path: path.join("docs", "paper"),
+          path: "docs/paper",
           initializeGit: true,
         },
       },
