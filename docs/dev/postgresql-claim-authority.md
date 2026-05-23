@@ -350,6 +350,11 @@ Progress:
   authority claim context/environment projection, verification-lost-race skip
   behavior, and reuse handling that keeps an existing adoption context instead
   of taking a duplicate claim for the same run id.
+- 2026-05-23: Slice 6B added post-launch completion verification for spawned
+  coordinator launches. Authority-backed completed results are converted to
+  failed run records when the claim is no longer verified at result-recording
+  time, preventing stale workers from recording successful completion after
+  lease loss or reclaim.
 
 ## Human Gates
 

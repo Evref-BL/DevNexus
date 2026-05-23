@@ -79,6 +79,7 @@ import type {
 } from "./nexusAutomationEligibleWorkItems.js";
 import {
   claimNexusEligibleWorkItem,
+  verifyNexusWorkItemAuthorityClaim,
   type NexusWorkItemClaimAuthority,
   type NexusWorkItemClaimAuthorityRecord,
   type NexusWorkItemClaimOwner,
@@ -882,7 +883,7 @@ export async function runNexusAutomationAgentLaunchOnce(
     contextFile = launchFiles.contextFile;
     resultFile = launchFiles.resultFile;
 
-    const agentResult = await options.launcher({
+    let agentResult = await options.launcher({
       runId,
       startedAt,
       projectRoot,
@@ -901,8 +902,19 @@ export async function runNexusAutomationAgentLaunchOnce(
       contextFile,
       resultFile,
     });
-    const status = normalizeAgentStatus(agentResult.status);
     const finishedAt = currentIso(options.now);
+    agentResult = await verifyCompletedAgentLaunchClaim({
+      projectRoot,
+      projectConfig,
+      automationConfig,
+      homePath: options.homePath,
+      env: options.env,
+      claimAuthority: options.claimAuthority,
+      workItemClaim,
+      agentResult,
+      finishedAt,
+    });
+    const status = normalizeAgentStatus(agentResult.status);
     const summary = agentResult.summary ?? defaultAgentSummary(status);
     ledger = appendNexusAutomationRunRecord({
       projectRoot,
@@ -1301,6 +1313,72 @@ function workItemClaimOwner(options: {
     hostId: configured?.hostId ?? os.hostname(),
     agentId: configured?.agentId ?? options.runId,
     ownerId: configured?.ownerId ?? options.options.owner ?? null,
+  };
+}
+
+async function verifyCompletedAgentLaunchClaim(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  automationConfig: NexusAutomationConfig;
+  homePath?: string;
+  env?: NodeJS.ProcessEnv;
+  claimAuthority?: NexusWorkItemClaimAuthority;
+  workItemClaim: NexusAutomationAgentLaunchWorkItemClaim | null;
+  agentResult: NexusAutomationAgentLaunchResult;
+  finishedAt: string;
+}): Promise<NexusAutomationAgentLaunchResult> {
+  const status = normalizeAgentStatus(options.agentResult.status);
+  const workItemClaim = options.workItemClaim;
+  const authorityClaim = workItemClaim?.authorityClaim;
+  if (status !== "completed" || !authorityClaim) {
+    return options.agentResult;
+  }
+
+  try {
+    const verification = await verifyNexusWorkItemAuthorityClaim({
+      projectRoot: options.projectRoot,
+      projectConfig: options.projectConfig,
+      automationConfig: options.automationConfig,
+      homePath: options.homePath,
+      env: options.env,
+      claimAuthority: options.claimAuthority,
+      authorityClaim,
+      now: () => options.finishedAt,
+    });
+    if (verification.status === "verified") {
+      workItemClaim.authorityClaim = verification.claim;
+      return options.agentResult;
+    }
+
+    return failedCompletedAgentLaunchClaim({
+      agentResult: options.agentResult,
+      summary: `Completed agent result rejected because authority claim verification failed: ${verification.status}`,
+    });
+  } catch (error) {
+    return failedCompletedAgentLaunchClaim({
+      agentResult: options.agentResult,
+      summary: `Completed agent result rejected because authority claim verification failed: ${errorMessage(error)}`,
+    });
+  }
+}
+
+function failedCompletedAgentLaunchClaim(options: {
+  agentResult: NexusAutomationAgentLaunchResult;
+  summary: string;
+}): NexusAutomationAgentLaunchResult {
+  return {
+    ...options.agentResult,
+    status: "failed",
+    summary: options.summary,
+    verification: [
+      ...(options.agentResult.verification ?? []),
+      {
+        command: "DevNexus authority claim verification",
+        status: "failed",
+        summary: options.summary,
+      },
+    ],
+    error: options.summary,
   };
 }
 
