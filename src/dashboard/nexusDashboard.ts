@@ -4444,32 +4444,57 @@ function localPluginCandidates(
   projectRoot: string,
   components: ResolvedNexusProjectComponent[],
 ): LocalPluginCandidate[] {
-  const candidates: LocalPluginCandidate[] = [];
   const seenPaths = new Set<string>();
-  for (const component of components) {
-    if (!component.sourceRootExists) {
-      continue;
-    }
-    const pluginsRoot = path.join(component.sourceRoot, "plugins");
-    if (!isDirectory(pluginsRoot)) {
-      continue;
-    }
-    for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-      const pluginRoot = path.resolve(pluginsRoot, entry.name);
-      if (seenPaths.has(pluginRoot) || samePath(pluginRoot, projectRoot)) {
-        continue;
-      }
-      seenPaths.add(pluginRoot);
-      const candidate = readLocalPluginCandidate(pluginRoot, entry.name);
-      if (candidate) {
-        candidates.push(candidate);
-      }
+  return components
+    .flatMap((component) =>
+      localPluginCandidatesForComponent(projectRoot, component, seenPaths),
+    )
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function localPluginCandidatesForComponent(
+  projectRoot: string,
+  component: ResolvedNexusProjectComponent,
+  seenPaths: Set<string>,
+): LocalPluginCandidate[] {
+  if (!component.sourceRootExists) {
+    return [];
+  }
+  const pluginsRoot = path.join(component.sourceRoot, "plugins");
+  if (!isDirectory(pluginsRoot)) {
+    return [];
+  }
+
+  const candidates: LocalPluginCandidate[] = [];
+  for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true })) {
+    const candidate = localPluginCandidateFromEntry({
+      projectRoot,
+      pluginsRoot,
+      entry,
+      seenPaths,
+    });
+    if (candidate) {
+      candidates.push(candidate);
     }
   }
-  return candidates.sort((left, right) => left.name.localeCompare(right.name));
+  return candidates;
+}
+
+function localPluginCandidateFromEntry(options: {
+  projectRoot: string;
+  pluginsRoot: string;
+  entry: fs.Dirent;
+  seenPaths: Set<string>;
+}): LocalPluginCandidate | null {
+  if (!options.entry.isDirectory()) {
+    return null;
+  }
+  const pluginRoot = path.resolve(options.pluginsRoot, options.entry.name);
+  if (options.seenPaths.has(pluginRoot) || samePath(pluginRoot, options.projectRoot)) {
+    return null;
+  }
+  options.seenPaths.add(pluginRoot);
+  return readLocalPluginCandidate(pluginRoot, options.entry.name);
 }
 
 function readLocalPluginCandidate(
