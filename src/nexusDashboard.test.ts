@@ -626,6 +626,170 @@ describe("nexus dashboard", () => {
     });
   });
 
+  it("builds git history from refs and commit parent relationships", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-git-history-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const field = "\x1f";
+    const record = "\x1e";
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "show-ref -d --head") {
+        return ok(args as string[], [
+          "merge000000000000000000000000000000000000000 HEAD",
+          "merge000000000000000000000000000000000000000 refs/heads/main",
+          "feature000000000000000000000000000000000000 refs/heads/feat/cockpit-graph",
+          "merge000000000000000000000000000000000000000 refs/remotes/app/main",
+          "tag0000000000000000000000000000000000000000 refs/tags/v1.0.0",
+          "",
+        ].join("\n"));
+      }
+      if (command.startsWith("-c log.showSignature=false log")) {
+        expect(command).toContain("--all");
+        return ok(args as string[], [
+          [
+            "merge000000000000000000000000000000000000000",
+            "main10000000000000000000000000000000000000 feature000000000000000000000000000000000000",
+            "Gabriel",
+            "gabriel@example.com",
+            "1779537600",
+            "Merge feature graph",
+          ].join(field),
+          [
+            "feature000000000000000000000000000000000000",
+            "main10000000000000000000000000000000000000",
+            "Codex",
+            "codex@example.com",
+            "1779537300",
+            "Add graph data",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      return baseGitRunner(args, cwd);
+    };
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner,
+      now: fixedClock("2026-05-23T10:00:00.000Z"),
+    });
+
+    expect(snapshot.history).toMatchObject({
+      totalCommitCount: 2,
+      incomplete: false,
+      repositories: [
+        expect.objectContaining({
+          componentId: "primary",
+          head: "merge000000000000000000000000000000000000000",
+          scope: {
+            kind: "all",
+            branches: [],
+          },
+          branchNames: [
+            "main",
+            "feat/cockpit-graph",
+            "app/main",
+          ],
+          tagNames: ["v1.0.0"],
+          moreAvailable: false,
+          commits: [
+            expect.objectContaining({
+              hash: "merge000000000000000000000000000000000000000",
+              shortHash: "merge00",
+              parents: [
+                "main10000000000000000000000000000000000000",
+                "feature000000000000000000000000000000000000",
+              ],
+              subject: "Merge feature graph",
+              refs: expect.arrayContaining([
+                expect.objectContaining({ kind: "head", name: "HEAD" }),
+                expect.objectContaining({ kind: "branch", name: "main" }),
+                expect.objectContaining({ kind: "remote", name: "app/main" }),
+              ]),
+            }),
+            expect.objectContaining({
+              hash: "feature000000000000000000000000000000000000",
+              parents: ["main10000000000000000000000000000000000000"],
+              committedAt: "2026-05-23T11:55:00.000Z",
+              subject: "Add graph data",
+              refs: [
+                expect.objectContaining({
+                  kind: "branch",
+                  name: "feat/cockpit-graph",
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  });
+
+  it("can scope git history to selected branches", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-filtered-git-history-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const field = "\x1f";
+    const record = "\x1e";
+    const baseGitRunner = fakeGitRunner();
+    const gitRunner: GitRunner = (args, cwd) => {
+      const command = args.join(" ");
+      if (command === "show-ref -d --head") {
+        return ok(args as string[], [
+          "feature100000000000000000000000000000000000 refs/heads/feat/cockpit-graph",
+          "",
+        ].join("\n"));
+      }
+      if (command.startsWith("-c log.showSignature=false log")) {
+        expect(command).toContain("feat/cockpit-graph");
+        expect(command).not.toContain("--all");
+        return ok(args as string[], [
+          [
+            "feature100000000000000000000000000000000000",
+            "main10000000000000000000000000000000000000",
+            "Codex",
+            "codex@example.com",
+            "1779537600",
+            "Add graph data",
+          ].join(field),
+          [
+            "feature000000000000000000000000000000000000",
+            "main00000000000000000000000000000000000000",
+            "Codex",
+            "codex@example.com",
+            "1779537300",
+            "Start graph data",
+          ].join(field),
+          record,
+        ].join(record));
+      }
+      return baseGitRunner(args, cwd);
+    };
+
+    const snapshot = await buildNexusDashboardSnapshot({
+      projectRoot,
+      gitRunner,
+      historyBranches: ["feat/cockpit-graph"],
+      historyMaxCommits: 1,
+      now: fixedClock("2026-05-23T10:00:00.000Z"),
+    });
+
+    expect(snapshot.history.repositories[0]).toMatchObject({
+      scope: {
+        kind: "branches",
+        branches: ["feat/cockpit-graph"],
+      },
+      moreAvailable: true,
+      commits: [
+        expect.objectContaining({
+          hash: "feature100000000000000000000000000000000000",
+        }),
+      ],
+    });
+  });
+
   it("builds a feature overview from feature branch delivery policy and related threads", async () => {
     const projectRoot = makeTempDir("dev-nexus-dashboard-features-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });

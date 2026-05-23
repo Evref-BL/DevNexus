@@ -196,6 +196,8 @@ export interface BuildNexusDashboardSnapshotOptions
   projectRoot: string;
   eligibleWorkMode?: NexusEligibleWorkMode;
   gitRunner?: GitRunner;
+  historyBranches?: string[];
+  historyMaxCommits?: number;
   now?: () => Date | string;
 }
 
@@ -230,6 +232,54 @@ export interface NexusDashboardGitState {
   ahead: number | null;
   behind: number | null;
   warnings: string[];
+}
+
+export type NexusDashboardGitHistoryRefKind =
+  | "head"
+  | "branch"
+  | "remote"
+  | "tag";
+
+export interface NexusDashboardGitHistoryRef {
+  name: string;
+  kind: NexusDashboardGitHistoryRefKind;
+  remote: string | null;
+  hash: string;
+}
+
+export interface NexusDashboardGitHistoryCommit {
+  hash: string;
+  shortHash: string;
+  parents: string[];
+  authorName: string;
+  authorEmail: string;
+  committedAt: string | null;
+  subject: string;
+  refs: NexusDashboardGitHistoryRef[];
+}
+
+export interface NexusDashboardGitHistoryRepository {
+  componentId: string;
+  componentName: string;
+  repositoryPath: string;
+  head: string | null;
+  defaultBranch: string | null;
+  scope: {
+    kind: "all" | "branches";
+    branches: string[];
+  };
+  commits: NexusDashboardGitHistoryCommit[];
+  branchNames: string[];
+  tagNames: string[];
+  moreAvailable: boolean;
+  warnings: string[];
+}
+
+export interface NexusDashboardGitHistorySummary {
+  totalCommitCount: number;
+  repositories: NexusDashboardGitHistoryRepository[];
+  incomplete: boolean;
+  detail: string | null;
 }
 
 export interface NexusDashboardComponentSummary {
@@ -684,6 +734,7 @@ export interface NexusDashboardSnapshot {
   summary: string;
   signals: NexusDashboardSignal[];
   components: NexusDashboardComponentSummary[];
+  history: NexusDashboardGitHistorySummary;
   automation: NexusDashboardDataResult<NexusAutomationStatus>;
   eligibleWork: NexusDashboardDataResult<NexusEligibleWorkSummary>;
   targetReport: NexusDashboardDataResult<NexusAutomationTargetReport>;
@@ -839,6 +890,13 @@ export async function buildNexusDashboardSnapshot(
   const componentSummaries = components.map((component) =>
     summarizeComponent(component, gitRunner),
   );
+  const history = summarizeGitHistory({
+    components: componentSummaries,
+    defaultBranch: projectConfig.repo.defaultBranch,
+    gitRunner,
+    branches: options.historyBranches,
+    maxCommits: options.historyMaxCommits,
+  });
   const providerUrls = dashboardProviderUrls(projectConfig, componentSummaries);
   const cycles = readTargetCycles(projectRoot, projectConfig);
   const runs = readRuns(projectRoot, projectConfig);
@@ -925,6 +983,7 @@ export async function buildNexusDashboardSnapshot(
     summary: dashboardSummary(componentSummaries, automation.value, eligibleWork.value, threads, blockers),
     signals: dashboardSignals(componentSummaries, automation.value, eligibleWork.value, threads, plugins, blockers),
     components: componentSummaries,
+    history,
     automation,
     eligibleWork,
     targetReport,
@@ -951,6 +1010,7 @@ export async function buildNexusDashboardWorkspaceShell(
   const componentSummaries = components.map(summarizeComponentShell);
   const project = projectSummary(projectRoot, projectConfig, componentSummaries);
   const plugins = summarizeConfiguredPlugins(projectConfig);
+  const history = emptyGitHistorySummary();
   const features = summarizeFeatures({
     projectRoot,
     projectConfig,
@@ -974,6 +1034,7 @@ export async function buildNexusDashboardWorkspaceShell(
     summary: "Loading workspace signals.",
     signals: dashboardShellSignals(componentSummaries, plugins),
     components: componentSummaries,
+    history,
     automation: pendingDashboardResult("Loading automation status."),
     eligibleWork: pendingDashboardResult("Loading tracked work."),
     targetReport: pendingDashboardResult("Loading target report."),
@@ -1012,6 +1073,13 @@ export async function buildNexusDashboardWorkspaceSection(
     const componentSummaries = components.map((component) =>
       summarizeComponent(component, gitRunner),
     );
+    const history = summarizeGitHistory({
+      components: componentSummaries,
+      defaultBranch: projectConfig.repo.defaultBranch,
+      gitRunner,
+      branches: options.historyBranches,
+      maxCommits: options.historyMaxCommits,
+    });
     return {
       version: 1,
       generatedAt,
@@ -1020,6 +1088,7 @@ export async function buildNexusDashboardWorkspaceSection(
       patch: {
         ...basePatch,
         components: componentSummaries,
+        history,
       },
     };
   }
@@ -2737,6 +2806,246 @@ function emptyTrackedWorkSummary(): NexusDashboardTrackedWorkSummary {
     excludedCount: 0,
     records: [],
   };
+}
+
+function emptyGitHistorySummary(): NexusDashboardGitHistorySummary {
+  return {
+    totalCommitCount: 0,
+    repositories: [],
+    incomplete: true,
+    detail: "Git history is loading.",
+  };
+}
+
+const dashboardGitHistorySeparator = "\x1f";
+const dashboardGitHistoryRecordSeparator = "\x1e";
+const dashboardGitHistoryDefaultMaxCommits = 120;
+
+function summarizeGitHistory(options: {
+  components: NexusDashboardComponentSummary[];
+  defaultBranch: string | null;
+  gitRunner: GitRunner;
+  branches?: string[];
+  maxCommits?: number;
+}): NexusDashboardGitHistorySummary {
+  const repositories = options.components
+    .filter((component) => component.sourceRootExists && component.git?.repositoryPath)
+    .map((component) =>
+      collectDashboardGitHistory(component, options.gitRunner, {
+        branches: options.branches,
+        defaultBranch: options.defaultBranch,
+        maxCommits: options.maxCommits,
+      }),
+    )
+    .filter((repository): repository is NexusDashboardGitHistoryRepository =>
+      repository !== null,
+    );
+  const totalCommitCount = repositories.reduce(
+    (total, repository) => total + repository.commits.length,
+    0,
+  );
+  return {
+    totalCommitCount,
+    repositories,
+    incomplete: repositories.some((repository) => repository.warnings.length > 0),
+    detail: repositories.flatMap((repository) => repository.warnings)[0] ?? null,
+  };
+}
+
+function collectDashboardGitHistory(
+  component: NexusDashboardComponentSummary,
+  gitRunner: GitRunner,
+  options: {
+    branches?: string[];
+    defaultBranch: string | null;
+    maxCommits?: number;
+  },
+): NexusDashboardGitHistoryRepository | null {
+  const repositoryPath = component.git?.repositoryPath ?? component.sourceRoot;
+  const refOutput = gitRawStdout(gitRunner, ["show-ref", "-d", "--head"], repositoryPath);
+  const refs = parseDashboardGitRefs(refOutput ?? "");
+  const head = refs.find((ref) => ref.kind === "head")?.hash ?? component.git?.headCommit ?? null;
+  const branches = uniqueNonEmptyStrings(options.branches ?? []);
+  const maxCommits = Math.max(
+    1,
+    Math.floor(options.maxCommits ?? dashboardGitHistoryDefaultMaxCommits),
+  );
+  const logArgs = dashboardGitHistoryLogArgs({
+    branches,
+    maxCommits: maxCommits + 1,
+  });
+  const logOutput = gitRawStdout(gitRunner, logArgs, repositoryPath);
+  if (logOutput === null) {
+    return {
+      componentId: component.id,
+      componentName: component.name,
+      repositoryPath,
+      head,
+      defaultBranch: options.defaultBranch,
+      scope: {
+        kind: branches.length > 0 ? "branches" : "all",
+        branches,
+      },
+      commits: [],
+      branchNames: branchNamesFromRefs(refs),
+      tagNames: tagNamesFromRefs(refs),
+      moreAvailable: false,
+      warnings: ["Git history could not be read."],
+    };
+  }
+  const parsedCommits = parseDashboardGitHistoryLog(logOutput, refs);
+  const commits = parsedCommits.slice(0, maxCommits);
+  return {
+    componentId: component.id,
+    componentName: component.name,
+    repositoryPath,
+    head,
+    defaultBranch: options.defaultBranch,
+    scope: {
+      kind: branches.length > 0 ? "branches" : "all",
+      branches,
+    },
+    commits,
+    branchNames: branchNamesFromRefs(refs),
+    tagNames: tagNamesFromRefs(refs),
+    moreAvailable: parsedCommits.length > maxCommits,
+    warnings: [],
+  };
+}
+
+function dashboardGitHistoryLogArgs(options: {
+  branches: string[];
+  maxCommits: number;
+}): string[] {
+  const args = [
+    "-c",
+    "log.showSignature=false",
+    "log",
+    `--max-count=${options.maxCommits}`,
+    "--date-order",
+    `--format=%H%x1f%P%x1f%an%x1f%ae%x1f%ct%x1f%s%x1e`,
+  ];
+  if (options.branches.length > 0) {
+    args.push(...options.branches);
+  } else {
+    args.push("--all", "--branches", "--remotes", "--tags");
+  }
+  args.push("--");
+  return args;
+}
+
+function parseDashboardGitHistoryLog(
+  output: string,
+  refs: NexusDashboardGitHistoryRef[],
+): NexusDashboardGitHistoryCommit[] {
+  const refsByHash = refs.reduce((map, ref) => {
+    const existing = map.get(ref.hash) ?? [];
+    existing.push(ref);
+    map.set(ref.hash, existing);
+    return map;
+  }, new Map<string, NexusDashboardGitHistoryRef[]>());
+  return output
+    .split(dashboardGitHistoryRecordSeparator)
+    .map((record) => record.trim())
+    .filter(Boolean)
+    .map((record) => {
+      const fields = record.split(dashboardGitHistorySeparator);
+      const hash = fields[0] ?? "";
+      const parentField = fields[1] ?? "";
+      const timestamp = Number(fields[4]);
+      return {
+        hash,
+        shortHash: hash.slice(0, 7),
+        parents: parentField ? parentField.split(" ").filter(Boolean) : [],
+        authorName: fields[2] ?? "",
+        authorEmail: fields[3] ?? "",
+        committedAt: Number.isFinite(timestamp)
+          ? new Date(timestamp * 1000).toISOString()
+          : null,
+        subject: fields.slice(5).join(dashboardGitHistorySeparator),
+        refs: refsByHash.get(hash) ?? [],
+      };
+    })
+    .filter((commit) => commit.hash);
+}
+
+function parseDashboardGitRefs(output: string): NexusDashboardGitHistoryRef[] {
+  const refs: NexusDashboardGitHistoryRef[] = [];
+  for (const line of output.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const [hash, ...refParts] = trimmed.split(/\s+/u);
+    const refName = refParts.join(" ");
+    if (!hash || !refName) {
+      continue;
+    }
+    const parsed = dashboardGitRef(hash, refName);
+    if (parsed) {
+      refs.push(parsed);
+    }
+  }
+  return refs;
+}
+
+function dashboardGitRef(
+  hash: string,
+  refName: string,
+): NexusDashboardGitHistoryRef | null {
+  if (refName === "HEAD") {
+    return {
+      name: "HEAD",
+      kind: "head",
+      remote: null,
+      hash,
+    };
+  }
+  if (refName.startsWith("refs/heads/")) {
+    return {
+      name: refName.slice("refs/heads/".length),
+      kind: "branch",
+      remote: null,
+      hash,
+    };
+  }
+  if (refName.startsWith("refs/remotes/") && !refName.endsWith("/HEAD")) {
+    const name = refName.slice("refs/remotes/".length);
+    return {
+      name,
+      kind: "remote",
+      remote: name.split("/")[0] ?? null,
+      hash,
+    };
+  }
+  if (refName.startsWith("refs/tags/")) {
+    const name = refName.endsWith("^{}")
+      ? refName.slice("refs/tags/".length, -3)
+      : refName.slice("refs/tags/".length);
+    return {
+      name,
+      kind: "tag",
+      remote: null,
+      hash,
+    };
+  }
+  return null;
+}
+
+function branchNamesFromRefs(refs: NexusDashboardGitHistoryRef[]): string[] {
+  return uniqueNonEmptyStrings(
+    refs
+      .filter((ref) => ref.kind === "branch" || ref.kind === "remote")
+      .map((ref) => ref.name),
+  );
+}
+
+function tagNamesFromRefs(refs: NexusDashboardGitHistoryRef[]): string[] {
+  return uniqueNonEmptyStrings(
+    refs
+      .filter((ref) => ref.kind === "tag")
+      .map((ref) => ref.name),
+  );
 }
 
 function summarizeFeatures(options: {
