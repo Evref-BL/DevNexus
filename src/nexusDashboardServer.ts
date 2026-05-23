@@ -113,6 +113,30 @@ interface DashboardThreadActionContext {
   cwd: string | null;
 }
 
+interface DashboardCachePolicy {
+  readonly freshMs: number;
+  readonly staleMs: number;
+}
+
+interface DashboardCacheEntry<T> {
+  readonly value?: T;
+  readonly freshUntil: number;
+  readonly staleUntil: number;
+  pending?: Promise<T>;
+}
+
+interface NexusDashboardServerCache {
+  readonly entries: Map<string, DashboardCacheEntry<unknown>>;
+}
+
+const dashboardCachePolicies = {
+  host: { freshMs: 60_000, staleMs: 300_000 },
+  projectIndex: { freshMs: 15_000, staleMs: 120_000 },
+  workspace: { freshMs: 60_000, staleMs: 300_000 },
+  shell: { freshMs: 10_000, staleMs: 60_000 },
+  section: { freshMs: 30_000, staleMs: 180_000 },
+} satisfies Record<string, DashboardCachePolicy>;
+
 interface NexusDashboardLocalAppIcon {
   readonly body: Buffer | string;
   readonly contentType: string;
@@ -127,6 +151,137 @@ class NexusDashboardRouteError extends Error {
     super(message);
     this.name = "NexusDashboardRouteError";
   }
+}
+
+function createDashboardServerCache(): NexusDashboardServerCache {
+  return { entries: new Map() };
+}
+
+function invalidateDashboardCache(cache: NexusDashboardServerCache): void {
+  cache.entries.clear();
+}
+
+async function cachedDashboardValue<T>(
+  cache: NexusDashboardServerCache,
+  key: string,
+  policy: DashboardCachePolicy,
+  load: () => Promise<T>,
+): Promise<T> {
+  const now = Date.now();
+  const entry = cache.entries.get(key) as DashboardCacheEntry<T> | undefined;
+
+  if (entry?.value !== undefined && now < entry.freshUntil) {
+    return entry.value;
+  }
+
+  if (entry?.value !== undefined && now < entry.staleUntil) {
+    if (!entry.pending) {
+      entry.pending = load()
+        .then((value) => {
+          cache.entries.set(
+            key,
+            dashboardCacheEntry(value, policy) as DashboardCacheEntry<unknown>,
+          );
+          return value;
+        })
+        .catch(() => entry.value as T)
+        .finally(() => {
+          const latest = cache.entries.get(key);
+          if (latest === entry) {
+            delete entry.pending;
+          }
+        });
+    }
+    return entry.value;
+  }
+
+  if (entry?.pending) {
+    return entry.pending;
+  }
+
+  const pending = load()
+    .then((value) => {
+      cache.entries.set(
+        key,
+        dashboardCacheEntry(value, policy) as DashboardCacheEntry<unknown>,
+      );
+      return value;
+    })
+    .catch((error: unknown) => {
+      if (entry?.value !== undefined) {
+        cache.entries.set(
+          key,
+          dashboardCacheEntry(entry.value, {
+            freshMs: 0,
+            staleMs: policy.staleMs,
+          }) as DashboardCacheEntry<unknown>,
+        );
+        return entry.value;
+      }
+      cache.entries.delete(key);
+      throw error;
+    });
+  cache.entries.set(key, {
+    value: entry?.value,
+    freshUntil: 0,
+    staleUntil: entry?.staleUntil ?? 0,
+    pending,
+  } as DashboardCacheEntry<unknown>);
+  return pending;
+}
+
+function dashboardCacheEntry<T>(
+  value: T,
+  policy: DashboardCachePolicy,
+): DashboardCacheEntry<T> {
+  const now = Date.now();
+  return {
+    value,
+    freshUntil: now + policy.freshMs,
+    staleUntil: now + policy.staleMs,
+  };
+}
+
+function dashboardWorkspaceCacheKey(
+  kind: string,
+  selection: DashboardWorkspaceSelection,
+): string {
+  return [
+    "workspace",
+    kind,
+    selection.workspaceId ?? "",
+    path.resolve(selection.snapshotOptions.projectRoot),
+    dashboardSnapshotOptionsCacheKey(selection.snapshotOptions),
+  ].join(":");
+}
+
+function dashboardHostCacheKey(
+  kind: string,
+  snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
+  workspaceId: string | null,
+): string {
+  return [
+    "host",
+    kind,
+    workspaceId ?? "",
+    dashboardSnapshotOptionsCacheKey(snapshotOptions),
+  ].join(":");
+}
+
+function dashboardSnapshotOptionsCacheKey(
+  options: BuildNexusDashboardHostSnapshotOptions,
+): string {
+  return JSON.stringify({
+    projectRoot: options.projectRoot ? path.resolve(options.projectRoot) : null,
+    currentProjectRoot:
+      options.currentProjectRoot === undefined
+        ? undefined
+        : options.currentProjectRoot
+          ? path.resolve(options.currentProjectRoot)
+          : null,
+    homePath: options.homePath ? path.resolve(options.homePath) : null,
+    eligibleWorkMode: options.eligibleWorkMode ?? null,
+  });
 }
 
 export async function startNexusDashboardServer(
@@ -155,6 +310,7 @@ export async function startNexusDashboardServer(
   const localResourceOpener =
     options.localResourceOpener ?? openDashboardLocalResource;
   const actionToken = randomBytes(24).toString("base64url");
+  const dashboardCache = createDashboardServerCache();
   const server = http.createServer((request, response) => {
     void routeDashboardRequest(
       request,
@@ -163,6 +319,7 @@ export async function startNexusDashboardServer(
       codexChatStarter,
       localResourceOpener,
       actionToken,
+      dashboardCache,
     );
   });
 
@@ -2549,6 +2706,7 @@ async function routeDashboardRequest(
   codexChatStarter: NexusDashboardCodexChatStarter,
   localResourceOpener: NexusDashboardLocalResourceOpener,
   actionToken: string,
+  dashboardCache: NexusDashboardServerCache,
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -2559,6 +2717,7 @@ async function routeDashboardRequest(
       snapshotOptions,
       codexChatStarter,
       actionToken,
+      dashboardCache,
       url,
     );
     return;
@@ -2580,6 +2739,7 @@ async function routeDashboardRequest(
       response,
       snapshotOptions,
       actionToken,
+      dashboardCache,
       url,
     );
     return;
@@ -2620,8 +2780,11 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      const snapshot = await buildNexusDashboardWorkspaceShell(
-        selection.snapshotOptions,
+      const snapshot = await cachedDashboardValue(
+        dashboardCache,
+        dashboardWorkspaceCacheKey("shell", selection),
+        dashboardCachePolicies.shell,
+        () => buildNexusDashboardWorkspaceShell(selection.snapshotOptions),
       );
       sendJson(response, dashboardWorkspacePayload(snapshot, selection));
       return;
@@ -2631,11 +2794,18 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
+      const section = dashboardSectionFromUrl(url);
       sendJson(
         response,
-        await buildNexusDashboardWorkspaceSection(
-          selection.snapshotOptions,
-          dashboardSectionFromUrl(url),
+        await cachedDashboardValue(
+          dashboardCache,
+          dashboardWorkspaceCacheKey(`section:${section}`, selection),
+          dashboardCachePolicies.section,
+          () =>
+            buildNexusDashboardWorkspaceSection(
+              selection.snapshotOptions,
+              section,
+            ),
         ),
       );
       return;
@@ -2645,7 +2815,12 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      const snapshot = await cachedDashboardValue(
+        dashboardCache,
+        dashboardWorkspaceCacheKey("snapshot", selection),
+        dashboardCachePolicies.workspace,
+        () => buildNexusDashboardSnapshot(selection.snapshotOptions),
+      );
       sendJson(response, dashboardWorkspacePayload(snapshot, selection));
       return;
     }
@@ -2654,14 +2829,24 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      const snapshot = await cachedDashboardValue(
+        dashboardCache,
+        dashboardWorkspaceCacheKey("snapshot", selection),
+        dashboardCachePolicies.workspace,
+        () => buildNexusDashboardSnapshot(selection.snapshotOptions),
+      );
       sendJson(response, dashboardDiagnosticsPayload(snapshot, selection));
       return;
     }
     if (url.pathname === "/api/host") {
       sendJson(
         response,
-        await buildDashboardHostForRequest(snapshotOptions, workspaceIdFromUrl(url)),
+        await cachedDashboardValue(
+          dashboardCache,
+          dashboardHostCacheKey("host", snapshotOptions, workspaceIdFromUrl(url)),
+          dashboardCachePolicies.host,
+          () => buildDashboardHostForRequest(snapshotOptions, workspaceIdFromUrl(url)),
+        ),
       );
       return;
     }
@@ -2670,7 +2855,12 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      const snapshot = await cachedDashboardValue(
+        dashboardCache,
+        dashboardWorkspaceCacheKey("snapshot", selection),
+        dashboardCachePolicies.workspace,
+        () => buildNexusDashboardSnapshot(selection.snapshotOptions),
+      );
       sendJson(response, snapshot.weave);
       return;
     }
@@ -2679,14 +2869,25 @@ async function routeDashboardRequest(
         snapshotOptions,
         workspaceIdFromUrl(url),
       );
-      const snapshot = await buildNexusDashboardSnapshot(selection.snapshotOptions);
+      const snapshot = await cachedDashboardValue(
+        dashboardCache,
+        dashboardWorkspaceCacheKey("snapshot", selection),
+        dashboardCachePolicies.workspace,
+        () => buildNexusDashboardSnapshot(selection.snapshotOptions),
+      );
       sendJson(response, { events: snapshot.events });
       return;
     }
     if (url.pathname === "/api/projects") {
-      const host = await buildDashboardProjectIndexForRequest(
-        snapshotOptions,
-        workspaceIdFromUrl(url),
+      const host = await cachedDashboardValue(
+        dashboardCache,
+        dashboardHostCacheKey("projects", snapshotOptions, workspaceIdFromUrl(url)),
+        dashboardCachePolicies.projectIndex,
+        () =>
+          buildDashboardProjectIndexForRequest(
+            snapshotOptions,
+            workspaceIdFromUrl(url),
+          ),
       );
       sendJson(response, { host, projects: host.workspaces });
       return;
@@ -2704,6 +2905,7 @@ async function routeCodexThreadStart(
   snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   codexChatStarter: NexusDashboardCodexChatStarter,
   actionToken: string,
+  dashboardCache: NexusDashboardServerCache,
   url: URL,
 ): Promise<void> {
   try {
@@ -2733,6 +2935,7 @@ async function routeCodexThreadStart(
       ...(threadContext?.threadId ? { threadId: threadContext.threadId } : {}),
       ...(threadContext?.cwd ? { cwd: threadContext.cwd } : {}),
     });
+    invalidateDashboardCache(dashboardCache);
     sendJson(response, { ok: true, result }, 201);
   } catch (error) {
     sendJson(response, dashboardErrorBody(error), dashboardErrorStatusCode(error));
@@ -2778,6 +2981,7 @@ async function routeDashboardThreadAction(
   response: ServerResponse,
   snapshotOptions: BuildNexusDashboardHostSnapshotOptions,
   actionToken: string,
+  dashboardCache: NexusDashboardServerCache,
   url: URL,
 ): Promise<void> {
   try {
@@ -2818,6 +3022,7 @@ async function routeDashboardThreadAction(
       thread,
       now: snapshotOptions.now,
     });
+    invalidateDashboardCache(dashboardCache);
     sendJson(response, {
       ok: true,
       result: {

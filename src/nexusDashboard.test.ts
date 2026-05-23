@@ -3445,6 +3445,128 @@ describe("nexus dashboard", () => {
     }
   });
 
+  it("reuses full workspace snapshots across dashboard endpoints", async () => {
+    const projectRoot = makeTempDir("dev-nexus-dashboard-cache-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    const baseGitRunner = fakeGitRunner();
+    let allowGit = true;
+    let gitCalls = 0;
+    const server = await startNexusDashboardServer({
+      projectRoot,
+      gitRunner: (args, cwd) => {
+        if (!allowGit) {
+          throw new Error("workspace refresh should use the cached snapshot");
+        }
+        gitCalls += 1;
+        return baseGitRunner(args, cwd);
+      },
+      now: fixedClock("2026-05-21T10:26:00.000Z"),
+    });
+
+    try {
+      const first = await fetch(`${server.url}api/dashboard`).then((response) =>
+        response.json(),
+      );
+      expect(first.project.id).toBe("dashboard-demo");
+      expect(gitCalls).toBeGreaterThan(0);
+
+      allowGit = false;
+
+      const diagnostics = await fetch(`${server.url}api/diagnostics`).then(
+        (response) => response.json(),
+      );
+      const weave = await fetch(`${server.url}api/weave`).then((response) =>
+        response.json(),
+      );
+      const events = await fetch(`${server.url}api/events`).then((response) =>
+        response.json(),
+      );
+      const second = await fetch(`${server.url}api/dashboard`).then((response) =>
+        response.json(),
+      );
+
+      expect(diagnostics.projectRoot).toBe(projectRoot);
+      expect(weave.nodes).toEqual(expect.any(Array));
+      expect(events.events).toEqual(expect.any(Array));
+      expect(second.project.id).toBe("dashboard-demo");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("reuses host snapshots across refresh requests", async () => {
+    const homePath = makeTempDir("dev-nexus-dashboard-host-cache-home-");
+    const registeredRoot = makeTempDir("dev-nexus-dashboard-host-cache-registered-");
+    const currentRoot = makeTempDir("dev-nexus-dashboard-host-cache-current-");
+    fs.mkdirSync(path.join(registeredRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(currentRoot, "source"), { recursive: true });
+    const registeredConfig = projectConfig({
+      id: "host-cache-registered",
+      name: "Host Cache Registered",
+    });
+    const currentConfig = projectConfig({
+      id: "host-cache-current",
+      name: "Host Cache Current",
+    });
+    saveProjectConfig(registeredRoot, registeredConfig);
+    saveProjectConfig(currentRoot, currentConfig);
+    saveNexusHomeConfigFile(
+      homePath,
+      {
+        version: 1,
+        paths: {
+          projectsRoot: path.join(homePath, "projects"),
+          workspacesRoot: path.join(homePath, "workspaces"),
+        },
+        projects: [
+          {
+            id: registeredConfig.id,
+            name: registeredConfig.name,
+            projectRoot: registeredRoot,
+          },
+        ],
+      },
+      validateNexusHomeConfigBase,
+    );
+    const baseGitRunner = fakeGitRunner();
+    let allowGit = true;
+    let gitCalls = 0;
+    const server = await startNexusDashboardServer({
+      projectRoot: currentRoot,
+      homePath,
+      gitRunner: (args, cwd) => {
+        if (!allowGit) {
+          throw new Error("host refresh should use the cached snapshot");
+        }
+        gitCalls += 1;
+        return baseGitRunner(args, cwd);
+      },
+      now: fixedClock("2026-05-21T10:26:30.000Z"),
+    });
+
+    try {
+      const first = await fetch(`${server.url}api/host`).then((response) =>
+        response.json(),
+      );
+      expect(first.workspaceCount).toBe(2);
+      expect(gitCalls).toBeGreaterThan(0);
+
+      allowGit = false;
+
+      const second = await fetch(`${server.url}api/host`).then((response) =>
+        response.json(),
+      );
+      expect(second.workspaceCount).toBe(2);
+      expect(second.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual([
+        "host-cache-current",
+        "host-cache-registered",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("serves a host project shell without probing workspace Git state", async () => {
     const homePath = makeTempDir("dev-nexus-dashboard-project-shell-home-");
     const registeredRoot = makeTempDir("dev-nexus-dashboard-project-shell-");
