@@ -25,9 +25,9 @@ subagents, subject to workspace policy, tool availability, cost,
 provider-mutation, credential, and runtime approval gates.
 
 Use [Concepts](concepts.md#work-sizing-terms) for sizing terms. DevNexus uses
-`work item` as the neutral tracker record, `slice` as an independently
-reviewable vertical increment, and `delivery topology` as the Git and review
-route for slice branches.
+`work item` as the neutral tracker record, `change` as an independently
+reviewable vertical increment, and `branch strategy` as the Git and review
+route for review branches.
 
 ## MCP Server
 
@@ -51,9 +51,9 @@ setup_record
 target_cycle_list
 target_cycle_record
 target_report
-publication_initiative_plan
-publication_initiative_report
-publication_initiative_finalization
+publication_feature_plan
+publication_feature_report
+publication_feature_finalization
 current_agent_adopt
 current_agent_record
 coordination_status
@@ -129,7 +129,7 @@ Multi-tracker components distinguish the canonical work item from supporting
 provider records. Coordinators should select eligible work from the component
 default tracker unless the target explicitly names another tracker. Mirror,
 coordination, planning, external-feedback, migration, and archive trackers are
-supporting surfaces unless the component owner changes `defaultWorkTrackerId`.
+supporting records unless the component owner changes `defaultWorkTrackerId`.
 
 Agents can use link records to connect a canonical item to existing provider
 issues before any sync plan:
@@ -139,7 +139,7 @@ dev-nexus work-item link <workspace-root> local-1 --component core --tracker for
 dev-nexus work-item show-links <workspace-root> local-1 --component core
 ```
 
-Use dry-run sync planning as the review surface for mirrored fields:
+Use dry-run sync planning as the review output for mirrored fields:
 
 ```bash
 dev-nexus work-item sync-plan <workspace-root> --component core --source-tracker primary --target-tracker forge --open --label onboarding --field title --field status
@@ -160,45 +160,44 @@ Before editing a Git checkout, run a freshness preflight:
 - Fast-forward clean branches with an upstream.
 - Record a blocker when freshness cannot be checked.
 
-For Git-backed initiatives, choose the delivery topology before preparing the
-first worktree. The words "feature", "initiative", "bugfix campaign", and
-"release train" do not by themselves choose a branch shape.
+For Git-backed features, choose the branch strategy before preparing the first
+worktree. The words "feature", "bugfix campaign", and "release train" do not
+by themselves choose a branch shape.
 
-- Use direct slice topology by default when slices can land independently on
-  the final integration branch.
-- Use stacked slice topology when later slices depend on earlier unmerged
-  slices.
-- Use an initiative integration branch only after human-in-the-loop approval
+- Use direct branch strategy by default when changes can land independently on
+  the final target branch.
+- Use stacked branch strategy when later changes depend on earlier unmerged
+  changes.
+- Use a feature branch only after human-in-the-loop approval
   when partial publication would leave the target branch incoherent or unsafe.
-- Use a throw-away integration branch only for compatibility rehearsal; do not
+- Use a temporary integration branch only for compatibility rehearsal; do not
   base new work on it.
 - Use the workspace release policy for version, train, candidate, and merge
   queue decisions.
 
-For initiative delivery, let the worktree and publication tools choose the
-provider surface from policy. The default final pull-request timing is
-`at_review_gate`, so agents should not open a final PR when the initiative branch
-is created unless policy explicitly says `at_initiative_start`. When upstream
-branch pushes are unavailable, use the configured `branchPublication` fallback
+For feature branches, let the worktree and publication tools choose the
+provider path from policy. The default final pull-request timing is
+`at_review_gate`, so agents should not open a final PR when the feature branch
+is created unless policy explicitly says `at_feature_start`. When upstream
+branch pushes are unavailable, use the configured branch publication fallback
 remote instead of inventing a fork or pushing with a human account.
 
-Use `publication branch-push --initiative` to let DevNexus probe the configured
-remote path. For `publication_remote_then_fallback`, the command checks the
-publication remote with a dry-run push before it selects the fallback remote.
-Use `initiative-finalization` to get the final PR action; for GitHub forks it
-renders the `owner:branch` head ref when the fallback remote URL identifies the
-fork.
+Use `publication branch-push --feature` to let DevNexus probe the configured
+remote path. For `push_remote_then_fallback`, the command checks the push remote
+with a dry-run push before it selects the fallback remote. Use
+`feature-finalization` to get the final PR action; for GitHub forks it renders
+the `owner:branch` head ref when the fallback remote URL identifies the fork.
 
-For stacked or hybrid work, pass `--initiative-parent` and
-`--initiative-stack-position` when a slice is not the first slice in the stack.
+For stacked or hybrid work, pass `--feature-parent` and
+`--feature-stack-position` when a change is not the first change in the stack.
 The generated worker context records the parent branch and stack position, so
 later agents can distinguish a normal update from a restack. Restacking a
 pushed branch requires human approval when it needs `--force-with-lease`.
 
-If `initiative-report` or `initiative-finalization` says the review branch is
+If `feature-report` or `feature-finalization` says the review branch is
 behind or diverged, prefer the reported merge-update command unless a human
 explicitly chooses rebase. Rebase rewrites the branch and needs a
-force-with-lease push, so it is a human-in-the-loop gate for public initiative
+force-with-lease push, so it is a human-in-the-loop gate for public feature
 branches.
 
 Prepare a component-scoped worktree when implementation should be isolated:
@@ -224,12 +223,12 @@ facade for issue status, request creation, checks, and merge decisions.
 The default publication posture is `review_handoff`: an agent prepares a branch
 and records verification, then a user or maintainer decides what to publish. See
 [Publication workflows](publication-workflows.md) before opting into
-green-main, CI tiers, merge queues, or publication trains.
+green-main, CI tiers, merge queues, or release trains.
 
 For green-main publication, save provider check data and let DevNexus classify
 the pull request or merge request before any merge attempt. Check collection is
 provider-specific until DevNexus has a neutral collector adapter, but the
-DevNexus planning surface should consume saved check facts:
+DevNexus planning command should consume saved check facts:
 
 ```bash
 dev-nexus publication green-main plan <workspace-root> --component core --pr <pr-number> --checks-file checks.json
@@ -248,7 +247,7 @@ Advanced publication helpers are opt-in planning commands. Use them only after
 the workspace policy enables the matching workflow:
 
 ```bash
-dev-nexus publication train-readiness <workspace-root> --version v-next
+dev-nexus publication release-train-readiness <workspace-root> --version v-next
 dev-nexus publication candidate-plan <workspace-root> --version v-next
 dev-nexus publication merge-queue-readiness <workspace-root> --component core
 ```
@@ -295,12 +294,12 @@ The workflow uses a small checkout vocabulary:
   Treat it as a read-mostly control room for status, coordination, setup, and
   integration planning.
 - Worker worktree: an isolated branch and filesystem path for one bounded work
-  item, component, or workspace-meta surface. Run edits, verification, and Git
+  item, component, or workspace-meta area. Run edits, verification, and Git
   commands for that work from this path.
-- Initiative integration branch: an approved long-lived branch where slices
+- Feature branch: an approved long-lived branch where changes
   accumulate before final publication because partial publication would be
   incoherent or unsafe.
-- Throw-away integration branch: a temporary branch used to rehearse conflicts,
+- Temporary integration branch: a temporary branch used to rehearse conflicts,
   compatibility, or release readiness. It is not a base for new work unless a
   human explicitly promotes it.
 - Rescue branch: a preservation branch for useful, ambiguous, or abandoned work
@@ -308,7 +307,7 @@ The workflow uses a small checkout vocabulary:
   it does not by itself prove that cleanup is safe.
 
 Worker and integrator are workflow behaviors, not a second authority model. A
-worker owns one bounded surface, keeps edits inside the adopted worktree,
+worker owns one bounded area, keeps edits inside the adopted worktree,
 verifies the result, commits useful work before ending when possible, and leaves
 a handoff that names the branch, head commit, changed areas, verification, and
 remaining decisions. An integrator serializes ready work by reading handoffs,
@@ -392,7 +391,7 @@ without mutating Codex or any provider state. The recipe includes a suggested
 heartbeat name, thread destination, hourly default schedule, active/paused state,
 and a self-contained prompt generated from workspace metadata. The prompt tells a
 wake-up agent to read DevNexus workspace context, use automation and tracker
-surfaces, prepare isolated worktrees, respect component tracker roles including
+areas, prepare isolated worktrees, respect component tracker roles including
 direct external issue selection, record target-cycle facts, verify work, and use
 the idle path to remove blockers or capture focused component-owned issues.
 

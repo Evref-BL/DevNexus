@@ -1,85 +1,85 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultNexusInitiativeDeliveryConfig,
-  type NexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
+  type NexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
 import {
   branchSlugFor,
-  renderInitiativeBranchPattern,
-  summarizeNexusInitiativeDeliveryPolicy,
-} from "./nexusInitiativeDeliveryPolicy.js";
+  renderFeatureBranchPattern,
+  summarizeNexusFeatureBranchDeliveryPolicy,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
 
-function initiativeConfig(
-  patch: Partial<NexusInitiativeDeliveryConfig> = {},
-): NexusInitiativeDeliveryConfig {
+function featureConfig(
+  patch: Partial<NexusFeatureBranchDeliveryConfig> = {},
+): NexusFeatureBranchDeliveryConfig {
   return {
-    ...defaultNexusInitiativeDeliveryConfig,
+    ...defaultNexusFeatureBranchDeliveryConfig,
     ...patch,
     branchNaming: {
-      ...defaultNexusInitiativeDeliveryConfig.branchNaming,
+      ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
       ...patch.branchNaming,
     },
     review: {
-      ...defaultNexusInitiativeDeliveryConfig.review,
+      ...defaultNexusFeatureBranchDeliveryConfig.review,
       ...patch.review,
     },
     provider: {
-      ...defaultNexusInitiativeDeliveryConfig.provider,
+      ...defaultNexusFeatureBranchDeliveryConfig.provider,
       ...patch.provider,
     },
     branchPublication: {
-      ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+      ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
       ...patch.branchPublication,
     },
   };
 }
 
-describe("initiative delivery policy", () => {
-  it("plans hybrid initiative branches with conventional intent prefixes", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+describe("feature branch delivery policy", () => {
+  it("plans hybrid feature branches with conventional intent prefixes", () => {
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
       }),
       fallbackScopeId: "v-next",
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary).toMatchObject({
       enabled: true,
-      activeInitiativeId: "Codex Goals",
+      activeFeatureId: "Codex Goals",
       activeScopeId: "Codex Goals",
       branchSlug: "codex-goals",
       defaultIntentPrefix: "feat",
-      defaultTopology: "hybrid",
-      reviewMode: "slice_pr",
+      defaultBranchStrategy: "hybrid",
+      reviewMode: "review_branch_pr",
       finalPullRequest: true,
       finalPullRequestCreation: "at_review_gate",
-      providerNoise: "status_only",
+      commentPolicy: "status_only",
       branchPublication: {
-        strategy: "publication_remote",
-        publicationRemote: "app",
+        strategy: "push_remote",
+        pushRemote: "app",
         fallbackRemote: null,
         selectedRemote: "app",
         requiresFallbackApproval: false,
       },
       branchPlan: {
-        topology: "hybrid",
+        branchStrategy: "hybrid",
         targetBranch: "main",
-        integrationBranch: "feat/codex-goals",
-        sliceBranchPattern: "feat/codex-goals/{slice}",
-        defaultSliceBaseBranch: "feat/codex-goals",
-        defaultSliceReviewTarget: "feat/codex-goals",
+        featureBranch: "feat/codex-goals",
+        reviewBranchPattern: "feat/codex-goals/{change}",
+        defaultChangeBaseBranch: "feat/codex-goals",
+        defaultChangeReviewTarget: "feat/codex-goals",
         finalReviewTarget: "main",
         finalPublicationTarget: "main",
         usesStackParent: true,
-        requiresIntegrationBranchApproval: true,
+        requiresFeatureBranchApproval: true,
         stack: {
           status: "active",
-          topology: "hybrid",
+          branchStrategy: "hybrid",
           publicationEligible: true,
           rootBranch: "feat/codex-goals",
           defaultParentBranch: "feat/codex-goals",
@@ -89,32 +89,32 @@ describe("initiative delivery policy", () => {
     });
   });
 
-  it("keeps direct slices targeting the final branch", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+  it("keeps direct changes targeting the final branch", () => {
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "small-fixes",
-        defaultTopology: "direct",
+        activeFeatureId: "small-fixes",
+        defaultBranchStrategy: "direct",
         branchNaming: {
           defaultIntentPrefix: "fix",
           allowedIntentPrefixes: ["feat", "fix"],
-          integrationBranchPattern: "{intent}/{initiative}",
-          sliceBranchPattern: "{intent}/{initiative}/{slice}",
+          featureBranchPattern: "{intent}/{feature}",
+          reviewBranchPattern: "{intent}/{feature}/{change}",
         },
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary.branchPlan).toMatchObject({
-      topology: "direct",
-      integrationBranch: null,
-      defaultSliceBaseBranch: "main",
-      defaultSliceReviewTarget: "main",
+      branchStrategy: "direct",
+      featureBranch: null,
+      defaultChangeBaseBranch: "main",
+      defaultChangeReviewTarget: "main",
       finalReviewTarget: "main",
-      requiresIntegrationBranchApproval: false,
+      requiresFeatureBranchApproval: false,
       stack: {
         status: "not_applicable",
         publicationEligible: true,
@@ -122,68 +122,68 @@ describe("initiative delivery policy", () => {
         defaultParentBranch: null,
       },
     });
-    expect(summary.branchPlan.sliceBranchPattern).toBe("fix/small-fixes/{slice}");
+    expect(summary.branchPlan.reviewBranchPattern).toBe("fix/small-fixes/{change}");
   });
 
-  it("summarizes stacked topology with target-rooted slice parents", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+  it("summarizes stacked branchStrategy with target-rooted change parents", () => {
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "stacked-work",
-        defaultTopology: "stacked",
+        activeFeatureId: "stacked-work",
+        defaultBranchStrategy: "stacked",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary.branchPlan).toMatchObject({
-      topology: "stacked",
-      integrationBranch: null,
-      defaultSliceBaseBranch: "main",
-      defaultSliceReviewTarget: "parent_slice_or_target",
+      branchStrategy: "stacked",
+      featureBranch: null,
+      defaultChangeBaseBranch: "main",
+      defaultChangeReviewTarget: "parent_change_or_target",
       stack: {
         status: "active",
-        topology: "stacked",
+        branchStrategy: "stacked",
         publicationEligible: true,
         rootBranch: "main",
         defaultParentBranch: "main",
-        defaultReviewTarget: "parent_slice_or_target",
-        slices: [],
+        defaultReviewTarget: "parent_change_or_target",
+        changes: [],
       },
     });
   });
 
-  it("uses publication train scope when no active initiative id is configured", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+  it("uses release train scope when no active feature id is configured", () => {
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: null,
-        defaultTopology: "integration_branch",
+        activeFeatureId: null,
+        defaultBranchStrategy: "feature_branch",
       }),
       fallbackScopeId: "0.2.0",
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary.activeScopeId).toBe("0.2.0");
-    expect(summary.branchPlan.integrationBranch).toBe("feat/0.2.0");
+    expect(summary.branchPlan.featureBranch).toBe("feat/0.2.0");
     expect(summary.warnings).toEqual([]);
   });
 
-  it("warns when enabled without an initiative or fallback scope", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+  it("warns when enabled without an feature or fallback scope", () => {
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: null,
-        defaultTopology: "throwaway_rehearsal",
+        activeFeatureId: null,
+        defaultBranchStrategy: "throwaway_rehearsal",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary.activeScopeId).toBe("manual");
@@ -194,7 +194,7 @@ describe("initiative delivery policy", () => {
       defaultParentBranch: "feat/manual",
     });
     expect(summary.warnings).toEqual([
-      "initiative delivery has no active initiative id; using manual",
+      "feature branch delivery has no active feature id; using manual",
       "throw-away rehearsal branches must not become publication sources",
     ]);
   });
@@ -202,34 +202,34 @@ describe("initiative delivery policy", () => {
   it("renders branch patterns and normalizes arbitrary ids to branch slugs", () => {
     expect(branchSlugFor(" Feature: Codex Goals! ")).toBe("feature-codex-goals");
     expect(
-      renderInitiativeBranchPattern("{intent}/{initiative}/{slice}", {
+      renderFeatureBranchPattern("{intent}/{feature}/{change}", {
         intent: "feat",
-        initiative: "codex-goals",
-        slice: "target-projection",
+        feature: "codex-goals",
+        change: "target-projection",
       }),
     ).toBe("feat/codex-goals/target-projection");
   });
 
   it("plans configured fallback remotes for fork or temp branch publication", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "fork-review",
-        defaultTopology: "hybrid",
+        activeFeatureId: "fork-review",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
-          strategy: "publication_remote_then_fallback",
+          strategy: "push_remote_then_fallback",
           fallbackRemote: "fork",
         },
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "app",
+      pushRemote: "app",
     });
 
     expect(summary.branchPublication).toMatchObject({
-      strategy: "publication_remote_then_fallback",
-      publicationRemote: "app",
+      strategy: "push_remote_then_fallback",
+      pushRemote: "app",
       fallbackRemote: "fork",
       selectedRemote: "app",
       requiresFallbackApproval: true,
@@ -238,16 +238,16 @@ describe("initiative delivery policy", () => {
   });
 
   it("renders upstream final pull request heads as branch names", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "origin",
+      pushRemote: "origin",
       remoteUrls: {
         origin: "https://github.com/Evref-BL/DevNexus.git",
       },
@@ -266,11 +266,11 @@ describe("initiative delivery policy", () => {
   });
 
   it("renders GitHub fork final pull request heads from SSH fallback remotes", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",
@@ -279,7 +279,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "origin",
+      pushRemote: "origin",
       remoteUrls: {
         fork: "git@github.com:Gabriel-Darbord/DevNexus.git",
       },
@@ -298,11 +298,11 @@ describe("initiative delivery policy", () => {
   });
 
   it("renders GitHub fork final pull request heads from HTTPS fallback remotes", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",
@@ -311,7 +311,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "origin",
+      pushRemote: "origin",
       remoteUrls: {
         fork: "https://github.com/Gabriel-Darbord/DevNexus.git",
       },
@@ -327,11 +327,11 @@ describe("initiative delivery policy", () => {
 
 
   it("blocks fork pull request heads when fallback remotes have no GitHub URL", () => {
-    const summary = summarizeNexusInitiativeDeliveryPolicy({
-      config: initiativeConfig({
+    const summary = summarizeNexusFeatureBranchDeliveryPolicy({
+      config: featureConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",
@@ -340,7 +340,7 @@ describe("initiative delivery policy", () => {
       fallbackScopeId: null,
       unscopedName: "manual",
       targetBranch: "main",
-      publicationRemote: "origin",
+      pushRemote: "origin",
     });
 
     expect(summary.branchPublication.finalPullRequestHead).toMatchObject({

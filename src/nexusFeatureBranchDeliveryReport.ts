@@ -1,24 +1,24 @@
 import path from "node:path";
 import {
-  defaultNexusPublicationTrainCiTierPolicy,
+  defaultNexusReleaseTrainCiTierPolicy,
   mergeNexusCiTierPolicy,
   resolveNexusCiTierDecision,
   type NexusCiTierDecision,
   type NexusCiTierPolicyConfig,
 } from "./nexusCiTierPolicy.js";
 import {
-  buildNexusInitiativeBranchUpdateDecision,
-  type NexusInitiativeBranchUpdateDecision,
-} from "./nexusInitiativeBranchUpdateDecision.js";
+  buildNexusReviewBranchUpdateDecision,
+  type NexusReviewBranchUpdateDecision,
+} from "./nexusReviewBranchUpdateDecision.js";
 import {
-  buildNexusInitiativeDeliveryPlan,
-  type NexusInitiativeDeliveryPlanItem,
-} from "./nexusInitiativeDeliveryPlan.js";
+  buildNexusFeatureBranchDeliveryPlan,
+  type NexusFeatureBranchDeliveryPlanItem,
+} from "./nexusFeatureBranchDeliveryPlan.js";
 import type {
-  NexusInitiativeDeliveryBranchPublicationSummary,
-  NexusInitiativeDeliveryPolicySummary,
-  NexusInitiativeDeliveryPullRequestHeadSummary,
-} from "./nexusInitiativeDeliveryPolicy.js";
+  NexusFeatureBranchDeliveryBranchPublicationSummary,
+  NexusFeatureBranchDeliveryPolicySummary,
+  NexusFeatureBranchDeliveryPullRequestHeadSummary,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   classifyNexusPublicationProviderEvidenceChecks,
   findNexusPublicationProviderEvidence,
@@ -41,7 +41,7 @@ import {
 } from "./nexusProjectLifecycle.js";
 import { resolveNexusPublicationPolicy } from "./nexusPublicationPolicy.js";
 
-export type NexusInitiativeDeliveryReportNextAction =
+export type NexusFeatureBranchDeliveryReportNextAction =
   | "create_pull_request"
   | "collect_provider_evidence"
   | "update_branch"
@@ -53,7 +53,7 @@ export type NexusInitiativeDeliveryReportNextAction =
   | "ready_for_final_publication"
   | "wait";
 
-export type NexusInitiativeDeliveryReportItemStatus =
+export type NexusFeatureBranchDeliveryReportItemStatus =
   | "needs_final_pull_request"
   | "needs_provider_evidence"
   | "needs_update"
@@ -64,7 +64,7 @@ export type NexusInitiativeDeliveryReportItemStatus =
   | "ready"
   | "wait";
 
-export interface NexusInitiativeDeliveryProviderEvidenceSummary {
+export interface NexusFeatureBranchDeliveryProviderEvidenceSummary {
   provider: string | null;
   sourceKind: NexusPublicationProviderEvidence["sourceKind"] | null;
   sourceUrl: string | null;
@@ -91,34 +91,34 @@ export interface NexusInitiativeDeliveryProviderEvidenceSummary {
   collectedAt: string | null;
 }
 
-export interface NexusInitiativeDeliveryReportItem {
+export interface NexusFeatureBranchDeliveryReportItem {
   componentId: string;
   componentName: string;
   targetBranch: string;
-  publicationTrainVersionId: string | null;
-  initiativeId: string;
-  topology: string;
+  releaseTrainVersionId: string | null;
+  featureId: string;
+  branchStrategy: string;
   reviewMode: string;
-  providerNoise: string;
-  integrationBranch: string | null;
-  sliceBranchPattern: string;
-  stack: NexusInitiativeDeliveryPolicySummary["branchPlan"]["stack"];
+  commentPolicy: string;
+  featureBranch: string | null;
+  reviewBranchPattern: string;
+  stack: NexusFeatureBranchDeliveryPolicySummary["branchPlan"]["stack"];
   finalReviewTarget: string;
   finalPublicationTarget: string;
   finalPullRequest: boolean;
   finalPullRequestCreation: string;
-  branchPublication: NexusInitiativeDeliveryBranchPublicationSummary;
-  finalPullRequestHead: NexusInitiativeDeliveryPullRequestHeadSummary;
-  branchUpdateDecision: NexusInitiativeBranchUpdateDecision;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationSummary;
+  finalPullRequestHead: NexusFeatureBranchDeliveryPullRequestHeadSummary;
+  branchUpdateDecision: NexusReviewBranchUpdateDecision;
   ciTier: NexusCiTierDecision;
-  providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
-  status: NexusInitiativeDeliveryReportItemStatus;
-  nextAction: NexusInitiativeDeliveryReportNextAction;
+  providerEvidence: NexusFeatureBranchDeliveryProviderEvidenceSummary;
+  status: NexusFeatureBranchDeliveryReportItemStatus;
+  nextAction: NexusFeatureBranchDeliveryReportNextAction;
   reasons: string[];
   warnings: string[];
 }
 
-export interface NexusInitiativeDeliveryReportSummary {
+export interface NexusFeatureBranchDeliveryReportSummary {
   itemCount: number;
   readyCount: number;
   needsFinalPullRequestCount: number;
@@ -131,7 +131,7 @@ export interface NexusInitiativeDeliveryReportSummary {
   waitCount: number;
 }
 
-export interface NexusInitiativeDeliveryReport {
+export interface NexusFeatureBranchDeliveryReport {
   version: 1;
   generatedAt: string;
   projectRoot: string;
@@ -140,29 +140,29 @@ export interface NexusInitiativeDeliveryReport {
     name: string;
   };
   componentId: string | null;
-  initiativeId: string | null;
-  summary: NexusInitiativeDeliveryReportSummary;
-  nextAction: NexusInitiativeDeliveryReportNextAction;
-  items: NexusInitiativeDeliveryReportItem[];
+  featureId: string | null;
+  summary: NexusFeatureBranchDeliveryReportSummary;
+  nextAction: NexusFeatureBranchDeliveryReportNextAction;
+  items: NexusFeatureBranchDeliveryReportItem[];
   warnings: string[];
   mutatesSource: false;
 }
 
-export function buildNexusInitiativeDeliveryReport(options: {
+export function buildNexusFeatureBranchDeliveryReport(options: {
   projectRoot: string;
   componentId?: string;
-  initiativeId?: string | null;
+  featureId?: string | null;
   providerEvidence?: NexusPublicationProviderEvidenceInput[];
   fullMatrixBudgetAvailable?: boolean | null;
   now?: Date | string | (() => Date | string);
-}): NexusInitiativeDeliveryReport {
+}): NexusFeatureBranchDeliveryReport {
   const projectRoot = path.resolve(required(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
   const components = resolveProjectComponents(projectRoot, projectConfig);
-  const plan = buildNexusInitiativeDeliveryPlan({
+  const plan = buildNexusFeatureBranchDeliveryPlan({
     projectRoot,
     componentId: options.componentId,
-    initiativeId: options.initiativeId,
+    featureId: options.featureId,
   });
   const normalizedEvidence = normalizeNexusPublicationProviderEvidence(
     options.providerEvidence ?? [],
@@ -187,7 +187,7 @@ export function buildNexusInitiativeDeliveryReport(options: {
       name: projectConfig.name,
     },
     componentId: options.componentId ?? null,
-    initiativeId: options.initiativeId ?? null,
+    featureId: options.featureId ?? null,
     summary: summarizeItems(items),
     nextAction: nextAction(items),
     items,
@@ -199,28 +199,28 @@ export function buildNexusInitiativeDeliveryReport(options: {
 function reportItem(options: {
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
-  item: NexusInitiativeDeliveryPlanItem;
+  item: NexusFeatureBranchDeliveryPlanItem;
   providerEvidence: NexusPublicationProviderEvidence[];
   fullMatrixBudgetAvailable: boolean;
-}): NexusInitiativeDeliveryReportItem {
+}): NexusFeatureBranchDeliveryReportItem {
   const component = options.components.find((candidate) =>
     candidate.id === options.item.componentId
   );
   if (!component) {
     throw new Error(`Component ${options.item.componentId} was not found.`);
   }
-  const initiative = options.item.initiative;
-  const branchPlan = initiative.branchPlan;
-  const branchName = branchPlan.integrationBranch ??
-    branchPlan.defaultSliceReviewTarget;
+  const feature = options.item.feature;
+  const branchPlan = feature.branchPlan;
+  const branchName = branchPlan.featureBranch ??
+    branchPlan.defaultChangeReviewTarget;
   const ciTier = resolveNexusCiTierDecision({
-    policy: initiativeCiTierPolicy(options.projectConfig, component),
+    policy: featureCiTierPolicy(options.projectConfig, component),
     eventName: "pull_request",
     branchName,
     targetBranch: branchPlan.finalPublicationTarget,
     fullMatrixBudgetAvailable: options.fullMatrixBudgetAvailable,
   });
-  const evidence = findEvidenceForInitiative({
+  const evidence = findEvidenceForFeature({
     evidence: options.providerEvidence,
     branchName,
     targetBranch: branchPlan.finalPublicationTarget,
@@ -232,60 +232,60 @@ function reportItem(options: {
   });
   const providerEvidence = providerEvidenceSummary(evidence, classification);
   const classificationResult = classifyItem({
-    initiativeFinalPullRequest: initiative.finalPullRequest,
+    featureFinalPullRequest: feature.finalPullRequest,
     providerEvidence,
     ciTier,
-    finalPullRequestCreation: initiative.finalPullRequestCreation,
+    finalPullRequestCreation: feature.finalPullRequestCreation,
   });
 
   return {
     componentId: options.item.componentId,
     componentName: options.item.componentName,
     targetBranch: options.item.targetBranch,
-    publicationTrainVersionId: options.item.publicationTrainVersionId,
-    initiativeId: initiative.activeScopeId,
-    topology: initiative.defaultTopology,
-    reviewMode: initiative.reviewMode,
-    providerNoise: initiative.providerNoise,
-    integrationBranch: branchPlan.integrationBranch,
-    sliceBranchPattern: branchPlan.sliceBranchPattern,
+    releaseTrainVersionId: options.item.releaseTrainVersionId,
+    featureId: feature.activeScopeId,
+    branchStrategy: feature.defaultBranchStrategy,
+    reviewMode: feature.reviewMode,
+    commentPolicy: feature.commentPolicy,
+    featureBranch: branchPlan.featureBranch,
+    reviewBranchPattern: branchPlan.reviewBranchPattern,
     stack: branchPlan.stack,
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
-    finalPullRequest: initiative.finalPullRequest,
-    finalPullRequestCreation: initiative.finalPullRequestCreation,
-    branchPublication: initiative.branchPublication,
-    finalPullRequestHead: initiative.branchPublication.finalPullRequestHead,
-    branchUpdateDecision: buildNexusInitiativeBranchUpdateDecision({
+    finalPullRequest: feature.finalPullRequest,
+    finalPullRequestCreation: feature.finalPullRequestCreation,
+    branchPublication: feature.branchPublication,
+    finalPullRequestHead: feature.branchPublication.finalPullRequestHead,
+    branchUpdateDecision: buildNexusReviewBranchUpdateDecision({
       baseStatus: providerEvidence.baseStatus,
       headBranch: providerEvidence.headBranch ?? branchName,
       baseBranch: branchPlan.finalPublicationTarget,
-      pushRemote: initiative.branchPublication.selectedRemote,
+      pushRemote: feature.branchPublication.selectedRemote,
       publicBranch: providerEvidence.sourceKind === "pull_request" ||
         providerEvidence.sourceKind === "branch" ||
         providerEvidence.reviewTarget !== null,
       stackedBranch: branchPlan.stack.status === "active" &&
-        (branchPlan.stack.topology === "stacked" ||
-          branchPlan.stack.topology === "hybrid"),
+        (branchPlan.stack.branchStrategy === "stacked" ||
+          branchPlan.stack.branchStrategy === "hybrid"),
     }),
     ciTier,
     providerEvidence,
     status: classificationResult.status,
     nextAction: classificationResult.nextAction,
     reasons: classificationResult.reasons,
-    warnings: [...initiative.warnings],
+    warnings: [...feature.warnings],
   };
 }
 
-function initiativeCiTierPolicy(
+function featureCiTierPolicy(
   projectConfig: NexusProjectConfig,
   component: ResolvedNexusProjectComponent,
 ): NexusCiTierPolicyConfig {
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
-  if (publication.publicationTrain?.ciTiers) {
+  if (publication.releaseTrain?.ciTiers) {
     return mergeNexusCiTierPolicy(
-      defaultNexusPublicationTrainCiTierPolicy,
-      publication.publicationTrain.ciTiers,
+      defaultNexusReleaseTrainCiTierPolicy,
+      publication.releaseTrain.ciTiers,
     );
   }
   if (component.verification?.ciTiers) {
@@ -294,10 +294,10 @@ function initiativeCiTierPolicy(
   if (projectConfig.automation?.verification.ciTiers) {
     return projectConfig.automation.verification.ciTiers;
   }
-  return defaultNexusPublicationTrainCiTierPolicy;
+  return defaultNexusReleaseTrainCiTierPolicy;
 }
 
-function findEvidenceForInitiative(options: {
+function findEvidenceForFeature(options: {
   evidence: NexusPublicationProviderEvidence[];
   branchName: string | null;
   targetBranch: string;
@@ -317,7 +317,7 @@ function findEvidenceForInitiative(options: {
 function providerEvidenceSummary(
   evidence: NexusPublicationProviderEvidence | null,
   classification: ReturnType<typeof classifyNexusPublicationProviderEvidenceChecks>,
-): NexusInitiativeDeliveryProviderEvidenceSummary {
+): NexusFeatureBranchDeliveryProviderEvidenceSummary {
   return {
     provider: evidence?.provider ?? null,
     sourceKind: evidence?.sourceKind ?? null,
@@ -347,20 +347,20 @@ function providerEvidenceSummary(
 }
 
 function classifyItem(options: {
-  initiativeFinalPullRequest: boolean;
+  featureFinalPullRequest: boolean;
   finalPullRequestCreation: string;
-  providerEvidence: NexusInitiativeDeliveryProviderEvidenceSummary;
+  providerEvidence: NexusFeatureBranchDeliveryProviderEvidenceSummary;
   ciTier: NexusCiTierDecision;
 }): {
-  status: NexusInitiativeDeliveryReportItemStatus;
-  nextAction: NexusInitiativeDeliveryReportNextAction;
+  status: NexusFeatureBranchDeliveryReportItemStatus;
+  nextAction: NexusFeatureBranchDeliveryReportNextAction;
   reasons: string[];
 } {
   const evidence = options.providerEvidence;
   const reasons: string[] = [];
   if (!evidence.provider) {
     if (
-      options.initiativeFinalPullRequest &&
+      options.featureFinalPullRequest &&
       options.finalPullRequestCreation === "at_review_gate"
     ) {
       reasons.push("final pull request is created at the review gate");
@@ -422,7 +422,7 @@ function classifyItem(options: {
     };
   }
   if (
-    options.initiativeFinalPullRequest &&
+    options.featureFinalPullRequest &&
     evidence.reviewState !== "approved"
   ) {
     if (evidence.draft === true) {
@@ -464,8 +464,8 @@ function booleanMetadata(
 }
 
 function summarizeItems(
-  items: NexusInitiativeDeliveryReportItem[],
-): NexusInitiativeDeliveryReportSummary {
+  items: NexusFeatureBranchDeliveryReportItem[],
+): NexusFeatureBranchDeliveryReportSummary {
   return {
     itemCount: items.length,
     readyCount: countStatus(items, "ready"),
@@ -481,15 +481,15 @@ function summarizeItems(
 }
 
 function countStatus(
-  items: NexusInitiativeDeliveryReportItem[],
-  status: NexusInitiativeDeliveryReportItemStatus,
+  items: NexusFeatureBranchDeliveryReportItem[],
+  status: NexusFeatureBranchDeliveryReportItemStatus,
 ): number {
   return items.filter((item) => item.status === status).length;
 }
 
 function nextAction(
-  items: NexusInitiativeDeliveryReportItem[],
-): NexusInitiativeDeliveryReportNextAction {
+  items: NexusFeatureBranchDeliveryReportItem[],
+): NexusFeatureBranchDeliveryReportNextAction {
   const actions = items.map((item) => item.nextAction);
   for (const action of [
     "resolve_conflicts",
@@ -501,7 +501,7 @@ function nextAction(
     "request_review",
     "collect_provider_evidence",
     "wait",
-  ] satisfies NexusInitiativeDeliveryReportNextAction[]) {
+  ] satisfies NexusFeatureBranchDeliveryReportNextAction[]) {
     if (actions.includes(action)) {
       return action;
     }

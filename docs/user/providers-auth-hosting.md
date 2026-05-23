@@ -317,7 +317,7 @@ Publication policy describes what agents may do after verification.
 
 The default posture is `review_handoff`. It keeps the first workspace simple:
 the agent prepares a branch or handoff, records verification, and leaves
-publication to the user or maintainer. Version planning, publication trains, CI
+publication to the user or maintainer. Version planning, release trains, CI
 tiers, merge queues, and remote runners are optional additions.
 
 Common postures:
@@ -329,7 +329,7 @@ Common postures:
   branch.
 
 See [Publication workflows](publication-workflows.md) for the simple default
-configuration and the opt-in green-main, CI tier, and publication train path.
+configuration and the opt-in green-main, CI tier, and release train path.
 
 For hosted workspaces, prefer explicit automation remotes and auth profiles for
 agent-created Git and provider activity. With GitHub Apps, the remote can be a

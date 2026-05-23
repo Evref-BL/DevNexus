@@ -27,7 +27,7 @@ publication rules agents need before they edit code.
 - [Agent workflows](user/agent-workflows.md) covers worktrees, automation loops,
   result files, and coordination handoffs.
 - [Publication workflows](user/publication-workflows.md) covers review handoff,
-  green-main checks, publication trains, initiative delivery, and finalization
+  green-main checks, release trains, feature branch delivery, and finalization
   gates.
 - [Providers, auth, and hosting](user/providers-auth-hosting.md) covers GitHub
   Apps, GitHub CLI profiles, GitLab, Jira, user accounts, machine-user accounts,
@@ -40,6 +40,8 @@ publication rules agents need before they edit code.
 ## Project Internals
 
 - [Architecture notes](dev/architecture.md) covers the internal design.
+- [Review policy design](dev/review-policy.md) records the source-backed
+  concept for local, provider, and gated review behavior.
 - [Agent-client plugin policy](dev/agent-client-plugins.md) records the
   current Codex and Claude plugin exposure, runtime, distribution, and uninstall
   decisions.

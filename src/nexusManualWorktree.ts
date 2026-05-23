@@ -45,17 +45,17 @@ import {
   type NexusExpectedGitIdentity,
 } from "./nexusGitIdentity.js";
 import {
-  buildNexusInitiativeDeliveryPlan,
-} from "./nexusInitiativeDeliveryPlan.js";
+  buildNexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
 import {
   branchSlugFor,
-  renderInitiativeBranchPattern,
-} from "./nexusInitiativeDeliveryPolicy.js";
+  renderFeatureBranchPattern,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   resolveComponentWorkItemRoute,
   throwWorkItemLookupFailure,
 } from "./nexusWorkItemRouting.js";
-import type { NexusWorkerContextInitiativeDelivery } from "./nexusWorkerContextBundle.js";
+import type { NexusWorkerContextFeatureBranchDelivery } from "./nexusWorkerContextBundle.js";
 import {
   createWorkItemService,
   type ResolvedWorkItemProjectContext,
@@ -71,10 +71,10 @@ export interface PrepareNexusManualWorktreeOptions {
   branchName?: string;
   worktreeName?: string;
   baseRef?: string | null;
-  initiativeId?: string | null;
-  initiativeSlice?: string | null;
-  initiativeParentBranch?: string | null;
-  initiativeStackPosition?: number | null;
+  featureId?: string | null;
+  featureChange?: string | null;
+  featureParentBranch?: string | null;
+  featureStackPosition?: number | null;
   branchIntent?: string | null;
   topic?: string | null;
   workItemId?: string | null;
@@ -133,7 +133,7 @@ export interface NexusPreparedWorktreeSummary {
     baseRef: string | null;
     workItem: PrepareGitWorktreeResult["workItem"];
     gitIdentity: PrepareGitWorktreeResult["gitIdentity"];
-    initiativeDelivery: NexusWorkerContextInitiativeDelivery | null;
+    featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null;
     gitCommandCount: number;
   };
   lease: {
@@ -202,10 +202,10 @@ export interface ResolvedNexusManualWorktreeWorkItem {
   workItem?: WorkItem | null;
 }
 
-interface ResolvedManualWorktreeInitiativeDelivery {
+interface ResolvedManualWorktreeFeatureDelivery {
   branchName: string;
   baseRef: string;
-  context: NexusWorkerContextInitiativeDelivery;
+  context: NexusWorkerContextFeatureBranchDelivery;
 }
 
 export async function resolveNexusManualWorktreeWorkItem(options: {
@@ -301,25 +301,25 @@ export function prepareNexusManualWorktree(
     },
     options.now,
   );
-  const initiativeDelivery = !projectMeta && options.initiativeId
-    ? resolveManualWorktreeInitiativeDelivery({
+  const featureBranchDelivery = !projectMeta && options.featureId
+    ? resolveManualWorktreeFeatureDelivery({
         projectRoot,
         componentId: target.ownerId,
-        initiativeId: options.initiativeId,
-        sliceSlug: options.initiativeSlice ?? slug,
-        parentBranch: options.initiativeParentBranch,
-        stackPosition: options.initiativeStackPosition,
+        featureId: options.featureId,
+        changeSlug: options.featureChange ?? slug,
+        parentBranch: options.featureParentBranch,
+        stackPosition: options.featureStackPosition,
         branchIntent: options.branchIntent,
       })
     : null;
   const branchName =
     options.branchName ??
-    initiativeDelivery?.branchName ??
+    featureBranchDelivery?.branchName ??
     `codex/${safeDirectoryName(target.ownerId)}/${slug}`;
   const baseRef =
     options.baseRef !== undefined
       ? options.baseRef ?? null
-      : initiativeDelivery?.baseRef ?? target.defaultBaseRef;
+      : featureBranchDelivery?.baseRef ?? target.defaultBaseRef;
   const automationConfig = projectConfig.automation ?? defaultNexusAutomationConfig;
   const publication = target.component
     ? resolveNexusPublicationPolicy(projectConfig, target.component)
@@ -411,7 +411,7 @@ export function prepareNexusManualWorktree(
         baseRef: worktree.baseRef,
         workItem: contextWorkItem,
       },
-      initiativeDelivery: initiativeDelivery?.context ?? null,
+      featureBranchDelivery: featureBranchDelivery?.context ?? null,
       agentTargetPolicy: agentTargetSelection.policy,
       pluginFragments: projectPluginWorkerFragments(projectConfig, {
         componentId: target.ownerId,
@@ -519,7 +519,7 @@ export function summarizeNexusManualWorktreeResult(
       baseRef: result.worktree.baseRef,
       workItem: result.worktree.workItem,
       gitIdentity: result.worktree.gitIdentity,
-      initiativeDelivery: result.setup.context?.context.initiativeDelivery ?? null,
+      featureBranchDelivery: result.setup.context?.context.featureBranchDelivery ?? null,
       gitCommandCount: result.worktree.git.commands.length,
     },
     lease: {
@@ -608,54 +608,54 @@ function preparedGitIdentity(
   };
 }
 
-function resolveManualWorktreeInitiativeDelivery(options: {
+function resolveManualWorktreeFeatureDelivery(options: {
   projectRoot: string;
   componentId: string;
-  initiativeId: string;
-  sliceSlug: string;
+  featureId: string;
+  changeSlug: string;
   parentBranch?: string | null;
   stackPosition?: number | null;
   branchIntent?: string | null;
-}): ResolvedManualWorktreeInitiativeDelivery {
-  const plan = buildNexusInitiativeDeliveryPlan({
+}): ResolvedManualWorktreeFeatureDelivery {
+  const plan = buildNexusFeatureBranchDeliveryPlan({
     projectRoot: options.projectRoot,
     componentId: options.componentId,
-    initiativeId: options.initiativeId,
+    featureId: options.featureId,
   });
   const item = plan.items[0];
   if (!item) {
     throw new Error(
-      `Initiative delivery policy was not found for ${options.initiativeId}`,
+      `Feature branch delivery policy was not found for ${options.featureId}`,
     );
   }
-  const initiative = item.initiative;
-  const intent = options.branchIntent ?? initiative.defaultIntentPrefix;
-  if (!initiative.allowedIntentPrefixes.includes(intent)) {
+  const feature = item.feature;
+  const intent = options.branchIntent ?? feature.defaultIntentPrefix;
+  if (!feature.allowedIntentPrefixes.includes(intent)) {
     throw new Error(
-      `Initiative branch intent ${intent} is not allowed for ${initiative.activeScopeId}`,
+      `Feature branch intent ${intent} is not allowed for ${feature.activeScopeId}`,
     );
   }
-  const sliceSlug = branchSlugFor(options.sliceSlug);
-  const sliceBranchPattern = patternWithIntent(
-    initiative.branchPlan.sliceBranchPattern,
-    initiative.defaultIntentPrefix,
+  const changeSlug = branchSlugFor(options.changeSlug);
+  const reviewBranchPattern = patternWithIntent(
+    feature.branchPlan.reviewBranchPattern,
+    feature.defaultIntentPrefix,
     intent,
   );
-  const branchName = renderInitiativeBranchPattern(sliceBranchPattern, {
+  const branchName = renderFeatureBranchPattern(reviewBranchPattern, {
     intent,
-    initiative: initiative.branchSlug,
-    slice: sliceSlug,
+    feature: feature.branchSlug,
+    change: changeSlug,
   });
-  const stack = initiative.branchPlan.stack;
+  const stack = feature.branchPlan.stack;
   const parentBranch =
     options.parentBranch?.trim() ||
     (stack.status === "active" ? stack.defaultParentBranch : null);
   const stackPosition = options.stackPosition ??
     (stack.status === "active" ? 1 : null);
-  const branchTarget = parentBranch ?? initiative.branchPlan.defaultSliceReviewTarget;
+  const branchTarget = parentBranch ?? feature.branchPlan.defaultChangeReviewTarget;
   const hitlGates = [
-    ...(initiative.branchPlan.requiresIntegrationBranchApproval
-      ? ["integration branch approval"]
+    ...(feature.branchPlan.requiresFeatureBranchApproval
+      ? ["feature branch approval"]
       : []),
     "pull request creation or retargeting",
     "force update or restack of a pushed branch",
@@ -664,22 +664,22 @@ function resolveManualWorktreeInitiativeDelivery(options: {
 
   return {
     branchName,
-    baseRef: parentBranch ?? initiative.branchPlan.defaultSliceBaseBranch,
+    baseRef: parentBranch ?? feature.branchPlan.defaultChangeBaseBranch,
     context: {
-      initiativeId: initiative.activeScopeId,
-      sliceSlug,
-      topology: initiative.defaultTopology,
-      integrationBranch: initiative.branchPlan.integrationBranch,
+      featureId: feature.activeScopeId,
+      changeSlug,
+      branchStrategy: feature.defaultBranchStrategy,
+      featureBranch: feature.branchPlan.featureBranch,
       branchTarget,
       parentBranch,
       stackPosition,
       childBranches: [],
       stackPublicationEligible: stack.publicationEligible,
-      finalPublicationTarget: initiative.branchPlan.finalPublicationTarget,
-      reviewMode: initiative.reviewMode,
-      finalPullRequestCreation: initiative.finalPullRequestCreation,
-      providerNoise: initiative.providerNoise,
-      branchPublication: initiative.branchPublication,
+      finalPublicationTarget: feature.branchPlan.finalPublicationTarget,
+      reviewMode: feature.reviewMode,
+      finalPullRequestCreation: feature.finalPullRequestCreation,
+      commentPolicy: feature.commentPolicy,
+      branchPublication: feature.branchPublication,
       hitlGates,
     },
   };

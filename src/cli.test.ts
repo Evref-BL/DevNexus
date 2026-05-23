@@ -7,8 +7,8 @@ import {
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
-  defaultNexusPublicationTrainCiTierPolicy,
+  defaultNexusFeatureBranchDeliveryConfig,
+  defaultNexusReleaseTrainCiTierPolicy,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
@@ -157,7 +157,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
   };
 }
 
-function publicationTrainLease(options: {
+function releaseTrainLease(options: {
   projectId: string;
   componentId: string;
   workItemId: string;
@@ -183,9 +183,9 @@ function publicationTrainLease(options: {
       kind: "component_worktree",
       base: "componentWorktreesRoot",
       componentId: options.componentId,
-      relativePath: "train-readiness",
+      relativePath: "release-train-readiness",
     },
-    writeScope: options.writeScope ?? ["src/nexusPublicationTrainReadiness.ts"],
+    writeScope: options.writeScope ?? ["src/nexusReleaseTrainReadiness.ts"],
     status: "ready",
     createdAt: "2026-05-21T10:00:00.000Z",
     lastSeenAt: "2026-05-21T10:00:00.000Z",
@@ -199,7 +199,7 @@ function publicationTrainLease(options: {
         kind: "component_worktree",
         base: "componentWorktreesRoot",
         componentId: options.componentId,
-        relativePath: "train-readiness",
+        relativePath: "release-train-readiness",
       },
       upstream: `origin/${options.branchName}`,
       ahead: 0,
@@ -1611,7 +1611,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1619,7 +1619,7 @@ describe("dev-nexus cli", () => {
             targetBranch: "main",
             greenMain: {
               integrationPreference: "pull_request",
-              integrationBranch: null,
+              featureBranch: null,
               directTargetPush: "blocked",
               mergeAuthority: "authorized_merge",
               requiredChecks: [
@@ -1742,8 +1742,8 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("prints publication train readiness in text and JSON", async () => {
-    const projectRoot = makeTempDir("dev-nexus-cli-train-readiness-");
+  it("prints release train readiness in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-release-train-readiness-");
     saveProjectConfig(
       projectRoot,
       projectConfig({
@@ -1763,7 +1763,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1804,11 +1804,11 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
-          branchName: "codex/train-readiness",
+          branchName: "codex/release-train-readiness",
         }),
       ],
     });
@@ -1834,7 +1834,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "train-readiness",
+        "release-train-readiness",
         projectRoot,
         "--evidence-file",
         evidenceFile,
@@ -1846,12 +1846,12 @@ describe("dev-nexus cli", () => {
     );
 
     expect(textOutput.output()).toContain(
-      "DevNexus publication train readiness.",
+      "DevNexus release train readiness.",
     );
     expect(textOutput.output()).toContain("Next action: create_candidate_branch");
     expect(textOutput.output()).toContain("Version 0.2.0: 1 branch(es), 1 eligible");
     expect(textOutput.output()).toContain(
-      "primary github-120 codex/train-readiness -> eligible",
+      "primary github-120 codex/release-train-readiness -> eligible",
     );
     expect(textOutput.output()).toContain(
       "next=candidate_matrix evidence=success",
@@ -1861,7 +1861,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "train-readiness",
+        "release-train-readiness",
         projectRoot,
         "--full-matrix-budget-exhausted",
         "--json",
@@ -1922,7 +1922,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1970,14 +1970,14 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-120",
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
-          branchName: "codex/train-readiness",
+          branchName: "codex/release-train-readiness",
         }),
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-121",
           projectId: "demo-project",
           componentId: "primary",
@@ -4961,7 +4961,7 @@ describe("dev-nexus cli", () => {
         "--intent",
         "choice",
         "--question",
-        "Which provider target shape should this slice use?",
+        "Which provider target shape should this change use?",
         "--target",
         "gitlab-mr:7",
         "--response-status",
@@ -7006,7 +7006,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7014,15 +7014,15 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
+            featureBranchDelivery: {
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
               branchNaming: {
                 defaultIntentPrefix: "feat",
               },
             },
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
             selector: {
               statuses: ["ready"],
             },
@@ -7106,13 +7106,13 @@ describe("dev-nexus cli", () => {
     });
 
     expect(textOutput.output()).toContain(
-      "Publication trains: 1 configured, 1 enabled.",
+      "Release trains: 1 configured, 1 enabled.",
     );
     expect(textOutput.output()).toContain(
       "primary: active=v-next candidate=candidate/v-next integration=integration/v-next tier=remote_smoke",
     );
     expect(textOutput.output()).toContain(
-      "Initiative delivery: topology=hybrid active=codex-goals integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+      "Feature branch delivery: branchStrategy=hybrid active=codex-goals feature=feat/codex-goals changes=feat/codex-goals/{change}",
     );
     expect(textOutput.output()).toContain("Selector labels: none");
     expect(textOutput.output()).toContain("Version planning: 1 shown");
@@ -7142,18 +7142,18 @@ describe("dev-nexus cli", () => {
         componentProgress: [
           {
             componentId: "primary",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
               activeVersionId: "v-next",
               candidateBranch: "candidate/v-next",
               integrationBranch: "integration/v-next",
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 activeScopeId: "codex-goals",
-                topology: "hybrid",
-                integrationBranch: "feat/codex-goals",
-                sliceBranchPattern: "feat/codex-goals/{slice}",
+                branchStrategy: "hybrid",
+                featureBranch: "feat/codex-goals",
+                reviewBranchPattern: "feat/codex-goals/{change}",
                 finalPublicationTarget: "main",
-                providerNoise: "status_only",
+                commentPolicy: "status_only",
               },
               ciTierDefault: "remote_smoke",
               selectorLabels: [],
@@ -7165,7 +7165,7 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("prints read-only initiative delivery plans", async () => {
+  it("prints read-only feature branch delivery plans", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const baseConfig = projectConfig();
@@ -7177,7 +7177,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7185,11 +7185,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],
@@ -7202,7 +7202,7 @@ describe("dev-nexus cli", () => {
     const jsonOutput = captureOutput();
 
     await main(
-      ["publication", "initiative-plan", projectRoot, "--component", "primary"],
+      ["publication", "feature-plan", projectRoot, "--component", "primary"],
       {
         stdout: textOutput.writer,
       },
@@ -7210,7 +7210,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-plan",
+        "feature-plan",
         projectRoot,
         "--component",
         "primary",
@@ -7221,12 +7221,12 @@ describe("dev-nexus cli", () => {
       },
     );
 
-    expect(textOutput.output()).toContain("DevNexus initiative delivery plan.");
+    expect(textOutput.output()).toContain("DevNexus feature branch delivery plan.");
     expect(textOutput.output()).toContain(
-      "primary: active=codex-goals topology=hybrid",
+      "primary: active=codex-goals branchStrategy=hybrid",
     );
     expect(textOutput.output()).toContain(
-      "integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+      "feature=feat/codex-goals changes=feat/codex-goals/{change}",
     );
     expect(JSON.parse(jsonOutput.output())).toMatchObject({
       ok: true,
@@ -7236,12 +7236,12 @@ describe("dev-nexus cli", () => {
         items: [
           {
             componentId: "primary",
-            initiative: {
+            feature: {
               activeScopeId: "codex-goals",
-              defaultTopology: "hybrid",
+              defaultBranchStrategy: "hybrid",
               branchPlan: {
-                integrationBranch: "feat/codex-goals",
-                sliceBranchPattern: "feat/codex-goals/{slice}",
+                featureBranch: "feat/codex-goals",
+                reviewBranchPattern: "feat/codex-goals/{change}",
                 finalPublicationTarget: "main",
               },
             },
@@ -7251,7 +7251,7 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("prints read-only initiative delivery reports", async () => {
+  it("prints read-only feature branch delivery reports", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const baseConfig = projectConfig();
@@ -7263,7 +7263,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7271,11 +7271,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],
@@ -7284,7 +7284,7 @@ describe("dev-nexus cli", () => {
         },
       },
     });
-    const evidenceFile = path.join(projectRoot, "initiative-evidence.json");
+    const evidenceFile = path.join(projectRoot, "feature-evidence.json");
     fs.writeFileSync(
       evidenceFile,
       JSON.stringify({
@@ -7321,7 +7321,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-report",
+        "feature-report",
         projectRoot,
         "--component",
         "primary",
@@ -7336,7 +7336,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-report",
+        "feature-report",
         projectRoot,
         "--component",
         "primary",
@@ -7352,7 +7352,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-finalization",
+        "feature-finalization",
         projectRoot,
         "--component",
         "primary",
@@ -7367,7 +7367,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-finalization",
+        "feature-finalization",
         projectRoot,
         "--component",
         "primary",
@@ -7383,7 +7383,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-finalization",
+        "feature-finalization",
         projectRoot,
         "--component",
         "primary",
@@ -7394,10 +7394,10 @@ describe("dev-nexus cli", () => {
       },
     );
 
-    expect(textOutput.output()).toContain("DevNexus initiative delivery report.");
+    expect(textOutput.output()).toContain("DevNexus feature branch delivery report.");
     expect(textOutput.output()).toContain("Next action: request_review");
     expect(textOutput.output()).toContain(
-      "primary: active=codex-goals topology=hybrid -> review_needed",
+      "primary: active=codex-goals branchStrategy=hybrid -> review_needed",
     );
     expect(textOutput.output()).toContain(
       "checks=success review=waiting_for_approval merge=mergeable base=current policy=clear",
@@ -7428,7 +7428,7 @@ describe("dev-nexus cli", () => {
       },
     });
     expect(finalizationTextOutput.output()).toContain(
-      "DevNexus initiative finalization plan.",
+      "DevNexus feature finalization plan.",
     );
     expect(finalizationTextOutput.output()).toContain(
       "primary: active=codex-goals review=ready_for_review publication=needs_review",
@@ -7467,7 +7467,7 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("prints initiative branch update decision reasons in text and JSON", async () => {
+  it("prints feature branch update decision reasons in text and JSON", async () => {
     const projectRoot = makeTempDir("dev-nexus-cli-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const baseConfig = projectConfig();
@@ -7479,7 +7479,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7487,11 +7487,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],
@@ -7500,7 +7500,7 @@ describe("dev-nexus cli", () => {
         },
       },
     });
-    const evidenceFile = path.join(projectRoot, "initiative-evidence.json");
+    const evidenceFile = path.join(projectRoot, "feature-evidence.json");
     fs.writeFileSync(
       evidenceFile,
       JSON.stringify({
@@ -7534,7 +7534,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-report",
+        "feature-report",
         projectRoot,
         "--component",
         "primary",
@@ -7546,7 +7546,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "initiative-report",
+        "feature-report",
         projectRoot,
         "--component",
         "primary",

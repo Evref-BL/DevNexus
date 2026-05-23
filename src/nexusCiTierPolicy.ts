@@ -169,7 +169,7 @@ export const defaultNexusCiTierPolicy: NexusCiTierPolicyConfig = {
   },
 };
 
-export const defaultNexusPublicationTrainCiTierPolicy:
+export const defaultNexusReleaseTrainCiTierPolicy:
   NexusCiTierPolicyConfig = {
     ...defaultNexusCiTierPolicy,
     defaultTier: "remote_smoke",

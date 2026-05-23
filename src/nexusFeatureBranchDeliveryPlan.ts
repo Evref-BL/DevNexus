@@ -1,6 +1,6 @@
 import {
-  type NexusInitiativeDeliveryPolicySummary,
-} from "./nexusInitiativeDeliveryPolicy.js";
+  type NexusFeatureBranchDeliveryPolicySummary,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
 import {
   loadProjectConfig,
   type NexusProjectConfig,
@@ -10,18 +10,18 @@ import {
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import {
-  summarizeNexusPublicationTrainPolicy,
-} from "./nexusPublicationTrainPolicy.js";
+  summarizeNexusReleaseTrainPolicy,
+} from "./nexusReleaseTrainPolicy.js";
 
-export interface NexusInitiativeDeliveryPlanItem {
+export interface NexusFeatureBranchDeliveryPlanItem {
   componentId: string;
   componentName: string;
   targetBranch: string;
-  publicationTrainVersionId: string | null;
-  initiative: NexusInitiativeDeliveryPolicySummary;
+  releaseTrainVersionId: string | null;
+  feature: NexusFeatureBranchDeliveryPolicySummary;
 }
 
-export interface NexusInitiativeDeliveryPlan {
+export interface NexusFeatureBranchDeliveryPlan {
   version: 1;
   projectRoot: string;
   project: {
@@ -29,18 +29,18 @@ export interface NexusInitiativeDeliveryPlan {
     name: string;
   };
   componentId: string | null;
-  initiativeId: string | null;
+  featureId: string | null;
   itemCount: number;
-  items: NexusInitiativeDeliveryPlanItem[];
+  items: NexusFeatureBranchDeliveryPlanItem[];
   warnings: string[];
   mutatesSource: false;
 }
 
-export function buildNexusInitiativeDeliveryPlan(options: {
+export function buildNexusFeatureBranchDeliveryPlan(options: {
   projectRoot: string;
   componentId?: string;
-  initiativeId?: string | null;
-}): NexusInitiativeDeliveryPlan {
+  featureId?: string | null;
+}): NexusFeatureBranchDeliveryPlan {
   const projectConfig = loadProjectConfig(options.projectRoot);
   const components = selectedComponents({
     projectRoot: options.projectRoot,
@@ -49,20 +49,20 @@ export function buildNexusInitiativeDeliveryPlan(options: {
   });
   const warnings: string[] = [];
   const items = components.flatMap((component) => {
-    const train = summarizeNexusPublicationTrainPolicy({
+    const train = summarizeNexusReleaseTrainPolicy({
       projectConfig,
       component,
     });
-    if (!train?.initiativeDelivery) {
+    if (!train?.featureBranchDelivery) {
       warnings.push(
-        `component ${component.id} has no initiative delivery policy configured`,
+        `component ${component.id} has no feature branch delivery policy configured`,
       );
       return [];
     }
     if (
-      options.initiativeId &&
-      train.initiativeDelivery.activeScopeId !== options.initiativeId &&
-      train.initiativeDelivery.activeInitiativeId !== options.initiativeId
+      options.featureId &&
+      train.featureBranchDelivery.activeScopeId !== options.featureId &&
+      train.featureBranchDelivery.activeFeatureId !== options.featureId
     ) {
       return [];
     }
@@ -70,12 +70,12 @@ export function buildNexusInitiativeDeliveryPlan(options: {
       componentId: component.id,
       componentName: component.name,
       targetBranch: train.targetBranch,
-      publicationTrainVersionId: train.activeVersionId,
-      initiative: train.initiativeDelivery,
+      releaseTrainVersionId: train.activeVersionId,
+      feature: train.featureBranchDelivery,
     }];
   });
-  if (items.length === 0 && options.initiativeId) {
-    warnings.push(`initiative delivery policy was not found: ${options.initiativeId}`);
+  if (items.length === 0 && options.featureId) {
+    warnings.push(`feature branch delivery policy was not found: ${options.featureId}`);
   }
 
   return {
@@ -86,7 +86,7 @@ export function buildNexusInitiativeDeliveryPlan(options: {
       name: projectConfig.name,
     },
     componentId: options.componentId ?? null,
-    initiativeId: options.initiativeId ?? null,
+    featureId: options.featureId ?? null,
     itemCount: items.length,
     items,
     warnings,

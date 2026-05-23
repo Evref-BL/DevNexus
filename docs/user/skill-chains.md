@@ -9,19 +9,20 @@ background documentation.
 
 Some skills are frames rather than phases: `dev-nexus` provides workspace
 infrastructure, `take-the-lead` changes the collaboration contract while the
-user keeps decision authority, and `initiative-workflow` holds a durable
-objective, delivery topology, and integration surface across slices.
+user keeps decision authority, and `feature-workflow` keeps a long-running
+feature, bugfix, release, research project, or docs rewrite together across
+reviewable changes.
 
 Use the sizing vocabulary in [Concepts](concepts.md#work-sizing-terms) when a
-chain needs to classify work. In this page, `slice` means an independently
-reviewable vertical increment, and `delivery topology` means the Git and review
-route used by slice branches.
+chain needs to classify work. In this page, `change` means an independently
+reviewable vertical increment, and `branch strategy` means the Git and review
+route used by review branches.
 
 ```mermaid
 flowchart LR
   DN["dev-nexus"] -. workspace .-> Chain["skill chain"]
   Lead["take-the-lead"] -. collaboration .-> Chain
-  Initiative["initiative-workflow"] -. durable objective .-> Chain
+  Feature["feature-workflow"] -. long-running work .-> Chain
 ```
 
 The decision skills have distinct roles:
@@ -64,42 +65,42 @@ flowchart TD
   B -->|"no or overhead too high"| F["continue inline"]
 ```
 
-## Git Delivery Topologies
+## Git Branch Strategies
 
-For Git-backed initiatives, choose the delivery topology before
-`prepare-dev-nexus-worktree`. The topology tells agents how slice branches reach
-the integration surface; it is separate from the initiative objective and
-tracker anchor.
+For Git-backed features, choose the branch strategy before
+`prepare-dev-nexus-worktree`. The strategy tells agents how review branches
+reach the base branch or feature branch; it is separate from the feature
+objective and tracker anchor.
 
-Use the smallest topology that preserves reviewability:
+Use the smallest strategy that preserves reviewability:
 
-- Direct slice topology: short-lived slice branches or pull requests target the
-  final integration branch. This is the default when slices can land
+- Direct branch strategy: short-lived review branches or pull requests target
+  the final target branch. This is the default when changes can land
   independently.
-- Stacked slice topology: dependent slice branches target the branch below them
-  and land bottom-up or retarget as dependencies land.
-- Initiative integration branch topology: slice branches target one approved
-  long-lived initiative branch. Use it only after human-in-the-loop (HITL)
-  approval when partial publication would be incoherent or unsafe.
-- Throw-away integration branch topology: ready branches meet temporarily for
+- Stacked branch strategy: dependent review branches target the branch below
+  them and land bottom-up or retarget as dependencies land.
+- Feature branch strategy: review branches target one approved long-lived
+  feature branch. Use it only after human-in-the-loop (HITL) approval when
+  partial publication would be incoherent or unsafe.
+- Temporary integration branch strategy: ready branches meet temporarily for
   compatibility rehearsal. Do not base new work on that branch.
-- Release or version topology: follow the workspace release policy instead of
+- Release train strategy: follow the workspace release policy instead of
   treating a release train as automatic permission to batch unrelated work.
 
 ```mermaid
 flowchart TD
-  A{"Git-backed initiative?"}
-  A -->|"no"| Artifact["choose artifact or tracker surface"]
-  A -->|"yes"| B{"Can slices land independently?"}
-  B -->|"yes"| Direct["direct slice topology"]
-  B -->|"dependent sequence"| Stacked["stacked slice topology"]
+  A{"Git-backed feature?"}
+  A -->|"no"| Artifact["choose artifact or tracker path"]
+  A -->|"yes"| B{"Can changes land independently?"}
+  B -->|"yes"| Direct["direct branch strategy"]
+  B -->|"dependent sequence"| Stacked["stacked branch strategy"]
   B -->|"partial state unsafe"| Approval["HITL approval"]
-  Approval --> Initiative["initiative integration branch topology"]
-  B -->|"compatibility rehearsal"| Throwaway["throw-away integration branch topology"]
+  Approval --> Feature["feature branch strategy"]
+  B -->|"compatibility rehearsal"| Temporary["temporary integration branch strategy"]
   Direct --> Worktree["prepare-dev-nexus-worktree"]
   Stacked --> Worktree
-  Initiative --> Worktree
-  Throwaway --> Verify["verify integration only"]
+  Feature --> Worktree
+  Temporary --> Verify["verify integration only"]
 ```
 
 ## Feature Implementation
@@ -115,7 +116,7 @@ flowchart TD
   C --> D{"Needs challenge?"}
   D -->|"general plan"| E["grill-me"]
   D -->|"docs, ADRs, or code reality"| F["grill-with-docs"]
-  D -->|"no"| T["select delivery topology"]
+  D -->|"no"| T["select branch strategy"]
   E --> T
   F --> T
   T --> G["write-implementation-plan"]
@@ -164,7 +165,7 @@ flowchart TD
   C -->|"no"| F["architecture-deepening"]
   D --> F
   E --> F
-  F --> T["select delivery topology"]
+  F --> T["select branch strategy"]
   T --> G["write-implementation-plan"]
   G --> H["prepare-dev-nexus-worktree"]
   H --> I["tdd"]
@@ -200,14 +201,14 @@ flowchart TD
 
 ## Plan To Published Version
 
-Use this chain when a version, release train, or broad initiative needs to move
-from planning through multiple slices to a publishable result. The per-slice
+Use this chain when a version, release train, or broad feature needs to move
+from planning through multiple changes to a publishable result. The per-change
 section expands each mode into separate skill nodes instead of hiding multiple
 skills in one box.
 
 ```mermaid
 flowchart TD
-  A["initiative-workflow"] --> B["zoom-out"]
+  A["feature-workflow"] --> B["zoom-out"]
   B --> C["design-with-user"]
   C --> D{"Needs challenge?"}
   D -->|"general plan"| E["grill-me"]
@@ -216,16 +217,16 @@ flowchart TD
   E --> G
   F --> G
   G --> H["to-issues"]
-  H --> T["select delivery topology"]
+  H --> T["select branch strategy"]
   T --> I["write-implementation-plan"]
-  I --> J{"Independent slices?"}
+  I --> J{"Independent changes?"}
   J -->|"yes"| K["parallel-work-dispatch"]
-  J -->|"no"| L["execute-initiative-plan"]
+  J -->|"no"| L["execute-feature-plan"]
   K --> S0
   L --> S0
 
-  subgraph Slice["repeat for each version slice"]
-    S0["prepare-dev-nexus-worktree"] --> S1{"Slice mode"}
+  subgraph Change["repeat for each version change"]
+    S0["prepare-dev-nexus-worktree"] --> S1{"Change type"}
     S1 -->|"feature"| S2["tdd"]
     S1 -->|"bugfix"| S3["diagnose"]
     S3 --> S4["tdd"]

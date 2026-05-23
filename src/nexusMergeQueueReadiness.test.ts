@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
-import { defaultNexusPublicationTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
+import { defaultNexusReleaseTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
 import {
   buildNexusMergeQueueReadinessReport,
   type NexusMergeQueueWorkflowTriggerInput,
@@ -326,7 +326,7 @@ function projectConfig(
       ...defaultNexusAutomationConfig,
       verification: {
         ...defaultNexusAutomationConfig.verification,
-        ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+        ciTiers: defaultNexusReleaseTrainCiTierPolicy,
       },
       publication: {
         ...defaultNexusAutomationConfig.publication,

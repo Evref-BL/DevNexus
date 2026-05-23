@@ -1,8 +1,8 @@
 # Agent-client plugin compatibility
 
 This note records the implementation assumptions for DevNexus agent-client
-plugins. It supports the Codex and Claude adapter initiative tracked by
-Evref-BL/DevNexus#183 and the compatibility-matrix slice tracked by
+plugins. It supports the Codex and Claude adapter feature tracked by
+Evref-BL/DevNexus#183 and the compatibility-matrix change tracked by
 Evref-BL/DevNexus#207.
 
 The product direction is stable: DevNexus stays the external runtime, npm
@@ -149,7 +149,7 @@ DevNexus safely.
   provider operations.
 - Keep plugin-local installation optional. Claude has a documented data
   directory; Codex plugin-local dependency persistence is still unknown for this
-  initiative until a prototype confirms it.
+  feature until a prototype confirms it.
 - Keep domain plugins separate. DevNexus-TypeScript, DevNexus-Pharo, and
   DevNexus-Research should continue to declare DevNexus plugin capabilities,
   while agent-client adapters expose DevNexus itself to Codex or Claude.

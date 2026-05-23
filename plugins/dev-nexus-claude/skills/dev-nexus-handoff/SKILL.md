@@ -5,7 +5,7 @@ description: Record DevNexus progress, verification, blockers, branches, commits
 
 # DevNexus Handoff
 
-Use this skill when Claude Code is pausing, finishing a slice, requesting
+Use this skill when Claude Code is pausing, finishing a change, requesting
 review, or leaving progress for another agent or human.
 
 ## Workflow
