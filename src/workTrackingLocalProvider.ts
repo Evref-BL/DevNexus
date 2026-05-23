@@ -30,6 +30,7 @@ import type {
   WorkStatusQuery,
   WorkTrackerProvider,
 } from "./workTrackingTypes.js";
+import { temporaryStoreNonce } from "./nexusSecureRandom.js";
 
 export const localWorkTrackingDirectoryName = ".dev-nexus";
 export const localWorkTrackingStoreFileName = "work-items.json";
@@ -522,10 +523,7 @@ function localWorkTrackingStoreLockPath(storePath: string): string {
 function temporaryStorePath(storePath: string): string {
   const directory = path.dirname(storePath);
   const basename = path.basename(storePath);
-  const nonce = `${process.pid}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`;
-  return path.join(directory, `.${basename}.${nonce}.tmp`);
+  return path.join(directory, `.${basename}.${temporaryStoreNonce()}.tmp`);
 }
 
 function writeTextFileSync(filePath: string, content: string): void {

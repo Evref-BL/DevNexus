@@ -47,6 +47,7 @@ import {
   resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
 } from "./nexusPublicationPolicy.js";
+import { secureRandomIdSuffix } from "./nexusSecureRandom.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
 import {
   loadProjectConfig,
@@ -1284,7 +1285,7 @@ export function generateNexusAutomationAgentRunId(
     .replaceAll("-", "")
     .replaceAll(":", "")
     .replace(".", "-");
-  const suffix = Math.random().toString(36).slice(2, 8);
+  const suffix = secureRandomIdSuffix();
 
   return `agent-${timestamp}-${suffix}`;
 }

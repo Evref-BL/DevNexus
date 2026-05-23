@@ -43,6 +43,7 @@ import {
   resolveNexusPublicationPolicy,
   type NexusPublicationActorRunner,
 } from "./nexusPublicationPolicy.js";
+import { secureRandomIdSuffix } from "./nexusSecureRandom.js";
 import {
   resolvePrimaryProjectComponent,
   resolveProjectComponents,
@@ -776,7 +777,7 @@ export function generateNexusAutomationRunId(
     .replaceAll("-", "")
     .replaceAll(":", "")
     .replace(".", "-");
-  const suffix = Math.random().toString(36).slice(2, 8);
+  const suffix = secureRandomIdSuffix();
 
   return `run-${timestamp}-${suffix}`;
 }

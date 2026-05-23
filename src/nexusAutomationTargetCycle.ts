@@ -5,6 +5,7 @@ import {
   normalizeNexusAuthorityProjectSummary,
   type NexusAuthorityProjectSummary,
 } from "./nexusAuthority.js";
+import { secureRandomIdSuffix } from "./nexusSecureRandom.js";
 import type { WorkStatus } from "./workTrackingTypes.js";
 
 export const maxNexusAutomationTargetCycleNoteLength = 1000;
@@ -315,7 +316,7 @@ export function generateNexusAutomationTargetCycleId(
     .replaceAll("-", "")
     .replaceAll(":", "")
     .replace(".", "-");
-  const suffix = Math.random().toString(36).slice(2, 8);
+  const suffix = secureRandomIdSuffix();
 
   return `target-cycle-${timestamp}-${suffix}`;
 }

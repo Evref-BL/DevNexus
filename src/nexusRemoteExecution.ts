@@ -10,6 +10,7 @@ import {
   type ResolvedNexusProjectComponent,
 } from "./nexusProjectLifecycle.js";
 import type { NexusRunnerMutationClass } from "./nexusRunnerProfile.js";
+import { temporaryStoreNonce } from "./nexusSecureRandom.js";
 
 export const nexusRemoteExecutionRequestKind =
   "dev-nexus.remote-execution.request";
@@ -990,10 +991,7 @@ function assertRecord(value: unknown, pathName: string): Record<string, unknown>
 function temporaryStorePath(storePath: string): string {
   const directory = path.dirname(storePath);
   const basename = path.basename(storePath);
-  const nonce = `${process.pid}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`;
-  return path.join(directory, `.${basename}.${nonce}.tmp`);
+  return path.join(directory, `.${basename}.${temporaryStoreNonce()}.tmp`);
 }
 
 function errorDetail(error: unknown): string {
