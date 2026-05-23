@@ -283,16 +283,11 @@ export class NexusMemoryWorkItemClaimAuthority
     now: Date;
   }): Promise<NexusWorkItemClaimAuthorityVerifyResult> {
     const claim = this.claims.get(serializedClaimAuthorityKey(options.key));
-    const result = verifyCurrentClaim({
+    return verifyCurrentClaim({
       claim,
       leaseToken: options.leaseToken,
       now: options.now,
     });
-    if (result.status === "verified") {
-      return result;
-    }
-
-    return result;
   }
 
   async heartbeatClaim(options: {
