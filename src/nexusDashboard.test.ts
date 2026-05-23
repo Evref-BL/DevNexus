@@ -1115,7 +1115,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("host-action-queue");
     expect(module).toContain("dn-host-action-shell");
     expect(module).toContain("host-workspaces");
-    expect(module).toContain("dn-host-sticky-panel");
+    expect(module).not.toContain("dn-host-sticky-panel");
     expect(module).toContain("data-workspace-id");
     expect(module).toContain("data-workspace-selection-id");
     expect(module).toContain("targetSelectionId");
@@ -1639,6 +1639,53 @@ describe("nexus dashboard", () => {
     expect(html).not.toContain("dn-header-path-row");
     expect(html.indexOf("dn-header-path-value")).toBeLessThan(
       html.indexOf("data-open-target=\"home\""),
+    );
+  });
+
+  it("keeps host workspaces above the action queue like project pages", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+
+    const html = hooks.renderHostDashboard({
+      version: 1,
+      generatedAt: "2026-05-23T08:15:00.000Z",
+      hostId: "Mac.lan",
+      homePath: "/Users/gabriel.darbord/.dev-nexus",
+      workspaceCount: 1,
+      needsAttentionCount: 1,
+      partial: false,
+      actionQueue: [],
+      workspaces: [
+        {
+          id: "dev-nexus-dogfood",
+          name: "DevNexus Dogfood",
+          root: "/Users/gabriel.darbord/dev-nexus/dev-nexus-dogfood",
+          registered: true,
+          current: true,
+          loading: false,
+          tone: "danger",
+          summary: "Workspace needs attention.",
+          componentCount: 5,
+          needsDecisionCount: 1,
+          threadCount: 2,
+          pluginCount: 1,
+          blockerCount: 1,
+          automationStatus: "blocked",
+          dirtyComponentCount: 0,
+          eligibleWorkCount: 0,
+        },
+      ],
+    }, "dark");
+
+    expect(html).toContain('id="host-workspaces"');
+    expect(html).toContain('aria-label="Host signals"');
+    expect(html).toContain('id="host-action-queue"');
+    expect(html).not.toContain("dn-host-main-grid");
+    expect(html).not.toContain("dn-host-sticky-panel");
+    expect(html.indexOf('id="host-workspaces"')).toBeLessThan(
+      html.indexOf('aria-label="Host signals"'),
+    );
+    expect(html.indexOf('aria-label="Host signals"')).toBeLessThan(
+      html.indexOf('id="host-action-queue"'),
     );
   });
 
