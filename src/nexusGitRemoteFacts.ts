@@ -23,30 +23,54 @@ export function parseNexusGitRemoteFacts(text: string): NexusGitRemoteFacts {
   let currentRemote: string | null = null;
 
   for (const line of text.split(/\r?\n/u)) {
-    const section = /^\s*\[remote\s+"([^"]+)"\]\s*$/u.exec(line);
-    if (section) {
-      currentRemote = section[1]!.trim() || null;
+    const trimmed = line.trim();
+    const section = gitRemoteSectionName(trimmed);
+    if (section !== undefined) {
+      currentRemote = section || null;
       continue;
     }
-    if (/^\s*\[/u.test(line)) {
+    if (trimmed.startsWith("[")) {
       currentRemote = null;
       continue;
     }
     if (!currentRemote) {
       continue;
     }
-    const url = /^\s*url\s*=\s*(.+?)\s*$/u.exec(line);
-    if (url) {
-      urls[currentRemote] = url[1]!.trim();
+    const assignment = gitConfigAssignment(trimmed);
+    if (assignment?.key === "url") {
+      urls[currentRemote] = assignment.value;
       continue;
     }
-    const pushUrl = /^\s*pushurl\s*=\s*(.+?)\s*$/u.exec(line);
-    if (pushUrl) {
-      pushUrls[currentRemote] = pushUrl[1]!.trim();
+    if (assignment?.key === "pushurl") {
+      pushUrls[currentRemote] = assignment.value;
     }
   }
 
   return { urls, pushUrls };
+}
+
+function gitRemoteSectionName(line: string): string | undefined {
+  const prefix = '[remote "';
+  const suffix = '"]';
+  if (!line.startsWith(prefix) || !line.endsWith(suffix)) {
+    return undefined;
+  }
+
+  return line.slice(prefix.length, line.length - suffix.length).trim();
+}
+
+function gitConfigAssignment(
+  line: string,
+): { key: string; value: string } | null {
+  const separator = line.indexOf("=");
+  if (separator < 0) {
+    return null;
+  }
+
+  return {
+    key: line.slice(0, separator).trim(),
+    value: line.slice(separator + 1).trim(),
+  };
 }
 
 function gitConfigPath(repositoryPath: string): string | null {
@@ -59,11 +83,21 @@ function gitConfigPath(repositoryPath: string): string | null {
     return null;
   }
 
-  const match = /^gitdir:\s*(.+?)\s*$/u.exec(fs.readFileSync(gitPath, "utf8"));
-  if (!match) {
+  const gitDir = gitDirFromFileContent(fs.readFileSync(gitPath, "utf8"));
+  if (!gitDir) {
     return null;
   }
-  const gitDir = path.resolve(repositoryPath, match[1]!);
-  const configPath = path.join(gitDir, "config");
+  const configPath = path.join(path.resolve(repositoryPath, gitDir), "config");
   return fs.existsSync(configPath) ? configPath : null;
+}
+
+function gitDirFromFileContent(text: string): string | null {
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("gitdir:")) {
+      return trimmed.slice("gitdir:".length).trim() || null;
+    }
+  }
+
+  return null;
 }
