@@ -186,7 +186,7 @@ still run from the component checkout root.
 
 Worktree-first coordination is an operating expectation for mutating
 interactive chats. Shared checkouts and stable component source roots remain
-useful as read-mostly status, setup, and integration surfaces. Worker
+useful for read-mostly status, setup, and integration planning. Worker
 worktrees, integration branches, and rescue branches model where work happens
 and how it is preserved; they do not define who is allowed to push, merge,
 approve, mutate providers, or publish.
@@ -194,7 +194,7 @@ approve, mutate providers, or publish.
 Those permissions belong to the separate authority model tracked by
 `dev-nexus:local-87` through `dev-nexus:local-95`. Source changes for worktree
 coordination should consume the effective authority result instead of adding a
-second role system. Until those authority and guardrail slices are implemented,
+second role system. Until those authority and guardrail changes are implemented,
 documentation should describe the expected workflow without implying automatic
 enforcement.
 

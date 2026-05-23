@@ -1,19 +1,19 @@
 import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
 import type { NexusPublicationProviderBaseStatus } from "./nexusPublicationProviderEvidence.js";
 
-export type NexusInitiativeBranchUpdateDecisionStatus =
+export type NexusReviewBranchUpdateDecisionStatus =
   | "not_required"
   | "behind"
   | "diverged"
   | "unknown";
 
-export type NexusInitiativeBranchUpdateChoiceId =
+export type NexusReviewBranchUpdateChoiceId =
   | "merge_update"
   | "rebase"
   | "no_update";
 
-export interface NexusInitiativeBranchUpdateChoice {
-  id: NexusInitiativeBranchUpdateChoiceId;
+export interface NexusReviewBranchUpdateChoice {
+  id: NexusReviewBranchUpdateChoiceId;
   recommended: boolean;
   humanInTheLoop: boolean;
   forceWithLeaseRequired: boolean;
@@ -21,9 +21,9 @@ export interface NexusInitiativeBranchUpdateChoice {
   reasons: string[];
 }
 
-export interface NexusInitiativeBranchUpdateDecision {
-  status: NexusInitiativeBranchUpdateDecisionStatus;
-  recommendation: NexusInitiativeBranchUpdateChoiceId | "none";
+export interface NexusReviewBranchUpdateDecision {
+  status: NexusReviewBranchUpdateDecisionStatus;
+  recommendation: NexusReviewBranchUpdateChoiceId | "none";
   headBranch: string | null;
   baseBranch: string;
   pushRemote: string | null;
@@ -35,17 +35,17 @@ export interface NexusInitiativeBranchUpdateDecision {
   forceWithLeaseRequired: boolean;
   humanInTheLoop: boolean;
   reasons: string[];
-  choices: NexusInitiativeBranchUpdateChoice[];
+  choices: NexusReviewBranchUpdateChoice[];
 }
 
-export function buildNexusInitiativeBranchUpdateDecision(options: {
+export function buildNexusReviewBranchUpdateDecision(options: {
   baseStatus: NexusPublicationProviderBaseStatus | null;
   headBranch: string | null;
   baseBranch: string;
   pushRemote?: string | null;
   publicBranch?: boolean;
   stackedBranch?: boolean;
-}): NexusInitiativeBranchUpdateDecision {
+}): NexusReviewBranchUpdateDecision {
   const baseStatus = options.baseStatus;
   const pushRemote = clean(options.pushRemote) ?? null;
   const publicBranch = options.publicBranch ?? (

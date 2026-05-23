@@ -4,9 +4,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
-import { buildNexusInitiativeDeliveryReport } from "./nexusInitiativeDeliveryReport.js";
+import { buildNexusFeatureBranchDeliveryReport } from "./nexusFeatureBranchDeliveryReport.js";
 import {
   saveProjectConfig,
   type NexusProjectConfig,
@@ -26,13 +26,13 @@ afterEach(() => {
   }
 });
 
-describe("initiative delivery report", () => {
+describe("feature branch delivery report", () => {
   it("reports a delayed final pull request as a review-gate action", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+    const projectRoot = makeTempDir("dev-nexus-feature-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusInitiativeDeliveryReport({
+    const report = buildNexusFeatureBranchDeliveryReport({
       projectRoot,
       componentId: "primary",
     });
@@ -56,15 +56,15 @@ describe("initiative delivery report", () => {
     });
   });
 
-  it("flags initiative pull requests that are behind the base branch", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+  it("flags feature pull requests that are behind the base branch", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusInitiativeDeliveryReport({
+    const report = buildNexusFeatureBranchDeliveryReport({
       projectRoot,
       componentId: "primary",
-      initiativeId: "codex-goals",
+      featureId: "codex-goals",
       now: "2026-05-22T09:00:00.000Z",
       providerEvidence: [
         {
@@ -74,7 +74,7 @@ describe("initiative delivery report", () => {
             kind: "pull_request",
             number: 243,
             url: "https://github.com/Evref-BL/DevNexus/pull/243",
-            title: "Initiative delivery topology workflow",
+            title: "Feature branch branchStrategy workflow",
           },
           headBranch: "feat/codex-goals",
           headSha: "abc123",
@@ -95,7 +95,7 @@ describe("initiative delivery report", () => {
       version: 1,
       generatedAt: "2026-05-22T09:00:00.000Z",
       project: {
-        id: "initiative-report-demo",
+        id: "feature-report-demo",
       },
       summary: {
         itemCount: 1,
@@ -107,8 +107,8 @@ describe("initiative delivery report", () => {
       items: [
         {
           componentId: "primary",
-          initiativeId: "codex-goals",
-          integrationBranch: "feat/codex-goals",
+          featureId: "codex-goals",
+          featureBranch: "feat/codex-goals",
           finalPublicationTarget: "main",
           status: "needs_update",
           nextAction: "update_branch",
@@ -153,12 +153,12 @@ describe("initiative delivery report", () => {
     });
   });
 
-  it("reports ready initiative pull requests from green provider evidence", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+  it("reports ready feature pull requests from green provider evidence", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusInitiativeDeliveryReport({
+    const report = buildNexusFeatureBranchDeliveryReport({
       projectRoot,
       componentId: "primary",
       providerEvidence: [
@@ -198,11 +198,11 @@ describe("initiative delivery report", () => {
   });
 
   it("treats draft final pull requests as review-needed before publication policy", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-report-");
+    const projectRoot = makeTempDir("dev-nexus-feature-report-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusInitiativeDeliveryReport({
+    const report = buildNexusFeatureBranchDeliveryReport({
       projectRoot,
       componentId: "primary",
       providerEvidence: [
@@ -254,8 +254,8 @@ describe("initiative delivery report", () => {
 function projectConfig(): NexusProjectConfig {
   return {
     version: 1,
-    id: "initiative-report-demo",
-    name: "Initiative Report Demo",
+    id: "feature-report-demo",
+    name: "Feature Report Demo",
     home: null,
     repo: {
       kind: "git",
@@ -270,7 +270,7 @@ function projectConfig(): NexusProjectConfig {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -278,11 +278,11 @@ function projectConfig(): NexusProjectConfig {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
           },
           selector: {
             statuses: ["ready"],

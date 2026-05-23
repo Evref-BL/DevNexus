@@ -3,11 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
-import { defaultNexusPublicationTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
+import { defaultNexusReleaseTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
 import {
-  buildNexusPublicationTrainReadinessReport,
-  type NexusPublicationTrainProviderEvidenceInput,
-} from "./nexusPublicationTrainReadiness.js";
+  buildNexusReleaseTrainReadinessReport,
+  type NexusReleaseTrainProviderEvidenceInput,
+} from "./nexusReleaseTrainReadiness.js";
 import {
   saveProjectConfig,
   type NexusProjectConfig,
@@ -36,12 +36,12 @@ afterEach(() => {
   }
 });
 
-describe("publication train readiness", () => {
+describe("release train readiness", () => {
   it("reports wait when no ready branches are recorded", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       now,
     });
@@ -55,20 +55,20 @@ describe("publication train readiness", () => {
   });
 
   it("groups one clean ready branch by component and version", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
     writeLeases(projectRoot, [
       lease({
         id: "lease-ready",
         workItemId: "github-120",
-        branchName: "codex/dev-nexus/github-120-publication-train-readiness",
+        branchName: "codex/dev-nexus/github-120-publication-release-train-readiness",
         lastObservedHeadCommit: "abc123",
         pushed: true,
-        upstream: "origin/codex/dev-nexus/github-120-publication-train-readiness",
+        upstream: "origin/codex/dev-nexus/github-120-publication-release-train-readiness",
       }),
     ]);
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       now,
     });
@@ -117,7 +117,7 @@ describe("publication train readiness", () => {
   });
 
   it("groups ready branches across multiple components and versions", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig({
       components: [
         componentConfig("dev-nexus", "DevNexus"),
@@ -165,7 +165,7 @@ describe("publication train readiness", () => {
       }),
     ]);
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       now,
     });
@@ -187,7 +187,7 @@ describe("publication train readiness", () => {
   });
 
   it("surfaces stale, blocked, dirty, unpushed, missing-head, and missing-upstream states", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
     writeLeases(projectRoot, [
       lease({
@@ -219,7 +219,7 @@ describe("publication train readiness", () => {
       }),
     ]);
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       now,
     });
@@ -240,7 +240,7 @@ describe("publication train readiness", () => {
   });
 
   it("reports provider evidence status when checks are supplied", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
     writeLeases(projectRoot, [
       lease({
@@ -253,7 +253,7 @@ describe("publication train readiness", () => {
       }),
     ]);
 
-    const providerEvidence: NexusPublicationTrainProviderEvidenceInput[] = [
+    const providerEvidence: NexusReleaseTrainProviderEvidenceInput[] = [
       {
         branchName: "candidate/0.2.0",
         checks: [
@@ -263,7 +263,7 @@ describe("publication train readiness", () => {
         ],
       },
     ];
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       providerEvidence,
       now,
@@ -277,7 +277,7 @@ describe("publication train readiness", () => {
   });
 
   it("accepts normalized provider evidence metadata from generic providers", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
     writeLeases(projectRoot, [
       lease({
@@ -290,7 +290,7 @@ describe("publication train readiness", () => {
       }),
     ]);
 
-    const providerEvidence: NexusPublicationTrainProviderEvidenceInput[] = [
+    const providerEvidence: NexusReleaseTrainProviderEvidenceInput[] = [
       {
         provider: "generic",
         sourceKind: "candidate_branch",
@@ -307,7 +307,7 @@ describe("publication train readiness", () => {
         ],
       },
     ];
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       providerEvidence,
       now,
@@ -328,7 +328,7 @@ describe("publication train readiness", () => {
   });
 
   it("marks high-cost candidate tiers as waiting when CI budget is exhausted", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
     writeLeases(projectRoot, [
       lease({
@@ -341,7 +341,7 @@ describe("publication train readiness", () => {
       }),
     ]);
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       fullMatrixBudgetAvailable: false,
       now,
@@ -366,10 +366,10 @@ describe("publication train readiness", () => {
   });
 
   it("uses handoff inputs when lease data is unavailable", () => {
-    const projectRoot = makeTempDir("dev-nexus-train-readiness-");
+    const projectRoot = makeTempDir("dev-nexus-release-train-readiness-");
     saveProjectConfig(projectRoot, projectConfig());
 
-    const report = buildNexusPublicationTrainReadinessReport({
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot,
       now,
       handoffs: [
@@ -382,7 +382,7 @@ describe("publication train readiness", () => {
           headCommit: "abc123",
           upstream: "origin/codex/handoff",
           pushed: true,
-          changedAreas: ["src/nexusPublicationTrainReadiness.ts"],
+          changedAreas: ["src/nexusReleaseTrainReadiness.ts"],
         },
       ],
     });
@@ -394,7 +394,7 @@ describe("publication train readiness", () => {
     expect(report.components[0]?.items[0]).toMatchObject({
       sourceKind: "handoff",
       sourceId: "handoff-ready",
-      changedAreas: ["src/nexusPublicationTrainReadiness.ts"],
+      changedAreas: ["src/nexusReleaseTrainReadiness.ts"],
     });
   });
 });
@@ -404,7 +404,7 @@ function projectConfig(
 ): NexusProjectConfig {
   return {
     version: 1,
-    id: "train-readiness-demo",
+    id: "release-train-readiness-demo",
     name: "Train Readiness Demo",
     home: null,
     repo: {
@@ -419,7 +419,7 @@ function projectConfig(
       ...defaultNexusAutomationConfig,
       verification: {
         ...defaultNexusAutomationConfig.verification,
-        ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+        ciTiers: defaultNexusReleaseTrainCiTierPolicy,
       },
     },
     versionPlanning: {
@@ -509,7 +509,7 @@ function lease(options: {
     kind: nexusWorktreeLeaseKind,
     version: 1,
     id: options.id,
-    projectId: "train-readiness-demo",
+    projectId: "release-train-readiness-demo",
     scope: {
       kind: "component",
       componentId,

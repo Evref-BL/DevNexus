@@ -1,21 +1,21 @@
 import type {
-  NexusInitiativeDeliveryTopology,
+  NexusFeatureBranchDeliveryBranchStrategy,
 } from "./nexusAutomationConfig.js";
 import type {
   NexusPublicationProviderBaseStatus,
 } from "./nexusPublicationProviderEvidence.js";
 
-export type NexusInitiativeRestackPlanStatus =
+export type NexusFeatureRestackPlanStatus =
   | "not_required"
   | "ready"
   | "needs_restack";
 
-export type NexusInitiativeRestackNextAction =
+export type NexusFeatureRestackNextAction =
   | "wait"
   | "update_branches"
   | "request_human_approval";
 
-export interface NexusInitiativeRestackBranchInput {
+export interface NexusFeatureRestackBranchInput {
   branch: string;
   parentBranch: string | null;
   childBranches?: string[];
@@ -25,7 +25,7 @@ export interface NexusInitiativeRestackBranchInput {
   baseStatus?: NexusPublicationProviderBaseStatus | null;
 }
 
-export interface NexusInitiativeRestackPlanItem {
+export interface NexusFeatureRestackPlanItem {
   branch: string;
   parentBranch: string | null;
   childBranches: string[];
@@ -38,30 +38,30 @@ export interface NexusInitiativeRestackPlanItem {
   reasons: string[];
 }
 
-export interface NexusInitiativeRestackPlan {
-  topology: NexusInitiativeDeliveryTopology;
+export interface NexusFeatureRestackPlan {
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
   finalPublicationTarget: string;
-  status: NexusInitiativeRestackPlanStatus;
-  nextAction: NexusInitiativeRestackNextAction;
+  status: NexusFeatureRestackPlanStatus;
+  nextAction: NexusFeatureRestackNextAction;
   publicationEligible: boolean;
   branchCount: number;
   needsUpdateCount: number;
   forceWithLeaseCount: number;
   humanApprovalCount: number;
-  items: NexusInitiativeRestackPlanItem[];
+  items: NexusFeatureRestackPlanItem[];
   warnings: string[];
   mutatesSource: false;
 }
 
-export function buildNexusInitiativeRestackPlan(options: {
-  topology: NexusInitiativeDeliveryTopology;
+export function buildNexusFeatureRestackPlan(options: {
+  branchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
   finalPublicationTarget: string;
-  branches: NexusInitiativeRestackBranchInput[];
-}): NexusInitiativeRestackPlan {
-  const publicationEligible = options.topology !== "throwaway_rehearsal";
-  if (options.topology === "direct" || !publicationEligible) {
+  branches: NexusFeatureRestackBranchInput[];
+}): NexusFeatureRestackPlan {
+  const publicationEligible = options.branchStrategy !== "throwaway_rehearsal";
+  if (options.branchStrategy === "direct" || !publicationEligible) {
     return {
-      topology: options.topology,
+      branchStrategy: options.branchStrategy,
       finalPublicationTarget: options.finalPublicationTarget,
       status: "not_required",
       nextAction: "wait",
@@ -90,7 +90,7 @@ export function buildNexusInitiativeRestackPlan(options: {
   ).length;
 
   return {
-    topology: options.topology,
+    branchStrategy: options.branchStrategy,
     finalPublicationTarget: options.finalPublicationTarget,
     status: needsUpdateCount > 0 ? "needs_restack" : "ready",
     nextAction: humanApprovalCount > 0
@@ -110,8 +110,8 @@ export function buildNexusInitiativeRestackPlan(options: {
 }
 
 function restackItem(
-  input: NexusInitiativeRestackBranchInput,
-): NexusInitiativeRestackPlanItem {
+  input: NexusFeatureRestackBranchInput,
+): NexusFeatureRestackPlanItem {
   const baseStatus = input.baseStatus ?? null;
   const reasons = restackReasons({
     parentChanged: input.parentChanged,

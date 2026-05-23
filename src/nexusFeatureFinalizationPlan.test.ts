@@ -4,9 +4,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
-import { buildNexusInitiativeFinalizationPlan } from "./nexusInitiativeFinalizationPlan.js";
+import { buildNexusFeatureFinalizationPlan } from "./nexusFeatureFinalizationPlan.js";
 import {
   saveProjectConfig,
   type NexusProjectConfig,
@@ -26,13 +26,13 @@ afterEach(() => {
   }
 });
 
-describe("initiative finalization plan", () => {
+describe("feature finalization plan", () => {
   it("recommends creating the final pull request only at the review gate", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       now: "2026-05-22T21:15:00.000Z",
@@ -53,15 +53,15 @@ describe("initiative finalization plan", () => {
           componentId: "primary",
           head: "feat/codex-goals",
           base: "main",
-          title: "Finalize initiative codex-goals",
+          title: "Finalize feature codex-goals",
           draft: false,
         },
         reasons: ["final pull request is created at the review gate"],
         cliCommand:
           "dev-nexus publication pull-request upsert " +
           `${projectRoot} --component primary --head feat/codex-goals --base main ` +
-          '--title "Finalize initiative codex-goals" --body ' +
-          '"Finalize initiative codex-goals. Head: feat/codex-goals Base: main Review target: main Run initiative-finalization with current provider evidence before publication."',
+          '--title "Finalize feature codex-goals" --body ' +
+          '"Finalize feature codex-goals. Head: feat/codex-goals Base: main Review target: main Run feature-finalization with current provider evidence before publication."',
       },
       reviewReadiness: {
         status: "needs_final_pull_request",
@@ -77,14 +77,14 @@ describe("initiative finalization plan", () => {
     });
   });
 
-  it("reports a missing initiative-start final pull request as a create action", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+  it("reports a missing feature-start final pull request as a create action", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig({
-      finalPullRequestCreation: "at_initiative_start",
+      finalPullRequestCreation: "at_feature_start",
     }));
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       now: "2026-05-22T21:15:00.000Z",
@@ -93,16 +93,16 @@ describe("initiative finalization plan", () => {
     expect(plan.nextAction).toBe("create_pull_request");
     expect(plan.items[0]).toMatchObject({
       finalPullRequestAction: {
-        status: "create_at_initiative_start",
+        status: "create_at_feature_start",
         humanInTheLoop: false,
         providerAction: {
           kind: "pull_request_upsert",
           head: "feat/codex-goals",
           base: "main",
-          title: "Finalize initiative codex-goals",
+          title: "Finalize feature codex-goals",
           draft: false,
         },
-        reasons: ["final pull request should have been created at initiative start"],
+        reasons: ["final pull request should have been created at feature start"],
       },
       reviewReadiness: {
         status: "needs_final_pull_request",
@@ -112,7 +112,7 @@ describe("initiative finalization plan", () => {
   });
 
   it("renders fallback fork pull request heads in final PR actions", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     const sourceRoot = path.join(projectRoot, "source");
     fs.mkdirSync(path.join(sourceRoot, ".git"), { recursive: true });
     fs.writeFileSync(
@@ -131,7 +131,7 @@ describe("initiative finalization plan", () => {
       },
     }));
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       now: "2026-05-22T21:15:00.000Z",
@@ -158,7 +158,7 @@ describe("initiative finalization plan", () => {
   });
 
   it("blocks fork final PR creation when fallback remote metadata is missing", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig({
       branchPublication: {
@@ -167,7 +167,7 @@ describe("initiative finalization plan", () => {
       },
     }));
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       now: "2026-05-22T21:15:00.000Z",
@@ -194,13 +194,13 @@ describe("initiative finalization plan", () => {
   });
 
   it("reports manual-only final pull request creation as a HITL action", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig({
       finalPullRequestCreation: "manual_only",
     }));
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       now: "2026-05-22T21:15:00.000Z",
@@ -223,11 +223,11 @@ describe("initiative finalization plan", () => {
   });
 
   it("distinguishes safe review from authorized publication", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       providerEvidence: [
@@ -267,8 +267,8 @@ describe("initiative finalization plan", () => {
       items: [
         {
           componentId: "primary",
-          initiativeId: "codex-goals",
-          integrationBranch: "feat/codex-goals",
+          featureId: "codex-goals",
+          featureBranch: "feat/codex-goals",
           reviewReadiness: {
             status: "ready_for_review",
             nextAction: "request_review",
@@ -289,11 +289,11 @@ describe("initiative finalization plan", () => {
   });
 
   it("includes conservative update choices for diverged review branches", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       providerEvidence: [
@@ -352,11 +352,11 @@ describe("initiative finalization plan", () => {
   });
 
   it("stops at human approval when final publication evidence is otherwise ready", () => {
-    const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig());
 
-    const plan = buildNexusInitiativeFinalizationPlan({
+    const plan = buildNexusFeatureFinalizationPlan({
       projectRoot,
       componentId: "primary",
       providerEvidence: [
@@ -402,16 +402,16 @@ describe("initiative finalization plan", () => {
 });
 
 function projectConfig(options: {
-  finalPullRequestCreation?: "at_initiative_start" | "at_review_gate" | "manual_only";
+  finalPullRequestCreation?: "at_feature_start" | "at_review_gate" | "manual_only";
   branchPublication?: {
-    strategy: "publication_remote" | "fallback_remote" | "publication_remote_then_fallback" | "manual_only";
+    strategy: "push_remote" | "fallback_remote" | "push_remote_then_fallback" | "manual_only";
     fallbackRemote: string | null;
   };
 } = {}): NexusProjectConfig {
   return {
     version: 1,
-    id: "initiative-finalization-demo",
-    name: "Initiative Finalization Demo",
+    id: "feature-finalization-demo",
+    name: "Feature Finalization Demo",
     home: null,
     repo: {
       kind: "git",
@@ -426,7 +426,7 @@ function projectConfig(options: {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -434,20 +434,20 @@ function projectConfig(options: {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
             review: {
-              ...defaultNexusInitiativeDeliveryConfig.review,
+              ...defaultNexusFeatureBranchDeliveryConfig.review,
               finalPullRequestCreation:
                 options.finalPullRequestCreation ??
-                defaultNexusInitiativeDeliveryConfig.review
+                defaultNexusFeatureBranchDeliveryConfig.review
                   .finalPullRequestCreation,
             },
             branchPublication: options.branchPublication ?? {
-              ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+              ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
             },
           },
           selector: {

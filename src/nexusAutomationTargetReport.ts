@@ -62,9 +62,9 @@ import {
   summarizeNexusAutomationPublicationPolicy,
 } from "./nexusAutomationConfig.js";
 import {
-  summarizeNexusPublicationTrainPolicy,
-  type NexusPublicationTrainPolicySummary,
-} from "./nexusPublicationTrainPolicy.js";
+  summarizeNexusReleaseTrainPolicy,
+  type NexusReleaseTrainPolicySummary,
+} from "./nexusReleaseTrainPolicy.js";
 import type {
   WorktreePublicationDecision,
   WorktreeVerificationRecord,
@@ -223,7 +223,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   codexGoals: NexusAutomationTargetReportCodexGoalSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
   publication: NexusAutomationPublicationPolicySummary | null;
-  publicationTrain: NexusPublicationTrainPolicySummary | null;
+  releaseTrain: NexusReleaseTrainPolicySummary | null;
   authority: NexusAuthorityComponentSummary | null;
 }
 
@@ -1002,8 +1002,8 @@ function summarizeComponentProgress(options: {
             ),
           )
         : null,
-      publicationTrain: draft.component
-        ? summarizeNexusPublicationTrainPolicy({
+      releaseTrain: draft.component
+        ? summarizeNexusReleaseTrainPolicy({
             projectConfig: options.projectConfig,
             component: draft.component,
           })

@@ -7,7 +7,7 @@ import {
   callDevNexusMcpTool,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   defaultLocalWorkTrackingStorePath,
   devNexusCoreMcpToolNames,
   handleDevNexusMcpJsonRpcMessage,
@@ -152,7 +152,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
   };
 }
 
-function initiativeProjectConfig(): NexusProjectConfig {
+function featureProjectConfig(): NexusProjectConfig {
   return projectConfig({
     automation: {
       ...defaultNexusAutomationConfig,
@@ -171,7 +171,7 @@ function initiativeProjectConfig(): NexusProjectConfig {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -179,11 +179,11 @@ function initiativeProjectConfig(): NexusProjectConfig {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
           },
           selector: {
             statuses: ["ready"],
@@ -284,9 +284,9 @@ describe("DevNexus MCP server", () => {
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
-      "publication_initiative_plan",
-      "publication_initiative_report",
-      "publication_initiative_finalization",
+      "publication_feature_plan",
+      "publication_feature_report",
+      "publication_feature_finalization",
       "current_agent_adopt",
       "current_agent_record",
       "worktree_prepare",
@@ -439,20 +439,20 @@ describe("DevNexus MCP server", () => {
     }
   });
 
-  it("exposes read-only initiative delivery plan and report tools", async () => {
+  it("exposes read-only feature branch delivery plan and report tools", async () => {
     const projectRoot = makeTempDir("dev-nexus-mcp-project-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
-    saveProjectConfig(projectRoot, initiativeProjectConfig());
+    saveProjectConfig(projectRoot, featureProjectConfig());
 
     const plan = toolJson(
-      await callDevNexusMcpTool("publication_initiative_plan", {
+      await callDevNexusMcpTool("publication_feature_plan", {
         projectRoot,
         componentId: "primary",
       }),
     );
     const report = toolJson(
       await callDevNexusMcpTool(
-        "publication_initiative_report",
+        "publication_feature_report",
         {
           projectRoot,
           componentId: "primary",
@@ -482,7 +482,7 @@ describe("DevNexus MCP server", () => {
     );
     const finalization = toolJson(
       await callDevNexusMcpTool(
-        "publication_initiative_finalization",
+        "publication_feature_finalization",
         {
           projectRoot,
           componentId: "primary",
@@ -519,11 +519,11 @@ describe("DevNexus MCP server", () => {
         items: [
           {
             componentId: "primary",
-            initiative: {
+            feature: {
               activeScopeId: "codex-goals",
-              defaultTopology: "hybrid",
+              defaultBranchStrategy: "hybrid",
               branchPlan: {
-                integrationBranch: "feat/codex-goals",
+                featureBranch: "feat/codex-goals",
                 finalPublicationTarget: "main",
               },
             },
@@ -2267,7 +2267,7 @@ describe("DevNexus MCP server", () => {
           projectRoot,
           workItemId: "local-1",
           intent: "approval",
-          question: "Approve the mocked external request slice?",
+          question: "Approve the mocked external request change?",
           target: "github-issue:22",
           responseStatus: "approved",
           responseSummary: "Approved by reviewer comment.",

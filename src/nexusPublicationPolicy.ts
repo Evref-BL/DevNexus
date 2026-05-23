@@ -245,13 +245,13 @@ export function resolveNexusPublicationPolicy(
     componentPublication,
     "greenMain",
   );
-  const hasComponentPublicationTrain = Object.prototype.hasOwnProperty.call(
+  const hasComponentReleaseTrain = Object.prototype.hasOwnProperty.call(
     componentPublication,
-    "publicationTrain",
+    "releaseTrain",
   );
-  const hasProjectPublicationTrain = Object.prototype.hasOwnProperty.call(
+  const hasProjectReleaseTrain = Object.prototype.hasOwnProperty.call(
     projectPublication,
-    "publicationTrain",
+    "releaseTrain",
   );
   const merged: NexusAutomationPublicationConfig = {
     ...defaultNexusAutomationConfig.publication,
@@ -273,10 +273,10 @@ export function resolveNexusPublicationPolicy(
     greenMain: hasComponentGreenMain
       ? componentPublication.greenMain ?? null
       : projectPublication.greenMain ?? null,
-    ...(hasComponentPublicationTrain
-      ? { publicationTrain: componentPublication.publicationTrain ?? null }
-      : hasProjectPublicationTrain
-        ? { publicationTrain: projectPublication.publicationTrain ?? null }
+    ...(hasComponentReleaseTrain
+      ? { releaseTrain: componentPublication.releaseTrain ?? null }
+      : hasProjectReleaseTrain
+        ? { releaseTrain: projectPublication.releaseTrain ?? null }
         : {}),
   };
 
