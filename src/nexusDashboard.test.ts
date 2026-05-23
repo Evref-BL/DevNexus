@@ -2015,6 +2015,125 @@ describe("nexus dashboard", () => {
     expect(rendered).not.toContain("Other feature work");
   });
 
+  it("annotates git history with feature status and provider actions", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const action = {
+      label: "Open issue #42",
+      href: "https://github.com/Evref-BL/DevNexus/issues/42",
+      provider: "github",
+      kind: "issue",
+      title: "Review cockpit graph",
+    };
+    const snapshot = {
+      features: {
+        records: [
+          {
+            id: "feature:primary:feat-cockpit-graph",
+            title: "Cockpit graph",
+            status: "needs-review",
+            statusLabel: "Needs review",
+            featureBranch: "feat/cockpit-graph",
+            branches: ["feat/cockpit-graph"],
+          },
+        ],
+      },
+      threads: {
+        records: [
+          {
+            id: "thread-1",
+            title: "Review graph UX",
+            componentId: "primary",
+            workItemId: "github-42",
+            branchName: "feat/cockpit-graph",
+            hostId: "Mac.lan",
+            decision: "review",
+            decisionLabel: "Review",
+            decisionDetail: "Human review is needed.",
+            updatedAt: "2026-05-23T12:00:00.000Z",
+            actions: [action],
+          },
+        ],
+      },
+      trackedWork: {
+        records: [],
+      },
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "feature000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/cockpit-graph"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "feature000000000000000000000000000000000000",
+                shortHash: "feature",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Add graph annotations",
+                refs: [
+                  {
+                    name: "feat/cockpit-graph",
+                    kind: "branch",
+                    remote: null,
+                    hash: "feature000000000000000000000000000000000000",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderGitHistory(
+      snapshot,
+      "history:primary:feature000000000000000000000000000000000000",
+    );
+    const detail = hooks.selectedDetail(
+      snapshot,
+      "history:primary:feature000000000000000000000000000000000000",
+    ) as {
+      actions: Array<{ href: string }>;
+      facts: Array<[string, string]>;
+    };
+
+    expect(rendered).toContain("Needs review");
+    expect(rendered).toContain("1 thread");
+    expect(detail.facts).toEqual(
+      expect.arrayContaining([
+        ["Feature", "Cockpit graph"],
+        ["Threads", "1"],
+      ]),
+    );
+    expect(detail.actions).toEqual([
+      expect.objectContaining({
+        href: "https://github.com/Evref-BL/DevNexus/issues/42",
+      }),
+    ]);
+  });
+
   it("renders compact provider chips with provider and external-link affordances", async () => {
     const hooks = await loadDashboardClientTestHooks();
 
