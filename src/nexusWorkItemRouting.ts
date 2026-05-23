@@ -35,37 +35,11 @@ export function resolveComponentWorkItemRoute(options: {
   );
   const qualified = componentQualifiedWorkItemId(components, rawWorkItemId);
   if (qualified) {
-    const requestedComponent = requestedComponentId
-      ? componentById(components, requestedComponentId)
-      : null;
-    if (requestedComponentId && !requestedComponent) {
-      throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
-    }
-    if (requestedComponent && requestedComponent.id !== qualified.component.id) {
-      throw new Error(
-        `Work item id component "${qualified.component.id}" conflicts with requested component "${requestedComponent.id}" for provider-local id "${qualified.itemId}" ` +
-          `(requested tracker: ${componentTrackerLabel(requestedComponent)}; id tracker: ${componentTrackerLabel(qualified.component)}).`,
-      );
-    }
-
-    return {
-      component: qualified.component,
-      itemId: qualified.itemId,
-      qualified: true,
-    };
+    return routeQualifiedWorkItem(components, requestedComponentId, qualified);
   }
 
   if (requestedComponentId) {
-    const component = componentById(components, requestedComponentId);
-    if (!component) {
-      throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
-    }
-
-    return {
-      component,
-      itemId: rawWorkItemId,
-      qualified: false,
-    };
+    return routeRequestedComponent(components, requestedComponentId, rawWorkItemId);
   }
 
   const inferredComponent = options.currentPath
@@ -84,9 +58,66 @@ export function resolveComponentWorkItemRoute(options: {
     components,
     itemId: rawWorkItemId,
   });
+  return routeLocalWorkItemMatch({
+    projectRoot,
+    projectConfig: options.projectConfig,
+    itemId: rawWorkItemId,
+    localMatches,
+  });
+}
+
+function routeQualifiedWorkItem(
+  components: ResolvedNexusProjectComponent[],
+  requestedComponentId: string | undefined,
+  qualified: { component: ResolvedNexusProjectComponent; itemId: string },
+): ResolvedComponentWorkItemRoute {
+  const requestedComponent = requestedComponentId
+    ? componentById(components, requestedComponentId)
+    : null;
+  if (requestedComponentId && !requestedComponent) {
+    throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
+  }
+  if (requestedComponent && requestedComponent.id !== qualified.component.id) {
+    throw new Error(
+      `Work item id component "${qualified.component.id}" conflicts with requested component "${requestedComponent.id}" for provider-local id "${qualified.itemId}" ` +
+        `(requested tracker: ${componentTrackerLabel(requestedComponent)}; id tracker: ${componentTrackerLabel(qualified.component)}).`,
+    );
+  }
+
+  return {
+    component: qualified.component,
+    itemId: qualified.itemId,
+    qualified: true,
+  };
+}
+
+function routeRequestedComponent(
+  components: ResolvedNexusProjectComponent[],
+  requestedComponentId: string,
+  itemId: string,
+): ResolvedComponentWorkItemRoute {
+  const component = componentById(components, requestedComponentId);
+  if (!component) {
+    throw new Error(`Workspace component is not configured: ${requestedComponentId}`);
+  }
+
+  return {
+    component,
+    itemId,
+    qualified: false,
+  };
+}
+
+function routeLocalWorkItemMatch(options: {
+  projectRoot: string;
+  projectConfig: NexusProjectConfig;
+  itemId: string;
+  localMatches: ResolvedNexusProjectComponent[];
+}): ResolvedComponentWorkItemRoute {
+  const { itemId, localMatches } = options;
   if (localMatches.length > 1) {
     throw new Error(
-      `Provider-local work item id "${rawWorkItemId}" is ambiguous across components: ` +
+      `Provider-local work item id "${itemId}" is ambiguous across components: ` +
         `${localMatches.map((component) => componentTrackerSummary(component)).join(", ")}. ` +
         "Provide --component or use a component-qualified work item id.",
     );
@@ -94,14 +125,14 @@ export function resolveComponentWorkItemRoute(options: {
   if (localMatches.length === 1) {
     return {
       component: localMatches[0]!,
-      itemId: rawWorkItemId,
+      itemId,
       qualified: false,
     };
   }
 
   return {
-    component: resolvePrimaryProjectComponent(projectRoot, options.projectConfig),
-    itemId: rawWorkItemId,
+    component: resolvePrimaryProjectComponent(options.projectRoot, options.projectConfig),
+    itemId,
     qualified: false,
   };
 }
