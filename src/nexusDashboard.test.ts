@@ -1149,6 +1149,7 @@ describe("nexus dashboard", () => {
     expect(module).toContain("data-open-app");
     expect(module).toContain("/api/local/app-icon?app=");
     expect(module).toContain("dn-app-icon-img");
+    expect(module).toContain(".dn-header-path-menu { flex: 0 1 auto; width: fit-content; min-width: min(100%, 320px); max-width: min(100%, 520px); }");
     expect(module).toContain("Finder");
     expect(module).toContain("VS Code");
     expect(module).toContain("Terminal");
