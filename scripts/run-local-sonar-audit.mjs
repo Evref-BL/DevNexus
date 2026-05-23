@@ -119,7 +119,7 @@ async function main() {
     return result.status === "passed" ? 0 : 1;
   } finally {
     if (!args.keepServer && serverStarted) {
-      runAllowFailure("docker", ["rm", "-f", serverName]);
+      runAllowFailure("docker", ["rm", "-fv", serverName]);
     }
     if (!args.keepServer && networkCreated) {
       runAllowFailure("docker", ["network", "rm", networkName]);
