@@ -80,8 +80,8 @@ planning or no train at all.
 
 This example opts into a green-main workflow and a version-scoped release
 train. It is suitable for a workspace that wants ordinary pull requests to run
-cheap remote smoke first, then run the full matrix only for candidate or
-protected target validation.
+cheap remote smoke first, then run the full matrix for candidate validation and
+for every pull request whose base branch is the protected target branch.
 
 ```json
 {

@@ -78,6 +78,7 @@ export interface NexusCiTierResolutionInput {
   policy?: NexusCiTierPolicyConfig | null;
   eventName?: NexusCiTierEventName | null;
   branchName?: string | null;
+  baseBranch?: string | null;
   targetBranch?: string | null;
   changedPaths?: string[];
   workflowMode?: NexusCiWorkflowMode | null;
@@ -242,6 +243,7 @@ export function resolveNexusCiTierDecision(
   );
   const eventName = input.eventName ?? null;
   const branchName = input.branchName ?? null;
+  const baseBranch = input.baseBranch ?? null;
   const targetBranch = input.targetBranch ?? "main";
   const changedPaths = input.changedPaths ?? [];
   const workflowMode = input.workflowMode ?? null;
@@ -264,6 +266,13 @@ export function resolveNexusCiTierDecision(
   } else if (eventName === "schedule") {
     selectedTierId = "scheduled_drift";
     reasonCodes.push("scheduled_drift");
+  } else if (
+    eventName === "pull_request" &&
+    baseBranch &&
+    matchesBranch(baseBranch, targetBranch)
+  ) {
+    selectedTierId = "protected_target";
+    reasonCodes.push("target_branch");
   } else if (workflowMode === "release" || changeRisk === "release") {
     selectedTierId = "candidate_matrix";
     reasonCodes.push("release_mode");
@@ -302,7 +311,7 @@ export function resolveNexusCiTierDecision(
   if (
     tier.cost === "high" &&
     !budgetAvailable &&
-    !isFinalGate(eventName, branchName, targetBranch)
+    !isFinalGate(eventName, branchName, baseBranch, targetBranch)
   ) {
     tier = requireTier(policy, "remote_smoke", "budget fallback tier");
     budgetLimited = true;
@@ -457,11 +466,17 @@ function releasePath(file: string): boolean {
 function isFinalGate(
   eventName: NexusCiTierEventName | null,
   branchName: string | null,
+  baseBranch: string | null,
   targetBranch: string,
 ): boolean {
   return (
     eventName === "merge_group" ||
     eventName === "schedule" ||
+    Boolean(
+      eventName === "pull_request" &&
+        baseBranch &&
+        matchesBranch(baseBranch, targetBranch),
+    ) ||
     Boolean(branchName && matchesBranch(branchName, targetBranch))
   );
 }
