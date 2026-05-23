@@ -4,6 +4,11 @@ import {
   resolveNexusReviewPolicy,
   validateNexusReviewPolicyConfig,
 } from "./nexusReviewPolicy.js";
+import {
+  assertNexusReviewPolicyEnforcement,
+  buildNexusReviewPolicyEnforcementDecision,
+  NexusReviewPolicyEnforcementError,
+} from "./nexusReviewPolicyEnforcement.js";
 import { normalizeNexusPublicationProviderEvidence } from "./nexusPublicationProviderEvidence.js";
 
 describe("nexus review policy", () => {
@@ -163,5 +168,53 @@ describe("nexus review policy", () => {
         },
       }),
     ).toThrow(/must not combine none/);
+  });
+
+  it("enforces review policy only for final actions when explicitly configured", () => {
+    const noPolicy = buildNexusReviewPolicyEnforcementDecision({
+      componentId: "api",
+      finalAction: true,
+      requestedAction: "provider.pull_request.merge",
+    });
+    expect(noPolicy).toMatchObject({
+      mode: "noop",
+      status: "allowed",
+      reviewPlan: null,
+    });
+
+    const configuredPolicy = validateNexusReviewPolicyConfig({
+      default: {
+        transport: "pull_request",
+        gates: ["provider_approval_required"],
+      },
+    });
+    const reviewSurfaceAction = buildNexusReviewPolicyEnforcementDecision({
+      componentId: "api",
+      policy: configuredPolicy,
+      finalAction: false,
+      requestedAction: "provider.pull_request.open",
+    });
+    expect(reviewSurfaceAction).toMatchObject({
+      mode: "final_actions",
+      status: "allowed",
+      reviewPlan: null,
+    });
+
+    const blockedFinalAction = buildNexusReviewPolicyEnforcementDecision({
+      componentId: "api",
+      policy: configuredPolicy,
+      finalAction: true,
+      requestedAction: "provider.pull_request.merge",
+    });
+    expect(blockedFinalAction).toMatchObject({
+      mode: "final_actions",
+      status: "blocked",
+      reviewPlan: {
+        status: "review_required",
+      },
+    });
+    expect(() =>
+      assertNexusReviewPolicyEnforcement(blockedFinalAction)
+    ).toThrow(NexusReviewPolicyEnforcementError);
   });
 });

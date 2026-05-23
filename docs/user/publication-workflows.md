@@ -72,6 +72,11 @@ required evidence, provider mutations, blocked actions, and next action. Local
 human approval is action-scoped: if the branch, head commit, or requested action
 changes, the review plan should ask for fresh authorization.
 
+Publication commands enforce configured component review policy only at final
+actions. Opening or updating a pull request remains allowed because it creates
+the review surface. Pull-request merge and direct target-branch push are blocked
+until the review plan is ready.
+
 ## When To Opt Into Advanced Publication
 
 Use a richer publication policy when local handoff is no longer enough.
@@ -395,6 +400,13 @@ The finalization plan is also read-only. It reports whether the branch is safe
 for review, whether configured review gates are satisfied, whether it is ready
 for publication, and whether publication still requires a human decision. It
 does not merge, undraft, comment, or enter a merge queue.
+
+When a final action needs local human authorization, pass the current instruction
+to the mutating command:
+
+```bash
+dev-nexus publication pull-request merge <workspace-root> --component api --number 123 --authorized --authorization-summary "Approved in local review"
+```
 
 ## Choosing A Path
 

@@ -65,6 +65,8 @@ evaluation, and publication.
 ## Model
 
 Review policy produces a plan. It does not publish the change by itself.
+Mutating publication commands can consume the same plan when they need to decide
+whether a final publication action is allowed.
 
 ```mermaid
 flowchart TD
@@ -103,6 +105,28 @@ flowchart LR
   F[Human says approve or merge now] --> G[Action-scoped authorization]
   G --> E
 ```
+
+## Enforcement Boundary
+
+DevNexus follows the common provider split between creating a review object and
+submitting the change. [GitHub branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+describes required reviews and status checks as merge requirements,
+[GitLab merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
+are checked before merge, and
+[Gerrit submit requirements](https://gerrit-review.googlesource.com/Documentation/config-submit-requirements.html)
+decide whether a reviewed change is submittable. Review policy enforcement
+therefore blocks final publication actions, not the actions that create or
+update the review surface.
+
+When a component has no explicit `review` policy, enforcement is a noop. When a
+component configures review policy, mutating publication commands use
+`final_actions` enforcement:
+
+- Allowed before review is complete: branch pushes to review branches,
+  pull-request or merge-request creation, draft updates, and review requests.
+- Blocked until the resolved review plan is `ready`: pull-request merge, direct
+  target-branch push, package publish, release publish, and final publication
+  completion.
 
 ## Policy Shape
 
@@ -263,10 +287,10 @@ The first implementation is deliberately small:
 4. Keep provider comments silent unless comment policy explicitly enables them.
 
 Feature-finalization planning now includes the component review plan when a
-review policy is configured. This first integration is advisory:
-feature-finalization reports the review result, but mutating publication
-commands do not yet enforce it. Further follow-up work should decide enforcement
-semantics and expand provider-native readback where needed.
+review policy is configured. Mutating publication commands enforce configured
+review policy for final actions: pull-request merge and direct target-branch
+push are blocked until the resolved review plan is ready. Further follow-up work
+should expand provider-native readback where needed.
 
 The first implementation should not add committed approval files or a general
 approval ledger. If a later project needs audit-grade local approvals, that
