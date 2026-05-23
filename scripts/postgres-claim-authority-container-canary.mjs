@@ -51,6 +51,7 @@ try {
     [
       "run",
       "-d",
+      "--rm",
       "--name",
       postgresName,
       "--network",
@@ -363,7 +364,7 @@ function dockerRunArgs(mode, options = {}) {
 
 function cleanup() {
   if (postgresStarted) {
-    spawnSync(dockerCommand, ["rm", "-f", postgresName], { encoding: "utf8" });
+    spawnSync(dockerCommand, ["rm", "-f", "-v", postgresName], { encoding: "utf8" });
   }
   if (networkCreated) {
     spawnSync(dockerCommand, ["network", "rm", networkName], { encoding: "utf8" });
