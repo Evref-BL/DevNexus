@@ -2001,6 +2001,161 @@ describe("nexus dashboard", () => {
     expect(rendered).not.toMatch(/M 22 15 C 22 36, 40 84, 40 105/);
   });
 
+  it("keeps every loaded git history row visible in the graph", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const commits = Array.from({ length: 82 }, (_, index) => {
+      const hash = `commit${String(index).padStart(34, "0")}`;
+      const parent =
+        index + 1 < 82 ? `commit${String(index + 1).padStart(34, "0")}` : null;
+      return {
+        hash,
+        shortHash: hash.slice(0, 7),
+        parents: parent ? [parent] : [],
+        authorName: "Codex",
+        authorEmail: "codex@example.com",
+        committedAt: "2026-05-23T12:00:00.000Z",
+        subject: `Commit ${index}`,
+        refs:
+          index === 0
+            ? [
+                {
+                  name: "main",
+                  kind: "branch",
+                  remote: null,
+                  hash,
+                },
+              ]
+            : [],
+      };
+    });
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: commits[0].hash,
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: true,
+            warnings: [],
+            commits,
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rows = hooks.gitHistoryRows(snapshot);
+
+    expect(rows?.rows).toHaveLength(82);
+  });
+
+  it("renders git graph svg at the same height as its commit rows", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "head000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "head000000000000000000000000000000000000",
+                shortHash: "head000",
+                parents: ["step200000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Head",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "head000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "step200000000000000000000000000000000000",
+                shortHash: "step200",
+                parents: ["step100000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Step 2",
+                refs: [],
+              },
+              {
+                hash: "step100000000000000000000000000000000000",
+                shortHash: "step100",
+                parents: ["base000000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Step 1",
+                refs: [],
+              },
+              {
+                hash: "base000000000000000000000000000000000000",
+                shortHash: "base000",
+                parents: [],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:45:00.000Z",
+                subject: "Base",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rendered = hooks.renderGitHistory(snapshot);
+
+    expect(rendered).toContain('width="118"');
+    expect(rendered).toContain('height="120"');
+    expect(rendered).toContain('viewBox="0 0 118 120"');
+  });
+
   it("filters project git history by branch head ancestors", async () => {
     const hooks = await loadDashboardClientTestHooks();
     const snapshot = {
