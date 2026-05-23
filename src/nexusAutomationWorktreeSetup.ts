@@ -24,6 +24,7 @@ import {
   type NexusWorkerContextSkillReference,
   type NexusWorkerContextBundleWorktree,
   type NexusWorkerContextAgentTargetPolicy,
+  type NexusWorkerContextFeatureBranchDelivery,
 } from "./nexusWorkerContextBundle.js";
 import {
   nexusSkillManifestFileName,
@@ -118,6 +119,7 @@ export interface NexusAutomationWorktreeSetupContextInput {
     root: string;
   };
   ownership: NexusWorkerContextBundleWorktree;
+  featureBranchDelivery?: NexusWorkerContextFeatureBranchDelivery | null;
   targetStatePath?: string | null;
   agentTargetPolicy?: NexusWorkerContextAgentTargetPolicy;
   pluginFragments?: NexusPluginWorkerFragmentsProjection;
@@ -332,6 +334,7 @@ function materializeWorkerContext(options: {
     branchName: ownership.branchName,
     baseRef: ownership.baseRef,
     workItem: ownership.workItem,
+    featureBranchDelivery: options.context.featureBranchDelivery ?? null,
     targetStatePath:
       options.context.targetStatePath ?? options.automationConfig.target.statePath,
     skills: workerContextSkillsFromProjections(

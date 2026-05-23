@@ -33,9 +33,9 @@ import type {
   NexusVersionScopeStatus,
 } from "./nexusVersionPlanningConfig.js";
 
-export type NexusPublicationTrainSourceKind = "lease" | "handoff";
+export type NexusReleaseTrainSourceKind = "lease" | "handoff";
 
-export type NexusPublicationTrainCandidateEligibility =
+export type NexusReleaseTrainCandidateEligibility =
   | "eligible"
   | "wait"
   | "needs_scope"
@@ -43,7 +43,7 @@ export type NexusPublicationTrainCandidateEligibility =
   | "needs_human"
   | "blocked";
 
-export type NexusPublicationTrainEvidenceStatus =
+export type NexusReleaseTrainEvidenceStatus =
   | "not_required"
   | "success"
   | "pending"
@@ -52,7 +52,7 @@ export type NexusPublicationTrainEvidenceStatus =
   | "missing"
   | "unavailable";
 
-export type NexusPublicationTrainCheckEvidenceStatus =
+export type NexusReleaseTrainCheckEvidenceStatus =
   | "success"
   | "pending"
   | "failed"
@@ -60,20 +60,20 @@ export type NexusPublicationTrainCheckEvidenceStatus =
   | "missing"
   | "unknown";
 
-export type NexusPublicationTrainNextAction =
+export type NexusReleaseTrainNextAction =
   | "wait"
   | "verify"
   | "resolve_blockers"
   | "create_candidate_branch"
   | "request_human_decision";
 
-export type NexusPublicationTrainProviderCheckInput =
+export type NexusReleaseTrainProviderCheckInput =
   NexusPublicationProviderCheckInput;
 
-export type NexusPublicationTrainProviderEvidenceInput =
+export type NexusReleaseTrainProviderEvidenceInput =
   NexusPublicationProviderEvidenceInput;
 
-export interface NexusPublicationTrainHandoffInput {
+export interface NexusReleaseTrainHandoffInput {
   id: string;
   componentId: string;
   workItemId?: string | null;
@@ -88,17 +88,17 @@ export interface NexusPublicationTrainHandoffInput {
   blockers?: string[];
 }
 
-export interface BuildNexusPublicationTrainReadinessReportOptions {
+export interface BuildNexusReleaseTrainReadinessReportOptions {
   projectRoot: string;
   versionId?: string | null;
   fullMatrixBudgetAvailable?: boolean | null;
-  providerEvidence?: NexusPublicationTrainProviderEvidenceInput[];
-  handoffs?: NexusPublicationTrainHandoffInput[];
+  providerEvidence?: NexusReleaseTrainProviderEvidenceInput[];
+  handoffs?: NexusReleaseTrainHandoffInput[];
   now?: Date | string | (() => Date | string);
 }
 
-export interface NexusPublicationTrainSourceState {
-  status: NexusWorktreeLeaseStatus | NexusPublicationTrainHandoffInput["status"];
+export interface NexusReleaseTrainSourceState {
+  status: NexusWorktreeLeaseStatus | NexusReleaseTrainHandoffInput["status"];
   stale: boolean;
   blocked: boolean;
   dirty: boolean | null;
@@ -108,20 +108,20 @@ export interface NexusPublicationTrainSourceState {
   warnings: string[];
 }
 
-export interface NexusPublicationTrainVersionScope {
+export interface NexusReleaseTrainVersionScope {
   versionId: string;
   objective: string;
   targetBranch: string;
   scopeStatus: NexusVersionScopeStatus;
 }
 
-export interface NexusPublicationTrainCheckEvidence {
+export interface NexusReleaseTrainCheckEvidence {
   name: string;
-  status: NexusPublicationTrainCheckEvidenceStatus;
+  status: NexusReleaseTrainCheckEvidenceStatus;
   url: string | null;
 }
 
-export interface NexusPublicationTrainEvidence {
+export interface NexusReleaseTrainEvidence {
   branchName: string | null;
   headCommit: string | null;
   provider: string | null;
@@ -132,46 +132,46 @@ export interface NexusPublicationTrainEvidence {
   intendedCiTier: string | null;
   mergeability: NexusPublicationProviderMergeability | null;
   branchPolicy: NexusPublicationProviderBranchPolicy | null;
-  status: NexusPublicationTrainEvidenceStatus;
-  requiredChecks: NexusPublicationTrainCheckEvidence[];
+  status: NexusReleaseTrainEvidenceStatus;
+  requiredChecks: NexusReleaseTrainCheckEvidence[];
   message: string;
 }
 
-export interface NexusPublicationTrainReadinessItem {
-  sourceKind: NexusPublicationTrainSourceKind;
+export interface NexusReleaseTrainReadinessItem {
+  sourceKind: NexusReleaseTrainSourceKind;
   sourceId: string;
   componentId: string;
   componentName: string;
   workItemId: string | null;
   branchName: string | null;
   candidateBranchName: string | null;
-  version: NexusPublicationTrainVersionScope | null;
-  state: NexusPublicationTrainSourceState;
-  candidateEligibility: NexusPublicationTrainCandidateEligibility;
+  version: NexusReleaseTrainVersionScope | null;
+  state: NexusReleaseTrainSourceState;
+  candidateEligibility: NexusReleaseTrainCandidateEligibility;
   reasons: string[];
   ciTier: NexusCiTierDecision;
-  evidence: NexusPublicationTrainEvidence;
+  evidence: NexusReleaseTrainEvidence;
   changedAreas: string[];
 }
 
-export interface NexusPublicationTrainComponentGroup {
+export interface NexusReleaseTrainComponentGroup {
   componentId: string;
   componentName: string;
   itemCount: number;
   eligibleCount: number;
-  items: NexusPublicationTrainReadinessItem[];
+  items: NexusReleaseTrainReadinessItem[];
 }
 
-export interface NexusPublicationTrainVersionGroup {
+export interface NexusReleaseTrainVersionGroup {
   versionId: string | null;
   objective: string | null;
   targetBranch: string | null;
   itemCount: number;
   eligibleCount: number;
-  items: NexusPublicationTrainReadinessItem[];
+  items: NexusReleaseTrainReadinessItem[];
 }
 
-export interface NexusPublicationTrainReadinessSummary {
+export interface NexusReleaseTrainReadinessSummary {
   itemCount: number;
   readyCount: number;
   eligibleCount: number;
@@ -189,7 +189,7 @@ export interface NexusPublicationTrainReadinessSummary {
   budgetLimitedCount: number;
 }
 
-export interface NexusPublicationTrainReadinessReport {
+export interface NexusReleaseTrainReadinessReport {
   version: 1;
   generatedAt: string;
   projectRoot: string;
@@ -198,20 +198,20 @@ export interface NexusPublicationTrainReadinessReport {
     name: string;
     componentCount: number;
   };
-  summary: NexusPublicationTrainReadinessSummary;
-  components: NexusPublicationTrainComponentGroup[];
-  versions: NexusPublicationTrainVersionGroup[];
-  nextAction: NexusPublicationTrainNextAction;
+  summary: NexusReleaseTrainReadinessSummary;
+  components: NexusReleaseTrainComponentGroup[];
+  versions: NexusReleaseTrainVersionGroup[];
+  nextAction: NexusReleaseTrainNextAction;
   warnings: string[];
 }
 
 interface ReadinessSource {
-  sourceKind: NexusPublicationTrainSourceKind;
+  sourceKind: NexusReleaseTrainSourceKind;
   sourceId: string;
   componentId: string | null;
   workItemId: string | null;
   branchName: string | null;
-  status: NexusWorktreeLeaseStatus | NexusPublicationTrainHandoffInput["status"];
+  status: NexusWorktreeLeaseStatus | NexusReleaseTrainHandoffInput["status"];
   stale: boolean;
   dirty: boolean | null;
   pushed: boolean | null;
@@ -222,13 +222,13 @@ interface ReadinessSource {
 }
 
 interface ClassifiedReadiness {
-  eligibility: NexusPublicationTrainCandidateEligibility;
+  eligibility: NexusReleaseTrainCandidateEligibility;
   reasons: string[];
 }
 
-export function buildNexusPublicationTrainReadinessReport(
-  options: BuildNexusPublicationTrainReadinessReportOptions,
-): NexusPublicationTrainReadinessReport {
+export function buildNexusReleaseTrainReadinessReport(
+  options: BuildNexusReleaseTrainReadinessReportOptions,
+): NexusReleaseTrainReadinessReport {
   const projectRoot = path.resolve(required(options.projectRoot, "projectRoot"));
   const projectConfig = loadProjectConfig(projectRoot);
   const components = resolveProjectComponents(projectRoot, projectConfig);
@@ -252,7 +252,7 @@ export function buildNexusPublicationTrainReadinessReport(
         warnings,
       }),
     )
-    .filter((item): item is NexusPublicationTrainReadinessItem => item !== null);
+    .filter((item): item is NexusReleaseTrainReadinessItem => item !== null);
 
   return {
     version: 1,
@@ -275,15 +275,15 @@ function readinessItem(options: {
   projectConfig: NexusProjectConfig;
   components: ResolvedNexusProjectComponent[];
   source: ReadinessSource;
-  options: BuildNexusPublicationTrainReadinessReportOptions;
+  options: BuildNexusReleaseTrainReadinessReportOptions;
   warnings: string[];
-}): NexusPublicationTrainReadinessItem | null {
+}): NexusReleaseTrainReadinessItem | null {
   const component = options.components.find(
     (candidate) => candidate.id === options.source.componentId,
   );
   if (!component) {
     options.warnings.push(
-      `Publication train source ${options.source.sourceId} references unknown component ${options.source.componentId ?? "none"}.`,
+      `Release train source ${options.source.sourceId} references unknown component ${options.source.componentId ?? "none"}.`,
     );
     return null;
   }
@@ -363,7 +363,7 @@ function leaseSources(options: {
     }));
 }
 
-function handoffSource(handoff: NexusPublicationTrainHandoffInput): ReadinessSource {
+function handoffSource(handoff: NexusReleaseTrainHandoffInput): ReadinessSource {
   return {
     sourceKind: "handoff",
     sourceId: handoff.id,
@@ -381,7 +381,7 @@ function handoffSource(handoff: NexusPublicationTrainHandoffInput): ReadinessSou
   };
 }
 
-function sourceState(source: ReadinessSource): NexusPublicationTrainSourceState {
+function sourceState(source: ReadinessSource): NexusReleaseTrainSourceState {
   return {
     status: source.status,
     stale: source.stale,
@@ -396,8 +396,8 @@ function sourceState(source: ReadinessSource): NexusPublicationTrainSourceState 
 
 function classifyReadiness(options: {
   source: ReadinessSource;
-  state: NexusPublicationTrainSourceState;
-  version: NexusPublicationTrainVersionScope | null;
+  state: NexusReleaseTrainSourceState;
+  version: NexusReleaseTrainVersionScope | null;
   hasVersionPlanning: boolean;
   ciTier: NexusCiTierDecision;
 }): ClassifiedReadiness {
@@ -470,7 +470,7 @@ function versionScope(options: {
   projectConfig: NexusProjectConfig;
   source: ReadinessSource;
   requestedVersionId: string | null;
-}): NexusPublicationTrainVersionScope | null {
+}): NexusReleaseTrainVersionScope | null {
   const versions = options.projectConfig.versionPlanning?.versions ?? [];
   for (const version of versions) {
     if (options.requestedVersionId && version.id !== options.requestedVersionId) {
@@ -509,8 +509,8 @@ function evidenceForSource(options: {
   source: ReadinessSource;
   branchName: string | null;
   ciTier: NexusCiTierDecision;
-  providerEvidence: NexusPublicationTrainProviderEvidenceInput[];
-}): NexusPublicationTrainEvidence {
+  providerEvidence: NexusReleaseTrainProviderEvidenceInput[];
+}): NexusReleaseTrainEvidence {
   const requiredChecks = options.ciTier.requiredChecks;
   const evidence = findNexusPublicationProviderEvidence(
     normalizeNexusPublicationProviderEvidence(options.providerEvidence),
@@ -586,8 +586,8 @@ function evidenceForSource(options: {
 }
 
 function summarizeItems(
-  items: NexusPublicationTrainReadinessItem[],
-): NexusPublicationTrainReadinessSummary {
+  items: NexusReleaseTrainReadinessItem[],
+): NexusReleaseTrainReadinessSummary {
   return {
     itemCount: items.length,
     readyCount: items.filter((item) => item.state.status === "ready").length,
@@ -613,16 +613,16 @@ function summarizeItems(
 }
 
 function countByEligibility(
-  items: NexusPublicationTrainReadinessItem[],
-  eligibility: NexusPublicationTrainCandidateEligibility,
+  items: NexusReleaseTrainReadinessItem[],
+  eligibility: NexusReleaseTrainCandidateEligibility,
 ): number {
   return items.filter((item) => item.candidateEligibility === eligibility).length;
 }
 
 function groupByComponent(
-  items: NexusPublicationTrainReadinessItem[],
-): NexusPublicationTrainComponentGroup[] {
-  const groups = new Map<string, NexusPublicationTrainReadinessItem[]>();
+  items: NexusReleaseTrainReadinessItem[],
+): NexusReleaseTrainComponentGroup[] {
+  const groups = new Map<string, NexusReleaseTrainReadinessItem[]>();
   for (const item of items) {
     groups.set(item.componentId, [...(groups.get(item.componentId) ?? []), item]);
   }
@@ -636,9 +636,9 @@ function groupByComponent(
 }
 
 function groupByVersion(
-  items: NexusPublicationTrainReadinessItem[],
-): NexusPublicationTrainVersionGroup[] {
-  const groups = new Map<string, NexusPublicationTrainReadinessItem[]>();
+  items: NexusReleaseTrainReadinessItem[],
+): NexusReleaseTrainVersionGroup[] {
+  const groups = new Map<string, NexusReleaseTrainReadinessItem[]>();
   for (const item of items) {
     groups.set(item.version?.versionId ?? "", [
       ...(groups.get(item.version?.versionId ?? "") ?? []),
@@ -656,8 +656,8 @@ function groupByVersion(
 }
 
 function nextAction(
-  items: NexusPublicationTrainReadinessItem[],
-): NexusPublicationTrainNextAction {
+  items: NexusReleaseTrainReadinessItem[],
+): NexusReleaseTrainNextAction {
   if (countByEligibility(items, "eligible") > 0) {
     return "create_candidate_branch";
   }

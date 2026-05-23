@@ -6,8 +6,8 @@ import {
   defaultNexusAutomationConfig,
 } from "./nexusAutomationConfig.js";
 import {
-  summarizeNexusPublicationTrainPolicy,
-} from "./nexusPublicationTrainPolicy.js";
+  summarizeNexusReleaseTrainPolicy,
+} from "./nexusReleaseTrainPolicy.js";
 import {
   saveProjectConfig,
   type NexusProjectConfig,
@@ -28,7 +28,7 @@ afterEach(() => {
   }
 });
 
-describe("publication train policy", () => {
+describe("release train policy", () => {
   it("summarizes configured branch names, active version, CI budget, and selector posture", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-train-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
@@ -36,7 +36,7 @@ describe("publication train policy", () => {
     saveProjectConfig(projectRoot, config);
     const component = resolveProjectComponents(projectRoot, config)[0]!;
 
-    const summary = summarizeNexusPublicationTrainPolicy({
+    const summary = summarizeNexusReleaseTrainPolicy({
       projectConfig: config,
       component,
     });
@@ -52,6 +52,20 @@ describe("publication train policy", () => {
         integrationBranch: "integration/0.2.0",
         candidateBranch: "candidate/0.2.0",
       },
+      featureBranchDelivery: {
+        enabled: true,
+        activeScopeId: "feature-a",
+        branchSlug: "feature-a",
+        defaultBranchStrategy: "hybrid",
+        defaultIntentPrefix: "feat",
+        commentPolicy: "status_only",
+        branchPlan: {
+          featureBranch: "feat/feature-a",
+          reviewBranchPattern: "feat/feature-a/{change}",
+          defaultChangeBaseBranch: "feat/feature-a",
+          finalPublicationTarget: "main",
+        },
+      },
       selector: {
         statuses: ["ready"],
         labels: [],
@@ -59,7 +73,7 @@ describe("publication train policy", () => {
       },
       ciTiers: {
         defaultTier: "remote_smoke",
-        source: "publication_train",
+        source: "release_train",
         fullMatrixBudget: {
           minimumIntervalMinutes: 90,
           minimumChangeCount: 4,
@@ -69,7 +83,7 @@ describe("publication train policy", () => {
     });
   });
 
-  it("returns null when the workspace has not opted into publication train policy", () => {
+  it("returns null when the workspace has not opted into release train policy", () => {
     const projectRoot = makeTempDir("dev-nexus-publication-train-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     const config = projectConfig({
@@ -80,7 +94,7 @@ describe("publication train policy", () => {
     const component = resolveProjectComponents(projectRoot, config)[0]!;
 
     expect(
-      summarizeNexusPublicationTrainPolicy({
+      summarizeNexusReleaseTrainPolicy({
         projectConfig: config,
         component,
       }),
@@ -109,13 +123,21 @@ function projectConfig(
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "0.2.0",
           branchNaming: {
             integrationPrefix: "integration",
             candidatePrefix: "candidate",
             unscopedName: "manual",
+          },
+          featureBranchDelivery: {
+            enabled: true,
+            activeFeatureId: "feature-a",
+            defaultBranchStrategy: "hybrid",
+            branchNaming: {
+              defaultIntentPrefix: "feat",
+            },
           },
           ciTiers: {
             enabled: true,

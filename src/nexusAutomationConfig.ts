@@ -210,13 +210,74 @@ export interface NexusAutomationGreenMainConfig {
   staleChecks: NexusAutomationGreenMainStaleCheckPolicy;
 }
 
-export interface NexusAutomationPublicationTrainBranchNamingConfig {
+export type NexusFeatureBranchDeliveryBranchStrategy =
+  | "direct"
+  | "stacked"
+  | "feature_branch"
+  | "hybrid"
+  | "throwaway_rehearsal";
+
+export type NexusFeatureBranchDeliveryReviewMode =
+  | "review_branch_pr"
+  | "commit_pr"
+  | "batch_pr";
+
+export type NexusFeatureBranchDeliveryFinalPullRequestCreationPolicy =
+  | "at_feature_start"
+  | "at_review_gate"
+  | "manual_only";
+
+export type NexusFeatureBranchDeliveryCommentPolicy =
+  | "silent"
+  | "status_only"
+  | "comments_allowed";
+
+export type NexusFeatureBranchDeliveryBranchPublicationStrategy =
+  | "push_remote"
+  | "fallback_remote"
+  | "push_remote_then_fallback"
+  | "manual_only";
+
+export interface NexusFeatureBranchDeliveryBranchNamingConfig {
+  defaultIntentPrefix: string;
+  allowedIntentPrefixes: string[];
+  featureBranchPattern: string;
+  reviewBranchPattern: string;
+}
+
+export interface NexusFeatureBranchDeliveryReviewConfig {
+  mode: NexusFeatureBranchDeliveryReviewMode;
+  finalPullRequest: boolean;
+  finalPullRequestCreation: NexusFeatureBranchDeliveryFinalPullRequestCreationPolicy;
+}
+
+export interface NexusFeatureBranchDeliveryProviderConfig {
+  commentPolicy: NexusFeatureBranchDeliveryCommentPolicy;
+}
+
+export interface NexusFeatureBranchDeliveryBranchPublicationConfig {
+  strategy: NexusFeatureBranchDeliveryBranchPublicationStrategy;
+  fallbackRemote: string | null;
+}
+
+export interface NexusFeatureBranchDeliveryConfig {
+  enabled: boolean;
+  activeFeatureId: string | null;
+  defaultBranchStrategy: NexusFeatureBranchDeliveryBranchStrategy;
+  allowedBranchStrategies: NexusFeatureBranchDeliveryBranchStrategy[];
+  branchNaming: NexusFeatureBranchDeliveryBranchNamingConfig;
+  review: NexusFeatureBranchDeliveryReviewConfig;
+  provider: NexusFeatureBranchDeliveryProviderConfig;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationConfig;
+}
+
+export interface NexusAutomationReleaseTrainBranchNamingConfig {
   integrationPrefix: string;
   candidatePrefix: string;
   unscopedName: string;
 }
 
-export interface NexusAutomationPublicationTrainSelectorConfig {
+export interface NexusAutomationReleaseTrainSelectorConfig {
   statuses: WorkStatus[];
   labels: string[];
   milestones: string[];
@@ -224,12 +285,13 @@ export interface NexusAutomationPublicationTrainSelectorConfig {
   providerQuery: string | null;
 }
 
-export interface NexusAutomationPublicationTrainConfig {
+export interface NexusAutomationReleaseTrainConfig {
   enabled: boolean;
   activeVersionId: string | null;
-  branchNaming: NexusAutomationPublicationTrainBranchNamingConfig;
+  branchNaming: NexusAutomationReleaseTrainBranchNamingConfig;
+  featureBranchDelivery?: NexusFeatureBranchDeliveryConfig | null;
   ciTiers?: NexusCiTierPolicyConfig | null;
-  selector: NexusAutomationPublicationTrainSelectorConfig;
+  selector: NexusAutomationReleaseTrainSelectorConfig;
 }
 
 export interface NexusAutomationPublicationConfig {
@@ -248,7 +310,7 @@ export interface NexusAutomationPublicationConfig {
   manualActor: NexusPublicationActorConfig | null;
   commandEnvironment: Record<string, string>;
   greenMain?: NexusAutomationGreenMainConfig | null;
-  publicationTrain?: NexusAutomationPublicationTrainConfig | null;
+  releaseTrain?: NexusAutomationReleaseTrainConfig | null;
 }
 
 export interface NexusAutomationPublicationPolicySummary {
@@ -392,8 +454,8 @@ export const defaultNexusAutomationGreenMainConfig:
     staleChecks: "block",
   };
 
-export const defaultNexusAutomationPublicationTrainConfig:
-  NexusAutomationPublicationTrainConfig = {
+export const defaultNexusAutomationReleaseTrainConfig:
+  NexusAutomationReleaseTrainConfig = {
     enabled: false,
     activeVersionId: null,
     branchNaming: {
@@ -407,6 +469,46 @@ export const defaultNexusAutomationPublicationTrainConfig:
       milestones: [],
       assignees: [],
       providerQuery: null,
+    },
+  };
+
+export const defaultNexusFeatureBranchDeliveryConfig:
+  NexusFeatureBranchDeliveryConfig = {
+    enabled: false,
+    activeFeatureId: null,
+    defaultBranchStrategy: "direct",
+    allowedBranchStrategies: [
+      "direct",
+      "stacked",
+      "feature_branch",
+      "hybrid",
+      "throwaway_rehearsal",
+    ],
+    branchNaming: {
+      defaultIntentPrefix: "feat",
+      allowedIntentPrefixes: [
+        "feat",
+        "fix",
+        "chore",
+        "docs",
+        "refactor",
+        "test",
+        "ci",
+      ],
+      featureBranchPattern: "{intent}/{feature}",
+      reviewBranchPattern: "{intent}/{feature}/{change}",
+    },
+    review: {
+      mode: "review_branch_pr",
+      finalPullRequest: true,
+      finalPullRequestCreation: "at_review_gate",
+    },
+    provider: {
+      commentPolicy: "status_only",
+    },
+    branchPublication: {
+      strategy: "push_remote",
+      fallbackRemote: null,
     },
   };
 
@@ -526,7 +628,7 @@ export function normalizeNexusAutomationPublicationConfig(
   value: NexusAutomationPublicationConfig,
   pathName = "workspace config.automation.publication",
 ): NexusAutomationPublicationConfig {
-  const publicationTrain = normalizePublicationTrainConfig(value.publicationTrain);
+  const releaseTrain = normalizeReleaseTrainConfig(value.releaseTrain);
   if (value.strategy === "green_main") {
     const greenMain = {
       ...defaultNexusAutomationGreenMainConfig,
@@ -562,7 +664,7 @@ export function normalizeNexusAutomationPublicationConfig(
 
     return {
       ...value,
-      ...(publicationTrain !== undefined ? { publicationTrain } : {}),
+      ...(releaseTrain !== undefined ? { releaseTrain } : {}),
       greenMain: {
         ...greenMain,
         requiredChecks: [...greenMain.requiredChecks],
@@ -579,13 +681,13 @@ export function normalizeNexusAutomationPublicationConfig(
   const { greenMain: _greenMain, ...withoutGreenMain } = value;
   return {
     ...withoutGreenMain,
-    ...(publicationTrain !== undefined ? { publicationTrain } : {}),
+    ...(releaseTrain !== undefined ? { releaseTrain } : {}),
   };
 }
 
-function normalizePublicationTrainConfig(
-  value: NexusAutomationPublicationConfig["publicationTrain"],
-): NexusAutomationPublicationConfig["publicationTrain"] | undefined {
+function normalizeReleaseTrainConfig(
+  value: NexusAutomationPublicationConfig["releaseTrain"],
+): NexusAutomationPublicationConfig["releaseTrain"] | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -596,6 +698,15 @@ function normalizePublicationTrainConfig(
     enabled: value.enabled,
     activeVersionId: value.activeVersionId,
     branchNaming: { ...value.branchNaming },
+    ...(value.featureBranchDelivery
+      ? {
+          featureBranchDelivery: normalizeFeatureBranchDeliveryConfig(
+            value.featureBranchDelivery,
+          ),
+        }
+      : value.featureBranchDelivery === null
+        ? { featureBranchDelivery: null }
+        : {}),
     ...(value.ciTiers
       ? {
           ciTiers: {
@@ -620,6 +731,39 @@ function normalizePublicationTrainConfig(
       milestones: [...value.selector.milestones],
       assignees: [...value.selector.assignees],
       providerQuery: value.selector.providerQuery,
+    },
+  };
+}
+
+function normalizeFeatureBranchDeliveryConfig(
+  value: NexusFeatureBranchDeliveryConfig,
+): NexusFeatureBranchDeliveryConfig {
+  const branchNaming = {
+    ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
+    ...value.branchNaming,
+  };
+  return {
+    ...defaultNexusFeatureBranchDeliveryConfig,
+    ...value,
+    allowedBranchStrategies: value.allowedBranchStrategies
+      ? [...value.allowedBranchStrategies]
+      : [...defaultNexusFeatureBranchDeliveryConfig.allowedBranchStrategies],
+    branchNaming: {
+      ...branchNaming,
+      allowedIntentPrefixes: branchNaming.allowedIntentPrefixes
+        ? [...branchNaming.allowedIntentPrefixes]
+        : [
+            ...defaultNexusFeatureBranchDeliveryConfig.branchNaming
+              .allowedIntentPrefixes,
+          ],
+    },
+    review: {
+      ...defaultNexusFeatureBranchDeliveryConfig.review,
+      ...value.review,
+    },
+    provider: {
+      ...defaultNexusFeatureBranchDeliveryConfig.provider,
+      ...value.provider,
     },
   };
 }
@@ -1498,7 +1642,7 @@ export function validatePartialNexusAutomationPublicationConfig(
     ...optionalPublicationActorField(record, "manualActor", pathName),
     ...optionalCommandEnvironmentField(record, "commandEnvironment", pathName),
     ...optionalGreenMainPublicationField(record, "greenMain", pathName),
-    ...optionalPublicationTrainField(record, "publicationTrain", pathName),
+    ...optionalReleaseTrainField(record, "releaseTrain", pathName),
   };
 }
 
@@ -1694,6 +1838,24 @@ function optionalArrayField<Key extends string, Item>(
   } as Record<Key, Item[]>;
 }
 
+function optionalArray<Item>(
+  value: unknown,
+  pathName: string,
+  normalizeItem: (value: unknown, pathName: string) => Item,
+): Item[] {
+  if (!Array.isArray(value)) {
+    throw new NexusAutomationConfigError(`${pathName} must be an array`);
+  }
+
+  return value.map((item, index) =>
+    normalizeItem(item, `${pathName}[${index}]`),
+  );
+}
+
+function uniqueValues<Value>(values: Value[]): Value[] {
+  return [...new Set(values)];
+}
+
 function optionalStringArray(
   value: unknown,
   pathName: string,
@@ -1724,6 +1886,57 @@ function optionalBranchPrefix(
     );
   }
   return prefix;
+}
+
+function validateBranchIntentPrefix(
+  value: unknown,
+  pathName: string,
+): string {
+  const prefix = requiredNonEmptyString(value, pathName).replace(/\/+$/u, "");
+  if (
+    prefix.length === 0 ||
+    prefix.includes("/") ||
+    prefix === "." ||
+    prefix === ".." ||
+    /\s/u.test(prefix)
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a single Git branch prefix segment without whitespace`,
+    );
+  }
+  return prefix;
+}
+
+function validateFeatureBranchPattern(
+  value: unknown,
+  pathName: string,
+  requiredPlaceholders: string[],
+  forbiddenPlaceholders: string[],
+  defaultPattern: string,
+): string {
+  const pattern = value === undefined
+    ? defaultPattern
+    : requiredNonEmptyString(value, pathName);
+  if (pattern.startsWith("/") || pattern.includes("..") || /\s/u.test(pattern)) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a relative Git branch pattern without whitespace or parent traversal`,
+    );
+  }
+  for (const placeholder of requiredPlaceholders) {
+    if (!pattern.includes(`{${placeholder}}`)) {
+      throw new NexusAutomationConfigError(
+        `${pathName} must include {${placeholder}}`,
+      );
+    }
+  }
+  for (const placeholder of forbiddenPlaceholders) {
+    if (pattern.includes(`{${placeholder}}`)) {
+      throw new NexusAutomationConfigError(
+        `${pathName} must not include {${placeholder}}`,
+      );
+    }
+  }
+  return pattern.replace(/\/+$/u, "");
 }
 
 function optionalBranchSegment(
@@ -1866,11 +2079,11 @@ function validateGreenMainPublicationConfig(
   };
 }
 
-function optionalPublicationTrainField<Key extends string>(
+function optionalReleaseTrainField<Key extends string>(
   record: Record<string, unknown>,
   key: Key,
   pathName: string,
-): Partial<Record<Key, NexusAutomationPublicationTrainConfig | null>> {
+): Partial<Record<Key, NexusAutomationReleaseTrainConfig | null>> {
   const value = record[key];
   if (value === undefined) {
     return {};
@@ -1880,29 +2093,35 @@ function optionalPublicationTrainField<Key extends string>(
   }
 
   return {
-    [key]: validatePublicationTrainConfig(value, `${pathName}.${key}`),
-  } as Record<Key, NexusAutomationPublicationTrainConfig>;
+    [key]: validateReleaseTrainConfig(value, `${pathName}.${key}`),
+  } as Record<Key, NexusAutomationReleaseTrainConfig>;
 }
 
-function validatePublicationTrainConfig(
+function validateReleaseTrainConfig(
   value: unknown,
   pathName: string,
-): NexusAutomationPublicationTrainConfig {
+): NexusAutomationReleaseTrainConfig {
   const record = assertRecord(value, pathName);
   const enabled = optionalBoolean(record, "enabled", pathName) ??
-    defaultNexusAutomationPublicationTrainConfig.enabled;
+    defaultNexusAutomationReleaseTrainConfig.enabled;
   const activeVersionId = optionalNullableString(
     record.activeVersionId,
     `${pathName}.activeVersionId`,
-  ) ?? defaultNexusAutomationPublicationTrainConfig.activeVersionId;
-  const branchNaming = validatePublicationTrainBranchNaming(
+  ) ?? defaultNexusAutomationReleaseTrainConfig.activeVersionId;
+  const branchNaming = validateReleaseTrainBranchNaming(
     record.branchNaming,
     `${pathName}.branchNaming`,
   );
+  const featureBranchDelivery = record.featureBranchDelivery === undefined
+    ? undefined
+    : validateFeatureBranchDeliveryConfig(
+        record.featureBranchDelivery,
+        `${pathName}.featureBranchDelivery`,
+      );
   const ciTiers = record.ciTiers === undefined
     ? undefined
     : validateNexusCiTierPolicyConfig(record.ciTiers, `${pathName}.ciTiers`);
-  const selector = validatePublicationTrainSelector(
+  const selector = validateReleaseTrainSelector(
     record.selector,
     `${pathName}.selector`,
   );
@@ -1911,44 +2130,300 @@ function validatePublicationTrainConfig(
     enabled,
     activeVersionId,
     branchNaming,
+    ...(featureBranchDelivery !== undefined ? { featureBranchDelivery } : {}),
     ...(ciTiers !== undefined ? { ciTiers } : {}),
     selector,
   };
 }
 
-function validatePublicationTrainBranchNaming(
+function validateFeatureBranchDeliveryConfig(
   value: unknown,
   pathName: string,
-): NexusAutomationPublicationTrainBranchNamingConfig {
+): NexusFeatureBranchDeliveryConfig | null {
+  if (value === null) {
+    return null;
+  }
+  const record = assertRecord(value, pathName);
+  const enabled = optionalBoolean(record, "enabled", pathName) ??
+    defaultNexusFeatureBranchDeliveryConfig.enabled;
+  const activeFeatureId = optionalNullableString(
+    record.activeFeatureId,
+    `${pathName}.activeFeatureId`,
+  ) ?? defaultNexusFeatureBranchDeliveryConfig.activeFeatureId;
+  const allowedBranchStrategies = validateAllowedFeatureBranchStrategies(
+    record.allowedBranchStrategies,
+    `${pathName}.allowedBranchStrategies`,
+  );
+  const defaultBranchStrategy = record.defaultBranchStrategy === undefined
+    ? defaultNexusFeatureBranchDeliveryConfig.defaultBranchStrategy
+    : validateFeatureBranchDeliveryBranchStrategy(
+        record.defaultBranchStrategy,
+        `${pathName}.defaultBranchStrategy`,
+      );
+  if (!allowedBranchStrategies.includes(defaultBranchStrategy)) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.defaultBranchStrategy must be included in allowedBranchStrategies`,
+    );
+  }
+
+  return {
+    enabled,
+    activeFeatureId,
+    defaultBranchStrategy,
+    allowedBranchStrategies,
+    branchNaming: validateFeatureBranchDeliveryBranchNaming(
+      record.branchNaming,
+      `${pathName}.branchNaming`,
+    ),
+    review: validateFeatureBranchDeliveryReview(
+      record.review,
+      `${pathName}.review`,
+    ),
+    provider: validateFeatureBranchDeliveryProvider(
+      record.provider,
+      `${pathName}.provider`,
+    ),
+    branchPublication: validateFeatureBranchDeliveryBranchPublication(
+      record.branchPublication,
+      `${pathName}.branchPublication`,
+    ),
+  };
+}
+
+function validateAllowedFeatureBranchStrategies(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryBranchStrategy[] {
+  const branchStrategies = value === undefined
+    ? [...defaultNexusFeatureBranchDeliveryConfig.allowedBranchStrategies]
+    : optionalArray(value, pathName, validateFeatureBranchDeliveryBranchStrategy);
+  if (branchStrategies.length === 0) {
+    throw new NexusAutomationConfigError(`${pathName} must not be empty`);
+  }
+  return uniqueValues(branchStrategies);
+}
+
+function validateFeatureBranchDeliveryBranchNaming(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryBranchNamingConfig {
   if (value === undefined) {
-    return { ...defaultNexusAutomationPublicationTrainConfig.branchNaming };
+    return {
+      defaultIntentPrefix:
+        defaultNexusFeatureBranchDeliveryConfig.branchNaming.defaultIntentPrefix,
+      allowedIntentPrefixes: [
+        ...defaultNexusFeatureBranchDeliveryConfig.branchNaming.allowedIntentPrefixes,
+      ],
+      featureBranchPattern:
+        defaultNexusFeatureBranchDeliveryConfig.branchNaming.featureBranchPattern,
+      reviewBranchPattern:
+        defaultNexusFeatureBranchDeliveryConfig.branchNaming.reviewBranchPattern,
+    };
+  }
+  const record = assertRecord(value, pathName);
+  const allowedIntentPrefixes = record.allowedIntentPrefixes === undefined
+    ? [...defaultNexusFeatureBranchDeliveryConfig.branchNaming.allowedIntentPrefixes]
+    : uniqueValues(optionalArray(
+        record.allowedIntentPrefixes,
+        `${pathName}.allowedIntentPrefixes`,
+        validateBranchIntentPrefix,
+      ));
+  if (allowedIntentPrefixes.length === 0) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.allowedIntentPrefixes must not be empty`,
+    );
+  }
+  const defaultIntentPrefix = record.defaultIntentPrefix === undefined
+    ? defaultNexusFeatureBranchDeliveryConfig.branchNaming.defaultIntentPrefix
+    : validateBranchIntentPrefix(
+        record.defaultIntentPrefix,
+        `${pathName}.defaultIntentPrefix`,
+      );
+  if (!allowedIntentPrefixes.includes(defaultIntentPrefix)) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.defaultIntentPrefix must be included in allowedIntentPrefixes`,
+    );
+  }
+
+  return {
+    defaultIntentPrefix,
+    allowedIntentPrefixes,
+    featureBranchPattern: validateFeatureBranchPattern(
+      record.featureBranchPattern,
+      `${pathName}.featureBranchPattern`,
+      ["intent", "feature"],
+      ["change"],
+      defaultNexusFeatureBranchDeliveryConfig.branchNaming.featureBranchPattern,
+    ),
+    reviewBranchPattern: validateFeatureBranchPattern(
+      record.reviewBranchPattern,
+      `${pathName}.reviewBranchPattern`,
+      ["intent", "feature", "change"],
+      [],
+      defaultNexusFeatureBranchDeliveryConfig.branchNaming.reviewBranchPattern,
+    ),
+  };
+}
+
+function validateFeatureBranchDeliveryReview(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryReviewConfig {
+  if (value === undefined) {
+    return { ...defaultNexusFeatureBranchDeliveryConfig.review };
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    mode: record.mode === undefined
+      ? defaultNexusFeatureBranchDeliveryConfig.review.mode
+      : validateFeatureBranchDeliveryReviewMode(record.mode, `${pathName}.mode`),
+    finalPullRequest:
+      optionalBoolean(record, "finalPullRequest", pathName) ??
+      defaultNexusFeatureBranchDeliveryConfig.review.finalPullRequest,
+    finalPullRequestCreation: record.finalPullRequestCreation === undefined
+      ? defaultNexusFeatureBranchDeliveryConfig.review.finalPullRequestCreation
+      : validateFeatureBranchDeliveryFinalPullRequestCreationPolicy(
+          record.finalPullRequestCreation,
+          `${pathName}.finalPullRequestCreation`,
+        ),
+  };
+}
+
+function validateFeatureBranchDeliveryFinalPullRequestCreationPolicy(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryFinalPullRequestCreationPolicy {
+  if (
+    value === "at_feature_start" ||
+    value === "at_review_gate" ||
+    value === "manual_only"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be at_feature_start, at_review_gate, or manual_only`,
+  );
+}
+
+function validateFeatureBranchDeliveryProvider(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryProviderConfig {
+  if (value === undefined) {
+    return { ...defaultNexusFeatureBranchDeliveryConfig.provider };
+  }
+  const record = assertRecord(value, pathName);
+  return {
+    commentPolicy: record.commentPolicy === undefined
+      ? defaultNexusFeatureBranchDeliveryConfig.provider.commentPolicy
+      : validateFeatureBranchDeliveryCommentPolicy(
+          record.commentPolicy,
+          `${pathName}.commentPolicy`,
+        ),
+  };
+}
+
+function validateFeatureBranchDeliveryBranchPublication(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryBranchPublicationConfig {
+  if (value === undefined) {
+    return { ...defaultNexusFeatureBranchDeliveryConfig.branchPublication };
+  }
+  const record = assertRecord(value, pathName);
+  const strategy = record.strategy === undefined
+    ? defaultNexusFeatureBranchDeliveryConfig.branchPublication.strategy
+    : validateFeatureBranchDeliveryBranchPublicationStrategy(
+        record.strategy,
+        `${pathName}.strategy`,
+      );
+  const fallbackRemote = validateFeatureBranchDeliveryRemoteName(
+    optionalNullableString(record.fallbackRemote, `${pathName}.fallbackRemote`) ??
+      defaultNexusFeatureBranchDeliveryConfig.branchPublication.fallbackRemote,
+    `${pathName}.fallbackRemote`,
+  );
+  if (
+    (strategy === "fallback_remote" ||
+      strategy === "push_remote_then_fallback") &&
+    !fallbackRemote
+  ) {
+    throw new NexusAutomationConfigError(
+      `${pathName}.fallbackRemote is required when strategy is ${strategy}`,
+    );
+  }
+
+  return {
+    strategy,
+    fallbackRemote,
+  };
+}
+
+function validateFeatureBranchDeliveryBranchPublicationStrategy(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryBranchPublicationStrategy {
+  if (
+    value === "push_remote" ||
+    value === "fallback_remote" ||
+    value === "push_remote_then_fallback" ||
+    value === "manual_only"
+  ) {
+    return value;
+  }
+  throw new NexusAutomationConfigError(
+    `${pathName} must be push_remote, fallback_remote, push_remote_then_fallback, or manual_only`,
+  );
+}
+
+function validateFeatureBranchDeliveryRemoteName(
+  value: string | null | undefined,
+  pathName: string,
+): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const remote = value.trim();
+  if (remote.length === 0 || /\s/u.test(remote)) {
+    throw new NexusAutomationConfigError(
+      `${pathName} must be a Git remote name without whitespace`,
+    );
+  }
+  return remote;
+}
+
+function validateReleaseTrainBranchNaming(
+  value: unknown,
+  pathName: string,
+): NexusAutomationReleaseTrainBranchNamingConfig {
+  if (value === undefined) {
+    return { ...defaultNexusAutomationReleaseTrainConfig.branchNaming };
   }
   const record = assertRecord(value, pathName);
   return {
     integrationPrefix:
       optionalBranchPrefix(record.integrationPrefix, `${pathName}.integrationPrefix`) ??
-      defaultNexusAutomationPublicationTrainConfig.branchNaming.integrationPrefix,
+      defaultNexusAutomationReleaseTrainConfig.branchNaming.integrationPrefix,
     candidatePrefix:
       optionalBranchPrefix(record.candidatePrefix, `${pathName}.candidatePrefix`) ??
-      defaultNexusAutomationPublicationTrainConfig.branchNaming.candidatePrefix,
+      defaultNexusAutomationReleaseTrainConfig.branchNaming.candidatePrefix,
     unscopedName:
       optionalBranchSegment(record.unscopedName, `${pathName}.unscopedName`) ??
-      defaultNexusAutomationPublicationTrainConfig.branchNaming.unscopedName,
+      defaultNexusAutomationReleaseTrainConfig.branchNaming.unscopedName,
   };
 }
 
-function validatePublicationTrainSelector(
+function validateReleaseTrainSelector(
   value: unknown,
   pathName: string,
-): NexusAutomationPublicationTrainSelectorConfig {
+): NexusAutomationReleaseTrainSelectorConfig {
   if (value === undefined) {
     return {
-      statuses: [...defaultNexusAutomationPublicationTrainConfig.selector.statuses],
-      labels: [...defaultNexusAutomationPublicationTrainConfig.selector.labels],
-      milestones: [...defaultNexusAutomationPublicationTrainConfig.selector.milestones],
-      assignees: [...defaultNexusAutomationPublicationTrainConfig.selector.assignees],
+      statuses: [...defaultNexusAutomationReleaseTrainConfig.selector.statuses],
+      labels: [...defaultNexusAutomationReleaseTrainConfig.selector.labels],
+      milestones: [...defaultNexusAutomationReleaseTrainConfig.selector.milestones],
+      assignees: [...defaultNexusAutomationReleaseTrainConfig.selector.assignees],
       providerQuery:
-        defaultNexusAutomationPublicationTrainConfig.selector.providerQuery,
+        defaultNexusAutomationReleaseTrainConfig.selector.providerQuery,
     };
   }
   const record = assertRecord(value, pathName);
@@ -1958,28 +2433,28 @@ function validatePublicationTrainSelector(
       "statuses",
       pathName,
       validateWorkStatus,
-    ).statuses ?? [...defaultNexusAutomationPublicationTrainConfig.selector.statuses],
+    ).statuses ?? [...defaultNexusAutomationReleaseTrainConfig.selector.statuses],
     labels: optionalArrayField(
       record,
       "labels",
       pathName,
       requiredNonEmptyString,
-    ).labels ?? [...defaultNexusAutomationPublicationTrainConfig.selector.labels],
+    ).labels ?? [...defaultNexusAutomationReleaseTrainConfig.selector.labels],
     milestones: optionalArrayField(
       record,
       "milestones",
       pathName,
       requiredNonEmptyString,
-    ).milestones ?? [...defaultNexusAutomationPublicationTrainConfig.selector.milestones],
+    ).milestones ?? [...defaultNexusAutomationReleaseTrainConfig.selector.milestones],
     assignees: optionalArrayField(
       record,
       "assignees",
       pathName,
       requiredNonEmptyString,
-    ).assignees ?? [...defaultNexusAutomationPublicationTrainConfig.selector.assignees],
+    ).assignees ?? [...defaultNexusAutomationReleaseTrainConfig.selector.assignees],
     providerQuery:
       optionalNullableString(record.providerQuery, `${pathName}.providerQuery`) ??
-      defaultNexusAutomationPublicationTrainConfig.selector.providerQuery,
+      defaultNexusAutomationReleaseTrainConfig.selector.providerQuery,
   };
 }
 
@@ -2077,6 +2552,59 @@ function validateGreenMainMergeAuthorityPolicy(
 
   throw new NexusAutomationConfigError(
     `${pathName} must be handoff or authorized_merge`,
+  );
+}
+
+function validateFeatureBranchDeliveryBranchStrategy(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryBranchStrategy {
+  if (
+    value === "direct" ||
+    value === "stacked" ||
+    value === "feature_branch" ||
+    value === "hybrid" ||
+    value === "throwaway_rehearsal"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be direct, stacked, feature_branch, hybrid, or throwaway_rehearsal`,
+  );
+}
+
+function validateFeatureBranchDeliveryReviewMode(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryReviewMode {
+  if (
+    value === "review_branch_pr" ||
+    value === "commit_pr" ||
+    value === "batch_pr"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be review_branch_pr, commit_pr, or batch_pr`,
+  );
+}
+
+function validateFeatureBranchDeliveryCommentPolicy(
+  value: unknown,
+  pathName: string,
+): NexusFeatureBranchDeliveryCommentPolicy {
+  if (
+    value === "silent" ||
+    value === "status_only" ||
+    value === "comments_allowed"
+  ) {
+    return value;
+  }
+
+  throw new NexusAutomationConfigError(
+    `${pathName} must be silent, status_only, or comments_allowed`,
   );
 }
 

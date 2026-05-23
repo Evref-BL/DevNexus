@@ -109,6 +109,18 @@ import {
   type NexusAutomationTargetReport,
 } from "./nexusAutomationTargetReport.js";
 import {
+  buildNexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
+import {
+  buildNexusFeatureBranchDeliveryReport,
+} from "./nexusFeatureBranchDeliveryReport.js";
+import {
+  buildNexusFeatureFinalizationPlan,
+} from "./nexusFeatureFinalizationPlan.js";
+import type {
+  NexusPublicationProviderEvidenceInput,
+} from "./nexusPublicationProviderEvidence.js";
+import {
   adoptNexusAutomationCurrentAgent,
   adoptNexusAutomationCurrentAgentFromCoordinatorLoop,
   recordNexusAutomationCurrentAgentAdoptionResult,
@@ -545,6 +557,58 @@ const tools: McpTool[] = [
     },
   },
   {
+    name: "publication_feature_plan",
+    description: "Build a read-only feature branch delivery branch plan from configured publication policy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        featureId: { type: "string" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "publication_feature_report",
+    description: "Build a read-only feature branch delivery readiness report from configured policy and optional provider evidence.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        featureId: { type: "string" },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+        fullMatrixBudgetAvailable: { type: "boolean" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "publication_feature_finalization",
+    description: "Build a read-only feature finalization plan that separates review readiness from publication authority.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectRoot: { type: "string" },
+        componentId: { type: "string" },
+        featureId: { type: "string" },
+        providerEvidence: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+        fullMatrixBudgetAvailable: { type: "boolean" },
+      },
+      required: ["projectRoot"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "current_agent_adopt",
     description: "Create or reuse DevNexus agent-launch context for the current coordinator without spawning nested model execution.",
     inputSchema: {
@@ -658,6 +722,11 @@ const tools: McpTool[] = [
         branchName: { type: "string" },
         worktreeName: { type: "string" },
         baseRef: { type: ["string", "null"] },
+        featureId: { type: ["string", "null"] },
+        featureChange: { type: ["string", "null"] },
+        featureParentBranch: { type: ["string", "null"] },
+        featureStackPosition: { type: "number" },
+        branchIntent: { type: ["string", "null"] },
         hostId: { type: ["string", "null"] },
         agentId: { type: ["string", "null"] },
         workerAgentProvider: { type: ["string", "null"] },
@@ -1545,6 +1614,47 @@ export async function callDevNexusMcpTool(
           report: detail === "full" ? report : summarizeTargetReport(report),
         });
       }
+      case "publication_feature_plan":
+        return toolResult({
+          ok: true,
+          plan: buildNexusFeatureBranchDeliveryPlan({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            featureId: optionalNullableString(args, "featureId", "arguments"),
+          }),
+        });
+      case "publication_feature_report":
+        return toolResult({
+          ok: true,
+          report: buildNexusFeatureBranchDeliveryReport({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            featureId: optionalNullableString(args, "featureId", "arguments"),
+            providerEvidence: providerEvidenceFromArgs(args),
+            fullMatrixBudgetAvailable: optionalBoolean(
+              args,
+              "fullMatrixBudgetAvailable",
+              "arguments",
+            ),
+            now: context.now,
+          }),
+        });
+      case "publication_feature_finalization":
+        return toolResult({
+          ok: true,
+          plan: buildNexusFeatureFinalizationPlan({
+            projectRoot: projectRootFromArgs(args),
+            componentId: optionalString(args, "componentId", "arguments"),
+            featureId: optionalNullableString(args, "featureId", "arguments"),
+            providerEvidence: providerEvidenceFromArgs(args),
+            fullMatrixBudgetAvailable: optionalBoolean(
+              args,
+              "fullMatrixBudgetAvailable",
+              "arguments",
+            ),
+            now: context.now,
+          }),
+        });
       case "current_agent_adopt": {
         const coordinatorLoop =
           optionalBoolean(args, "coordinatorLoop", "arguments") ?? false;
@@ -1653,6 +1763,23 @@ export async function callDevNexusMcpTool(
           branchName: optionalString(args, "branchName", "arguments"),
           worktreeName: optionalString(args, "worktreeName", "arguments"),
           baseRef: optionalNullableString(args, "baseRef", "arguments"),
+          featureId: optionalNullableString(args, "featureId", "arguments"),
+          featureChange: optionalNullableString(
+            args,
+            "featureChange",
+            "arguments",
+          ),
+          featureParentBranch: optionalNullableString(
+            args,
+            "featureParentBranch",
+            "arguments",
+          ),
+          featureStackPosition: optionalPositiveInteger(
+            args,
+            "featureStackPosition",
+            "arguments",
+          ),
+          branchIntent: optionalNullableString(args, "branchIntent", "arguments"),
           hostId: optionalNullableString(args, "hostId", "arguments"),
           agentId: optionalNullableString(args, "agentId", "arguments"),
           workerAgentProvider: optionalNullableString(
@@ -3402,6 +3529,25 @@ function remoteExecutionAttachmentRefsFromArgs(
   });
 }
 
+function providerEvidenceFromArgs(
+  args: Record<string, unknown>,
+): NexusPublicationProviderEvidenceInput[] {
+  const values = args.providerEvidence;
+  if (values === undefined || values === null) {
+    return [];
+  }
+  if (!Array.isArray(values)) {
+    throw new Error("arguments.providerEvidence must be an array");
+  }
+
+  return values.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`arguments.providerEvidence[${index}] must be an object`);
+    }
+    return value as NexusPublicationProviderEvidenceInput;
+  });
+}
+
 function remoteExecutionMutationClassFromArgs(
   args: Record<string, unknown>,
 ): NexusRunnerMutationClass {
@@ -4008,7 +4154,7 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
       component.verification.length > 0 ||
       component.publicationDecisions.length > 0 ||
       component.runs.length > 0 ||
-      component.publicationTrain !== null,
+      component.releaseTrain !== null,
   );
   return {
     version: report.version,
@@ -4094,23 +4240,48 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
             integrationPreference: component.publication.integrationPreference,
           }
         : null,
-      publicationTrain: component.publicationTrain
+      releaseTrain: component.releaseTrain
         ? {
-            enabled: component.publicationTrain.enabled,
-            activeVersionId: component.publicationTrain.activeVersionId,
-            activeVersionFound: component.publicationTrain.activeVersionFound,
-            targetBranch: component.publicationTrain.targetBranch,
-            candidateBranch: component.publicationTrain.branches.candidateBranch,
+            enabled: component.releaseTrain.enabled,
+            activeVersionId: component.releaseTrain.activeVersionId,
+            activeVersionFound: component.releaseTrain.activeVersionFound,
+            targetBranch: component.releaseTrain.targetBranch,
+            candidateBranch: component.releaseTrain.branches.candidateBranch,
             integrationBranch:
-              component.publicationTrain.branches.integrationBranch,
-            ciTierDefault: component.publicationTrain.ciTiers.defaultTier,
+              component.releaseTrain.branches.integrationBranch,
+            ciTierDefault: component.releaseTrain.ciTiers.defaultTier,
             fullMatrixBudget:
-              component.publicationTrain.ciTiers.fullMatrixBudget,
-            selectorLabels: component.publicationTrain.selector.labels,
+              component.releaseTrain.ciTiers.fullMatrixBudget,
+            selectorLabels: component.releaseTrain.selector.labels,
             requiresPublicLabel:
-              component.publicationTrain.selector.requiresPublicLabel,
-            warningCount: component.publicationTrain.warnings.length,
-            warnings: summaryItems(component.publicationTrain.warnings),
+              component.releaseTrain.selector.requiresPublicLabel,
+            featureBranchDelivery: component.releaseTrain.featureBranchDelivery
+              ? {
+                  enabled: component.releaseTrain.featureBranchDelivery.enabled,
+                  activeScopeId:
+                    component.releaseTrain.featureBranchDelivery.activeScopeId,
+                  branchStrategy:
+                    component.releaseTrain.featureBranchDelivery.defaultBranchStrategy,
+                  featureBranch:
+                    component.releaseTrain.featureBranchDelivery.branchPlan.featureBranch,
+                  reviewBranchPattern:
+                    component.releaseTrain.featureBranchDelivery.branchPlan
+                      .reviewBranchPattern,
+                  finalPublicationTarget:
+                    component.releaseTrain.featureBranchDelivery.branchPlan
+                      .finalPublicationTarget,
+                  finalPullRequestCreation:
+                    component.releaseTrain.featureBranchDelivery
+                      .finalPullRequestCreation,
+                  commentPolicy:
+                    component.releaseTrain.featureBranchDelivery.commentPolicy,
+                  branchPublication:
+                    component.releaseTrain.featureBranchDelivery
+                      .branchPublication,
+                }
+              : null,
+            warningCount: component.releaseTrain.warnings.length,
+            warnings: summaryItems(component.releaseTrain.warnings),
           }
         : null,
       authority: component.authority

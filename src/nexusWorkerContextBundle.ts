@@ -156,6 +156,32 @@ export interface NexusWorkerContextBundleWorktree {
   workItem: NexusWorkerContextBundleWorkItem | null;
 }
 
+export interface NexusWorkerContextFeatureBranchPublication {
+  strategy: string;
+  pushRemote: string | null;
+  fallbackRemote: string | null;
+  selectedRemote: string | null;
+  requiresFallbackApproval: boolean;
+}
+
+export interface NexusWorkerContextFeatureBranchDelivery {
+  featureId: string;
+  changeSlug: string;
+  branchStrategy: string;
+  featureBranch: string | null;
+  branchTarget: string;
+  parentBranch: string | null;
+  stackPosition: number | null;
+  childBranches: string[];
+  stackPublicationEligible: boolean;
+  finalPublicationTarget: string;
+  reviewMode: string;
+  finalPullRequestCreation: string;
+  commentPolicy: string;
+  branchPublication: NexusWorkerContextFeatureBranchPublication;
+  hitlGates: string[];
+}
+
 export interface NexusWorkerContextBundle {
   version: 1;
   project: NexusWorkerContextProject;
@@ -168,6 +194,7 @@ export interface NexusWorkerContextBundle {
   dependencySupport: NexusWorkerContextDependencySupport;
   ownership: NexusWorkerContextBundleWorktree;
   worktree: NexusWorkerContextBundleWorktree;
+  featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null;
   publicationScope: NexusWorkerContextPublicationScope;
   publication: NexusAutomationPublicationConfig | null;
   gitIdentity: NexusExpectedGitIdentity | null;
@@ -190,6 +217,7 @@ export interface NexusWorkerContextBundleOptions {
   branchName: string;
   baseRef: string | null;
   workItem: NexusWorkerContextBundleWorkItem | null;
+  featureBranchDelivery?: NexusWorkerContextFeatureBranchDelivery | null;
   targetStatePath?: string | null;
   skills?: NexusWorkerContextSkills;
   dependencyProjections?: NexusWorkerContextDependencyProjection[];
@@ -303,6 +331,7 @@ export function buildNexusWorkerContextBundle(
     baseRef,
     workItem,
   };
+  const featureBranchDelivery = options.featureBranchDelivery ?? null;
 
   return {
     version: 1,
@@ -320,6 +349,7 @@ export function buildNexusWorkerContextBundle(
     dependencySupport,
     ownership: worktree,
     worktree,
+    featureBranchDelivery,
     publicationScope,
     publication,
     gitIdentity,
@@ -365,6 +395,7 @@ export function renderNexusWorkerBriefing(
     `Work item: ${workItemLine}`,
     `Branch: ${context.worktree.branchName}`,
     `Base ref: ${baseRefLine}`,
+    ...renderFeatureDeliveryLines(context.featureBranchDelivery),
     "",
     ...renderAgentTargetPolicyLines(context.agentTargetPolicy),
     "",
@@ -397,6 +428,35 @@ export function renderNexusWorkerBriefing(
     "",
     ...renderPluginBriefingFragments(context.pluginFragments.briefing),
   ].join("\n");
+}
+
+function renderFeatureDeliveryLines(
+  featureBranchDelivery: NexusWorkerContextFeatureBranchDelivery | null,
+): string[] {
+  if (!featureBranchDelivery) {
+    return [];
+  }
+  return [
+    `Feature: ${featureBranchDelivery.featureId}`,
+    `Feature change: ${featureBranchDelivery.changeSlug}`,
+    `Branch strategy: ${featureBranchDelivery.branchStrategy}`,
+    `Review target: ${featureBranchDelivery.branchTarget}`,
+    `Final publication target: ${featureBranchDelivery.finalPublicationTarget}`,
+    `Feature branch: ${featureBranchDelivery.featureBranch ?? "none"}`,
+    `Parent branch: ${featureBranchDelivery.parentBranch ?? "none"}`,
+    `Stack position: ${featureBranchDelivery.stackPosition ?? "none"}`,
+    `Final PR creation: ${featureBranchDelivery.finalPullRequestCreation}`,
+    `Branch push remote: ${
+      featureBranchDelivery.branchPublication.selectedRemote ?? "manual"
+    }${
+      featureBranchDelivery.branchPublication.fallbackRemote
+        ? ` (fallback: ${featureBranchDelivery.branchPublication.fallbackRemote})`
+        : ""
+    }`,
+    `Provider output policy: ${featureBranchDelivery.commentPolicy}`,
+    "HITL gates:",
+    ...featureBranchDelivery.hitlGates.map((gate) => `- ${gate}`),
+  ];
 }
 
 function renderAgentTargetPolicyLines(

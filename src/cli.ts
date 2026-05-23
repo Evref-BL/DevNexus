@@ -868,6 +868,11 @@ interface ParsedWorktreePrepareCommand {
   branchName?: string;
   worktreeName?: string;
   baseRef?: string | null;
+  featureId?: string | null;
+  featureChange?: string | null;
+  featureParentBranch?: string | null;
+  featureStackPosition?: number | null;
+  branchIntent?: string | null;
   topic?: string | null;
   workItemId?: string | null;
   workItemTitle?: string | null;
@@ -1730,6 +1735,11 @@ async function handleWorktreeCommand(
       branchName: parsed.branchName,
       worktreeName: parsed.worktreeName,
       baseRef: parsed.baseRef,
+      featureId: parsed.featureId,
+      featureChange: parsed.featureChange,
+      featureParentBranch: parsed.featureParentBranch,
+      featureStackPosition: parsed.featureStackPosition,
+      branchIntent: parsed.branchIntent,
       topic: parsed.topic,
       workItemId: resolvedWorkItem.itemId ?? parsed.workItemId,
       workItemTitle:
@@ -4302,6 +4312,21 @@ function parseWorktreePrepareCommand(
       case "--no-base-ref":
         parsed.baseRef = null;
         break;
+      case "--feature":
+        parsed.featureId = next();
+        break;
+      case "--feature-change":
+        parsed.featureChange = next();
+        break;
+      case "--feature-parent":
+        parsed.featureParentBranch = next();
+        break;
+      case "--feature-stack-position":
+        parsed.featureStackPosition = parsePositiveInteger(next(), arg);
+        break;
+      case "--branch-intent":
+        parsed.branchIntent = next();
+        break;
       case "--host":
         parsed.hostId = next();
         break;
@@ -6112,8 +6137,8 @@ function printProjectComponentAddPreviewResult(
     applied: false,
     proposal,
     nextAction: proposal.status === "ready"
-      ? "Review the component topology preview, then rerun without --dry-run to update the project."
-      : "Fix the reported component topology diagnostics before applying.",
+      ? "Review the component branchStrategy preview, then rerun without --dry-run to update the project."
+      : "Fix the reported component branchStrategy diagnostics before applying.",
   };
   if (parsed.json) {
     writeJson(stdout, payload);
@@ -7135,6 +7160,12 @@ function printWorktreePrepareResult(
   if (result.worktree.baseRef) {
     writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
   }
+  if (result.setup.context?.context.featureBranchDelivery) {
+    const feature = result.setup.context.context.featureBranchDelivery;
+    writeLine(stdout, `  Feature: ${feature.featureId}`);
+    writeLine(stdout, `  Review target: ${feature.branchTarget}`);
+    writeLine(stdout, `  Final target: ${feature.finalPublicationTarget}`);
+  }
   for (const action of result.nextActions) {
     writeLine(stdout, `  Next: ${action}`);
   }
@@ -7695,19 +7726,25 @@ function printAutomationTargetReportResult(
   if (result.authority) {
     printAuthorityProjectSummary(result.authority, stdout);
   }
-  const publicationTrains = result.componentProgress
-    .map((component) => component.publicationTrain)
+  const releaseTrains = result.componentProgress
+    .map((component) => component.releaseTrain)
     .filter((train): train is NonNullable<typeof train> => train !== null);
-  if (publicationTrains.length > 0) {
+  if (releaseTrains.length > 0) {
     writeLine(
       stdout,
-      `  Publication trains: ${publicationTrains.length} configured, ${publicationTrains.filter((train) => train.enabled).length} enabled.`,
+      `  Release trains: ${releaseTrains.length} configured, ${releaseTrains.filter((train) => train.enabled).length} enabled.`,
     );
-    for (const train of publicationTrains) {
+    for (const train of releaseTrains) {
       writeLine(
         stdout,
-        `    ${train.componentId}: active=${train.activeVersionId ?? "unscoped"} candidate=${train.branches.candidateBranch} integration=${train.branches.integrationBranch} tier=${train.ciTiers.defaultTier} budget=${formatPublicationTrainBudget(train)}`,
+        `    ${train.componentId}: active=${train.activeVersionId ?? "unscoped"} candidate=${train.branches.candidateBranch} integration=${train.branches.integrationBranch} tier=${train.ciTiers.defaultTier} budget=${formatReleaseTrainBudget(train)}`,
       );
+      if (train.featureBranchDelivery) {
+        writeLine(
+          stdout,
+          `      Feature branch delivery: branchStrategy=${train.featureBranchDelivery.defaultBranchStrategy} active=${train.featureBranchDelivery.activeScopeId} feature=${train.featureBranchDelivery.branchPlan.featureBranch ?? "none"} changes=${train.featureBranchDelivery.branchPlan.reviewBranchPattern}`,
+        );
+      }
       if (train.selector.labels.length === 0) {
         writeLine(stdout, "      Selector labels: none");
       }
@@ -7766,9 +7803,9 @@ function printAutomationScheduleResult(
   }
 }
 
-function formatPublicationTrainBudget(
+function formatReleaseTrainBudget(
   train: NonNullable<
-    NexusAutomationTargetReport["componentProgress"][number]["publicationTrain"]
+    NexusAutomationTargetReport["componentProgress"][number]["releaseTrain"]
   >,
 ): string {
   const budget = train.ciTiers.fullMatrixBudget;

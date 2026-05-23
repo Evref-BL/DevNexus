@@ -285,6 +285,7 @@ describe("nexus forge publication facade", () => {
             html_url: "https://github.com/Evref-BL/DevNexus/pull/12",
             title: "Feature",
             mergeable: true,
+            mergeable_state: "behind",
             head: {
               ref: "codex/dev-nexus/github-148",
               sha: "abc123",
@@ -319,6 +320,22 @@ describe("nexus forge publication facade", () => {
             ],
           },
         },
+        {
+          body: [
+            {
+              state: "COMMENTED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+            {
+              state: "APPROVED",
+              user: {
+                login: "reviewer-a",
+              },
+            },
+          ],
+        },
       ]),
     });
 
@@ -341,7 +358,10 @@ describe("nexus forge publication facade", () => {
       headBranch: "codex/dev-nexus/github-148",
       headSha: "abc123",
       targetBranch: "main",
-      mergeability: "mergeable",
+      reviewState: "approved",
+      mergeability: "blocked",
+      branchPolicy: "pending",
+      baseStatus: "behind",
       checks: [
         {
           name: "test / ubuntu",
@@ -388,6 +408,19 @@ describe("nexus forge publication facade", () => {
             workflow: "CI",
           },
         ]));
+      }
+      if (key.startsWith("pr view ")) {
+        return commandResult(JSON.stringify({
+          number: 12,
+          url: "https://github.com/Evref-BL/DevNexus/pull/12",
+          title: "Feature",
+          headRefName: "codex/dev-nexus/github-148",
+          headRefOid: "abc123",
+          baseRefName: "main",
+          reviewDecision: "APPROVED",
+          mergeStateStatus: "CLEAN",
+          isDraft: false,
+        }));
       }
       if (key.startsWith("pr merge ")) {
         return commandResult("");
@@ -448,6 +481,8 @@ describe("nexus forge publication facade", () => {
               bucket: "pass",
             },
           ],
+          reviewState: "APPROVED",
+          baseStatus: "current",
         },
       });
     await expect(adapter.mergePullRequest({ number: 12 }))
@@ -474,6 +509,7 @@ describe("nexus forge publication facade", () => {
       ["api", "app"],
       ["pr", "create"],
       ["pr", "checks"],
+      ["pr", "view"],
       ["pr", "merge"],
       ["issue", "close"],
     ]);

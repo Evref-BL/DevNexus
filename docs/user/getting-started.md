@@ -137,7 +137,7 @@ dev-nexus workspace component add <workspace-root> --answers ./component-add.jso
 dev-nexus workspace component add <workspace-root> --answers ./component-add.json --json
 ```
 
-The preview reports common topology mistakes before writing. It checks for
+The preview reports common layout mistakes before writing. It checks for
 container folders with nested repositories, non-Git folders, branch or remote
 drift, and stable component source roots placed under generated `worktrees/`.
 

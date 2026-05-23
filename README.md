@@ -42,7 +42,7 @@ dev-nexus diagnostics cli-version-skew --json
 - A **provider** is an external tool or service DevNexus can reference, such as
   GitHub, GitLab, Jira, Codex, or Claude.
 - A **work item** is the neutral tracker record owned by a component. It can
-  represent a task, bug, story, Product Backlog Item, epic, initiative, or
+  represent a task, bug, story, Product Backlog Item, epic, feature, or
   impediment, depending on the component's tracker conventions. Work items can
   live in DevNexus' local tracker or in providers such as GitHub, GitLab, or
   Jira.
@@ -194,7 +194,7 @@ dev-nexus workspace mcp refresh <workspace-root> --agent codex
   accounts, machine-user accounts, and workspace repository hosting.
 - [Publication workflows](docs/user/publication-workflows.md) explains the
   simple review-handoff default and the optional green-main, CI tier, and
-  publication train paths.
+  release train paths.
 - [Agent targets and projection cleanup](docs/user/agent-targets.md) explains
   supported providers, active targets, generated support, and stale provider
   files.

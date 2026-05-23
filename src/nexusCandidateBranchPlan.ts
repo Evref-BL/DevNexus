@@ -1,10 +1,10 @@
 import {
-  buildNexusPublicationTrainReadinessReport,
-  type BuildNexusPublicationTrainReadinessReportOptions,
-  type NexusPublicationTrainReadinessItem,
-  type NexusPublicationTrainReadinessReport,
-  type NexusPublicationTrainVersionGroup,
-} from "./nexusPublicationTrainReadiness.js";
+  buildNexusReleaseTrainReadinessReport,
+  type BuildNexusReleaseTrainReadinessReportOptions,
+  type NexusReleaseTrainReadinessItem,
+  type NexusReleaseTrainReadinessReport,
+  type NexusReleaseTrainVersionGroup,
+} from "./nexusReleaseTrainReadiness.js";
 import type { NexusCiTierDecision } from "./nexusCiTierPolicy.js";
 
 export type NexusCandidateBranchPlanNextAction =
@@ -27,7 +27,7 @@ export interface NexusCandidateBranchNamingPolicy {
 }
 
 export interface BuildNexusCandidateBranchPlanOptions
-  extends BuildNexusPublicationTrainReadinessReportOptions {
+  extends BuildNexusReleaseTrainReadinessReportOptions {
   integrationBranchName?: string | null;
   candidateBranchName?: string | null;
   branchNaming?: NexusCandidateBranchNamingPolicy;
@@ -41,7 +41,7 @@ export interface NexusCandidateBranchPlanItem {
   branchName: string | null;
   sourceId: string;
   scopeStatus: string | null;
-  candidateEligibility: NexusPublicationTrainReadinessItem["candidateEligibility"];
+  candidateEligibility: NexusReleaseTrainReadinessItem["candidateEligibility"];
   changedAreas: string[];
   reasons: string[];
 }
@@ -65,7 +65,7 @@ export interface NexusCandidateBranchPlan {
   version: 1;
   generatedAt: string;
   projectRoot: string;
-  project: NexusPublicationTrainReadinessReport["project"];
+  project: NexusReleaseTrainReadinessReport["project"];
   selectedVersion: {
     id: string | null;
     objective: string | null;
@@ -84,7 +84,7 @@ export interface NexusCandidateBranchPlan {
   candidateCiTier: NexusCiTierDecision | null;
   nextAction: NexusCandidateBranchPlanNextAction;
   warnings: string[];
-  readiness: NexusPublicationTrainReadinessReport;
+  readiness: NexusReleaseTrainReadinessReport;
   mutatesSource: false;
 }
 
@@ -97,7 +97,7 @@ const defaultBranchNaming: Required<NexusCandidateBranchNamingPolicy> = {
 export function buildNexusCandidateBranchPlan(
   options: BuildNexusCandidateBranchPlanOptions,
 ): NexusCandidateBranchPlan {
-  const readiness = buildNexusPublicationTrainReadinessReport(options);
+  const readiness = buildNexusReleaseTrainReadinessReport(options);
   const warnings = [...readiness.warnings];
   const selectedGroup = selectVersionGroup(readiness, options.versionId ?? null);
   if (!selectedGroup && readiness.versions.filter((group) => group.eligibleCount > 0).length > 1) {
@@ -167,9 +167,9 @@ export function buildNexusCandidateBranchPlan(
 }
 
 function selectVersionGroup(
-  readiness: NexusPublicationTrainReadinessReport,
+  readiness: NexusReleaseTrainReadinessReport,
   requestedVersionId: string | null,
-): NexusPublicationTrainVersionGroup | null {
+): NexusReleaseTrainVersionGroup | null {
   if (requestedVersionId) {
     return readiness.versions.find((group) => group.versionId === requestedVersionId) ??
       null;
@@ -184,7 +184,7 @@ function selectVersionGroup(
   return null;
 }
 
-function planItem(item: NexusPublicationTrainReadinessItem): NexusCandidateBranchPlanItem {
+function planItem(item: NexusReleaseTrainReadinessItem): NexusCandidateBranchPlanItem {
   const category = itemCategory(item);
   return {
     category,
@@ -201,7 +201,7 @@ function planItem(item: NexusPublicationTrainReadinessItem): NexusCandidateBranc
 }
 
 function itemCategory(
-  item: NexusPublicationTrainReadinessItem,
+  item: NexusReleaseTrainReadinessItem,
 ): NexusCandidateBranchPlanItemCategory {
   if (item.version?.scopeStatus === "excluded" || item.candidateEligibility === "needs_scope") {
     return "excluded";
@@ -224,7 +224,7 @@ function itemCategory(
 }
 
 function itemReasons(
-  item: NexusPublicationTrainReadinessItem,
+  item: NexusReleaseTrainReadinessItem,
   category: NexusCandidateBranchPlanItemCategory,
 ): string[] {
   const reasons = [...item.reasons];
@@ -244,9 +244,9 @@ function itemReasons(
 }
 
 function itemsExcludedBySelection(
-  readiness: NexusPublicationTrainReadinessReport,
-  selectedGroup: NexusPublicationTrainVersionGroup | null,
-): NexusPublicationTrainReadinessItem[] {
+  readiness: NexusReleaseTrainReadinessReport,
+  selectedGroup: NexusReleaseTrainVersionGroup | null,
+): NexusReleaseTrainReadinessItem[] {
   if (!selectedGroup) {
     return readiness.versions.flatMap((group) => group.items);
   }
@@ -283,8 +283,8 @@ function planNextAction(options: {
   excluded: NexusCandidateBranchPlanItem[];
   blocked: NexusCandidateBranchPlanItem[];
   changedAreaOverlaps: NexusCandidateBranchChangedAreaOverlap[];
-  selectedGroup: NexusPublicationTrainVersionGroup | null;
-  readiness: NexusPublicationTrainReadinessReport;
+  selectedGroup: NexusReleaseTrainVersionGroup | null;
+  readiness: NexusReleaseTrainReadinessReport;
 }): NexusCandidateBranchPlanNextAction {
   if (
     !options.selectedGroup &&

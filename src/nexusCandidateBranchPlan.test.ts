@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultNexusAutomationConfig } from "./nexusAutomationConfig.js";
-import { defaultNexusPublicationTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
+import { defaultNexusReleaseTrainCiTierPolicy } from "./nexusCiTierPolicy.js";
 import {
   buildNexusCandidateBranchPlan,
 } from "./nexusCandidateBranchPlan.js";
@@ -67,8 +67,8 @@ describe("candidate branch planning", () => {
       lease({
         id: "lease-120",
         workItemId: "github-120",
-        branchName: "codex/train-readiness",
-        changedAreas: ["src/nexusPublicationTrainReadiness.ts"],
+        branchName: "codex/release-train-readiness",
+        changedAreas: ["src/nexusReleaseTrainReadiness.ts"],
       }),
       lease({
         id: "lease-121",
@@ -351,7 +351,7 @@ function projectConfig(
       ...defaultNexusAutomationConfig,
       verification: {
         ...defaultNexusAutomationConfig.verification,
-        ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+        ciTiers: defaultNexusReleaseTrainCiTierPolicy,
       },
     },
     versionPlanning: {

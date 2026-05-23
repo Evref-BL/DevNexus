@@ -17,10 +17,26 @@ import {
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
 import {
+  buildNexusFeatureBranchDeliveryPlan,
+  type NexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
+import {
+  buildNexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReport,
+  type NexusFeatureBranchDeliveryReportItem,
+} from "./nexusFeatureBranchDeliveryReport.js";
+import {
+  buildNexusFeatureFinalizationPlan,
+  type NexusFeatureFinalizationPlan,
+} from "./nexusFeatureFinalizationPlan.js";
+import {
+  inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
+  NexusPublicationBranchPushBlockedError,
   pushNexusPublicationBranchForComponent,
   upsertNexusPublicationPullRequestForComponent,
   type NexusPublicationBranchPushResult,
+  type NexusPublicationPullRequestEvidenceResult,
   type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
@@ -32,10 +48,10 @@ import {
   type NexusPublicationProviderEvidenceCheckClassification,
 } from "./nexusPublicationProviderEvidence.js";
 import {
-  buildNexusPublicationTrainReadinessReport,
-  type NexusPublicationTrainProviderEvidenceInput,
-  type NexusPublicationTrainReadinessReport,
-} from "./nexusPublicationTrainReadiness.js";
+  buildNexusReleaseTrainReadinessReport,
+  type NexusReleaseTrainProviderEvidenceInput,
+  type NexusReleaseTrainReadinessReport,
+} from "./nexusReleaseTrainReadiness.js";
 import type { NexusProviderCredentialCommandRunner } from "./nexusProviderCredentialBroker.js";
 import {
   parsePositiveInteger,
@@ -74,6 +90,7 @@ interface ParsedPublicationBranchPushCommand {
   repositoryPath?: string;
   branch: string;
   targetBranch?: string | null;
+  featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   dryRun?: boolean;
@@ -103,7 +120,15 @@ interface ParsedPublicationPullRequestMergeCommand {
   json?: boolean;
 }
 
-interface ParsedPublicationTrainReadinessCommand {
+interface ParsedPublicationPullRequestEvidenceCommand {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  number: number;
+  json?: boolean;
+}
+
+interface ParsedReleaseTrainReadinessCommand {
   projectRoot: string;
   versionId?: string | null;
   evidenceFile?: string;
@@ -120,6 +145,25 @@ interface ParsedPublicationCandidatePlanCommand {
   fullMatrixBudgetAvailable?: boolean;
   json?: boolean;
 }
+
+interface ParsedPublicationFeaturePlanCommand {
+  projectRoot: string;
+  componentId?: string;
+  featureId?: string | null;
+  json?: boolean;
+}
+
+interface ParsedPublicationFeatureReportCommand {
+  projectRoot: string;
+  componentId?: string;
+  featureId?: string | null;
+  evidenceFile?: string;
+  fullMatrixBudgetAvailable?: boolean;
+  json?: boolean;
+}
+
+interface ParsedPublicationFeatureFinalizationCommand
+  extends ParsedPublicationFeatureReportCommand {}
 
 interface ParsedPublicationEvidenceNormalizeCommand {
   evidenceFile: string;
@@ -143,22 +187,37 @@ export async function handlePublicationCommand(
 ): Promise<number> {
   if (argv[1] === "branch-push") {
     const parsed = parsePublicationBranchPushCommand(argv);
-    const result = await pushNexusPublicationBranchForComponent({
-      projectRoot: parsed.projectRoot,
-      componentId: parsed.componentId,
-      projectRepository: parsed.projectRepository,
-      repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
-      branch: parsed.branch,
-      targetBranch: parsed.targetBranch,
-      forceWithLease: parsed.forceWithLease,
-      forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
-      baseEnv: dependencies.env ?? process.env,
-      fetch: dependencies.fetch,
-      credentialCommandRunner: dependencies.credentialCommandRunner,
-      gitRunner: parsed.dryRun
-        ? dryRunPublicationGitPushRunner
-        : dependencies.publicationGitPushRunner,
-    });
+    let result: NexusPublicationBranchPushResult;
+    try {
+      result = await pushNexusPublicationBranchForComponent({
+        projectRoot: parsed.projectRoot,
+        componentId: parsed.componentId,
+        projectRepository: parsed.projectRepository,
+        repositoryPath: path.resolve(parsed.repositoryPath ?? process.cwd()),
+        branch: parsed.branch,
+        targetBranch: parsed.targetBranch,
+        featureId: parsed.featureId,
+        forceWithLease: parsed.forceWithLease,
+        forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+        baseEnv: dependencies.env ?? process.env,
+        fetch: dependencies.fetch,
+        credentialCommandRunner: dependencies.credentialCommandRunner,
+        gitRunner: parsed.dryRun
+          ? dryRunPublicationGitPushRunner
+          : dependencies.publicationGitPushRunner,
+        remoteProbeRunner: dependencies.publicationGitPushRunner,
+      });
+    } catch (error) {
+      if (parsed.json && error instanceof NexusPublicationBranchPushBlockedError) {
+        printPublicationBranchPushBlockedError(
+          error,
+          parsed,
+          dependencies.stdout ?? process.stdout,
+        );
+        return 1;
+      }
+      throw error;
+    }
     printPublicationBranchPushResult(
       result,
       parsed,
@@ -211,6 +270,25 @@ export async function handlePublicationCommand(
     return result.merge.merged ? 0 : 1;
   }
 
+  if (argv[1] === "pull-request" && argv[2] === "evidence") {
+    const parsed = parsePublicationPullRequestEvidenceCommand(argv);
+    const result = await inspectNexusPublicationPullRequestForComponent({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      projectRepository: parsed.projectRepository,
+      number: parsed.number,
+      baseEnv: dependencies.env ?? process.env,
+      fetch: dependencies.fetch,
+      credentialCommandRunner: dependencies.credentialCommandRunner,
+    });
+    printPublicationPullRequestEvidenceResult(
+      result,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   if (argv[1] === "green-main" && argv[2] === "plan") {
     const parsed = parsePublicationGreenMainPlanCommand(argv);
     const checks = readGreenMainChecksInput(parsed.checksFile);
@@ -238,7 +316,7 @@ export async function handlePublicationCommand(
   if (argv[1] === "evidence" && argv[2] === "normalize") {
     const parsed = parsePublicationEvidenceNormalizeCommand(argv);
     const evidence = normalizeNexusPublicationProviderEvidence(
-      readPublicationTrainEvidenceInput(parsed.evidenceFile),
+      readReleaseTrainEvidenceInput(parsed.evidenceFile),
     );
     const classifications = parsed.requiredChecks.length > 0
       ? evidence.map((item) =>
@@ -267,7 +345,7 @@ export async function handlePublicationCommand(
         ? readPublicationWorkflowTriggersInput(parsed.workflowTriggersFile)
         : [],
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
@@ -279,18 +357,18 @@ export async function handlePublicationCommand(
     return 0;
   }
 
-  if (argv[1] === "train-readiness") {
-    const parsed = parsePublicationTrainReadinessCommand(argv);
-    const report = buildNexusPublicationTrainReadinessReport({
+  if (argv[1] === "release-train-readiness") {
+    const parsed = parseReleaseTrainReadinessCommand(argv);
+    const report = buildNexusReleaseTrainReadinessReport({
       projectRoot: parsed.projectRoot,
       versionId: parsed.versionId,
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
-    printPublicationTrainReadinessReport(
+    printReleaseTrainReadinessReport(
       report,
       parsed,
       dependencies.stdout ?? process.stdout,
@@ -307,7 +385,7 @@ export async function handlePublicationCommand(
       candidateBranchName: parsed.candidateBranchName,
       fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
       providerEvidence: parsed.evidenceFile
-        ? readPublicationTrainEvidenceInput(parsed.evidenceFile)
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
         : [],
       now: dependencies.now,
     });
@@ -319,8 +397,63 @@ export async function handlePublicationCommand(
     return 0;
   }
 
+  if (argv[1] === "feature-plan") {
+    const parsed = parsePublicationFeaturePlanCommand(argv);
+    const plan = buildNexusFeatureBranchDeliveryPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      featureId: parsed.featureId,
+    });
+    printPublicationFeaturePlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "feature-report") {
+    const parsed = parsePublicationFeatureReportCommand(argv);
+    const report = buildNexusFeatureBranchDeliveryReport({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      featureId: parsed.featureId,
+      providerEvidence: parsed.evidenceFile
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      now: dependencies.now,
+    });
+    printPublicationFeatureReport(
+      report,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
+  if (argv[1] === "feature-finalization") {
+    const parsed = parsePublicationFeatureFinalizationCommand(argv);
+    const plan = buildNexusFeatureFinalizationPlan({
+      projectRoot: parsed.projectRoot,
+      componentId: parsed.componentId,
+      featureId: parsed.featureId,
+      providerEvidence: parsed.evidenceFile
+        ? readReleaseTrainEvidenceInput(parsed.evidenceFile)
+        : [],
+      fullMatrixBudgetAvailable: parsed.fullMatrixBudgetAvailable,
+      now: dependencies.now,
+    });
+    printPublicationFeatureFinalizationPlan(
+      plan,
+      parsed,
+      dependencies.stdout ?? process.stdout,
+    );
+    return 0;
+  }
+
   throw new Error(
-    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, train-readiness, or candidate-plan",
+    "publication requires branch-push, pull-request upsert, pull-request merge, green-main plan, evidence normalize, merge-queue-readiness, release-train-readiness, candidate-plan, feature-plan, feature-report, or feature-finalization",
   );
 }
 
@@ -431,6 +564,9 @@ function parsePublicationBranchPushCommand(
         break;
       case "--target-branch":
         parsed.targetBranch = next();
+        break;
+      case "--feature":
+        parsed.featureId = next();
         break;
       case "--force-with-lease":
         parsed.forceWithLease = true;
@@ -582,6 +718,55 @@ function parsePublicationPullRequestMergeCommand(
   return parsed as ParsedPublicationPullRequestMergeCommand;
 }
 
+function parsePublicationPullRequestEvidenceCommand(
+  argv: string[],
+): ParsedPublicationPullRequestEvidenceCommand {
+  const [, scope, command, projectRoot, ...rest] = argv;
+  if (scope !== "pull-request" || command !== "evidence") {
+    throw new Error("publication requires pull-request evidence");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication pull-request evidence requires a workspace root");
+  }
+
+  const parsed: Partial<ParsedPublicationPullRequestEvidenceCommand> = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--project-repository":
+        parsed.projectRepository = true;
+        break;
+      case "--number":
+        parsed.number = parsePositiveInteger(next(), arg);
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication pull-request evidence option: ${arg}`);
+    }
+  }
+  if (!parsed.number) {
+    throw new Error("publication pull-request evidence requires --number");
+  }
+  assertSinglePublicationTarget(parsed.componentId, parsed.projectRepository);
+
+  return parsed as ParsedPublicationPullRequestEvidenceCommand;
+}
+
 function assertSinglePublicationTarget(
   componentId: string | undefined,
   projectRepository: boolean | undefined,
@@ -602,18 +787,18 @@ function parsePublicationPullRequestMergeMethod(
   throw new Error(`${optionName} must be merge, squash, or rebase`);
 }
 
-function parsePublicationTrainReadinessCommand(
+function parseReleaseTrainReadinessCommand(
   argv: string[],
-): ParsedPublicationTrainReadinessCommand {
+): ParsedReleaseTrainReadinessCommand {
   const [, command, projectRoot, ...rest] = argv;
-  if (command !== "train-readiness") {
-    throw new Error("publication requires train-readiness");
+  if (command !== "release-train-readiness") {
+    throw new Error("publication requires release-train-readiness");
   }
   if (!projectRoot || projectRoot.startsWith("--")) {
-    throw new Error("publication train-readiness requires a workspace root");
+    throw new Error("release-train-readiness requires a workspace root");
   }
 
-  const parsed: ParsedPublicationTrainReadinessCommand = {
+  const parsed: ParsedReleaseTrainReadinessCommand = {
     projectRoot,
   };
   for (let index = 0; index < rest.length; index += 1) {
@@ -643,7 +828,7 @@ function parsePublicationTrainReadinessCommand(
         parsed.json = true;
         break;
       default:
-        throw new Error(`Unknown publication train-readiness option: ${arg}`);
+        throw new Error(`Unknown release-train-readiness option: ${arg}`);
     }
   }
 
@@ -795,6 +980,150 @@ function parsePublicationCandidatePlanCommand(
   return parsed;
 }
 
+function parsePublicationFeaturePlanCommand(
+  argv: string[],
+): ParsedPublicationFeaturePlanCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "feature-plan") {
+    throw new Error("publication requires feature-plan");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication feature-plan requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationFeaturePlanCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--feature":
+        parsed.featureId = next();
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication feature-plan option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationFeatureReportCommand(
+  argv: string[],
+): ParsedPublicationFeatureReportCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "feature-report") {
+    throw new Error("publication requires feature-report");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication feature-report requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationFeatureReportCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--feature":
+        parsed.featureId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication feature-report option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
+function parsePublicationFeatureFinalizationCommand(
+  argv: string[],
+): ParsedPublicationFeatureFinalizationCommand {
+  const [, command, projectRoot, ...rest] = argv;
+  if (command !== "feature-finalization") {
+    throw new Error("publication requires feature-finalization");
+  }
+  if (!projectRoot || projectRoot.startsWith("--")) {
+    throw new Error("publication feature-finalization requires a workspace root");
+  }
+
+  const parsed: ParsedPublicationFeatureFinalizationCommand = {
+    projectRoot,
+  };
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    const next = (): string => {
+      index += 1;
+      if (index >= rest.length) {
+        throw new Error(`${arg} requires a value`);
+      }
+      return rest[index]!;
+    };
+
+    switch (arg) {
+      case "--component":
+        parsed.componentId = next();
+        break;
+      case "--feature":
+        parsed.featureId = next();
+        break;
+      case "--evidence-file":
+        parsed.evidenceFile = next();
+        break;
+      case "--full-matrix-budget-available":
+        parsed.fullMatrixBudgetAvailable = true;
+        break;
+      case "--full-matrix-budget-exhausted":
+        parsed.fullMatrixBudgetAvailable = false;
+        break;
+      case "--json":
+        parsed.json = true;
+        break;
+      default:
+        throw new Error(`Unknown publication feature-finalization option: ${arg}`);
+    }
+  }
+
+  return parsed;
+}
+
 function readGreenMainChecksInput(
   inputPath: string,
 ): NexusGreenMainCheckRunInput[] {
@@ -831,7 +1160,10 @@ function publicationPullRequestBody(
   parsed: ParsedPublicationPullRequestUpsertCommand,
 ): string | null | undefined {
   if (parsed.body !== undefined) {
-    return parsed.body;
+    if (parsed.body === null) {
+      return null;
+    }
+    return normalizeInlinePullRequestBody(parsed.body);
   }
   if (parsed.bodyFile) {
     return fs.readFileSync(path.resolve(parsed.bodyFile), "utf8");
@@ -839,12 +1171,19 @@ function publicationPullRequestBody(
   return undefined;
 }
 
-function readPublicationTrainEvidenceInput(
+function normalizeInlinePullRequestBody(body: string): string {
+  const escapedLineBreak = `${String.fromCharCode(92)}n`;
+  return body.includes(escapedLineBreak)
+    ? body.replaceAll(escapedLineBreak, String.fromCharCode(10))
+    : body;
+}
+
+function readReleaseTrainEvidenceInput(
   inputPath: string,
-): NexusPublicationTrainProviderEvidenceInput[] {
-  const raw = readCliJsonFile(inputPath, "publication train readiness evidence");
+): NexusReleaseTrainProviderEvidenceInput[] {
+  const raw = readCliJsonFile(inputPath, "release train readiness evidence");
   if (Array.isArray(raw)) {
-    return raw as NexusPublicationTrainProviderEvidenceInput[];
+    return raw as NexusReleaseTrainProviderEvidenceInput[];
   }
   if (raw !== null && typeof raw === "object") {
     const record = raw as {
@@ -852,15 +1191,15 @@ function readPublicationTrainEvidenceInput(
       providerEvidence?: unknown;
     };
     if (Array.isArray(record.evidence)) {
-      return record.evidence as NexusPublicationTrainProviderEvidenceInput[];
+      return record.evidence as NexusReleaseTrainProviderEvidenceInput[];
     }
     if (Array.isArray(record.providerEvidence)) {
-      return record.providerEvidence as NexusPublicationTrainProviderEvidenceInput[];
+      return record.providerEvidence as NexusReleaseTrainProviderEvidenceInput[];
     }
   }
 
   throw new Error(
-    "publication train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
+    "release train readiness evidence file must be an array, {\"evidence\": [...]}, or {\"providerEvidence\": [...]}",
   );
 }
 
@@ -968,6 +1307,7 @@ function printPublicationBranchPushResult(
     repository: result.repository,
     branch: result.branch,
     targetBranch: result.targetBranch,
+    featureBranchDelivery: result.featureBranchDelivery,
     forceWithLease: result.forceWithLease,
     forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
     credential: result.credential,
@@ -993,6 +1333,17 @@ function printPublicationBranchPushResult(
   writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branch}`);
+  if (result.featureBranchDelivery) {
+    writeLine(stdout, `  Feature: ${result.featureBranchDelivery.featureId}`);
+    writeLine(
+      stdout,
+      `  Feature remote policy: ${result.featureBranchDelivery.branchPublication.strategy} -> ${result.featureBranchDelivery.branchPublication.selectedRemote}`,
+    );
+    writeLine(
+      stdout,
+      `  Feature remote selection: ${result.featureBranchDelivery.remoteSelection.status}`,
+    );
+  }
   if (result.targetBranch) {
     writeLine(stdout, `  Target branch: ${result.targetBranch}`);
   }
@@ -1009,6 +1360,22 @@ function printPublicationBranchPushResult(
   if (result.push.git.stderr.trim()) {
     writeLine(stdout, `  Git: ${result.push.git.stderr.trim()}`);
   }
+}
+
+function printPublicationBranchPushBlockedError(
+  error: NexusPublicationBranchPushBlockedError,
+  parsed: ParsedPublicationBranchPushCommand,
+  stdout: TextWriter,
+): void {
+  writeJson(stdout, {
+    ok: false,
+    dryRun: Boolean(parsed.dryRun),
+    error: {
+      code: "feature_branch_publication_blocked",
+      message: error.message,
+    },
+    featureBranchDelivery: error.featureBranchDelivery,
+  });
 }
 
 function printPublicationPullRequestUpsertResult(
@@ -1077,6 +1444,42 @@ function printPublicationPullRequestMergeResult(
   writeLine(stdout, `  Backend: ${result.merge.metadata.backend}`);
 }
 
+function printPublicationPullRequestEvidenceResult(
+  result: NexusPublicationPullRequestEvidenceResult,
+  parsed: ParsedPublicationPullRequestEvidenceCommand,
+  stdout: TextWriter,
+): void {
+  const payload = {
+    ok: true,
+    projectRoot: result.projectRoot,
+    componentId: result.componentId,
+    target: result.target,
+    repository: result.repository,
+    credential: result.credential,
+    pullRequest: result.pullRequest,
+    evidence: result.evidence,
+    providerEvidence: [result.evidence],
+    metadata: result.metadata,
+  };
+  if (parsed.json) {
+    writeJson(stdout, payload);
+    return;
+  }
+
+  writeLine(stdout, "DevNexus publication pull request evidence.");
+  writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
+  writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
+  writeLine(stdout, `  Pull request: #${result.pullRequest.number}`);
+  writeLine(stdout, `  Head: ${result.evidence.headBranch ?? "unknown"}`);
+  writeLine(stdout, `  Base: ${result.evidence.targetBranch ?? "unknown"}`);
+  writeLine(stdout, `  Checks: ${result.evidence.checks?.length ?? 0}`);
+  writeLine(stdout, `  Review: ${result.evidence.reviewState ?? "unknown"}`);
+  writeLine(stdout, `  Base status: ${result.evidence.baseStatus ?? "unknown"}`);
+  writeLine(stdout, `  Mergeability: ${result.evidence.mergeability ?? "unknown"}`);
+  writeLine(stdout, `  Credential: ${result.credential.profileId} (${result.credential.kind})`);
+  writeLine(stdout, `  Backend: ${result.metadata.backend}`);
+}
+
 function formatPublicationTarget(
   target: NexusPublicationBranchPushResult["target"],
 ): string {
@@ -1087,9 +1490,9 @@ function formatPublicationTarget(
   return `component ${target.componentId ?? target.id}`;
 }
 
-function printPublicationTrainReadinessReport(
-  report: NexusPublicationTrainReadinessReport,
-  parsed: ParsedPublicationTrainReadinessCommand,
+function printReleaseTrainReadinessReport(
+  report: NexusReleaseTrainReadinessReport,
+  parsed: ParsedReleaseTrainReadinessCommand,
   stdout: TextWriter,
 ): void {
   if (parsed.json) {
@@ -1102,7 +1505,7 @@ function printPublicationTrainReadinessReport(
     return;
   }
 
-  writeLine(stdout, "DevNexus publication train readiness.");
+  writeLine(stdout, "DevNexus release train readiness.");
   writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
   writeLine(stdout, `  Next action: ${report.nextAction}`);
   writeLine(
@@ -1261,6 +1664,217 @@ function printPublicationCandidatePlan(
   for (const warning of plan.warnings) {
     writeLine(stdout, `  Warning: ${warning}`);
   }
+}
+
+function printPublicationFeaturePlan(
+  plan: NexusFeatureBranchDeliveryPlan,
+  parsed: ParsedPublicationFeaturePlanCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus feature branch delivery plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Features: ${plan.itemCount}`);
+  for (const item of plan.items) {
+    const feature = item.feature;
+    const branchPlan = feature.branchPlan;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${feature.activeScopeId} branchStrategy=${feature.defaultBranchStrategy}`,
+    );
+    writeLine(
+      stdout,
+      `    feature=${branchPlan.featureBranch ?? "none"} changes=${branchPlan.reviewBranchPattern}`,
+    );
+    writeLine(
+      stdout,
+      `    base=${branchPlan.defaultChangeBaseBranch} reviewTarget=${branchPlan.defaultChangeReviewTarget} final=${branchPlan.finalPublicationTarget}`,
+    );
+    writeLine(
+      stdout,
+      `    review=${feature.reviewMode} finalPR=${feature.finalPullRequest} finalPRCreation=${feature.finalPullRequestCreation} commentPolicy=${feature.commentPolicy}`,
+    );
+    writeLine(
+      stdout,
+      `    branchPublication=${feature.branchPublication.strategy} remote=${feature.branchPublication.selectedRemote ?? "manual"} fallback=${feature.branchPublication.fallbackRemote ?? "none"}`,
+    );
+    if (branchPlan.requiresFeatureBranchApproval) {
+      writeLine(stdout, "    HITL: feature branch approval required");
+    }
+  }
+  for (const warning of plan.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationFeatureReport(
+  report: NexusFeatureBranchDeliveryReport,
+  parsed: ParsedPublicationFeatureReportCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: report.nextAction,
+      summary: report.summary,
+      report,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus feature branch delivery report.");
+  writeLine(stdout, `  Project: ${report.project.id} (${report.project.name})`);
+  writeLine(stdout, `  Next action: ${report.nextAction}`);
+  writeLine(
+    stdout,
+    `  Features: ${report.summary.itemCount}; ready=${report.summary.readyCount}; needsUpdate=${report.summary.needsUpdateCount}; blocked=${report.summary.blockedCount}; reviewNeeded=${report.summary.reviewNeededCount}`,
+  );
+  for (const item of report.items) {
+    const evidence = item.providerEvidence;
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${item.featureId} branchStrategy=${item.branchStrategy} -> ${item.status}`,
+    );
+    writeLine(
+      stdout,
+      `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} ci=${item.ciTier.tier.id}`,
+    );
+    writeLine(
+      stdout,
+      `    evidence=${evidence.provider ?? "none"} ${evidence.sourceKind ?? "no-source"} checks=${evidence.checksStatus} review=${evidence.reviewState ?? "unknown"} merge=${evidence.mergeability ?? "unknown"} base=${evidence.baseStatus ?? "unknown"} policy=${evidence.branchPolicy ?? "unknown"} draft=${evidence.draft ?? "unknown"}`,
+    );
+    if (evidence.reviewTarget) {
+      writeLine(
+        stdout,
+        `    reviewTarget=${formatReviewTarget(evidence.reviewTarget)}`,
+      );
+    }
+    if (item.branchUpdateDecision.status !== "not_required") {
+      writeLine(
+        stdout,
+        `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
+      );
+      if (item.branchUpdateDecision.reasons.length > 0) {
+        writeLine(
+          stdout,
+          `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
+        );
+      }
+      const command = recommendedBranchUpdateCommand(item);
+      if (command) {
+        writeLine(stdout, `    branchUpdate command: ${command}`);
+      }
+    }
+    if (item.reasons.length > 0) {
+      writeLine(stdout, `    reasons: ${item.reasons.join("; ")}`);
+    }
+  }
+  for (const warning of report.warnings) {
+    writeLine(stdout, `  Warning: ${warning}`);
+  }
+}
+
+function printPublicationFeatureFinalizationPlan(
+  plan: NexusFeatureFinalizationPlan,
+  parsed: ParsedPublicationFeatureFinalizationCommand,
+  stdout: TextWriter,
+): void {
+  if (parsed.json) {
+    writeJson(stdout, {
+      ok: true,
+      nextAction: plan.nextAction,
+      summary: plan.summary,
+      plan,
+    });
+    return;
+  }
+
+  writeLine(stdout, "DevNexus feature finalization plan.");
+  writeLine(stdout, `  Project: ${plan.project.id} (${plan.project.name})`);
+  writeLine(stdout, `  Next action: ${plan.nextAction}`);
+  writeLine(
+    stdout,
+    `  Features: ${plan.summary.itemCount}; safeToReview=${plan.summary.safeToReviewCount}; readyForPublication=${plan.summary.readyForPublicationCount}; needsReview=${plan.summary.needsReviewCount}; blocked=${plan.summary.blockedCount}`,
+  );
+  for (const item of plan.items) {
+    writeLine(
+      stdout,
+      `  ${item.componentId}: active=${item.featureId} review=${item.reviewReadiness.status} publication=${item.publicationReadiness.status}`,
+    );
+    writeLine(
+      stdout,
+      `    feature=${item.featureBranch ?? "none"} final=${item.finalPublicationTarget} authorizedToMerge=${item.publicationReadiness.authorizedToMerge}`,
+    );
+    writeLine(
+      stdout,
+      `    finalPRAction=${item.finalPullRequestAction.status} humanInTheLoop=${item.finalPullRequestAction.humanInTheLoop}`,
+    );
+    if (item.finalPullRequestAction.providerAction) {
+      const action = item.finalPullRequestAction.providerAction;
+      writeLine(
+        stdout,
+        `    finalPR=${action.head} -> ${action.base} title=${action.title}`,
+      );
+    }
+    if (item.finalPullRequestAction.cliCommand) {
+      writeLine(
+        stdout,
+        `    command: ${item.finalPullRequestAction.cliCommand}`,
+      );
+    }
+    if (item.branchUpdateDecision.status !== "not_required") {
+      writeLine(
+        stdout,
+        `    branchUpdate=${item.branchUpdateDecision.status} recommendation=${item.branchUpdateDecision.recommendation} forceWithLease=${item.branchUpdateDecision.forceWithLeaseRequired}`,
+      );
+      if (item.branchUpdateDecision.reasons.length > 0) {
+        writeLine(
+          stdout,
+          `    branchUpdate reasons: ${item.branchUpdateDecision.reasons.join("; ")}`,
+        );
+      }
+      const command = recommendedBranchUpdateCommand(item);
+      if (command) {
+        writeLine(stdout, `    branchUpdate command: ${command}`);
+      }
+    }
+    if (item.reviewReadiness.reasons.length > 0) {
+      writeLine(
+        stdout,
+        `    review reasons: ${item.reviewReadiness.reasons.join("; ")}`,
+      );
+    }
+    if (item.publicationReadiness.reasons.length > 0) {
+      writeLine(
+        stdout,
+        `    publication reasons: ${item.publicationReadiness.reasons.join("; ")}`,
+      );
+    }
+  }
+}
+
+function formatReviewTarget(
+  target: NonNullable<NexusFeatureBranchDeliveryReportItem["providerEvidence"]["reviewTarget"]>,
+): string {
+  const label = target.number ? `#${target.number}` : target.id ?? target.kind;
+  return target.url ? `${label} ${target.url}` : label;
+}
+
+function recommendedBranchUpdateCommand(
+  item: Pick<NexusFeatureBranchDeliveryReportItem, "branchUpdateDecision">,
+): string | null {
+  const recommendation = item.branchUpdateDecision.recommendation;
+  const choice = item.branchUpdateDecision.choices.find((candidate) =>
+    candidate.id === recommendation
+  );
+  return choice?.command ?? null;
 }
 
 function writeCandidatePlanItems(

@@ -89,7 +89,7 @@ export function nexusForgeRepositoryFromGitHubRepository(
   };
 }
 
-function parseGitHubRemoteUrl(
+export function parseGitHubRemoteUrl(
   remoteUrl: string | null | undefined,
 ): { host: string; owner: string; name: string } | null {
   const normalized = remoteUrl?.trim();

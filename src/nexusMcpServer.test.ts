@@ -7,6 +7,7 @@ import {
   callDevNexusMcpTool,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   defaultLocalWorkTrackingStorePath,
   devNexusCoreMcpToolNames,
   handleDevNexusMcpJsonRpcMessage,
@@ -153,6 +154,49 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
   };
 }
 
+function featureProjectConfig(): NexusProjectConfig {
+  return projectConfig({
+    automation: {
+      ...defaultNexusAutomationConfig,
+      mode: "agent_launch",
+      selector: {
+        ...defaultNexusAutomationConfig.selector,
+        statuses: ["ready"],
+        labels: ["automation"],
+      },
+      target: {
+        ...defaultNexusAutomationConfig.target,
+        id: "dogfood",
+        objective: "Use DevNexus to work on itself until no eligible issue remains.",
+      },
+      publication: {
+        ...defaultNexusAutomationConfig.publication,
+        strategy: "green_main",
+        targetBranch: "main",
+        releaseTrain: {
+          enabled: true,
+          activeVersionId: "v-next",
+          branchNaming: {
+            integrationPrefix: "integration",
+            candidatePrefix: "candidate",
+            unscopedName: "manual",
+          },
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
+            enabled: true,
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
+          },
+          selector: {
+            statuses: ["ready"],
+            labels: [],
+          },
+        },
+      },
+    },
+  });
+}
+
 function toolJson(result: { content: Array<{ text: string }> }): any {
   return JSON.parse(result.content[0]!.text);
 }
@@ -242,6 +286,9 @@ describe("DevNexus MCP server", () => {
       "target_cycle_list",
       "target_cycle_record",
       "target_report",
+      "publication_feature_plan",
+      "publication_feature_report",
+      "publication_feature_finalization",
       "current_agent_adopt",
       "current_agent_heartbeat",
       "current_agent_record",
@@ -393,6 +440,146 @@ describe("DevNexus MCP server", () => {
           .detail,
       ).toBeUndefined();
     }
+  });
+
+  it("exposes read-only feature branch delivery plan and report tools", async () => {
+    const projectRoot = makeTempDir("dev-nexus-mcp-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, featureProjectConfig());
+
+    const plan = toolJson(
+      await callDevNexusMcpTool("publication_feature_plan", {
+        projectRoot,
+        componentId: "primary",
+      }),
+    );
+    const report = toolJson(
+      await callDevNexusMcpTool(
+        "publication_feature_report",
+        {
+          projectRoot,
+          componentId: "primary",
+          providerEvidence: [
+            {
+              provider: "github",
+              sourceKind: "pull_request",
+              reviewTarget: 243,
+              headBranch: "feat/codex-goals",
+              targetBranch: "main",
+              intendedCiTier: "remote_smoke",
+              reviewState: "waiting_for_approval",
+              mergeability: "mergeable",
+              branchPolicy: "blocked",
+              baseStatus: "current",
+              metadata: {
+                draft: true,
+              },
+              checks: [
+                { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              ],
+            },
+          ],
+        },
+        { now: fixedClock("2026-05-22T21:10:00.000Z") },
+      ),
+    );
+    const finalization = toolJson(
+      await callDevNexusMcpTool(
+        "publication_feature_finalization",
+        {
+          projectRoot,
+          componentId: "primary",
+          providerEvidence: [
+            {
+              provider: "github",
+              sourceKind: "pull_request",
+              reviewTarget: 243,
+              headBranch: "feat/codex-goals",
+              targetBranch: "main",
+              intendedCiTier: "remote_smoke",
+              reviewState: "waiting_for_approval",
+              mergeability: "mergeable",
+              branchPolicy: "blocked",
+              baseStatus: "current",
+              metadata: {
+                draft: true,
+              },
+              checks: [
+                { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+              ],
+            },
+          ],
+        },
+        { now: fixedClock("2026-05-22T21:10:00.000Z") },
+      ),
+    );
+
+    expect(plan).toMatchObject({
+      ok: true,
+      plan: {
+        mutatesSource: false,
+        itemCount: 1,
+        items: [
+          {
+            componentId: "primary",
+            feature: {
+              activeScopeId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              branchPlan: {
+                featureBranch: "feat/codex-goals",
+                finalPublicationTarget: "main",
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect(report).toMatchObject({
+      ok: true,
+      report: {
+        generatedAt: "2026-05-22T21:10:00.000Z",
+        mutatesSource: false,
+        nextAction: "request_review",
+        summary: {
+          itemCount: 1,
+          reviewNeededCount: 1,
+        },
+        items: [
+          {
+            componentId: "primary",
+            status: "review_needed",
+            nextAction: "request_review",
+            providerEvidence: {
+              branchPolicy: "blocked",
+              draft: true,
+            },
+          },
+        ],
+      },
+    });
+    expect(finalization).toMatchObject({
+      ok: true,
+      plan: {
+        nextAction: "request_review",
+        summary: {
+          safeToReviewCount: 1,
+          needsReviewCount: 1,
+        },
+        items: [
+          {
+            componentId: "primary",
+            reviewReadiness: {
+              status: "ready_for_review",
+              safeToReview: true,
+            },
+            publicationReadiness: {
+              status: "needs_review",
+              authorizedToMerge: false,
+            },
+          },
+        ],
+      },
+    });
   });
 
   it("defaults oversized status tools to compact summaries with full detail opt-in", async () => {
@@ -2265,7 +2452,7 @@ describe("DevNexus MCP server", () => {
           projectRoot,
           workItemId: "local-1",
           intent: "approval",
-          question: "Approve the mocked external request slice?",
+          question: "Approve the mocked external request change?",
           target: "github-issue:22",
           responseStatus: "approved",
           responseSummary: "Approved by reviewer comment.",

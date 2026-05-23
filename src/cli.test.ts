@@ -7,7 +7,8 @@ import {
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
-  defaultNexusPublicationTrainCiTierPolicy,
+  defaultNexusFeatureBranchDeliveryConfig,
+  defaultNexusReleaseTrainCiTierPolicy,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
   defaultLocalWorkTrackingStorePath,
@@ -156,7 +157,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
   };
 }
 
-function publicationTrainLease(options: {
+function releaseTrainLease(options: {
   projectId: string;
   componentId: string;
   workItemId: string;
@@ -182,9 +183,9 @@ function publicationTrainLease(options: {
       kind: "component_worktree",
       base: "componentWorktreesRoot",
       componentId: options.componentId,
-      relativePath: "train-readiness",
+      relativePath: "release-train-readiness",
     },
-    writeScope: options.writeScope ?? ["src/nexusPublicationTrainReadiness.ts"],
+    writeScope: options.writeScope ?? ["src/nexusReleaseTrainReadiness.ts"],
     status: "ready",
     createdAt: "2026-05-21T10:00:00.000Z",
     lastSeenAt: "2026-05-21T10:00:00.000Z",
@@ -198,7 +199,7 @@ function publicationTrainLease(options: {
         kind: "component_worktree",
         base: "componentWorktreesRoot",
         componentId: options.componentId,
-        relativePath: "train-readiness",
+        relativePath: "release-train-readiness",
       },
       upstream: `origin/${options.branchName}`,
       ahead: 0,
@@ -1387,7 +1388,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1395,7 +1396,7 @@ describe("dev-nexus cli", () => {
             targetBranch: "main",
             greenMain: {
               integrationPreference: "pull_request",
-              integrationBranch: null,
+              featureBranch: null,
               directTargetPush: "blocked",
               mergeAuthority: "authorized_merge",
               requiredChecks: [
@@ -1518,8 +1519,8 @@ describe("dev-nexus cli", () => {
     });
   });
 
-  it("prints publication train readiness in text and JSON", async () => {
-    const projectRoot = makeTempDir("dev-nexus-cli-train-readiness-");
+  it("prints release train readiness in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-release-train-readiness-");
     saveProjectConfig(
       projectRoot,
       projectConfig({
@@ -1539,7 +1540,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1580,11 +1581,11 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
-          branchName: "codex/train-readiness",
+          branchName: "codex/release-train-readiness",
         }),
       ],
     });
@@ -1610,7 +1611,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "train-readiness",
+        "release-train-readiness",
         projectRoot,
         "--evidence-file",
         evidenceFile,
@@ -1622,12 +1623,12 @@ describe("dev-nexus cli", () => {
     );
 
     expect(textOutput.output()).toContain(
-      "DevNexus publication train readiness.",
+      "DevNexus release train readiness.",
     );
     expect(textOutput.output()).toContain("Next action: create_candidate_branch");
     expect(textOutput.output()).toContain("Version 0.2.0: 1 branch(es), 1 eligible");
     expect(textOutput.output()).toContain(
-      "primary github-120 codex/train-readiness -> eligible",
+      "primary github-120 codex/release-train-readiness -> eligible",
     );
     expect(textOutput.output()).toContain(
       "next=candidate_matrix evidence=success",
@@ -1637,7 +1638,7 @@ describe("dev-nexus cli", () => {
     await main(
       [
         "publication",
-        "train-readiness",
+        "release-train-readiness",
         projectRoot,
         "--full-matrix-budget-exhausted",
         "--json",
@@ -1698,7 +1699,7 @@ describe("dev-nexus cli", () => {
           ...defaultNexusAutomationConfig,
           verification: {
             ...defaultNexusAutomationConfig.verification,
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
           },
           publication: {
             ...defaultNexusAutomationConfig.publication,
@@ -1746,14 +1747,14 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-120",
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
-          branchName: "codex/train-readiness",
+          branchName: "codex/release-train-readiness",
         }),
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-121",
           projectId: "demo-project",
           componentId: "primary",
@@ -4789,7 +4790,7 @@ describe("dev-nexus cli", () => {
         "--intent",
         "choice",
         "--question",
-        "Which provider target shape should this slice use?",
+        "Which provider target shape should this change use?",
         "--target",
         "gitlab-mr:7",
         "--response-status",
@@ -6840,7 +6841,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -6848,7 +6849,15 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            ciTiers: defaultNexusPublicationTrainCiTierPolicy,
+            featureBranchDelivery: {
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+              },
+            },
+            ciTiers: defaultNexusReleaseTrainCiTierPolicy,
             selector: {
               statuses: ["ready"],
             },
@@ -6932,10 +6941,13 @@ describe("dev-nexus cli", () => {
     });
 
     expect(textOutput.output()).toContain(
-      "Publication trains: 1 configured, 1 enabled.",
+      "Release trains: 1 configured, 1 enabled.",
     );
     expect(textOutput.output()).toContain(
       "primary: active=v-next candidate=candidate/v-next integration=integration/v-next tier=remote_smoke",
+    );
+    expect(textOutput.output()).toContain(
+      "Feature branch delivery: branchStrategy=hybrid active=codex-goals feature=feat/codex-goals changes=feat/codex-goals/{change}",
     );
     expect(textOutput.output()).toContain("Selector labels: none");
     expect(textOutput.output()).toContain("Version planning: 1 shown");
@@ -6965,11 +6977,19 @@ describe("dev-nexus cli", () => {
         componentProgress: [
           {
             componentId: "primary",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
               activeVersionId: "v-next",
               candidateBranch: "candidate/v-next",
               integrationBranch: "integration/v-next",
+              featureBranchDelivery: {
+                activeScopeId: "codex-goals",
+                branchStrategy: "hybrid",
+                featureBranch: "feat/codex-goals",
+                reviewBranchPattern: "feat/codex-goals/{change}",
+                finalPublicationTarget: "main",
+                commentPolicy: "status_only",
+              },
               ciTierDefault: "remote_smoke",
               selectorLabels: [],
               requiresPublicLabel: false,
@@ -6977,6 +6997,438 @@ describe("dev-nexus cli", () => {
           },
         ],
       },
+    });
+  });
+
+  it("prints read-only feature branch delivery plans", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      ["publication", "feature-plan", projectRoot, "--component", "primary"],
+      {
+        stdout: textOutput.writer,
+      },
+    );
+    await main(
+      [
+        "publication",
+        "feature-plan",
+        projectRoot,
+        "--component",
+        "primary",
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+      },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus feature branch delivery plan.");
+    expect(textOutput.output()).toContain(
+      "primary: active=codex-goals branchStrategy=hybrid",
+    );
+    expect(textOutput.output()).toContain(
+      "feature=feat/codex-goals changes=feat/codex-goals/{change}",
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      plan: {
+        itemCount: 1,
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            feature: {
+              activeScopeId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              branchPlan: {
+                featureBranch: "feat/codex-goals",
+                reviewBranchPattern: "feat/codex-goals/{change}",
+                finalPublicationTarget: "main",
+              },
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("prints read-only feature branch delivery reports", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const evidenceFile = path.join(projectRoot, "feature-evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 243,
+              url: "https://github.com/Evref-BL/DevNexus/pull/243",
+            },
+            headBranch: "feat/codex-goals",
+            targetBranch: "main",
+            intendedCiTier: "remote_smoke",
+            reviewState: "waiting_for_approval",
+            mergeability: "mergeable",
+            branchPolicy: "clear",
+            baseStatus: "current",
+            checks: [
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+    const finalizationTextOutput = captureOutput();
+    const finalizationJsonOutput = captureOutput();
+    const finalizationCreateTextOutput = captureOutput();
+
+    await main(
+      [
+        "publication",
+        "feature-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      {
+        stdout: textOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "feature-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      {
+        stdout: jsonOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "feature-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      {
+        stdout: finalizationTextOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "feature-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      {
+        stdout: finalizationJsonOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+    await main(
+      [
+        "publication",
+        "feature-finalization",
+        projectRoot,
+        "--component",
+        "primary",
+      ],
+      {
+        stdout: finalizationCreateTextOutput.writer,
+        now: () => "2026-05-22T10:00:00.000Z",
+      },
+    );
+
+    expect(textOutput.output()).toContain("DevNexus feature branch delivery report.");
+    expect(textOutput.output()).toContain("Next action: request_review");
+    expect(textOutput.output()).toContain(
+      "primary: active=codex-goals branchStrategy=hybrid -> review_needed",
+    );
+    expect(textOutput.output()).toContain(
+      "checks=success review=waiting_for_approval merge=mergeable base=current policy=clear",
+    );
+    expect(JSON.parse(jsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "request_review",
+      summary: {
+        itemCount: 1,
+        reviewNeededCount: 1,
+      },
+      report: {
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            status: "review_needed",
+            providerEvidence: {
+              reviewTarget: {
+                number: 243,
+              },
+              checksStatus: "success",
+              reviewState: "waiting_for_approval",
+              baseStatus: "current",
+            },
+          },
+        ],
+      },
+    });
+    expect(finalizationTextOutput.output()).toContain(
+      "DevNexus feature finalization plan.",
+    );
+    expect(finalizationTextOutput.output()).toContain(
+      "primary: active=codex-goals review=ready_for_review publication=needs_review",
+    );
+    expect(finalizationCreateTextOutput.output()).toContain(
+      "finalPRAction=create_at_review_gate",
+    );
+    expect(finalizationCreateTextOutput.output()).toContain(
+      "dev-nexus publication pull-request upsert",
+    );
+    expect(finalizationCreateTextOutput.output()).toContain("--head feat/codex-goals");
+    expect(JSON.parse(finalizationJsonOutput.output())).toMatchObject({
+      ok: true,
+      nextAction: "request_review",
+      summary: {
+        itemCount: 1,
+        safeToReviewCount: 1,
+        needsReviewCount: 1,
+      },
+      plan: {
+        mutatesSource: false,
+        items: [
+          {
+            componentId: "primary",
+            reviewReadiness: {
+              status: "ready_for_review",
+              safeToReview: true,
+            },
+            publicationReadiness: {
+              status: "needs_review",
+              authorizedToMerge: false,
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("prints feature branch update decision reasons in text and JSON", async () => {
+    const projectRoot = makeTempDir("dev-nexus-cli-project-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    const baseConfig = projectConfig();
+    saveProjectConfig(projectRoot, {
+      ...baseConfig,
+      automation: {
+        ...baseConfig.automation!,
+        publication: {
+          ...baseConfig.automation!.publication,
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            branchNaming: {
+              integrationPrefix: "integration",
+              candidatePrefix: "candidate",
+              unscopedName: "manual",
+            },
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+            },
+            selector: {
+              statuses: ["ready"],
+            },
+          },
+        },
+      },
+    });
+    const evidenceFile = path.join(projectRoot, "feature-evidence.json");
+    fs.writeFileSync(
+      evidenceFile,
+      JSON.stringify({
+        evidence: [
+          {
+            provider: "github",
+            sourceKind: "pull_request",
+            reviewTarget: {
+              kind: "pull_request",
+              number: 243,
+              url: "https://github.com/Evref-BL/DevNexus/pull/243",
+            },
+            headBranch: "feat/codex-goals",
+            targetBranch: "main",
+            intendedCiTier: "remote_smoke",
+            reviewState: "approved",
+            mergeability: "mergeable",
+            branchPolicy: "clear",
+            baseStatus: "behind",
+            checks: [
+              { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+            ],
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const textOutput = captureOutput();
+    const jsonOutput = captureOutput();
+
+    await main(
+      [
+        "publication",
+        "feature-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+      ],
+      { stdout: textOutput.writer },
+    );
+    await main(
+      [
+        "publication",
+        "feature-report",
+        projectRoot,
+        "--component",
+        "primary",
+        "--evidence-file",
+        evidenceFile,
+        "--json",
+      ],
+      { stdout: jsonOutput.writer },
+    );
+
+    expect(textOutput.output()).toContain(
+      "branchUpdate=behind recommendation=merge_update forceWithLease=false",
+    );
+    expect(textOutput.output()).toContain(
+      "branchUpdate reasons: review branch base status is behind; CI may be stale until the review branch includes the current base branch",
+    );
+    expect(textOutput.output()).toContain(
+      "branchUpdate command: git checkout feat/codex-goals && git merge --no-ff main && git push origin feat/codex-goals",
+    );
+    const payload = JSON.parse(jsonOutput.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      nextAction: "update_branch",
+      report: {
+        items: [
+          {
+            branchUpdateDecision: {
+              status: "behind",
+              recommendation: "merge_update",
+              pushRemote: "origin",
+              publicBranch: true,
+            },
+          },
+        ],
+      },
+    });
+    const decision = payload.report.items[0].branchUpdateDecision;
+    expect(decision.reasons).toEqual(expect.arrayContaining([
+      "review branch base status is behind",
+      "CI may be stale until the review branch includes the current base branch",
+      "avoid direct pushes to the protected base branch",
+    ]));
+    expect(decision.choices.find((choice: { id: string }) =>
+      choice.id === "merge_update"
+    )).toMatchObject({
+      command:
+        "git checkout feat/codex-goals && git merge --no-ff main && git push origin feat/codex-goals",
     });
   });
 

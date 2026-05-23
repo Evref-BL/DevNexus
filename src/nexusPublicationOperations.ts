@@ -1,7 +1,14 @@
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
+  buildNexusFeatureBranchDeliveryPlan,
+} from "./nexusFeatureBranchDeliveryPlan.js";
+import type {
+  NexusFeatureBranchDeliveryBranchPublicationSummary,
+} from "./nexusFeatureBranchDeliveryPolicy.js";
+import {
   createNexusForgePublicationAdapter,
+  type NexusForgePullRequestChecksResult,
   type NexusForgePullRequestMergeResult,
   type NexusForgePullRequestResult,
 } from "./nexusForgePublication.js";
@@ -91,8 +98,53 @@ export interface NexusPublicationBranchPushResult {
   targetBranch: string | null;
   forceWithLease: boolean;
   forceWithLeaseExpectedCommit: string | null;
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary | null;
   credential: NexusPublicationCredentialSummary;
   push: NexusPublicationGitPushResult;
+}
+
+export interface NexusPublicationBranchPushFeatureSummary {
+  featureId: string;
+  branchPublication: NexusFeatureBranchDeliveryBranchPublicationSummary;
+  remoteSelection: NexusPublicationBranchPushRemoteSelection;
+}
+
+export type NexusPublicationBranchPushRemoteSelectionStatus =
+  | "not_required"
+  | "push_remote_writable"
+  | "fallback_selected"
+  | "blocked";
+
+export interface NexusPublicationBranchPushRemoteSelection {
+  status: NexusPublicationBranchPushRemoteSelectionStatus;
+  selectedRemote: string | null;
+  pushRemote: string | null;
+  fallbackRemote: string | null;
+  reasons: string[];
+  setupActions: string[];
+  probes: NexusPublicationBranchPushRemoteProbe[];
+}
+
+export interface NexusPublicationBranchPushRemoteProbe {
+  remote: string;
+  exitCode: number | null;
+  stderr: string;
+  writable: boolean;
+}
+
+export class NexusPublicationBranchPushBlockedError extends Error {
+  readonly featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
+  readonly remoteSelection: NexusPublicationBranchPushRemoteSelection;
+
+  constructor(options: {
+    message: string;
+    featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
+  }) {
+    super(options.message);
+    this.name = "NexusPublicationBranchPushBlockedError";
+    this.featureBranchDelivery = options.featureBranchDelivery;
+    this.remoteSelection = options.featureBranchDelivery.remoteSelection;
+  }
 }
 
 export interface NexusPublicationPullRequestUpsertResult {
@@ -117,6 +169,19 @@ export interface NexusPublicationPullRequestMergeResult {
   merge: NexusForgePullRequestMergeResult;
 }
 
+export interface NexusPublicationPullRequestEvidenceResult {
+  projectRoot: string;
+  componentId: string | null;
+  target: NexusPublicationTargetSummary;
+  repository: NexusGitHubRepositorySelection;
+  credential: NexusPublicationCredentialSummary;
+  pullRequest: {
+    number: number;
+  };
+  evidence: NexusForgePullRequestChecksResult["evidence"];
+  metadata: NexusForgePullRequestChecksResult["metadata"];
+}
+
 export interface NexusPublicationOperationRuntimeOptions {
   baseEnv?: NodeJS.ProcessEnv;
   fetch?: typeof fetch;
@@ -131,9 +196,11 @@ export interface PushNexusPublicationBranchForComponentOptions
   repositoryPath: string;
   branch: string;
   targetBranch?: string | null;
+  featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
   gitRunner?: NexusPublicationGitPushRunner;
+  remoteProbeRunner?: NexusPublicationGitPushRunner;
 }
 
 export interface UpsertNexusPublicationPullRequestForComponentOptions
@@ -156,6 +223,14 @@ export interface MergeNexusPublicationPullRequestForComponentOptions
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+}
+
+export interface InspectNexusPublicationPullRequestForComponentOptions
+  extends NexusPublicationOperationRuntimeOptions {
+  projectRoot: string;
+  componentId?: string;
+  projectRepository?: boolean;
+  number: number;
 }
 
 export function resolveNexusPublicationComponentContext(options: {
@@ -235,6 +310,10 @@ export async function pushNexusPublicationBranchForComponent(
   options: PushNexusPublicationBranchForComponentOptions,
 ): Promise<NexusPublicationBranchPushResult> {
   const context = resolveNexusPublicationTargetContext(options);
+  const featureBranchDeliveryPlan = resolveFeatureBranchPushPolicy({
+    context,
+    featureId: options.featureId ?? null,
+  });
   assertSafePublicationBranchTarget({
     publication: context.publication,
     branch: options.branch,
@@ -246,6 +325,22 @@ export async function pushNexusPublicationBranchForComponent(
     requiredPermissions: { contents: "write" },
     runtime: options,
   });
+  const featureBranchDelivery = featureBranchDeliveryPlan
+    ? resolveFeatureBranchPushRemoteSelection({
+        featureBranchDelivery: featureBranchDeliveryPlan,
+        repositoryPath: options.repositoryPath,
+        branch: options.branch,
+        baseEnv: options.baseEnv,
+        gitRunner: options.remoteProbeRunner ?? options.gitRunner,
+      })
+    : null;
+  const remoteOverride =
+    featureBranchDelivery?.remoteSelection.selectedRemote ??
+    featureBranchDelivery?.branchPublication.selectedRemote ??
+    null;
+  const preferConfiguredRemote = Boolean(
+    remoteOverride && remoteOverride !== context.publication.remote,
+  );
   const push = pushNexusPublicationBranch({
     policy: context.publication,
     repositoryPath: options.repositoryPath,
@@ -258,6 +353,8 @@ export async function pushNexusPublicationBranchForComponent(
     authProfiles: context.authProfiles,
     baseEnv: options.baseEnv,
     gitRunner: options.gitRunner,
+    remoteOverride,
+    preferConfiguredRemote,
   });
 
   return {
@@ -269,8 +366,233 @@ export async function pushNexusPublicationBranchForComponent(
     targetBranch: options.targetBranch ?? null,
     forceWithLease: options.forceWithLease ?? false,
     forceWithLeaseExpectedCommit: options.forceWithLeaseExpectedCommit ?? null,
+    featureBranchDelivery,
     credential: summarizePublicationCredential(credential),
     push,
+  };
+}
+
+function resolveFeatureBranchPushPolicy(options: {
+  context: NexusPublicationTargetContext;
+  featureId: string | null;
+}): NexusPublicationBranchPushFeatureSummary | null {
+  if (!options.featureId) {
+    return null;
+  }
+  if (!options.context.component) {
+    throw new Error("Feature branch publication requires a component target.");
+  }
+  const plan = buildNexusFeatureBranchDeliveryPlan({
+    projectRoot: options.context.projectRoot,
+    componentId: options.context.component.id,
+    featureId: options.featureId,
+  });
+  const item = plan.items[0];
+  if (!item) {
+    throw new Error(`Feature branch delivery policy was not found: ${options.featureId}`);
+  }
+  const summary = {
+    featureId: item.feature.activeScopeId,
+    branchPublication: item.feature.branchPublication,
+    remoteSelection: {
+      status: "not_required" as const,
+      selectedRemote: item.feature.branchPublication.selectedRemote,
+      pushRemote: item.feature.branchPublication.pushRemote,
+      fallbackRemote: item.feature.branchPublication.fallbackRemote,
+      reasons: [],
+      setupActions: [],
+      probes: [],
+    },
+  };
+  if (!item.feature.branchPublication.selectedRemote) {
+    const manualOnly =
+      item.feature.branchPublication.strategy === "manual_only";
+    throw new NexusPublicationBranchPushBlockedError({
+      message:
+        manualOnly
+          ? `Feature ${options.featureId} branch publication is manual-only; no push remote was selected.`
+          : `Feature ${options.featureId} branch publication has no selected push remote.`,
+      featureBranchDelivery: featureRemoteSelection(summary, {
+        status: "blocked",
+        selectedRemote: null,
+        pushRemote: item.feature.branchPublication.pushRemote,
+        fallbackRemote: item.feature.branchPublication.fallbackRemote,
+        reasons: [
+          manualOnly
+            ? "feature branch publication is manual-only"
+            : "feature branch publication has no selected remote",
+        ],
+        setupActions: [
+          manualOnly
+            ? "publish manually or configure featureBranchDelivery.branchPublication"
+            : "configure automation.publication.remote or featureBranchDelivery.branchPublication.fallbackRemote",
+        ],
+        probes: [],
+      }),
+    });
+  }
+  return summary;
+}
+
+function resolveFeatureBranchPushRemoteSelection(options: {
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary;
+  repositoryPath: string;
+  branch: string;
+  baseEnv?: NodeJS.ProcessEnv;
+  gitRunner?: NexusPublicationGitPushRunner;
+}): NexusPublicationBranchPushFeatureSummary {
+  const branchPublication = options.featureBranchDelivery.branchPublication;
+  if (branchPublication.strategy !== "push_remote_then_fallback") {
+    return options.featureBranchDelivery;
+  }
+
+  const pushRemote = branchPublication.pushRemote;
+  const fallbackRemote = branchPublication.fallbackRemote;
+  if (!pushRemote) {
+    if (!fallbackRemote) {
+      return blockedFeatureRemoteSelection(
+        options.featureBranchDelivery,
+        "push remote is not configured",
+        "configure automation.publication.remote or featureBranchDelivery.branchPublication.fallbackRemote",
+      );
+    }
+    return featureRemoteSelection(options.featureBranchDelivery, {
+      status: "fallback_selected",
+      selectedRemote: fallbackRemote,
+      pushRemote,
+      fallbackRemote,
+      reasons: ["push remote is not configured"],
+      setupActions: [],
+      probes: [],
+    });
+  }
+
+  const publicationProbe = probeFeatureBranchRemote({
+    remote: pushRemote,
+    repositoryPath: options.repositoryPath,
+    branch: options.branch,
+    baseEnv: options.baseEnv,
+    gitRunner: options.gitRunner,
+  });
+  if (publicationProbe.writable) {
+    return featureRemoteSelection(options.featureBranchDelivery, {
+      status: "push_remote_writable",
+      selectedRemote: pushRemote,
+      pushRemote,
+      fallbackRemote,
+      reasons: ["push remote accepted a dry-run branch push"],
+      setupActions: [],
+      probes: [publicationProbe],
+    });
+  }
+  if (!fallbackRemote) {
+    return blockedFeatureRemoteSelection(
+      options.featureBranchDelivery,
+      `push remote ${pushRemote} rejected a dry-run branch push`,
+      "configure featureBranchDelivery.branchPublication.fallbackRemote",
+      [publicationProbe],
+    );
+  }
+
+  const fallbackProbe = probeFeatureBranchRemote({
+    remote: fallbackRemote,
+    repositoryPath: options.repositoryPath,
+    branch: options.branch,
+    baseEnv: options.baseEnv,
+    gitRunner: options.gitRunner,
+  });
+  if (!fallbackProbe.writable) {
+    return blockedFeatureRemoteSelection(
+      options.featureBranchDelivery,
+      `fallback remote ${fallbackRemote} rejected a dry-run branch push`,
+      `fix remote ${fallbackRemote} before publishing the feature branch`,
+      [publicationProbe, fallbackProbe],
+    );
+  }
+
+  return featureRemoteSelection(options.featureBranchDelivery, {
+    status: "fallback_selected",
+    selectedRemote: fallbackRemote,
+    pushRemote,
+    fallbackRemote,
+    reasons: [
+      `push remote ${pushRemote} rejected a dry-run branch push`,
+      `fallback remote ${fallbackRemote} accepted a dry-run branch push`,
+    ],
+    setupActions: [],
+    probes: [publicationProbe, fallbackProbe],
+  });
+}
+
+function probeFeatureBranchRemote(options: {
+  remote: string;
+  repositoryPath: string;
+  branch: string;
+  baseEnv?: NodeJS.ProcessEnv;
+  gitRunner?: NexusPublicationGitPushRunner;
+}): NexusPublicationBranchPushRemoteProbe {
+  if (!options.gitRunner) {
+    return {
+      remote: options.remote,
+      exitCode: null,
+      stderr: "remote writability probe was not run",
+      writable: true,
+    };
+  }
+  const result = options.gitRunner(
+    ["push", "--dry-run", options.remote, options.branch],
+    {
+      cwd: options.repositoryPath,
+      env: {
+        ...(options.baseEnv ?? process.env),
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    },
+  );
+  return {
+    remote: options.remote,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    writable: result.exitCode === 0,
+  };
+}
+
+function blockedFeatureRemoteSelection(
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary,
+  reason: string,
+  setupAction: string,
+  probes: NexusPublicationBranchPushRemoteProbe[] = [],
+): never {
+  const blocked = featureRemoteSelection(featureBranchDelivery, {
+    status: "blocked",
+    selectedRemote: null,
+    pushRemote: featureBranchDelivery.branchPublication.pushRemote,
+    fallbackRemote: featureBranchDelivery.branchPublication.fallbackRemote,
+    reasons: [reason],
+    setupActions: [setupAction],
+    probes,
+  });
+  throw new NexusPublicationBranchPushBlockedError({
+    message: [
+      "Feature branch publication is blocked.",
+      ...blocked.remoteSelection.reasons,
+      ...blocked.remoteSelection.setupActions,
+    ].join(" "),
+    featureBranchDelivery: blocked,
+  });
+}
+
+function featureRemoteSelection(
+  featureBranchDelivery: NexusPublicationBranchPushFeatureSummary,
+  remoteSelection: NexusPublicationBranchPushRemoteSelection,
+): NexusPublicationBranchPushFeatureSummary {
+  return {
+    ...featureBranchDelivery,
+    branchPublication: {
+      ...featureBranchDelivery.branchPublication,
+      selectedRemote: remoteSelection.selectedRemote,
+    },
+    remoteSelection,
   };
 }
 
@@ -348,6 +670,41 @@ export async function mergeNexusPublicationPullRequestForComponent(
       method,
     },
     merge,
+  };
+}
+
+export async function inspectNexusPublicationPullRequestForComponent(
+  options: InspectNexusPublicationPullRequestForComponentOptions,
+): Promise<NexusPublicationPullRequestEvidenceResult> {
+  const context = resolveNexusPublicationTargetContext(options);
+  const credential = await resolvePublicationCredential({
+    context,
+    purpose: "api",
+    requiredPermissions: { pull_requests: "read" },
+    runtime: options,
+  });
+  const adapter = createNexusForgePublicationAdapter({
+    repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
+    credential,
+    preferredBackend: "github_rest",
+    fetch: options.fetch,
+    baseEnv: options.baseEnv,
+  });
+  const result = await adapter.inspectPullRequestChecks({
+    number: options.number,
+  });
+
+  return {
+    projectRoot: context.projectRoot,
+    componentId: componentIdForPublicationTarget(context),
+    target: publicationTargetSummary(context),
+    repository: context.repository,
+    credential: summarizePublicationCredential(credential),
+    pullRequest: {
+      number: options.number,
+    },
+    evidence: result.evidence,
+    metadata: result.metadata,
   };
 }
 

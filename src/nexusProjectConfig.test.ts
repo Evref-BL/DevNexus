@@ -2140,7 +2140,7 @@ describe("workspace config", () => {
     });
   });
 
-  it("accepts optional publication train policy without requiring public labels", () => {
+  it("accepts optional release train policy without requiring public labels", () => {
     const ciTiers = {
       defaultTier: "remote_smoke" as const,
       fullMatrixBudget: {
@@ -2156,7 +2156,7 @@ describe("workspace config", () => {
         publication: {
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "0.2.0",
             branchNaming: {
@@ -2180,7 +2180,7 @@ describe("workspace config", () => {
           remoteUrl: "https://github.com/example/project.git",
           defaultBranch: "main",
           publication: {
-            publicationTrain: {
+            releaseTrain: {
               enabled: false,
             },
           },
@@ -2188,7 +2188,7 @@ describe("workspace config", () => {
       ],
     });
 
-    expect(config.automation?.publication.publicationTrain).toMatchObject({
+    expect(config.automation?.publication.releaseTrain).toMatchObject({
       enabled: true,
       activeVersionId: "0.2.0",
       branchNaming: {
@@ -2208,12 +2208,193 @@ describe("workspace config", () => {
         },
       },
     });
-    expect(config.components[0]?.publication?.publicationTrain).toMatchObject({
+    expect(config.components[0]?.publication?.releaseTrain).toMatchObject({
       enabled: false,
       selector: {
         labels: [],
       },
     });
+  });
+
+  it("accepts feature branch delivery policy on release trains", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "feature-delivery-project",
+      name: "Feature Branch Delivery Project",
+      automation: {
+        publication: {
+          strategy: "green_main",
+          targetBranch: "main",
+          releaseTrain: {
+            enabled: true,
+            activeVersionId: "v-next",
+            featureBranchDelivery: {
+              enabled: true,
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              allowedBranchStrategies: ["direct", "stacked", "hybrid"],
+              branchNaming: {
+                defaultIntentPrefix: "feat",
+                allowedIntentPrefixes: ["feat/", "fix", "chore"],
+                featureBranchPattern: "{intent}/{feature}",
+                reviewBranchPattern: "{intent}/{feature}/{change}",
+              },
+              review: {
+                mode: "review_branch_pr",
+                finalPullRequest: true,
+                finalPullRequestCreation: "at_review_gate",
+              },
+              provider: {
+                commentPolicy: "status_only",
+              },
+              branchPublication: {
+                strategy: "push_remote_then_fallback",
+                fallbackRemote: "fork",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(
+      config.automation?.publication.releaseTrain?.featureBranchDelivery,
+    ).toMatchObject({
+      enabled: true,
+      activeFeatureId: "codex-goals",
+      defaultBranchStrategy: "hybrid",
+      allowedBranchStrategies: ["direct", "stacked", "hybrid"],
+      branchNaming: {
+        defaultIntentPrefix: "feat",
+        allowedIntentPrefixes: ["feat", "fix", "chore"],
+        featureBranchPattern: "{intent}/{feature}",
+        reviewBranchPattern: "{intent}/{feature}/{change}",
+      },
+      review: {
+        mode: "review_branch_pr",
+        finalPullRequest: true,
+        finalPullRequestCreation: "at_review_gate",
+      },
+      provider: {
+        commentPolicy: "status_only",
+      },
+      branchPublication: {
+        strategy: "push_remote_then_fallback",
+        fallbackRemote: "fork",
+      },
+    });
+  });
+
+  it("rejects invalid feature branch delivery policy", () => {
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            releaseTrain: {
+              enabled: true,
+              featureBranchDelivery: {
+                defaultBranchStrategy: "hybrid",
+                allowedBranchStrategies: ["direct", "stacked"],
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultBranchStrategy must be included in allowedBranchStrategies/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            releaseTrain: {
+              enabled: true,
+              featureBranchDelivery: {
+                branchNaming: {
+                  defaultIntentPrefix: "feature",
+                  allowedIntentPrefixes: ["feat", "fix"],
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/defaultIntentPrefix must be included in allowedIntentPrefixes/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            releaseTrain: {
+              enabled: true,
+              featureBranchDelivery: {
+                branchNaming: {
+                  featureBranchPattern: "{intent}/{feature}/{change}",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/featureBranchPattern must not include \{change\}/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            releaseTrain: {
+              enabled: true,
+              featureBranchDelivery: {
+                review: {
+                  finalPullRequestCreation: "always",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/finalPullRequestCreation must be/);
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "feature-delivery-project",
+        name: "Feature Branch Delivery Project",
+        automation: {
+          publication: {
+            strategy: "green_main",
+            targetBranch: "main",
+            releaseTrain: {
+              enabled: true,
+              featureBranchDelivery: {
+                branchPublication: {
+                  strategy: "fallback_remote",
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow(/fallbackRemote is required/);
   });
 
   it("accepts publication identity and remote guardrails", () => {
