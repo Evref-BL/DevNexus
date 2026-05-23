@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
 import {
@@ -99,6 +100,7 @@ export interface NexusPublicationBranchPushResult {
   forceWithLease: boolean;
   forceWithLeaseExpectedCommit: string | null;
   featureBranchDelivery: NexusPublicationBranchPushFeatureSummary | null;
+  warnings: string[];
   credential: NexusPublicationCredentialSummary;
   push: NexusPublicationGitPushResult;
 }
@@ -153,7 +155,20 @@ export interface NexusPublicationPullRequestUpsertResult {
   target: NexusPublicationTargetSummary;
   repository: NexusGitHubRepositorySelection;
   credential: NexusPublicationCredentialSummary;
-  pullRequest: NexusForgePullRequestResult;
+  dryRun: boolean;
+  plan: NexusPublicationPullRequestUpsertPlan;
+  pullRequest: NexusForgePullRequestResult | null;
+}
+
+export interface NexusPublicationPullRequestUpsertPlan {
+  operation: "create" | "update";
+  number: number | null;
+  head: string;
+  base: string;
+  title: string;
+  bodyProvided: boolean;
+  draft: boolean;
+  backend: "github_rest";
 }
 
 export interface NexusPublicationPullRequestMergeResult {
@@ -214,6 +229,7 @@ export interface UpsertNexusPublicationPullRequestForComponentOptions
   title: string;
   body?: string | null;
   draft?: boolean;
+  dryRun?: boolean;
 }
 
 export interface MergeNexusPublicationPullRequestForComponentOptions
@@ -356,6 +372,15 @@ export async function pushNexusPublicationBranchForComponent(
     remoteOverride,
     preferConfiguredRemote,
   });
+  const warnings = publicationBranchPushWarnings({
+    repositoryPath: options.repositoryPath,
+    branch: options.branch,
+    configuredRemote: context.publication.remote,
+    selectedRemote:
+      remoteOverride ??
+      context.publication.remote ??
+      null,
+  });
 
   return {
     projectRoot: context.projectRoot,
@@ -367,6 +392,7 @@ export async function pushNexusPublicationBranchForComponent(
     forceWithLease: options.forceWithLease ?? false,
     forceWithLeaseExpectedCommit: options.forceWithLeaseExpectedCommit ?? null,
     featureBranchDelivery,
+    warnings,
     credential: summarizePublicationCredential(credential),
     push,
   };
@@ -606,6 +632,34 @@ export async function upsertNexusPublicationPullRequestForComponent(
     requiredPermissions: { pull_requests: "write" },
     runtime: options,
   });
+  const base =
+    options.base ??
+    context.publication.targetBranch ??
+    publicationTargetDefaultBranch(context) ??
+    "main";
+  const plan: NexusPublicationPullRequestUpsertPlan = {
+    operation: options.number ? "update" : "create",
+    number: options.number ?? null,
+    head: options.head,
+    base,
+    title: options.title,
+    bodyProvided: options.body !== undefined,
+    draft: options.draft === true,
+    backend: "github_rest",
+  };
+  if (options.dryRun === true) {
+    return {
+      projectRoot: context.projectRoot,
+      componentId: componentIdForPublicationTarget(context),
+      target: publicationTargetSummary(context),
+      repository: context.repository,
+      credential: summarizePublicationCredential(credential),
+      dryRun: true,
+      plan,
+      pullRequest: null,
+    };
+  }
+
   const adapter = createNexusForgePublicationAdapter({
     repository: nexusForgeRepositoryFromGitHubRepository(context.repository),
     credential,
@@ -616,11 +670,7 @@ export async function upsertNexusPublicationPullRequestForComponent(
   const pullRequest = await adapter.upsertPullRequest({
     number: options.number,
     head: options.head,
-    base:
-      options.base ??
-      context.publication.targetBranch ??
-      publicationTargetDefaultBranch(context) ??
-      "main",
+    base,
     title: options.title,
     ...(options.body !== undefined ? { body: options.body } : {}),
     ...(options.draft === true ? { draft: true } : {}),
@@ -632,8 +682,47 @@ export async function upsertNexusPublicationPullRequestForComponent(
     target: publicationTargetSummary(context),
     repository: context.repository,
     credential: summarizePublicationCredential(credential),
+    dryRun: false,
+    plan,
     pullRequest,
   };
+}
+
+function publicationBranchPushWarnings(options: {
+  repositoryPath: string;
+  branch: string;
+  configuredRemote?: string | null;
+  selectedRemote?: string | null;
+}): string[] {
+  const configuredRemote = options.configuredRemote ?? null;
+  const selectedRemote = options.selectedRemote ?? configuredRemote;
+  if (!configuredRemote || selectedRemote !== configuredRemote) {
+    return [];
+  }
+  const upstreamRemote = gitConfigValue(
+    options.repositoryPath,
+    `branch.${options.branch}.remote`,
+  );
+  if (!upstreamRemote || upstreamRemote === configuredRemote) {
+    return [];
+  }
+
+  return [
+    `Branch ${options.branch} tracks remote ${upstreamRemote}, not configured publication remote ${configuredRemote}.`,
+  ];
+}
+
+function gitConfigValue(repositoryPath: string, key: string): string | null {
+  const result = spawnSync("git", ["config", "--get", key], {
+    cwd: repositoryPath,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    return null;
+  }
+
+  const value = result.stdout.trim();
+  return value.length > 0 ? value : null;
 }
 
 export async function mergeNexusPublicationPullRequestForComponent(

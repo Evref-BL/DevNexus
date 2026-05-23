@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -73,6 +74,36 @@ describe("publication operations", () => {
         cwd: sourceRoot,
         token: "installation-token",
       }),
+    ]);
+  });
+
+  it("warns when a review branch tracks a non-policy upstream remote", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    initGitRepositoryWithUpstream({
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/app-publication-cli",
+      upstreamRemote: "bot",
+    });
+
+    const result = await pushNexusPublicationBranchForComponent({
+      projectRoot,
+      repositoryPath: sourceRoot,
+      branch: "codex/dev-nexus/app-publication-cli",
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      gitRunner: (args) => ({
+        args: [...args],
+        stdout: "",
+        stderr: "Everything up-to-date",
+        exitCode: 0,
+      }),
+    });
+
+    expect(result.credential.profileId).toBe("dev-nexus-app-github");
+    expect(result.push.plan.remote).toBe("https://github.com/Evref-BL/DevNexus.git");
+    expect(result.warnings).toEqual([
+      "Branch codex/dev-nexus/app-publication-cli tracks remote bot, not configured publication remote app.",
     ]);
   });
 
@@ -1154,6 +1185,155 @@ describe("publication CLI operations", () => {
     ]);
   });
 
+  it("dry-runs pull request upserts through the configured App API credential path", async () => {
+    const { projectRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("dry-run should not call the provider");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "pull-request",
+        "upsert",
+        projectRoot,
+        "--head",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        "Use DevNexus App credentials for publication.",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout.output())).toMatchObject({
+      ok: true,
+      dryRun: true,
+      pullRequest: null,
+      plan: {
+        operation: "create",
+        head: "codex/dev-nexus/app-publication-cli",
+        base: "main",
+        title: "Add App publication commands",
+        bodyProvided: true,
+        draft: false,
+      },
+      credential: {
+        profileId: "dev-nexus-app-github",
+        kind: "github_app",
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
+  it("dry-runs component pull request upserts with App credentials in a dogfood-shaped workspace", async () => {
+    const { projectRoot } = createMultiComponentPublicationProject();
+
+    const result = await upsertNexusPublicationPullRequestForComponent({
+      projectRoot,
+      componentId: "dev-nexus",
+      head: "codex/dev-nexus/app-publication-cli",
+      title: "Add App publication commands",
+      dryRun: true,
+      baseEnv: {
+        DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+      } as NodeJS.ProcessEnv,
+      fetch: async () => {
+        throw new Error("dry-run should not call the provider");
+      },
+    });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.repository).toMatchObject({
+      owner: "Evref-BL",
+      name: "DevNexus",
+    });
+    expect(result.credential).toMatchObject({
+      profileId: "dev-nexus-app-github",
+      actorId: "dev-nexus-automation-app",
+      account: "devnexus-automation",
+      kind: "github_app",
+    });
+    expect(result.plan).toMatchObject({
+      operation: "create",
+      head: "codex/dev-nexus/app-publication-cli",
+      base: "main",
+    });
+    expect(result.pullRequest).toBeNull();
+  });
+
+  it("dry-runs review handoff through configured branch push and pull request planning", async () => {
+    const { projectRoot, sourceRoot } = createPublicationProject();
+    const stdout = textWriter();
+    const fetchImpl: typeof fetch = async () => {
+      throw new Error("dry-run should not call the provider");
+    };
+
+    const exitCode = await main(
+      [
+        "publication",
+        "review-handoff",
+        projectRoot,
+        "--repository-path",
+        sourceRoot,
+        "--branch",
+        "codex/dev-nexus/app-publication-cli",
+        "--title",
+        "Add App publication commands",
+        "--body",
+        "Use DevNexus App credentials for publication.",
+        "--dry-run",
+        "--json",
+      ],
+      {
+        stdout,
+        env: {
+          DEV_NEXUS_TEST_APP_TOKEN: "installation-token",
+        } as NodeJS.ProcessEnv,
+        fetch: fetchImpl,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const payload = JSON.parse(stdout.output());
+    expect(payload).toMatchObject({
+      ok: true,
+      dryRun: true,
+      branchPush: {
+        dryRun: true,
+        credential: {
+          profileId: "dev-nexus-app-github",
+        },
+        push: {
+          plan: {
+            remote: "https://github.com/Evref-BL/DevNexus.git",
+            refspec: "codex/dev-nexus/app-publication-cli",
+          },
+        },
+      },
+      pullRequest: {
+        dryRun: true,
+        plan: {
+          operation: "create",
+          head: "codex/dev-nexus/app-publication-cli",
+          base: "main",
+        },
+      },
+    });
+    expect(stdout.output()).not.toContain("installation-token");
+  });
+
   it("normalizes escaped line breaks in inline pull request bodies", async () => {
     const { projectRoot } = createPublicationProject();
     const stdout = textWriter();
@@ -1601,6 +1781,52 @@ function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
   return tempDir;
+}
+
+function initGitRepositoryWithUpstream(options: {
+  repositoryPath: string;
+  branch: string;
+  upstreamRemote: string;
+}): void {
+  runGit(options.repositoryPath, ["init"]);
+  runGit(options.repositoryPath, ["checkout", "--orphan", options.branch]);
+  fs.writeFileSync(path.join(options.repositoryPath, "README.md"), "test\n", "utf8");
+  runGit(options.repositoryPath, ["add", "README.md"]);
+  runGit(options.repositoryPath, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "Initial commit",
+  ]);
+  runGit(options.repositoryPath, [
+    "remote",
+    "add",
+    options.upstreamRemote,
+    "git@github.com:Gabot-Darbot/DevNexus.git",
+  ]);
+  runGit(options.repositoryPath, [
+    "config",
+    `branch.${options.branch}.remote`,
+    options.upstreamRemote,
+  ]);
+  runGit(options.repositoryPath, [
+    "config",
+    `branch.${options.branch}.merge`,
+    `refs/heads/${options.branch}`,
+  ]);
+}
+
+function runGit(repositoryPath: string, args: string[]): void {
+  const command = spawnSync("git", args, {
+    cwd: repositoryPath,
+    encoding: "utf8",
+  });
+  if (command.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${command.stderr}`);
+  }
 }
 
 function textWriter(): { write(chunk: string): boolean; output(): string } {
