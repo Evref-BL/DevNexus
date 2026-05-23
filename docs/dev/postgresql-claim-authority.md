@@ -319,6 +319,38 @@ Progress:
   configured schema, applies the exported schema SQL, verifies one-winner
   claiming and fencing-token verification, then releases the synthetic claim.
 
+### Slice 6: Current-Agent Coordination Parity
+
+Scope:
+
+- Route current-agent adoption through the same work-item claim authority as
+  spawned coordinator launches.
+- Include claim ownership and authority fencing facts in current-agent context
+  and environment.
+- Preserve run-id reuse without taking a second claim.
+
+Acceptance:
+
+- Current-agent adoption does not proceed without a successful claim when
+  work-item claims are enabled.
+- Authority-backed claim verification failures skip adoption before the current
+  coordinator starts mutable work.
+- Existing current-agent result recording and target-cycle behavior remain
+  compatible.
+
+Verification:
+
+- `npm test -- src/nexusAutomationCurrentAgentAdoption.test.ts`
+- `npm test -- src/nexusAutomationAgentLaunch.test.ts src/nexusWorkItemClaim.test.ts`
+- `npm run build`
+
+Progress:
+
+- 2026-05-23: Slice 6A added current-agent adoption claim acquisition,
+  authority claim context/environment projection, verification-lost-race skip
+  behavior, and reuse handling that keeps an existing adoption context instead
+  of taking a duplicate claim for the same run id.
+
 ## Human Gates
 
 - Provider write gate: create or update GitHub implementation issues/comments.
@@ -335,3 +367,8 @@ Progress:
   concurrency key.
 - Whether the first PostgreSQL implementation should include active-worker and
   runtime semaphores or only the picker mutex and claim lease.
+- Whether completed, blocked, and failed worker records should synchronously
+  release database claims, rely on lease expiry, or use an explicit separate
+  release command.
+- How to heartbeat long-running synchronous command workers without requiring a
+  database dependency for users who keep the optimistic tracker backend.

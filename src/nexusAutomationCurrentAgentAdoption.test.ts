@@ -14,6 +14,9 @@ import {
   readNexusAutomationTargetCycleLedger,
   recordNexusAutomationCurrentAgentAdoptionResult,
   saveProjectConfig,
+  type NexusWorkItemClaimAuthority,
+  type NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  type NexusWorkItemClaimAuthorityRecord,
   type NexusProjectConfig,
 } from "./index.js";
 
@@ -131,6 +134,11 @@ describe("current-agent automation adoption", () => {
         DEV_NEXUS_RUN_ID: "current-agent-1",
         DEV_NEXUS_MAX_CONCURRENT_SUBAGENTS: "2",
         DEV_NEXUS_ELIGIBLE_WORK_ITEM_IDS: "local-1",
+        DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: "claimed",
+      },
+      workItemClaim: {
+        status: "claimed",
+        workItemId: "local-1",
       },
       result: {
         file: expect.stringContaining("result.json"),
@@ -155,6 +163,10 @@ describe("current-agent automation adoption", () => {
       result: {
         file: first.resultFile,
         statuses: ["completed", "failed", "blocked", "skipped"],
+      },
+      workItemClaim: {
+        status: "claimed",
+        workItemId: "local-1",
       },
     });
     expect(fs.existsSync(path.join(projectRoot, "worktrees"))).toBe(false);
@@ -226,7 +238,7 @@ describe("current-agent automation adoption", () => {
         .items[0],
     ).toMatchObject({
       id: "local-1",
-      status: "ready",
+      status: "in_progress",
     });
   });
 
@@ -333,4 +345,163 @@ describe("current-agent automation adoption", () => {
       },
     ]);
   });
+
+  it("claims eligible work before current-agent adoption", async () => {
+    const projectRoot = makeTempDir("dev-nexus-current-agent-claim-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Claimed current-agent task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 91);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "verified",
+          claim: authorityClaim!,
+        };
+      },
+    };
+
+    const adoption = await adoptNexusAutomationCurrentAgent({
+      projectRoot,
+      runId: "current-agent-claim-1",
+      claimAuthority,
+      workItemClaimOwner: {
+        hostId: "host-a",
+      },
+      workItemClaimLeaseTokenFactory: () => "lease-current-agent-1",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+    });
+
+    expect(adoption).toMatchObject({
+      status: "started",
+      shouldProceed: true,
+      workItemClaim: {
+        status: "claimed",
+        componentId: "primary",
+        trackerId: "default",
+        workItemId: "local-1",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 91,
+          owner: {
+            leaseToken: "lease-current-agent-1",
+          },
+        },
+      },
+      environment: {
+        DEV_NEXUS_WORK_ITEM_CLAIM_STATUS: "claimed",
+        DEV_NEXUS_CLAIM_AUTHORITY_KIND: "test-authority",
+        DEV_NEXUS_CLAIM_FENCING_TOKEN: "91",
+      },
+    });
+    const context = JSON.parse(fs.readFileSync(adoption.contextFile!, "utf8"));
+    expect(context.workItemClaim).toMatchObject({
+      status: "claimed",
+      authorityClaim: {
+        authorityKind: "test-authority",
+        fencingToken: 91,
+      },
+    });
+  });
+
+  it("skips current-agent adoption when authority claim verification loses race", async () => {
+    const projectRoot = makeTempDir("dev-nexus-current-agent-claim-lost-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig());
+    await createLocalWorkTrackerProvider({
+      projectRoot,
+      now: fixedClock("2026-05-17T09:00:00.000Z"),
+    }).createWorkItem({
+      projectRoot,
+      title: "Rejected current-agent task",
+      status: "ready",
+      labels: ["automation"],
+    });
+    let authorityClaim: NexusWorkItemClaimAuthorityRecord | null = null;
+    const claimAuthority: NexusWorkItemClaimAuthority = {
+      kind: "test-authority",
+      async claimCandidate(input) {
+        authorityClaim = testAuthorityClaim(input, 92);
+        return {
+          status: "claimed",
+          workItem: {
+            ...input.freshWorkItem,
+            status: "in_progress",
+          },
+          authorityClaim,
+        };
+      },
+      async verifyClaim() {
+        return {
+          status: "token_mismatch",
+          claim: authorityClaim ?? undefined,
+        };
+      },
+    };
+
+    const adoption = await adoptNexusAutomationCurrentAgent({
+      projectRoot,
+      runId: "current-agent-claim-lost-1",
+      claimAuthority,
+      workItemClaimLeaseTokenFactory: () => "lease-current-agent-lost",
+      now: fixedClock("2026-05-17T10:00:00.000Z"),
+    });
+
+    expect(adoption).toMatchObject({
+      status: "skipped",
+      shouldProceed: false,
+      summary: expect.stringContaining("lost race"),
+      workItemClaim: {
+        status: "lost_race",
+        reason: "verification_failed",
+        authorityClaim: {
+          authorityKind: "test-authority",
+          fencingToken: 92,
+        },
+      },
+    });
+    expect(adoption.contextFile).toBeNull();
+  });
 });
+
+function testAuthorityClaim(
+  input: NexusWorkItemClaimAuthorityClaimCandidateOptions,
+  fencingToken: number,
+): NexusWorkItemClaimAuthorityRecord {
+  return {
+    authorityKind: "test-authority",
+    key: {
+      projectId: input.projectId,
+      componentId: input.candidate.componentId,
+      trackerId: input.tracker.id,
+      provider: input.provider.provider,
+      workItemId: input.freshWorkItem.id,
+    },
+    owner: input.owner,
+    fencingToken,
+    state: "active",
+    claimedAt: input.owner.claimedAt,
+    expiresAt: input.owner.expiresAt,
+    lastHeartbeatAt: input.now.toISOString(),
+  };
+}

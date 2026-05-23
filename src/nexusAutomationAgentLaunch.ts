@@ -81,12 +81,18 @@ import {
   claimNexusEligibleWorkItem,
   type NexusWorkItemClaimAuthority,
   type NexusWorkItemClaimAuthorityRecord,
-  type NexusWorkItemClaimObservation,
   type NexusWorkItemClaimOwner,
   type NexusWorkItemClaimOwnerInput,
-  type NexusWorkItemClaimResult,
-  type NexusWorkItemClaimSkippedCandidate,
 } from "./nexusWorkItemClaim.js";
+import {
+  automationComponentEligibleWorkItemsForClaim as componentEligibleWorkItemsForClaim,
+  automationWorkItemClaimFromResult as agentLaunchWorkItemClaim,
+  automationWorkItemClaimSkipSummary,
+  blockedAutomationWorkItemClaim as blockedWorkItemClaim,
+  disabledAutomationWorkItemClaim as disabledWorkItemClaim,
+  type NexusAutomationWorkItemClaim,
+  type NexusAutomationWorkItemClaimStatus,
+} from "./nexusAutomationWorkItemClaimContext.js";
 import {
   buildNexusExternalIssueVisibilitySummary,
   type NexusExternalIssueVisibilitySummary,
@@ -184,23 +190,10 @@ export type {
 } from "./nexusAutomationEligibleWorkItems.js";
 
 export type NexusAutomationAgentLaunchWorkItemClaimStatus =
-  NexusWorkItemClaimResult["status"] | "blocked" | "disabled";
+  NexusAutomationWorkItemClaimStatus;
 
-export interface NexusAutomationAgentLaunchWorkItemClaim {
-  status: NexusAutomationAgentLaunchWorkItemClaimStatus;
-  reason: string | null;
-  componentId: string | null;
-  trackerId: string | null;
-  workItemId: string | null;
-  logicalWorkItemId: string | null;
-  workItemTitle: string | null;
-  owner: NexusWorkItemClaimOwner | null;
-  authorityClaim: NexusWorkItemClaimAuthorityRecord | null;
-  reclaimedFrom: NexusWorkItemClaimObservation | null;
-  skippedCandidates: NexusWorkItemClaimSkippedCandidate[];
-  activeClaims: NexusWorkItemClaimObservation[];
-  staleClaims: NexusWorkItemClaimObservation[];
-}
+export type NexusAutomationAgentLaunchWorkItemClaim =
+  NexusAutomationWorkItemClaim;
 
 export interface NexusAutomationAgentLaunchContext {
   version: 1;
@@ -764,7 +757,10 @@ export async function runNexusAutomationAgentLaunchOnce(
           });
         } else {
           const finishedAt = currentIso(options.now);
-          const summary = workItemClaimSkipSummary(workItemClaim);
+          const summary = automationWorkItemClaimSkipSummary(
+            workItemClaim,
+            "coordinator launch",
+          );
           ledger = appendNexusAutomationRunRecord({
             projectRoot,
             config: automationConfig,
@@ -1306,143 +1302,6 @@ function workItemClaimOwner(options: {
     agentId: configured?.agentId ?? options.runId,
     ownerId: configured?.ownerId ?? options.options.owner ?? null,
   };
-}
-
-function agentLaunchWorkItemClaim(
-  claim: NexusWorkItemClaimResult,
-): NexusAutomationAgentLaunchWorkItemClaim {
-  if (claim.status === "claimed") {
-    return {
-      status: "claimed",
-      reason: null,
-      componentId: claim.componentId,
-      trackerId: claim.trackerId,
-      workItemId: claim.workItem.id,
-      logicalWorkItemId: claim.workItem.externalRef?.itemId ?? claim.workItem.id,
-      workItemTitle: claim.workItem.title,
-      owner: claim.owner,
-      authorityClaim: claim.authorityClaim ?? null,
-      reclaimedFrom: claim.reclaimedFrom ?? null,
-      skippedCandidates: claim.skippedCandidates,
-      activeClaims: claim.activeClaims ?? [],
-      staleClaims: claim.staleClaims ?? [],
-    };
-  }
-
-  if (claim.status === "lost_race") {
-    return {
-      status: "lost_race",
-      reason: claim.reason,
-      componentId: claim.componentId,
-      trackerId: claim.trackerId,
-      workItemId: claim.candidate.id,
-      logicalWorkItemId: claim.candidate.externalRef?.itemId ?? claim.candidate.id,
-      workItemTitle: claim.candidate.title,
-      owner: claim.owner,
-      authorityClaim: claim.authorityClaim ?? null,
-      reclaimedFrom: claim.reclaimedFrom ?? null,
-      skippedCandidates: claim.skippedCandidates,
-      activeClaims: claim.activeClaims ?? [],
-      staleClaims: claim.staleClaims ?? [],
-    };
-  }
-
-  return {
-    status: "no_claim",
-    reason: claim.reason,
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    authorityClaim: null,
-    reclaimedFrom: null,
-    skippedCandidates: claim.skippedCandidates,
-    activeClaims: claim.activeClaims ?? [],
-    staleClaims: claim.staleClaims ?? [],
-  };
-}
-
-function disabledWorkItemClaim(): NexusAutomationAgentLaunchWorkItemClaim {
-  return {
-    status: "disabled",
-    reason: "disabled_by_project_policy",
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    authorityClaim: null,
-    reclaimedFrom: null,
-    skippedCandidates: [],
-    activeClaims: [],
-    staleClaims: [],
-  };
-}
-
-function blockedWorkItemClaim(
-  reason: string,
-): NexusAutomationAgentLaunchWorkItemClaim {
-  return {
-    status: "blocked",
-    reason,
-    componentId: null,
-    trackerId: null,
-    workItemId: null,
-    logicalWorkItemId: null,
-    workItemTitle: null,
-    owner: null,
-    authorityClaim: null,
-    reclaimedFrom: null,
-    skippedCandidates: [],
-    activeClaims: [],
-    staleClaims: [],
-  };
-}
-
-function componentEligibleWorkItemsForClaim(options: {
-  componentEligibleWorkItems: NexusAutomationComponentEligibleWorkItems[];
-  claim: Extract<NexusWorkItemClaimResult, { status: "claimed" }>;
-}): NexusAutomationComponentEligibleWorkItems[] {
-  const existing = options.componentEligibleWorkItems.find(
-    (component) => component.componentId === options.claim.componentId,
-  );
-  return [
-    {
-      componentId: options.claim.componentId,
-      workItems: [options.claim.workItem],
-      ...(existing?.importCandidateWorkItems
-        ? { importCandidateWorkItems: existing.importCandidateWorkItems }
-        : {}),
-      ...(existing?.excludedWorkItems
-        ? { excludedWorkItems: existing.excludedWorkItems }
-        : {}),
-      ...(existing?.warnings ? { warnings: existing.warnings } : {}),
-      ...(existing?.blockers ? { blockers: existing.blockers } : {}),
-      ...(existing?.trackerResults ? { trackerResults: existing.trackerResults } : {}),
-    },
-  ];
-}
-
-function workItemClaimSkipSummary(
-  claim: NexusAutomationAgentLaunchWorkItemClaim,
-): string {
-  if (claim.status === "lost_race") {
-    return `Work-item claim lost race for ${claim.workItemId ?? "candidate"}; coordinator launch skipped`;
-  }
-  if (claim.reason === "active_claims") {
-    return "Eligible work is already claimed by another owner";
-  }
-  if (claim.reason === "stale_claims") {
-    return "Eligible work has stale claims and reclaim policy is disabled";
-  }
-  if (claim.reason === "candidates_not_claimable") {
-    return "Eligible work items were not claimable";
-  }
-
-  return "No eligible work item could be claimed";
 }
 
 function buildAgentLaunchContext(
