@@ -23,7 +23,8 @@
     "README.md",
     "package.json",
     "scripts/first-workspace-onboarding-smoke.mjs",
-    "scripts/postgres-claim-authority-container-canary.mjs"
+    "scripts/postgres-claim-authority-container-canary.mjs",
+    "scripts/sonar-quality-gate.mjs"
   ],
   "publishConfig": {
     "access": "public"
@@ -45,6 +46,7 @@
     "coverage": "vitest run --coverage",
     "coverage:plugins": "npm --prefix plugins/dev-nexus-research run coverage",
     "coverage:all": "npm run coverage && npm run coverage:plugins",
+    "quality:sonar-gate": "node scripts/sonar-quality-gate.mjs",
     "check": "npm run build && npm test && npm run smoke:onboarding && npm run check:plugins",
     "smoke:onboarding": "node scripts/first-workspace-onboarding-smoke.mjs",
     "smoke:postgres-containers": "node scripts/postgres-claim-authority-container-canary.mjs",
