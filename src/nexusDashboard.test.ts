@@ -1557,6 +1557,20 @@ describe("nexus dashboard", () => {
     );
   });
 
+  it("keeps visible dashboard content stable during background refresh", () => {
+    const module = renderNexusDashboardClientModule();
+
+    expect(module).toContain("lastRenderSignature");
+    expect(module).toContain("dashboardRenderSignature");
+    expect(module).toContain("stripVolatileDashboardFields");
+    expect(module).toContain("if (signature && signature === lastRenderSignature) return;");
+    expect(module).toContain("const hasVisibleData = selectedWorkspaceId ? Boolean(latestSnapshot) : Boolean(latestHost);");
+    expect(module).toContain("if (!hasVisibleData) {");
+    expect(module).toContain("latestSnapshot = null;");
+    expect(module).not.toContain("catch (error) {\n      latestSnapshot = null;");
+    expect(module).not.toContain("catch {\n      latestHost = null;");
+  });
+
   it("audits static visual guardrails for light and dark cockpit modes", () => {
     const audit = auditNexusDashboardClientVisuals();
 
