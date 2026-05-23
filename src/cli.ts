@@ -29,6 +29,7 @@ import { handleDiagnosticsCommand } from "./cliDiagnosticsCommand.js";
 import { handleAuthCommand } from "./cliAuthCommand.js";
 import { handleHostCommand } from "./cliHostCommand.js";
 import { handlePublicationCommand } from "./cliPublicationCommand.js";
+import { handleReviewCommand } from "./cliReviewCommand.js";
 import { isCliEntrypoint } from "./cliRuntime.js";
 import {
   parseQuickFixPlanCommand,
@@ -995,6 +996,9 @@ async function mainUnchecked(
   if (argv[0] === "publication") {
     return handlePublicationCommand(argv, dependencies);
   }
+  if (argv[0] === "review") {
+    return handleReviewCommand(argv, dependencies);
+  }
   if (argv[0] === "quick-fix") {
     return handleQuickFixCommand(argv, dependencies);
   }
@@ -1017,7 +1021,7 @@ async function mainUnchecked(
   }
 
   throw new Error(
-    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
+    "dev-nexus requires home, auth, workspace, setup, diagnostics, host, coordination, remote-execution, worktree, publication, review, quick-fix, work-item, ci-failure-intake, automation, mcp-stdio, mcp-gateway-stdio, or --help",
   );
 }
 

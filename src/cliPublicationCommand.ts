@@ -40,7 +40,11 @@ import {
   type NexusPublicationPullRequestMergeResult,
   type NexusPublicationPullRequestUpsertResult,
 } from "./nexusPublicationOperations.js";
+import {
+  NexusReviewPolicyEnforcementError,
+} from "./nexusReviewPolicyEnforcement.js";
 import type { NexusPublicationGitPushRunner } from "./nexusPublicationPolicy.js";
+import type { NexusReviewLocalAuthorization } from "./nexusReviewPolicy.js";
 import {
   classifyNexusPublicationProviderEvidenceChecks,
   normalizeNexusPublicationProviderEvidence,
@@ -93,6 +97,9 @@ interface ParsedPublicationBranchPushCommand {
   featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
+  authorized?: boolean;
+  authorizationTimestamp?: string | null;
+  authorizationSummary?: string | null;
   dryRun?: boolean;
   json?: boolean;
 }
@@ -136,6 +143,10 @@ interface ParsedPublicationPullRequestMergeCommand {
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+  branchRole?: string | null;
+  authorized?: boolean;
+  authorizationTimestamp?: string | null;
+  authorizationSummary?: string | null;
   json?: boolean;
 }
 
@@ -218,6 +229,7 @@ export async function handlePublicationCommand(
         featureId: parsed.featureId,
         forceWithLease: parsed.forceWithLease,
         forceWithLeaseExpectedCommit: parsed.forceWithLeaseExpectedCommit,
+        localAuthorization: publicationLocalAuthorization(parsed),
         baseEnv: dependencies.env ?? process.env,
         fetch: dependencies.fetch,
         credentialCommandRunner: dependencies.credentialCommandRunner,
@@ -231,6 +243,14 @@ export async function handlePublicationCommand(
         printPublicationBranchPushBlockedError(
           error,
           parsed,
+          dependencies.stdout ?? process.stdout,
+        );
+        return 1;
+      }
+      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+        printPublicationReviewPolicyBlockedError(
+          error,
+          Boolean(parsed.dryRun),
           dependencies.stdout ?? process.stdout,
         );
         return 1;
@@ -322,10 +342,25 @@ export async function handlePublicationCommand(
       projectRepository: parsed.projectRepository,
       number: parsed.number,
       method: parsed.method,
+      branchRole: parsed.branchRole,
+      localAuthorization: publicationLocalAuthorization(parsed),
       baseEnv: dependencies.env ?? process.env,
       fetch: dependencies.fetch,
       credentialCommandRunner: dependencies.credentialCommandRunner,
+    }).catch((error: unknown) => {
+      if (parsed.json && error instanceof NexusReviewPolicyEnforcementError) {
+        printPublicationReviewPolicyBlockedError(
+          error,
+          false,
+          dependencies.stdout ?? process.stdout,
+        );
+        return null;
+      }
+      throw error;
     });
+    if (!result) {
+      return 1;
+    }
     printPublicationPullRequestMergeResult(
       result,
       parsed,
@@ -639,6 +674,15 @@ function parsePublicationBranchPushCommand(
         parsed.forceWithLease = true;
         parsed.forceWithLeaseExpectedCommit = next();
         break;
+      case "--authorized":
+        parsed.authorized = true;
+        break;
+      case "--authorization-timestamp":
+        parsed.authorizationTimestamp = next();
+        break;
+      case "--authorization-summary":
+        parsed.authorizationSummary = next();
+        break;
       case "--dry-run":
         parsed.dryRun = true;
         break;
@@ -855,6 +899,18 @@ function parsePublicationPullRequestMergeCommand(
         break;
       case "--method":
         parsed.method = parsePublicationPullRequestMergeMethod(next(), arg);
+        break;
+      case "--branch-role":
+        parsed.branchRole = next();
+        break;
+      case "--authorized":
+        parsed.authorized = true;
+        break;
+      case "--authorization-timestamp":
+        parsed.authorizationTimestamp = next();
+        break;
+      case "--authorization-summary":
+        parsed.authorizationSummary = next();
         break;
       case "--json":
         parsed.json = true;
@@ -1331,6 +1387,23 @@ function normalizeInlinePullRequestBody(body: string): string {
     : body;
 }
 
+function publicationLocalAuthorization(
+  parsed: {
+    authorized?: boolean;
+    authorizationTimestamp?: string | null;
+    authorizationSummary?: string | null;
+  },
+): Partial<NexusReviewLocalAuthorization> | null {
+  if (!parsed.authorized) {
+    return null;
+  }
+  return {
+    authorized: true,
+    authorizedAt: parsed.authorizationTimestamp ?? null,
+    summary: parsed.authorizationSummary ?? null,
+  };
+}
+
 function readReleaseTrainEvidenceInput(
   inputPath: string,
 ): NexusReleaseTrainProviderEvidenceInput[] {
@@ -1512,6 +1585,23 @@ function printPublicationBranchPushBlockedError(
   });
 }
 
+function printPublicationReviewPolicyBlockedError(
+  error: NexusReviewPolicyEnforcementError,
+  dryRun: boolean,
+  stdout: TextWriter,
+): void {
+  writeJson(stdout, {
+    ok: false,
+    dryRun,
+    error: {
+      code: "review_policy_blocked",
+      message: error.message,
+    },
+    reviewEnforcement: error.decision,
+    reviewPlan: error.reviewPlan,
+  });
+}
+
 function printPublicationPullRequestUpsertResult(
   result: NexusPublicationPullRequestUpsertResult,
   parsed: ParsedPublicationPullRequestUpsertCommand,
@@ -1607,6 +1697,7 @@ function publicationBranchPushPayload(
     warnings: result.warnings,
     forceWithLease: result.forceWithLease,
     forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
+    reviewEnforcement: result.reviewEnforcement,
     credential: result.credential,
     push: {
       git: result.push.git,
@@ -1649,6 +1740,7 @@ function printPublicationPullRequestMergeResult(
     repository: result.repository,
     credential: result.credential,
     pullRequest: result.pullRequest,
+    reviewEnforcement: result.reviewEnforcement,
     merge: result.merge,
   };
   if (parsed.json) {

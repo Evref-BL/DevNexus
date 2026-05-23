@@ -83,6 +83,8 @@ export * from "./nexusPublicationOperations.js";
 export * from "./nexusReleaseTrainPolicy.js";
 export * from "./nexusCandidateBranchPlan.js";
 export * from "./nexusPublicationProviderEvidence.js";
+export * from "./nexusReviewPolicy.js";
+export * from "./nexusReviewPolicyEnforcement.js";
 export * from "./nexusReleaseTrainReadiness.js";
 export * from "./nexusQuickFix.js";
 export * from "./nexusRemoteExecution.js";

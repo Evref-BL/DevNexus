@@ -9,9 +9,21 @@ import {
   type NexusMergeQueueWorkflowTriggerInput,
 } from "./nexusMergeQueueReadiness.js";
 import { shellQuoteArgument } from "./nexusAutomationAgentProfile.js";
-import type {
+import {
+  findNexusPublicationProviderEvidence,
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidence,
   NexusPublicationProviderEvidenceInput,
 } from "./nexusPublicationProviderEvidence.js";
+import {
+  buildNexusReviewPlan,
+  type NexusReviewPlan,
+} from "./nexusReviewPolicy.js";
+import { loadProjectConfig } from "./nexusProjectConfig.js";
+import {
+  resolveProjectComponents,
+  type ResolvedNexusProjectComponent,
+} from "./nexusProjectLifecycle.js";
 
 export type NexusFeatureFinalizationNextAction =
   | "create_pull_request"
@@ -117,6 +129,7 @@ export interface NexusFeatureFinalizationPlanItem {
   finalPullRequestAction: NexusFeatureFinalPullRequestAction;
   branchUpdateDecision: NexusFeatureBranchDeliveryReportItem["branchUpdateDecision"];
   reviewTarget: string;
+  reviewPlan: NexusReviewPlan | null;
   providerEvidence: NexusFeatureBranchDeliveryReportItem["providerEvidence"];
   reviewReadiness: NexusFeatureReadinessDecision<NexusFeatureReviewReadinessStatus> & {
     safeToReview: boolean;
@@ -175,11 +188,22 @@ export function buildNexusFeatureFinalizationPlan(options: {
     fullMatrixBudgetAvailable: options.fullMatrixBudgetAvailable,
     now: options.now,
   });
+  const projectConfig = loadProjectConfig(deliveryReport.projectRoot);
+  const components = resolveProjectComponents(
+    deliveryReport.projectRoot,
+    projectConfig,
+  );
+  const normalizedProviderEvidence = normalizeNexusPublicationProviderEvidence(
+    options.providerEvidence ?? [],
+  );
   const items = deliveryReport.items.map((item) =>
     finalizationItem({
       item,
       projectRoot: options.projectRoot,
+      component: components.find((candidate) => candidate.id === item.componentId) ??
+        null,
       providerEvidence: options.providerEvidence ?? [],
+      normalizedProviderEvidence,
       mergeQueueEnabled: options.mergeQueueEnabled,
       workflowTriggers: options.workflowTriggers ?? [],
       now: options.now,
@@ -205,7 +229,9 @@ export function buildNexusFeatureFinalizationPlan(options: {
 function finalizationItem(options: {
   item: NexusFeatureBranchDeliveryReportItem;
   projectRoot: string;
+  component: ResolvedNexusProjectComponent | null;
   providerEvidence: NexusPublicationProviderEvidenceInput[];
+  normalizedProviderEvidence: NexusPublicationProviderEvidence[];
   mergeQueueEnabled?: boolean | null;
   workflowTriggers: NexusMergeQueueWorkflowTriggerInput[];
   now?: Date | string | (() => Date | string);
@@ -218,6 +244,11 @@ function finalizationItem(options: {
     options.item,
     finalPullRequestAction,
   );
+  const reviewPlan = finalizationReviewPlan({
+    item: options.item,
+    component: options.component,
+    providerEvidence: options.normalizedProviderEvidence,
+  });
   const mergeQueue = mergeQueueSummary(options);
   const publicationDecision = classifyPublicationReadiness(
     options.item,
@@ -236,6 +267,7 @@ function finalizationItem(options: {
     finalPullRequestAction,
     branchUpdateDecision: options.item.branchUpdateDecision,
     reviewTarget: options.item.finalReviewTarget,
+    reviewPlan,
     providerEvidence: options.item.providerEvidence,
     reviewReadiness: {
       ...reviewDecision,
@@ -253,6 +285,54 @@ function finalizationItem(options: {
     mergeQueue,
     warnings: options.item.warnings,
   };
+}
+
+function finalizationReviewPlan(options: {
+  item: NexusFeatureBranchDeliveryReportItem;
+  component: ResolvedNexusProjectComponent | null;
+  providerEvidence: NexusPublicationProviderEvidence[];
+}): NexusReviewPlan | null {
+  if (!options.component?.review) {
+    return null;
+  }
+
+  const branchName = options.item.finalPullRequestHead.branch ??
+    options.item.featureBranch ??
+    options.item.providerEvidence.headBranch ??
+    options.item.providerEvidence.headRef;
+  const evidence = findEvidenceForFeature({
+    evidence: options.providerEvidence,
+    branchName,
+    targetBranch: options.item.finalPublicationTarget,
+    intendedCiTier: options.item.ciTier.tier.id,
+  });
+
+  return buildNexusReviewPlan({
+    componentId: options.item.componentId,
+    policy: options.component.review,
+    branchRole: "feature_finalization",
+    requestedAction: "provider.pull_request.merge",
+    branchName,
+    headSha: options.item.providerEvidence.headSha,
+    providerEvidence: evidence,
+  });
+}
+
+function findEvidenceForFeature(options: {
+  evidence: NexusPublicationProviderEvidence[];
+  branchName: string | null;
+  targetBranch: string;
+  intendedCiTier: string;
+}): NexusPublicationProviderEvidence | null {
+  const match = {
+    branchName: options.branchName,
+    targetBranch: options.targetBranch,
+    intendedCiTier: options.intendedCiTier,
+  };
+  return findNexusPublicationProviderEvidence(options.evidence, {
+    sourceKind: "pull_request",
+    ...match,
+  }) ?? findNexusPublicationProviderEvidence(options.evidence, match);
 }
 
 function classifyReviewReadiness(

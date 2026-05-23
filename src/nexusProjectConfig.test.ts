@@ -2285,6 +2285,96 @@ describe("workspace config", () => {
     });
   });
 
+  it("validates component review policy", () => {
+    const config = validateProjectConfig({
+      version: 1,
+      id: "review-policy-project",
+      name: "Review Policy Project",
+      components: [
+        {
+          id: "core",
+          name: "Core",
+          kind: "git",
+          role: "primary",
+          remoteUrl: "https://github.com/example/core.git",
+          defaultBranch: "main",
+          sourceRoot: "source",
+          review: {
+            default: {
+              transport: "local",
+              gates: ["human_required"],
+            },
+            rules: [
+              {
+                match: {
+                  paths: ["docs/**"],
+                },
+                transport: "local",
+                gates: ["human_required"],
+              },
+              {
+                match: {
+                  branchRole: "feature_finalization",
+                },
+                transport: "pull_request",
+                gates: ["provider_approval_required", "ci_required"],
+              },
+            ],
+          },
+          relationships: [],
+        },
+      ],
+    });
+
+    expect(config.components[0]?.review).toMatchObject({
+      default: {
+        transport: "local",
+        gates: ["human_required"],
+      },
+      rules: [
+        {
+          match: {
+            paths: ["docs/**"],
+          },
+          transport: "local",
+          gates: ["human_required"],
+        },
+        {
+          match: {
+            branchRole: "feature_finalization",
+          },
+          transport: "pull_request",
+          gates: ["provider_approval_required", "ci_required"],
+        },
+      ],
+    });
+
+    expect(() =>
+      validateProjectConfig({
+        version: 1,
+        id: "bad-review-policy-project",
+        name: "Bad Review Policy Project",
+        components: [
+          {
+            id: "core",
+            name: "Core",
+            kind: "git",
+            role: "primary",
+            remoteUrl: "https://github.com/example/core.git",
+            defaultBranch: "main",
+            sourceRoot: "source",
+            review: {
+              default: {
+                transport: "forum",
+              },
+            },
+            relationships: [],
+          },
+        ],
+      }),
+    ).toThrow(/transport must be/);
+  });
+
   it("rejects invalid feature branch delivery policy", () => {
     expect(() =>
       validateProjectConfig({

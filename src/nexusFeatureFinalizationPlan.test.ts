@@ -400,6 +400,68 @@ describe("feature finalization plan", () => {
       },
     });
   });
+
+  it("includes the component review policy result in finalization plans", () => {
+    const projectRoot = makeTempDir("dev-nexus-feature-finalization-");
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    saveProjectConfig(projectRoot, projectConfig({
+      review: {
+        default: {
+          transport: "local",
+          gates: ["human_required"],
+        },
+        rules: [
+          {
+            match: {
+              branchRole: "feature_finalization",
+            },
+            transport: "pull_request",
+            gates: ["provider_approval_required", "ci_required"],
+          },
+        ],
+      },
+    }));
+
+    const plan = buildNexusFeatureFinalizationPlan({
+      projectRoot,
+      componentId: "primary",
+      providerEvidence: [
+        {
+          provider: "github",
+          sourceKind: "pull_request",
+          reviewTarget: 243,
+          headBranch: "feat/codex-goals",
+          targetBranch: "main",
+          intendedCiTier: "remote_smoke",
+          reviewState: "approved",
+          mergeability: "mergeable",
+          branchPolicy: "clear",
+          baseStatus: "current",
+          checks: [
+            { name: "Node 22 check (ubuntu-latest)", bucket: "pass" },
+          ],
+        },
+      ],
+    });
+
+    expect(plan.items[0]).toMatchObject({
+      reviewPlan: {
+        componentId: "primary",
+        status: "ready",
+        transport: "pull_request",
+        matchedRuleIndex: 0,
+        context: {
+          branchRole: "feature_finalization",
+          requestedAction: "provider.pull_request.merge",
+          branchName: "feat/codex-goals",
+        },
+        providerMutations: ["create_or_update_pull_request"],
+      },
+      publicationReadiness: {
+        status: "ready_for_publication",
+      },
+    });
+  });
 });
 
 function projectConfig(options: {
@@ -408,6 +470,7 @@ function projectConfig(options: {
     strategy: "push_remote" | "fallback_remote" | "push_remote_then_fallback" | "manual_only";
     fallbackRemote: string | null;
   };
+  review?: NexusProjectConfig["components"][number]["review"];
 } = {}): NexusProjectConfig {
   return {
     version: 1,
@@ -467,6 +530,7 @@ function projectConfig(options: {
         remoteUrl: "git@example.invalid:demo/project.git",
         defaultBranch: "main",
         sourceRoot: "source",
+        review: options.review,
         relationships: [],
       },
     ],

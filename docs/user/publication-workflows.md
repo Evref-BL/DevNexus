@@ -60,6 +60,23 @@ a change is checked and approved; publication decides whether it may be pushed,
 merged, queued, or released. The target review-policy design is recorded in
 [Review policy design](../dev/review-policy.md).
 
+When a component configures review policy, agents can ask DevNexus for the
+current review path:
+
+```bash
+dev-nexus review plan <workspace-root> --component api --path docs/guide.md
+```
+
+The review plan is read-only by default. It reports the transport, gates,
+required evidence, provider mutations, blocked actions, and next action. Local
+human approval is action-scoped: if the branch, head commit, or requested action
+changes, the review plan should ask for fresh authorization.
+
+Publication commands enforce configured component review policy only at final
+actions. Opening or updating a pull request remains allowed because it creates
+the review surface. Pull-request merge and direct target-branch push are blocked
+until the review plan is ready.
+
 ## When To Opt Into Advanced Publication
 
 Use a richer publication policy when local handoff is no longer enough.
@@ -252,8 +269,10 @@ Feature branch delivery uses three read-only commands:
   review state, base freshness, and conflicts.
 - `feature-finalization` separates review readiness from publication
   authority. A draft pull request can be safe to review while still blocked for
-  final publication. A green, approved pull request still stops at the human
-  publication gate unless policy explicitly grants more authority.
+  final publication. When component review policy is configured, each item also
+  carries the resolved review plan for the final pull request. A green, approved
+  pull request still stops at the human publication gate unless policy
+  explicitly grants more authority.
 
 For stacked and hybrid branch strategies, the plan also carries a stack summary:
 publication eligibility, root branch, default parent branch, review target, and
@@ -378,9 +397,16 @@ dev-nexus publication feature-finalization <workspace-root> --component api --ev
 ```
 
 The finalization plan is also read-only. It reports whether the branch is safe
-for review, whether it is ready for publication, and whether publication still
-requires a human decision. It does not merge, undraft, comment, or enter a merge
-queue.
+for review, whether configured review gates are satisfied, whether it is ready
+for publication, and whether publication still requires a human decision. It
+does not merge, undraft, comment, or enter a merge queue.
+
+When a final action needs local human authorization, pass the current instruction
+to the mutating command:
+
+```bash
+dev-nexus publication pull-request merge <workspace-root> --component api --number 123 --authorized --authorization-summary "Approved in local review"
+```
 
 ## Choosing A Path
 

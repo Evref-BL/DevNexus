@@ -20,6 +20,7 @@ export const devNexusCoreMcpToolNames = [
   "publication_feature_plan",
   "publication_feature_report",
   "publication_feature_finalization",
+  "review_plan",
   "current_agent_adopt",
   "current_agent_heartbeat",
   "current_agent_record",

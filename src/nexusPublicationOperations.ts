@@ -42,7 +42,17 @@ import {
   type NexusPublicationGitPushResult,
   type NexusPublicationGitPushRunner,
 } from "./nexusPublicationPolicy.js";
+import {
+  normalizeNexusPublicationProviderEvidence,
+  type NexusPublicationProviderEvidence,
+} from "./nexusPublicationProviderEvidence.js";
 import type { NexusHostingAuthProfileConfig } from "./nexusProjectHosting.js";
+import type { NexusReviewLocalAuthorization } from "./nexusReviewPolicy.js";
+import {
+  assertNexusReviewPolicyEnforcement,
+  buildNexusReviewPolicyEnforcementDecision,
+  type NexusReviewPolicyEnforcementDecision,
+} from "./nexusReviewPolicyEnforcement.js";
 
 export interface NexusPublicationComponentContext {
   projectRoot: string;
@@ -103,6 +113,7 @@ export interface NexusPublicationBranchPushResult {
   warnings: string[];
   credential: NexusPublicationCredentialSummary;
   push: NexusPublicationGitPushResult;
+  reviewEnforcement: NexusReviewPolicyEnforcementDecision | null;
 }
 
 export interface NexusPublicationBranchPushFeatureSummary {
@@ -181,6 +192,7 @@ export interface NexusPublicationPullRequestMergeResult {
     number: number;
     method: "merge" | "squash" | "rebase";
   };
+  reviewEnforcement: NexusReviewPolicyEnforcementDecision | null;
   merge: NexusForgePullRequestMergeResult;
 }
 
@@ -214,6 +226,7 @@ export interface PushNexusPublicationBranchForComponentOptions
   featureId?: string | null;
   forceWithLease?: boolean;
   forceWithLeaseExpectedCommit?: string | null;
+  localAuthorization?: Partial<NexusReviewLocalAuthorization> | null;
   gitRunner?: NexusPublicationGitPushRunner;
   remoteProbeRunner?: NexusPublicationGitPushRunner;
 }
@@ -239,6 +252,8 @@ export interface MergeNexusPublicationPullRequestForComponentOptions
   projectRepository?: boolean;
   number: number;
   method?: "merge" | "squash" | "rebase";
+  branchRole?: string | null;
+  localAuthorization?: Partial<NexusReviewLocalAuthorization> | null;
 }
 
 export interface InspectNexusPublicationPullRequestForComponentOptions
@@ -335,6 +350,13 @@ export async function pushNexusPublicationBranchForComponent(
     branch: options.branch,
     targetBranch: options.targetBranch ?? null,
   });
+  const reviewEnforcement = branchPushReviewEnforcement({
+    context,
+    branch: options.branch,
+    targetBranch: options.targetBranch ?? null,
+    localAuthorization: options.localAuthorization ?? null,
+  });
+  assertNexusReviewPolicyEnforcement(reviewEnforcement);
   const credential = await resolvePublicationCredential({
     context,
     purpose: "git",
@@ -395,6 +417,7 @@ export async function pushNexusPublicationBranchForComponent(
     warnings,
     credential: summarizePublicationCredential(credential),
     push,
+    reviewEnforcement,
   };
 }
 
@@ -743,6 +766,14 @@ export async function mergeNexusPublicationPullRequestForComponent(
     baseEnv: options.baseEnv,
   });
   const method = options.method ?? "merge";
+  const reviewEnforcement = await pullRequestMergeReviewEnforcement({
+    context,
+    adapter,
+    number: options.number,
+    branchRole: options.branchRole ?? null,
+    localAuthorization: options.localAuthorization ?? null,
+  });
+  assertNexusReviewPolicyEnforcement(reviewEnforcement);
   const merge = await adapter.mergePullRequest({
     number: options.number,
     method,
@@ -758,6 +789,7 @@ export async function mergeNexusPublicationPullRequestForComponent(
       number: options.number,
       method,
     },
+    reviewEnforcement,
     merge,
   };
 }
@@ -879,6 +911,116 @@ function publicationTargetDefaultBranch(
   context: NexusPublicationTargetContext,
 ): string | null {
   return context.component?.defaultBranch ?? context.projectConfig.repo.defaultBranch ?? null;
+}
+
+function branchPushReviewEnforcement(options: {
+  context: NexusPublicationTargetContext;
+  branch: string;
+  targetBranch: string | null;
+  localAuthorization: Partial<NexusReviewLocalAuthorization> | null;
+}): NexusReviewPolicyEnforcementDecision | null {
+  const reviewPolicy = options.context.component?.review ?? null;
+  if (!reviewPolicy) {
+    return null;
+  }
+  const finalTargetBranch = publicationFinalTargetBranch(options.context);
+  const pushedTargetBranch = options.targetBranch?.trim() || options.branch.trim();
+  if (!finalTargetBranch || pushedTargetBranch !== finalTargetBranch) {
+    return null;
+  }
+  const requestedAction = "git.push_target_branch";
+
+  return buildNexusReviewPolicyEnforcementDecision({
+    componentId: componentIdForPublicationTarget(options.context),
+    policy: reviewPolicy,
+    finalAction: true,
+    requestedAction,
+    branchRole: "direct_target_push",
+    branchName: pushedTargetBranch,
+    localAuthorization: scopedLocalAuthorization({
+      localAuthorization: options.localAuthorization,
+      requestedAction,
+      branchName: pushedTargetBranch,
+      headSha: null,
+    }),
+  });
+}
+
+async function pullRequestMergeReviewEnforcement(options: {
+  context: NexusPublicationTargetContext;
+  adapter: ReturnType<typeof createNexusForgePublicationAdapter>;
+  number: number;
+  branchRole: string | null;
+  localAuthorization: Partial<NexusReviewLocalAuthorization> | null;
+}): Promise<NexusReviewPolicyEnforcementDecision | null> {
+  const reviewPolicy = options.context.component?.review ?? null;
+  if (!reviewPolicy) {
+    return null;
+  }
+  const evidenceResult = await options.adapter.inspectPullRequestChecks({
+    number: options.number,
+  });
+  const providerEvidence = normalizeNexusPublicationProviderEvidence([
+    evidenceResult.evidence,
+  ])[0] ?? null;
+  const requestedAction = "provider.pull_request.merge";
+  const branchName = providerEvidence?.headBranch ?? providerEvidence?.headRef ?? null;
+  const headSha = providerEvidence?.headSha ?? null;
+
+  return buildNexusReviewPolicyEnforcementDecision({
+    componentId: componentIdForPublicationTarget(options.context),
+    policy: reviewPolicy,
+    finalAction: true,
+    requestedAction,
+    branchRole: options.branchRole ??
+      inferPullRequestMergeBranchRole(options.context, providerEvidence),
+    branchName,
+    headSha,
+    localAuthorization: scopedLocalAuthorization({
+      localAuthorization: options.localAuthorization,
+      requestedAction,
+      branchName,
+      headSha,
+    }),
+    providerEvidence,
+  });
+}
+
+function inferPullRequestMergeBranchRole(
+  context: NexusPublicationTargetContext,
+  providerEvidence: NexusPublicationProviderEvidence | null,
+): string | null {
+  const targetBranch = providerEvidence?.targetBranch ?? null;
+  const finalTargetBranch = publicationFinalTargetBranch(context);
+  if (targetBranch && finalTargetBranch && targetBranch === finalTargetBranch) {
+    return "feature_finalization";
+  }
+  return null;
+}
+
+function scopedLocalAuthorization(options: {
+  localAuthorization: Partial<NexusReviewLocalAuthorization> | null;
+  requestedAction: string;
+  branchName: string | null;
+  headSha: string | null;
+}): Partial<NexusReviewLocalAuthorization> | null {
+  const authorization = options.localAuthorization;
+  if (!authorization?.authorized) {
+    return authorization ?? null;
+  }
+
+  return {
+    ...authorization,
+    requestedAction: authorization.requestedAction ?? options.requestedAction,
+    branchName: authorization.branchName ?? options.branchName,
+    headSha: authorization.headSha ?? options.headSha,
+  };
+}
+
+function publicationFinalTargetBranch(
+  context: NexusPublicationTargetContext,
+): string | null {
+  return context.publication.targetBranch ?? publicationTargetDefaultBranch(context);
 }
 
 function assertSafePublicationBranchTarget(options: {
