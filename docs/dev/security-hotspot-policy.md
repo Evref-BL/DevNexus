@@ -54,7 +54,7 @@ user-managed toolchains.
 Preferred handling:
 
 - Route DevNexus-owned OS command execution through one command-resolution
-  helper.
+  helper. The current implementation is `src/nexusCommandPath.ts`.
 - Accept configured absolute executable paths when available.
 - Resolve bare commands against an explicit trusted `PATH`.
 - Reject empty, relative, current-directory, project-local, temp-directory, or

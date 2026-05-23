@@ -12,6 +12,7 @@ import {
   type NexusProjectAgentMcpTarget,
   type NexusProjectConfig,
 } from "./nexusProjectConfig.js";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
   nexusSkillManifestFileName,
   type NexusProjectSkillAgentTarget,
@@ -539,7 +540,7 @@ function isSourceControlled(projectRoot: string, relativePath: string): boolean 
   }
   try {
     childProcess.execFileSync(
-      "git",
+      resolveNexusCommandPath("git"),
       ["-C", projectRoot, "ls-files", "--error-unmatch", "--", relativePath],
       { stdio: ["ignore", "ignore", "ignore"] },
     );
@@ -555,7 +556,7 @@ function isIgnoredByGit(projectRoot: string, relativePath: string): boolean {
   }
   try {
     childProcess.execFileSync(
-      "git",
+      resolveNexusCommandPath("git"),
       ["-C", projectRoot, "check-ignore", "-q", "--", relativePath],
       { stdio: ["ignore", "ignore", "ignore"] },
     );

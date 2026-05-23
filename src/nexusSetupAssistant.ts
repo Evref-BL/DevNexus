@@ -67,6 +67,7 @@ import {
   nexusSkillSupportDirectoryName,
   nexusSkillsDirectoryName,
 } from "./nexusSkills.js";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 
 export type NexusSetupFlowId =
   | "github-workspace-repository"
@@ -2579,16 +2580,21 @@ function listWindowsMcpRuntimeProcesses(
     "Select-Object ProcessId, CommandLine |",
     "ConvertTo-Json -Compress",
   ].join(" ");
-  const result = childProcess.spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-Command", script],
-    {
-      encoding: "utf8",
-      shell: false,
-      timeout: timeoutMs ?? 2_000,
-      windowsHide: true,
-    },
-  );
+  let result: childProcess.SpawnSyncReturns<string>;
+  try {
+    result = childProcess.spawnSync(
+      resolveNexusCommandPath("powershell.exe"),
+      ["-NoProfile", "-Command", script],
+      {
+        encoding: "utf8",
+        shell: false,
+        timeout: timeoutMs ?? 2_000,
+        windowsHide: true,
+      },
+    );
+  } catch {
+    return [];
+  }
   if (result.status !== 0 || !result.stdout.trim()) {
     return [];
   }
@@ -2612,11 +2618,20 @@ function listWindowsMcpRuntimeProcesses(
 function listPosixMcpRuntimeProcesses(
   timeoutMs: number | undefined,
 ): NexusMcpRuntimeProcess[] {
-  const result = childProcess.spawnSync("ps", ["-axo", "pid=,command="], {
-    encoding: "utf8",
-    shell: false,
-    timeout: timeoutMs ?? 2_000,
-  });
+  let result: childProcess.SpawnSyncReturns<string>;
+  try {
+    result = childProcess.spawnSync(
+      resolveNexusCommandPath("ps"),
+      ["-axo", "pid=,command="],
+      {
+        encoding: "utf8",
+        shell: false,
+        timeout: timeoutMs ?? 2_000,
+      },
+    );
+  } catch {
+    return [];
+  }
   if (result.status !== 0) {
     return [];
   }
@@ -3333,7 +3348,7 @@ function loadSetupHomeAuthProfiles(
 function gitRemoteUrl(sourceRoot: string, remoteName: string): string | null {
   try {
     return childProcess.execFileSync(
-      "git",
+      resolveNexusCommandPath("git"),
       ["-C", sourceRoot, "remote", "get-url", remoteName],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
@@ -3345,7 +3360,7 @@ function gitRemoteUrl(sourceRoot: string, remoteName: string): string | null {
 function gitStatusPorcelain(sourceRoot: string): string | null {
   try {
     return childProcess.execFileSync(
-      "git",
+      resolveNexusCommandPath("git"),
       ["-C", sourceRoot, "status", "--porcelain"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );

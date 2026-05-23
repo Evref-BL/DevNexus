@@ -1,8 +1,14 @@
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import {
+  spawn,
+  spawnSync,
+  type ChildProcess,
+  type SpawnSyncReturns,
+} from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 
 export interface ProcessLogPaths {
   stdout: string;
@@ -459,7 +465,20 @@ async function waitForProcessExit(
 function runTaskkill(pid: number, force: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = ["/pid", String(pid), "/t", ...(force ? ["/f"] : [])];
-    const child = spawn("taskkill.exe", args, {
+    let taskkillPath: string;
+    try {
+      taskkillPath = resolveNexusCommandPath("taskkill.exe");
+    } catch (error) {
+      reject(
+        new ProcessSupervisorError(
+          error instanceof Error
+            ? `taskkill could not be resolved: ${error.message}`
+            : "taskkill could not be resolved.",
+        ),
+      );
+      return;
+    }
+    const child = spawn(taskkillPath, args, {
       shell: false,
       windowsHide: true,
     });
@@ -578,16 +597,21 @@ export function findProcessListeningOnPort(
     "  }",
     "}",
   ].join("; ");
-  const result = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-Command", script],
-    {
-      encoding: "utf8",
-      shell: false,
-      timeout: options.timeoutMs ?? 2_000,
-      windowsHide: true,
-    },
-  );
+  let result: SpawnSyncReturns<string>;
+  try {
+    result = spawnSync(
+      resolveNexusCommandPath("powershell.exe"),
+      ["-NoProfile", "-Command", script],
+      {
+        encoding: "utf8",
+        shell: false,
+        timeout: options.timeoutMs ?? 2_000,
+        windowsHide: true,
+      },
+    );
+  } catch {
+    return undefined;
+  }
   const pid = Number(result.stdout.trim());
 
   return Number.isInteger(pid) && pid > 0
