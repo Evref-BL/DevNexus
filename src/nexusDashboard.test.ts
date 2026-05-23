@@ -67,9 +67,10 @@ async function loadDashboardClientTestHooks(): Promise<{
   renderFeatureOverview: (snapshot: unknown, selectedId?: string | null) => string;
   renderGitHistory: (snapshot: unknown, selectedId?: string | null, filter?: string | null) => string;
   gitHistoryRows: (snapshot: unknown, filter?: string | null) => {
+    maxLane: number;
     repository: unknown;
     rows: Array<{ commit: { hash: string }; lane: number; selectId: string }>;
-    paths: Array<{ fromLane: number; toLane: number }>;
+    paths: Array<{ fromLane?: number; points?: Array<{ lane: number }>; toLane?: number }>;
   } | null;
   renderActionStrip: (
     actions: Array<{
@@ -1997,8 +1998,139 @@ describe("nexus dashboard", () => {
     const rendered = hooks.renderGitHistory(snapshot);
 
     expect(rendered).toContain("dn-git-line-shadow");
-    expect(rendered).toMatch(/M 22 15 V 75 C /);
+    expect(rendered).toMatch(/M 22 15 C .*40 40\.5 V 105/);
     expect(rendered).not.toMatch(/M 22 15 C 22 36, 40 84, 40 105/);
+  });
+
+  it("compacts git graph lanes after side branches rejoin active history", async () => {
+    const hooks = await loadDashboardClientTestHooks();
+    const snapshot = {
+      history: {
+        repositories: [
+          {
+            componentId: "primary",
+            componentName: "DevNexus",
+            repositoryPath: "/workspace/source",
+            head: "top0000000000000000000000000000000000000",
+            defaultBranch: "main",
+            scope: {
+              kind: "all",
+              branches: [],
+            },
+            branchNames: ["main", "feat/a", "feat/b"],
+            tagNames: [],
+            moreAvailable: false,
+            warnings: [],
+            commits: [
+              {
+                hash: "top0000000000000000000000000000000000000",
+                shortHash: "top0000",
+                parents: [
+                  "main300000000000000000000000000000000000",
+                  "sideA00000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T12:00:00.000Z",
+                subject: "Merge first side branch",
+                refs: [
+                  {
+                    name: "main",
+                    kind: "branch",
+                    remote: null,
+                    hash: "top0000000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "main300000000000000000000000000000000000",
+                shortHash: "main300",
+                parents: [
+                  "main200000000000000000000000000000000000",
+                  "sideB00000000000000000000000000000000000",
+                ],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T11:58:00.000Z",
+                subject: "Merge second side branch",
+                refs: [],
+              },
+              {
+                hash: "sideA00000000000000000000000000000000000",
+                shortHash: "sideA00",
+                parents: ["main200000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:57:00.000Z",
+                subject: "First side branch work",
+                refs: [
+                  {
+                    name: "feat/a",
+                    kind: "branch",
+                    remote: null,
+                    hash: "sideA00000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "sideB00000000000000000000000000000000000",
+                shortHash: "sideB00",
+                parents: ["main200000000000000000000000000000000000"],
+                authorName: "Codex",
+                authorEmail: "codex@example.com",
+                committedAt: "2026-05-23T11:55:00.000Z",
+                subject: "Second side branch work",
+                refs: [
+                  {
+                    name: "feat/b",
+                    kind: "branch",
+                    remote: null,
+                    hash: "sideB00000000000000000000000000000000000",
+                  },
+                ],
+              },
+              {
+                hash: "main200000000000000000000000000000000000",
+                shortHash: "main200",
+                parents: ["main100000000000000000000000000000000000"],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T11:50:00.000Z",
+                subject: "Shared base",
+                refs: [],
+              },
+              {
+                hash: "main100000000000000000000000000000000000",
+                shortHash: "main100",
+                parents: [],
+                authorName: "Gabriel",
+                authorEmail: "gabriel@example.com",
+                committedAt: "2026-05-23T11:45:00.000Z",
+                subject: "Root",
+                refs: [],
+              },
+            ],
+          },
+        ],
+        incomplete: false,
+        detail: null,
+      },
+      project: {
+        name: "Dashboard Demo",
+      },
+      signals: [],
+      weave: {
+        nodes: [],
+        lanes: [],
+      },
+    };
+
+    const rows = hooks.gitHistoryRows(snapshot);
+    const sideB = rows?.rows.find((row) => row.commit.hash.startsWith("sideB"));
+
+    expect(sideB?.lane).toBe(1);
+    expect(rows?.maxLane).toBe(2);
+    expect(rows?.paths.some((path) => path.points?.some((point) => point.lane === 2))).toBe(true);
   });
 
   it("keeps every loaded git history row visible in the graph", async () => {
