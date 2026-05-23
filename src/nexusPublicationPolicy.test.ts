@@ -954,9 +954,10 @@ describe("nexus publication policy", () => {
 
   it("plans App-token HTTPS Git pushes without embedding tokens in remotes or args", () => {
     const policy = appPublicationPolicy();
+    const repositoryPath = path.resolve("/repo/project");
     const invocation = prepareNexusPublicationGitPush({
       policy,
-      repositoryPath: "/repo/project",
+      repositoryPath,
       branch: "feature/local-38",
       targetBranch: "feature/local-38",
       authProfiles: appAuthProfiles(),
@@ -986,7 +987,7 @@ describe("nexus publication policy", () => {
 
     expect(invocation.plan).toMatchObject({
       command: "git",
-      cwd: "/repo/project",
+      cwd: repositoryPath,
       transport: "https_token",
       remote: "https://github.com/Evref-BL/DevNexus.git",
       refspec: "feature/local-38",
@@ -1023,6 +1024,7 @@ describe("nexus publication policy", () => {
   });
 
   it("runs App-token Git pushes with a scoped credential helper and redacted plan", () => {
+    const repositoryPath = path.resolve("/repo/project");
     const calls: Array<{
       args: readonly string[];
       cwd: string;
@@ -1039,7 +1041,7 @@ describe("nexus publication policy", () => {
     };
     const result = pushNexusPublicationBranch({
       policy: appPublicationPolicy(),
-      repositoryPath: "/repo/project",
+      repositoryPath,
       branch: "feature/local-38",
       credential: {
         provider: "github",
@@ -1070,7 +1072,7 @@ describe("nexus publication policy", () => {
     expect(result.git.exitCode).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
-      cwd: "/repo/project",
+      cwd: repositoryPath,
       env: {
         PATH: "/usr/bin",
         DEV_NEXUS_GIT_TOKEN: "installation-token",

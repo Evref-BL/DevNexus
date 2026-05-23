@@ -108,7 +108,7 @@ describe("nexus workspace setup wizard", () => {
           role: "primary",
           source: {
             kind: "create_local",
-            path: "components/primary",
+            path: path.join("components", "primary"),
             initializeGit: true,
           },
         },
@@ -227,7 +227,7 @@ describe("nexus workspace setup wizard", () => {
           role: "primary",
           source: {
             kind: "create_local",
-            path: "components/core",
+            path: path.join("components", "core"),
             initializeGit: true,
           },
         },
@@ -285,7 +285,7 @@ describe("nexus workspace setup wizard", () => {
         role: "primary",
         source: {
           kind: "create_local",
-          path: "components/core",
+          path: path.join("components", "core"),
           initializeGit: true,
         },
       },

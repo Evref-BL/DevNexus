@@ -112,12 +112,29 @@ describe("nexus CI tier policy", () => {
       targetBranch: "main",
       fullMatrixBudgetAvailable: false,
     });
+    const targetPullRequestDecision = resolveNexusCiTierDecision({
+      policy: defaultNexusReleaseTrainCiTierPolicy,
+      eventName: "pull_request",
+      branchName: "feature/source-change",
+      baseBranch: "main",
+      targetBranch: "main",
+      changedPaths: ["docs/readme.md"],
+      fullMatrixBudgetAvailable: false,
+    });
 
     expect(mergeQueueDecision.tier.id).toBe("protected_target");
     expect(mergeQueueDecision.budgetLimited).toBe(false);
     expect(mergeQueueDecision.requiredChecks).toEqual(fullMatrixChecks);
     expect(targetDecision.tier.id).toBe("protected_target");
     expect(targetDecision.budgetLimited).toBe(false);
+    expect(targetPullRequestDecision.tier.id).toBe("protected_target");
+    expect(targetPullRequestDecision.budgetLimited).toBe(false);
+    expect(targetPullRequestDecision.status).toBe("required");
+    expect(targetPullRequestDecision.requiredChecks).toEqual(fullMatrixChecks);
+    expect(targetPullRequestDecision.reasonCodes).toEqual([
+      "target_branch",
+      "budget_available",
+    ]);
   });
 
   it("falls back to cheap smoke when high-cost candidate budget is exhausted", () => {

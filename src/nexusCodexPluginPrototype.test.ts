@@ -10,7 +10,7 @@ function readJson(filePath: string): any {
 }
 
 function readText(filePath: string): string {
-  return fs.readFileSync(filePath, "utf8");
+  return fs.readFileSync(filePath, "utf8").replace(/\r\n/gu, "\n");
 }
 
 describe("Codex DevNexus local plugin prototype", () => {

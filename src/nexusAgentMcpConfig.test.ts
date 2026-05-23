@@ -9,6 +9,10 @@ import {
 
 const tempDirs: string[] = [];
 
+function tomlArgs(values: string[]): string {
+  return `args = [${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+}
+
 function makeTempDir(prefix: string): string {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(tempDir);
@@ -78,7 +82,9 @@ describe("nexus agent MCP config", () => {
     expect(refreshed).not.toContain("old-dev-nexus");
     expect(refreshed).toContain("[mcp_servers.dev_nexus]");
     expect(refreshed).toContain('command = "node"');
-    expect(refreshed).toContain(`args = ["${currentNexusCliScriptPath()}", "mcp-stdio"]`);
+    expect(refreshed).toContain(
+      tomlArgs([currentNexusCliScriptPath(), "mcp-stdio"]),
+    );
     expect(refreshed).toContain('default_tools_approval_mode = "approve"');
     expect(fs.readFileSync(path.join(projectRoot, ".git", "info", "exclude"), "utf8"))
       .toContain(".codex/config.toml");
