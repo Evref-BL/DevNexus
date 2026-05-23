@@ -264,8 +264,10 @@ Feature branch delivery uses three read-only commands:
   review state, base freshness, and conflicts.
 - `feature-finalization` separates review readiness from publication
   authority. A draft pull request can be safe to review while still blocked for
-  final publication. A green, approved pull request still stops at the human
-  publication gate unless policy explicitly grants more authority.
+  final publication. When component review policy is configured, each item also
+  carries the resolved review plan for the final pull request. A green, approved
+  pull request still stops at the human publication gate unless policy
+  explicitly grants more authority.
 
 For stacked and hybrid branch strategies, the plan also carries a stack summary:
 publication eligibility, root branch, default parent branch, review target, and
@@ -390,9 +392,9 @@ dev-nexus publication feature-finalization <workspace-root> --component api --ev
 ```
 
 The finalization plan is also read-only. It reports whether the branch is safe
-for review, whether it is ready for publication, and whether publication still
-requires a human decision. It does not merge, undraft, comment, or enter a merge
-queue.
+for review, whether configured review gates are satisfied, whether it is ready
+for publication, and whether publication still requires a human decision. It
+does not merge, undraft, comment, or enter a merge queue.
 
 ## Choosing A Path
 

@@ -262,8 +262,11 @@ The first implementation is deliberately small:
    authorization, provider review state, and provider CI/check state.
 4. Keep provider comments silent unless comment policy explicitly enables them.
 
-Follow-up work should feed the review result into publication and feature
-finalization planning, then expand provider-native readback where needed.
+Feature-finalization planning now includes the component review plan when a
+review policy is configured. This first integration is advisory:
+feature-finalization reports the review result, but mutating publication
+commands do not yet enforce it. Further follow-up work should decide enforcement
+semantics and expand provider-native readback where needed.
 
 The first implementation should not add committed approval files or a general
 approval ledger. If a later project needs audit-grade local approvals, that
