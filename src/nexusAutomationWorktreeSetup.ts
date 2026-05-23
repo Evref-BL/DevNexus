@@ -523,7 +523,9 @@ function selectedProjectSkillIds(
   const selected =
     skillsConfig?.defaultCorePack === false ? new Set<string>() : new Set(installedSkillIds);
   const order =
-    skillsConfig?.defaultCorePack === false ? [] : [...installedSkillIds].sort();
+    skillsConfig?.defaultCorePack === false
+      ? []
+      : [...installedSkillIds].sort((left, right) => left.localeCompare(right));
 
   for (const item of skillsConfig?.items ?? []) {
     if (item.enabled === false) {
@@ -691,7 +693,7 @@ function relativeSkillFiles(root: string, includeManifest: boolean): string[] {
 
   const files: string[] = [];
   collectRelativeSkillFiles(root, root, includeManifest, files);
-  return files.sort();
+  return files.sort((left, right) => left.localeCompare(right));
 }
 
 function collectRelativeSkillFiles(

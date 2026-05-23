@@ -4022,7 +4022,7 @@ function validatePluginMcpToolOwnership(
         (capability.tools ?? [])
           .map((tool) => tool.name.trim())
           .filter((toolName) => coreToolNames.has(toolName)),
-      )).sort();
+      )).sort((left, right) => left.localeCompare(right));
       if (duplicateTools.length === 0) {
         continue;
       }

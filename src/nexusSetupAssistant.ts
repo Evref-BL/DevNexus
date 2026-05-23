@@ -3080,7 +3080,7 @@ function hostingPlanSetupCheck(
   const dispositions = plan.actions.map((action) => action.disposition);
   const mutationClasses = Array.from(new Set(
     plan.actions.map((action) => action.mutationClass),
-  )).sort();
+  )).sort((left, right) => left.localeCompare(right));
   return {
     id: "github-hosting-plan",
     title: "GitHub hosting plan",

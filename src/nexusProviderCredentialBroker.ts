@@ -1843,9 +1843,13 @@ function githubAppCredentialCacheKey(
   return JSON.stringify({
     profileId: profile.id,
     installationAccount,
-    repositories: [...repositories].sort(),
+    repositories: [...repositories].sort((left, right) => left.localeCompare(right)),
     requiredPermissions: requiredPermissions
-      ? Object.fromEntries(Object.entries(requiredPermissions).sort())
+      ? Object.fromEntries(
+        Object.entries(requiredPermissions).sort(([left], [right]) =>
+          left.localeCompare(right),
+        ),
+      )
       : {},
   });
 }

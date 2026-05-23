@@ -923,7 +923,7 @@ function skillDefinitionsForProjectedCapabilities(
 
   const missing = [...capabilitiesBySkillId.keys()]
     .filter((skillId) => !definitionsById.has(skillId))
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   if (missing.length > 0) {
     throw new Error(
       `Plugin declares projected skills without packaged definitions: ${missing.join(", ")}`,
@@ -1042,7 +1042,9 @@ function mergeTargetAgentSelectors(
   if (!existing || !next) {
     return null;
   }
-  return [...new Set([...existing, ...next])].sort();
+  return [...new Set([...existing, ...next])].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function mcpTargetsForProjection(

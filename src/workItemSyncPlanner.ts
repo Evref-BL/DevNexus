@@ -2070,7 +2070,7 @@ function valuesEqual(left: unknown, right: unknown): boolean {
 
 function comparableValue(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return [...value].map(String).sort();
+    return [...value].map(String).sort((left, right) => left.localeCompare(right));
   }
 
   return value ?? null;

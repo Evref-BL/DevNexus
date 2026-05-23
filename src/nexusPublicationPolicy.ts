@@ -610,7 +610,7 @@ export function publicationEnvironmentVariables(
     DEV_NEXUS_PUBLICATION_COMMAND_ENV_KEYS: Object.keys(
       policy.commandEnvironment,
     )
-      .sort()
+      .sort((left, right) => left.localeCompare(right))
       .join(","),
   };
 }

@@ -164,7 +164,7 @@ export function extractCodexAppServerMethodNames(
   const methods = new Set<string>();
   const visited = new Set<object>();
   collectMethodNames(initializeResult, methods, visited, 0);
-  return [...methods].sort();
+  return [...methods].sort((left, right) => left.localeCompare(right));
 }
 
 const methodListKeys = new Set([

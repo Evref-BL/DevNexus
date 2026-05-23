@@ -932,7 +932,7 @@ function renderPublicationPolicyLines(
   }
 
   const commandEnvironmentKeys = Object.keys(publication.commandEnvironment)
-    .sort()
+    .sort((left, right) => left.localeCompare(right))
     .join(", ");
   const policySummary = summarizeNexusAutomationPublicationPolicy(publication);
 

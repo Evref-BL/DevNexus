@@ -364,7 +364,7 @@ function legacyTargetsOutsideActivePolicy(
     .map(([provider, sources]) => ({
       provider,
       state: "locally-selected-but-not-allowed" as const,
-      source: [...sources].sort().join(", "),
+      source: [...sources].sort((left, right) => left.localeCompare(right)).join(", "),
       reason:
         `Legacy target ${provider} is configured outside config.agentTargets.active.`,
     }));
@@ -405,7 +405,7 @@ function selectedCapabilityProviders(
   capabilityTargets: readonly string[],
   activeProviderSet: Set<string>,
 ): string[] {
-  const active = [...activeProviderSet].sort();
+  const active = [...activeProviderSet].sort((left, right) => left.localeCompare(right));
   if (capabilityTargets.length === 0) {
     return active;
   }
