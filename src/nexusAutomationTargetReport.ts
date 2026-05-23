@@ -223,7 +223,7 @@ export interface NexusAutomationTargetReportComponentProgressSummary {
   codexGoals: NexusAutomationTargetReportCodexGoalSummary[];
   runs: NexusAutomationTargetReportExecutionRunSummary[];
   publication: NexusAutomationPublicationPolicySummary | null;
-  publicationTrain: NexusPublicationTrainPolicySummary | null;
+  releaseTrain: NexusPublicationTrainPolicySummary | null;
   authority: NexusAuthorityComponentSummary | null;
 }
 
@@ -1002,7 +1002,7 @@ function summarizeComponentProgress(options: {
             ),
           )
         : null,
-      publicationTrain: draft.component
+      releaseTrain: draft.component
         ? summarizeNexusPublicationTrainPolicy({
             projectConfig: options.projectConfig,
             component: draft.component,

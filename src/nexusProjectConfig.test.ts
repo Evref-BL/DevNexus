@@ -2149,7 +2149,7 @@ describe("workspace config", () => {
         publication: {
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "0.2.0",
             branchNaming: {
@@ -2173,7 +2173,7 @@ describe("workspace config", () => {
           remoteUrl: "https://github.com/example/project.git",
           defaultBranch: "main",
           publication: {
-            publicationTrain: {
+            releaseTrain: {
               enabled: false,
             },
           },
@@ -2181,7 +2181,7 @@ describe("workspace config", () => {
       ],
     });
 
-    expect(config.automation?.publication.publicationTrain).toMatchObject({
+    expect(config.automation?.publication.releaseTrain).toMatchObject({
       enabled: true,
       activeVersionId: "0.2.0",
       branchNaming: {
@@ -2201,7 +2201,7 @@ describe("workspace config", () => {
         },
       },
     });
-    expect(config.components[0]?.publication?.publicationTrain).toMatchObject({
+    expect(config.components[0]?.publication?.releaseTrain).toMatchObject({
       enabled: false,
       selector: {
         labels: [],
@@ -2209,7 +2209,7 @@ describe("workspace config", () => {
     });
   });
 
-  it("accepts initiative delivery policy on publication trains", () => {
+  it("accepts feature branch delivery policy on release trains", () => {
     const config = validateProjectConfig({
       version: 1,
       id: "initiative-delivery-project",
@@ -2218,30 +2218,30 @@ describe("workspace config", () => {
         publication: {
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
-            initiativeDelivery: {
+            featureBranchDelivery: {
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
-              allowedTopologies: ["direct", "stacked", "hybrid"],
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
+              allowedBranchStrategies: ["direct", "stacked", "hybrid"],
               branchNaming: {
                 defaultIntentPrefix: "feat",
                 allowedIntentPrefixes: ["feat/", "fix", "chore"],
-                integrationBranchPattern: "{intent}/{initiative}",
-                sliceBranchPattern: "{intent}/{initiative}/{slice}",
+                featureBranchPattern: "{intent}/{feature}",
+                reviewBranchPattern: "{intent}/{feature}/{change}",
               },
               review: {
-                mode: "slice_pr",
+                mode: "review_branch_pr",
                 finalPullRequest: true,
                 finalPullRequestCreation: "at_review_gate",
               },
               provider: {
-                noise: "status_only",
+                commentPolicy: "status_only",
               },
               branchPublication: {
-                strategy: "publication_remote_then_fallback",
+                strategy: "push_remote_then_fallback",
                 fallbackRemote: "fork",
               },
             },
@@ -2251,34 +2251,34 @@ describe("workspace config", () => {
     });
 
     expect(
-      config.automation?.publication.publicationTrain?.initiativeDelivery,
+      config.automation?.publication.releaseTrain?.featureBranchDelivery,
     ).toMatchObject({
       enabled: true,
-      activeInitiativeId: "codex-goals",
-      defaultTopology: "hybrid",
-      allowedTopologies: ["direct", "stacked", "hybrid"],
+      activeFeatureId: "codex-goals",
+      defaultBranchStrategy: "hybrid",
+      allowedBranchStrategies: ["direct", "stacked", "hybrid"],
       branchNaming: {
         defaultIntentPrefix: "feat",
         allowedIntentPrefixes: ["feat", "fix", "chore"],
-        integrationBranchPattern: "{intent}/{initiative}",
-        sliceBranchPattern: "{intent}/{initiative}/{slice}",
+        featureBranchPattern: "{intent}/{feature}",
+        reviewBranchPattern: "{intent}/{feature}/{change}",
       },
       review: {
-        mode: "slice_pr",
+        mode: "review_branch_pr",
         finalPullRequest: true,
         finalPullRequestCreation: "at_review_gate",
       },
       provider: {
-        noise: "status_only",
+        commentPolicy: "status_only",
       },
       branchPublication: {
-        strategy: "publication_remote_then_fallback",
+        strategy: "push_remote_then_fallback",
         fallbackRemote: "fork",
       },
     });
   });
 
-  it("rejects invalid initiative delivery policy", () => {
+  it("rejects invalid feature branch delivery policy", () => {
     expect(() =>
       validateProjectConfig({
         version: 1,
@@ -2288,17 +2288,17 @@ describe("workspace config", () => {
           publication: {
             strategy: "green_main",
             targetBranch: "main",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
-              initiativeDelivery: {
-                defaultTopology: "hybrid",
-                allowedTopologies: ["direct", "stacked"],
+              featureBranchDelivery: {
+                defaultBranchStrategy: "hybrid",
+                allowedBranchStrategies: ["direct", "stacked"],
               },
             },
           },
         },
       }),
-    ).toThrow(/defaultTopology must be included in allowedTopologies/);
+    ).toThrow(/defaultBranchStrategy must be included in allowedBranchStrategies/);
 
     expect(() =>
       validateProjectConfig({
@@ -2309,9 +2309,9 @@ describe("workspace config", () => {
           publication: {
             strategy: "green_main",
             targetBranch: "main",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 branchNaming: {
                   defaultIntentPrefix: "initiative",
                   allowedIntentPrefixes: ["feat", "fix"],
@@ -2332,18 +2332,18 @@ describe("workspace config", () => {
           publication: {
             strategy: "green_main",
             targetBranch: "main",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 branchNaming: {
-                  integrationBranchPattern: "{intent}/{initiative}/{slice}",
+                  featureBranchPattern: "{intent}/{feature}/{change}",
                 },
               },
             },
           },
         },
       }),
-    ).toThrow(/integrationBranchPattern must not include \{slice\}/);
+    ).toThrow(/featureBranchPattern must not include \{change\}/);
 
     expect(() =>
       validateProjectConfig({
@@ -2354,9 +2354,9 @@ describe("workspace config", () => {
           publication: {
             strategy: "green_main",
             targetBranch: "main",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 review: {
                   finalPullRequestCreation: "always",
                 },
@@ -2376,9 +2376,9 @@ describe("workspace config", () => {
           publication: {
             strategy: "green_main",
             targetBranch: "main",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 branchPublication: {
                   strategy: "fallback_remote",
                 },

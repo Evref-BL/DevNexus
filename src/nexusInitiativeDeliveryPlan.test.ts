@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
 import { buildNexusInitiativeDeliveryPlan } from "./nexusInitiativeDeliveryPlan.js";
 import {
@@ -52,18 +52,18 @@ describe("initiative delivery plan", () => {
         {
           componentId: "primary",
           targetBranch: "main",
-          publicationTrainVersionId: "v-next",
+          releaseTrainVersionId: "v-next",
           initiative: {
             activeScopeId: "codex-goals",
-            defaultTopology: "hybrid",
+            defaultBranchStrategy: "hybrid",
             branchPlan: {
               integrationBranch: "feat/codex-goals",
-              sliceBranchPattern: "feat/codex-goals/{slice}",
+              reviewBranchPattern: "feat/codex-goals/{change}",
               finalPublicationTarget: "main",
             },
             finalPullRequestCreation: "at_review_gate",
             branchPublication: {
-              strategy: "publication_remote_then_fallback",
+              strategy: "push_remote_then_fallback",
               publicationRemote: "origin",
               fallbackRemote: "fork",
               selectedRemote: "origin",
@@ -113,7 +113,7 @@ function projectConfig(): NexusProjectConfig {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -121,17 +121,17 @@ function projectConfig(): NexusProjectConfig {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
             branchPublication: {
-              strategy: "publication_remote_then_fallback",
+              strategy: "push_remote_then_fallback",
               fallbackRemote: "fork",
             },
             branchNaming: {
-              ...defaultNexusInitiativeDeliveryConfig.branchNaming,
+              ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
               defaultIntentPrefix: "feat",
             },
           },

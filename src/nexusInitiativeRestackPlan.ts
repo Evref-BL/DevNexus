@@ -1,5 +1,5 @@
 import type {
-  NexusInitiativeDeliveryTopology,
+  NexusFeatureBranchDeliveryBranchStrategy,
 } from "./nexusAutomationConfig.js";
 import type {
   NexusPublicationProviderBaseStatus,
@@ -39,7 +39,7 @@ export interface NexusInitiativeRestackPlanItem {
 }
 
 export interface NexusInitiativeRestackPlan {
-  topology: NexusInitiativeDeliveryTopology;
+  topology: NexusFeatureBranchDeliveryBranchStrategy;
   finalPublicationTarget: string;
   status: NexusInitiativeRestackPlanStatus;
   nextAction: NexusInitiativeRestackNextAction;
@@ -54,7 +54,7 @@ export interface NexusInitiativeRestackPlan {
 }
 
 export function buildNexusInitiativeRestackPlan(options: {
-  topology: NexusInitiativeDeliveryTopology;
+  topology: NexusFeatureBranchDeliveryBranchStrategy;
   finalPublicationTarget: string;
   branches: NexusInitiativeRestackBranchInput[];
 }): NexusInitiativeRestackPlan {

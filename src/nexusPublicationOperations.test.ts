@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { main } from "./cli.js";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   inspectNexusPublicationPullRequestForComponent,
   mergeNexusPublicationPullRequestForComponent,
   pushNexusPublicationBranchForComponent,
@@ -103,7 +103,7 @@ describe("publication operations", () => {
       },
     });
 
-    expect(result.initiativeDelivery).toMatchObject({
+    expect(result.featureBranchDelivery).toMatchObject({
       initiativeId: "codex-goals",
       branchPublication: {
         strategy: "fallback_remote",
@@ -129,7 +129,7 @@ describe("publication operations", () => {
       projectRoot,
       initiativeFallbackPublicationProjectConfig(
         homePath,
-        "publication_remote_then_fallback",
+        "push_remote_then_fallback",
       ),
     );
     const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
@@ -164,9 +164,9 @@ describe("publication operations", () => {
       },
     });
 
-    expect(result.initiativeDelivery).toMatchObject({
+    expect(result.featureBranchDelivery).toMatchObject({
       branchPublication: {
-        strategy: "publication_remote_then_fallback",
+        strategy: "push_remote_then_fallback",
         selectedRemote: "fork",
       },
       remoteSelection: {
@@ -202,7 +202,7 @@ describe("publication operations", () => {
       projectRoot,
       initiativeFallbackPublicationProjectConfig(
         homePath,
-        "publication_remote_then_fallback",
+        "push_remote_then_fallback",
       ),
     );
     const calls: Array<{ args: readonly string[]; token: string | undefined }> = [];
@@ -229,9 +229,9 @@ describe("publication operations", () => {
       },
     });
 
-    expect(result.initiativeDelivery).toMatchObject({
+    expect(result.featureBranchDelivery).toMatchObject({
       remoteSelection: {
-        status: "publication_remote_writable",
+        status: "push_remote_writable",
         selectedRemote: "app",
         probes: [
           {
@@ -259,7 +259,7 @@ describe("publication operations", () => {
       projectRoot,
       initiativeFallbackPublicationProjectConfig(
         homePath,
-        "publication_remote_then_fallback",
+        "push_remote_then_fallback",
       ),
     );
 
@@ -881,7 +881,7 @@ describe("publication CLI operations", () => {
       projectRoot,
       initiativeFallbackPublicationProjectConfig(
         homePath,
-        "publication_remote_then_fallback",
+        "push_remote_then_fallback",
       ),
     );
     const stdout = textWriter();
@@ -929,9 +929,9 @@ describe("publication CLI operations", () => {
     expect(JSON.parse(stdout.output())).toMatchObject({
       ok: true,
       dryRun: true,
-      initiativeDelivery: {
+      featureBranchDelivery: {
         branchPublication: {
-          strategy: "publication_remote_then_fallback",
+          strategy: "push_remote_then_fallback",
           selectedRemote: "fork",
         },
         remoteSelection: {
@@ -958,7 +958,7 @@ describe("publication CLI operations", () => {
       projectRoot,
       initiativeFallbackPublicationProjectConfig(
         homePath,
-        "publication_remote_then_fallback",
+        "push_remote_then_fallback",
       ),
     );
     const stdout = textWriter();
@@ -997,7 +997,7 @@ describe("publication CLI operations", () => {
       error: {
         code: "initiative_branch_publication_blocked",
       },
-      initiativeDelivery: {
+      featureBranchDelivery: {
         remoteSelection: {
           status: "blocked",
           selectedRemote: null,
@@ -1527,7 +1527,7 @@ function initiativeFallbackPublicationProjectConfig(
   strategy:
     | "fallback_remote"
     | "manual_only"
-    | "publication_remote_then_fallback" = "fallback_remote",
+    | "push_remote_then_fallback" = "fallback_remote",
   fallbackRemote: string | null = "fork",
 ): NexusProjectConfig {
   return {
@@ -1546,7 +1546,7 @@ function initiativeFallbackPublicationProjectConfig(
           handle: "devnexus-automation",
           id: "dev-nexus-automation-app",
         },
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: null,
           branchNaming: {
@@ -1554,11 +1554,11 @@ function initiativeFallbackPublicationProjectConfig(
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
             branchPublication: {
               strategy,
               fallbackRemote,

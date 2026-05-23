@@ -52,16 +52,16 @@ describe("publication train policy", () => {
         integrationBranch: "integration/0.2.0",
         candidateBranch: "candidate/0.2.0",
       },
-      initiativeDelivery: {
+      featureBranchDelivery: {
         enabled: true,
         activeScopeId: "initiative-a",
         branchSlug: "initiative-a",
-        defaultTopology: "hybrid",
+        defaultBranchStrategy: "hybrid",
         defaultIntentPrefix: "feat",
-        providerNoise: "status_only",
+        commentPolicy: "status_only",
         branchPlan: {
           integrationBranch: "feat/initiative-a",
-          sliceBranchPattern: "feat/initiative-a/{slice}",
+          reviewBranchPattern: "feat/initiative-a/{change}",
           defaultSliceBaseBranch: "feat/initiative-a",
           finalPublicationTarget: "main",
         },
@@ -123,7 +123,7 @@ function projectConfig(
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "0.2.0",
           branchNaming: {
@@ -131,10 +131,10 @@ function projectConfig(
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
+          featureBranchDelivery: {
             enabled: true,
-            activeInitiativeId: "initiative-a",
-            defaultTopology: "hybrid",
+            activeFeatureId: "initiative-a",
+            defaultBranchStrategy: "hybrid",
             branchNaming: {
               defaultIntentPrefix: "feat",
             },

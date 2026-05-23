@@ -7,7 +7,7 @@ import {
   createLocalWorkTrackerProvider,
   currentNexusCliScriptPath,
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   defaultNexusPublicationTrainCiTierPolicy,
   loadProjectConfig,
   loadLocalWorkTrackingStore,
@@ -155,7 +155,7 @@ function projectConfig(overrides: Partial<NexusProjectConfig> = {}): NexusProjec
   };
 }
 
-function publicationTrainLease(options: {
+function releaseTrainLease(options: {
   projectId: string;
   componentId: string;
   workItemId: string;
@@ -1579,7 +1579,7 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
@@ -1745,14 +1745,14 @@ describe("dev-nexus cli", () => {
       version: 1,
       updatedAt: "2026-05-21T10:00:00.000Z",
       leases: [
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-120",
           projectId: "demo-project",
           componentId: "primary",
           workItemId: "github-120",
           branchName: "codex/train-readiness",
         }),
-        publicationTrainLease({
+        releaseTrainLease({
           id: "lease-cli-candidate-121",
           projectId: "demo-project",
           componentId: "primary",
@@ -6781,7 +6781,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -6789,10 +6789,10 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
+            featureBranchDelivery: {
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
               branchNaming: {
                 defaultIntentPrefix: "feat",
               },
@@ -6887,7 +6887,7 @@ describe("dev-nexus cli", () => {
       "primary: active=v-next candidate=candidate/v-next integration=integration/v-next tier=remote_smoke",
     );
     expect(textOutput.output()).toContain(
-      "Initiative delivery: topology=hybrid active=codex-goals integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+      "Initiative delivery: topology=hybrid active=codex-goals integration=feat/codex-goals slices=feat/codex-goals/{change}",
     );
     expect(textOutput.output()).toContain("Selector labels: none");
     expect(textOutput.output()).toContain("Version planning: 1 shown");
@@ -6917,18 +6917,18 @@ describe("dev-nexus cli", () => {
         componentProgress: [
           {
             componentId: "primary",
-            publicationTrain: {
+            releaseTrain: {
               enabled: true,
               activeVersionId: "v-next",
               candidateBranch: "candidate/v-next",
               integrationBranch: "integration/v-next",
-              initiativeDelivery: {
+              featureBranchDelivery: {
                 activeScopeId: "codex-goals",
                 topology: "hybrid",
                 integrationBranch: "feat/codex-goals",
-                sliceBranchPattern: "feat/codex-goals/{slice}",
+                reviewBranchPattern: "feat/codex-goals/{change}",
                 finalPublicationTarget: "main",
-                providerNoise: "status_only",
+                commentPolicy: "status_only",
               },
               ciTierDefault: "remote_smoke",
               selectorLabels: [],
@@ -6952,7 +6952,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -6960,11 +6960,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],
@@ -7001,7 +7001,7 @@ describe("dev-nexus cli", () => {
       "primary: active=codex-goals topology=hybrid",
     );
     expect(textOutput.output()).toContain(
-      "integration=feat/codex-goals slices=feat/codex-goals/{slice}",
+      "integration=feat/codex-goals slices=feat/codex-goals/{change}",
     );
     expect(JSON.parse(jsonOutput.output())).toMatchObject({
       ok: true,
@@ -7013,10 +7013,10 @@ describe("dev-nexus cli", () => {
             componentId: "primary",
             initiative: {
               activeScopeId: "codex-goals",
-              defaultTopology: "hybrid",
+              defaultBranchStrategy: "hybrid",
               branchPlan: {
                 integrationBranch: "feat/codex-goals",
-                sliceBranchPattern: "feat/codex-goals/{slice}",
+                reviewBranchPattern: "feat/codex-goals/{change}",
                 finalPublicationTarget: "main",
               },
             },
@@ -7038,7 +7038,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7046,11 +7046,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],
@@ -7254,7 +7254,7 @@ describe("dev-nexus cli", () => {
           ...baseConfig.automation!.publication,
           strategy: "green_main",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -7262,11 +7262,11 @@ describe("dev-nexus cli", () => {
               candidatePrefix: "candidate",
               unscopedName: "manual",
             },
-            initiativeDelivery: {
-              ...defaultNexusInitiativeDeliveryConfig,
+            featureBranchDelivery: {
+              ...defaultNexusFeatureBranchDeliveryConfig,
               enabled: true,
-              activeInitiativeId: "codex-goals",
-              defaultTopology: "hybrid",
+              activeFeatureId: "codex-goals",
+              defaultBranchStrategy: "hybrid",
             },
             selector: {
               statuses: ["ready"],

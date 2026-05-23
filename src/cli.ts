@@ -7061,8 +7061,8 @@ function printWorktreePrepareResult(
   if (result.worktree.baseRef) {
     writeLine(stdout, `  Base ref: ${result.worktree.baseRef}`);
   }
-  if (result.setup.context?.context.initiativeDelivery) {
-    const initiative = result.setup.context.context.initiativeDelivery;
+  if (result.setup.context?.context.featureBranchDelivery) {
+    const initiative = result.setup.context.context.featureBranchDelivery;
     writeLine(stdout, `  Initiative: ${initiative.initiativeId}`);
     writeLine(stdout, `  Review target: ${initiative.branchTarget}`);
     writeLine(stdout, `  Final target: ${initiative.finalPublicationTarget}`);
@@ -7627,23 +7627,23 @@ function printAutomationTargetReportResult(
   if (result.authority) {
     printAuthorityProjectSummary(result.authority, stdout);
   }
-  const publicationTrains = result.componentProgress
-    .map((component) => component.publicationTrain)
+  const releaseTrains = result.componentProgress
+    .map((component) => component.releaseTrain)
     .filter((train): train is NonNullable<typeof train> => train !== null);
-  if (publicationTrains.length > 0) {
+  if (releaseTrains.length > 0) {
     writeLine(
       stdout,
-      `  Publication trains: ${publicationTrains.length} configured, ${publicationTrains.filter((train) => train.enabled).length} enabled.`,
+      `  Publication trains: ${releaseTrains.length} configured, ${releaseTrains.filter((train) => train.enabled).length} enabled.`,
     );
-    for (const train of publicationTrains) {
+    for (const train of releaseTrains) {
       writeLine(
         stdout,
         `    ${train.componentId}: active=${train.activeVersionId ?? "unscoped"} candidate=${train.branches.candidateBranch} integration=${train.branches.integrationBranch} tier=${train.ciTiers.defaultTier} budget=${formatPublicationTrainBudget(train)}`,
       );
-      if (train.initiativeDelivery) {
+      if (train.featureBranchDelivery) {
         writeLine(
           stdout,
-          `      Initiative delivery: topology=${train.initiativeDelivery.defaultTopology} active=${train.initiativeDelivery.activeScopeId} integration=${train.initiativeDelivery.branchPlan.integrationBranch ?? "none"} slices=${train.initiativeDelivery.branchPlan.sliceBranchPattern}`,
+          `      Initiative delivery: topology=${train.featureBranchDelivery.defaultBranchStrategy} active=${train.featureBranchDelivery.activeScopeId} integration=${train.featureBranchDelivery.branchPlan.integrationBranch ?? "none"} slices=${train.featureBranchDelivery.branchPlan.reviewBranchPattern}`,
         );
       }
       if (train.selector.labels.length === 0) {
@@ -7706,7 +7706,7 @@ function printAutomationScheduleResult(
 
 function formatPublicationTrainBudget(
   train: NonNullable<
-    NexusAutomationTargetReport["componentProgress"][number]["publicationTrain"]
+    NexusAutomationTargetReport["componentProgress"][number]["releaseTrain"]
   >,
 ): string {
   const budget = train.ciTiers.fullMatrixBudget;

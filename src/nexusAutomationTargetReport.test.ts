@@ -231,7 +231,7 @@ describe("nexus automation target report", () => {
           ...defaultNexusAutomationConfig.publication,
           strategy: "local_only",
           targetBranch: "main",
-          publicationTrain: {
+          releaseTrain: {
             enabled: true,
             activeVersionId: "v-next",
             branchNaming: {
@@ -400,7 +400,7 @@ describe("nexus automation target report", () => {
         },
       ],
     });
-    expect(report.componentProgress[0]?.publicationTrain).toMatchObject({
+    expect(report.componentProgress[0]?.releaseTrain).toMatchObject({
       enabled: true,
       activeVersionId: "v-next",
       activeVersionFound: true,

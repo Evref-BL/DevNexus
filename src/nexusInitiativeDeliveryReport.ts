@@ -95,13 +95,13 @@ export interface NexusInitiativeDeliveryReportItem {
   componentId: string;
   componentName: string;
   targetBranch: string;
-  publicationTrainVersionId: string | null;
+  releaseTrainVersionId: string | null;
   initiativeId: string;
   topology: string;
   reviewMode: string;
-  providerNoise: string;
+  commentPolicy: string;
   integrationBranch: string | null;
-  sliceBranchPattern: string;
+  reviewBranchPattern: string;
   stack: NexusInitiativeDeliveryPolicySummary["branchPlan"]["stack"];
   finalReviewTarget: string;
   finalPublicationTarget: string;
@@ -242,13 +242,13 @@ function reportItem(options: {
     componentId: options.item.componentId,
     componentName: options.item.componentName,
     targetBranch: options.item.targetBranch,
-    publicationTrainVersionId: options.item.publicationTrainVersionId,
+    releaseTrainVersionId: options.item.releaseTrainVersionId,
     initiativeId: initiative.activeScopeId,
-    topology: initiative.defaultTopology,
+    topology: initiative.defaultBranchStrategy,
     reviewMode: initiative.reviewMode,
-    providerNoise: initiative.providerNoise,
+    commentPolicy: initiative.commentPolicy,
     integrationBranch: branchPlan.integrationBranch,
-    sliceBranchPattern: branchPlan.sliceBranchPattern,
+    reviewBranchPattern: branchPlan.reviewBranchPattern,
     stack: branchPlan.stack,
     finalReviewTarget: branchPlan.finalReviewTarget,
     finalPublicationTarget: branchPlan.finalPublicationTarget,
@@ -282,10 +282,10 @@ function initiativeCiTierPolicy(
   component: ResolvedNexusProjectComponent,
 ): NexusCiTierPolicyConfig {
   const publication = resolveNexusPublicationPolicy(projectConfig, component);
-  if (publication.publicationTrain?.ciTiers) {
+  if (publication.releaseTrain?.ciTiers) {
     return mergeNexusCiTierPolicy(
       defaultNexusPublicationTrainCiTierPolicy,
-      publication.publicationTrain.ciTiers,
+      publication.releaseTrain.ciTiers,
     );
   }
   if (component.verification?.ciTiers) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultNexusInitiativeDeliveryConfig,
-  type NexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
+  type NexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
 import {
   branchSlugFor,
@@ -10,25 +10,25 @@ import {
 } from "./nexusInitiativeDeliveryPolicy.js";
 
 function initiativeConfig(
-  patch: Partial<NexusInitiativeDeliveryConfig> = {},
-): NexusInitiativeDeliveryConfig {
+  patch: Partial<NexusFeatureBranchDeliveryConfig> = {},
+): NexusFeatureBranchDeliveryConfig {
   return {
-    ...defaultNexusInitiativeDeliveryConfig,
+    ...defaultNexusFeatureBranchDeliveryConfig,
     ...patch,
     branchNaming: {
-      ...defaultNexusInitiativeDeliveryConfig.branchNaming,
+      ...defaultNexusFeatureBranchDeliveryConfig.branchNaming,
       ...patch.branchNaming,
     },
     review: {
-      ...defaultNexusInitiativeDeliveryConfig.review,
+      ...defaultNexusFeatureBranchDeliveryConfig.review,
       ...patch.review,
     },
     provider: {
-      ...defaultNexusInitiativeDeliveryConfig.provider,
+      ...defaultNexusFeatureBranchDeliveryConfig.provider,
       ...patch.provider,
     },
     branchPublication: {
-      ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+      ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
       ...patch.branchPublication,
     },
   };
@@ -39,8 +39,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
       }),
       fallbackScopeId: "v-next",
       unscopedName: "manual",
@@ -50,17 +50,17 @@ describe("initiative delivery policy", () => {
 
     expect(summary).toMatchObject({
       enabled: true,
-      activeInitiativeId: "Codex Goals",
+      activeFeatureId: "Codex Goals",
       activeScopeId: "Codex Goals",
       branchSlug: "codex-goals",
       defaultIntentPrefix: "feat",
-      defaultTopology: "hybrid",
-      reviewMode: "slice_pr",
+      defaultBranchStrategy: "hybrid",
+      reviewMode: "review_branch_pr",
       finalPullRequest: true,
       finalPullRequestCreation: "at_review_gate",
-      providerNoise: "status_only",
+      commentPolicy: "status_only",
       branchPublication: {
-        strategy: "publication_remote",
+        strategy: "push_remote",
         publicationRemote: "app",
         fallbackRemote: null,
         selectedRemote: "app",
@@ -70,7 +70,7 @@ describe("initiative delivery policy", () => {
         topology: "hybrid",
         targetBranch: "main",
         integrationBranch: "feat/codex-goals",
-        sliceBranchPattern: "feat/codex-goals/{slice}",
+        reviewBranchPattern: "feat/codex-goals/{change}",
         defaultSliceBaseBranch: "feat/codex-goals",
         defaultSliceReviewTarget: "feat/codex-goals",
         finalReviewTarget: "main",
@@ -93,13 +93,13 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "small-fixes",
-        defaultTopology: "direct",
+        activeFeatureId: "small-fixes",
+        defaultBranchStrategy: "direct",
         branchNaming: {
           defaultIntentPrefix: "fix",
           allowedIntentPrefixes: ["feat", "fix"],
-          integrationBranchPattern: "{intent}/{initiative}",
-          sliceBranchPattern: "{intent}/{initiative}/{slice}",
+          featureBranchPattern: "{intent}/{feature}",
+          reviewBranchPattern: "{intent}/{feature}/{change}",
         },
       }),
       fallbackScopeId: null,
@@ -122,15 +122,15 @@ describe("initiative delivery policy", () => {
         defaultParentBranch: null,
       },
     });
-    expect(summary.branchPlan.sliceBranchPattern).toBe("fix/small-fixes/{slice}");
+    expect(summary.branchPlan.reviewBranchPattern).toBe("fix/small-fixes/{change}");
   });
 
   it("summarizes stacked topology with target-rooted slice parents", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "stacked-work",
-        defaultTopology: "stacked",
+        activeFeatureId: "stacked-work",
+        defaultBranchStrategy: "stacked",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
@@ -159,8 +159,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: null,
-        defaultTopology: "integration_branch",
+        activeFeatureId: null,
+        defaultBranchStrategy: "integration_branch",
       }),
       fallbackScopeId: "0.2.0",
       unscopedName: "manual",
@@ -177,8 +177,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: null,
-        defaultTopology: "throwaway_rehearsal",
+        activeFeatureId: null,
+        defaultBranchStrategy: "throwaway_rehearsal",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
@@ -202,10 +202,10 @@ describe("initiative delivery policy", () => {
   it("renders branch patterns and normalizes arbitrary ids to branch slugs", () => {
     expect(branchSlugFor(" Feature: Codex Goals! ")).toBe("feature-codex-goals");
     expect(
-      renderInitiativeBranchPattern("{intent}/{initiative}/{slice}", {
+      renderInitiativeBranchPattern("{intent}/{feature}/{change}", {
         intent: "feat",
-        initiative: "codex-goals",
-        slice: "target-projection",
+        feature: "codex-goals",
+        change: "target-projection",
       }),
     ).toBe("feat/codex-goals/target-projection");
   });
@@ -214,10 +214,10 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "fork-review",
-        defaultTopology: "hybrid",
+        activeFeatureId: "fork-review",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
-          strategy: "publication_remote_then_fallback",
+          strategy: "push_remote_then_fallback",
           fallbackRemote: "fork",
         },
       }),
@@ -228,7 +228,7 @@ describe("initiative delivery policy", () => {
     });
 
     expect(summary.branchPublication).toMatchObject({
-      strategy: "publication_remote_then_fallback",
+      strategy: "push_remote_then_fallback",
       publicationRemote: "app",
       fallbackRemote: "fork",
       selectedRemote: "app",
@@ -241,8 +241,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
       }),
       fallbackScopeId: null,
       unscopedName: "manual",
@@ -269,8 +269,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",
@@ -301,8 +301,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",
@@ -330,8 +330,8 @@ describe("initiative delivery policy", () => {
     const summary = summarizeNexusInitiativeDeliveryPolicy({
       config: initiativeConfig({
         enabled: true,
-        activeInitiativeId: "Codex Goals",
-        defaultTopology: "hybrid",
+        activeFeatureId: "Codex Goals",
+        defaultBranchStrategy: "hybrid",
         branchPublication: {
           strategy: "fallback_remote",
           fallbackRemote: "fork",

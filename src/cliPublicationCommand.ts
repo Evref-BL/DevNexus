@@ -1307,7 +1307,7 @@ function printPublicationBranchPushResult(
     repository: result.repository,
     branch: result.branch,
     targetBranch: result.targetBranch,
-    initiativeDelivery: result.initiativeDelivery,
+    featureBranchDelivery: result.featureBranchDelivery,
     forceWithLease: result.forceWithLease,
     forceWithLeaseExpectedCommit: result.forceWithLeaseExpectedCommit,
     credential: result.credential,
@@ -1333,15 +1333,15 @@ function printPublicationBranchPushResult(
   writeLine(stdout, `  Target: ${formatPublicationTarget(result.target)}`);
   writeLine(stdout, `  Repository: ${result.repository.owner}/${result.repository.name}`);
   writeLine(stdout, `  Branch: ${result.branch}`);
-  if (result.initiativeDelivery) {
-    writeLine(stdout, `  Initiative: ${result.initiativeDelivery.initiativeId}`);
+  if (result.featureBranchDelivery) {
+    writeLine(stdout, `  Initiative: ${result.featureBranchDelivery.initiativeId}`);
     writeLine(
       stdout,
-      `  Initiative remote policy: ${result.initiativeDelivery.branchPublication.strategy} -> ${result.initiativeDelivery.branchPublication.selectedRemote}`,
+      `  Initiative remote policy: ${result.featureBranchDelivery.branchPublication.strategy} -> ${result.featureBranchDelivery.branchPublication.selectedRemote}`,
     );
     writeLine(
       stdout,
-      `  Initiative remote selection: ${result.initiativeDelivery.remoteSelection.status}`,
+      `  Initiative remote selection: ${result.featureBranchDelivery.remoteSelection.status}`,
     );
   }
   if (result.targetBranch) {
@@ -1374,7 +1374,7 @@ function printPublicationBranchPushBlockedError(
       code: "initiative_branch_publication_blocked",
       message: error.message,
     },
-    initiativeDelivery: error.initiativeDelivery,
+    featureBranchDelivery: error.featureBranchDelivery,
   });
 }
 
@@ -1687,11 +1687,11 @@ function printPublicationInitiativePlan(
     const branchPlan = initiative.branchPlan;
     writeLine(
       stdout,
-      `  ${item.componentId}: active=${initiative.activeScopeId} topology=${initiative.defaultTopology}`,
+      `  ${item.componentId}: active=${initiative.activeScopeId} topology=${initiative.defaultBranchStrategy}`,
     );
     writeLine(
       stdout,
-      `    integration=${branchPlan.integrationBranch ?? "none"} slices=${branchPlan.sliceBranchPattern}`,
+      `    integration=${branchPlan.integrationBranch ?? "none"} slices=${branchPlan.reviewBranchPattern}`,
     );
     writeLine(
       stdout,
@@ -1699,7 +1699,7 @@ function printPublicationInitiativePlan(
     );
     writeLine(
       stdout,
-      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} finalPRCreation=${initiative.finalPullRequestCreation} providerNoise=${initiative.providerNoise}`,
+      `    review=${initiative.reviewMode} finalPR=${initiative.finalPullRequest} finalPRCreation=${initiative.finalPullRequestCreation} commentPolicy=${initiative.commentPolicy}`,
     );
     writeLine(
       stdout,

@@ -83,7 +83,7 @@ export interface NexusInitiativeMergeQueueFinalizationSummary {
 export type NexusInitiativeFinalPullRequestActionStatus =
   | "not_required"
   | "already_exists"
-  | "create_at_initiative_start"
+  | "create_at_feature_start"
   | "create_at_review_gate"
   | "manual_only"
   | "blocked";
@@ -349,7 +349,7 @@ function sharedReadinessBlocker(
   }
   if (
     finalPullRequestAction.status === "create_at_review_gate" ||
-    finalPullRequestAction.status === "create_at_initiative_start"
+    finalPullRequestAction.status === "create_at_feature_start"
   ) {
     return {
       status: "needs_final_pull_request",
@@ -513,9 +513,9 @@ function finalPullRequestExists(item: NexusInitiativeDeliveryReportItem): boolea
 
 function finalPullRequestActionStatus(
   policy: string,
-): "create_at_initiative_start" | "create_at_review_gate" | null {
-  if (policy === "at_initiative_start") {
-    return "create_at_initiative_start";
+): "create_at_feature_start" | "create_at_review_gate" | null {
+  if (policy === "at_feature_start") {
+    return "create_at_feature_start";
   }
   if (policy === "at_review_gate") {
     return "create_at_review_gate";
@@ -524,9 +524,9 @@ function finalPullRequestActionStatus(
 }
 
 function finalPullRequestActionReason(
-  status: "create_at_initiative_start" | "create_at_review_gate",
+  status: "create_at_feature_start" | "create_at_review_gate",
 ): string {
-  return status === "create_at_initiative_start"
+  return status === "create_at_feature_start"
     ? "final pull request should have been created at initiative start"
     : "final pull request is created at the review gate";
 }

@@ -22,7 +22,8 @@
     "docs",
     "README.md",
     "package.json",
-    "scripts/first-workspace-onboarding-smoke.mjs"
+    "scripts/first-workspace-onboarding-smoke.mjs",
+    "scripts/update-git-workflow-vocabulary-config.mjs"
   ],
   "publishConfig": {
     "access": "public"

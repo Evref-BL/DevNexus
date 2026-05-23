@@ -1,6 +1,6 @@
 import {
-  defaultNexusAutomationPublicationTrainConfig,
-  type NexusAutomationPublicationTrainConfig,
+  defaultNexusAutomationReleaseTrainConfig,
+  type NexusAutomationReleaseTrainConfig,
 } from "./nexusAutomationConfig.js";
 import {
   defaultNexusPublicationTrainCiTierPolicy,
@@ -52,7 +52,7 @@ export interface NexusPublicationTrainPolicySummary {
   objective: string | null;
   targetBranch: string;
   branches: NexusPublicationTrainBranchPolicySummary;
-  initiativeDelivery: NexusInitiativeDeliveryPolicySummary | null;
+  featureBranchDelivery: NexusInitiativeDeliveryPolicySummary | null;
   selector: NexusPublicationTrainSelectorPolicySummary;
   ciTiers: NexusPublicationTrainCiTierPolicySummary;
   warnings: string[];
@@ -66,20 +66,20 @@ export function summarizeNexusPublicationTrainPolicy(options: {
     options.projectConfig,
     options.component,
   );
-  if (!publication.publicationTrain) {
+  if (!publication.releaseTrain) {
     return null;
   }
 
   const train = {
-    ...defaultNexusAutomationPublicationTrainConfig,
-    ...publication.publicationTrain,
+    ...defaultNexusAutomationReleaseTrainConfig,
+    ...publication.releaseTrain,
     branchNaming: {
-      ...defaultNexusAutomationPublicationTrainConfig.branchNaming,
-      ...publication.publicationTrain.branchNaming,
+      ...defaultNexusAutomationReleaseTrainConfig.branchNaming,
+      ...publication.releaseTrain.branchNaming,
     },
     selector: {
-      ...defaultNexusAutomationPublicationTrainConfig.selector,
-      ...publication.publicationTrain.selector,
+      ...defaultNexusAutomationReleaseTrainConfig.selector,
+      ...publication.releaseTrain.selector,
     },
   };
   const activeVersion = activeVersionFor(
@@ -127,9 +127,9 @@ export function summarizeNexusPublicationTrainPolicy(options: {
         train.branchNaming.unscopedName,
       ),
     },
-    initiativeDelivery: train.initiativeDelivery
+    featureBranchDelivery: train.featureBranchDelivery
       ? summarizeNexusInitiativeDeliveryPolicy({
-          config: train.initiativeDelivery,
+          config: train.featureBranchDelivery,
           fallbackScopeId: activeVersionId,
           unscopedName: train.branchNaming.unscopedName,
           targetBranch,
@@ -179,7 +179,7 @@ function componentRemoteFacts(
 
 function activeVersionFor(
   versions: readonly NexusVersionConfig[],
-  train: NexusAutomationPublicationTrainConfig,
+  train: NexusAutomationReleaseTrainConfig,
 ): NexusVersionConfig | null {
   if (train.activeVersionId) {
     return versions.find((version) => version.id === train.activeVersionId) ??
@@ -189,7 +189,7 @@ function activeVersionFor(
 }
 
 function resolveTrainCiTiers(options: {
-  train: NexusAutomationPublicationTrainConfig;
+  train: NexusAutomationReleaseTrainConfig;
   projectConfig: NexusProjectConfig;
   component: ResolvedNexusProjectComponent;
 }): {
@@ -230,7 +230,7 @@ function resolveTrainCiTiers(options: {
 }
 
 function trainWarnings(options: {
-  train: NexusAutomationPublicationTrainConfig;
+  train: NexusAutomationReleaseTrainConfig;
   activeVersion: NexusVersionConfig | null;
   versionCount: number;
 }): string[] {

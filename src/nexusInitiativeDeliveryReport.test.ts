@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
 import { buildNexusInitiativeDeliveryReport } from "./nexusInitiativeDeliveryReport.js";
 import {
@@ -270,7 +270,7 @@ function projectConfig(): NexusProjectConfig {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -278,11 +278,11 @@ function projectConfig(): NexusProjectConfig {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
           },
           selector: {
             statuses: ["ready"],

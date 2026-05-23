@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
 } from "./nexusAutomationConfig.js";
 import { buildNexusInitiativeFinalizationPlan } from "./nexusInitiativeFinalizationPlan.js";
 import {
@@ -81,7 +81,7 @@ describe("initiative finalization plan", () => {
     const projectRoot = makeTempDir("dev-nexus-initiative-finalization-");
     fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
     saveProjectConfig(projectRoot, projectConfig({
-      finalPullRequestCreation: "at_initiative_start",
+      finalPullRequestCreation: "at_feature_start",
     }));
 
     const plan = buildNexusInitiativeFinalizationPlan({
@@ -93,7 +93,7 @@ describe("initiative finalization plan", () => {
     expect(plan.nextAction).toBe("create_pull_request");
     expect(plan.items[0]).toMatchObject({
       finalPullRequestAction: {
-        status: "create_at_initiative_start",
+        status: "create_at_feature_start",
         humanInTheLoop: false,
         providerAction: {
           kind: "pull_request_upsert",
@@ -402,9 +402,9 @@ describe("initiative finalization plan", () => {
 });
 
 function projectConfig(options: {
-  finalPullRequestCreation?: "at_initiative_start" | "at_review_gate" | "manual_only";
+  finalPullRequestCreation?: "at_feature_start" | "at_review_gate" | "manual_only";
   branchPublication?: {
-    strategy: "publication_remote" | "fallback_remote" | "publication_remote_then_fallback" | "manual_only";
+    strategy: "push_remote" | "fallback_remote" | "push_remote_then_fallback" | "manual_only";
     fallbackRemote: string | null;
   };
 } = {}): NexusProjectConfig {
@@ -426,7 +426,7 @@ function projectConfig(options: {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -434,20 +434,20 @@ function projectConfig(options: {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
             review: {
-              ...defaultNexusInitiativeDeliveryConfig.review,
+              ...defaultNexusFeatureBranchDeliveryConfig.review,
               finalPullRequestCreation:
                 options.finalPullRequestCreation ??
-                defaultNexusInitiativeDeliveryConfig.review
+                defaultNexusFeatureBranchDeliveryConfig.review
                   .finalPullRequestCreation,
             },
             branchPublication: options.branchPublication ?? {
-              ...defaultNexusInitiativeDeliveryConfig.branchPublication,
+              ...defaultNexusFeatureBranchDeliveryConfig.branchPublication,
             },
           },
           selector: {

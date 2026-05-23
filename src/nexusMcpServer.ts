@@ -4097,7 +4097,7 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
       component.verification.length > 0 ||
       component.publicationDecisions.length > 0 ||
       component.runs.length > 0 ||
-      component.publicationTrain !== null,
+      component.releaseTrain !== null,
   );
   return {
     version: report.version,
@@ -4183,49 +4183,49 @@ export function summarizeTargetReport(report: NexusAutomationTargetReport) {
             integrationPreference: component.publication.integrationPreference,
           }
         : null,
-      publicationTrain: component.publicationTrain
+      releaseTrain: component.releaseTrain
         ? {
-            enabled: component.publicationTrain.enabled,
-            activeVersionId: component.publicationTrain.activeVersionId,
-            activeVersionFound: component.publicationTrain.activeVersionFound,
-            targetBranch: component.publicationTrain.targetBranch,
-            candidateBranch: component.publicationTrain.branches.candidateBranch,
+            enabled: component.releaseTrain.enabled,
+            activeVersionId: component.releaseTrain.activeVersionId,
+            activeVersionFound: component.releaseTrain.activeVersionFound,
+            targetBranch: component.releaseTrain.targetBranch,
+            candidateBranch: component.releaseTrain.branches.candidateBranch,
             integrationBranch:
-              component.publicationTrain.branches.integrationBranch,
-            ciTierDefault: component.publicationTrain.ciTiers.defaultTier,
+              component.releaseTrain.branches.integrationBranch,
+            ciTierDefault: component.releaseTrain.ciTiers.defaultTier,
             fullMatrixBudget:
-              component.publicationTrain.ciTiers.fullMatrixBudget,
-            selectorLabels: component.publicationTrain.selector.labels,
+              component.releaseTrain.ciTiers.fullMatrixBudget,
+            selectorLabels: component.releaseTrain.selector.labels,
             requiresPublicLabel:
-              component.publicationTrain.selector.requiresPublicLabel,
-            initiativeDelivery: component.publicationTrain.initiativeDelivery
+              component.releaseTrain.selector.requiresPublicLabel,
+            featureBranchDelivery: component.releaseTrain.featureBranchDelivery
               ? {
-                  enabled: component.publicationTrain.initiativeDelivery.enabled,
+                  enabled: component.releaseTrain.featureBranchDelivery.enabled,
                   activeScopeId:
-                    component.publicationTrain.initiativeDelivery.activeScopeId,
+                    component.releaseTrain.featureBranchDelivery.activeScopeId,
                   topology:
-                    component.publicationTrain.initiativeDelivery.defaultTopology,
+                    component.releaseTrain.featureBranchDelivery.defaultBranchStrategy,
                   integrationBranch:
-                    component.publicationTrain.initiativeDelivery.branchPlan
+                    component.releaseTrain.featureBranchDelivery.branchPlan
                       .integrationBranch,
-                  sliceBranchPattern:
-                    component.publicationTrain.initiativeDelivery.branchPlan
-                      .sliceBranchPattern,
+                  reviewBranchPattern:
+                    component.releaseTrain.featureBranchDelivery.branchPlan
+                      .reviewBranchPattern,
                   finalPublicationTarget:
-                    component.publicationTrain.initiativeDelivery.branchPlan
+                    component.releaseTrain.featureBranchDelivery.branchPlan
                       .finalPublicationTarget,
                   finalPullRequestCreation:
-                    component.publicationTrain.initiativeDelivery
+                    component.releaseTrain.featureBranchDelivery
                       .finalPullRequestCreation,
-                  providerNoise:
-                    component.publicationTrain.initiativeDelivery.providerNoise,
+                  commentPolicy:
+                    component.releaseTrain.featureBranchDelivery.commentPolicy,
                   branchPublication:
-                    component.publicationTrain.initiativeDelivery
+                    component.releaseTrain.featureBranchDelivery
                       .branchPublication,
                 }
               : null,
-            warningCount: component.publicationTrain.warnings.length,
-            warnings: summaryItems(component.publicationTrain.warnings),
+            warningCount: component.releaseTrain.warnings.length,
+            warnings: summaryItems(component.releaseTrain.warnings),
           }
         : null,
       authority: component.authority

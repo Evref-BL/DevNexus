@@ -17,7 +17,7 @@ export interface NexusInitiativeDeliveryPlanItem {
   componentId: string;
   componentName: string;
   targetBranch: string;
-  publicationTrainVersionId: string | null;
+  releaseTrainVersionId: string | null;
   initiative: NexusInitiativeDeliveryPolicySummary;
 }
 
@@ -53,7 +53,7 @@ export function buildNexusInitiativeDeliveryPlan(options: {
       projectConfig,
       component,
     });
-    if (!train?.initiativeDelivery) {
+    if (!train?.featureBranchDelivery) {
       warnings.push(
         `component ${component.id} has no initiative delivery policy configured`,
       );
@@ -61,8 +61,8 @@ export function buildNexusInitiativeDeliveryPlan(options: {
     }
     if (
       options.initiativeId &&
-      train.initiativeDelivery.activeScopeId !== options.initiativeId &&
-      train.initiativeDelivery.activeInitiativeId !== options.initiativeId
+      train.featureBranchDelivery.activeScopeId !== options.initiativeId &&
+      train.featureBranchDelivery.activeFeatureId !== options.initiativeId
     ) {
       return [];
     }
@@ -70,8 +70,8 @@ export function buildNexusInitiativeDeliveryPlan(options: {
       componentId: component.id,
       componentName: component.name,
       targetBranch: train.targetBranch,
-      publicationTrainVersionId: train.activeVersionId,
-      initiative: train.initiativeDelivery,
+      releaseTrainVersionId: train.activeVersionId,
+      initiative: train.featureBranchDelivery,
     }];
   });
   if (items.length === 0 && options.initiativeId) {

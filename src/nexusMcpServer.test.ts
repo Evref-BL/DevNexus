@@ -7,7 +7,7 @@ import {
   callDevNexusMcpTool,
   createLocalWorkTrackerProvider,
   defaultNexusAutomationConfig,
-  defaultNexusInitiativeDeliveryConfig,
+  defaultNexusFeatureBranchDeliveryConfig,
   defaultLocalWorkTrackingStorePath,
   devNexusCoreMcpToolNames,
   handleDevNexusMcpJsonRpcMessage,
@@ -171,7 +171,7 @@ function initiativeProjectConfig(): NexusProjectConfig {
         ...defaultNexusAutomationConfig.publication,
         strategy: "green_main",
         targetBranch: "main",
-        publicationTrain: {
+        releaseTrain: {
           enabled: true,
           activeVersionId: "v-next",
           branchNaming: {
@@ -179,11 +179,11 @@ function initiativeProjectConfig(): NexusProjectConfig {
             candidatePrefix: "candidate",
             unscopedName: "manual",
           },
-          initiativeDelivery: {
-            ...defaultNexusInitiativeDeliveryConfig,
+          featureBranchDelivery: {
+            ...defaultNexusFeatureBranchDeliveryConfig,
             enabled: true,
-            activeInitiativeId: "codex-goals",
-            defaultTopology: "hybrid",
+            activeFeatureId: "codex-goals",
+            defaultBranchStrategy: "hybrid",
           },
           selector: {
             statuses: ["ready"],
@@ -521,7 +521,7 @@ describe("DevNexus MCP server", () => {
             componentId: "primary",
             initiative: {
               activeScopeId: "codex-goals",
-              defaultTopology: "hybrid",
+              defaultBranchStrategy: "hybrid",
               branchPlan: {
                 integrationBranch: "feat/codex-goals",
                 finalPublicationTarget: "main",
