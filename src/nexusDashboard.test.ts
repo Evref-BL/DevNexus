@@ -1151,6 +1151,9 @@ describe("nexus dashboard", () => {
     expect(module).toContain("/api/local/app-icon?app=");
     expect(module).toContain("dn-app-icon-img");
     expect(module).toContain(".dn-header-path-menu { flex: 0 1 auto; width: fit-content; min-width: min(100%, 320px); max-width: min(100%, 520px); }");
+    expect(module).toContain("@media (max-width: 860px) { .dn-header { grid-template-columns: 1fr; } .dn-header-actions { justify-content: flex-end; width: 100%; } .dn-header-strip { width: 100%; } }");
+    expect(module).toContain("@media (max-width: 560px) { .dn-header-actions { justify-content: stretch; } .dn-header-strip { justify-content: stretch; } .dn-header-path-menu { width: 100%; max-width: 100%; } }");
+    expect(module).not.toContain(".dn-header-strip, .dn-header-path-menu { width: 100%; }");
     expect(module).toContain("Finder");
     expect(module).toContain("VS Code");
     expect(module).toContain("Terminal");
