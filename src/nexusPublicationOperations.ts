@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import type { NexusAutomationPublicationConfig } from "./nexusAutomationConfig.js";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
   buildNexusFeatureBranchDeliveryPlan,
 } from "./nexusFeatureBranchDeliveryPlan.js";
@@ -736,10 +737,14 @@ function publicationBranchPushWarnings(options: {
 }
 
 function gitConfigValue(repositoryPath: string, key: string): string | null {
-  const result = spawnSync("git", ["config", "--get", key], {
-    cwd: repositoryPath,
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    resolveNexusCommandPath("git"),
+    ["config", "--get", key],
+    {
+      cwd: repositoryPath,
+      encoding: "utf8",
+    },
+  );
   if (result.status !== 0) {
     return null;
   }

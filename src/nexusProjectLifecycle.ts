@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
   loadProjectConfig,
   normalizeComponentWorkTrackers,
@@ -312,7 +313,7 @@ export function defaultProjectGitRunner(
   args: readonly string[],
   cwd?: string,
 ): ProjectGitCommandResult {
-  const result = spawnSync("git", [...args], {
+  const result = spawnSync(resolveNexusCommandPath("git"), [...args], {
     cwd,
     encoding: "utf8",
     shell: false,

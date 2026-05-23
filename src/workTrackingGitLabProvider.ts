@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import {
   assertWorkStatus as assertSharedWorkStatus,
   dedupeStrings,
@@ -437,19 +438,24 @@ export function defaultGitLabCredentialRunner(
   request: GitLabCredentialRequest,
   options: { interactive: boolean },
 ): GitLabCredentialCommandResult {
-  const result = spawnSync("git", ["credential", "fill"], {
-    input: gitLabCredentialInput(request),
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ...(options.interactive
-        ? {}
-        : {
-            GCM_INTERACTIVE: "0",
-            GIT_TERMINAL_PROMPT: "0",
-          }),
+  const env = {
+    ...process.env,
+    ...(options.interactive
+      ? {}
+      : {
+          GCM_INTERACTIVE: "0",
+          GIT_TERMINAL_PROMPT: "0",
+        }),
+  };
+  const result = spawnSync(
+    resolveNexusCommandPath("git", env),
+    ["credential", "fill"],
+    {
+      input: gitLabCredentialInput(request),
+      encoding: "utf8",
+      env,
     },
-  });
+  );
 
   return {
     status: result.status,

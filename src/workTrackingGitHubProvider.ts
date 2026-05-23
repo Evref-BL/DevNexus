@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolveNexusCommandPath } from "./nexusCommandPath.js";
 import type {
   CreateWorkItemInput,
   ExternalRef,
@@ -688,20 +689,25 @@ export function defaultGitCredentialRunner(
     env?: Record<string, string | undefined>;
   },
 ): GitCredentialCommandResult {
-  const result = spawnSync("git", ["credential", "fill"], {
-    input: gitCredentialInput(request),
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ...(options.env ?? {}),
-      ...(options.interactive
-        ? {}
-        : {
-            GCM_INTERACTIVE: "0",
-            GIT_TERMINAL_PROMPT: "0",
-          }),
+  const env = {
+    ...process.env,
+    ...(options.env ?? {}),
+    ...(options.interactive
+      ? {}
+      : {
+          GCM_INTERACTIVE: "0",
+          GIT_TERMINAL_PROMPT: "0",
+        }),
+  };
+  const result = spawnSync(
+    resolveNexusCommandPath("git", env),
+    ["credential", "fill"],
+    {
+      input: gitCredentialInput(request),
+      encoding: "utf8",
+      env,
     },
-  });
+  );
 
   return {
     status: result.status,
