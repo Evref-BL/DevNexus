@@ -665,7 +665,8 @@ function assertGreenMainPublicationConfig(
   greenMain: NexusAutomationGreenMainConfig,
   pathName: string,
 ): void {
-  for (const message of greenMainPublicationConfigErrors(value, greenMain, pathName)) {
+  const message = greenMainPublicationConfigErrors(value, greenMain, pathName)[0];
+  if (message !== undefined) {
     throw new NexusAutomationConfigError(message);
   }
 }

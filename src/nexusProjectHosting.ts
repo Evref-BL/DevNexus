@@ -814,7 +814,7 @@ function requiredHostingAuthProfileIds(options: {
     profileIds.add(options.hosting.provisioning.providerMutationAuthProfile);
   }
 
-  return [...profileIds].sort();
+  return [...profileIds].sort((left, right) => left.localeCompare(right));
 }
 
 function authProfileStatus(options: {
